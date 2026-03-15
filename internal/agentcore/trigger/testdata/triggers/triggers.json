@@ -1,0 +1,30 @@
+{
+  "triggers": {},
+  "runs": {},
+  "events": [
+    {
+      "id": "evt_a0721180",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-03-15T14:29:08.0449573+08:00",
+      "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_630847c5",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-03-15T16:25:32.0962577+08:00",
+      "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_3eeb5bd1",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-03-15T16:26:42.9525291+08:00",
+      "message": "Trigger created: Test Trigger"
+    }
+  ]
+}

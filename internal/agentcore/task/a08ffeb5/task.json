@@ -1,0 +1,28 @@
+{
+  "id": "a08ffeb5",
+  "title": "Test Task",
+  "description": "Test description",
+  "status": "running",
+  "steps": [
+    {
+      "id": 0,
+      "action": "Step 1",
+      "skill_name": "",
+      "status": "done",
+      "result": "Step 1 result",
+      "started_at": "2026-03-15T15:53:36.9721187+08:00",
+      "done_at": "2026-03-15T15:53:36.9721187+08:00"
+    },
+    {
+      "id": 1,
+      "action": "Step 2",
+      "skill_name": "",
+      "status": "failed",
+      "error": "step failed",
+      "done_at": "2026-03-15T15:53:36.9721187+08:00"
+    }
+  ],
+  "tenant_id": "tenant-1",
+  "created_at": "2026-03-15T15:53:36.9716142+08:00",
+  "updated_at": "2026-03-15T15:53:36.9721187+08:00"
+}
