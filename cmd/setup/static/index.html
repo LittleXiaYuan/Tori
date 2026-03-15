@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yunque Agent - Setup</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#000;--bg-card:#0a0a0a;--bg-hover:#141414;--border:#1f1f1f;--text:#fafafa;--text-muted:#737373;--accent:#fff;--accent-hover:#e5e5e5}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{width:100%;max-width:520px;padding:24px}
+
+.logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:36px}
+.logo-mark{width:28px;height:28px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.logo-text{font-size:15px;font-weight:600;letter-spacing:-.02em}
+
+.stepper{display:flex;gap:3px;margin-bottom:28px}
+.step-dot{flex:1;height:2px;border-radius:1px;background:var(--border);transition:background .3s}
+.step-dot.active{background:var(--text-muted)}
+.step-dot.done{background:var(--text)}
+
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:12px}
+.card h2{font-size:16px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px}
+.card .sub{color:var(--text-muted);font-size:13px;margin-bottom:24px}
+
+.field{margin-bottom:18px}
+.field label{display:block;font-size:12px;font-weight:500;margin-bottom:5px;color:var(--text-muted)}
+.field label .req{color:var(--text-muted);opacity:.7}
+.field .hint{font-size:11px;color:var(--text-muted);opacity:.7;margin-top:3px}
+input[type="text"],input[type="password"]{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s;font-family:inherit}
+input:focus{border-color:var(--text-muted)}
+input::placeholder{color:var(--text-muted);opacity:.5}
+
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+.btn{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--accent);color:var(--bg)}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--text-muted);color:var(--text)}
+
+.check-list{list-style:none}
+.check-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.check-item:last-child{border-bottom:none}
+.ci-icon{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ci-icon svg{width:14px;height:14px}
+.ci-label{flex:1}
+.ci-status{font-size:11px;color:var(--text-muted)}
+.check-item.pass .ci-icon{color:var(--text)}
+.check-item.fail .ci-icon{color:var(--text-muted)}
+.check-item.warn .ci-icon{color:var(--text-muted)}
+
+.features{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px}
+.feat{background:var(--bg-hover);border:1px solid var(--border);border-radius:10px;padding:16px}
+.feat .fi{margin-bottom:8px;color:var(--text-muted)}
+.feat .fi svg{width:18px;height:18px}
+.feat .ft{font-size:13px;font-weight:500}
+.feat .fd{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+.done-box{text-align:center;padding:16px 0}
+.done-box .big-icon{margin-bottom:12px;color:var(--text-muted)}
+.done-box .big-icon svg{width:40px;height:40px}
+.cmd-block{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin:12px auto;display:inline-block;font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--text)}
+
+.review-table{width:100%;font-size:12px}
+.review-table tr{border-bottom:1px solid var(--border)}
+.review-table td{padding:7px 0;vertical-align:top}
+.review-table td:first-child{color:var(--text-muted);width:120px;white-space:nowrap}
+.review-table td:last-child{word-break:break-all}
+.muted{color:var(--text-muted);font-style:italic}
+.err-msg{color:var(--text-muted);font-size:12px;margin-top:6px;display:none;border-left:2px solid var(--text-muted);padding-left:8px}
+
+[hidden]{display:none!important}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning svg{animation:spin .8s linear infinite}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <div class="logo-mark">Y</div>
+    <span class="logo-text">Yunque Agent Setup</span>
+  </div>
+  <div class="stepper" id="stepper"></div>
+
+  <!-- Step 0: Welcome -->
+  <div class="card step" data-step="0">
+    <h2>Welcome</h2>
+    <p class="sub">只需几步完成配置，即可启动你的 AI Agent</p>
+    <div class="features">
+      <div class="feat"><div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></div><div class="ft">智能对话</div><div class="fd">接入主流大模型 API</div></div>
+      <div class="feat"><div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="ft">长期记忆</div><div class="fd">自动提取和保存事实</div></div>
+      <div class="feat"><div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div><div class="ft">插件系统</div><div class="fd">可扩展的技能框架</div></div>
+      <div class="feat"><div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg></div><div class="ft">多渠道</div><div class="fd">Telegram / 飞书接入</div></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="go(1)">Start</button>
+    </div>
+  </div>
+
+  <!-- Step 1: Core -->
+  <div class="card step" data-step="1" hidden>
+    <h2>Model Configuration</h2>
+    <p class="sub">大模型 API 连接信息</p>
+    <div class="field">
+      <label>API Key <span class="req">*</span></label>
+      <input type="password" id="f-key" placeholder="sk-xxxxxxxx">
+      <div class="hint">从 GitCode AI / OpenAI / 其他兼容平台获取</div>
+    </div>
+    <div class="field">
+      <label>Base URL</label>
+      <input type="text" id="f-url" value="https://api-ai.gitcode.com/v1">
+      <div class="hint">OpenAI 兼容接口地址</div>
+    </div>
+    <div class="field">
+      <label>Model</label>
+      <input type="text" id="f-model" value="zai-org/GLM-5">
+    </div>
+    <div class="field">
+      <label>Listen Address</label>
+      <input type="text" id="f-addr" value=":9090">
+      <div class="hint">Agent HTTP 服务监听端口</div>
+    </div>
+    <div class="err-msg" id="err1"></div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="go(0)">Back</button>
+      <button class="btn btn-primary" onclick="v1()">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Multi-Model (Phase F) -->
+  <div class="card step" data-step="2" hidden>
+    <h2>Multi-Model Pool</h2>
+    <p class="sub">可选：配置快速/专家模型实现智能路由</p>
+    <div class="field">
+      <label>Fast Model (轻量任务)</label>
+      <input type="text" id="f-fast-model" placeholder="e.g. zai-org/GLM-4-Flash">
+      <div class="hint">用于分类、摘要等轻量任务，留空使用主模型</div>
+    </div>
+    <div class="field">
+      <label>Expert Model (复杂任务)</label>
+      <input type="text" id="f-expert-model" placeholder="e.g. zai-org/GLM-4-Plus">
+      <div class="hint">用于复杂推理、代码生成等，留空使用主模型</div>
+    </div>
+    <div class="field">
+      <label>Heartbeat (心跳自检)</label>
+      <select id="f-heartbeat" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px">
+        <option value="">Disabled</option>
+        <option value="true">Enabled (每30分钟自检)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Self-Iterate (受控自我迭代)</label>
+      <select id="f-iterate" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px">
+        <option value="">Disabled</option>
+        <option value="true">Enabled (需人工批准)</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="go(1)">Back</button>
+      <button class="btn btn-primary" onclick="go(3)">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Channels -->
+  <div class="card step" data-step="3" hidden>
+    <h2>Channels</h2>
+    <p class="sub">可选的消息渠道，不需要的留空即可</p>
+    <div class="field">
+      <label>Telegram Bot Token</label>
+      <input type="text" id="f-tg" placeholder="Leave empty to skip">
+      <div class="hint">从 @BotFather 获取</div>
+    </div>
+    <div class="field">
+      <label>Discord Bot Token</label>
+      <input type="text" id="f-discord" placeholder="Leave empty to skip">
+      <div class="hint">从 Discord Developer Portal 获取</div>
+    </div>
+    <div class="field">
+      <label>Feishu App ID</label>
+      <input type="text" id="f-fsid" placeholder="Leave empty to skip">
+    </div>
+    <div class="field">
+      <label>Feishu App Secret</label>
+      <input type="password" id="f-fss" placeholder="Leave empty to skip">
+    </div>
+    <div class="field">
+      <label>Slack Bot Token</label>
+      <input type="text" id="f-slack" placeholder="Leave empty to skip">
+      <div class="hint">xoxb-xxxx 格式</div>
+    </div>
+    <div class="field">
+      <label>Slack Signing Secret</label>
+      <input type="password" id="f-slacksecret" placeholder="Leave empty to skip">
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="go(2)">Back</button>
+      <button class="btn btn-primary" onclick="go(4)">Next</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Review -->
+  <div class="card step" data-step="4" hidden>
+    <h2>Review</h2>
+    <p class="sub">确认以下配置是否正确</p>
+    <table class="review-table"><tbody id="rv"></tbody></table>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="go(3)">Back</button>
+      <button class="btn btn-primary" id="btn-save" onclick="save()">Save &amp; Verify</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Done -->
+  <div class="card step" data-step="5" hidden>
+    <div class="done-box">
+      <div class="big-icon" id="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinning-target"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+      <h2 id="d-title">Saving...</h2>
+      <p id="d-sub" style="color:var(--text-muted);font-size:13px;line-height:1.6;margin-top:8px"></p>
+    </div>
+    <ul class="check-list" id="checks"></ul>
+    <div class="actions" id="d-act" hidden>
+      <button class="btn btn-primary" id="d-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STEPS=6;
+const IC={
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  spin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 10 11 15 8 12"/></svg>'
+};
+
+function go(n){
+  if(n===3)review();
+  document.querySelectorAll('.step').forEach(el=>{el.hidden=true});
+  document.querySelector('[data-step="'+n+'"]').hidden=false;
+  let s=document.getElementById('stepper');s.innerHTML='';
+  for(let i=0;i<STEPS;i++){let d=document.createElement('div');d.className='step-dot'+(i<n?' done':i===n?' active':'');s.appendChild(d)}
+}
+
+function v1(){
+  let key=document.getElementById('f-key').value.trim(),e=document.getElementById('err1');
+  if(!key){e.textContent='API Key is required';e.style.display='block';return}
+  if(key.length<8){e.textContent='API Key seems too short';e.style.display='block';return}
+  e.style.display='none';go(2);
+}
+
+function gv(id){return document.getElementById(id).value.trim()}
+function cfg(){
+  return{LLM_API_KEY:gv('f-key'),LLM_BASE_URL:gv('f-url'),LLM_MODEL:gv('f-model'),AGENT_ADDR:gv('f-addr'),LLM_FAST_MODEL:gv('f-fast-model'),LLM_EXPERT_MODEL:gv('f-expert-model'),HEARTBEAT_ENABLED:gv('f-heartbeat'),SELF_ITERATE_ENABLED:gv('f-iterate'),TELEGRAM_BOT_TOKEN:gv('f-tg'),DISCORD_BOT_TOKEN:gv('f-discord'),FEISHU_APP_ID:gv('f-fsid'),FEISHU_APP_SECRET:gv('f-fss'),SLACK_BOT_TOKEN:gv('f-slack'),SLACK_SIGNING_SECRET:gv('f-slacksecret')};
+}
+
+function review(){
+  let c=cfg(),rv=document.getElementById('rv');rv.innerHTML='';
+  let labels={LLM_API_KEY:'API Key',LLM_BASE_URL:'Base URL',LLM_MODEL:'Model',AGENT_ADDR:'Address',LLM_FAST_MODEL:'Fast Model',LLM_EXPERT_MODEL:'Expert Model',HEARTBEAT_ENABLED:'Heartbeat',SELF_ITERATE_ENABLED:'Self-Iterate',TELEGRAM_BOT_TOKEN:'Telegram',DISCORD_BOT_TOKEN:'Discord',FEISHU_APP_ID:'Feishu ID',FEISHU_APP_SECRET:'Feishu Secret',SLACK_BOT_TOKEN:'Slack',SLACK_SIGNING_SECRET:'Slack Secret'};
+  let secrets=['LLM_API_KEY','FEISHU_APP_SECRET','SLACK_SIGNING_SECRET'];
+  for(let k of Object.keys(labels)){
+    let v=c[k]||'';let display=v;
+    if(secrets.includes(k)&&v)display='****'+v.slice(-4);
+    let tr=document.createElement('tr');
+    tr.innerHTML='<td>'+labels[k]+'</td><td>'+(v?display:'<span class="muted">not set</span>')+'</td>';
+    rv.appendChild(tr);
+  }
+}
+
+async function save(){
+  go(4);
+  let cl=document.getElementById('checks');cl.innerHTML='';
+  let items=['Save configuration','Create directories','Setup persona','Test API connection'];
+  items.forEach((t,i)=>{
+    let li=document.createElement('li');li.className='check-item';li.id='ck-'+i;
+    li.innerHTML='<span class="ci-icon spinning">'+IC.spin+'</span><span class="ci-label">'+t+'</span><span class="ci-status"></span>';
+    cl.appendChild(li);
+  });
+
+  try{
+    let res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg())});
+    let data=await res.json();
+    data.checks.forEach((c,i)=>{
+      let el=document.getElementById('ck-'+i);if(!el)return;
+      el.className='check-item '+(c.ok?'pass':c.warn?'warn':'fail');
+      el.querySelector('.ci-icon').className='ci-icon';
+      el.querySelector('.ci-icon').innerHTML=c.ok?IC.check:c.warn?IC.warn:IC.x;
+      el.querySelector('.ci-status').textContent=c.msg;
+    });
+    let di=document.getElementById('d-icon'),dt=document.getElementById('d-title'),ds=document.getElementById('d-sub');
+    if(data.success){
+      di.innerHTML=IC.ok;dt.textContent='Setup Complete';
+      ds.innerHTML='<b>Option 1: 直接运行（自动开浏览器）</b><br><span class="cmd-block">go run ./cmd/agent</span><br><br><b>Option 2: Docker</b><br><span class="cmd-block">docker compose --profile lite up -d</span><br><br>Dashboard: <b>http://localhost'+gv('f-addr')+'</b>';
+    }else{
+      di.innerHTML=IC.warn;dt.textContent='Saved with warnings';
+      ds.innerHTML='.env 已生成，修正警告后启动：<br><br><span class="cmd-block">go run ./cmd/agent</span><br>或 <span class="cmd-block">docker compose --profile lite up -d</span>';
+    }
+    document.getElementById('d-act').hidden=false;
+    document.getElementById('d-btn').onclick=()=>{fetch('/api/shutdown');window.close()};
+  }catch(e){
+    document.getElementById('d-icon').innerHTML=IC.x;
+    document.getElementById('d-title').textContent='Save failed';
+    document.getElementById('d-sub').textContent=e.message;
+  }
+}
+
+go(0);
+</script>
+</body>
+</html>
