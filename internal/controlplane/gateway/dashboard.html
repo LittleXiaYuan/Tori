@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yunque Agent</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--dim:#64748b;--blue:#60a5fa;--purple:#a78bfa;--green:#6ee7b7;--yellow:#fcd34d;--red:#fca5a5;--r:10px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.side{width:210px;min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:20}
+.main{margin-left:210px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.top{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
+.cnt{padding:20px;flex:1}
+.logo{padding:16px 18px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.logo h1{font-size:17px;font-weight:700;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo small{font-size:10px;color:var(--dim)}
+.ng{margin-bottom:4px}
+.nl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);padding:10px 18px 4px;font-weight:600}
+.ni{display:block;padding:7px 18px;cursor:pointer;color:var(--muted);font-size:13px;transition:all .15s;border-left:3px solid transparent;text-decoration:none}
+.ni:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.ni.a{color:var(--blue);background:rgba(96,165,250,.06);border-left-color:var(--blue)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px;transition:border-color .2s}
+.card:hover{border-color:var(--blue)}
+.card h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:6px}
+.card .v{font-size:26px;font-weight:700;color:#f1f5f9}
+.card .s{font-size:11px;color:var(--muted);margin-top:3px}
+.sec{margin-bottom:24px}
+.sec h2{font-size:15px;font-weight:600;margin-bottom:12px;color:#f1f5f9;display:flex;align-items:center;gap:8px}
+.sec h2::before{content:'';width:3px;height:14px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:2px}
+table{width:100%;border-collapse:collapse;background:var(--bg2);border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
+th{text-align:left;padding:9px 12px;background:var(--bg);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:9px 12px;border-top:1px solid var(--bg);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:500}
+.b-g{background:#064e3b;color:var(--green)}.b-b{background:#1e3a5f;color:#93c5fd}.b-y{background:#422006;color:var(--yellow)}.b-r{background:#450a0a;color:var(--red)}.b-p{background:#2e1065;color:var(--purple)}
+.btn{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;font-size:11px;transition:all .15s;font-family:inherit}
+.btn:hover{background:var(--bg3);border-color:var(--blue)}.btn-p{background:#2563eb;border-color:#2563eb;color:#fff}.btn-p:hover{background:#1d4ed8}.btn-d{background:#dc2626;border-color:#dc2626;color:#fff}.btn-d:hover{background:#b91c1c}.btn:disabled{opacity:.4;cursor:not-allowed}
+input[type="text"],input[type="password"],input[type="date"],textarea,select{padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;outline:none;transition:border-color .2s;font-family:inherit;width:100%}
+input:focus,textarea:focus{border-color:var(--blue)}input::placeholder,textarea::placeholder{color:var(--dim)}textarea{resize:vertical;min-height:60px}
+.cha{height:380px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.msg{padding:8px 12px;margin:5px 0;border-radius:8px;max-width:85%;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg-u{background:#1e3a5f;margin-left:auto;text-align:right}.msg-b{background:var(--bg2);border:1px solid var(--border)}
+.cbar{display:flex;gap:8px}.cbar input{flex:1}
+.pnl{display:none}.pnl.a{display:block}
+.sbar{display:flex;gap:8px;margin-bottom:14px}.sbar input{flex:1}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}.dot-g{background:#22c55e}.dot-y{background:#eab308}.dot-r{background:#ef4444}
+.ld{text-align:center;padding:28px;color:var(--dim)}.empty{text-align:center;padding:36px;color:var(--dim);font-size:12px}
+code{font-family:'SF Mono','Fira Code',monospace;font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+@media(max-width:768px){.side{width:56px;overflow:hidden}.side .nl,.side .logo small,.side .ni-txt{display:none}.logo h1{font-size:13px}.main{margin-left:56px}}
+</style>
+</head>
+<body>
+<nav class="side">
+<div class="logo"><h1>云雀 Agent</h1><small id="ver">v0.1.0</small></div>
+<div class="ng"><div class="nl">Core</div>
+<a class="ni a" data-n="overview" onclick="go('overview')"><span class="ni-txt">Overview</span></a>
+<a class="ni" data-n="chat" onclick="go('chat')"><span class="ni-txt">Chat</span></a></div>
+<div class="ng"><div class="nl">Skills</div>
+<a class="ni" data-n="skills" onclick="go('skills')"><span class="ni-txt">Skills</span></a>
+<a class="ni" data-n="plugins" onclick="go('plugins')"><span class="ni-txt">Plugins</span></a>
+<a class="ni" data-n="skillhub" onclick="go('skillhub')"><span class="ni-txt">SkillHub</span></a></div>
+<div class="ng"><div class="nl">Data</div>
+<a class="ni" data-n="memory" onclick="go('memory')"><span class="ni-txt">Memory</span></a>
+<a class="ni" data-n="knowledge" onclick="go('knowledge')"><span class="ni-txt">Knowledge</span></a></div>
+<div class="ng"><div class="nl">Governance</div>
+<a class="ni" data-n="trust" onclick="go('trust')"><span class="ni-txt">Trust</span></a>
+<a class="ni" data-n="iterate" onclick="go('iterate')"><span class="ni-txt">Self-Iterate</span></a>
+<a class="ni" data-n="audit" onclick="go('audit')"><span class="ni-txt">Audit</span></a></div>
+<div class="ng"><div class="nl">System</div>
+<a class="ni" data-n="system" onclick="go('system')"><span class="ni-txt">System</span></a></div>
+</nav>
+
+<div class="main">
+<div class="top">
+<div style="flex:1;font-size:13px;font-weight:500" id="title">Overview</div>
+<span style="font-size:11px;display:flex;align-items:center;gap:5px" id="conn"><span class="dot dot-r"></span>未连接</span>
+<input type="password" id="ak" placeholder="API Key" style="width:220px">
+<button class="btn btn-p" onclick="doConnect()">Connect</button>
+</div>
+<div class="cnt">
+
+<!-- Overview -->
+<div class="pnl a" id="p-overview">
+<div class="grid" id="ov-grid"><div class="ld">Loading...</div></div>
+<div class="sec"><h2>Health</h2><div id="ov-health" class="card" style="font-size:12px">Loading...</div></div>
+</div>
+
+<!-- Chat -->
+<div class="pnl" id="p-chat">
+<div class="cha" id="chat-msgs"></div>
+<div class="cbar">
+<input type="text" id="chat-in" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendChat()">
+<select id="chat-mode" style="width:100px"><option value="normal">Normal</option><option value="stream">Stream</option></select>
+<button class="btn btn-p" onclick="sendChat()">Send</button>
+</div>
+</div>
+
+<!-- Skills -->
+<div class="pnl" id="p-skills">
+<div class="sec"><h2>Registered Skills</h2>
+<table><thead><tr><th>Name</th><th>Description</th><th>Parameters</th></tr></thead><tbody id="sk-tb"><tr><td colspan="3" class="ld">Loading...</td></tr></tbody></table>
+</div></div>
+
+<!-- Plugins -->
+<div class="pnl" id="p-plugins">
+<div class="sec"><h2>Plugin Registry</h2>
+<table><thead><tr><th>Name</th><th>Description</th><th>Status</th><th>Action</th></tr></thead><tbody id="pl-tb"><tr><td colspan="4" class="ld">Loading...</td></tr></tbody></table>
+</div></div>
+
+<!-- SkillHub -->
+<div class="pnl" id="p-skillhub">
+<div class="sbar"><input type="text" id="sh-q" placeholder="Search skills..." onkeydown="if(event.key==='Enter')searchHub()"><button class="btn btn-p" onclick="searchHub()">Search</button></div>
+<div class="sec"><h2>Search Results</h2><div id="sh-res" class="empty">Enter a query to search</div></div>
+<div class="sec"><h2>Installed Skills</h2><div id="sh-inst"></div></div>
+<div class="sec"><h2>Trending</h2><div id="sh-trend"></div></div>
+</div>
+
+<!-- Memory -->
+<div class="pnl" id="p-memory">
+<div class="grid" id="mem-grid"></div>
+<div class="sec"><h2>Search Memory</h2>
+<div class="sbar"><input type="text" id="mem-q" placeholder="Search..." onkeydown="if(event.key==='Enter')searchMem()"><button class="btn btn-p" onclick="searchMem()">Search</button></div>
+<div id="mem-res"></div></div>
+<div class="sec"><h2>Add Memory</h2>
+<div class="row"><input type="text" id="mem-k" placeholder="Key" style="flex:1"><input type="text" id="mem-v" placeholder="Value" style="flex:2"><button class="btn btn-p" onclick="addMem()">Add</button></div>
+</div></div>
+
+<!-- Trust -->
+<div class="pnl" id="p-trust">
+<div class="sec"><h2>Progressive Trust Scores</h2>
+<table><thead><tr><th>Skill</th><th>Score</th><th>Level</th><th>Action</th></tr></thead><tbody id="tr-tb"><tr><td colspan="4" class="ld">Loading...</td></tr></tbody></table>
+</div></div>
+
+<!-- Iterate -->
+<div class="pnl" id="p-iterate">
+<div class="grid" id="it-grid"></div>
+<div class="row"><button class="btn btn-p" onclick="triggerIter()">Trigger Iteration</button></div>
+<div class="sec"><h2>Proposals</h2><div id="it-props"></div></div>
+</div>
+
+<!-- Audit -->
+<div class="pnl" id="p-audit">
+<div class="sbar"><input type="date" id="au-date"><button class="btn btn-p" onclick="loadAudit()">Load</button></div>
+<div class="grid" id="au-stats"></div>
+<div class="sec"><h2>Records</h2><div id="au-recs"></div></div>
+</div>
+
+<!-- Knowledge -->
+<div class="pnl" id="p-knowledge">
+<div class="grid" id="kb-grid"></div>
+<div class="sec"><h2>Search</h2>
+<div class="sbar"><input type="text" id="kb-q" placeholder="Search knowledge base..." onkeydown="if(event.key==='Enter')searchKB()"><button class="btn btn-p" onclick="searchKB()">Search</button></div>
+<div id="kb-res"></div></div>
+<div class="sec"><h2>Sources</h2><div id="kb-src"></div></div>
+<div class="sec"><h2>Upload</h2>
+<div class="row"><input type="file" id="kb-file" accept=".txt,.md,.csv,.json" style="border:none;padding:0"><button class="btn btn-p" onclick="uploadKB()">Upload</button></div>
+</div></div>
+
+<!-- System -->
+<div class="pnl" id="p-system">
+<div class="grid" id="sys-grid"></div>
+<div class="sec"><h2>API Endpoints</h2>
+<table><thead><tr><th>Method</th><th>Path</th><th>Auth</th></tr></thead><tbody id="ep-tb"></tbody></table>
+</div></div>
+
+</div></div>
+
+<script>
+let KEY=localStorage.getItem('yunque_key')||'';
+let CUR='overview';
+const TITLES={overview:'Overview',chat:'Chat',skills:'Skills',plugins:'Plugins',skillhub:'SkillHub',memory:'Memory',knowledge:'Knowledge',trust:'Trust Scores',iterate:'Self-Iterate',audit:'Audit Trail',system:'System'};
+
+async function api(p,o={}){
+  const h={'Content-Type':'application/json'};
+  if(KEY)h['X-API-Key']=KEY;
+  const r=await fetch(p,Object.assign({},o,{headers:Object.assign({},h,o.headers||{})}));
+  if(r.status===401)throw new Error('unauthorized');
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function card(t,v,s){return '<div class="card"><h3>'+esc(t)+'</h3><div class="v">'+esc(v)+'</div><div class="s">'+esc(s)+'</div></div>'}
+
+function go(n){
+  CUR=n;
+  document.querySelectorAll('.pnl').forEach(function(p){p.classList.remove('a')});
+  document.querySelectorAll('.ni').forEach(function(i){i.classList.remove('a')});
+  var el=document.getElementById('p-'+n);if(el)el.classList.add('a');
+  var nav=document.querySelector('[data-n="'+n+'"]');if(nav)nav.classList.add('a');
+  document.getElementById('title').textContent=TITLES[n]||n;
+  var fn=LOADERS[n];if(fn)fn();
+}
+
+function doConnect(){
+  KEY=document.getElementById('ak').value.trim();
+  if(KEY){localStorage.setItem('yunque_key',KEY);setConn(true);go(CUR)}
+}
+function setConn(ok){
+  document.getElementById('conn').innerHTML='<span class="dot '+(ok?'dot-g':'dot-r')+'"></span>'+(ok?'已连接':'未连接');
+}
+
+// === LOADERS ===
+var LOADERS={};
+
+LOADERS.overview=async function(){
+  var g=document.getElementById('ov-grid');
+  try{
+    var s=await api('/v1/system/stats');
+    g.innerHTML=[
+      card('Requests',s.requests_total||0,'Total API calls'),
+      card('Tenants',s.tenants||0,'Registered'),
+      card('Skills',s.skills||0,'Available'),
+      card('Plugins',s.plugins||0,'Registered'),
+      card('Sessions',s.conversations||0,'Active'),
+      card('Scheduler',s.scheduler_jobs||0,'Jobs')
+    ].join('');
+  }catch(e){g.innerHTML='<div class="empty">Stats unavailable — connect first</div>'}
+  var h=document.getElementById('ov-health');
+  try{
+    var d=await fetch('/healthz').then(function(r){return r.json()});
+    var dot=d.status==='ok'?'dot-g':d.status==='degraded'?'dot-y':'dot-r';
+    h.innerHTML='<div class="row"><span class="dot '+dot+'"></span><b>'+esc(d.status)+'</b> &nbsp; Breaker: <span class="badge b-b">'+esc(d.breaker_state)+'</span> &nbsp; Uptime: '+Math.floor((d.uptime_sec||0)/60)+'m</div>';
+  }catch(e){h.innerHTML='<span style="color:var(--dim)">Health check failed</span>'}
+};
+
+LOADERS.skills=async function(){
+  var tb=document.getElementById('sk-tb');
+  try{
+    var d=await api('/v1/skills');
+    var sk=d.skills||[];
+    if(!sk.length){tb.innerHTML='<tr><td colspan="3" class="empty">No skills registered</td></tr>';return}
+    tb.innerHTML=sk.map(function(s){return '<tr><td><span class="badge b-b">'+esc(s.name)+'</span></td><td>'+esc(s.description)+'</td><td><code>'+esc(JSON.stringify((s.parameters||{}).required||[]))+'</code></td></tr>'}).join('');
+  }catch(e){tb.innerHTML='<tr><td colspan="3" class="empty">'+esc(e.message)+'</td></tr>'}
+};
+
+LOADERS.plugins=async function(){
+  var tb=document.getElementById('pl-tb');
+  try{
+    var d=await api('/v1/plugins');
+    if(!d||!d.length){tb.innerHTML='<tr><td colspan="4" class="empty">No plugins</td></tr>';return}
+    tb.innerHTML=d.map(function(p){return '<tr><td>'+esc(p.name)+'</td><td>'+esc(p.description||'-')+'</td><td><span class="badge '+(p.enabled?'b-g':'b-r')+'">'+(p.enabled?'Enabled':'Disabled')+'</span></td><td><button class="btn" onclick="togglePlugin(\''+esc(p.name)+'\','+(!p.enabled)+')">'+(p.enabled?'Disable':'Enable')+'</button></td></tr>'}).join('');
+  }catch(e){tb.innerHTML='<tr><td colspan="4" class="empty">'+esc(e.message)+'</td></tr>'}
+};
+async function togglePlugin(n,en){
+  await api('/v1/plugins/toggle',{method:'POST',body:JSON.stringify({name:n,enabled:en})});
+  LOADERS.plugins();
+}
+
+LOADERS.skillhub=async function(){
+  var inst=document.getElementById('sh-inst');
+  try{
+    var d=await api('/api/skillhub/installed');
+    var sk=d.skills||[];
+    if(!sk.length){inst.innerHTML='<div class="empty">No installed skills</div>';return}
+    inst.innerHTML='<table><thead><tr><th>Name</th><th>Version</th><th>Action</th></tr></thead><tbody>'+sk.map(function(s){return '<tr><td>'+esc(s.name||s.slug)+'</td><td>'+esc(s.version||'-')+'</td><td><button class="btn btn-d" onclick="uninstallSkill(\''+esc(s.slug||s.name)+'\')">Uninstall</button></td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){inst.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  try{
+    var t=await api('/api/skillhub/trending');
+    var tr=document.getElementById('sh-trend');
+    var sk=t.skills||[];
+    if(!sk.length){tr.innerHTML='<div class="empty">No trending data</div>';return}
+    tr.innerHTML='<table><thead><tr><th>Name</th><th>Downloads</th><th>Action</th></tr></thead><tbody>'+sk.map(function(s){return '<tr><td>'+esc(s.name||s.slug)+'</td><td>'+esc(s.downloads||0)+'</td><td><button class="btn btn-p" onclick="installSkill(\''+esc(s.slug||s.name)+'\')">Install</button></td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){document.getElementById('sh-trend').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+};
+async function searchHub(){
+  var q=document.getElementById('sh-q').value.trim();if(!q)return;
+  var el=document.getElementById('sh-res');el.innerHTML='<div class="ld">Searching...</div>';
+  try{
+    var d=await api('/api/skillhub/search?q='+encodeURIComponent(q));
+    var sk=d.skills||[];
+    if(!sk.length){el.innerHTML='<div class="empty">No results</div>';return}
+    el.innerHTML='<table><thead><tr><th>Name</th><th>Description</th><th>Action</th></tr></thead><tbody>'+sk.map(function(s){return '<tr><td>'+esc(s.name||s.slug)+'</td><td>'+esc(s.description||'-')+'</td><td><button class="btn btn-p" onclick="installSkill(\''+esc(s.slug||s.name)+'\')">Install</button></td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function installSkill(slug){
+  try{await api('/api/skillhub/install',{method:'POST',body:JSON.stringify({slug:slug})});LOADERS.skillhub()}catch(e){alert('Install failed: '+e.message)}
+}
+async function uninstallSkill(slug){
+  try{await api('/api/skillhub/uninstall',{method:'POST',body:JSON.stringify({slug:slug})});LOADERS.skillhub()}catch(e){alert('Uninstall failed: '+e.message)}
+}
+
+LOADERS.memory=async function(){
+  var g=document.getElementById('mem-grid');
+  try{
+    var d=await api('/v1/memory/stats');
+    g.innerHTML=[card('Short-term',d.short_term||0,'items'),card('Mid-term',d.mid_term||0,'facts'),card('Long-term',d.long_term||0,'rules')].join('');
+  }catch(e){g.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+};
+async function searchMem(){
+  var q=document.getElementById('mem-q').value.trim();if(!q)return;
+  var el=document.getElementById('mem-res');el.innerHTML='<div class="ld">Searching...</div>';
+  try{
+    var d=await api('/v1/memory/search',{method:'POST',body:JSON.stringify({query:q,limit:20})});
+    var items=d.results||d.items||[];
+    if(!items.length){el.innerHTML='<div class="empty">No results</div>';return}
+    el.innerHTML='<table><thead><tr><th>Key</th><th>Value</th><th>Source</th></tr></thead><tbody>'+items.map(function(i){return '<tr><td><code>'+esc(i.key||'')+'</code></td><td>'+esc(i.value||i.content||'')+'</td><td><span class="badge b-p">'+esc(i.source||'-')+'</span></td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function addMem(){
+  var k=document.getElementById('mem-k').value.trim(),v=document.getElementById('mem-v').value.trim();
+  if(!k||!v)return;
+  try{
+    await api('/v1/memory/add',{method:'POST',body:JSON.stringify({key:k,value:v})});
+    document.getElementById('mem-k').value='';document.getElementById('mem-v').value='';
+    LOADERS.memory();
+  }catch(e){alert('Failed: '+e.message)}
+}
+
+LOADERS.trust=async function(){
+  var tb=document.getElementById('tr-tb');
+  try{
+    var d=await api('/api/trust/scores');
+    var scores=d.scores||[];
+    if(!scores.length){tb.innerHTML='<tr><td colspan="4" class="empty">No trust data yet</td></tr>';return}
+    tb.innerHTML=scores.map(function(s){
+      var lv=s.score<30?'Read-only':s.score<60?'Write':s.score<80?'Network':'Shell';
+      var bc=s.score<30?'b-r':s.score<60?'b-y':s.score<80?'b-b':'b-g';
+      return '<tr><td>'+esc(s.skill||s.slug)+'</td><td><b>'+s.score+'</b></td><td><span class="badge '+bc+'">'+lv+'</span></td><td><button class="btn" onclick="resetTrust(\''+esc(s.skill||s.slug)+'\')">Reset</button></td></tr>'
+    }).join('');
+  }catch(e){tb.innerHTML='<tr><td colspan="4" class="empty">'+esc(e.message)+'</td></tr>'}
+};
+async function resetTrust(skill){
+  try{await api('/api/trust/reset',{method:'POST',body:JSON.stringify({skill:skill})});LOADERS.trust()}catch(e){alert(e.message)}
+}
+
+LOADERS.iterate=async function(){
+  var g=document.getElementById('it-grid');
+  try{
+    var d=await api('/api/iterate/status');
+    g.innerHTML=[card('Status',d.enabled?'Enabled':'Disabled','Engine state'),card('Proposals',d.total_proposals||0,'Total'),card('Approved',d.approved||0,'Applied'),card('Round',d.current_round||0,'Current')].join('');
+  }catch(e){g.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  var el=document.getElementById('it-props');
+  try{
+    var d=await api('/api/iterate/proposals');
+    var props=d.proposals||[];
+    if(!props.length){el.innerHTML='<div class="empty">No proposals</div>';return}
+    el.innerHTML='<table><thead><tr><th>ID</th><th>Type</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+props.map(function(p){
+      var acts=p.status==='pending'?'<button class="btn btn-p" onclick="approveIter(\''+esc(p.id)+'\')">Approve</button> <button class="btn btn-d" onclick="rejectIter(\''+esc(p.id)+'\')">Reject</button>':'';
+      return '<tr><td><code>'+esc((p.id||'').substring(0,8))+'</code></td><td><span class="badge b-b">'+esc(p.type||'-')+'</span></td><td>'+esc(p.description||'-')+'</td><td><span class="badge '+(p.status==='approved'?'b-g':p.status==='rejected'?'b-r':'b-y')+'">'+esc(p.status)+'</span></td><td>'+acts+'</td></tr>'
+    }).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+};
+async function triggerIter(){
+  try{var d=await api('/api/iterate/trigger',{method:'POST'});alert('Triggered: '+(d.message||'OK'))}catch(e){alert(e.message)}
+  LOADERS.iterate();
+}
+async function approveIter(id){try{await api('/api/iterate/approve',{method:'POST',body:JSON.stringify({id:id})});LOADERS.iterate()}catch(e){alert(e.message)}}
+async function rejectIter(id){try{await api('/api/iterate/reject',{method:'POST',body:JSON.stringify({id:id})});LOADERS.iterate()}catch(e){alert(e.message)}}
+
+LOADERS.audit=async function(){
+  var sg=document.getElementById('au-stats');
+  try{
+    var d=await api('/v1/audit/stats');
+    sg.innerHTML=[card('Total Records',d.total||0,'All time'),card('Today',d.today||0,'Records'),card('Chain Length',d.chain_length||0,'Merkle entries')].join('');
+  }catch(e){sg.innerHTML=''}
+  loadAudit();
+};
+async function loadAudit(){
+  var el=document.getElementById('au-recs');
+  var date=document.getElementById('au-date').value;
+  var url='/api/audit/trail';if(date)url+='?date='+date;
+  try{
+    var d=await api(url);
+    var recs=d.records||d.entries||[];
+    if(!recs.length){el.innerHTML='<div class="empty">No records for this date</div>';return}
+    el.innerHTML='<table><thead><tr><th>Time</th><th>Event</th><th>Tenant</th><th>Details</th></tr></thead><tbody>'+recs.slice(0,100).map(function(r){return '<tr><td><code>'+esc(r.timestamp||r.time||'-')+'</code></td><td><span class="badge b-b">'+esc(r.event||r.type||'-')+'</span></td><td>'+esc(r.tenant||'-')+'</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">'+esc(r.detail||r.message||'-')+'</td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+
+LOADERS.knowledge=async function(){
+  var g=document.getElementById('kb-grid');
+  try{
+    var d=await api('/v1/knowledge/stats');
+    g.innerHTML=[card('Sources',d.sources||0,'Files'),card('Chunks',d.chunks||0,'Text segments'),card('Semantic',d.has_embeddings?'Yes':'No','Index')].join('');
+  }catch(e){g.innerHTML=''}
+  var el=document.getElementById('kb-src');
+  try{
+    var d=await api('/v1/knowledge/sources');
+    var src=d.sources||[];
+    if(!src.length){el.innerHTML='<div class="empty">No sources</div>';return}
+    el.innerHTML='<table><thead><tr><th>Name</th><th>Type</th><th>Chunks</th></tr></thead><tbody>'+src.map(function(s){return '<tr><td>'+esc(s.name||s.path||'-')+'</td><td><span class="badge b-b">'+esc(s.type||'-')+'</span></td><td>'+esc(s.chunks||0)+'</td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+};
+async function searchKB(){
+  var q=document.getElementById('kb-q').value.trim();if(!q)return;
+  var el=document.getElementById('kb-res');el.innerHTML='<div class="ld">Searching...</div>';
+  try{
+    var d=await api('/v1/knowledge/search',{method:'POST',body:JSON.stringify({query:q,limit:10})});
+    var chunks=d.chunks||d.results||[];
+    if(!chunks.length){el.innerHTML='<div class="empty">No results</div>';return}
+    el.innerHTML='<table><thead><tr><th>#</th><th>Content</th><th>Source</th><th>Score</th></tr></thead><tbody>'+chunks.map(function(c,i){return '<tr><td>'+(i+1)+'</td><td style="max-width:400px">'+esc(c.content||'')+'</td><td><code>'+esc(c.source||'-')+'</code></td><td>'+((c.score||0)*100).toFixed(0)+'%</td></tr>'}).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function uploadKB(){
+  var f=document.getElementById('kb-file').files[0];if(!f)return;
+  var fd=new FormData();fd.append('file',f);
+  var h={};if(KEY)h['X-API-Key']=KEY;
+  try{
+    await fetch('/v1/knowledge/upload',{method:'POST',headers:h,body:fd});
+    document.getElementById('kb-file').value='';LOADERS.knowledge();
+  }catch(e){alert('Upload failed: '+e.message)}
+}
+
+LOADERS.system=async function(){
+  var g=document.getElementById('sys-grid');
+  try{
+    var v=await fetch('/v1/version').then(function(r){return r.json()});
+    var h=await fetch('/healthz').then(function(r){return r.json()});
+    g.innerHTML=[card('Version',v.version||'-','Build'),card('Go',v.go_version||'-','Runtime'),card('OS/Arch',v.os+'/'+v.arch,'Platform'),card('Uptime',Math.floor((h.uptime_sec||0)/60)+'m','Since start'),card('Git',v.git_commit||'-','Commit'),card('Build Date',v.build_date||'-','')].join('');
+  }catch(e){g.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  var EPS=[
+    ['GET','/healthz','No'],['GET','/v1/version','No'],
+    ['POST','/v1/chat','Yes'],['POST','/v1/chat/stream','Yes'],['GET','/v1/ws','Yes'],
+    ['GET','/v1/skills','Yes'],['POST','/v1/tenants','Yes'],['GET','/v1/tenants','Yes'],
+    ['GET','/v1/memory/stats','Yes'],['POST','/v1/memory/search','Yes'],['POST','/v1/memory/add','Yes'],['POST','/v1/memory/compact','Yes'],
+    ['POST','/v1/sandbox/exec','Yes'],['GET','/v1/system/info','Yes'],['GET','/v1/system/stats','Yes'],
+    ['GET','/v1/metrics','Yes'],['GET','/v1/metrics/prometheus','No'],
+    ['GET','/v1/scheduler/jobs','Yes'],['POST','/v1/scheduler/add','Yes'],['POST','/v1/scheduler/remove','Yes'],
+    ['GET','/v1/conversations','Yes'],['GET','/v1/conversations/messages','Yes'],
+    ['POST','/webhook/feishu','No'],
+    ['GET','/v1/plugins','Yes'],['POST','/v1/plugins/toggle','Yes'],['POST','/v1/upload','Yes'],
+    ['POST','/v1/token','API Key'],['GET','/v1/usage','Yes'],['POST','/v1/quota','Yes'],
+    ['GET','/v1/persona','Yes'],['GET','/v1/persona/skills','Yes'],
+    ['GET','/v1/heartbeat','Yes'],['POST','/v1/heartbeat/trigger','Yes'],['GET','/v1/heartbeat/logs','Yes'],
+    ['GET','/v1/inbox','Yes'],['POST','/v1/inbox/read','Yes'],
+    ['GET','/v1/bots','Yes'],['GET','/v1/bots/detail','Yes'],
+    ['GET','/v1/search','Yes'],['GET','/v1/search/providers','Yes'],
+    ['GET','/v1/graph/entities','Yes'],['GET','/v1/graph/relations','Yes'],['GET','/v1/graph/context','Yes'],['GET','/v1/graph/stats','Yes'],
+    ['GET','/v1/router/stats','Yes'],
+    ['GET','/v1/identity/resolve','Yes'],['GET','/v1/identity/profiles','Yes'],
+    ['GET','/v1/cost/summary','Yes'],['POST','/v1/cost/budget','Yes'],
+    ['POST','/v1/fork','Yes'],['GET','/v1/fork/branch','Yes'],['GET','/v1/fork/list','Yes'],
+    ['POST','/v1/embeddings','Yes'],['POST','/v1/subagent','Yes'],['POST','/v1/subagent/message','Yes'],
+    ['GET','/v1/cache/stats','Yes'],
+    ['GET','/v1/audit/tail','Yes'],['GET','/v1/audit/verify','Yes'],['GET','/v1/audit/stats','Yes'],
+    ['GET','/v1/market/search','Yes'],['GET','/v1/market/top','Yes'],['GET','/v1/market/stats','Yes'],
+    ['GET','/v1/federation/peers','Yes'],['GET','/v1/federation/stats','Yes'],
+    ['POST','/v1/knowledge/search','Yes'],['GET','/v1/knowledge/sources','Yes'],['GET','/v1/knowledge/stats','Yes'],['POST','/v1/knowledge/upload','Yes'],['POST','/v1/knowledge/ingest','Yes'],['DELETE','/v1/knowledge/source','Yes'],
+    ['GET','/v1/cron/list','Yes'],['POST','/v1/cron/add','Yes'],['POST','/v1/cron/remove','Yes'],['POST','/v1/cron/run','Yes'],
+    ['POST','/v1/tools/exec','Yes'],['GET','/v1/tools/list','Yes'],['GET','/v1/tools/poll','Yes'],['POST','/v1/tools/kill','Yes'],
+    ['GET','/api/skillhub/search','Yes'],['POST','/api/skillhub/install','Yes'],['GET','/api/skillhub/installed','Yes'],['POST','/api/skillhub/uninstall','Yes'],['GET','/api/skillhub/trending','Yes'],
+    ['GET','/api/iterate/proposals','Yes'],['POST','/api/iterate/approve','Yes'],['POST','/api/iterate/reject','Yes'],['POST','/api/iterate/trigger','Yes'],['GET','/api/iterate/status','Yes'],
+    ['GET','/api/trust/scores','Yes'],['POST','/api/trust/reset','Yes'],
+    ['GET','/api/audit/trail','Yes'],['GET','/api/skillgrow/patterns','Yes'],['GET','/api/review/status','Yes']
+  ];
+  var tb=document.getElementById('ep-tb');
+  tb.innerHTML=EPS.map(function(e){
+    var bc=e[0]==='GET'?'b-g':e[0]==='POST'?'b-b':e[0]==='DELETE'?'b-r':'b-y';
+    return '<tr><td><span class="badge '+bc+'">'+e[0]+'</span></td><td><code>'+e[1]+'</code></td><td>'+e[2]+'</td></tr>'
+  }).join('');
+};
+
+// === CHAT ===
+async function sendChat(){
+  var input=document.getElementById('chat-in');
+  var msg=input.value.trim();if(!msg)return;
+  input.value='';addMsg(msg,'u');
+  var mode=document.getElementById('chat-mode').value;
+  if(mode==='stream'){await streamChat(msg)}else{await normalChat(msg)}
+}
+async function normalChat(msg){
+  addMsg('thinking...','b');
+  try{
+    var d=await api('/v1/chat',{method:'POST',body:JSON.stringify({messages:[{role:'user',content:msg}]})});
+    removeLast();addMsg(d.reply||d.error||JSON.stringify(d),'b');
+  }catch(e){removeLast();addMsg('Error: '+e.message,'b')}
+}
+async function streamChat(msg){
+  var h={'Content-Type':'application/json'};if(KEY)h['X-API-Key']=KEY;
+  var div=addMsg('','b');
+  try{
+    var res=await fetch('/v1/chat/stream',{method:'POST',headers:h,body:JSON.stringify({messages:[{role:'user',content:msg}]})});
+    var reader=res.body.getReader();var dec=new TextDecoder();var text='';
+    while(true){
+      var chunk=await reader.read();if(chunk.done)break;
+      var lines=dec.decode(chunk.value,{stream:true}).split('\n');
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i];
+        if(line.indexOf('data: ')===0){
+          var data=line.substring(6);
+          if(data==='[DONE]')break;
+          try{var obj=JSON.parse(data);text+=(obj.delta||obj.content||obj.text||'')}catch(e2){text+=data}
+          div.textContent=text;
+        }
+      }
+    }
+    if(!text)div.textContent='(empty response)';
+  }catch(e){div.textContent='Stream error: '+e.message}
+  scrollChat();
+}
+function addMsg(t,who){
+  var area=document.getElementById('chat-msgs');
+  var d=document.createElement('div');d.className='msg msg-'+who;d.textContent=t;
+  area.appendChild(d);scrollChat();return d;
+}
+function removeLast(){var a=document.getElementById('chat-msgs');if(a.lastChild)a.removeChild(a.lastChild)}
+function scrollChat(){var a=document.getElementById('chat-msgs');a.scrollTop=a.scrollHeight}
+
+// === INIT ===
+async function init(){
+  if(KEY){document.getElementById('ak').value=KEY;setConn(true)}
+  try{
+    var v=await fetch('/v1/version').then(function(r){return r.json()});
+    document.getElementById('ver').textContent='v'+(v.version||'0.1.0');
+    document.title='Yunque Agent v'+(v.version||'0.1.0');
+  }catch(e){}
+  // Set today as default audit date
+  var now=new Date();var ds=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  document.getElementById('au-date').value=ds;
+  go('overview');
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+package gateway
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"math/rand"
+	"net/http"
+	"time"
+
+	"yunque-agent/internal/agentcore/adaptive"
+	"yunque-agent/internal/agentcore/emotion"
+	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/memory"
+	"yunque-agent/internal/agentcore/persona"
+	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/observe"
+)
+
+// stickerSendProb returns the probability (0-1) of actually sending a sticker for a given frequency level.
+// 0=never, 1=rare(25%), 2=normal(50%), 3=frequent(80%)
+func stickerSendProb(freq float64) float64 {
+	switch {
+	case freq <= 0:
+		return 0
+	case freq <= 1:
+		return 0.25
+	case freq <= 2:
+		return 0.50
+	default:
+		return 0.80
+	}
+}
+
+// mathRandFloat64 returns a random float64 in [0,1). Wraps rand.Float64 for testability.
+var mathRandFloat64 = func() float64 { return rand.Float64() }
+
+func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
+	tid := tenantFromCtx(r.Context())
+	ctx, traceSpan := observe.StartTrace(r.Context(), "gateway.handleChat")
+	traceSpan.Attrs["tenant_id"] = tid
+	traceSpan.Attrs["req_id"] = RequestID(r.Context())
+	r = r.WithContext(ctx)
+	start := time.Now()
+
+	// Quota enforcement
+	if !g.usage.CheckQuota(tid) {
+		apperror.WriteCode(w, apperror.CodeQuotaExceeded, "quota exceeded")
+		return
+	}
+
+	var req struct {
+		Messages  []llm.Message `json:"messages"`
+		SessionID string        `json:"session_id"`
+		TaskID    string        `json:"task_id"`
+		ClassID   string        `json:"class_id"`
+		TeacherID string        `json:"teacher_id"`
+		StudentID string        `json:"student_id"`
+		Platform  string        `json:"platform,omitempty"` // target platform for sticker suggestions (e.g., "line", "telegram")
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
+		return
+	}
+	if len(req.Messages) == 0 {
+		apperror.WriteCode(w, apperror.CodeMessageEmpty, "messages array is required")
+		return
+	}
+	if len(req.Messages) > 100 {
+		apperror.WriteCode(w, apperror.CodeMessageTooMany, "max 100 messages per request")
+		return
+	}
+	for _, m := range req.Messages {
+		if len(m.Content) > 32000 {
+			apperror.WriteCode(w, apperror.CodeMessageTooLong, "max 32000 chars per message")
+			return
+		}
+	}
+
+	// Chinese guardrail pipeline: check input safety
+	if g.zhGuard != nil && len(req.Messages) > 0 {
+		lastMsg := req.Messages[len(req.Messages)-1].Content
+		guardResult := g.zhGuard.Run(r.Context(), lastMsg)
+		if guardResult.Blocked {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "内容安全检查未通过: "+guardResult.Rule)
+			return
+		}
+		// Apply redaction if any
+		if guardResult.Redacted != "" {
+			req.Messages[len(req.Messages)-1].Content = guardResult.Redacted
+		}
+	}
+
+	// Task thread: when task_id is set, use the task's dedicated conversation thread.
+	// This overrides session_id — the task thread becomes the session.
+	var taskContext string
+	if req.TaskID != "" && g.threadMgr != nil {
+		threadSID := g.threadMgr.Ensure(req.TaskID, tid)
+		req.SessionID = threadSID
+		// Inject task working memory as context
+		if g.workMemMgr != nil {
+			taskContext = g.workMemMgr.RenderForTask(req.TaskID)
+			// Extract user confirmations from the message into working memory
+			if len(req.Messages) > 0 {
+				lastMsg := req.Messages[len(req.Messages)-1]
+				if lastMsg.Role == "user" {
+					g.workMemMgr.ExtractConfirmFromThread(req.TaskID, lastMsg.Content)
+				}
+			}
+		}
+	}
+
+	// Session management: two modes based on how the client sends messages.
+	//  - Web UI sends full conversation history → use it directly, save only the new message
+	//  - API clients may send a single message → load history from session store
+	msgs := req.Messages
+	if req.SessionID != "" {
+		_ = g.convStore.GetOrCreate(req.SessionID, tid)
+		if len(req.Messages) <= 1 {
+			// Single message: API-style call, load server-side history
+			history := g.convStore.Get(req.SessionID)
+			if len(history) > 0 {
+				msgs = append(history, req.Messages...)
+			}
+		}
+		// Save only the last user message (avoid duplicating full history)
+		if len(req.Messages) > 0 {
+			lastMsg := req.Messages[len(req.Messages)-1]
+			if lastMsg.Role == "user" {
+				g.convStore.Append(req.SessionID, lastMsg)
+			}
+		}
+	}
+
+	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
+	if g.orchestrator != nil && len(req.Messages) > 0 {
+		for _, m := range req.Messages {
+			if m.Role == "user" && m.Content != "" {
+				_ = g.orchestrator.Ingest(r.Context(), tid, m.Content, "conversation", "user_input")
+			}
+		}
+	}
+
+	// Smart router: classify query → select optimal model tier
+	var routedTier string
+	var routedModelID string
+	if g.smartRouter != nil && len(msgs) > 0 {
+		lastMsg := msgs[len(msgs)-1].Content
+		routedModel, tier := g.smartRouter.Route(r.Context(), lastMsg, false)
+		routedTier = tier.String()
+		if routedModel != nil {
+			routedModelID = routedModel.ModelID
+		}
+		traceSpan.Attrs["router_tier"] = routedTier
+		traceSpan.Attrs["router_model"] = routedModelID
+	}
+
+	// Budget pre-check
+	if g.costTracker != nil {
+		estIn := len(fmt.Sprint(msgs))/4 + 50
+		estOut := 500 // conservative estimate
+		model := g.planner.LLMClientFor(routedTier).Model()
+		if g.costTracker.WouldExceedBudget(model, estIn, estOut) {
+			apperror.WriteCode(w, apperror.CodeQuotaExceeded, "cost budget would be exceeded")
+			return
+		}
+	}
+
+	// Emotion analysis: detect user emotion from last message (non-blocking, best-effort)
+	// Respects per-persona feature toggle: business/tech_expert presets disable emotion by default.
+	var emotionHint *emotion.Result
+	emotionFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureEmotion)
+	if g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() && emotionFeatureOK && len(msgs) > 0 {
+		lastMsg := msgs[len(msgs)-1].Content
+		if msgs[len(msgs)-1].Role == "user" && lastMsg != "" {
+			emotionHint, _ = g.emotionAnalyzer.AnalyzeText(r.Context(), lastMsg)
+			if emotionHint != nil && g.emotionHistory != nil {
+				g.emotionHistory.Record(req.SessionID, emotionHint.Emotion, emotionHint.Confidence, emotionHint.Source)
+			}
+			// Event-driven Reverie trigger: detect significant emotion shifts.
+			if emotionHint != nil && g.emotionShift != nil {
+				g.emotionShift.Observe(req.SessionID, string(emotionHint.Emotion), emotionHint.Confidence)
+			}
+			// Filter by per-persona minimum confidence threshold.
+			if emotionHint != nil {
+				minConf := 0.5 // default
+				if g.personaChain != nil {
+					minConf = g.personaChain.FloatFeature(persona.FeatureEmotionMinConfidence, 0.5)
+				}
+				if emotionHint.Confidence < minConf {
+					emotionHint = nil
+				}
+			}
+		}
+	}
+
+	result, err := g.planner.Run(r.Context(), planner.PlanRequest{
+		Messages:      msgs,
+		ClassID:       req.ClassID,
+		TeacherID:     req.TeacherID,
+		StudentID:     req.StudentID,
+		TenantID:      tid,
+		ModelOverride: routedTier,
+		EmotionHint:   emotionHint,
+		TaskID:        req.TaskID,
+		TaskContext:   taskContext,
+	})
+	if err != nil {
+		slog.Error("planner error", "err", err, "tenant", tid)
+		g.metrics.RecordRequest(time.Since(start), 0, 0, err)
+		observe.EndSpan(traceSpan, err)
+
+		// Self-heal: attempt to generate a plugin for unsupported tasks
+		if g.healer != nil && len(req.Messages) > 0 {
+			lastMsg := req.Messages[len(req.Messages)-1].Content
+			errMsg := err.Error()
+			go func() {
+				healCtx, healCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer healCancel()
+				if g.healer.ShouldHeal(lastMsg, errMsg) {
+					generated, healErr := g.healer.GenerateAndInstall(healCtx, lastMsg+"\nError: "+errMsg)
+					if healErr != nil {
+						slog.Warn("selfheal: generation failed", "err", healErr)
+					} else {
+						slog.Info("selfheal: plugin generated and installed", "name", generated.Name)
+					}
+				}
+			}()
+		}
+
+		apperror.Write(w, apperror.Wrap(apperror.CodeLLMError, "planner execution failed", err))
+		return
+	}
+
+	// Record usage (estimate tokens: ~4 chars per token for mixed CJK/EN)
+	estTokensIn := int64(len(fmt.Sprint(msgs))/4 + 50)
+	estTokensOut := int64(len(result.Reply)/4 + 50)
+	g.usage.RecordChat(tid, estTokensIn+estTokensOut)
+	g.metrics.RecordRequest(time.Since(start), estTokensIn, estTokensOut, nil)
+	for _, sk := range result.SkillsUsed {
+		g.metrics.RecordSkillCall(sk, 0, nil)
+	}
+
+	// Cost tracking: record actual token usage (use routed model)
+	if g.costTracker != nil {
+		model := g.planner.LLMClientFor(routedTier).Model()
+		cost, alert := g.costTracker.Record(model, tid, "", req.SessionID, int(estTokensIn), int(estTokensOut), time.Since(start))
+		traceSpan.Attrs["cost_usd"] = fmt.Sprintf("%.6f", cost)
+		if alert != nil {
+			slog.Warn("cost alert", "type", alert.Type, "message", alert.Message)
+		}
+	}
+
+	// Output moderation: check agent reply for safety
+	if g.zhGuard != nil && result.Reply != "" {
+		outResult := g.zhGuard.Run(r.Context(), result.Reply)
+		if outResult.Redacted != "" {
+			result.Reply = outResult.Redacted
+		}
+	}
+
+	// Save assistant reply to session
+	if req.SessionID != "" {
+		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: result.Reply})
+	}
+
+	// ── Memory: write assistant reply to short-term ──
+	if g.orchestrator != nil && result.Reply != "" {
+		_ = g.orchestrator.Ingest(r.Context(), tid, result.Reply, "conversation", "assistant_reply")
+	}
+
+	// Memory pipeline: extract facts from the LATEST exchange only (not full history).
+	// Sending full conversation causes token bloat and extraction failure.
+	if g.pipeline != nil && len(req.Messages) > 0 {
+		lastUserMsg := ""
+		for i := len(req.Messages) - 1; i >= 0; i-- {
+			if req.Messages[i].Role == "user" {
+				lastUserMsg = req.Messages[i].Content
+				break
+			}
+		}
+		if lastUserMsg != "" {
+			pipelineReply := result.Reply
+			pipelineTID := tid
+			go func() {
+				pipeCtx, pipeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer pipeCancel()
+				chatMsgs := []memory.ChatMessage{
+					{Role: "user", Content: lastUserMsg},
+					{Role: "assistant", Content: pipelineReply},
+				}
+				result, err := g.pipeline.Process(pipeCtx, pipelineTID, chatMsgs)
+				if err != nil {
+					slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
+				} else if result != nil && len(result.ExtractedFacts) > 0 {
+					slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
+					// Event-driven Reverie trigger: notify on high-value fact extraction.
+					if g.factHook != nil {
+						g.factHook.OnExtracted(result.ExtractedFacts)
+					}
+				}
+			}()
+		}
+	}
+
+	// Learning loop: extract lessons with dynamic quality from Reflect
+	if g.learning != nil && len(req.Messages) > 0 {
+		userMsg := req.Messages[len(req.Messages)-1].Content
+		quality := 7 // default
+		if g.learning.Reflect() != nil {
+			if eval, err := g.learning.Reflect().Evaluate(r.Context(), userMsg, result.Reply, nil); err == nil {
+				quality = eval.Quality
+			}
+		}
+		g.learning.AfterInteraction(r.Context(), userMsg, result.Reply, result.SkillsUsed, quality)
+	}
+
+	// Adaptive loop: observe interaction for behavior adaptation
+	if g.adaptiveLoop != nil && len(req.Messages) > 0 {
+		userMsg := req.Messages[len(req.Messages)-1].Content
+		go func() {
+			adaptCtx, adaptCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer adaptCancel()
+			g.adaptiveLoop.ObserveInteraction(adaptCtx, userMsg, result.Reply)
+		}()
+		// Feed emotion signal into adaptive emoji dimension
+		if emotionHint != nil && emotionHint.IsPositive() {
+			g.adaptiveLoop.RecordFeedback(adaptive.Feedback{
+				Type:        adaptive.FeedbackPreference,
+				Dimension:   adaptive.DimEmoji,
+				UserMessage: req.Messages[len(req.Messages)-1].Content,
+				Correction:  "with_emoji",
+			})
+		}
+	}
+
+	observe.EndSpan(traceSpan, nil)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Trace-ID", observe.TraceIDFromContext(r.Context()))
+
+	// Wrap response: include planner result + optional emotion metadata
+	resp := map[string]any{
+		"reply":       result.Reply,
+		"skills_used": result.SkillsUsed,
+		"steps":       result.Steps,
+	}
+	if result.Plan != nil {
+		resp["plan"] = result.Plan
+	}
+	if emotionHint != nil && emotionHint.Emotion != emotion.EmotionNeutral && emotionHint.Emotion != emotion.EmotionUnknown {
+		resp["emotion"] = emotionHint
+		// Include sticker suggestion: if platform specified, return that one; otherwise return all platforms.
+		stickerFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureSticker)
+		freq := 2.0 // default: normal
+		if g.personaChain != nil {
+			freq = g.personaChain.FloatFeature(persona.FeatureStickerFrequency, 2)
+		}
+		if g.stickerMap != nil && stickerFeatureOK && mathRandFloat64() < stickerSendProb(freq) {
+			if req.Platform != "" {
+				if s := g.stickerMap.Suggest(emotionHint.Emotion, req.Platform); s != nil {
+					resp["sticker_suggestion"] = s
+				}
+			} else {
+				if multi := g.stickerMap.SuggestMulti(emotionHint.Emotion); len(multi) > 0 {
+					resp["sticker_suggestions"] = multi
+				}
+			}
+		}
+	}
+	json.NewEncoder(w).Encode(resp)
+}
