@@ -217,12 +217,12 @@ func TestProviderRegistryValidation(t *testing.T) {
 		t.Fatal("expected error for missing base_url")
 	}
 
-	// Missing api_keys
+	// Empty api_keys — should succeed (local backends like Ollama don't need keys)
 	err = reg.Register(ProviderConfig{
 		ID: "x", Type: ProviderTypeChat, BaseURL: "url", Model: "m",
 	})
-	if err == nil {
-		t.Fatal("expected error for missing api_keys")
+	if err != nil {
+		t.Fatalf("empty api_keys should be allowed for local backends: %v", err)
 	}
 }
 
