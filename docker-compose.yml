@@ -1,0 +1,202 @@
+# Yunque Agent - Docker Compose
+#
+# Quick start (zero external deps, WebUI embedded):
+#   docker compose --profile lite up -d
+#
+# Full stack (PostgreSQL + pgvector):
+#   docker compose --profile full up -d
+#
+# Dashboard:  http://localhost:9090
+# API:        http://localhost:9090/v1/
+
+services:
+  # ── Lite mode: SQLite only, zero external deps ──
+  agent-lite:
+    profiles: ["lite"]
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-0.1.0}
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    ports:
+      - "${AGENT_PORT:-9090}:9090"
+    volumes:
+      - agent-data:/app/data
+    environment:
+      AGENT_ADDR: ":9090"
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api-ai.gitcode.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-zai-org/GLM-5}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-default}
+      DEFAULT_API_KEY: ${DEFAULT_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_WEBHOOK_PATH: ${WHATSAPP_WEBHOOK_PATH:-}
+      SIGNAL_PHONE_NUMBER: ${SIGNAL_PHONE_NUMBER:-}
+      SIGNAL_CONFIG_DIR: ${SIGNAL_CONFIG_DIR:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      SLACK_WEBHOOK_PATH: ${SLACK_WEBHOOK_PATH:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      OPEN_BROWSER: "false"
+      # Multi-model pool (Phase F)
+      LLM_FAST_URL: ${LLM_FAST_URL:-}
+      LLM_FAST_KEY: ${LLM_FAST_KEY:-}
+      LLM_FAST_MODEL: ${LLM_FAST_MODEL:-}
+      LLM_EXPERT_URL: ${LLM_EXPERT_URL:-}
+      LLM_EXPERT_KEY: ${LLM_EXPERT_KEY:-}
+      LLM_EXPERT_MODEL: ${LLM_EXPERT_MODEL:-}
+      LLM_FALLBACK_URL: ${LLM_FALLBACK_URL:-}
+      LLM_FALLBACK_KEY: ${LLM_FALLBACK_KEY:-}
+      LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-}
+      # Embeddings
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+      EMBED_DIMS: ${EMBED_DIMS:-}
+      # Web search
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      SEARXNG_URL: ${SEARXNG_URL:-}
+      # Heartbeat (Phase E)
+      HEARTBEAT_ENABLED: ${HEARTBEAT_ENABLED:-false}
+      HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-30}
+      # Self-iterate (Phase H)
+      SELF_ITERATE_ENABLED: ${SELF_ITERATE_ENABLED:-false}
+      SELF_ITERATE_TOKEN_BUDGET: ${SELF_ITERATE_TOKEN_BUDGET:-5000}
+      SELF_ITERATE_MAX_ROUNDS: ${SELF_ITERATE_MAX_ROUNDS:-3}
+      SELF_ITERATE_COOLDOWN: ${SELF_ITERATE_COOLDOWN:-60}
+      SELF_ITERATE_AUTO_APPROVE: ${SELF_ITERATE_AUTO_APPROVE:-false}
+      # Federation
+      FEDERATION_SECRET: ${FEDERATION_SECRET:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # ── Full mode: PostgreSQL + pgvector ──
+  postgres:
+    profiles: ["full"]
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tori
+      POSTGRES_USER: tori
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tori_secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tori"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  agent:
+    profiles: ["full"]
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-0.1.0}
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${AGENT_PORT:-9090}:9090"
+    volumes:
+      - agent-data:/app/data
+    environment:
+      AGENT_ADDR: ":9090"
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api-ai.gitcode.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-zai-org/GLM-5}
+      DATABASE_URL: postgres://tori:${POSTGRES_PASSWORD:-tori_secret}@postgres:5432/tori?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-default}
+      DEFAULT_API_KEY: ${DEFAULT_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_WEBHOOK_PATH: ${WHATSAPP_WEBHOOK_PATH:-}
+      SIGNAL_PHONE_NUMBER: ${SIGNAL_PHONE_NUMBER:-}
+      SIGNAL_CONFIG_DIR: ${SIGNAL_CONFIG_DIR:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      SLACK_WEBHOOK_PATH: ${SLACK_WEBHOOK_PATH:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      OPEN_BROWSER: "false"
+      # Multi-model pool (Phase F)
+      LLM_FAST_URL: ${LLM_FAST_URL:-}
+      LLM_FAST_KEY: ${LLM_FAST_KEY:-}
+      LLM_FAST_MODEL: ${LLM_FAST_MODEL:-}
+      LLM_EXPERT_URL: ${LLM_EXPERT_URL:-}
+      LLM_EXPERT_KEY: ${LLM_EXPERT_KEY:-}
+      LLM_EXPERT_MODEL: ${LLM_EXPERT_MODEL:-}
+      LLM_FALLBACK_URL: ${LLM_FALLBACK_URL:-}
+      LLM_FALLBACK_KEY: ${LLM_FALLBACK_KEY:-}
+      LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-}
+      # Embeddings
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+      EMBED_DIMS: ${EMBED_DIMS:-}
+      # Web search
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      SEARXNG_URL: ${SEARXNG_URL:-}
+      # Heartbeat
+      HEARTBEAT_ENABLED: ${HEARTBEAT_ENABLED:-false}
+      HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-30}
+      # Self-iterate
+      SELF_ITERATE_ENABLED: ${SELF_ITERATE_ENABLED:-false}
+      SELF_ITERATE_TOKEN_BUDGET: ${SELF_ITERATE_TOKEN_BUDGET:-5000}
+      SELF_ITERATE_MAX_ROUNDS: ${SELF_ITERATE_MAX_ROUNDS:-3}
+      SELF_ITERATE_COOLDOWN: ${SELF_ITERATE_COOLDOWN:-60}
+      SELF_ITERATE_AUTO_APPROVE: ${SELF_ITERATE_AUTO_APPROVE:-false}
+      # Federation
+      FEDERATION_SECRET: ${FEDERATION_SECRET:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  pgdata:
+  agent-data:

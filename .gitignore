@@ -1,0 +1,55 @@
+# ── Build outputs ──
+*.exe
+*.exe~
+tori
+tori_*
+agent
+dist/
+
+# ── Runtime data (generated at runtime, not source code) ──
+data/sessions/
+data/tasks/
+data/audit/
+data/audit.jsonl
+data/cost_telemetry.jsonl
+data/memory.json
+data/memory.json.bak
+data/memory.json.tmp
+data/adaptive.json
+data/editable.json
+data/graph.json
+data/reverie.json
+data/state.json
+data/mcp.json
+data/threads.json
+data/working_memory.json
+data/memory/daily/
+data/output/
+data/qqchat/
+data/templates/
+data/cron/jobs.json
+
+# ── OS / IDE ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+nul
+
+# ── Go ──
+vendor/
+
+# ── Node / Web ──
+web/node_modules/
+web/.next/
+web/out/
+docs/node_modules/
+
+# ── Environment (keep .env.example, ignore actual .env) ──
+.env
+!.env.example
+
+# ── External projects ──

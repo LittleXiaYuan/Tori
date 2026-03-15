@@ -1,0 +1,25 @@
+{
+  "name": "hello-world",
+  "description": "A simple example plugin that greets users",
+  "language": "python",
+  "system_prompt": "You can use the 'hello' tool to greet users by name.",
+  "skills": [
+    {
+      "name": "hello",
+      "description": "Greet a user by name and return a friendly message",
+      "handler": "handler.py",
+      "parameters": {
+        "name": {
+          "type": "string",
+          "description": "The name of the person to greet",
+          "required": true
+        },
+        "style": {
+          "type": "string",
+          "description": "Greeting style: formal, casual, or funny",
+          "default": "casual"
+        }
+      }
+    }
+  ]
+}

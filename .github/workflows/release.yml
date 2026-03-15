@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (branch/tag/SHA)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Resolve version
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo 'dev')"
+          fi
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build dashboard
+        run: cd web && npm ci && npm run build
+
+      - name: Build binaries (6 platforms)
+        run: |
+          LDFLAGS="-s -w \
+            -X yunque-agent/internal/version.Version=${{ steps.meta.outputs.version }} \
+            -X yunque-agent/internal/version.GitCommit=${{ steps.meta.outputs.commit }} \
+            -X yunque-agent/internal/version.BuildDate=${{ steps.meta.outputs.build_date }}"
+
+          mkdir -p dist
+
+          platforms="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
+          for p in $platforms; do
+            OS="${p%/*}"
+            ARCH="${p#*/}"
+            EXT=""
+            [ "$OS" = "windows" ] && EXT=".exe"
+            OUT="dist/yunque-agent-${OS}-${ARCH}${EXT}"
+            echo "Building $OUT..."
+            CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build -ldflags "$LDFLAGS" -o "$OUT" ./cmd/agent
+          done
+
+          ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.meta.outputs.version }}
+          artifacts: "dist/*"
+          draft: false
+          prerelease: ${{ contains(steps.meta.outputs.version, '-') }}
+          generateReleaseNotes: true
