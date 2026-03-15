@@ -1,0 +1,9 @@
+node_modules/
+.next/
+# out/ is the Next.js static export output, embedded by Go.
+# Placeholder index.html is tracked; real build artifacts are ignored.
+out/*
+!out/index.html
+dist/
+.env*.local
+npm-debug.log*
