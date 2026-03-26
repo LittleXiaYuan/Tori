@@ -1,12 +1,16 @@
 package general
 
-import "yunque-agent/pkg/skills"
+import (
+	"yunque-agent/internal/agentcore/workflow"
+	"yunque-agent/pkg/skills"
+)
 
 // GeneralPlugin bundles all general-purpose skills.
 type GeneralPlugin struct {
 	hostReadPaths  []string
 	hostWritePaths []string
 	searchFn       SearchFunc
+	wfStore        workflow.Store
 }
 
 func New(hostReadPaths []string) *GeneralPlugin {
@@ -28,6 +32,11 @@ func (p *GeneralPlugin) SetSearchFunc(fn SearchFunc) {
 	p.searchFn = fn
 }
 
+// SetWorkflowStore injects the shared workflow store.
+func (p *GeneralPlugin) SetWorkflowStore(s workflow.Store) {
+	p.wfStore = s
+}
+
 func (p *GeneralPlugin) Skills() []skills.Skill {
 	ws := NewWebSearchSkill()
 	if p.searchFn != nil {
@@ -39,7 +48,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 	if len(writeDirs) == 0 {
 		writeDirs = []string{"data/tasks", "data/output"}
 	}
-	// Read dirs for zip: host read paths + write dirs (can zip own outputs)
+	// Read dirs for zip / xlsx_split: host read paths + write dirs (can read own outputs)
 	readDirs := append(append([]string{}, p.hostReadPaths...), writeDirs...)
 
 	return []skills.Skill{
@@ -55,9 +64,21 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewZipUnpackSkill(readDirs, writeDirs),
 		NewDocxCreateSkill(writeDirs),
 		NewXlsxCreateSkill(writeDirs),
+		NewXlsxSplitSkill(readDirs, writeDirs),
+		NewPdfCreateSkill(writeDirs),
 		NewHtmlExportSkill(writeDirs),
 		NewPptxCreateSkill(writeDirs),
+		NewSendEmailSkill(),
+		newWorkflowGenWithStore(p.wfStore),
 	}
+}
+
+func newWorkflowGenWithStore(store workflow.Store) skills.Skill {
+	sk := NewWorkflowGenSkill()
+	if store != nil {
+		sk.SetStore(store)
+	}
+	return sk
 }
 
 func (p *GeneralPlugin) SystemPrompt() string {
@@ -70,9 +91,13 @@ func (p *GeneralPlugin) SystemPrompt() string {
 - 解析文档文件（PDF/Word/Excel/CSV/TXT/Markdown），提取文本内容
 - 生成 Word 文档(.docx)：支持标题、段落、列表，使用 Markdown 子集语法描述内容
 - 生成 Excel 表格(.xlsx)：支持 CSV 格式数据输入，自动表头加粗
+- 拆分 Excel(.xlsx)：按指定列的去重值拆成多个带表头的 xlsx 文件
+- 生成简易 PDF(.pdf)：将多行文本导出为单页 PDF（拉丁字符最稳妥）
 - 导出 HTML 网页报告：将 Markdown 内容渲染为美观的独立 HTML 页面
 - 生成 PowerPoint 演示文稿(.pptx)：用 --- 分隔幻灯片，每张第一行为标题
+- 发送电子邮件（SMTP）：支持纯文本和 HTML 格式，抄送，自定义发件人名称
 - 多语言翻译（支持中英日韩法德西俄等20+语言，可指定翻译风格）
 - AI图片生成（根据文字描述生成图片，支持多种尺寸和风格）
-- 浏览器自动化（获取网页内容、提取正文、提取链接、查看HTTP头）`
+- 浏览器自动化（获取网页内容、提取正文、提取链接、查看HTTP头）
+- 自动生成工作流（NL2Workflow）：根据用户的口语化需求或想法，自动利用大模型创建具有逻辑拓扑的 Workflow 流程并入库执行。`
 }

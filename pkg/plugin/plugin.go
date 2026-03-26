@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"yunque-agent/pkg/skills"
@@ -40,6 +41,59 @@ type UIPlugin interface {
 	// e.g. {"/upload": uploadHandler, "/analyze": analyzeHandler}
 	// These get mounted at /v1/ext/{plugin-key}{path}
 	HTTPHandlers() map[string]http.HandlerFunc
+}
+
+// CognitivePlugin extends Plugin with capabilities that participate in the agent's
+// reasoning process: dynamic context injection, message routing, and memory transformation.
+type CognitivePlugin interface {
+	Plugin
+
+	// DynamicContext returns context text injected into the LLM system prompt on every request.
+	// Return "" to skip.
+	DynamicContext(ctx context.Context, userMessage string) string
+
+	// ShouldHandle returns a confidence score (0-1) for claiming this message.
+	// Score >= 0.7 means the plugin handles it directly via Handle(), bypassing the Planner.
+	ShouldHandle(ctx context.Context, message string) float64
+
+	// Handle processes a message claimed by ShouldHandle.
+	Handle(ctx context.Context, message string, env *CognitiveEnv) (string, error)
+
+	// OnMemoryExtract transforms facts extracted by the memory pipeline.
+	// Return nil to suppress all facts.
+	OnMemoryExtract(ctx context.Context, facts []ExtractedFact) []ExtractedFact
+}
+
+// CognitiveEnv provides resources to CognitivePlugin.Handle().
+type CognitiveEnv struct {
+	LLMCall      func(ctx context.Context, system, user string) (string, error)
+	MemorySearch func(ctx context.Context, query string) string
+	TenantID     string
+	UserID       string
+	ChannelType  string
+	SessionID    string
+}
+
+// ExtractedFact is a fact extracted by the memory pipeline.
+type ExtractedFact struct {
+	Key     string            `json:"key"`
+	Value   string            `json:"value"`
+	Source  string            `json:"source"`
+	Tags    map[string]string `json:"tags,omitempty"`
+}
+
+// PluginMemory is a namespaced key-value store for plugin-private data.
+// Each CognitivePlugin gets its own isolated namespace so plugins don't
+// interfere with each other or with the agent's main memory.
+type PluginMemory interface {
+	Get(key string) (string, bool)
+	Set(key, value string) error
+	Delete(key string) error
+	List(prefix string) map[string]string
+	// Search returns values that semantically match the query.
+	// Plugins with rich data can implement vector search; simple implementations
+	// can fall back to substring matching.
+	Search(query string, limit int) []string
 }
 
 // Registry manages loaded plugins.
@@ -174,6 +228,7 @@ type PluginInfo struct {
 	Source      string  `json:"source"`             // "builtin" or "script"
 	Language    string  `json:"language,omitempty"` // for script plugins
 	HasUI       bool    `json:"has_ui"`             // implements UIPlugin
+	IsCognitive bool    `json:"is_cognitive"`       // implements CognitivePlugin
 	UITabs      []UITab `json:"ui_tabs,omitempty"`  // registered tabs
 }
 
@@ -230,6 +285,107 @@ func (r *Registry) AllHTTPHandlers() map[string]http.HandlerFunc {
 			for path, handler := range up.HTTPHandlers() {
 				fullPath := "/v1/ext/" + e.plugin.Name() + path
 				out[fullPath] = handler
+			}
+		}
+	}
+	return out
+}
+
+// ── CognitivePlugin Registry Methods ──
+
+// AllCognitive returns all enabled CognitivePlugins.
+func (r *Registry) AllCognitive() []CognitivePlugin {
+	var out []CognitivePlugin
+	for _, e := range r.plugins {
+		if e.enabled {
+			if cp, ok := e.plugin.(CognitivePlugin); ok {
+				out = append(out, cp)
+			}
+		}
+	}
+	return out
+}
+
+// RouteMessage checks all CognitivePlugins and returns the one that wants to handle
+// the message with the highest confidence. Returns nil if no plugin claims it (score < 0.7).
+func (r *Registry) RouteMessage(ctx context.Context, message string) (CognitivePlugin, float64) {
+	var best CognitivePlugin
+	bestScore := 0.0
+	for _, e := range r.plugins {
+		if !e.enabled {
+			continue
+		}
+		cp, ok := e.plugin.(CognitivePlugin)
+		if !ok {
+			continue
+		}
+		score := cp.ShouldHandle(ctx, message)
+		if score > bestScore {
+			bestScore = score
+			best = cp
+		}
+	}
+	if bestScore < 0.7 {
+		return nil, 0
+	}
+	return best, bestScore
+}
+
+// CollectDynamicContext gathers context text from all CognitivePlugins for a given
+// user message. Returns concatenated context ready for injection into the system prompt.
+func (r *Registry) CollectDynamicContext(ctx context.Context, userMessage string) string {
+	var parts []string
+	for _, e := range r.plugins {
+		if !e.enabled {
+			continue
+		}
+		cp, ok := e.plugin.(CognitivePlugin)
+		if !ok {
+			continue
+		}
+		if ctxText := cp.DynamicContext(ctx, userMessage); ctxText != "" {
+			parts = append(parts, "## "+e.plugin.Name()+" 认知上下文\n"+ctxText)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	result := ""
+	for i, p := range parts {
+		if i > 0 {
+			result += "\n\n"
+		}
+		result += p
+	}
+	return result
+}
+
+// TransformFacts passes extracted facts through all CognitivePlugins' OnMemoryExtract.
+// Plugins are called in registration order; each sees the output of the previous.
+func (r *Registry) TransformFacts(ctx context.Context, facts []ExtractedFact) []ExtractedFact {
+	for _, e := range r.plugins {
+		if !e.enabled {
+			continue
+		}
+		cp, ok := e.plugin.(CognitivePlugin)
+		if !ok {
+			continue
+		}
+		facts = cp.OnMemoryExtract(ctx, facts)
+		if facts == nil {
+			return nil
+		}
+	}
+	return facts
+}
+
+// PluginInfoEx extends PluginInfo with cognitive capability flags.
+func (r *Registry) AllIncludeDisabledEx() []PluginInfo {
+	out := r.AllIncludeDisabled()
+	for i, info := range out {
+		if e, ok := r.plugins[info.Name]; ok {
+			if _, isCognitive := e.plugin.(CognitivePlugin); isCognitive {
+				out[i].IsCognitive = true
 			}
 		}
 	}

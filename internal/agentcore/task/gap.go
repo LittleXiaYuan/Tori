@@ -10,6 +10,12 @@ import (
 	"time"
 )
 
+// PersistGapFunc writes a gap record to durable storage (e.g., Ledger event log).
+type PersistGapFunc func(ctx context.Context, record GapRecord) error
+
+// LoadGapsFunc loads previously persisted gap records from durable storage.
+type LoadGapsFunc func(ctx context.Context) ([]GapRecord, error)
+
 // ──────────────────────────────────────────────
 // GapAnalyzer — analyzes task step failures to identify capability gaps
 //
@@ -50,10 +56,11 @@ type GapRecord struct {
 
 // GapAnalyzer detects and records capability gaps from task failures.
 type GapAnalyzer struct {
-	mu      sync.RWMutex
-	records []GapRecord
-	llmCall LLMFunc // optional: LLM for deeper analysis
-	counter int
+	mu        sync.RWMutex
+	records   []GapRecord
+	llmCall   LLMFunc         // optional: LLM for deeper analysis
+	persistFn PersistGapFunc  // optional: persist to Ledger
+	counter   int
 }
 
 // NewGapAnalyzer creates a gap analyzer.
@@ -61,6 +68,29 @@ func NewGapAnalyzer(llmCall LLMFunc) *GapAnalyzer {
 	return &GapAnalyzer{
 		llmCall: llmCall,
 	}
+}
+
+// SetPersist sets the function used to durably store gap records (e.g., to Ledger).
+func (g *GapAnalyzer) SetPersist(fn PersistGapFunc) { g.persistFn = fn }
+
+// LoadRecords restores previously persisted gap records into in-memory state.
+func (g *GapAnalyzer) LoadRecords(ctx context.Context, loadFn LoadGapsFunc) error {
+	records, err := loadFn(ctx)
+	if err != nil {
+		return fmt.Errorf("gap: load records: %w", err)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.records = append(g.records, records...)
+	if len(records) > 0 && records[len(records)-1].ID != "" {
+		// Try to parse counter from last ID ("gap-N")
+		var n int
+		if _, err := fmt.Sscanf(records[len(records)-1].ID, "gap-%d", &n); err == nil {
+			g.counter = n
+		}
+	}
+	slog.Info("gap: loaded persisted records", "count", len(records))
+	return nil
 }
 
 // Analyze examines a failed step and produces a GapRecord.
@@ -96,6 +126,13 @@ func (g *GapAnalyzer) Analyze(ctx context.Context, t *Task, step *Step) *GapReco
 	g.mu.Lock()
 	g.records = append(g.records, *rec)
 	g.mu.Unlock()
+
+	// Persist to durable storage if configured
+	if g.persistFn != nil {
+		if err := g.persistFn(ctx, *rec); err != nil {
+			slog.Warn("gap: persist failed", "id", id, "err", err)
+		}
+	}
 
 	slog.Info("gap: detected", "id", id, "type", rec.GapType, "skill", rec.SkillName, "error", rec.ErrorMsg)
 	return rec

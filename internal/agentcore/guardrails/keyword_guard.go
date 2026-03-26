@@ -37,6 +37,16 @@ func (g *KeywordGuard) AddCategory(cat KeywordCategory) {
 	g.categories = append(g.categories, cat)
 }
 
+// NewKeywordGuardFromList creates a keyword guard from a name and keyword list.
+// Used by the plugin extension system to register custom safety rules.
+func NewKeywordGuardFromList(name string, keywords []string) *KeywordGuard {
+	return &KeywordGuard{
+		categories: []KeywordCategory{
+			{Name: name, Keywords: keywords, Block: true, Score: 0.8},
+		},
+	}
+}
+
 // Name implements Guard.
 func (g *KeywordGuard) Name() string { return "keyword_moderation" }
 

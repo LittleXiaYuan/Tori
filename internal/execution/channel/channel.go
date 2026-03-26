@@ -3,8 +3,10 @@ package channel
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
+	rdebug "runtime/debug"
 	"sync"
 	"time"
 )
@@ -56,6 +58,19 @@ type Channel interface {
 	Send(ctx context.Context, target string, reply Reply) error
 }
 
+// ProgressSender is an optional interface for channels that support
+// multi-step output via message editing (e.g., Telegram editMessageText).
+// This enables the "Agent thinking process" UX in IM channels:
+//   1. Send initial "thinking..." message → get messageID
+//   2. Edit message with progress updates
+//   3. Send final reply as a new message
+type ProgressSender interface {
+	// SendAndGetID sends a message and returns its platform message ID.
+	SendAndGetID(ctx context.Context, target string, reply Reply) (messageID string, err error)
+	// EditMessage updates an existing message by ID.
+	EditMessage(ctx context.Context, target string, messageID string, content string) error
+}
+
 // Reactor is an optional interface for channels that support emoji reactions on messages.
 // Channels that implement this can add emoji/sticker reactions to incoming messages,
 // similar to Telegram's setMessageReaction or Discord's addReaction.
@@ -76,10 +91,15 @@ type StickerSender interface {
 
 // Registry manages multiple channels.
 type Registry struct {
-	channels  map[string]Channel
-	tracker   *GroupTracker
-	onMessage func(channelType string)            // called on incoming message
-	onSend    func(channelType string, err error) // called on outgoing reply
+	channels    map[string]Channel
+	tracker     *GroupTracker
+	groupFilter *GroupFilterConfig
+	engagement  *EngagementProfile
+	inbox       *InboxChannel
+	interceptor *CommandInterceptor                  // universal command handler
+	enricher    *StickerEnricher                     // auto-sticker on emotion
+	onMessage   func(channelType string)            // called on incoming message
+	onSend      func(channelType string, err error) // called on outgoing reply
 }
 
 // NewRegistry creates a channel registry.
@@ -91,6 +111,18 @@ func NewRegistry() *Registry {
 func (r *Registry) SetMetricsHooks(onMessage func(string), onSend func(string, error)) {
 	r.onMessage = onMessage
 	r.onSend = onSend
+}
+
+// SetCommandInterceptor attaches a universal command interceptor that
+// processes slash commands before they reach the planner.
+func (r *Registry) SetCommandInterceptor(ci *CommandInterceptor) {
+	r.interceptor = ci
+}
+
+// SetStickerEnricher attaches a sticker enricher that automatically
+// appends stickers to replies based on detected emotion.
+func (r *Registry) SetStickerEnricher(se *StickerEnricher) {
+	r.enricher = se
 }
 
 // Register adds a channel.
@@ -114,15 +146,29 @@ func (r *Registry) All() []Channel {
 }
 
 // StartAll starts all registered channels concurrently.
+// If a CommandInterceptor is set, slash commands are processed before reaching the planner.
 // If metrics hooks are set, incoming and outgoing messages are recorded automatically.
 func (r *Registry) StartAll(ctx context.Context, handler func(Message) Reply) {
 	wrapped := handler
+
+	// Layer 1: sticker enricher (enriches reply after planner runs)
+	if r.enricher != nil {
+		wrapped = r.enricher.Wrap(wrapped)
+	}
+
+	// Layer 2: command interceptor (intercepts slash commands before planner)
+	if r.interceptor != nil {
+		wrapped = r.interceptor.Wrap(wrapped)
+	}
+
+	// Layer 3: metrics hooks
 	if r.onMessage != nil || r.onSend != nil {
+		inner := wrapped
 		wrapped = func(msg Message) Reply {
 			if r.onMessage != nil {
 				r.onMessage(msg.ChannelType)
 			}
-			reply := handler(msg)
+			reply := inner(msg)
 			if r.onSend != nil {
 				r.onSend(msg.ChannelType, nil)
 			}
@@ -131,8 +177,16 @@ func (r *Registry) StartAll(ctx context.Context, handler func(Message) Reply) {
 	}
 	for _, ch := range r.channels {
 		go func(c Channel) {
+			defer func() {
+				if rec := recover(); rec != nil {
+					slog.Error("channel panic — recovered",
+						"channel", c.Type(), "panic", rec,
+						"stack", string(debugStack()))
+					writePanicFile("channel."+c.Type(), rec)
+				}
+			}()
 			if err := c.Start(ctx, wrapped); err != nil {
-				// log error but don't crash
+				slog.Error("channel stopped", "channel", c.Type(), "err", err)
 			}
 		}(ch)
 	}
@@ -259,4 +313,22 @@ func (t *GroupTracker) save() {
 	if err := os.WriteFile(t.path, data, 0644); err != nil {
 		slog.Warn("group tracker: save error", "path", t.path, "err", err)
 	}
+}
+
+func debugStack() []byte {
+	return rdebug.Stack()
+}
+
+func writePanicFile(label string, panicVal interface{}) {
+	f, err := os.OpenFile("data/panic.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	stack := string(rdebug.Stack())
+	entry := fmt.Sprintf(
+		"=== PANIC [%s] at %s ===\npanic: %v\n%s\n\n",
+		label, time.Now().Format(time.RFC3339), panicVal, stack,
+	)
+	f.WriteString(entry)
 }

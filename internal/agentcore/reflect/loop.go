@@ -13,13 +13,19 @@ import (
 // After each interaction, it evaluates quality, extracts lessons, and updates strategy.
 type LearningLoop struct {
 	llm      *llm.Client
-	onUpdate func(key, value string) // callback to update memory
+	onUpdate func(key, value string)                                    // callback to update memory
+	onLesson func(category, outcome, lesson, context string, tags []string) // callback to write structured lesson to ExperienceStore
 	engine   *Engine
 }
 
 // NewLearningLoop creates a learning loop.
 func NewLearningLoop(llmClient *llm.Client, onUpdate func(key, value string)) *LearningLoop {
 	return &LearningLoop{llm: llmClient, onUpdate: onUpdate, engine: NewEngine(llmClient)}
+}
+
+// SetOnLesson attaches a callback for each structured lesson extracted from an interaction.
+func (l *LearningLoop) SetOnLesson(fn func(category, outcome, lesson, context string, tags []string)) {
+	l.onLesson = fn
 }
 
 // Reflect returns the underlying reflect engine.
@@ -40,16 +46,30 @@ func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply
 			l.onUpdate("strategy:success:"+time.Now().Format("20060102_150405"),
 				"User asked: "+truncateStr(userMsg, 100)+" → Skills: "+joinStr(skillsUsed)+" → Quality: high")
 		}
+		if l.onLesson != nil {
+			skillTags := append([]string{"high_quality"}, skillsUsed...)
+			l.onLesson("skill_usage", "success",
+				"高质量回复: "+truncateStr(userMsg, 80)+" (技能: "+joinStr(skillsUsed)+")",
+				truncateStr(agentReply, 120), skillTags)
+		}
 		return
 	}
 
 	// Lower quality — ask LLM to extract lessons
 	go func() {
 		lessons := l.extractLessons(ctx, userMsg, agentReply, skillsUsed, quality)
+		outcome := "partial"
+		if quality < 5 {
+			outcome = "failure"
+		}
 		for _, lesson := range lessons {
 			slog.Info("learning loop", "category", lesson.Category, "insight", lesson.Insight, "action", lesson.Action)
 			if l.onUpdate != nil {
 				l.onUpdate("lesson:"+lesson.Category+":"+time.Now().Format("20060102_150405"), lesson.Insight)
+			}
+			if l.onLesson != nil {
+				l.onLesson(lesson.Category, outcome, lesson.Insight,
+					truncateStr(userMsg, 80), skillsUsed)
 			}
 		}
 	}()

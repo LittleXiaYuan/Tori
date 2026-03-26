@@ -42,6 +42,52 @@ func (d *Discord) Start(ctx context.Context, handler func(Message) Reply) error 
 	d.session = session
 	d.mu.Unlock()
 
+	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.Type != discordgo.InteractionMessageComponent {
+			return
+		}
+		data := i.MessageComponentData()
+		if data.CustomID == "" {
+			return
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		var uid, uname string
+		if i.User != nil {
+			uid, uname = i.User.ID, i.User.Username
+		} else if i.Member != nil && i.Member.User != nil {
+			uid, uname = i.Member.User.ID, i.Member.User.Username
+		}
+		if uid == "" {
+			return
+		}
+		chatType := "direct"
+		if i.GuildID != "" {
+			chatType = "group"
+		}
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredMessageUpdate,
+		})
+		msg := Message{
+			ChannelType: "discord",
+			ChannelID:   i.ChannelID,
+			UserID:      uid,
+			UserName:    uname,
+			Content:     data.CustomID,
+			Extra: map[string]string{
+				"chat_type": chatType,
+				"guild_id":  i.GuildID,
+			},
+		}
+		go func() {
+			reply := handler(msg)
+			if err := d.Send(ctx, i.ChannelID, reply); err != nil {
+				slog.Error("discord send reply failed", "err", err)
+			}
+		}()
+	})
+
 	session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if m.Author == nil || m.Author.Bot {
 			return
@@ -135,11 +181,25 @@ func (d *Discord) Send(_ context.Context, target string, reply Reply) error {
 	}
 
 	content := reply.Content
-	if content == "" {
+	components := discordComponentsFromRich(reply.Rich)
+	if len(components) == 0 {
+		content = ContentWithButtonFallback(reply)
+	}
+	if content == "" && len(components) == 0 {
 		return nil
 	}
 
-	// Split long messages
+	if len(components) > 0 {
+		_, err := session.ChannelMessageSendComplex(target, &discordgo.MessageSend{
+			Content:    content,
+			Components: components,
+		})
+		if err != nil {
+			return fmt.Errorf("discord send: %w", err)
+		}
+		return nil
+	}
+
 	chunks := splitDiscordMessage(content)
 	for _, chunk := range chunks {
 		_, err := session.ChannelMessageSend(target, chunk)
@@ -148,6 +208,41 @@ func (d *Discord) Send(_ context.Context, target string, reply Reply) error {
 		}
 	}
 	return nil
+}
+
+func discordComponentsFromRich(rm *RichMessage) []discordgo.MessageComponent {
+	if rm == nil {
+		return nil
+	}
+	var rows []discordgo.MessageComponent
+	var row []discordgo.MessageComponent
+	for _, comp := range rm.Components {
+		b, ok := comp.(*ButtonComponent)
+		if !ok || b.URL != "" {
+			continue
+		}
+		style := discordgo.PrimaryButton
+		if b.Style == "danger" {
+			style = discordgo.DangerButton
+		}
+		cid := TruncateRunes(b.Value, 100)
+		if cid == "" {
+			cid = TruncateRunes(b.Label, 100)
+		}
+		row = append(row, discordgo.Button{
+			Label:    TruncateRunes(b.Label, 80),
+			Style:    style,
+			CustomID: cid,
+		})
+		if len(row) >= 5 {
+			rows = append(rows, discordgo.ActionsRow{Components: row})
+			row = nil
+		}
+	}
+	if len(row) > 0 {
+		rows = append(rows, discordgo.ActionsRow{Components: row})
+	}
+	return rows
 }
 
 // isDuplicate checks and records message IDs to prevent duplicate processing.

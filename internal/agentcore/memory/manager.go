@@ -12,12 +12,19 @@ const (
 	longWeight  = 1.0 // knowledge base is highest quality
 )
 
+// MemPersister is the interface for memory persistence backends.
+// Both file-based Persister and Ledger-based LedgerPersister implement this.
+type MemPersister interface {
+	MarkDirty()
+	Stop()
+}
+
 // Manager provides unified access to all three memory layers.
 type Manager struct {
 	Short     *ShortTerm
 	Mid       *MidTerm
 	Long      *LongTerm
-	persister *Persister
+	persister MemPersister
 }
 
 // NewManager creates a memory manager with three layers.
@@ -25,8 +32,8 @@ func NewManager(short *ShortTerm, mid *MidTerm, long *LongTerm) *Manager {
 	return &Manager{Short: short, Mid: mid, Long: long}
 }
 
-// SetPersister attaches a file persister.
-func (m *Manager) SetPersister(p *Persister) {
+// SetPersister attaches a persistence backend.
+func (m *Manager) SetPersister(p MemPersister) {
 	m.persister = p
 }
 

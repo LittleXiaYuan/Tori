@@ -57,18 +57,25 @@ type LifecycleListener func(ctx context.Context, event LifecycleEvent)
 
 // LifecycleManager 生命周期管理器
 type LifecycleManager struct {
-	store     *Store
-	listeners []LifecycleListener
+	store        Store
+	listeners    []LifecycleListener
+	ledgerBridge *LedgerBridge // optional: forwards events to Ledger
 
 	// 按 task 维度加锁，避免全局串行
 	taskLocks sync.Map // taskID -> *sync.Mutex
 }
 
 // NewLifecycleManager 创建生命周期管理器
-func NewLifecycleManager(store *Store) *LifecycleManager {
+func NewLifecycleManager(store Store) *LifecycleManager {
 	return &LifecycleManager{
 		store: store,
 	}
+}
+
+// SetEventSink connects a LedgerBridge to receive lifecycle events.
+// The bridge is nil-safe, so calling this is optional.
+func (lm *LifecycleManager) SetEventSink(bridge *LedgerBridge) {
+	lm.ledgerBridge = bridge
 }
 
 // OnEvent 注册事件监听器
@@ -143,6 +150,9 @@ func (lm *LifecycleManager) TransitionTo(ctx context.Context, taskID string, new
 	})
 	lock.Lock() // 重新加锁，保证 defer unlock 正常工作
 
+	// Forward to Ledger bridge (non-blocking, nil-safe)
+	lm.ledgerBridge.forwardTransition(ctx, taskID, oldStatus, newStatus)
+
 	slog.Info("task status changed",
 		"task_id", taskID,
 		"old_status", oldStatus,
@@ -192,6 +202,9 @@ func (lm *LifecycleManager) OnStepStart(ctx context.Context, taskID string, step
 		StepID:    stepID,
 		Timestamp: time.Now(),
 	})
+
+	// Forward to Ledger bridge
+	lm.ledgerBridge.forwardStepStarted(ctx, taskID, stepID, step)
 	lock.Lock()
 
 	return nil
@@ -239,6 +252,9 @@ func (lm *LifecycleManager) OnStepComplete(ctx context.Context, taskID string, s
 		Result:    result,
 		Timestamp: time.Now(),
 	})
+
+	// Forward to Ledger bridge (triggers checkpoint save)
+	lm.ledgerBridge.forwardStepCompleted(ctx, taskID, stepID, result)
 	lock.Lock()
 
 	return nil
@@ -286,6 +302,9 @@ func (lm *LifecycleManager) OnStepFailed(ctx context.Context, taskID string, ste
 		Error:     err,
 		Timestamp: time.Now(),
 	})
+
+	// Forward to Ledger bridge
+	lm.ledgerBridge.forwardStepFailed(ctx, taskID, stepID, err)
 	lock.Lock()
 
 	return nil

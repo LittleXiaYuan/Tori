@@ -15,16 +15,28 @@ export function getApiKey(): string {
   return apiKey;
 }
 
-async function fetcher<T>(path: string, opts?: RequestInit): Promise<T> {
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("yunque_token") : "";
+  if (token) return { Authorization: `Bearer ${token}` };
   const key = getApiKey();
+  if (key) return { "X-API-Key": key };
+  return {};
+}
+
+async function fetcher<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
     headers: {
       "Content-Type": "application/json",
-      ...(key ? { "X-API-Key": key } : {}),
+      ...getAuthHeaders(),
       ...opts?.headers,
     },
   });
+  if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
+    localStorage.removeItem("yunque_token");
+    window.location.href = "/login";
+    throw new Error("unauthorized");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status}: ${text}`);
@@ -140,7 +152,7 @@ export const api = {
     sessionId?: string
   ): AsyncGenerator<string> {
     const key = getApiKey();
-    const res = await fetch(`${BASE}/v1/chat/stream`, {
+    const res = await fetch(`${BASE}/v1/chat/agentic`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -191,12 +203,15 @@ export const api = {
             } catch { /* ignore parse errors */ }
             continue;
           }
-          // Parse delta event: {"content": "..."}
+          // Parse delta or step events
           try {
             const parsed = JSON.parse(raw);
-            if (parsed.content) yield parsed.content;
+            if (parsed.content) {
+              yield parsed.content;
+            } else if (parsed.id && parsed.domain) {
+              yield raw;
+            }
           } catch {
-            // Non-JSON data line, yield as-is
             if (raw.trim()) yield raw;
           }
         } else if (line.trim() === "") {

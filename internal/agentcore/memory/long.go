@@ -302,6 +302,18 @@ func (l *LongTerm) Count(tenantID string) int {
 	return len(l.items[tenantID])
 }
 
+// ExportAll returns all items grouped by tenant ID.
+// Used by external persistence backends (e.g. LedgerPersister).
+func (l *LongTerm) ExportAll() map[string][]Item {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	out := make(map[string][]Item)
+	for tid, items := range l.items {
+		out[tid] = append(out[tid], items...)
+	}
+	return out
+}
+
 // --- Vector math ---
 
 func cosineSimilarity(a, b []float32) float64 {

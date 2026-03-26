@@ -43,12 +43,27 @@ type Layer struct {
 
 // LayerAssembler collects context layers and assembles them within a budget.
 type LayerAssembler struct {
-	maxTokens int // 0 = unlimited
+	maxTokens    int // 0 = unlimited
+	maxPerLayer  int // 0 = no per-layer limit; max tokens any single layer may consume
+	dedup        bool // if true, detect and remove duplicate sentences across layers
 }
 
 // NewLayerAssembler creates an assembler with optional max token budget for dynamic context.
 func NewLayerAssembler(maxDynTokens int) *LayerAssembler {
 	return &LayerAssembler{maxTokens: maxDynTokens}
+}
+
+// WithPerLayerLimit sets a maximum token budget per individual layer.
+// Layers exceeding this are truncated (not dropped), preserving partial context.
+func (la *LayerAssembler) WithPerLayerLimit(maxPerLayer int) *LayerAssembler {
+	la.maxPerLayer = maxPerLayer
+	return la
+}
+
+// WithDedup enables cross-layer sentence deduplication.
+func (la *LayerAssembler) WithDedup() *LayerAssembler {
+	la.dedup = true
+	return la
 }
 
 // Assemble takes a set of layers, sorts by priority, and returns the assembled
@@ -64,6 +79,11 @@ func (la *LayerAssembler) Assemble(layers []Layer) (string, []string) {
 		if l.Tokens <= 0 {
 			l.Tokens = estimateTokens(l.Content)
 		}
+		// Per-layer truncation: truncate oversized layers instead of dropping them
+		if la.maxPerLayer > 0 && l.Tokens > la.maxPerLayer {
+			l.Content = truncateToTokens(l.Content, la.maxPerLayer)
+			l.Tokens = la.maxPerLayer
+		}
 		active = append(active, l)
 	}
 
@@ -72,23 +92,81 @@ func (la *LayerAssembler) Assemble(layers []Layer) (string, []string) {
 		return active[i].Priority < active[j].Priority
 	})
 
+	// Cross-layer dedup: track seen sentences, remove duplicates from lower-priority layers
+	var seen map[string]bool
+	if la.dedup {
+		seen = make(map[string]bool)
+	}
+
 	// Accumulate within budget
 	var parts []string
 	var included []string
 	totalTokens := 0
 	for _, l := range active {
-		if la.maxTokens > 0 && totalTokens+l.Tokens > la.maxTokens {
-			continue // skip this layer — over budget
+		content := l.Content
+		tokens := l.Tokens
+
+		if la.dedup && seen != nil {
+			content, tokens = dedupContent(content, seen)
+			if content == "" {
+				continue
+			}
 		}
-		parts = append(parts, l.Content)
+
+		if la.maxTokens > 0 && totalTokens+tokens > la.maxTokens {
+			// Try to fit a partial layer instead of dropping entirely
+			remaining := la.maxTokens - totalTokens
+			if remaining > 50 {
+				content = truncateToTokens(content, remaining)
+				tokens = remaining
+			} else {
+				continue
+			}
+		}
+		parts = append(parts, content)
 		included = append(included, l.Name)
-		totalTokens += l.Tokens
+		totalTokens += tokens
 	}
 
 	if len(parts) == 0 {
 		return "", nil
 	}
 	return strings.Join(parts, "\n\n"), included
+}
+
+// truncateToTokens truncates content to approximately maxTokens.
+func truncateToTokens(content string, maxTokens int) string {
+	runes := []rune(content)
+	maxChars := maxTokens * 35 / 10 // inverse of estimate: ~3.5 chars per token
+	if len(runes) <= maxChars {
+		return content
+	}
+	return string(runes[:maxChars]) + "\n...[截断]"
+}
+
+// dedupContent removes sentences that have already been seen in higher-priority layers.
+// Returns the deduplicated content and its new token estimate.
+func dedupContent(content string, seen map[string]bool) (string, int) {
+	lines := strings.Split(content, "\n")
+	var kept []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "##") || strings.HasPrefix(trimmed, "[") {
+			kept = append(kept, line)
+			continue
+		}
+		if len(trimmed) < 10 {
+			kept = append(kept, line)
+			continue
+		}
+		if seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		kept = append(kept, line)
+	}
+	result := strings.Join(kept, "\n")
+	return strings.TrimSpace(result), estimateTokens(result)
 }
 
 // estimateTokens estimates token count (~3.5 chars per token for mixed CJK/EN).

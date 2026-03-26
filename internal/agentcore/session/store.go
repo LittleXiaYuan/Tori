@@ -134,15 +134,20 @@ func (s *Store) Append(sessionID string, msgs ...llm.Message) {
 	sess.Messages = append(sess.Messages, msgs...)
 	sess.UpdatedAt = time.Now()
 
-	// Persist each message to DB
+	// Persist each message to DB (async — don't block the request path)
 	if s.repo != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		for _, m := range msgs {
-			if err := s.repo.Append(ctx, sessionID, m.Role, m.Content); err != nil {
-				slog.Error("session repo Append", "err", err)
+		persistMsgs := make([]llm.Message, len(msgs))
+		copy(persistMsgs, msgs)
+		sid := sessionID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			for _, m := range persistMsgs {
+				if err := s.repo.Append(ctx, sid, m.Role, m.Content); err != nil {
+					slog.Error("session repo Append", "err", err)
+				}
 			}
-		}
+		}()
 	}
 
 	// Trim: keep system message + last N messages

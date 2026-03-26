@@ -3,11 +3,15 @@ package channel
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -280,6 +284,131 @@ func CallJSONAPI(ctx context.Context, client *http.Client, method, url string, b
 	}
 
 	return respBody, resp.StatusCode, nil
+}
+
+// ──────────────────────────────────────────────
+// File / Image Component Loader
+// ──────────────────────────────────────────────
+
+// LoadComponentBytes loads raw bytes from a Component (ImageComponent or FileComponent).
+// It resolves the source in priority order: Base64 → file:// path → http(s) URL.
+// Returns (data, filename, mimeType, error).
+func LoadComponentBytes(ctx context.Context, client *http.Client, comp Component) (data []byte, filename, mimeType string, err error) {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+
+	switch c := comp.(type) {
+	case *ImageComponent:
+		filename = "image.png"
+		mimeType = "image/png"
+		if c.Alt != "" {
+			filename = sanitizeFilename(c.Alt) + ".png"
+		}
+		if c.Base64 != "" {
+			data, err = base64.StdEncoding.DecodeString(c.Base64)
+			return
+		}
+		if c.URL != "" {
+			data, filename, mimeType, err = loadFromURL(ctx, client, c.URL, filename)
+			return
+		}
+		err = fmt.Errorf("image component has no data source")
+
+	case *FileComponent:
+		filename = c.FileName
+		if filename == "" {
+			filename = "file"
+		}
+		mimeType = c.MimeType
+		if mimeType == "" {
+			mimeType = mime.TypeByExtension(filepath.Ext(filename))
+		}
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		if c.URL != "" {
+			data, filename, mimeType, err = loadFromURL(ctx, client, c.URL, filename)
+			return
+		}
+		err = fmt.Errorf("file component has no URL")
+
+	default:
+		err = fmt.Errorf("unsupported component type: %T", comp)
+	}
+	return
+}
+
+// loadFromURL fetches bytes from an HTTP URL or a file:// path.
+func loadFromURL(ctx context.Context, client *http.Client, rawURL, defaultFilename string) ([]byte, string, string, error) {
+	filename := defaultFilename
+
+	if strings.HasPrefix(rawURL, "file://") {
+		path := strings.TrimPrefix(rawURL, "file://")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("read file %q: %w", path, err)
+		}
+		name := filepath.Base(path)
+		if name != "" && name != "." {
+			filename = name
+		}
+		mt := mime.TypeByExtension(filepath.Ext(filename))
+		if mt == "" {
+			mt = "application/octet-stream"
+		}
+		return data, filename, mt, nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("build request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("fetch %q: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", "", fmt.Errorf("fetch %q status %d", rawURL, resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20)) // 50 MB cap
+	if err != nil {
+		return nil, "", "", fmt.Errorf("read body: %w", err)
+	}
+
+	// Try to get filename from Content-Disposition
+	if cd := resp.Header.Get("Content-Disposition"); cd != "" {
+		if _, params, e := mime.ParseMediaType(cd); e == nil {
+			if fn := params["filename"]; fn != "" {
+				filename = sanitizeFilename(fn)
+			}
+		}
+	}
+	mt := resp.Header.Get("Content-Type")
+	if mt == "" {
+		mt = mime.TypeByExtension(filepath.Ext(filename))
+	}
+	if mt == "" {
+		mt = "application/octet-stream"
+	}
+	// Strip parameters (e.g. "image/jpeg; charset=utf-8" → "image/jpeg")
+	if idx := strings.Index(mt, ";"); idx > 0 {
+		mt = strings.TrimSpace(mt[:idx])
+	}
+	return data, filename, mt, nil
+}
+
+func sanitizeFilename(name string) string {
+	// Replace characters that are invalid in filenames
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_",
+		"?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	cleaned := replacer.Replace(name)
+	if cleaned == "" {
+		return "file"
+	}
+	return cleaned
 }
 
 // ──────────────────────────────────────────────

@@ -98,7 +98,7 @@ func (d *DingTalk) Start(ctx context.Context, handler func(Message) Reply) error
 		case msg := <-d.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if reply.Content != "" {
+				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 					target := m.Extra["conversation_id"]
 					if target == "" {
 						target = m.UserID
@@ -225,7 +225,7 @@ func (d *DingTalk) Send(_ context.Context, target string, reply Reply) error {
 	msgKey := "sampleMarkdown"
 	msgParam := map[string]string{
 		"title": "回复",
-		"text":  reply.Content,
+		"text":  ContentWithButtonFallback(reply),
 	}
 
 	paramJSON, _ := json.Marshal(msgParam)

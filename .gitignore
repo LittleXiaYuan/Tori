@@ -6,28 +6,13 @@ tori_*
 agent
 dist/
 
+# ── Logs & temp files ──
+*.log
+tmp*.txt
+reflog*.txt
+
 # ── Runtime data (generated at runtime, not source code) ──
-data/sessions/
-data/tasks/
-data/audit/
-data/audit.jsonl
-data/cost_telemetry.jsonl
-data/memory.json
-data/memory.json.bak
-data/memory.json.tmp
-data/adaptive.json
-data/editable.json
-data/graph.json
-data/reverie.json
-data/state.json
-data/mcp.json
-data/threads.json
-data/working_memory.json
-data/memory/daily/
-data/output/
-data/qqchat/
-data/templates/
-data/cron/jobs.json
+data/
 
 # ── OS / IDE ──
 .DS_Store
@@ -53,3 +38,4 @@ docs/node_modules/
 !.env.example
 
 # ── External projects ──
+

@@ -36,10 +36,10 @@ func NewBrowserSkill() *BrowserSkill {
 	}
 }
 
-func (s *BrowserSkill) Name() string { return "browser" }
+func (s *BrowserSkill) Name() string { return "web_fetch" }
 
 func (s *BrowserSkill) Description() string {
-	return "浏览器自动化工具：获取网页内容、提取文本、读取页面标题和元信息。支持 fetch（获取页面文本）和 readability（提取正文）两种模式。"
+	return "HTTP 网页抓取工具（轻量级，不启动浏览器）：通过 HTTP 请求获取网页内容、提取文本、读取页面标题和元信息。适合纯文本抓取场景。如需操作浏览器（截图、点击、JS 渲染），请使用 browser_navigate 等原生浏览器工具。"
 }
 
 func (s *BrowserSkill) Parameters() map[string]any {

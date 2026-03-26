@@ -39,14 +39,16 @@ import {
   Zap,
   Brain,
   Server,
+  Palette,
+  Globe,
+  GitBranch,
   type LucideIcon,
 } from "lucide-react";
 
-// Icon name -> component map for dynamic plugins
 const iconMap: Record<string, LucideIcon> = {
   Gauge, Terminal, ScanFace, MailWarning, Radar, Blocks, Cpu, Cog, Package,
   UsersRound, BarChart3, Settings, BookOpen, Clock, TerminalSquare, Shield,
-  HardDriveDownload, SmilePlus, BrainCircuit, ListTodo, Lightbulb, Layers, FileDown, MessageSquareText, Puzzle,
+  HardDriveDownload, SmilePlus, BrainCircuit, ListTodo, Lightbulb, Layers, FileDown, MessageSquareText, Puzzle, Palette, GitBranch,
 };
 
 interface NavItem {
@@ -78,7 +80,8 @@ const navGroups: NavGroup[] = [
     icon: ListTodo,
     items: [
       { href: "/tasks", key: "nav.tasks", icon: ListTodo },
-      { href: "/triggers", key: "nav.triggers", icon: Zap },
+      { href: "/automation", key: "nav.automation", icon: Zap },
+      { href: "/workflows", key: "nav.workflows", icon: GitBranch },
       { href: "/templates", key: "nav.templates", icon: Layers },
       { href: "/cron", key: "nav.cron", icon: Clock },
     ],
@@ -111,8 +114,10 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/audit", key: "nav.audit", icon: Shield },
       { href: "/metrics", key: "nav.metrics", icon: BarChart3 },
+      { href: "/browser", key: "nav.browser", icon: Globe },
       { href: "/tenants", key: "nav.tenants", icon: UsersRound },
       { href: "/backup", key: "nav.backup", icon: HardDriveDownload },
+      { href: "/settings/theme", key: "nav.theme", icon: Palette },
       { href: "/settings", key: "nav.settings", icon: Settings },
     ],
   },

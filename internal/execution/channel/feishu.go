@@ -58,14 +58,13 @@ func (f *Feishu) Start(ctx context.Context, handler func(Message) Reply) error {
 // HandleWebhook processes incoming Feishu event callbacks.
 // Mount this on your HTTP server: POST /webhook/feishu
 func (f *Feishu) HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	// Signature verification (production security)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(400)
+		return
+	}
+
 	if f.encryptKey != "" {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(400)
-			return
-		}
-		r.Body = io.NopCloser(bytes.NewReader(body))
 		timestamp := r.Header.Get("X-Lark-Request-Timestamp")
 		nonce := r.Header.Get("X-Lark-Request-Nonce")
 		sig := r.Header.Get("X-Lark-Signature")
@@ -79,50 +78,51 @@ func (f *Feishu) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var event struct {
-		Challenge string `json:"challenge"` // URL verification
-		Header    struct {
-			EventType string `json:"event_type"`
-		} `json:"header"`
-		Event struct {
-			Message struct {
-				ChatID      string `json:"chat_id"`
-				MessageType string `json:"message_type"`
-				Content     string `json:"content"`
-			} `json:"message"`
-			Sender struct {
-				SenderID struct {
-					OpenID string `json:"open_id"`
-				} `json:"sender_id"`
-			} `json:"sender"`
-		} `json:"event"`
-	}
-	json.NewDecoder(r.Body).Decode(&event)
-
-	// URL verification challenge
-	if event.Challenge != "" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"challenge": event.Challenge})
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		w.WriteHeader(400)
 		return
 	}
 
-	switch event.Header.EventType {
+	if ch, ok := root["challenge"].(string); ok && ch != "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"challenge": ch})
+		return
+	}
+
+	header, _ := root["header"].(map[string]any)
+	eventType, _ := header["event_type"].(string)
+
+	switch eventType {
 	case "im.message.receive_v1":
-		// Extract text content
+		ev, _ := root["event"].(map[string]any)
+		if ev == nil {
+			break
+		}
+		msg, _ := ev["message"].(map[string]any)
+		if msg == nil {
+			break
+		}
+		chatID, _ := msg["chat_id"].(string)
+		contentJSON, _ := msg["content"].(string)
 		var content struct {
 			Text string `json:"text"`
 		}
-		json.Unmarshal([]byte(event.Event.Message.Content), &content)
-
+		_ = json.Unmarshal([]byte(contentJSON), &content)
+		openID := ""
+		if sender, ok := ev["sender"].(map[string]any); ok {
+			if sid, ok := sender["sender_id"].(map[string]any); ok {
+				openID, _ = sid["open_id"].(string)
+			}
+		}
 		f.msgCh <- Message{
 			ChannelType: "feishu",
-			ChannelID:   event.Event.Message.ChatID,
-			UserID:      event.Event.Sender.SenderID.OpenID,
+			ChannelID:   chatID,
+			UserID:      openID,
 			Content:     content.Text,
 		}
 	case "card.action.trigger":
-		// Interactive card button callback
-		f.handleCardAction(w, r)
+		f.handleFeishuCardCallback(w, root)
 		return
 	}
 	w.WriteHeader(200)
@@ -133,17 +133,22 @@ func (f *Feishu) Send(_ context.Context, chatID string, reply Reply) error {
 
 	switch reply.Format {
 	case "card":
-		// reply.Content is a pre-built card JSON string
 		msgType = "interactive"
 		content = reply.Content
 	case "markdown":
-		// Feishu post (rich text) with markdown-like content
 		msgType = "interactive"
 		card := AgentReplyCard("云雀助手", reply.Content)
 		content = card.Build()
 	default:
+		if card := buildCardFromFeishuRich(reply); card != nil {
+			return f.sendRaw(chatID, "interactive", card.Build())
+		}
 		msgType = "text"
-		content = fmt.Sprintf(`{"text":"%s"}`, reply.Content)
+		pl, err := json.Marshal(map[string]string{"text": ContentWithButtonFallback(reply)})
+		if err != nil {
+			return err
+		}
+		content = string(pl)
 	}
 
 	return f.sendRaw(chatID, msgType, content)
@@ -189,18 +194,68 @@ func (f *Feishu) SetCardActionHandler(h CardActionHandler) {
 	f.cardAction = h
 }
 
-func (f *Feishu) handleCardAction(w http.ResponseWriter, r *http.Request) {
-	var cb struct {
-		OpenID string            `json:"open_id"`
-		Action map[string]string `json:"action"`
+func feishuNested(m map[string]any, key string) map[string]any {
+	v, ok := m[key].(map[string]any)
+	if !ok {
+		return nil
 	}
-	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
-		w.WriteHeader(400)
+	return v
+}
+
+func feishuString(m map[string]any, key string) string {
+	v, ok := m[key].(string)
+	if !ok {
+		return ""
+	}
+	return v
+}
+
+func (f *Feishu) handleFeishuCardCallback(w http.ResponseWriter, root map[string]any) {
+	ev := feishuNested(root, "event")
+	if ev == nil {
+		w.WriteHeader(200)
 		return
 	}
 
-	if f.cardAction != nil {
-		if reply := f.cardAction(cb.OpenID, cb.Action); reply != nil {
+	chatID := ""
+	if ctx := feishuNested(ev, "context"); ctx != nil {
+		chatID = feishuString(ctx, "open_chat_id")
+	}
+	openID := ""
+	if op := feishuNested(ev, "operator"); op != nil {
+		openID = feishuString(op, "open_id")
+	}
+
+	replyText := ""
+	var strVal map[string]string
+	if act := feishuNested(ev, "action"); act != nil {
+		if vm, ok := act["value"].(map[string]any); ok {
+			strVal = make(map[string]string, len(vm))
+			for k, v := range vm {
+				if s, ok := v.(string); ok {
+					strVal[k] = s
+					if k == "reply" {
+						replyText = s
+					}
+				}
+			}
+		}
+	}
+
+	if chatID != "" && replyText != "" {
+		select {
+		case f.msgCh <- Message{
+			ChannelType: "feishu",
+			ChannelID:   chatID,
+			UserID:      openID,
+			Content:     replyText,
+		}:
+		default:
+		}
+	}
+
+	if f.cardAction != nil && len(strVal) > 0 {
+		if reply := f.cardAction(openID, strVal); reply != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{
 				"toast": map[string]string{"type": "success", "content": "已处理"},
@@ -209,7 +264,11 @@ func (f *Feishu) handleCardAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.WriteHeader(200)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"toast": map[string]string{"type": "success", "content": "已收到"},
+	})
 }
 
 func (f *Feishu) tokenRefreshLoop(ctx context.Context) {

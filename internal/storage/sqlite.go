@@ -12,6 +12,28 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// MemoryItem represents a memory record.
+type MemoryItem struct {
+	ID         string
+	TenantID   string
+	Key        string
+	Value      string
+	Source     string
+	Category   string
+	AccessCnt  int
+	LastAccess time.Time
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+}
+
+// ConvSession represents a conversation session.
+type ConvSession struct {
+	ID        string
+	TenantID  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // SQLite implements persistence for memories, sessions, bots, inbox, and models.
 type SQLite struct {
 	db *sql.DB

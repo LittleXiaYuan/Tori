@@ -127,6 +127,24 @@ func (t *Telegram) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *Telegram) parseUpdate(u tgUpdate) *Message {
+	if u.CallbackQuery != nil {
+		cq := u.CallbackQuery
+		if cq.Message == nil {
+			return nil
+		}
+		return &Message{
+			ChannelType: "telegram",
+			ChannelID:   fmt.Sprintf("%d", cq.Message.Chat.ID),
+			UserID:      fmt.Sprintf("%d", cq.From.ID),
+			UserName:    cq.From.FirstName,
+			Content:     cq.Data,
+			Extra: map[string]string{
+				"message_id":        fmt.Sprintf("%d", cq.Message.MessageID),
+				"callback_query_id": cq.ID,
+				"chat_type":         cq.Message.Chat.Type,
+			},
+		}
+	}
 	if u.Message == nil {
 		return nil
 	}
@@ -191,6 +209,10 @@ func (t *Telegram) parseUpdate(u tgUpdate) *Message {
 func (t *Telegram) processMessage(ctx context.Context, msg Message, handler func(Message) Reply) {
 	chatID := msg.ChannelID
 
+	if cqID := msg.Extra["callback_query_id"]; cqID != "" {
+		defer t.answerCallbackQuery(cqID)
+	}
+
 	// Handle built-in commands
 	if cmd := t.parseCommand(msg.Content); cmd != "" {
 		reply := t.handleCommand(cmd)
@@ -233,14 +255,40 @@ func (t *Telegram) Send(ctx context.Context, target string, reply Reply) error {
 		}
 	}
 
+	textOut := reply.Content
+	if kb := telegramInlineKeyboard(reply.Rich); len(kb) > 0 {
+		if textOut == "" {
+			textOut = reply.Rich.TextContent()
+		}
+		body, _ := json.Marshal(map[string]any{
+			"chat_id":                  target,
+			"text":                     textOut,
+			"parse_mode":               "Markdown",
+			"reply_markup":             map[string]any{"inline_keyboard": kb},
+			"disable_web_page_preview": true,
+		})
+		resp, err := t.client.Post(t.apiURL("sendMessage"), "application/json", bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			b, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("telegram sendMessage %d: %s", resp.StatusCode, string(b))
+		}
+		return nil
+	}
+
+	textOut = ContentWithButtonFallback(reply)
+
 	// Send text content (skip if empty and we already sent rich components)
-	if reply.Content == "" && reply.Rich != nil && len(reply.Rich.Components) > 0 {
+	if textOut == "" && reply.Rich != nil && len(reply.Rich.Components) > 0 {
 		return nil
 	}
 
 	body, _ := json.Marshal(map[string]any{
 		"chat_id":    target,
-		"text":       reply.Content,
+		"text":       textOut,
 		"parse_mode": "Markdown",
 	})
 	resp, err := t.client.Post(t.apiURL("sendMessage"), "application/json", bytes.NewReader(body))
@@ -285,9 +333,52 @@ func (t *Telegram) sendPhoto(chatID, photoURL, caption string) error {
 	return nil
 }
 
+func telegramInlineKeyboard(rm *RichMessage) [][]map[string]string {
+	if rm == nil {
+		return nil
+	}
+	var rows [][]map[string]string
+	var row []map[string]string
+	for _, comp := range rm.Components {
+		b, ok := comp.(*ButtonComponent)
+		if !ok || b.URL != "" {
+			continue
+		}
+		val := TruncateRunes(b.Value, 60)
+		if val == "" {
+			val = TruncateRunes(b.Label, 60)
+		}
+		row = append(row, map[string]string{"text": TruncateRunes(b.Label, 64), "callback_data": val})
+		if len(row) >= 8 {
+			rows = append(rows, row)
+			row = nil
+		}
+	}
+	if len(row) > 0 {
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+func (t *Telegram) answerCallbackQuery(id string) {
+	body, _ := json.Marshal(map[string]string{"callback_query_id": id})
+	resp, err := t.client.Post(t.apiURL("answerCallbackQuery"), "application/json", bytes.NewReader(body))
+	if err == nil && resp != nil {
+		resp.Body.Close()
+	}
+}
+
 type tgUpdate struct {
-	UpdateID int        `json:"update_id"`
-	Message  *tgMessage `json:"message"`
+	UpdateID      int              `json:"update_id"`
+	Message       *tgMessage       `json:"message"`
+	CallbackQuery *tgCallbackQuery `json:"callback_query,omitempty"`
+}
+
+type tgCallbackQuery struct {
+	ID      string     `json:"id"`
+	From    tgUser     `json:"from"`
+	Message *tgMessage `json:"message"`
+	Data    string     `json:"data"`
 }
 
 type tgMessage struct {
@@ -432,10 +523,64 @@ func (t *Telegram) SendSticker(ctx context.Context, target string, sticker *Stic
 
 // Ensure Telegram implements optional interfaces
 var (
-	_ Channel       = (*Telegram)(nil)
-	_ Reactor       = (*Telegram)(nil)
-	_ StickerSender = (*Telegram)(nil)
+	_ Channel        = (*Telegram)(nil)
+	_ Reactor        = (*Telegram)(nil)
+	_ StickerSender  = (*Telegram)(nil)
+	_ ProgressSender = (*Telegram)(nil)
 )
+
+// SendAndGetID sends a message and returns the Telegram message ID.
+func (t *Telegram) SendAndGetID(ctx context.Context, target string, reply Reply) (string, error) {
+	content := reply.Content
+	if content == "" {
+		content = "..."
+	}
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":    target,
+		"text":       content,
+		"parse_mode": "Markdown",
+	})
+	resp, err := t.client.Post(t.apiURL("sendMessage"), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			MessageID int `json:"message_id"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if !result.OK {
+		return "", fmt.Errorf("sendMessage failed")
+	}
+	return fmt.Sprintf("%d", result.Result.MessageID), nil
+}
+
+// EditMessage edits an existing Telegram message.
+func (t *Telegram) EditMessage(ctx context.Context, target string, messageID string, content string) error {
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":    target,
+		"message_id": messageID,
+		"text":       content,
+		"parse_mode": "Markdown",
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.apiURL("editMessageText"), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("telegram editMessageText: %w", err)
+	}
+	defer resp.Body.Close()
+	// Telegram returns 400 if content unchanged; ignore that
+	return nil
+}
 
 func (t *Telegram) getUpdates(offset, timeout int) ([]tgUpdate, error) {
 	url := fmt.Sprintf("%s?offset=%d&timeout=%d", t.apiURL("getUpdates"), offset, timeout)

@@ -1,0 +1,12 @@
+{
+  "id": "98da2c91",
+  "title": "Test Task 3",
+  "description": "Test description",
+  "status": "completed",
+  "steps": null,
+  "tenant_id": "tenant-1",
+  "created_at": "2026-03-23T23:08:31.7771466+08:00",
+  "updated_at": "2026-03-23T23:08:31.7807799+08:00",
+  "started_at": "2026-03-23T23:08:31.7802601+08:00",
+  "finished_at": "2026-03-23T23:08:31.7807799+08:00"
+}

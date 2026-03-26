@@ -56,6 +56,24 @@ func (g *Gateway) serveWebUI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 3.5 Dynamic route fallback — for /workflows/abc, try workflows/_.html
+	// Next.js static export with generateStaticParams({id:"_"}) produces _.html.
+	if path != "" {
+		parts := strings.Split(path, "/")
+		if len(parts) >= 2 {
+			parent := strings.Join(parts[:len(parts)-1], "/")
+			// Try _.html (Next.js dynamic route placeholder)
+			for _, placeholder := range []string{"_.html", "[id].html"} {
+				dynamicPath := parent + "/" + placeholder
+				if data, err := fs.ReadFile(staticFS, dynamicPath); err == nil {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.Write(data)
+					return
+				}
+			}
+		}
+	}
+
 	// 4. SPA fallback: serve root index.html for client-side routing
 	data, err := fs.ReadFile(staticFS, "index.html")
 	if err != nil {

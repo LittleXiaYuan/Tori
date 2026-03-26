@@ -75,8 +75,16 @@ func (l *Lifecycle) AddObserver(obs Observer) {
 }
 
 // StartAll launches all channels with lifecycle management.
+// If the registry has a CommandInterceptor, slash commands are handled before reaching the planner.
 func (l *Lifecycle) StartAll(ctx context.Context, handler func(Message) Reply) {
-	l.handler = handler
+	wrapped := handler
+	if l.registry.enricher != nil {
+		wrapped = l.registry.enricher.Wrap(wrapped)
+	}
+	if l.registry.interceptor != nil {
+		wrapped = l.registry.interceptor.Wrap(wrapped)
+	}
+	l.handler = wrapped
 	for typ, ch := range l.registry.channels {
 		l.mu.Lock()
 		l.statuses[typ] = &ChannelStatus{Type: typ, State: StateConnecting}

@@ -129,6 +129,8 @@ type BudgetConfig struct {
 	MaxTotalCost    float64 `json:"max_total_cost,omitempty"`     // 总成本上限（USD）
 	CurrentDayCost  float64 `json:"current_day_cost,omitempty"`   // 当天已消耗成本
 	CurrentWeekCost float64 `json:"current_week_cost,omitempty"`  // 本周已消耗成本
+	CurrentDayRuns  int     `json:"current_day_runs,omitempty"`   // 当天已执行次数
+	CurrentWeekRuns int     `json:"current_week_runs,omitempty"`  // 本周已执行次数
 	LastResetAt     time.Time `json:"last_reset_at,omitempty"`    // 上次重置时间
 }
 

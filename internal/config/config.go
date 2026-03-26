@@ -23,7 +23,6 @@ type Config struct {
 	VLLMBaseURL     string // optional: vLLM local model endpoint
 	VLLMModel       string
 	LocalModelTier  string // tier assignment for local models: fast/smart/expert
-	DBURL           string
 	HostReadPaths   string // comma-separated host paths for read-only access
 	TelegramToken   string
 	FeishuAppID     string
@@ -35,6 +34,10 @@ type Config struct {
 	SelfIterateMaxRounds   int
 	SelfIterateCooldownMin int
 	SelfIterateAutoApprove bool
+	ReActEnabled           bool   // enable Ledger-powered ReAct reasoning mode
+	LongHorizonEnabled     bool   // enable DAG-based long-horizon planner for complex tasks
+	ReflectMode            string // "strict", "learning", "off" (default: "learning")
+	ReflectModel           string // LLM pool key for reflect evaluator (empty = primary)
 }
 
 // Load reads config from environment variables.
@@ -73,7 +76,7 @@ func Load() Config {
 		VLLMBaseURL:            getenv("VLLM_BASE_URL", ""),
 		VLLMModel:              getenv("VLLM_MODEL", ""),
 		LocalModelTier:         getenv("LOCAL_MODEL_TIER", "fast"),
-		DBURL:                  getenv("DATABASE_URL", ""),
+
 		HostReadPaths:          getenv("HOST_READ_PATHS", ""),
 		TelegramToken:          getenv("TELEGRAM_BOT_TOKEN", ""),
 		FeishuAppID:            getenv("FEISHU_APP_ID", ""),
@@ -84,6 +87,10 @@ func Load() Config {
 		SelfIterateMaxRounds:   iterRounds,
 		SelfIterateCooldownMin: iterCooldown,
 		SelfIterateAutoApprove: getenv("SELF_ITERATE_AUTO_APPROVE", "") == "true",
+		ReActEnabled:           getenv("REACT_ENABLED", "") == "true",
+		LongHorizonEnabled:     getenv("LONG_HORIZON_ENABLED", "") == "true",
+		ReflectMode:            getenv("REFLECT_MODE", "learning"),
+		ReflectModel:           getenv("REFLECT_MODEL", ""),
 	}
 }
 

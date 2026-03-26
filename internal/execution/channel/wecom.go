@@ -107,7 +107,7 @@ func (w *WeCom) Start(ctx context.Context, handler func(Message) Reply) error {
 		case msg := <-w.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if reply.Content != "" {
+				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 					if err := w.Send(ctx, m.UserID, reply); err != nil {
 						slog.Warn("wecom: reply failed", "to", m.UserID, "err", err)
 					}
@@ -194,7 +194,7 @@ func (w *WeCom) Send(_ context.Context, target string, reply Reply) error {
 	}
 
 	// Split long messages (WeCom text limit: 2048 chars)
-	parts := splitWeComMessage(reply.Content, 2048)
+	parts := splitWeComMessage(ContentWithButtonFallback(reply), 2048)
 	for _, part := range parts {
 		payload := map[string]any{
 			"touser":  target,

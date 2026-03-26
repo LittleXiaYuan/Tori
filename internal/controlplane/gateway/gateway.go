@@ -1,25 +1,27 @@
-﻿package gateway
+package gateway
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/adaptive"
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/cron"
 	"yunque-agent/internal/agentcore/distill"
+	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/agentcore/review"
 	"yunque-agent/internal/agentcore/skillgrow"
 	"yunque-agent/internal/agentcore/tools"
+	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/internal/agentcore/trust"
 
 	// tools imported via handlers_tools.go
@@ -50,10 +52,10 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/controlplane/tenant"
+	"yunque-agent/internal/execution/browser"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
 	"yunque-agent/internal/observe"
-	"yunque-agent/internal/version"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -84,6 +86,7 @@ type Gateway struct {
 	learning        *reflectpkg.LearningLoop
 	limiter         *RateLimiter
 	jwtCfg          *JWTConfig
+	passwordStore   *PasswordStore
 	usage           *UsageTracker
 	metrics         *observe.Metrics
 	pipeline        *memory.Pipeline
@@ -131,12 +134,13 @@ type Gateway struct {
 	speechReg       *speech.Registry
 	emotionAnalyzer *emotion.Analyzer
 	emotionHistory  *emotion.History
-	stickerMap      *emotion.StickerMap
-	channelReg      *channel.Registry
+	stickerMap       *emotion.StickerMap
+	stickerCollector *emotion.StickerCollector
+	channelReg       *channel.Registry
 	emotionShift    *planner.EmotionShiftDetector // event-driven Reverie trigger
 	factHook        *planner.FactEventHook        // event-driven Reverie trigger on high-value facts
 	reverie         *planner.Reverie              // Reverie inner monologue system (for API access)
-	taskStore       *task.Store                   // task runtime persistence
+	taskStore       task.Store                    // task runtime persistence
 	taskRunner      *task.Runner                  // task execution engine
 	gapAnalyzer     *task.GapAnalyzer             // capability gap detection
 	stateKernel     *state.Kernel                 // structured state kernel
@@ -148,9 +152,63 @@ type Gateway struct {
 	triggerMgr      *trigger.Manager              // unified trigger manager
 	preAckEmojis    []string                      // emoji list for pre-ack reactions (e.g., ["👍","🤔","💡"])
 	allowedOrigins  []string
+
+	// Workflow Engine
+	workflowStore  workflow.Store
+	workflowEngine *workflow.Engine
+
+	// RBAC
+	rbacEnforcer   *rbac.Enforcer
+	rbacMiddleware *rbac.Middleware
+
+	// Approval (Human-in-the-Loop)
+	approvalMgr *approval.Manager
+
+	// SSE Event Stream
+	sseBroker *SSEBroker
+
+	// Execution event trail (unified AgentEvent audit)
+	eventTrail *observe.AuditTrail
+
+	// Last plan result cache for save_as_workflow
+	lastPlanCache *sync.Map
+
+	// Browser Engine
+	browserEngine     *browser.Engine
+	browserRecognizer *browser.Recognizer
+	browserWorker     *browser.Worker
+	browserNotifier   *browser.Notifier
+	browserHeadless   bool
+	browserDataDir    string
+
 	mux             *http.ServeMux
 	reqCount        atomic.Int64
 	startTime       time.Time
+
+	replyHooks   []ReplyHook
+	replyHooksMu sync.RWMutex
+}
+
+// ReplyHook interceptor for outgoing messages.
+type ReplyHook func(ctx context.Context, msg channel.Message, reply channel.Reply)
+
+// AddReplyHook registers a global interceptor for outgoing channel replies.
+func (g *Gateway) AddReplyHook(h ReplyHook) {
+	g.replyHooksMu.Lock()
+	defer g.replyHooksMu.Unlock()
+	g.replyHooks = append(g.replyHooks, h)
+}
+
+// InvokeReplyHooks triggers all registered hooks asynchronously.
+func (g *Gateway) InvokeReplyHooks(ctx context.Context, msg channel.Message, reply channel.Reply) {
+	g.replyHooksMu.RLock()
+	hooks := make([]ReplyHook, len(g.replyHooks))
+	copy(hooks, g.replyHooks)
+	g.replyHooksMu.RUnlock()
+	
+	for _, h := range hooks {
+		go h(ctx, msg, reply)
+	}
 }
 
 // New creates a new Gateway.
@@ -300,6 +358,135 @@ func (g *Gateway) SetEmotionHistory(h *emotion.History) { g.emotionHistory = h }
 // SetStickerMap attaches a sticker suggestion map.
 func (g *Gateway) SetStickerMap(sm *emotion.StickerMap) { g.stickerMap = sm }
 
+// SetStickerCollector attaches a sticker collector for interactive sticker learning.
+func (g *Gateway) SetStickerCollector(sc *emotion.StickerCollector) { g.stickerCollector = sc }
+
+// WireStickerCommands connects the sticker command system to the channel registry.
+// This creates a CommandInterceptor with sticker commands (/add, /add-all, /sticker,
+// /sticker-del, /cancel) and attaches it to the channel registry so all IM channels
+// get universal sticker command support.
+// Call this after SetStickerMap, SetStickerCollector, and SetChannelRegistry.
+func (g *Gateway) WireStickerCommands() {
+	if g.channelReg == nil {
+		return
+	}
+
+	ci := channel.NewCommandInterceptor()
+	sc := &channel.StickerCommands{}
+
+	if g.stickerCollector != nil {
+		sc.StartCollect = func(channelType, userID, emotionStr string) string {
+			em, ok := emotion.ParseStickerCommand("/sticker " + emotionStr)
+			if !ok {
+				em = emotion.EmotionHappy
+			}
+			return g.stickerCollector.StartSession(channelType, userID, em)
+		}
+		sc.StartBulkAdd = func(channelType, userID string) string {
+			return g.stickerCollector.StartAddSession(channelType, userID)
+		}
+		sc.ListStickers = func(platform string) string {
+			return g.stickerCollector.ListStickers(platform)
+		}
+		sc.CancelSession = func(channelType, userID string) bool {
+			return g.stickerCollector.CancelSession(channelType, userID)
+		}
+	}
+
+	if g.stickerMap != nil {
+		sc.DeleteStickers = func(platform, emotionStr string) string {
+			em := emotion.Emotion(emotionStr)
+			g.stickerMap.Clear(platform, em)
+			return fmt.Sprintf("✅ 已删除 %s 平台的「%s」情绪贴图", platform, emotionStr)
+		}
+	}
+
+	// Fetch-and-learn for channels that support StickerSetFetcher
+	if g.channelReg != nil && g.stickerCollector != nil {
+		sc.FetchAndLearnSet = func(channelType, setName string) (string, error) {
+			ch, ok := g.channelReg.Get(channelType)
+			if !ok {
+				return "", fmt.Errorf("channel %s not found", channelType)
+			}
+			fetcher, ok := ch.(channel.StickerSetFetcher)
+			if !ok {
+				return "", fmt.Errorf("channel %s does not support fetching sticker sets", channelType)
+			}
+			stickers, err := fetcher.FetchStickerSet(setName)
+			if err != nil {
+				return "", err
+			}
+			result := g.stickerCollector.LearnStickerSet(channelType, stickers)
+			return result, nil
+		}
+	}
+
+	ci.Register(sc.Handler())
+	g.channelReg.SetCommandInterceptor(ci)
+}
+
+// WireStickerEnricher sets up automatic sticker sending based on detected emotion.
+// After the planner replies, if the incoming message carries a recognized emotion
+// above the confidence threshold, a sticker is appended to the reply.
+// Call this after SetStickerMap, SetEmotionAnalyzer, and SetChannelRegistry.
+func (g *Gateway) WireStickerEnricher() {
+	if g.channelReg == nil || g.stickerMap == nil || g.emotionAnalyzer == nil {
+		return
+	}
+
+	enricher := &channel.StickerEnricher{
+		MinConfidence: 0.5,
+		AnalyzeEmotion: func(text string) (string, float64) {
+			if !g.emotionAnalyzer.Enabled() {
+				return "", 0
+			}
+			featureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureEmotion)
+			if !featureOK {
+				return "", 0
+			}
+			res, err := g.emotionAnalyzer.AnalyzeText(context.Background(), text)
+			if err != nil || res == nil {
+				return "", 0
+			}
+			return string(res.Emotion), res.Confidence
+		},
+		SuggestSticker: func(emo, platform string) *channel.StickerComponent {
+			stickerFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureSticker)
+			if !stickerFeatureOK {
+				return nil
+			}
+			s := g.stickerMap.Suggest(emotion.Emotion(emo), platform)
+			if s == nil {
+				return nil
+			}
+			sc := channel.NewSticker(s.PackageID, s.StickerID)
+			sc.Platform = s.Platform
+			sc.FileID = s.FileID
+			sc.SetName = s.SetName
+			sc.Emoji = s.Emoji
+			if s.CDNURL != "" {
+				sc.URL = s.CDNURL
+			}
+			return sc
+		},
+		SendProbability: func() float64 {
+			freq := 2.0
+			if g.personaChain != nil {
+				freq = g.personaChain.FloatFeature(persona.FeatureStickerFrequency, 2)
+			}
+			return stickerSendProb(freq)
+		},
+	}
+
+	// Override MinConfidence from persona if available
+	if g.personaChain != nil {
+		minConf := g.personaChain.FloatFeature(persona.FeatureEmotionMinConfidence, 0.5)
+		enricher.MinConfidence = minConf
+	}
+
+	g.channelReg.SetStickerEnricher(enricher)
+}
+
 // SetEmotionShiftDetector attaches the emotion shift detector for Reverie event-driven triggers.
 func (g *Gateway) SetEmotionShiftDetector(d *planner.EmotionShiftDetector) { g.emotionShift = d }
 
@@ -309,8 +496,63 @@ func (g *Gateway) SetFactEventHook(h *planner.FactEventHook) { g.factHook = h }
 // SetReverie attaches the Reverie system for API access.
 func (g *Gateway) SetReverie(r *planner.Reverie) { g.reverie = r }
 
+// WireReverieActions connects Reverie's action callbacks to the actual subsystems:
+//   - write_memory → Memory Orchestrator (ingest as "reverie_insight")
+//   - create_task → Task Runner (create a new task)
+//   - update_profile → Persona identity (update user profile key-value)
+//
+// This enables the "reverie → memory → reflection" feedback loop:
+// Reverie thinks → writes to memory → memory informs future conversations
+// → reflection learns from outcomes → strategies guide Reverie.
+// Call this after SetReverie, SetOrchestrator, SetTaskRunner.
+func (g *Gateway) WireReverieActions() {
+	if g.reverie == nil {
+		return
+	}
+
+	// write_memory → orchestrator
+	if g.orchestrator != nil {
+		g.reverie.SetWriteMemory(func(ctx context.Context, fact string) error {
+			return g.orchestrator.Ingest(ctx, "default", fact, "reverie_insight", "reverie")
+		})
+	}
+
+	// create_task → task store
+	if g.taskStore != nil {
+		g.reverie.SetCreateTask(func(ctx context.Context, title, desc string) error {
+			_, err := g.taskStore.Create(task.CreateRequest{
+				Title:       title,
+				Description: desc,
+				TenantID:    "default",
+			})
+			return err
+		})
+	}
+
+	// update_profile → memory as persistent profile fact
+	if g.orchestrator != nil {
+		g.reverie.SetUpdateProfile(func(ctx context.Context, key, value string) error {
+			fact := fmt.Sprintf("[用户画像] %s: %s", key, value)
+			return g.orchestrator.Ingest(ctx, "default", fact, "profile_update", "reverie")
+		})
+	}
+}
+
+// WireReflectionLoop connects the reflection experience store to the planner
+// so that compiled strategies are injected into conversation context.
+// This closes the feedback loop: tasks run → experiences recorded → strategies compiled
+// → strategies guide future conversations → better outcomes → better experiences.
+func (g *Gateway) WireReflectionLoop() {
+	if g.experienceStore == nil || g.planner == nil {
+		return
+	}
+	g.planner.SetStrategyContext(func() string {
+		return g.experienceStore.CompileStrategies(20)
+	})
+}
+
 // SetTaskStore attaches the task persistence store.
-func (g *Gateway) SetTaskStore(s *task.Store) { g.taskStore = s }
+func (g *Gateway) SetTaskStore(s task.Store) { g.taskStore = s }
 
 // SetTaskRunner attaches the task execution engine.
 func (g *Gateway) SetTaskRunner(r *task.Runner) { g.taskRunner = r }
@@ -345,6 +587,62 @@ func (g *Gateway) SetChannelRegistry(cr *channel.Registry) { g.channelReg = cr }
 // SetPreAckEmojis configures the emoji list for pre-ack reactions on incoming messages.
 func (g *Gateway) SetPreAckEmojis(emojis []string) { g.preAckEmojis = emojis }
 
+// SetWorkflowStore attaches the workflow definition/instance store.
+func (g *Gateway) SetWorkflowStore(s workflow.Store) { g.workflowStore = s }
+
+// SetWorkflowEngine attaches the workflow execution engine.
+func (g *Gateway) SetWorkflowEngine(e *workflow.Engine) { g.workflowEngine = e }
+
+// SetRBACEnforcer attaches the RBAC permission enforcer.
+func (g *Gateway) SetRBACEnforcer(e *rbac.Enforcer) { g.rbacEnforcer = e }
+
+// SetRBACMiddleware attaches the RBAC HTTP middleware.
+func (g *Gateway) SetRBACMiddleware(m *rbac.Middleware) { g.rbacMiddleware = m }
+
+// SetApprovalManager attaches the human-in-the-loop approval manager.
+func (g *Gateway) SetApprovalManager(m *approval.Manager) { g.approvalMgr = m }
+
+// SetSSEBroker attaches the SSE event stream broker.
+func (g *Gateway) SetSSEBroker(b *SSEBroker) { g.sseBroker = b }
+
+// SetEventTrail attaches the unified event audit trail.
+func (g *Gateway) SetEventTrail(t *observe.AuditTrail) { g.eventTrail = t }
+
+// SetLastPlanCache sets the plan result cache for save_as_workflow.
+func (g *Gateway) SetLastPlanCache(c *sync.Map) { g.lastPlanCache = c }
+
+// SetBrowserEngine attaches the browser engine for runtime management.
+func (g *Gateway) SetBrowserEngine(e *browser.Engine, headless bool, dataDir string) {
+	g.browserEngine = e
+	g.browserHeadless = headless
+	g.browserDataDir = dataDir
+}
+
+// SetBrowserRecognizer attaches the OCR recognizer.
+func (g *Gateway) SetBrowserRecognizer(r *browser.Recognizer) { g.browserRecognizer = r }
+
+// SetBrowserWorker attaches the browser sub-agent worker.
+func (g *Gateway) SetBrowserWorker(w *browser.Worker) { g.browserWorker = w }
+
+// SetBrowserNotifier attaches the browser event notifier.
+func (g *Gateway) SetBrowserNotifier(n *browser.Notifier) { g.browserNotifier = n }
+
+// MountPluginAPIRoutes registers all /v1/plugin-api/* routes from a PluginAPIHandler.
+// These routes are used by the Go/Python SDKs for plugin ↔ agent communication.
+// SetPasswordStore attaches the admin password store.
+func (g *Gateway) SetPasswordStore(ps *PasswordStore) {
+	g.passwordStore = ps
+	// Register auth routes (no auth required for these)
+	g.mux.HandleFunc("/v1/auth/login", g.handleAuthLogin)
+	g.mux.HandleFunc("/v1/auth/status", g.handleAuthStatus)
+	g.mux.HandleFunc("/v1/auth/set-password", g.handleAuthSetPassword)
+}
+
+func (g *Gateway) MountPluginAPIRoutes(handler *PluginAPIHandler) {
+	handler.RegisterRoutes(g.mux)
+	slog.Info("plugin API routes mounted", "prefix", "/v1/plugin-api/")
+}
+
 // MountPluginRoutes discovers all UIPlugin HTTP handlers from the plugin registry
 // and mounts them on the mux under /v1/ext/{plugin-key}/{path}.
 // Call this after all plugins are registered and before ListenAndServe.
@@ -352,7 +650,12 @@ func (g *Gateway) MountPluginRoutes() {
 	handlers := g.pluginReg.AllHTTPHandlers()
 	for path, handler := range handlers {
 		slog.Info("mounted plugin route", "path", path)
-		g.mux.HandleFunc(path, g.requireAuth(handler))
+		if strings.HasPrefix(path, "/v1/ext/airi/") {
+			// Airi acts as an external OpenAI client and does not use Yunque JWTs
+			g.mux.HandleFunc(path, handler)
+		} else {
+			g.mux.HandleFunc(path, g.requireAuth(handler))
+		}
 	}
 	if len(handlers) > 0 {
 		slog.Info("plugin routes mounted", "count", len(handlers))
@@ -429,6 +732,26 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	sw := &statusWriter{ResponseWriter: w, code: 200}
 	ctx := context.WithValue(r.Context(), ctxKeyReqID, reqID)
+
+	// Global rate limiting for mutating requests (POST, DELETE, PUT, PATCH)
+	// GET/OPTIONS/HEAD and health endpoints are exempt
+	if r.Method != "GET" && r.Method != "OPTIONS" && r.Method != "HEAD" &&
+		r.URL.Path != "/healthz" && r.URL.Path != "/v1/version" {
+		key := tenantFromCtx(ctx)
+		if key == "" {
+			// For unauthenticated requests, use IP-based limiting
+			key = "ip:" + r.RemoteAddr
+		}
+		if !g.limiter.Allow(key) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"rate limit exceeded","retry_after":60}`))
+			slog.Warn("rate limited", "path", r.URL.Path, "key", key, "req_id", reqID)
+			return
+		}
+	}
+
 	g.mux.ServeHTTP(sw, r.WithContext(ctx))
 	slog.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.code, "duration_ms", time.Since(start).Milliseconds(), "req_id", reqID)
 	if g.auditChain != nil {
@@ -442,244 +765,23 @@ func (g *Gateway) routes() {
 	// Specific API routes below take priority over this catch-all.
 	g.mux.HandleFunc("/", g.serveWebUI)
 
-	g.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		breaker := g.planner.LLMBreaker()
-		health := map[string]any{
-			"status":        "ok",
-			"version":       version.Version,
-			"breaker_state": breaker.State(),
-			"uptime_sec":    int(time.Since(g.startTime).Seconds()),
-		}
-		if breaker.State() == "open" {
-			health["status"] = "degraded"
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(health)
-	})
-	g.mux.HandleFunc("/v1/version", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(version.Get())
-	})
-
-	g.mux.HandleFunc("/v1/tenants", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			g.handleCreateTenant(w, r)
-		case http.MethodGet:
-			g.handleListTenants(w, r)
-		default:
-			apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-		}
-	}))
-
-	g.mux.HandleFunc("/v1/chat", g.requireAuth(g.limiter.Middleware(g.handleChat)))
-	g.mux.HandleFunc("/v1/chat/stream", g.requireAuth(g.limiter.Middleware(g.handleStreamChat)))
-	g.mux.HandleFunc("/v1/skills", g.requireAuth(g.handleSkills))
-	g.mux.HandleFunc("/v1/memory/stats", g.requireAuth(g.handleMemoryStats))
-	g.mux.HandleFunc("/v1/memory/search", g.requireAuth(g.handleMemorySearch))
-	g.mux.HandleFunc("/v1/memory/add", g.requireAuth(g.handleMemoryAdd))
-	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.handleSandboxExec))
-	g.mux.HandleFunc("/v1/system/info", g.requireAuth(g.handleSystemInfo))
-	g.mux.HandleFunc("/v1/metrics", g.requireAuth(g.handleMetrics))
-	g.mux.HandleFunc("/v1/metrics/prometheus", g.handleMetricsPrometheus)
-	g.mux.HandleFunc("/v1/scheduler/jobs", g.requireAuth(g.handleSchedulerJobs))
-	g.mux.HandleFunc("/v1/scheduler/add", g.requireAuth(g.handleSchedulerAdd))
-	g.mux.HandleFunc("/v1/scheduler/remove", g.requireAuth(g.handleSchedulerRemove))
-	g.mux.HandleFunc("/v1/conversations", g.requireAuth(g.handleConversations))
-	g.mux.HandleFunc("/v1/conversations/messages", g.requireAuth(g.handleConversationMessages))
-	g.mux.HandleFunc("/v1/conversations/manage", g.requireAuth(g.handleConversationManage))
-	g.mux.HandleFunc("/webhook/feishu", g.handleFeishuWebhook)
-	g.mux.HandleFunc("/v1/plugins", g.requireAuth(g.handlePlugins))
-	g.mux.HandleFunc("/v1/plugins/toggle", g.requireAuth(g.handlePluginToggle))
-	g.mux.HandleFunc("/v1/plugins/create", g.requireAuth(g.handlePluginCreate))
-	g.mux.HandleFunc("/v1/plugins/delete", g.requireAuth(g.handlePluginDelete))
-	g.mux.HandleFunc("/v1/plugins/files", g.requireAuth(g.handlePluginFiles))
-	g.mux.HandleFunc("/v1/plugins/ui", g.requireAuth(g.handlePluginUI))
-	g.mux.HandleFunc("/v1/upload", g.requireAuth(g.handleFileUpload))
-	g.mux.HandleFunc("/v1/memory/compact", g.requireAuth(g.handleMemoryCompact))
-	g.mux.HandleFunc("/v1/persona", g.requireAuth(g.handlePersona))
-	g.mux.HandleFunc("/v1/persona/skills", g.requireAuth(g.handlePersonaSkills))
-	g.mux.HandleFunc("/v1/persona/presets", g.requireAuth(g.handlePresets))
-	g.mux.HandleFunc("/v1/persona/presets/custom", g.requireAuth(g.handleCustomPreset))
-	g.mux.HandleFunc("/v1/persona/presets/features", g.requireAuth(g.handlePresetFeatures))
-	g.mux.HandleFunc("/v1/emotion/stickers", g.requireAuth(g.handleStickers))
-	g.mux.HandleFunc("/v1/emotion/history", g.requireAuth(g.handleEmotionHistory))
-	g.mux.HandleFunc("/v1/heartbeat", g.requireAuth(g.handleHeartbeat))
-	g.mux.HandleFunc("/v1/heartbeat/trigger", g.requireAuth(g.handleHeartbeatTrigger))
-	g.mux.HandleFunc("/v1/heartbeat/logs", g.requireAuth(g.handleHeartbeatLogs))
-	g.mux.HandleFunc("/v1/inbox", g.requireAuth(g.handleInbox))
-	g.mux.HandleFunc("/v1/inbox/read", g.requireAuth(g.handleInboxRead))
-	g.mux.HandleFunc("/v1/bots", g.requireAuth(g.handleBots))
-	g.mux.HandleFunc("/v1/bots/detail", g.requireAuth(g.handleBotDetail))
-	g.mux.HandleFunc("/v1/search", g.requireAuth(g.handleSearch))
-	g.mux.HandleFunc("/v1/search/providers", g.requireAuth(g.handleSearchProviders))
-	g.mux.HandleFunc("/v1/graph/entities", g.requireAuth(g.handleGraphEntities))
-	g.mux.HandleFunc("/v1/graph/relations", g.requireAuth(g.handleGraphRelations))
-	g.mux.HandleFunc("/v1/graph/context", g.requireAuth(g.handleGraphContext))
-	g.mux.HandleFunc("/v1/graph/stats", g.requireAuth(g.handleGraphStats))
-	g.mux.HandleFunc("/v1/router/stats", g.requireAuth(g.handleRouterStats))
-	g.mux.HandleFunc("/v1/identity/resolve", g.requireAuth(g.handleIdentityResolve))
-	g.mux.HandleFunc("/v1/identity/profiles", g.requireAuth(g.handleIdentityProfiles))
-	g.mux.HandleFunc("/v1/cost/summary", g.requireAuth(g.handleCostSummary))
-	g.mux.HandleFunc("/v1/cost/budget", g.requireAuth(g.handleCostBudget))
-	g.mux.HandleFunc("/v1/cost/task", g.requireAuth(g.handleCostByTask))
-	g.mux.HandleFunc("/v1/cost/task/timeline", g.requireAuth(g.handleCostTaskTimeline))
-	g.mux.HandleFunc("/v1/cost/breakdown", g.requireAuth(g.handleCostBreakdown))
-	g.mux.HandleFunc("/v1/cost/history", g.requireAuth(g.handleCostHistory))
-	g.mux.HandleFunc("/v1/cost/alerts", g.requireAuth(g.handleCostAlerts))
-	g.mux.HandleFunc("/v1/fork", g.requireAuth(g.handleFork))
-	g.mux.HandleFunc("/v1/fork/branch", g.requireAuth(g.handleForkBranch))
-	g.mux.HandleFunc("/v1/fork/list", g.requireAuth(g.handleForkList))
-	g.mux.HandleFunc("/v1/embeddings", g.requireAuth(g.handleEmbeddings))
-	g.mux.HandleFunc("/v1/subagent", g.requireAuth(g.handleSubagent))
-	g.mux.HandleFunc("/v1/subagent/message", g.requireAuth(g.handleSubagentMessage))
-	g.mux.HandleFunc("/v1/system/stats", g.requireAuth(g.handleSystemStats))
-	g.mux.HandleFunc("/v1/cache/stats", g.requireAuth(g.handleCacheStats))
-	g.mux.HandleFunc("/v1/ws", g.requireAuth(g.handleWebSocket))
-	g.mux.HandleFunc("/v1/token", g.handleTokenGenerate)
-	g.mux.HandleFunc("/v1/usage", g.requireAuth(g.handleUsage))
-	g.mux.HandleFunc("/v1/quota", g.requireAuth(g.handleSetQuota))
-	g.mux.HandleFunc("/v1/audit/tail", g.requireAuth(g.handleAuditTail))
-	g.mux.HandleFunc("/v1/audit/verify", g.requireAuth(g.handleAuditVerify))
-	g.mux.HandleFunc("/v1/audit/stats", g.requireAuth(g.handleAuditStats))
-	g.mux.HandleFunc("/v1/market/search", g.requireAuth(g.handleMarketSearch))
-	g.mux.HandleFunc("/v1/market/top", g.requireAuth(g.handleMarketTop))
-	g.mux.HandleFunc("/v1/market/stats", g.requireAuth(g.handleMarketStats))
-	g.mux.HandleFunc("/v1/federation/peers", g.requireAuth(g.handleFedPeers))
-	g.mux.HandleFunc("/v1/federation/stats", g.requireAuth(g.handleFedStats))
-	g.mux.HandleFunc("/v1/knowledge/search", g.requireAuth(g.handleKBSearch))
-	g.mux.HandleFunc("/v1/knowledge/sources", g.requireAuth(g.handleKBSources))
-	g.mux.HandleFunc("/v1/knowledge/stats", g.requireAuth(g.handleKBStats))
-	g.mux.HandleFunc("/v1/knowledge/upload", g.requireAuth(g.handleKBUpload))
-	g.mux.HandleFunc("/v1/knowledge/ingest", g.requireAuth(g.handleKBIngest))
-	g.mux.HandleFunc("/v1/knowledge/import-url", g.requireAuth(g.handleKBImportURL))
-	g.mux.HandleFunc("/v1/knowledge/import-repo", g.requireAuth(g.handleKBImportRepo))
-	g.mux.HandleFunc("/v1/knowledge/source", g.requireAuth(g.handleKBDelete))
-	g.mux.HandleFunc("/v1/cron/list", g.requireAuth(g.handleCronList))
-	g.mux.HandleFunc("/v1/cron/add", g.requireAuth(g.handleCronAdd))
-	g.mux.HandleFunc("/v1/cron/remove", g.requireAuth(g.handleCronRemove))
-	g.mux.HandleFunc("/v1/cron/run", g.requireAuth(g.handleCronRun))
-	g.mux.HandleFunc("/v1/triggers", g.requireAuth(g.handleTriggers))
-	g.mux.HandleFunc("/v1/triggers/emit", g.requireAuth(g.handleTriggerEmit))
-	g.mux.HandleFunc("/v1/triggers/v2", g.requireAuth(g.handleTriggersV2))
-	g.mux.HandleFunc("/v1/triggers/v2/emit", g.requireAuth(g.handleTriggersV2Emit))
-	g.mux.HandleFunc("/v1/triggers/v2/runs", g.requireAuth(g.handleTriggersV2Runs))
-	g.mux.HandleFunc("/v1/triggers/v2/events", g.requireAuth(g.handleTriggersV2Events))
-	g.mux.HandleFunc("/v1/tools/exec", g.requireAuth(g.handleToolExec))
-	g.mux.HandleFunc("/v1/tools/list", g.requireAuth(g.handleToolList))
-	g.mux.HandleFunc("/v1/tools/poll", g.requireAuth(g.handleToolPoll))
-	g.mux.HandleFunc("/v1/tools/kill", g.requireAuth(g.handleToolKill))
-
-	// React & Sticker API
-	g.mux.HandleFunc("/v1/react", g.requireAuth(g.handleReact))
-	g.mux.HandleFunc("/v1/sticker/send", g.requireAuth(g.handleSendSticker))
-
-	// Channel Groups API
-	g.mux.HandleFunc("/v1/channels/groups", g.requireAuth(g.handleChannelGroups))
-
-	// Reverie API (inner monologue visualization & operations)
-	g.mux.HandleFunc("/v1/reverie/journal", g.requireAuth(g.handleReverieJournal))
-	g.mux.HandleFunc("/v1/reverie/stats", g.requireAuth(g.handleReverieStats))
-	g.mux.HandleFunc("/v1/reverie/config", g.requireAuth(g.handleReverieConfig))
-	g.mux.HandleFunc("/v1/reverie/think", g.requireAuth(g.handleReverieThink))
-	g.mux.HandleFunc("/v1/reverie/thought", g.requireAuth(g.handleReverieDeleteThought))
-	g.mux.HandleFunc("/v1/reverie/targets", g.requireAuth(g.handleReverieTargets))
-	g.mux.HandleFunc("/v1/reverie/actions", g.requireAuth(g.handleReverieActions))
-
-	// Task Runtime API
-	g.mux.HandleFunc("/v1/tasks", g.requireAuth(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			g.handleTaskList(w, r)
-		case http.MethodPost:
-			g.handleTaskCreate(w, r)
-		case http.MethodDelete:
-			g.handleTaskDelete(w, r)
-		default:
-			apperror.WriteCode(w, apperror.CodeBadRequest, "method not allowed")
-		}
-	}))
-	g.mux.HandleFunc("/v1/tasks/run", g.requireAuth(g.handleTaskRun))
-	g.mux.HandleFunc("/v1/tasks/cancel", g.requireAuth(g.handleTaskCancel))
-	g.mux.HandleFunc("/v1/tasks/pause", g.requireAuth(g.handleTaskPause))
-	g.mux.HandleFunc("/v1/tasks/resume", g.requireAuth(g.handleTaskResume))
-	g.mux.HandleFunc("/v1/tasks/restart", g.requireAuth(g.handleTaskRestart))
-	g.mux.HandleFunc("/v1/tasks/gaps", g.requireAuth(g.handleGaps))
-	g.mux.HandleFunc("/v1/tasks/gaps/resolve", g.requireAuth(g.handleGapResolve))
-	g.mux.HandleFunc("/v1/tasks/memory", g.requireAuth(g.handleTaskWorkingMemory))
-	g.mux.HandleFunc("/v1/tasks/threads", g.requireAuth(g.handleTaskThread))
-	g.mux.HandleFunc("/v1/tasks/templates", g.requireAuth(g.handleTemplates))
-	g.mux.HandleFunc("/v1/tasks/templates/instantiate", g.requireAuth(g.handleTemplateInstantiate))
-
-	// Document Generation API
-	g.mux.HandleFunc("/v1/documents/generate", g.requireAuth(g.handleDocGenerate))
-
-	// State Kernel API
-	g.mux.HandleFunc("/v1/state", g.requireAuth(g.handleStateSnapshot))
-	g.mux.HandleFunc("/v1/state/goals", g.requireAuth(g.handleStateGoals))
-	g.mux.HandleFunc("/v1/state/focus", g.requireAuth(g.handleStateFocus))
-	g.mux.HandleFunc("/v1/state/resources", g.requireAuth(g.handleStateResources))
-
-	// Reflection / Experience
-	g.mux.HandleFunc("/v1/reflect/experiences", g.requireAuth(g.handleExperiences))
-	g.mux.HandleFunc("/v1/reflect/strategies", g.requireAuth(g.handleStrategies))
-
-	// SkillHub API
-	g.mux.HandleFunc("/api/skillhub/search", g.requireAuth(g.handleSkillHubSearch))
-	g.mux.HandleFunc("/api/skillhub/install", g.requireAuth(g.handleSkillHubInstall))
-	g.mux.HandleFunc("/api/skillhub/installed", g.requireAuth(g.handleSkillHubInstalled))
-	g.mux.HandleFunc("/api/skillhub/uninstall", g.requireAuth(g.handleSkillHubUninstall))
-	g.mux.HandleFunc("/api/skillhub/trending", g.requireAuth(g.handleSkillHubTrending))
-	g.mux.HandleFunc("/api/skillhub/detail", g.requireAuth(g.handleSkillHubDetail))
-	g.mux.HandleFunc("/api/skillhub/check-updates", g.requireAuth(g.handleSkillHubCheckUpdates))
-	g.mux.HandleFunc("/api/skillhub/update", g.requireAuth(g.handleSkillHubUpdate))
-	g.mux.HandleFunc("/api/skillhub/rollback", g.requireAuth(g.handleSkillHubRollback))
-	g.mux.HandleFunc("/api/skillhub/versions", g.requireAuth(g.handleSkillHubVersions))
-	g.mux.HandleFunc("/api/skillhub/policy", g.requireAuth(g.handleSkillHubPolicy))
-	g.mux.HandleFunc("/api/skillhub/policy/check", g.requireAuth(g.handleSkillHubPolicyCheck))
-	g.mux.HandleFunc("/api/skillhub/analytics", g.requireAuth(g.handleSkillHubAnalytics))
-
-	// Iterate (self-improvement) API
-	g.mux.HandleFunc("/api/iterate/proposals", g.requireAuth(g.handleIterateProposals))
-	g.mux.HandleFunc("/api/iterate/approve", g.requireAuth(g.handleIterateApprove))
-	g.mux.HandleFunc("/api/iterate/reject", g.requireAuth(g.handleIterateReject))
-	g.mux.HandleFunc("/api/iterate/trigger", g.requireAuth(g.handleIterateTrigger))
-	g.mux.HandleFunc("/api/iterate/status", g.requireAuth(g.handleIterateStatus))
-
-	// Innovation API (Phase I)
-	g.mux.HandleFunc("/api/trust/scores", g.requireAuth(g.handleTrustScores))
-	g.mux.HandleFunc("/api/trust/reset", g.requireAuth(g.handleTrustReset))
-	g.mux.HandleFunc("/api/audit/trail", g.requireAuth(g.handleAuditTrail))
-	g.mux.HandleFunc("/api/skillgrow/patterns", g.requireAuth(g.handleSkillGrowPatterns))
-	g.mux.HandleFunc("/api/review/status", g.requireAuth(g.handleReviewStatus))
-
-	// Settings API (env config management + setup check)
-	g.mux.HandleFunc("/api/settings/schema", g.requireAuth(g.handleSettingsSchema))
-	g.mux.HandleFunc("/api/settings/config", g.requireAuth(g.handleSettingsConfig))
-	g.mux.HandleFunc("/api/settings/check", g.handleSettingsCheck) // no auth — needed for first-run setup
-
-	// Provider API (LLM provider management)
-	g.mux.HandleFunc("/api/providers", g.requireAuth(g.handleProviderList))
-	g.mux.HandleFunc("/api/providers/test", g.requireAuth(g.handleProviderTest))
-	g.mux.HandleFunc("/api/providers/enable", g.requireAuth(g.handleProviderEnable))
-	g.mux.HandleFunc("/api/providers/disable", g.requireAuth(g.handleProviderDisable))
-	g.mux.HandleFunc("/api/providers/switch-model", g.requireAuth(g.handleProviderSwitchModel))
-	g.mux.HandleFunc("/api/providers/session", g.requireAuth(g.handleProviderSessionOverride))
-	g.mux.HandleFunc("/api/providers/local/discover", g.requireAuth(g.handleLocalDiscover))
-	g.mux.HandleFunc("/api/providers/local/register", g.requireAuth(g.handleLocalRegister))
-
-	// Backup & Restore
-	g.mux.HandleFunc("/v1/backup/export", g.requireAuth(g.handleBackupExport))
-	g.mux.HandleFunc("/v1/backup/import", g.requireAuth(g.handleBackupImport))
-	g.mux.HandleFunc("/v1/backup/info", g.requireAuth(g.handleBackupInfo))
-
-	// Speech (TTS / STT)
-	g.mux.HandleFunc("/v1/speech/tts", g.requireAuth(g.handleTTS))
-	g.mux.HandleFunc("/v1/speech/stt", g.requireAuth(g.handleSTT))
-	g.mux.HandleFunc("/v1/speech/voices", g.requireAuth(g.handleVoices))
-
-	// WebChat widget (public — no auth, to allow embedding)
-	g.mux.HandleFunc("/v1/webchat/widget.js", g.handleWebChatWidget)
+	// Domain-specific route groups
+	g.registerSystemRoutes()    // healthz, version, tenants, metrics, settings, backup, speech, heartbeat, federation
+	g.registerChatRoutes()      // chat, ws, conversations, persona, emotion, bots, inbox, webhooks, webchat
+	g.registerMemoryRoutes()    // memory, graph, identity, embeddings, search
+	g.registerKnowledgeRoutes() // knowledge base (RAG)
+	g.registerTaskRoutes()      // tasks, state kernel, reflection, documents
+	g.registerTriggerRoutes()   // triggers, cron, scheduler, tools, sandbox
+	g.registerPluginRoutes()    // plugins, skills, skill market, skillhub
+	g.registerGovernanceRoutes() // audit, trust, iterate, review, cost, usage
+	g.registerProviderRoutes()  // LLM providers, router stats
+	g.registerReverieRoutes()   // reverie inner monologue
+	g.registerWorkflowRoutes()  // workflow engine (DAG)
+	g.registerRBACRoutes()      // role-based access control
+	g.registerApprovalRoutes()  // human-in-the-loop approval
+	g.registerSSERoutes()       // SSE event stream
+	g.registerTraceRoutes()     // execution trace / audit API
+	g.registerBrowserRoutes()   // browser engine management
 }
 
 // --- Auth middleware ---
@@ -699,20 +801,8 @@ func (g *Gateway) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 
-		// Localhost bypass: auto-authenticate with default tenant for local
-		// desktop access (browser same machine). No key required.
-		if token == "" {
-			if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-				if host == "127.0.0.1" || host == "::1" {
-					tenants := g.tenants.List()
-					if len(tenants) > 0 {
-						ctx := contextWithTenant(r.Context(), tenants[0].ID)
-						next.ServeHTTP(w, r.WithContext(ctx))
-						return
-					}
-				}
-			}
-		}
+		// Localhost bypass is disabled — all access requires authentication.
+		// Set LOCALHOST_BYPASS=true in .env to re-enable for development.
 
 		if token == "" {
 			apperror.WriteCode(w, apperror.CodeUnauthorized, "missing credentials")

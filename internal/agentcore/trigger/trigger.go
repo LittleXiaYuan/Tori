@@ -47,6 +47,7 @@ const (
 	ActionSendMessage  ActionType = "send_message"  // 发送消息到渠道
 	ActionCallSkill    ActionType = "call_skill"    // 调用技能
 	ActionWriteMemory  ActionType = "write_memory"  // 写记忆/更新画像
+	ActionRunWorkflow  ActionType = "run_workflow"  // 执行工作流
 
 	// Backward compatibility
 	ActionAgentTurn  ActionType = "agent_turn"  // 等同于 create_task

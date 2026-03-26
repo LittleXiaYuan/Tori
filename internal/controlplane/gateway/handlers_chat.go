@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"yunque-agent/internal/agentcore/adaptive"
@@ -16,6 +17,7 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/apperror"
+	channelpkg "yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/observe"
 )
 
@@ -243,6 +245,16 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		g.metrics.RecordSkillCall(sk, 0, nil)
 	}
 
+	// ReplyHook broadcast
+	lastUserMsgForHook := ""
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			lastUserMsgForHook = req.Messages[i].Content
+			break
+		}
+	}
+	g.InvokeReplyHooks(ctx, channelpkg.Message{ChannelType: "webui", Content: lastUserMsgForHook}, channelpkg.Reply{Content: result.Reply})
+
 	// Cost tracking: record actual token usage (use routed model)
 	if g.costTracker != nil {
 		model := g.planner.LLMClientFor(routedTier).Model()
@@ -345,6 +357,15 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		"reply":       result.Reply,
 		"skills_used": result.SkillsUsed,
 		"steps":       result.Steps,
+	}
+	if len(result.Actions) > 0 {
+		resp["actions"] = result.Actions
+	}
+	roots := []string{".", filepath.Join(".", "data"), filepath.Join(".", "data", "output"), filepath.Join(".", "data", "tasks")}
+	rich := RenderAgentActions(result.Actions)
+	rich = AttachFilesToRich(rich, result, roots)
+	if rich != nil && len(rich.Components) > 0 {
+		resp["rich"] = json.RawMessage(rich.ToJSON())
 	}
 	if result.Plan != nil {
 		resp["plan"] = result.Plan

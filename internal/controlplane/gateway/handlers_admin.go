@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
@@ -798,9 +800,8 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Read file content
-	content := make([]byte, header.Size)
-	if _, err := file.Read(content); err != nil {
+	content, err := io.ReadAll(file)
+	if err != nil {
 		apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "read file failed", err))
 		return
 	}
@@ -813,14 +814,34 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sb.WriteFile(header.Filename, string(content))
+	savedPath := filepath.Join(sb.WorkDir(), header.Filename)
 
-	slog.Info("file uploaded", "tenant", tid, "name", header.Filename, "size", header.Size)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	slog.Info("file uploaded", "tenant", tid, "name", header.Filename, "size", len(content))
+
+	resp := map[string]any{
 		"filename": header.Filename,
-		"size":     header.Size,
-		"path":     sb.WorkDir() + "/" + header.Filename,
-	})
+		"size":     len(content),
+		"path":     savedPath,
+	}
+
+	snippet := TryParseFile(header.Filename, content)
+	if g.planner != nil {
+		if analysis, aerr := g.planner.AnalyzeUploadedFile(r.Context(), header.Filename, snippet); aerr != nil {
+			slog.Debug("upload template analysis skipped", "err", aerr)
+		} else {
+			actions := planner.AnalysisToActions(savedPath, analysis)
+			if len(actions) > 0 {
+				resp["analysis"] = analysis
+				resp["actions"] = actions
+				if rich := RenderAgentActions(actions); rich != nil {
+					resp["rich"] = json.RawMessage(rich.ToJSON())
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (g *Gateway) handleSchedulerJobs(w http.ResponseWriter, r *http.Request) {

@@ -203,14 +203,11 @@ func checkPersona() (string, bool) {
 }
 
 func checkDatabase() (string, bool) {
-	url := os.Getenv("DATABASE_URL")
-	if url == "" {
-		return "使用内置 SQLite（适合单机）", true
+	dbPath := os.Getenv("LEDGER_DB_PATH")
+	if dbPath == "" {
+		dbPath = "data/ledger/ledger.db"
 	}
-	if !strings.HasPrefix(url, "postgres") {
-		return "DATABASE_URL 格式不正确", false
-	}
-	return "PostgreSQL: " + url[:min(30, len(url))] + "...", true
+	return "Ledger (SQLite): " + dbPath, true
 }
 
 func checkJWT() (string, bool) {

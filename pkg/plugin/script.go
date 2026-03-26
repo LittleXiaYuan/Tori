@@ -42,7 +42,23 @@ type ScriptPlugin struct {
 	dir      string
 	manifest Manifest
 	skills   []skills.Skill
+	apiToken string // injected by agent runtime for SDK access
 }
+
+// SetAPIToken sets the plugin-scoped API token for SDK calls.
+// This is called by the agent when issuing tokens during init.
+// The token is propagated to all child scriptSkill instances.
+func (s *ScriptPlugin) SetAPIToken(token string) {
+	s.apiToken = token
+	for _, sk := range s.skills {
+		if ss, ok := sk.(*scriptSkill); ok {
+			ss.token = token
+		}
+	}
+}
+
+// APIToken returns the plugin's API token.
+func (s *ScriptPlugin) APIToken() string { return s.apiToken }
 
 // PluginType defines how a plugin runs.
 type PluginType string
@@ -161,6 +177,69 @@ func (s *ScriptPlugin) Skills() []skills.Skill { return s.skills }
 func (s *ScriptPlugin) Dir() string            { return s.dir }
 func (s *ScriptPlugin) Manifest() Manifest     { return s.manifest }
 
+// CallHook invokes the plugin's hook handler script for a lifecycle event.
+// The handler script is named "hook.py" / "hook.js" / "hook.sh" in the plugin directory.
+// If no hook script exists, the call is a no-op (returns "", nil).
+// The hook payload is passed as JSON via stdin and via HOOK_EVENT/HOOK_DATA env vars.
+func (s *ScriptPlugin) CallHook(ctx context.Context, payload HookPayload) (string, error) {
+	// Determine hook script filename
+	var hookScript string
+	switch s.manifest.Language {
+	case "node":
+		hookScript = "hook.js"
+	case "shell":
+		hookScript = "hook.sh"
+	default:
+		hookScript = "hook.py"
+	}
+	hookPath := filepath.Join(s.dir, hookScript)
+	if _, err := os.Stat(hookPath); err != nil {
+		return "", nil // no hook script, silently skip
+	}
+
+	payloadJSON, _ := json.Marshal(payload)
+	dataJSON, _ := json.Marshal(payload.Data)
+
+	envVars := os.Environ()
+	envVars = append(envVars,
+		"HOOK_EVENT="+payload.Event,
+		"HOOK_DATA="+string(dataJSON),
+		"PLUGIN_NAME="+s.manifest.Name,
+		"PLUGIN_DIR="+s.dir,
+	)
+
+	hookCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var cmd *exec.Cmd
+	switch s.manifest.Language {
+	case "node":
+		cmd = exec.CommandContext(hookCtx, "node", hookPath)
+	case "shell":
+		if runtime.GOOS == "windows" {
+			cmd = exec.CommandContext(hookCtx, "cmd", "/c", hookPath)
+		} else {
+			cmd = exec.CommandContext(hookCtx, "sh", hookPath)
+		}
+	default: // python
+		interpreter := "python3"
+		if runtime.GOOS == "windows" {
+			interpreter = "python"
+		}
+		cmd = exec.CommandContext(hookCtx, interpreter, hookPath)
+	}
+	cmd.Dir = s.dir
+	cmd.Env = envVars
+	cmd.Stdin = strings.NewReader(string(payloadJSON))
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Warn("plugin hook script error", "plugin", s.manifest.Name, "event", payload.Event, "err", err)
+		return string(out), err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // UITabs implements UIPlugin. Returns tabs declared in the manifest's ui section.
 func (s *ScriptPlugin) UITabs() []UITab {
 	if s.manifest.UI == nil {
@@ -266,6 +345,7 @@ type scriptSkill struct {
 	handler     string
 	language    string
 	dir         string
+	token       string // API token for yunque SDK (inherited from parent ScriptPlugin)
 }
 
 func (s *scriptSkill) Name() string        { return s.name }
@@ -293,10 +373,20 @@ func (s *scriptSkill) Execute(ctx context.Context, args map[string]any, env *ski
 	// Pass arguments as JSON via stdin (and also as env vars)
 	argsJSON, _ := json.Marshal(args)
 
-	// Build environment
+	// Build environment with yunque SDK variables
 	envVars := os.Environ()
 	envVars = append(envVars, "PLUGIN_ARGS="+string(argsJSON))
 	envVars = append(envVars, "PLUGIN_SKILL="+s.name)
+	agentPort := os.Getenv("AGENT_PORT")
+	if agentPort == "" {
+		agentPort = "9090"
+	}
+	envVars = append(envVars, "YUNQUE_API_BASE=http://localhost:"+agentPort)
+	envVars = append(envVars, "YUNQUE_PLUGIN_NAME="+s.name)
+	envVars = append(envVars, "YUNQUE_PLUGIN_DIR="+s.dir)
+	if s.token != "" {
+		envVars = append(envVars, "YUNQUE_PLUGIN_TOKEN="+s.token)
+	}
 	if env != nil {
 		envVars = append(envVars, "TENANT_ID="+env.TenantID)
 	}

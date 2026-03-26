@@ -103,7 +103,7 @@ func (w *WeChatOfficial) Start(ctx context.Context, handler func(Message) Reply)
 		case msg := <-w.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if reply.Content != "" {
+				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 					if err := w.Send(ctx, m.UserID, reply); err != nil {
 						slog.Warn("wechat official: reply failed", "to", m.UserID, "err", err)
 					}
@@ -229,7 +229,7 @@ func (w *WeChatOfficial) Send(_ context.Context, target string, reply Reply) err
 	}
 
 	// Split long messages (WeChat text limit: 600 chars for customer service API)
-	parts := splitWxOfficialMessage(reply.Content, 600)
+	parts := splitWxOfficialMessage(ContentWithButtonFallback(reply), 600)
 	for _, part := range parts {
 		payload := map[string]any{
 			"touser":  target,

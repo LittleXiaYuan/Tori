@@ -323,6 +323,21 @@ func (g *Graph) Stats() map[string]int {
 	}
 }
 
+// ExportAll returns all entities and relations for external persistence.
+func (g *Graph) ExportAll() ([]Entity, []Relation) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	entities := make([]Entity, 0, len(g.entities))
+	for _, e := range g.entities {
+		entities = append(entities, *e)
+	}
+	relations := make([]Relation, 0, len(g.relations))
+	for _, r := range g.relations {
+		relations = append(relations, *r)
+	}
+	return entities, relations
+}
+
 func removeFromSlice(s []string, v string) []string {
 	for i, item := range s {
 		if item == v {

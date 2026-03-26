@@ -104,13 +104,13 @@ func TestTelegramParseCommand(t *testing.T) {
 
 func TestTelegramHandleCommand(t *testing.T) {
 	tg := NewTelegram("fake")
-	reply := tg.handleCommand("/start")
-	if reply.Content == "" {
+	reply, ok := tg.handleCommand("/start")
+	if !ok || reply.Content == "" {
 		t.Fatal("start command should return non-empty reply")
 	}
-	reply = tg.handleCommand("/unknown")
-	if !strings.Contains(reply.Content, "未知命令") {
-		t.Fatal("unknown command should mention '未知命令'")
+	_, ok = tg.handleCommand("/unknown")
+	if ok {
+		t.Fatal("unknown command should not be handled by Telegram's built-in handler")
 	}
 }
 

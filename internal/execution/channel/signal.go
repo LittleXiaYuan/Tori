@@ -100,7 +100,7 @@ func (s *Signal) Start(ctx context.Context, handler func(Message) Reply) error {
 		}
 
 		reply := handler(msg)
-		if reply.Content != "" {
+		if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 			target := sender
 			if groupID != "" {
 				target = groupID
@@ -124,11 +124,12 @@ func (s *Signal) Send(ctx context.Context, target string, reply Reply) error {
 		args = append([]string{"--config", s.configDir}, args...)
 	}
 
+	text := ContentWithButtonFallback(reply)
 	// Determine if target is a group or individual
 	if strings.HasPrefix(target, "+") {
-		args = append(args, "send", "-m", reply.Content, target)
+		args = append(args, "send", "-m", text, target)
 	} else {
-		args = append(args, "send", "-m", reply.Content, "-g", target)
+		args = append(args, "send", "-m", text, "-g", target)
 	}
 
 	cmd := exec.CommandContext(ctx, "signal-cli", args...)
@@ -155,7 +156,7 @@ type signalEnvelope struct {
 type signalDataMessage struct {
 	Timestamp int64            `json:"timestamp"`
 	Message   string           `json:"message"`
-	GroupInfo  *signalGroupInfo `json:"groupInfo"`
+	GroupInfo *signalGroupInfo `json:"groupInfo"`
 }
 
 type signalGroupInfo struct {

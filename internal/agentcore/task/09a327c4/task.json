@@ -1,0 +1,10 @@
+{
+  "id": "09a327c4",
+  "title": "Test Task",
+  "description": "Test description",
+  "status": "planning",
+  "steps": null,
+  "tenant_id": "tenant-1",
+  "created_at": "2026-03-20T10:50:26.4577201+08:00",
+  "updated_at": "2026-03-20T10:50:26.4582352+08:00"
+}

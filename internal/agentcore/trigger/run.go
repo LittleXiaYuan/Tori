@@ -135,15 +135,17 @@ func (b *BudgetConfig) CheckBudget(now time.Time) (allowed bool, reason string) 
 		return true, ""
 	}
 
+	// Auto-reset counters when day/week rolls over
+	b.maybeReset(now)
+
 	// 检查每日次数限制
-	if b.MaxRunsPerDay > 0 {
-		// TODO: 需要从 Store 查询今日执行次数
-		// 这里先简化处理
+	if b.MaxRunsPerDay > 0 && b.CurrentDayRuns >= b.MaxRunsPerDay {
+		return false, "daily run limit exceeded"
 	}
 
 	// 检查每周次数限制
-	if b.MaxRunsPerWeek > 0 {
-		// TODO: 需要从 Store 查询本周执行次数
+	if b.MaxRunsPerWeek > 0 && b.CurrentWeekRuns >= b.MaxRunsPerWeek {
+		return false, "weekly run limit exceeded"
 	}
 
 	// 检查成本限制
@@ -152,5 +154,43 @@ func (b *BudgetConfig) CheckBudget(now time.Time) (allowed bool, reason string) 
 	}
 
 	return true, ""
+}
+
+// RecordRun increments execution counters after a trigger run completes.
+func (b *BudgetConfig) RecordRun(now time.Time, cost float64) {
+	if b == nil {
+		return
+	}
+	b.maybeReset(now)
+	b.CurrentDayRuns++
+	b.CurrentWeekRuns++
+	b.CurrentDayCost += cost
+	b.CurrentWeekCost += cost
+}
+
+// maybeReset resets daily/weekly counters when the period rolls over.
+func (b *BudgetConfig) maybeReset(now time.Time) {
+	if b.LastResetAt.IsZero() {
+		b.LastResetAt = now
+		return
+	}
+
+	lastDay := b.LastResetAt.Truncate(24 * time.Hour)
+	today := now.Truncate(24 * time.Hour)
+
+	// New day → reset daily counters
+	if today.After(lastDay) {
+		b.CurrentDayRuns = 0
+		b.CurrentDayCost = 0
+		b.LastResetAt = now
+	}
+
+	// New week (Monday) → reset weekly counters
+	_, lastWeek := b.LastResetAt.ISOWeek()
+	_, thisWeek := now.ISOWeek()
+	if thisWeek != lastWeek {
+		b.CurrentWeekRuns = 0
+		b.CurrentWeekCost = 0
+	}
 }
 

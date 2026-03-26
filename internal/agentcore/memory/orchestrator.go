@@ -79,13 +79,15 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 
 // Orchestrator coordinates five memory layers into one unified system.
 type Orchestrator struct {
-	mu           sync.RWMutex
-	config       OrchestratorConfig
-	manager      *Manager       // short + mid + long
-	graph        *Graph         // knowledge graph
-	editable     *EditableMemory // agent-editable blocks
-	importanceFn ImportanceFunc
-	promotionLog []promotionEntry
+	mu               sync.RWMutex
+	config           OrchestratorConfig
+	manager          *Manager           // short + mid + long
+	graph            *Graph             // knowledge graph
+	editable         *EditableMemory    // agent-editable blocks
+	importanceFn     ImportanceFunc
+	conflictDetector *ConflictDetector  // optional: detects memory contradictions
+	promotionLog     []promotionEntry
+	conflictLog      []Conflict         // recent conflicts detected
 }
 
 type promotionEntry struct {
@@ -108,6 +110,20 @@ func NewOrchestrator(cfg OrchestratorConfig, mgr *Manager, g *Graph, em *Editabl
 // SetImportanceFunc sets the importance evaluator.
 func (o *Orchestrator) SetImportanceFunc(fn ImportanceFunc) {
 	o.importanceFn = fn
+}
+
+// SetConflictDetector enables memory conflict detection.
+func (o *Orchestrator) SetConflictDetector(cd *ConflictDetector) {
+	o.conflictDetector = cd
+}
+
+// Conflicts returns the recent conflict log.
+func (o *Orchestrator) Conflicts() []Conflict {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	out := make([]Conflict, len(o.conflictLog))
+	copy(out, o.conflictLog)
+	return out
 }
 
 // ──────────────────────────────────────────────
@@ -234,6 +250,11 @@ func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, 
 		Source:   source,
 	}
 
+	// Async conflict detection: check new content against existing memories
+	if o.conflictDetector != nil && importance >= ImportanceMedium {
+		go o.detectAndResolveConflicts(ctx, tenantID, content)
+	}
+
 	switch importance {
 	case ImportanceLow:
 		return o.manager.Short.Put(ctx, tenantID, item)
@@ -246,6 +267,68 @@ func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, 
 		return o.manager.AddLong(ctx, tenantID, item)
 	}
 	return o.manager.Short.Put(ctx, tenantID, item)
+}
+
+// detectAndResolveConflicts runs asynchronously after Ingest to find and handle
+// contradictions between new content and existing memories.
+func (o *Orchestrator) detectAndResolveConflicts(ctx context.Context, tenantID, newContent string) {
+	// Recall existing memories related to the new content
+	existing := o.Recall(ctx, tenantID, newContent, 10)
+	if len(existing) == 0 {
+		return
+	}
+
+	conflicts := o.conflictDetector.DetectConflicts(ctx, newContent, existing)
+	if len(conflicts) == 0 {
+		return
+	}
+
+	o.mu.Lock()
+	o.conflictLog = append(o.conflictLog, conflicts...)
+	// Keep only last 100 conflicts
+	if len(o.conflictLog) > 100 {
+		o.conflictLog = o.conflictLog[len(o.conflictLog)-100:]
+	}
+	o.mu.Unlock()
+
+	for _, c := range conflicts {
+		switch c.Resolution {
+		case ResOverwrite:
+			if c.Confidence >= 0.7 {
+				slog.Info("conflict: auto-overwrite",
+					"subject", c.Subject,
+					"old", truncate(c.OldFact, 60),
+					"new", truncate(c.NewFact, 60),
+					"confidence", c.Confidence,
+				)
+				// Mark old fact as superseded in editable memory
+				if o.editable != nil {
+					o.editable.AddBlock("_superseded:"+c.Subject, fmt.Sprintf(
+						"[已过时] %s → 新事实: %s",
+						truncate(c.OldFact, 80), truncate(c.NewFact, 80),
+					), 500)
+				}
+			}
+		case ResMerge:
+			slog.Info("conflict: merge (both facts kept with annotation)",
+				"subject", c.Subject,
+				"confidence", c.Confidence,
+			)
+		case ResKeepBoth:
+			slog.Debug("conflict: ambiguous, flagged for review",
+				"subject", c.Subject,
+			)
+		}
+	}
+}
+
+// truncate shortens a string for log display.
+func truncate(s string, maxRunes int) string {
+	r := []rune(s)
+	if len(r) <= maxRunes {
+		return s
+	}
+	return string(r[:maxRunes]) + "…"
 }
 
 // ──────────────────────────────────────────────

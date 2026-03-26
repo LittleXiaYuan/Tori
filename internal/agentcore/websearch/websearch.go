@@ -279,3 +279,76 @@ func FormatResults(results []Result) string {
 	}
 	return sb.String()
 }
+
+// ──────────────────────────────────────────────
+// GenericHTTP — plugin-registered search provider
+// ──────────────────────────────────────────────
+
+// GenericHTTPProvider is a search provider registered by plugins at runtime.
+// It calls a remote HTTP endpoint that returns JSON results.
+type GenericHTTPProvider struct {
+	name       string
+	baseURL    string
+	apiKey     string
+	searchPath string
+	client     *http.Client
+}
+
+// NewGenericHTTP creates a generic HTTP search provider for plugin extensions.
+func NewGenericHTTP(name, baseURL, apiKey, searchPath string) *GenericHTTPProvider {
+	if searchPath == "" {
+		searchPath = "/search"
+	}
+	return &GenericHTTPProvider{
+		name:       name,
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		apiKey:     apiKey,
+		searchPath: searchPath,
+		client:     &http.Client{Timeout: 15 * time.Second},
+	}
+}
+
+func (p *GenericHTTPProvider) Name() string { return p.name }
+
+func (p *GenericHTTPProvider) Search(ctx context.Context, query string, limit int) ([]Result, error) {
+	reqURL := fmt.Sprintf("%s%s?q=%s&limit=%d",
+		p.baseURL, p.searchPath, url.QueryEscape(query), limit)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if p.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("generic search %q: %w", p.name, err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("generic search %q HTTP %d: %s", p.name, resp.StatusCode, string(body))
+	}
+
+	// Try common response formats
+	var results []Result
+
+	// Format 1: {"results": [...]}
+	var wrapped struct {
+		Results []Result `json:"results"`
+	}
+	if json.Unmarshal(body, &wrapped) == nil && len(wrapped.Results) > 0 {
+		return wrapped.Results, nil
+	}
+
+	// Format 2: direct array [...]
+	if json.Unmarshal(body, &results) == nil {
+		return results, nil
+	}
+
+	return nil, fmt.Errorf("generic search %q: unknown response format", p.name)
+}

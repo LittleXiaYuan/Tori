@@ -190,6 +190,7 @@ func (r *Registry) Voices() []Voice {
 
 // OpenAITTS implements TTSProvider using OpenAI's TTS API.
 type OpenAITTS struct {
+	name    string
 	baseURL string
 	apiKey  string
 	model   string
@@ -205,6 +206,7 @@ func NewOpenAITTS(baseURL, apiKey, model string) *OpenAITTS {
 		baseURL = "https://api.openai.com/v1"
 	}
 	return &OpenAITTS{
+		name:    "openai_tts",
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		model:   model,
@@ -212,7 +214,14 @@ func NewOpenAITTS(baseURL, apiKey, model string) *OpenAITTS {
 	}
 }
 
-func (o *OpenAITTS) Name() string { return "openai_tts" }
+func (o *OpenAITTS) Name() string { return o.name }
+
+// NewOpenAICompatTTS creates a TTS provider with a custom name, for plugin-registered engines.
+func NewOpenAICompatTTS(name, baseURL, apiKey, model, voice string) *OpenAITTS {
+	tts := NewOpenAITTS(baseURL, apiKey, model)
+	tts.name = name
+	return tts
+}
 
 func (o *OpenAITTS) Voices() []Voice {
 	return []Voice{

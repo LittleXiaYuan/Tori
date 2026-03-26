@@ -605,7 +605,7 @@ func (q *QQ) Send(_ context.Context, target string, reply Reply) error {
 func (q *QQ) SendWithExtra(_ context.Context, target string, reply Reply, extra map[string]string) error {
 	chatType := extra["chat_type"]
 	msgID := extra["msg_id"]
-	content := reply.Content
+	content := ContentWithButtonFallback(reply)
 	if content == "" {
 		return nil
 	}

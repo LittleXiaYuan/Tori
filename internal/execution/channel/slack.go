@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -80,7 +81,7 @@ func (s *Slack) Send(ctx context.Context, channelID string, reply Reply) error {
 
 	body := map[string]any{
 		"channel": channelID,
-		"text":    reply.Content,
+		"text":    ContentWithButtonFallback(reply),
 	}
 	if reply.ReplyTo != "" {
 		body["thread_ts"] = reply.ReplyTo
@@ -166,7 +167,7 @@ func (s *Slack) processEvent(event slackEvent, handler func(Message) Reply) {
 	}
 
 	reply := handler(msg)
-	if reply.Content != "" {
+	if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 		// Reply in thread if the original message was in a thread
 		if event.ThreadTS != "" {
 			reply.ReplyTo = event.ThreadTS

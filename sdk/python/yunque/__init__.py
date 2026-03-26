@@ -1,0 +1,389 @@
+"""
+Yunque Agent Plugin SDK
+=======================
+
+The official Python SDK for writing Yunque Agent plugins.
+Provides access to all agent capabilities through a simple, Chrome-extension-like API.
+
+Usage in a plugin handler script:
+
+    import yunque
+
+    # Call the LLM
+    reply = yunque.llm("Summarize this text", text)
+
+    # Search the web
+    results = yunque.search("latest AI news", limit=5)
+
+    # Send a message to a channel
+    yunque.send("telegram", chat_id, "Hello from plugin!")
+
+    # Read/write plugin-private memory
+    yunque.memory.set("last_run", "2024-03-24")
+    val = yunque.memory.get("last_run")
+
+    # Access the knowledge base
+    docs = yunque.knowledge.search("quantum computing")
+
+    # Schedule a cron job
+    yunque.cron.add("0 8 * * *", "morning_digest")
+
+Environment variables (injected by the agent runtime):
+    YUNQUE_API_BASE     - Agent API base URL (default: http://localhost:9090)
+    YUNQUE_PLUGIN_TOKEN - Plugin-scoped API token (permissions limited by manifest)
+    YUNQUE_PLUGIN_NAME  - Plugin identifier
+    YUNQUE_PLUGIN_DIR   - Plugin directory path
+"""
+
+import json
+import os
+import urllib.request
+import urllib.error
+from typing import Any, Optional
+
+__version__ = "0.1.0"
+
+# ── Configuration ──
+
+_API_BASE = os.environ.get("YUNQUE_API_BASE", "http://localhost:9090")
+_TOKEN = os.environ.get("YUNQUE_PLUGIN_TOKEN", "")
+_PLUGIN_NAME = os.environ.get("YUNQUE_PLUGIN_NAME", os.environ.get("PLUGIN_NAME", ""))
+_PLUGIN_DIR = os.environ.get("YUNQUE_PLUGIN_DIR", os.environ.get("PLUGIN_DIR", ""))
+
+
+def _api_call(method: str, path: str, body: Any = None, timeout: int = 30) -> dict:
+    """Make an authenticated API call to the agent."""
+    url = f"{_API_BASE}{path}"
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    if _TOKEN:
+        req.add_header("Authorization", f"Bearer {_TOKEN}")
+    req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
+
+
+# ── LLM ──
+
+def llm(prompt: str, user_input: str = "", model: str = "", temperature: float = 0.7) -> str:
+    """Call the agent's LLM with a system prompt and user input.
+
+    Args:
+        prompt: System prompt or instruction.
+        user_input: User message (the main input to process).
+        model: Optional model override (e.g. "gpt-4o", "claude-3").
+        temperature: Creativity level (0-1).
+
+    Returns:
+        The LLM's response text.
+    """
+    body = {
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_input},
+        ],
+        "temperature": temperature,
+    }
+    if model:
+        body["model"] = model
+    resp = _api_call("POST", "/v1/plugin-api/llm", body)
+    return resp.get("reply", "")
+
+
+def chat(messages: list[dict], temperature: float = 0.7, model: str = "") -> str:
+    """Multi-turn chat with the LLM.
+
+    Args:
+        messages: List of {"role": "system"|"user"|"assistant", "content": "..."}.
+        temperature: Creativity level.
+        model: Optional model override.
+
+    Returns:
+        The assistant's response text.
+    """
+    body = {"messages": messages, "temperature": temperature}
+    if model:
+        body["model"] = model
+    resp = _api_call("POST", "/v1/plugin-api/llm", body)
+    return resp.get("reply", "")
+
+
+# ── Web Search ──
+
+def search(query: str, limit: int = 5) -> list[dict]:
+    """Search the web using the agent's configured search providers.
+
+    Returns:
+        List of {"title": str, "url": str, "snippet": str}.
+    """
+    resp = _api_call("POST", "/v1/plugin-api/search", {"query": query, "limit": limit})
+    return resp.get("results", [])
+
+
+# ── Channel Messaging ──
+
+def send(channel_type: str, target: str, content: str, format: str = "markdown") -> bool:
+    """Send a message through a channel (Telegram, Feishu, Discord, etc.).
+
+    Args:
+        channel_type: "telegram", "feishu", "discord", "slack", etc.
+        target: Chat ID or user ID.
+        content: Message content.
+        format: "text", "markdown", or "html".
+
+    Returns:
+        True if sent successfully.
+    """
+    resp = _api_call("POST", "/v1/plugin-api/send", {
+        "channel": channel_type,
+        "target": target,
+        "content": content,
+        "format": format,
+    })
+    return resp.get("ok", False)
+
+
+# ── Plugin Memory (private namespace) ──
+
+class _MemoryNamespace:
+    """Plugin-private key-value memory store."""
+
+    def get(self, key: str, default: str = "") -> str:
+        """Get a value from plugin memory."""
+        resp = _api_call("POST", "/v1/plugin-api/memory/get", {"key": key})
+        return resp.get("value", default)
+
+    def set(self, key: str, value: str) -> None:
+        """Set a value in plugin memory."""
+        _api_call("POST", "/v1/plugin-api/memory/set", {"key": key, "value": value})
+
+    def delete(self, key: str) -> None:
+        """Delete a key from plugin memory."""
+        _api_call("POST", "/v1/plugin-api/memory/delete", {"key": key})
+
+    def list(self, prefix: str = "") -> dict[str, str]:
+        """List all keys (optionally filtered by prefix)."""
+        resp = _api_call("POST", "/v1/plugin-api/memory/list", {"prefix": prefix})
+        return resp.get("entries", {})
+
+    def search(self, query: str, limit: int = 10) -> list[str]:
+        """Search plugin memory by content."""
+        resp = _api_call("POST", "/v1/plugin-api/memory/search", {
+            "query": query, "limit": limit,
+        })
+        return resp.get("results", [])
+
+
+memory = _MemoryNamespace()
+
+
+# ── Agent Memory (shared, requires memory.read/write permission) ──
+
+class _AgentMemory:
+    """Access the agent's shared memory system."""
+
+    def search(self, query: str, top_k: int = 5) -> str:
+        """Search the agent's combined memory (short+mid+long+graph+editable)."""
+        resp = _api_call("POST", "/v1/plugin-api/agent-memory/search", {
+            "query": query, "top_k": top_k,
+        })
+        return resp.get("context", "")
+
+    def add(self, fact: str, source: str = "") -> None:
+        """Add a fact to the agent's mid-term memory."""
+        _api_call("POST", "/v1/plugin-api/agent-memory/add", {
+            "fact": fact, "source": source or _PLUGIN_NAME,
+        })
+
+
+agent_memory = _AgentMemory()
+
+
+# ── Knowledge Base ──
+
+class _Knowledge:
+    """Access the agent's RAG knowledge base."""
+
+    def search(self, query: str, limit: int = 5) -> list[dict]:
+        """Search the knowledge base."""
+        resp = _api_call("POST", "/v1/plugin-api/knowledge/search", {
+            "query": query, "limit": limit,
+        })
+        return resp.get("results", [])
+
+    def ingest(self, content: str, source: str = "", filename: str = "") -> dict:
+        """Ingest text content into the knowledge base."""
+        resp = _api_call("POST", "/v1/plugin-api/knowledge/ingest", {
+            "content": content,
+            "source": source or _PLUGIN_NAME,
+            "filename": filename,
+        })
+        return resp
+
+
+knowledge = _Knowledge()
+
+
+# ── Cron / Scheduling ──
+
+class _Cron:
+    """Schedule periodic tasks."""
+
+    def add(self, expr: str, name: str, message: str = "") -> dict:
+        """Add a cron job.
+
+        Args:
+            expr: Cron expression (e.g. "0 8 * * *" for daily at 8am).
+            name: Job name.
+            message: What the agent should do when triggered.
+
+        Returns:
+            {"id": str, "status": "created"}.
+        """
+        resp = _api_call("POST", "/v1/plugin-api/cron/add", {
+            "expression": expr,
+            "name": f"{_PLUGIN_NAME}:{name}",
+            "message": message,
+        })
+        return resp
+
+    def remove(self, job_id: str) -> bool:
+        """Remove a cron job."""
+        resp = _api_call("POST", "/v1/plugin-api/cron/remove", {"id": job_id})
+        return resp.get("ok", False)
+
+    def list(self) -> list[dict]:
+        """List all cron jobs created by this plugin."""
+        resp = _api_call("GET", f"/v1/plugin-api/cron/list?plugin={_PLUGIN_NAME}")
+        return resp.get("jobs", [])
+
+
+cron = _Cron()
+
+
+# ── System Extension Registration ──
+# These let plugins ADD new system-level capabilities to the agent.
+# Like Magisk modules or Chrome extensions — you're extending the platform itself.
+
+def register_provider(id: str, base_url: str, model: str, *,
+                      api_keys: list[str] = None, tier: str = "",
+                      provider_type: str = "chat") -> dict:
+    """Register a new LLM provider (Ollama, vLLM, Claude, etc.).
+
+    The provider must serve an OpenAI-compatible API.
+
+    Example:
+        yunque.register_provider("ollama", "http://localhost:11434/v1", "llama3")
+    """
+    body = {"id": id, "base_url": base_url, "model": model, "type": provider_type}
+    if api_keys:
+        body["api_keys"] = api_keys
+    if tier:
+        body["tier"] = tier
+    return _api_call("POST", "/v1/plugin-api/register/provider", body)
+
+
+def register_channel(name: str, webhook_url: str, send_endpoint: str, *,
+                     display_name: str = "", config: dict = None) -> dict:
+    """Register a new messaging channel adapter (Matrix, IRC, custom webhook, etc.).
+
+    Args:
+        name: Channel type identifier (e.g. "matrix").
+        webhook_url: Your plugin's endpoint for receiving messages from the channel.
+        send_endpoint: Your plugin's endpoint for the agent to send messages through.
+    """
+    body = {"name": name, "webhook_url": webhook_url, "send_endpoint": send_endpoint}
+    if display_name:
+        body["display_name"] = display_name
+    if config:
+        body["config_json"] = json.dumps(config)
+    return _api_call("POST", "/v1/plugin-api/register/channel", body)
+
+
+def register_search(name: str, base_url: str, *, api_key: str = "",
+                    search_path: str = "/search") -> dict:
+    """Register a new web search engine."""
+    return _api_call("POST", "/v1/plugin-api/register/search", {
+        "name": name, "base_url": base_url, "api_key": api_key,
+        "search_path": search_path,
+    })
+
+
+def register_guardrail(name: str, description: str, *, phase: str = "both",
+                       keywords: list[str] = None, patterns: list[str] = None) -> dict:
+    """Register a new safety guardrail rule.
+
+    Args:
+        phase: "input" (check user messages), "output" (check agent replies), "both".
+        keywords: Block messages containing these keywords.
+        patterns: Block messages matching these regex patterns.
+    """
+    body = {"name": name, "description": description, "phase": phase}
+    if keywords:
+        body["keywords"] = keywords
+    if patterns:
+        body["patterns"] = patterns
+    return _api_call("POST", "/v1/plugin-api/register/guardrail", body)
+
+
+def register_embedding(name: str, base_url: str, model: str, *,
+                       api_key: str = "", dimensions: int = 0) -> dict:
+    """Register a new vector embedding provider."""
+    body = {"name": name, "base_url": base_url, "model": model}
+    if api_key:
+        body["api_key"] = api_key
+    if dimensions > 0:
+        body["dimensions"] = dimensions
+    return _api_call("POST", "/v1/plugin-api/register/embedding", body)
+
+
+def register_speech(name: str, speech_type: str, base_url: str, *,
+                    model: str = "", voice: str = "", api_key: str = "") -> dict:
+    """Register a new TTS or STT engine.
+
+    Args:
+        speech_type: "tts" (text-to-speech) or "stt" (speech-to-text).
+    """
+    body = {"name": name, "type": speech_type, "base_url": base_url}
+    if model:
+        body["model"] = model
+    if voice:
+        body["voice"] = voice
+    if api_key:
+        body["api_key"] = api_key
+    return _api_call("POST", "/v1/plugin-api/register/speech", body)
+
+
+def list_extensions() -> list[dict]:
+    """List all plugin-contributed system extensions."""
+    resp = _api_call("GET", "/v1/plugin-api/extensions")
+    return resp.get("extensions", [])
+
+
+# ── System Info ──
+
+def version() -> dict:
+    """Get the agent's version info."""
+    return _api_call("GET", "/v1/version")
+
+
+def info() -> dict:
+    """Get plugin runtime info."""
+    return {
+        "plugin_name": _PLUGIN_NAME,
+        "plugin_dir": _PLUGIN_DIR,
+        "api_base": _API_BASE,
+        "sdk_version": __version__,
+        "authenticated": bool(_TOKEN),
+    }

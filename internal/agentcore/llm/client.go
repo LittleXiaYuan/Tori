@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -24,14 +26,40 @@ type Client struct {
 	cache   *ResponseCache
 }
 
-// NewClient creates a new LLM client with a circuit breaker.
-// Opens after 5 consecutive failures, retries after 30 seconds.
+// newOptimizedTransport creates an HTTP transport tuned for LLM API calls:
+// - Connection pooling: reuse TCP connections across requests
+// - Keep-alive: prevent TCP re-handshake overhead
+// - TLS session caching: avoid full TLS negotiation on reconnect
+// - Response header timeout: fail fast if server accepts but doesn't respond
+func newOptimizedTransport() *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,  // TCP connect timeout
+			KeepAlive: 30 * time.Second, // TCP keep-alive probe interval
+		}).DialContext,
+		MaxIdleConns:          100,              // total idle connections across all hosts
+		MaxIdleConnsPerHost:   10,               // idle connections per LLM API host
+		MaxConnsPerHost:       20,               // max concurrent connections per host
+		IdleConnTimeout:       90 * time.Second, // kill idle connections after 90s
+		TLSHandshakeTimeout:   10 * time.Second, // TLS handshake limit
+		ExpectContinueTimeout: 1 * time.Second,  // 100-continue wait
+		ResponseHeaderTimeout: 30 * time.Second, // time to first response byte
+		ForceAttemptHTTP2:     true,              // prefer HTTP/2 for multiplexing
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+}
+
+// NewClient creates a new LLM client with optimized HTTP transport.
+// No global timeout — each request uses context deadline instead,
+// allowing streaming calls to run longer than non-streaming ones.
 func NewClient(baseURL, apiKey, model string) *Client {
 	return &Client{
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		model:   model,
-		http:    &http.Client{Timeout: 120 * time.Second},
+		http:    &http.Client{Transport: newOptimizedTransport()},
 		breaker: NewCircuitBreaker(5, 30*time.Second),
 		cache:   NewResponseCache(60*time.Second, 256),
 	}
@@ -45,9 +73,10 @@ func (c *Client) Model() string { return c.model }
 
 // Message is a chat message.
 type Message struct {
-	Role       string `json:"role"`
-	Content    string `json:"content"`
-	ToolCallID string `json:"tool_call_id,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // ChatRequest is the request to the LLM.
@@ -83,6 +112,12 @@ type streamChunk struct {
 func (c *Client) Cache() *ResponseCache { return c.cache }
 
 func (c *Client) Chat(ctx context.Context, messages []Message, temperature float64) (string, error) {
+	// Streaming responses need generous timeout (LLM generation can take time)
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		defer cancel()
+	}
 	ctx, span := observe.StartSpan(ctx, "llm.Chat")
 	span.Attrs["model"] = c.model
 	if err := c.breaker.Allow(); err != nil {
@@ -216,6 +251,12 @@ func (c *Client) readSSE(body io.Reader) (string, error) {
 // ChatJSON sends a request with response_format=json_object for structured output.
 // Retries up to 2 times on transient errors (5xx, timeout).
 func (c *Client) ChatJSON(ctx context.Context, messages []Message) (string, error) {
+	// JSON responses are typically shorter, use tighter timeout
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+	}
 	if err := c.breaker.Allow(); err != nil {
 		return "", err
 	}
@@ -289,6 +330,11 @@ func (c *Client) chatJSONOnce(ctx context.Context, messages []Message) (string, 
 // ChatWithModel calls the LLM using a specific model without mutating the client's default model.
 // This is safe for concurrent use — no shared state is modified.
 func (c *Client) ChatWithModel(ctx context.Context, model string, messages []Message, temperature float64) (string, error) {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		defer cancel()
+	}
 	ctx, span := observe.StartSpan(ctx, "llm.ChatWithModel")
 	span.Attrs["model"] = model
 	if err := c.breaker.Allow(); err != nil {

@@ -1,9 +1,8 @@
 package llm
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
+	"hash/fnv"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +12,7 @@ import (
 // duplicate calls for identical message sequences within a short window.
 type ResponseCache struct {
 	mu      sync.RWMutex
-	entries map[string]*cacheEntry
+	entries map[uint64]*cacheEntry
 	ttl     time.Duration
 	maxSize int
 }
@@ -33,7 +32,7 @@ func NewResponseCache(ttl time.Duration, maxSize int) *ResponseCache {
 		maxSize = 256
 	}
 	c := &ResponseCache{
-		entries: make(map[string]*cacheEntry, maxSize),
+		entries: make(map[uint64]*cacheEntry, maxSize),
 		ttl:     ttl,
 		maxSize: maxSize,
 	}
@@ -95,28 +94,32 @@ func (c *ResponseCache) Stats() map[string]any {
 	}
 }
 
-func (c *ResponseCache) key(msgs []Message, temp float64) string {
-	h := sha256.New()
+// key generates a fast hash for cache lookup using FNV-1a.
+// FNV-1a is ~5x faster than SHA256 and sufficient for an in-memory TTL cache.
+func (c *ResponseCache) key(msgs []Message, temp float64) uint64 {
+	h := fnv.New64a()
 	for _, m := range msgs {
 		h.Write([]byte(m.Role))
-		h.Write([]byte(":"))
+		h.Write([]byte{':'})
 		h.Write([]byte(m.Content))
-		h.Write([]byte("|"))
+		h.Write([]byte{'|'})
 	}
-	h.Write([]byte(fmt.Sprintf("t=%.2f", temp)))
-	return hex.EncodeToString(h.Sum(nil))[:32]
+	h.Write(strconv.AppendFloat(nil, temp, 'f', 2, 64))
+	return h.Sum64()
 }
 
 func (c *ResponseCache) evictOldest() {
-	var oldestKey string
+	var oldestKey uint64
 	var oldestTime time.Time
+	found := false
 	for k, e := range c.entries {
-		if oldestKey == "" || e.createdAt.Before(oldestTime) {
+		if !found || e.createdAt.Before(oldestTime) {
 			oldestKey = k
 			oldestTime = e.createdAt
+			found = true
 		}
 	}
-	if oldestKey != "" {
+	if found {
 		delete(c.entries, oldestKey)
 	}
 }

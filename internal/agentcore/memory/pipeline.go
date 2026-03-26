@@ -12,15 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
+// FactTransformFunc is called after fact extraction, before decision.
+// Plugins can use this to enrich, filter, or tag extracted facts.
+// Return nil to suppress all facts.
+type FactTransformFunc func(ctx context.Context, facts []string) []string
+
 // Pipeline orchestrates the intelligent memory lifecycle:
-// conversation → extract facts → extract entities/relations → decide mutations → apply to store → optional compaction.
+// conversation → extract facts → transform (plugins) → decide mutations → apply to store → optional compaction.
 type Pipeline struct {
-	extractor *Extractor
-	decider   *Decider
-	compactor *Compactor
-	manager   *Manager
-	graph     *Graph
-	dailyDir  string // directory for daily markdown memory files
+	extractor      *Extractor
+	decider        *Decider
+	compactor      *Compactor
+	manager        *Manager
+	graph          *Graph
+	dailyDir       string            // directory for daily markdown memory files
+	factTransform  FactTransformFunc // optional: plugin fact transformation hook
 }
 
 // NewPipeline creates a memory pipeline with LLM-driven fact processing.
@@ -54,6 +60,10 @@ func (p *Pipeline) SetGraph(g *Graph) { p.graph = g }
 // SetDailyDir configures a directory for daily markdown memory persistence.
 func (p *Pipeline) SetDailyDir(dir string) { p.dailyDir = dir }
 
+// SetFactTransform attaches a hook that transforms extracted facts before they
+// enter the decision phase. Used by CognitivePlugin.OnMemoryExtract and HookManager.
+func (p *Pipeline) SetFactTransform(fn FactTransformFunc) { p.factTransform = fn }
+
 // Process runs the full extract → decide → apply pipeline on a conversation.
 func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []ChatMessage) (*ProcessResult, error) {
 	result := &ProcessResult{}
@@ -66,6 +76,19 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 	}
 	if len(extracted.Facts) == 0 {
 		return result, nil
+	}
+
+	// Phase 1.5: Plugin fact transformation hook
+	// CognitivePlugins and HookManager can enrich, filter, or tag facts
+	// before they enter the decision phase.
+	facts := extracted.Facts
+	if p.factTransform != nil {
+		facts = p.factTransform(ctx, facts)
+		if facts == nil || len(facts) == 0 {
+			slog.Info("memory pipeline: all facts suppressed by transform hook")
+			return result, nil
+		}
+		extracted.Facts = facts
 	}
 	result.ExtractedFacts = extracted.Facts
 

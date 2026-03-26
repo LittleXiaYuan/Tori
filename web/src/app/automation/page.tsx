@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { api, type CronJob, type TriggerDef, type TriggerRun, type TriggerLogEvent, type TriggerAction } from "@/lib/api";
@@ -26,6 +26,7 @@ const actionTypeLabels: Record<string, string> = {
   send_message: "发消息",
   call_skill: "调用技能",
   write_memory: "写记忆",
+  run_workflow: "执行工作流",
 };
 
 const statusColor: Record<string, string> = {
@@ -455,6 +456,7 @@ export default function AutomationPage() {
                         <option value="send_message">发送消息</option>
                         <option value="call_skill">调用技能</option>
                         <option value="write_memory">写记忆</option>
+                        <option value="run_workflow">执行工作流</option>
                       </select>
                     </div>
                     {trigForm.action_type === "create_task" && (

@@ -12,16 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
-// Store persists tasks to individual JSON files under data/tasks/.
-type Store struct {
+// Store is the persistence layer interface for tasks.
+type Store interface {
+	Create(req CreateRequest) (*Task, error)
+	Get(id string) (*Task, bool)
+	List(tenantID string, limit int) []*Task
+	Update(t *Task) error
+	Delete(id string) bool
+	ArtifactDir(taskID string) (string, error)
+	RecoverInterrupted() int
+}
+
+// JSONStore persists tasks to individual JSON files under data/tasks/.
+type JSONStore struct {
 	mu      sync.RWMutex
 	tasks   map[string]*Task
 	baseDir string
 }
 
-// NewStore creates a task store rooted at dir (e.g. "data/tasks").
-func NewStore(dir string) *Store {
-	s := &Store{
+// NewJSONStore creates a task store rooted at dir (e.g. "data/tasks").
+func NewJSONStore(dir string) *JSONStore {
+	s := &JSONStore{
 		tasks:   make(map[string]*Task),
 		baseDir: dir,
 	}
@@ -30,7 +41,7 @@ func NewStore(dir string) *Store {
 }
 
 // Create persists a new task and returns it.
-func (s *Store) Create(req CreateRequest) (*Task, error) {
+func (s *JSONStore) Create(req CreateRequest) (*Task, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -66,7 +77,7 @@ func (s *Store) Create(req CreateRequest) (*Task, error) {
 }
 
 // Get returns a deep copy of a task by ID.
-func (s *Store) Get(id string) (*Task, bool) {
+func (s *JSONStore) Get(id string) (*Task, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	t, ok := s.tasks[id]
@@ -77,7 +88,7 @@ func (s *Store) Get(id string) (*Task, bool) {
 }
 
 // List returns deep copies of all tasks for a tenant, sorted by creation time (newest first).
-func (s *Store) List(tenantID string, limit int) []*Task {
+func (s *JSONStore) List(tenantID string, limit int) []*Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -97,7 +108,7 @@ func (s *Store) List(tenantID string, limit int) []*Task {
 }
 
 // Update writes the task back to the in-memory map and saves to disk.
-func (s *Store) Update(t *Task) error {
+func (s *JSONStore) Update(t *Task) error {
 	t.UpdatedAt = time.Now()
 	s.mu.Lock()
 	s.tasks[t.ID] = t
@@ -108,7 +119,7 @@ func (s *Store) Update(t *Task) error {
 }
 
 // Delete removes a task and its data directory.
-func (s *Store) Delete(id string) bool {
+func (s *JSONStore) Delete(id string) bool {
 	s.mu.Lock()
 	_, ok := s.tasks[id]
 	if ok {
@@ -122,7 +133,7 @@ func (s *Store) Delete(id string) bool {
 }
 
 // ArtifactDir returns the directory for a task's artifacts, creating if needed.
-func (s *Store) ArtifactDir(taskID string) (string, error) {
+func (s *JSONStore) ArtifactDir(taskID string) (string, error) {
 	dir := filepath.Join(s.baseDir, taskID, "artifacts")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -132,7 +143,7 @@ func (s *Store) ArtifactDir(taskID string) (string, error) {
 
 // ── persistence ──
 
-func (s *Store) save(t *Task) error {
+func (s *JSONStore) save(t *Task) error {
 	dir := filepath.Join(s.baseDir, t.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -144,7 +155,7 @@ func (s *Store) save(t *Task) error {
 	return os.WriteFile(filepath.Join(dir, "task.json"), data, 0o644)
 }
 
-func (s *Store) loadAll() {
+func (s *JSONStore) loadAll() {
 	entries, err := os.ReadDir(s.baseDir)
 	if err != nil {
 		return // dir doesn't exist yet, that's fine
@@ -169,7 +180,7 @@ func (s *Store) loadAll() {
 // RecoverInterrupted marks any tasks in running/planning state as interrupted.
 // Call this on startup to detect zombie tasks from a previous crash.
 // Returns the number of recovered tasks.
-func (s *Store) RecoverInterrupted() int {
+func (s *JSONStore) RecoverInterrupted() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

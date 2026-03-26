@@ -1,0 +1,181 @@
+/* ── Execution Trace Panel ── */
+
+.execution-trace {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  margin-bottom: 12px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.execution-trace__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.execution-trace__header:hover {
+  background: var(--bg-hover);
+}
+
+.execution-trace__toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.execution-trace__title {
+  font-weight: 500;
+}
+
+.execution-trace__live-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #34d399;
+  animation: live-pulse 1.5s infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.execution-trace__trace-id {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* ── Timeline ── */
+
+.execution-trace__timeline {
+  padding: 4px 14px 14px;
+  position: relative;
+}
+
+/* ── Trace Item ── */
+
+.trace-item {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 6px;
+}
+
+.trace-item__line {
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.trace-item:last-child .trace-item__line {
+  display: none;
+}
+
+.trace-item__dot {
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--trace-color, var(--text-muted));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--trace-color, var(--text-muted)) 40%, transparent);
+}
+
+.trace-item__content {
+  min-width: 0;
+}
+
+.trace-item__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.trace-item__icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.trace-item__label {
+  font-weight: 500;
+  color: var(--trace-color, var(--text));
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.trace-item__skill {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-item__offset {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.trace-item__expand {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.trace-item__summary {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.trace-item__detail {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+
+/* ── Color tokens (overridable via theme) ── */
+:root {
+  --trace-blue: #60a5fa;
+  --trace-amber: #fbbf24;
+  --trace-green: #34d399;
+  --trace-red: #f87171;
+  --trace-purple: #a78bfa;
+  --trace-cyan: #22d3ee;
+  --trace-orange: #fb923c;
+}

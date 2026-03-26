@@ -11,17 +11,40 @@ import (
 	"time"
 )
 
+// SkillRegisterFunc registers an installed skill as an executable entry in the SkillRegistry.
+// slug: the skill identifier, name: display name, description: what the skill does,
+// content: the SKILL.md body. Returns error if registration fails.
+type SkillRegisterFunc func(slug, name, description, content string) error
+
 // Installer manages skill installation lifecycle with security gates.
 type Installer struct {
-	mu        sync.Mutex
-	dataDir   string // base data dir (data/skills/)
-	provider  *ClawHubProvider
-	auditor   *Auditor
-	market    *Market
-	policy    *SecurityPolicy
-	onInstall func(slug string) // callback: refresh planner prompt cache
+	mu          sync.Mutex
+	dataDir     string // base data dir (data/skills/)
+	provider    *ClawHubProvider
+	github      *GitHubSkillProvider // optional GitHub provider for "owner/repo" slugs
+	auditor     *Auditor
+	market      *Market
+	policy      *SecurityPolicy
+	onInstall   func(slug string)    // callback: refresh planner prompt cache
+	onRegister  SkillRegisterFunc    // callback: register skill in SkillRegistry
 
 	installed map[string]*InstalledSkill // slug → installed info
+}
+
+// SetOnRegister attaches a callback that makes installed skills executable
+// by registering them in the SkillRegistry.
+func (inst *Installer) SetOnRegister(fn SkillRegisterFunc) {
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	inst.onRegister = fn
+}
+
+// SetGitHubProvider attaches a GitHub provider so skills can be installed directly
+// from GitHub repos using slugs like "owner/repo" or "owner/repo/path/to/skill".
+func (inst *Installer) SetGitHubProvider(p *GitHubSkillProvider) {
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	inst.github = p
 }
 
 // InstalledSkill tracks a locally installed skill.
@@ -57,7 +80,9 @@ func (inst *Installer) SetOnInstall(fn func(slug string)) { inst.onInstall = fn 
 // SetPolicy sets the security policy for install-time checks.
 func (inst *Installer) SetPolicy(p *SecurityPolicy) { inst.policy = p }
 
-// Install performs the complete installation flow for a ClawHub skill.
+// Install performs the complete installation flow for a skill.
+// For "owner/repo" or "owner/repo/path" slugs, it uses the GitHub provider.
+// For all other slugs, it uses the ClawHub provider.
 // Returns the audit report for the caller to inspect.
 func (inst *Installer) Install(ctx context.Context, slug string) (*AuditReport, error) {
 	inst.mu.Lock()
@@ -65,22 +90,34 @@ func (inst *Installer) Install(ctx context.Context, slug string) (*AuditReport, 
 
 	slog.Info("installer: starting", "slug", slug)
 
-	// Step 1: Fetch from ClawHub
-	if inst.provider == nil {
-		return nil, fmt.Errorf("clawhub provider not configured")
-	}
-	remote, err := inst.provider.Fetch(slug)
-	if err != nil {
-		return nil, fmt.Errorf("fetch: %w", err)
-	}
+	// Step 1: Fetch from the appropriate provider
+	var remote *RemoteSkill
+	var err error
 
-	// Step 1b: Download SKILL.md content if not included in metadata
-	if remote.Content == "" {
-		if raw, dlErr := inst.provider.Download(slug, remote.Version); dlErr == nil && len(raw) > 0 {
-			remote.Content = string(raw)
-		} else {
-			slog.Warn("installer: SKILL.md download empty, using description as fallback", "slug", slug, "err", dlErr)
-			remote.Content = remote.Description
+	if IsGitHubSlug(slug) && inst.github != nil {
+		slog.Info("installer: fetching from GitHub", "slug", slug)
+		remote, err = inst.github.Fetch(slug)
+		if err != nil {
+			return nil, fmt.Errorf("github fetch: %w", err)
+		}
+		// GitHub provider already includes Content from SKILL.md
+	} else {
+		// ClawHub path
+		if inst.provider == nil {
+			return nil, fmt.Errorf("no skill provider configured (ClawHub or GitHub)")
+		}
+		remote, err = inst.provider.Fetch(slug)
+		if err != nil {
+			return nil, fmt.Errorf("fetch: %w", err)
+		}
+		// Step 1b: Download SKILL.md content if not included in metadata
+		if remote.Content == "" {
+			if raw, dlErr := inst.provider.Download(slug, remote.Version); dlErr == nil && len(raw) > 0 {
+				remote.Content = string(raw)
+			} else {
+				slog.Warn("installer: SKILL.md download empty, using description as fallback", "slug", slug, "err", dlErr)
+				remote.Content = remote.Description
+			}
 		}
 	}
 
@@ -141,7 +178,16 @@ func (inst *Installer) Install(ctx context.Context, slug string) (*AuditReport, 
 	}
 	inst.saveInstalled()
 
-	// Step 8: Trigger prompt refresh
+	// Step 8: Register as executable skill
+	if inst.onRegister != nil {
+		if regErr := inst.onRegister(slug, adapted.Name, adapted.Description, remote.Content); regErr != nil {
+			slog.Warn("installer: skill registration failed (non-blocking)", "slug", slug, "err", regErr)
+		} else {
+			slog.Info("installer: skill registered as executable", "slug", slug)
+		}
+	}
+
+	// Step 9: Trigger prompt refresh
 	if inst.onInstall != nil {
 		inst.onInstall(slug)
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -89,7 +90,7 @@ func (w *WhatsApp) Send(ctx context.Context, to string, reply Reply) error {
 		"to":                to,
 		"type":              "text",
 		"text": map[string]any{
-			"body": reply.Content,
+			"body": ContentWithButtonFallback(reply),
 		},
 	}
 
@@ -164,7 +165,7 @@ func (w *WhatsApp) handleMessage(rw http.ResponseWriter, r *http.Request, handle
 				}
 
 				reply := handler(inMsg)
-				if reply.Content != "" {
+				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
 					if err := w.Send(r.Context(), msg.From, reply); err != nil {
 						slog.Warn("whatsapp: reply failed", "to", msg.From, "err", err)
 					}

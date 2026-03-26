@@ -124,7 +124,9 @@ func (s *ExperienceStore) Stats() ExperienceStats {
 	return st
 }
 
-// CompileStrategies aggregates recent experiences into strategy hints for the Planner.
+// CompileStrategies aggregates recent experiences into actionable strategy hints.
+// Output is concise and directive — each line is a clear do/don't instruction.
+// Only includes experiences with meaningful lessons (>20 chars), deduped by content.
 func (s *ExperienceStore) CompileStrategies(limit int) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -132,36 +134,47 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 		return ""
 	}
 
-	// Collect recent failure patterns and success strategies
-	var failures, successes []string
+	var avoids, uses []string
 	seen := make(map[string]bool)
 
-	for i := len(s.data) - 1; i >= 0 && (len(failures)+len(successes)) < limit; i-- {
+	for i := len(s.data) - 1; i >= 0 && (len(avoids)+len(uses)) < limit; i-- {
 		e := s.data[i]
-		key := e.Category + ":" + e.Lesson
-		if seen[key] {
+		lesson := strings.TrimSpace(e.Lesson)
+		if len(lesson) < 20 {
+			continue // skip trivially short lessons
+		}
+
+		// Dedup by normalized lesson content (first 60 chars)
+		normKey := strings.ToLower(lesson)
+		if len([]rune(normKey)) > 60 {
+			normKey = string([]rune(normKey)[:60])
+		}
+		if seen[normKey] {
 			continue
 		}
-		seen[key] = true
+		seen[normKey] = true
+
 		switch e.Outcome {
 		case "failure":
-			failures = append(failures, fmt.Sprintf("- [%s] %s", e.Category, e.Lesson))
+			avoids = append(avoids, fmt.Sprintf("- 避免: %s", lesson))
 		case "success":
-			successes = append(successes, fmt.Sprintf("- [%s] %s", e.Category, e.Lesson))
+			uses = append(uses, fmt.Sprintf("- 推荐: %s", lesson))
 		}
+	}
+
+	if len(avoids) == 0 && len(uses) == 0 {
+		return ""
 	}
 
 	var parts []string
-	if len(failures) > 0 {
-		parts = append(parts, "### 已知失败模式\n"+strings.Join(failures, "\n"))
+	// Show "do"s before "don't"s — positive guidance first
+	if len(uses) > 0 {
+		parts = append(parts, strings.Join(uses, "\n"))
 	}
-	if len(successes) > 0 {
-		parts = append(parts, "### 成功策略\n"+strings.Join(successes, "\n"))
+	if len(avoids) > 0 {
+		parts = append(parts, strings.Join(avoids, "\n"))
 	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, "\n\n")
+	return strings.Join(parts, "\n")
 }
 
 func (s *ExperienceStore) load() {

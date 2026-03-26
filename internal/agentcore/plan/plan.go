@@ -18,6 +18,7 @@ type StepStatus string
 
 const (
 	StepPending    StepStatus = "pending"
+	StepReady      StepStatus = "ready"
 	StepInProgress StepStatus = "in_progress"
 	StepCompleted  StepStatus = "completed"
 	StepFailed     StepStatus = "failed"
@@ -30,9 +31,25 @@ const (
 	PlanCreated   PlanStatus = "created"
 	PlanRunning   PlanStatus = "running"
 	PlanCompleted PlanStatus = "completed"
+	PlanRevising  PlanStatus = "revising"
 	PlanFailed    PlanStatus = "failed"
 	PlanAborted   PlanStatus = "aborted"
 )
+
+type Budget struct {
+	MaxSteps      int           `json:"max_steps"`
+	MaxRevisions  int           `json:"max_revisions"`
+	MaxDuration   time.Duration `json:"max_duration"`
+	StepsUsed     int           `json:"steps_used"`
+	RevisionsUsed int           `json:"revisions_used"`
+}
+
+func DefaultBudget() Budget {
+	return Budget{MaxSteps: 20, MaxRevisions: 3, MaxDuration: 5 * time.Minute}
+}
+
+func (b *Budget) CanStep() bool  { return b.MaxSteps <= 0 || b.StepsUsed < b.MaxSteps }
+func (b *Budget) CanRevise() bool { return b.MaxRevisions <= 0 || b.RevisionsUsed < b.MaxRevisions }
 
 // ──────────────────────────────────────────────
 // PlanStep
@@ -40,15 +57,19 @@ const (
 
 // PlanStep is a single step in a multi-step plan.
 type PlanStep struct {
-	Index       int           `json:"index"`
-	Description string        `json:"description"`
-	Status      StepStatus    `json:"status"`
-	Output      string        `json:"output,omitempty"`
-	Error       string        `json:"error,omitempty"`
-	StartedAt   *time.Time    `json:"started_at,omitempty"`
-	EndedAt     *time.Time    `json:"ended_at,omitempty"`
-	Duration    time.Duration `json:"duration,omitempty"`
-	ToolsUsed   []string      `json:"tools_used,omitempty"`
+	Index       int            `json:"index"`
+	Description string         `json:"description"`
+	Skill       string         `json:"skill,omitempty"`
+	Args        map[string]any `json:"args,omitempty"`
+	DependsOn   []int          `json:"depends_on"`
+	Status      StepStatus     `json:"status"`
+	Output      string         `json:"output,omitempty"`
+	Error       string         `json:"error,omitempty"`
+	StartedAt   *time.Time     `json:"started_at,omitempty"`
+	EndedAt     *time.Time     `json:"ended_at,omitempty"`
+	Duration    time.Duration  `json:"duration,omitempty"`
+	ToolsUsed   []string       `json:"tools_used,omitempty"`
+	RetryCount  int            `json:"retry_count,omitempty"`
 }
 
 // ──────────────────────────────────────────────
@@ -58,10 +79,12 @@ type PlanStep struct {
 // Plan represents a multi-step task decomposition.
 type Plan struct {
 	ID            string        `json:"id"`
-	Task          string        `json:"task"` // original user request
+	Task          string        `json:"task"`
 	Status        PlanStatus    `json:"status"`
 	Steps         []PlanStep    `json:"steps"`
-	Summary       string        `json:"summary,omitempty"` // completion summary
+	Summary       string        `json:"summary,omitempty"`
+	Budget        Budget        `json:"budget"`
+	Revisions     int           `json:"revisions"`
 	CreatedAt     time.Time     `json:"created_at"`
 	CompletedAt   *time.Time    `json:"completed_at,omitempty"`
 	TotalDuration time.Duration `json:"total_duration,omitempty"`
@@ -94,6 +117,58 @@ func (p *Plan) IsComplete() bool {
 	return c == t && t > 0
 }
 
+func (p *Plan) ReadySteps() []int {
+	var ready []int
+	for i, step := range p.Steps {
+		if step.Status != StepPending && step.Status != StepReady {
+			continue
+		}
+		allMet := true
+		for _, dep := range step.DependsOn {
+			if dep >= 0 && dep < len(p.Steps) {
+				ds := p.Steps[dep].Status
+				if ds != StepCompleted && ds != StepSkipped {
+					allMet = false
+					break
+				}
+			}
+		}
+		if allMet {
+			ready = append(ready, i)
+		}
+	}
+	return ready
+}
+
+func (p *Plan) FailedSteps() []int {
+	var failed []int
+	for i, s := range p.Steps {
+		if s.Status == StepFailed {
+			failed = append(failed, i)
+		}
+	}
+	return failed
+}
+
+func (p *Plan) StepSummary() string {
+	var b []byte
+	for _, s := range p.Steps {
+		line := fmt.Sprintf("[%d] %s — %s: %s", s.Index, s.Status, s.Description, s.Skill)
+		if s.Output != "" {
+			out := s.Output
+			if len([]rune(out)) > 100 {
+				out = string([]rune(out)[:100]) + "..."
+			}
+			line += " → " + out
+		}
+		if s.Error != "" {
+			line += " ✗ " + s.Error
+		}
+		b = append(b, []byte(line+"\n")...)
+	}
+	return string(b)
+}
+
 // ──────────────────────────────────────────────
 // Callbacks
 // ──────────────────────────────────────────────
@@ -101,28 +176,30 @@ func (p *Plan) IsComplete() bool {
 // DecomposeFunc breaks a task into steps. Returns step descriptions.
 type DecomposeFunc func(ctx context.Context, task string) ([]string, error)
 
-// ExecuteStepFunc executes a single plan step. Returns output or error.
+type DecomposeDAGFunc func(ctx context.Context, task string) ([]PlanStep, error)
+
+type ReviseFunc func(ctx context.Context, goal string, current *Plan, failedStep int) ([]PlanStep, error)
+
 type ExecuteStepFunc func(ctx context.Context, plan *Plan, stepIndex int) (output string, toolsUsed []string, err error)
 
-// SummarizeFunc produces a completion summary.
 type SummarizeFunc func(ctx context.Context, plan *Plan) (string, error)
 
-// OnStepUpdateFunc is called when a step status changes.
 type OnStepUpdateFunc func(plan *Plan, stepIndex int, status StepStatus)
-
-// ──────────────────────────────────────────────
-// Manager
-// ──────────────────────────────────────────────
 
 // Manager creates, tracks, and executes plans.
 type Manager struct {
 	mu           sync.RWMutex
 	plans        map[string]*Plan
 	decompose    DecomposeFunc
+	decomposeDAG DecomposeDAGFunc
+	revise       ReviseFunc
 	executeStep  ExecuteStepFunc
 	summarize    SummarizeFunc
 	onStepUpdate OnStepUpdateFunc
 }
+
+func (m *Manager) SetDecomposeDAG(fn DecomposeDAGFunc) { m.decomposeDAG = fn }
+func (m *Manager) SetRevise(fn ReviseFunc)             { m.revise = fn }
 
 // NewManager creates a plan manager.
 func NewManager(decompose DecomposeFunc, execute ExecuteStepFunc) *Manager {
@@ -381,4 +458,134 @@ func containsStr(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func (m *Manager) CreateDAG(ctx context.Context, task string, budget Budget) (*Plan, error) {
+	if m.decomposeDAG == nil {
+		return nil, fmt.Errorf("plan: no DAG decompose function set")
+	}
+	steps, err := m.decomposeDAG(ctx, task)
+	if err != nil {
+		return nil, fmt.Errorf("plan: DAG decompose: %w", err)
+	}
+	if len(steps) == 0 {
+		return nil, fmt.Errorf("plan: no steps")
+	}
+	for i := range steps {
+		steps[i].Index = i
+		steps[i].Status = StepPending
+	}
+	p := &Plan{ID: uuid.New().String(), Task: task, Status: PlanCreated, Steps: steps, Budget: budget, CreatedAt: time.Now()}
+	m.mu.Lock()
+	m.plans[p.ID] = p
+	m.mu.Unlock()
+	slog.Info("plan: created DAG", "id", p.ID, "steps", len(steps))
+	return p, nil
+}
+
+func (m *Manager) ExecuteDAG(ctx context.Context, planID string) error {
+	m.mu.RLock()
+	p, ok := m.plans[planID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("plan: %q not found", planID)
+	}
+	if p.Budget.MaxDuration > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, time.Now().Add(p.Budget.MaxDuration))
+		defer cancel()
+	}
+	p.Status = PlanRunning
+	for {
+		if ctx.Err() != nil {
+			p.Status = PlanAborted
+			return ctx.Err()
+		}
+		if p.IsComplete() {
+			break
+		}
+		ready := p.ReadySteps()
+		if len(ready) == 0 {
+			failed := p.FailedSteps()
+			if len(failed) > 0 && m.revise != nil && p.Budget.CanRevise() {
+				p.Budget.RevisionsUsed++
+				p.Revisions++
+				p.Status = PlanRevising
+				newSteps, err := m.revise(ctx, p.Task, p, failed[0])
+				if err != nil || len(newSteps) == 0 {
+					p.Status = PlanFailed
+					return fmt.Errorf("plan: revision failed")
+				}
+				var kept []PlanStep
+				for _, s := range p.Steps {
+					if s.Status == StepCompleted || s.Status == StepSkipped {
+						kept = append(kept, s)
+					}
+				}
+				base := len(kept)
+				for i, ns := range newSteps {
+					ns.Index = base + i
+					ns.Status = StepPending
+					kept = append(kept, ns)
+				}
+				p.Steps = kept
+				p.Status = PlanRunning
+				continue
+			}
+			p.Status = PlanFailed
+			return fmt.Errorf("plan: no ready steps")
+		}
+		if !p.Budget.CanStep() {
+			p.Status = PlanFailed
+			return fmt.Errorf("plan: budget exhausted")
+		}
+		type result struct {
+			idx   int
+			out   string
+			tools []string
+			err   error
+		}
+		ch := make(chan result, len(ready))
+		for _, idx := range ready {
+			p.Steps[idx].Status = StepInProgress
+			now := time.Now()
+			p.Steps[idx].StartedAt = &now
+			m.notifyStep(p, idx, StepInProgress)
+			go func(i int) {
+				out, tools, err := m.executeStep(ctx, p, i)
+				ch <- result{i, out, tools, err}
+			}(idx)
+		}
+		for range ready {
+			r := <-ch
+			p.Budget.StepsUsed++
+			step := &p.Steps[r.idx]
+			end := time.Now()
+			step.EndedAt = &end
+			if step.StartedAt != nil {
+				step.Duration = end.Sub(*step.StartedAt)
+			}
+			step.ToolsUsed = r.tools
+			if r.err != nil {
+				step.Status = StepFailed
+				step.Error = r.err.Error()
+				step.RetryCount++
+				m.notifyStep(p, r.idx, StepFailed)
+			} else {
+				step.Status = StepCompleted
+				step.Output = r.out
+				m.notifyStep(p, r.idx, StepCompleted)
+			}
+		}
+	}
+	now := time.Now()
+	p.CompletedAt = &now
+	p.TotalDuration = now.Sub(p.CreatedAt)
+	p.Status = PlanCompleted
+	if m.summarize != nil {
+		if s, err := m.summarize(ctx, p); err == nil {
+			p.Summary = s
+		}
+	}
+	return nil
 }

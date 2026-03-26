@@ -99,13 +99,14 @@ func (l *LINE) Start(ctx context.Context, handler func(Message) Reply) error {
 				if msg.Extra != nil {
 					replyToken = msg.Extra["reply_token"]
 				}
+				out := ContentWithButtonFallback(reply)
 				if replyToken != "" {
-					if err := l.replyMessage(ctx, replyToken, reply.Content); err != nil {
+					if err := l.replyMessage(ctx, replyToken, out); err != nil {
 						slog.Warn("line: reply failed, trying push", "err", err, "user_id", msg.UserID)
-						_ = l.pushMessage(ctx, msg.UserID, reply.Content)
+						_ = l.pushMessage(ctx, msg.UserID, out)
 					}
 				} else {
-					_ = l.pushMessage(ctx, msg.UserID, reply.Content)
+					_ = l.pushMessage(ctx, msg.UserID, out)
 				}
 			}
 		}
@@ -141,8 +142,9 @@ func (l *LINE) Send(ctx context.Context, target string, reply Reply) error {
 	}
 
 	// Send text content
-	if reply.Content != "" {
-		return l.pushMessage(ctx, target, reply.Content)
+	text := ContentWithButtonFallback(reply)
+	if text != "" {
+		return l.pushMessage(ctx, target, text)
 	}
 	return nil
 }

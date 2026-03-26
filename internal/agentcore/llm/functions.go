@@ -40,13 +40,18 @@ type ChatResponseFC struct {
 	Choices []ChatChoiceFC `json:"choices"`
 }
 
+// ToolChoiceAuto lets the model decide whether to call tools or respond with text.
+const ToolChoiceAuto = "auto"
+
+// ToolChoiceRequired forces the model to call at least one tool (no plain text allowed).
+const ToolChoiceRequired = "required"
+
 // ChatWithTools sends a chat request with function/tool definitions.
 // Returns the response message and any tool calls.
-func (c *Client) ChatWithTools(ctx context.Context, messages []Message, tools []FunctionDef, temperature float64) (string, []ToolCall, error) {
+func (c *Client) ChatWithTools(ctx context.Context, messages []Message, tools []FunctionDef, temperature float64, toolChoice ...string) (string, []ToolCall, error) {
 	if err := c.breaker.Allow(); err != nil {
 		return "", nil, err
 	}
-	// Build tools array in OpenAI format
 	toolDefs := make([]map[string]any, len(tools))
 	for i, t := range tools {
 		toolDefs[i] = map[string]any{
@@ -64,6 +69,9 @@ func (c *Client) ChatWithTools(ctx context.Context, messages []Message, tools []
 		"messages":    messages,
 		"temperature": temperature,
 		"tools":       toolDefs,
+	}
+	if len(toolChoice) > 0 && toolChoice[0] != "" && toolChoice[0] != ToolChoiceAuto {
+		reqBody["tool_choice"] = toolChoice[0]
 	}
 	body, _ := json.Marshal(reqBody)
 

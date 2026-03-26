@@ -104,7 +104,7 @@ func (s *Satori) Start(ctx context.Context, handler func(Message) Reply) error {
 				if msg.Extra != nil {
 					platform = msg.Extra["platform"]
 				}
-				_ = s.sendMessage(ctx, platform, channelID, reply.Content)
+				_ = s.sendMessage(ctx, platform, channelID, ContentWithButtonFallback(reply))
 			}
 		}
 	}()
@@ -127,7 +127,7 @@ func (s *Satori) Start(ctx context.Context, handler func(Message) Reply) error {
 
 // Send pushes a message to a Satori channel.
 func (s *Satori) Send(ctx context.Context, target string, reply Reply) error {
-	return s.sendMessage(ctx, s.platform, target, reply.Content)
+	return s.sendMessage(ctx, s.platform, target, ContentWithButtonFallback(reply))
 }
 
 // ──────────────────────────────────────────────

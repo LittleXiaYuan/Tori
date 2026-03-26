@@ -78,16 +78,17 @@ func (e *Email) Send(_ context.Context, target string, reply Reply) error {
 	if target == "" {
 		return fmt.Errorf("email target (recipient) is required")
 	}
-	if reply.Content == "" {
+	text := ContentWithButtonFallback(reply)
+	if text == "" {
 		return nil
 	}
 
 	subject := "Reply from Yunque Agent"
-	if s, ok := extractSubject(reply.Content); ok {
+	if s, ok := extractSubject(text); ok {
 		subject = s
 	}
 
-	body := buildEmailBody(e.cfg.From, target, subject, reply.Content)
+	body := buildEmailBody(e.cfg.From, target, subject, text)
 
 	client, err := e.dialer()
 	if err != nil {

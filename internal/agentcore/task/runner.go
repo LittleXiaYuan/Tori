@@ -53,7 +53,7 @@ type LLMFunc func(ctx context.Context, system, user string) (string, error)
 
 // Runner executes tasks by planning and running steps.
 type Runner struct {
-	store     *Store
+	store     Store
 	registry  *skills.Registry
 	llmCall   LLMFunc
 	env       *skills.Environment // base environment for skill execution
@@ -76,7 +76,7 @@ type Runner struct {
 }
 
 // NewRunner creates a task runner.
-func NewRunner(store *Store, registry *skills.Registry, llmCall LLMFunc, env *skills.Environment) *Runner {
+func NewRunner(store Store, registry *skills.Registry, llmCall LLMFunc, env *skills.Environment) *Runner {
 	r := &Runner{
 		store:    store,
 		registry: registry,

@@ -86,7 +86,7 @@ func (k *Kook) Start(ctx context.Context, handler func(Message) Reply) error {
 
 // Send pushes a proactive message to a Kook channel.
 func (k *Kook) Send(ctx context.Context, target string, reply Reply) error {
-	return k.sendMessage(ctx, target, reply.Content)
+	return k.sendMessage(ctx, target, ContentWithButtonFallback(reply))
 }
 
 // React adds an emoji reaction to a Kook message.
@@ -291,10 +291,11 @@ func (k *Kook) pollMessages(ctx context.Context, handler func(Message) Reply) er
 				lastMsgTime = msg.timestamp
 
 				reply := handler(msg.toMessage())
+				out := ContentWithButtonFallback(reply)
 				if msg.channelType == "GROUP" {
-					_ = k.sendMessage(ctx, msg.channelID, reply.Content)
+					_ = k.sendMessage(ctx, msg.channelID, out)
 				} else {
-					_ = k.sendDirectMessage(ctx, msg.authorID, reply.Content)
+					_ = k.sendDirectMessage(ctx, msg.authorID, out)
 				}
 			}
 		}

@@ -235,6 +235,20 @@ func (m *MidTerm) Count(tenantID string) int {
 	return len(m.items[tenantID])
 }
 
+// ExportAll returns all items grouped by tenant ID.
+// Used by external persistence backends (e.g. LedgerPersister).
+func (m *MidTerm) ExportAll() map[string][]Item {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make(map[string][]Item)
+	for tid, items := range m.items {
+		for _, item := range items {
+			out[tid] = append(out[tid], item)
+		}
+	}
+	return out
+}
+
 // --- TF-IDF engine ---
 
 // getIDF returns (or rebuilds) the IDF map for a tenant.

@@ -133,17 +133,17 @@ func TestJournalContext(t *testing.T) {
 	r := NewReverie(cfg)
 
 	// Empty journal
-	if ctx := r.JournalContext(5); ctx != "" {
+	if ctx := r.JournalContext(5, ""); ctx != "" {
 		t.Errorf("expected empty, got %q", ctx)
 	}
 
-	// Add thoughts manually
+	// Add thoughts manually with high significance (no-query mode requires ≥0.8)
 	r.mu.Lock()
-	r.journal = append(r.journal, Thought{Content: "想法1", Category: "insight"})
-	r.journal = append(r.journal, Thought{Content: "想法2", Category: "idea"})
+	r.journal = append(r.journal, Thought{Content: "想法1", Category: "insight", Significance: 0.9, CreatedAt: time.Now()})
+	r.journal = append(r.journal, Thought{Content: "想法2", Category: "idea", Significance: 0.85, CreatedAt: time.Now()})
 	r.mu.Unlock()
 
-	ctx := r.JournalContext(5)
+	ctx := r.JournalContext(5, "")
 	if ctx == "" {
 		t.Error("expected non-empty context")
 	}
@@ -159,12 +159,13 @@ func TestJournalContext_Limit(t *testing.T) {
 
 	r.mu.Lock()
 	for i := 0; i < 10; i++ {
-		r.journal = append(r.journal, Thought{Content: "thought", Category: "observation"})
+		// Use insight category with high significance to pass no-query filter (≥0.8)
+		r.journal = append(r.journal, Thought{Content: "thought", Category: "insight", Significance: 0.9, CreatedAt: time.Now()})
 	}
 	r.mu.Unlock()
 
-	ctx := r.JournalContext(3)
-	// Should only contain last 3 thoughts
+	ctx := r.JournalContext(3, "")
+	// Should only contain 3 thoughts (capped by maxThoughts — but 2 is the new default limit)
 	count := 0
 	for _, line := range splitLines(ctx) {
 		if len(line) > 0 && line[0] == '-' {
@@ -173,6 +174,24 @@ func TestJournalContext_Limit(t *testing.T) {
 	}
 	if count != 3 {
 		t.Errorf("expected 3 thought lines, got %d", count)
+	}
+}
+
+func TestJournalContext_QueryAware(t *testing.T) {
+	cfg := DefaultReverieConfig()
+	cfg.SaveFile = ""
+	r := NewReverie(cfg)
+
+	r.mu.Lock()
+	r.journal = append(r.journal, Thought{Content: "Go语言并发编程技巧", Category: "insight", Significance: 0.7})
+	r.journal = append(r.journal, Thought{Content: "用户喜欢简洁的回复风格", Category: "insight", Significance: 0.75})
+	r.journal = append(r.journal, Thought{Content: "Python数据分析常见错误", Category: "observation", Significance: 0.7})
+	r.mu.Unlock()
+
+	// Query about Go should surface Go-related thought first
+	ctx := r.JournalContext(1, "Go语言协程怎么用")
+	if !contains(ctx, "Go") {
+		t.Errorf("query-aware context should prioritize Go-related thought, got: %q", ctx)
 	}
 }
 

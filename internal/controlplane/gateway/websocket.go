@@ -16,6 +16,7 @@ import (
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
+	channelpkg "yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/observe"
 )
@@ -193,16 +194,82 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var fullReply strings.Builder
+	var jsonBuf strings.Builder
+	buffering := false
+
+	flushBuf := func() {
+		if jsonBuf.Len() > 0 {
+			bufText := jsonBuf.String()
+			jsonBuf.Reset()
+			data, _ := json.Marshal(map[string]string{"content": bufText})
+			sseEvent(w, flusher, "delta", string(data))
+		}
+		buffering = false
+	}
+
 	for delta := range deltaCh {
 		if delta.Finished {
 			break
 		}
-		if delta.Content != "" {
-			fullReply.WriteString(delta.Content)
-			data, _ := json.Marshal(map[string]string{"content": delta.Content})
-			sseEvent(w, flusher, "delta", string(data))
+		if delta.Content == "" {
+			continue
+		}
+		fullReply.WriteString(delta.Content)
+
+		if buffering {
+			jsonBuf.WriteString(delta.Content)
+			accumulated := jsonBuf.String()
+			if strings.Contains(accumulated, `"tool_calls"`) || strings.Contains(accumulated, `"skill_calls"`) {
+				depth := 0
+				closed := false
+				for _, ch := range accumulated {
+					if ch == '{' {
+						depth++
+					} else if ch == '}' {
+						depth--
+						if depth == 0 {
+							closed = true
+							break
+						}
+					}
+				}
+				if closed {
+					jsonBuf.Reset()
+					buffering = false
+				}
+			} else {
+				depth := 0
+				for _, ch := range accumulated {
+					if ch == '{' {
+						depth++
+					} else if ch == '}' {
+						depth--
+					}
+				}
+				if depth <= 0 {
+					flushBuf()
+				}
+				if jsonBuf.Len() > 500 {
+					flushBuf()
+				}
+			}
+		} else {
+			if strings.Contains(delta.Content, "{") {
+				idx := strings.Index(delta.Content, "{")
+				if idx > 0 {
+					safe := delta.Content[:idx]
+					data, _ := json.Marshal(map[string]string{"content": safe})
+					sseEvent(w, flusher, "delta", string(data))
+				}
+				jsonBuf.WriteString(delta.Content[idx:])
+				buffering = true
+			} else {
+				data, _ := json.Marshal(map[string]string{"content": delta.Content})
+				sseEvent(w, flusher, "delta", string(data))
+			}
 		}
 	}
+	flushBuf()
 	observe.EndSpan(llmSpan, nil)
 	reply := fullReply.String()
 
@@ -295,6 +362,16 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 			g.adaptiveLoop.ObserveInteraction(context.Background(), userMsg, reply)
 		}()
 	}
+
+	// ReplyHook broadcast
+	lastUserMsgForHook := ""
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			lastUserMsgForHook = req.Messages[i].Content
+			break
+		}
+	}
+	g.InvokeReplyHooks(ctx, channelpkg.Message{ChannelType: "webui", Content: lastUserMsgForHook}, channelpkg.Reply{Content: reply})
 
 	// Record usage
 	estTokens := int64(fullReply.Len()/4 + 100)

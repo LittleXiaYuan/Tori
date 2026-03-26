@@ -107,18 +107,18 @@ func TestExperienceStoreStats(t *testing.T) {
 func TestCompileStrategies(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
 	s := NewExperienceStore(path)
-	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "web_search 配合 summarize 效果好"})
-	s.Add(Experience{Category: "error_pattern", Outcome: "failure", Lesson: "translate 对长文本容易超时"})
+	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "web_search 配合 summarize 效果好，可以先搜索再总结"})
+	s.Add(Experience{Category: "error_pattern", Outcome: "failure", Lesson: "translate 对长文本容易超时，需要先分段再翻译"})
 
 	strategies := s.CompileStrategies(10)
 	if strategies == "" {
 		t.Fatal("expected non-empty strategies")
 	}
-	if !contains(strategies, "成功策略") {
-		t.Error("missing success section")
+	if !contains(strategies, "推荐") {
+		t.Error("missing success directive")
 	}
-	if !contains(strategies, "失败模式") {
-		t.Error("missing failure section")
+	if !contains(strategies, "避免") {
+		t.Error("missing failure directive")
 	}
 	if !contains(strategies, "web_search") {
 		t.Error("missing web_search strategy")

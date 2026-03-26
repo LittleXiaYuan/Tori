@@ -14,8 +14,8 @@ import (
 
 func TestBrowserSkillName(t *testing.T) {
 	s := NewBrowserSkill()
-	if s.Name() != "browser" {
-		t.Fatalf("expected browser, got %s", s.Name())
+	if s.Name() != "web_fetch" {
+		t.Fatalf("expected web_fetch, got %s", s.Name())
 	}
 }
 
