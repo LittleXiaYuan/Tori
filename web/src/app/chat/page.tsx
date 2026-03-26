@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { api, ConversationInfo, EmotionResult, StickerSuggestion } from "@/lib/api";
+import { api, ConversationInfo, EmotionResult, StickerSuggestion, PresetInfo } from "@/lib/api";
 import MarkdownRenderer from "@/components/markdown-renderer";
+import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import {
   Send, Bot, User, Loader2, Sparkles, RotateCcw, Trash2, ChevronDown,
   Plus, MessageSquare, Pin, PinOff, Archive, ArchiveRestore, Pencil, Check, X,
@@ -17,6 +18,7 @@ interface Message {
   steps?: number;
   emotion?: EmotionResult;
   stickerSuggestion?: StickerSuggestion;
+  traceEvents?: AgentEvent[];
 }
 
 // Emotion display mapping
@@ -110,6 +112,9 @@ export default function ChatPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const [presets, setPresets] = useState<PresetInfo[]>([]);
+  const [activePreset, setActivePreset] = useState<string>("");
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -125,6 +130,25 @@ export default function ChatPage() {
   }, [showArchived]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  // Load Persona Presets
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api.getPresets();
+        setPresets(data.presets || []);
+        setActivePreset(data.active || "");
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const handlePresetChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setActivePreset(id);
+    try {
+      await api.switchPreset(id);
+    } catch { /* revert or ignore */ }
+  };
 
   // Persist sessionId to localStorage
   useEffect(() => {
@@ -241,6 +265,7 @@ export default function ChatPage() {
       let streamWorked = false;
       let streamEmotion: Message["emotion"] = undefined;
       let streamSticker: Message["stickerSuggestion"] = undefined;
+      const traceEventsRef: AgentEvent[] = [];
 
       try {
         for await (const chunk of api.chatStream(
@@ -248,6 +273,22 @@ export default function ChatPage() {
           sessionId
         )) {
           streamWorked = true;
+          // Parse step/trace events from agentic SSE
+          if (chunk.startsWith("{\"id\":\"evt-")) {
+            try {
+              const evt: AgentEvent = JSON.parse(chunk);
+              traceEventsRef.push(evt);
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  traceEvents: [...traceEventsRef],
+                };
+                return updated;
+              });
+              continue;
+            } catch { /* not a trace event */ }
+          }
           // Parse emotion/sticker markers from done event
           const emotionMatch = chunk.match(/<!--emotion:(.+?)-->/);
           const stickerMatch = chunk.match(/<!--sticker:(.+?)-->/);
@@ -277,6 +318,7 @@ export default function ChatPage() {
               timestamp: Date.now(),
               emotion: streamEmotion,
               stickerSuggestion: streamSticker,
+              traceEvents: traceEventsRef,
             };
             return updated;
           });
@@ -471,6 +513,18 @@ export default function ChatPage() {
         <div className="flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold">Chat</h1>
+            {presets.length > 0 && (
+              <select
+                value={activePreset}
+                onChange={handlePresetChange}
+                className="text-sm px-2 py-1 rounded border outline-none cursor-pointer transition-colors"
+                style={{ background: "var(--bg)", borderColor: "var(--border)", color: "var(--text)" }}
+              >
+                {presets.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
             {streaming && (
               <span
                 className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full"
@@ -522,6 +576,9 @@ export default function ChatPage() {
                   color: msg.role === "user" ? "white" : "var(--text)",
                 }}
               >
+                {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
+                  <ExecutionTrace events={msg.traceEvents} isLive={streaming && i === messages.length - 1} />
+                )}
                 {msg.content ? (
                   msg.role === "assistant" ? (
                     <RichContent content={msg.content} />

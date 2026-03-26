@@ -56,9 +56,13 @@ var configSchema = []configGroup{
 		Fields: []configField{
 			{Key: "HEARTBEAT_ENABLED", Label: "Heartbeat", LabelZh: "心跳自检", Type: "select", Options: []string{"true", "false"}},
 			{Key: "HEARTBEAT_INTERVAL", Label: "Heartbeat Interval (min)", LabelZh: "心跳间隔（分钟）", Type: "number", Placeholder: "30"},
+			{Key: "LONG_HORIZON_ENABLED", Label: "Deep Planning (DAG)", LabelZh: "深度长线规划", Type: "select", Options: []string{"false", "true"}},
 			{Key: "SELF_ITERATE_ENABLED", Label: "Self-Iterate", LabelZh: "自我迭代", Type: "select", Options: []string{"true", "false"}},
 			{Key: "SELF_ITERATE_TOKEN_BUDGET", Label: "Iterate Token Budget", LabelZh: "迭代 Token 预算", Type: "number", Placeholder: "5000"},
 			{Key: "SELF_ITERATE_AUTO_APPROVE", Label: "Auto-Approve Proposals", LabelZh: "自动审批提案", Type: "select", Options: []string{"false", "true"}},
+			{Key: "REACT_ENABLED", Label: "ReAct Mode", LabelZh: "ReAct 推理模式", Type: "select", Options: []string{"false", "true"}},
+			{Key: "REFLECT_MODE", Label: "Reflect Mode", LabelZh: "反思评估模式", Type: "select", Options: []string{"learning", "strict", "off"}},
+			{Key: "REFLECT_MODEL", Label: "Reflect Eval Model", LabelZh: "反思评估器模型", Type: "text", Placeholder: "fast (留空=主模型)"},
 		},
 	},
 	{
@@ -99,9 +103,15 @@ var configSchema = []configGroup{
 		},
 	},
 	{
+		Key: "storage", Label: "Storage & Persistence", LabelZh: "存储与持久化",
+		Fields: []configField{
+			{Key: "LEDGER_DB_PATH", Label: "Ledger DB Path", LabelZh: "Ledger 数据库路径", Type: "text", Placeholder: "data/ledger/ledger.db"},
+			{Key: "STORAGE_MODE", Label: "Memory Storage Mode", LabelZh: "记忆存储模式", Type: "select", Options: []string{"ledger", "memory"}, Placeholder: "ledger"},
+		},
+	},
+	{
 		Key: "other", Label: "Other", LabelZh: "其他",
 		Fields: []configField{
-			{Key: "DATABASE_URL", Label: "Database URL", LabelZh: "数据库连接串", Type: "text"},
 			{Key: "SEARXNG_URL", Label: "SearXNG URL", LabelZh: "SearXNG 搜索地址", Type: "text"},
 			{Key: "PERSONA_DIR", Label: "Persona Directory", LabelZh: "人格目录", Type: "text", Placeholder: "data/personas"},
 			{Key: "OPEN_BROWSER", Label: "Auto-Open Browser", LabelZh: "自动打开浏览器", Type: "select", Options: []string{"true", "false"}},
