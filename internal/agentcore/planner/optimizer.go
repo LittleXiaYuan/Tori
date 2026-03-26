@@ -13,17 +13,19 @@ import (
 	"yunque-agent/internal/observe"
 )
 
-// SkillOptimizer 技能大盘聚合与自适应调参
+// SkillOptimizer analyzes skill usage metrics and generates optimization hints
+// for the planner's system prompt. This enables the agent to self-optimize
+// by preferring high-success-rate skills and avoiding consistently failing ones.
 type SkillOptimizer struct {
 	mu           sync.RWMutex
 	metrics      *observe.Metrics
-	history      []SkillPerformance // 历史大盘持久化
+	history      []SkillPerformance // persisted historical performance
 	saveFile     string
 	lastAnalysis time.Time
-	analyzeCount int // 防抖 (5次/60s)
+	analyzeCount int // throttle: analyze at most every 5 calls or 60 seconds
 }
 
-// SkillPerformance 单个技能监控指标
+// SkillPerformance tracks a skill's performance over time.
 type SkillPerformance struct {
 	Name        string  `json:"name"`
 	Total       int64   `json:"total"`
@@ -34,7 +36,7 @@ type SkillPerformance struct {
 	LastUpdated string  `json:"last_updated"`
 }
 
-// NewSkillOptimizer 装载分析器
+// NewSkillOptimizer creates an optimizer linked to the metrics system.
 func NewSkillOptimizer(met *observe.Metrics, saveFile string) *SkillOptimizer {
 	opt := &SkillOptimizer{
 		metrics:  met,
@@ -44,7 +46,8 @@ func NewSkillOptimizer(met *observe.Metrics, saveFile string) *SkillOptimizer {
 	return opt
 }
 
-// Analyze 并入最新监控指标 (带限流熔断)
+// Analyze collects current metrics snapshot and merges with historical data.
+// Throttled: runs at most every 60 seconds or every 5 calls, whichever comes first.
 func (o *SkillOptimizer) Analyze() {
 	if o.metrics == nil {
 		return
@@ -102,7 +105,8 @@ func (o *SkillOptimizer) Analyze() {
 	o.persistHistory()
 }
 
-// OptimizationHints 提取经常报错/高频动作供 Prompt 避坑
+// OptimizationHints generates a system prompt snippet with skill performance insights.
+// Returns empty string if no significant insights exist.
 func (o *SkillOptimizer) OptimizationHints() string {
 	o.mu.RLock()
 	defer o.mu.RUnlock()

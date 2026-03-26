@@ -182,8 +182,8 @@ export default function SettingsPage() {
                           <select value={values[f.key] || ""} onChange={e => upd(f.key, e.target.value)}
                             className="w-full rounded-lg px-3 py-2 text-sm border outline-none"
                             style={{ background: "var(--bg-hover)", borderColor: "var(--border)", color: "var(--text)" }}>
-                            <option value="">—</option>
-                            {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                            <option value="" style={{ background: "var(--bg-card)", color: "var(--text)" }}>—</option>
+                            {f.options?.map(o => <option key={o} value={o} style={{ background: "var(--bg-card)", color: "var(--text)" }}>{o}</option>)}
                           </select>
                         ) : (
                           <div className="relative">

@@ -507,3 +507,4 @@ select:focus {
     transform: translateY(0) scale(1);
   }
 }
+html { color-scheme: dark; }
