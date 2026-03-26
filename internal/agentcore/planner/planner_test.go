@@ -1,7 +1,16 @@
 package planner
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/pkg/skills"
 )
 
@@ -125,6 +134,30 @@ func TestCleanReplyTrailingCallDescriptionPreservesNormal(t *testing.T) {
 	}
 }
 
+func TestCleanReplyRemovesACTTags(t *testing.T) {
+	p := &Planner{}
+	input := `<|ACT {"emotion":{"name":"happy","intensity":1}}|>
+嗨！你好呀！
+
+<|ACT {"emotion":{"name":"curious","intensity":1}}|>
+今天有什么需要帮忙的吗？`
+	cleaned := p.cleanReply(input)
+	expected := "嗨！你好呀！\n\n今天有什么需要帮忙的吗？"
+	if cleaned != expected {
+		t.Fatalf("ACT tags not properly stripped.\nGot:      %q\nExpected: %q", cleaned, expected)
+	}
+}
+
+func TestCleanReplyACTTagsOnlyLine(t *testing.T) {
+	p := &Planner{}
+	input := `<|ACT {"emotion":{"name":"neutral","intensity":1}}|>
+Hello!`
+	cleaned := p.cleanReply(input)
+	if cleaned != "Hello!" {
+		t.Fatalf("single ACT tag not stripped, got: %q", cleaned)
+	}
+}
+
 func TestExecutionSummaryEmpty(t *testing.T) {
 	result := &PlanResult{Reply: "hello", Plan: nil}
 	if result.ExecutionSummary() != "" {
@@ -179,4 +212,254 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// ── Integration-level tests (mock LLM server) ──
+
+func mockLLMServer(t *testing.T, responseFunc func(msgs []llm.Message) string) *llm.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Messages []llm.Message `json:"messages"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		reply := responseFunc(req.Messages)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{"message": map[string]string{"role": "assistant", "content": reply}},
+			},
+		})
+	}))
+	t.Cleanup(srv.Close)
+	return llm.NewClient(srv.URL, "test-key", "test-model")
+}
+
+type mockSkill struct {
+	name   string
+	desc   string
+	execFn func(ctx context.Context, args map[string]any, env *skills.Environment) (string, error)
+}
+
+func (s *mockSkill) Name() string        { return s.name }
+func (s *mockSkill) Description() string { return s.desc }
+func (s *mockSkill) Parameters() map[string]any {
+	return map[string]any{"type": "object", "properties": map[string]any{}}
+}
+func (s *mockSkill) Execute(ctx context.Context, args map[string]any, env *skills.Environment) (string, error) {
+	return s.execFn(ctx, args, env)
+}
+
+func TestPlannerDefaults(t *testing.T) {
+	client := mockLLMServer(t, func(_ []llm.Message) string { return "hi" })
+	p := NewPlanner(client, skills.NewRegistry(), 0)
+	if p.maxSteps != 8 {
+		t.Errorf("expected default maxSteps=8, got %d", p.maxSteps)
+	}
+	if p.toolTimeout != 60*time.Second {
+		t.Errorf("expected default toolTimeout=60s, got %v", p.toolTimeout)
+	}
+}
+
+func TestRunTextBased_SimpleReply(t *testing.T) {
+	client := mockLLMServer(t, func(_ []llm.Message) string {
+		return "Hello! How can I help you?"
+	})
+	p := NewPlanner(client, skills.NewRegistry(), 8)
+	result, err := p.Run(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hello"}},
+		TenantID: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Reply == "" {
+		t.Error("expected non-empty reply")
+	}
+	if result.Steps != 1 {
+		t.Errorf("expected 1 step, got %d", result.Steps)
+	}
+}
+
+func TestRunTextBased_SkillCall(t *testing.T) {
+	callCount := 0
+	client := mockLLMServer(t, func(_ []llm.Message) string {
+		callCount++
+		if callCount == 1 {
+			return `I need to search. {"tool_calls": [{"name": "web_search", "arguments": {"query": "golang testing"}}]}`
+		}
+		return "Go testing uses the testing package."
+	})
+
+	reg := skills.NewRegistry()
+	reg.Register(&mockSkill{
+		name: "web_search", desc: "Search the web",
+		execFn: func(_ context.Context, args map[string]any, _ *skills.Environment) (string, error) {
+			q, _ := args["query"].(string)
+			return fmt.Sprintf("Results for '%s': Go testing is built-in.", q), nil
+		},
+	})
+
+	p := NewPlanner(client, reg, 8)
+	result, err := p.Run(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "how does go testing work?"}},
+		TenantID: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.SkillsUsed) != 1 || result.SkillsUsed[0] != "web_search" {
+		t.Errorf("expected [web_search], got %v", result.SkillsUsed)
+	}
+}
+
+func TestRunTextBased_ParallelSkillCalls(t *testing.T) {
+	callCount := 0
+	client := mockLLMServer(t, func(_ []llm.Message) string {
+		callCount++
+		if callCount == 1 {
+			return `{"tool_calls": [
+				{"name": "skill_a", "arguments": {"id": "1"}},
+				{"name": "skill_b", "arguments": {"id": "2"}}
+			]}`
+		}
+		return "Combined results."
+	})
+
+	var executed int32
+	reg := skills.NewRegistry()
+	reg.Register(&mockSkill{
+		name: "skill_a", desc: "A",
+		execFn: func(_ context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
+			time.Sleep(50 * time.Millisecond)
+			atomic.AddInt32(&executed, 1)
+			return "result_a", nil
+		},
+	})
+	reg.Register(&mockSkill{
+		name: "skill_b", desc: "B",
+		execFn: func(_ context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
+			time.Sleep(50 * time.Millisecond)
+			atomic.AddInt32(&executed, 1)
+			return "result_b", nil
+		},
+	})
+
+	p := NewPlanner(client, reg, 8)
+	result, err := p.Run(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "do both"}},
+		TenantID: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.SkillsUsed) != 2 {
+		t.Errorf("expected 2 skills, got %v", result.SkillsUsed)
+	}
+	if atomic.LoadInt32(&executed) != 2 {
+		t.Errorf("expected both skills executed, got %d", executed)
+	}
+}
+
+func TestRunTextBased_ContextCancellation(t *testing.T) {
+	client := mockLLMServer(t, func(_ []llm.Message) string {
+		time.Sleep(2 * time.Second)
+		return "should not reach"
+	})
+	p := NewPlanner(client, skills.NewRegistry(), 8)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_, err := p.Run(ctx, PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "hello"}},
+		TenantID: "test",
+	})
+	if err == nil {
+		t.Error("expected context cancellation error")
+	}
+}
+
+func TestRunTextBased_ReflectRetry(t *testing.T) {
+	callCount := 0
+	client := mockLLMServer(t, func(_ []llm.Message) string {
+		callCount++
+		if callCount == 1 {
+			return "bad answer"
+		}
+		return "improved answer after reflection"
+	})
+	p := NewPlanner(client, skills.NewRegistry(), 8)
+
+	reflectCount := 0
+	p.SetReflect(func(_ context.Context, _, _ string) bool {
+		reflectCount++
+		return reflectCount > 1 // reject first, accept second
+	})
+
+	result, err := p.Run(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "what is 2+2?"}},
+		TenantID: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Steps != 2 {
+		t.Errorf("expected 2 steps (reflect retry), got %d", result.Steps)
+	}
+}
+
+func TestSafeToolGo_PanicRecovery(t *testing.T) {
+	done := make(chan bool, 1)
+	safeToolGo(context.Background(), 5*time.Second, func(_ context.Context) {
+		defer func() { done <- true }()
+		panic("test panic")
+	})
+	select {
+	case <-done:
+		// recovered successfully
+	case <-time.After(2 * time.Second):
+		t.Error("safeToolGo did not recover in time")
+	}
+}
+
+func TestSafeToolGo_Timeout(t *testing.T) {
+	started := make(chan bool, 1)
+	safeToolGo(context.Background(), 100*time.Millisecond, func(ctx context.Context) {
+		started <- true
+		<-ctx.Done()
+	})
+	select {
+	case <-started:
+		// timeout will cancel the goroutine
+	case <-time.After(2 * time.Second):
+		t.Error("goroutine did not start")
+	}
+}
+
+func TestSetToolTimeout(t *testing.T) {
+	client := mockLLMServer(t, func(_ []llm.Message) string { return "ok" })
+	p := NewPlanner(client, skills.NewRegistry(), 8)
+	p.SetToolTimeout(30 * time.Second)
+	if p.toolTimeout != 30*time.Second {
+		t.Errorf("expected 30s, got %v", p.toolTimeout)
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{"hello", 10, "hello"},
+		{"hello world", 5, "hello..."},
+		{"你好世界", 2, "你好..."},
+		{"", 5, ""},
+	}
+	for _, tt := range tests {
+		got := truncate(tt.input, tt.maxLen)
+		if got != tt.expected {
+			t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.expected)
+		}
+	}
 }
