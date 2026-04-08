@@ -133,6 +133,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
     sendBridgeAction,
     syncBridgeState,
     setBridgeNotice,
+    setLastArtifact,
   };
 }
 

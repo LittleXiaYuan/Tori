@@ -359,6 +359,7 @@ export default function ChatPage() {
     sendBridgeAction,
     syncBridgeState,
     setBridgeNotice,
+    setLastArtifact,
   } = useBrowserBridge({
     onActionStart: (type, extra) => {
       pushBrowserTrace(makeBrowserTraceEvent(`??????????${browserActionLabel(type)}`, { action: type, stage: "start", ...extra }, "tool_start"));
@@ -713,6 +714,18 @@ export default function ChatPage() {
                 if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
                 chatD({ type: "UPDATE_LAST", updates });
+                if (doneData.browser_summary) {
+                  setLastArtifact({
+                    action: doneData.browser_summary.skill,
+                    url: doneData.browser_summary.url,
+                    title: doneData.browser_summary.title,
+                    elementCount: doneData.browser_summary.element_count,
+                    tabId: doneData.browser_summary.tab_id,
+                    hasScreenshot: doneData.browser_summary.has_screenshot,
+                    textLength: doneData.browser_summary.text_length,
+                    updatedAt: Date.now(),
+                  });
+                }
                 if (slashBrowserCommand) {
                   syncBridgeState();
                   const used = Array.isArray(doneData.skills_used) ? doneData.skills_used : [];
@@ -789,7 +802,7 @@ export default function ChatPage() {
       abortRef.current = null;
       loadConversations();
     }
-  }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, syncBridgeState]);
+  }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, setLastArtifact, syncBridgeState]);
 
   const stopGeneration = () => abortRef.current?.abort();
 
