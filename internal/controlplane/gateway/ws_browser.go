@@ -79,6 +79,7 @@ type BrowserResult struct {
 // BrowserHub manages the WebSocket connection to the browser extension.
 type BrowserHub struct {
 	mu        sync.Mutex
+	writeMu   sync.Mutex
 	conn      *websocket.Conn
 	connected bool
 	version   string
@@ -108,6 +109,19 @@ func (h *BrowserHub) OnEvent(fn func(BrowserResult)) {
 	h.listeners = append(h.listeners, fn)
 }
 
+func (h *BrowserHub) writeMessage(messageType int, data []byte) error {
+	h.mu.Lock()
+	conn := h.conn
+	connected := h.connected
+	h.mu.Unlock()
+	if !connected || conn == nil {
+		return fmt.Errorf("browser extension not connected")
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+	return conn.WriteMessage(messageType, data)
+}
+
 // SendAction sends a command to the browser extension and waits for the result.
 func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (BrowserResult, error) {
 	h.mu.Lock()
@@ -119,12 +133,11 @@ func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (Brow
 	reqID := fmt.Sprintf("browser-%d-%d", time.Now().UnixNano(), atomic.AddUint64(&h.seq, 1))
 	ch := make(chan BrowserResult, 1)
 	h.pending[reqID] = ch
+	h.mu.Unlock()
 
 	cmd := BrowserCommand{RequestID: reqID, Action: action}
 	data, _ := json.Marshal(cmd)
-	err := h.conn.WriteMessage(websocket.TextMessage, data)
-	h.mu.Unlock()
-
+	err := h.writeMessage(websocket.TextMessage, data)
 	if err != nil {
 		h.mu.Lock()
 		delete(h.pending, reqID)
@@ -286,7 +299,7 @@ func (g *Gateway) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 			case <-done:
 				return
 			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				if err := hub.writeMessage(websocket.PingMessage, nil); err != nil {
 					return
 				}
 			}
