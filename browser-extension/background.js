@@ -48,15 +48,18 @@ function connect() {
     const socketUrl = buildWebSocketURL(wsUrl, r.yunque_api_key || "");
     log("info", `Connecting to ${socketUrl.replace(/([?&](?:key|api_key)=)[^&]+/, "$1***")}`);
 
+    let socket;
     try {
-      ws = new WebSocket(socketUrl);
+      socket = new WebSocket(socketUrl);
+      ws = socket;
     } catch (e) {
       log("error", `WebSocket create failed: ${e.message}`);
       scheduleReconnect();
       return;
     }
 
-    ws.onopen = () => {
+    socket.onopen = () => {
+      if (ws !== socket) return;
       connected = true;
       log("info", "WebSocket connected");
       clearTimeout(reconnectTimer);
@@ -66,7 +69,8 @@ function connect() {
       broadcastRuntimeState({ force: true });
     };
 
-    ws.onmessage = async (evt) => {
+    socket.onmessage = async (evt) => {
+      if (ws !== socket) return;
       try {
         const msg = JSON.parse(evt.data);
         await handleCommand(msg);
@@ -76,7 +80,8 @@ function connect() {
       }
     };
 
-    ws.onclose = () => {
+    socket.onclose = () => {
+      if (ws !== socket) return;
       connected = false;
       ws = null;
       log("warn", "WebSocket closed");
@@ -85,7 +90,8 @@ function connect() {
       scheduleReconnect();
     };
 
-    ws.onerror = () => {
+    socket.onerror = () => {
+      if (ws !== socket) return;
       log("error", "WebSocket error");
       updateBadge("ERR", "#F44336");
       persistRuntimeState();
