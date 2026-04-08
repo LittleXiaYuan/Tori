@@ -13,6 +13,7 @@ let ws = null;
 let wsUrl = DEFAULT_WS_URL;
 let reconnectTimer = null;
 let outboundQueue = [];
+let lastBroadcastSignature = "";
 let sessions = new Map();   // tabId → { target, lastUsed }
 let connected = false;
 let runtimeSession = {
@@ -62,7 +63,7 @@ function connect() {
       sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
       flushOutboundQueue();
       restoreBadgeFromState();
-      broadcastRuntimeState();
+      broadcastRuntimeState({ force: true });
     };
 
     ws.onmessage = async (evt) => {
@@ -80,7 +81,7 @@ function connect() {
       ws = null;
       log("warn", "WebSocket closed");
       restoreBadgeFromState();
-      broadcastRuntimeState();
+      broadcastRuntimeState({ force: true });
       scheduleReconnect();
     };
 
@@ -88,7 +89,7 @@ function connect() {
       log("error", "WebSocket error");
       updateBadge("ERR", "#F44336");
       persistRuntimeState();
-      broadcastRuntimeState();
+      broadcastRuntimeState({ force: true });
     };
   });
 }
@@ -136,6 +137,10 @@ function persistRuntimeState() {
   }, () => void chrome.runtime.lastError);
 }
 
+function runtimeStateSignature() {
+  return JSON.stringify(getRuntimeState());
+}
+
 function restoreBadgeFromState() {
   const badge = getBadgeState();
   updateBadge(badge.text, badge.color);
@@ -173,7 +178,7 @@ function restoreRuntimeState() {
       }
 
       restoreBadgeFromState();
-      broadcastRuntimeState();
+      broadcastRuntimeState({ force: true });
       resolve();
     });
   });
@@ -197,19 +202,24 @@ async function getTabSnapshot(tabId) {
   }
 }
 
-async function updateRuntimeSession(patch = {}) {
+async function updateRuntimeSession(patch = {}, options = {}) {
+  const { forceBroadcast = false } = options;
   if (!runtimeSession.id) runtimeSession.id = nextSessionId();
   const tabInfo = await getTabSnapshot(patch.currentTabId || runtimeSession.currentTabId);
-  runtimeSession = {
+  const nextSession = {
     ...runtimeSession,
     ...patch,
     currentTabId: patch.currentTabId ?? (tabInfo?.tabId ?? runtimeSession.currentTabId),
     currentUrl: patch.currentUrl ?? (tabInfo?.url ?? runtimeSession.currentUrl),
     title: patch.title ?? (tabInfo?.title ?? runtimeSession.title),
-    updatedAt: Date.now(),
+  };
+  const changed = JSON.stringify(runtimeSession) !== JSON.stringify(nextSession);
+  runtimeSession = {
+    ...nextSession,
+    updatedAt: changed ? Date.now() : runtimeSession.updatedAt,
   };
   persistRuntimeState();
-  broadcastRuntimeState();
+  broadcastRuntimeState({ force: forceBroadcast });
   return runtimeSession;
 }
 
@@ -226,9 +236,13 @@ function getRuntimeState() {
   };
 }
 
-function broadcastRuntimeState() {
-  persistRuntimeState();
-  const payload = { type: "bridge_state_update", state: getRuntimeState() };
+function broadcastRuntimeState(options = {}) {
+  const { force = false } = options;
+  const state = getRuntimeState();
+  const signature = JSON.stringify(state);
+  if (!force && signature === lastBroadcastSignature) return;
+  lastBroadcastSignature = signature;
+  const payload = { type: "bridge_state_update", state };
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (!tab.id) continue;
@@ -795,7 +809,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     updatedAt: Date.now(),
   };
   persistRuntimeState();
-  broadcastRuntimeState();
+  broadcastRuntimeState({ force: true });
 });
 
 // Also try connecting immediately when the service worker wakes up
