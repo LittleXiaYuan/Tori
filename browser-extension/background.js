@@ -6,11 +6,13 @@ const RECONNECT_DELAY = 3000;
 const SESSION_TIMEOUT = 60000;
 const DEFAULT_WS_URL = "ws://localhost:9090/ws/browser";
 const RUNTIME_STATE_KEY = "yunque_runtime_state";
+const MAX_OUTBOUND_QUEUE = 100;
 
 // ─── State ───────────────────────────────────────────
 let ws = null;
 let wsUrl = DEFAULT_WS_URL;
 let reconnectTimer = null;
+let outboundQueue = [];
 let sessions = new Map();   // tabId → { target, lastUsed }
 let connected = false;
 let runtimeSession = {
@@ -57,7 +59,8 @@ function connect() {
       connected = true;
       log("info", "WebSocket connected");
       clearTimeout(reconnectTimer);
-      sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version });
+      sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
+      flushOutboundQueue();
       restoreBadgeFromState();
       broadcastRuntimeState();
     };
@@ -74,13 +77,14 @@ function connect() {
 
     ws.onclose = () => {
       connected = false;
+      ws = null;
       log("warn", "WebSocket closed");
       restoreBadgeFromState();
       broadcastRuntimeState();
       scheduleReconnect();
     };
 
-    ws.onerror = (e) => {
+    ws.onerror = () => {
       log("error", "WebSocket error");
       updateBadge("ERR", "#F44336");
       persistRuntimeState();
@@ -94,10 +98,20 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
 }
 
-function sendToBackend(msg) {
+function sendToBackend(msg, options = {}) {
+  const { queueIfOffline = true, fromQueue = false } = options;
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(msg));
+    try {
+      ws.send(JSON.stringify(msg));
+      return true;
+    } catch (e) {
+      log("warn", `Send failed: ${e.message}`);
+    }
   }
+  if (queueIfOffline && !fromQueue) {
+    enqueueOutboundMessage(msg);
+  }
+  return false;
 }
 
 function nextSessionId() {
