@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"yunque-agent/pkg/safego"
+
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
@@ -71,6 +73,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		SessionID string        `json:"session_id"`
 		TaskID    string        `json:"task_id"`
 		Platform  string        `json:"platform,omitempty"`
+		Thinking  *bool         `json:"thinking,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -115,6 +118,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	msgs = g.augmentMessagesForBrowserIntent(msgs)
 	// Memory: write user message(s) to short-term
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
@@ -160,12 +164,13 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// ── Run planner with StepCallback → SSE ──
 	planReq := planner.PlanRequest{
-		Messages:      msgs,
-		TenantID:      tid,
-		ModelOverride: routedTier,
-		EmotionHint:   emotionHint,
-		TaskID:        req.TaskID,
-		TaskContext:   taskContext,
+		Messages:        msgs,
+		TenantID:        tid,
+		ModelOverride:   routedTier,
+		EmotionHint:     emotionHint,
+		TaskID:          req.TaskID,
+		TaskContext:     taskContext,
+		ThinkingEnabled: req.Thinking,
 		StepCallback: func(event observe.AgentEvent) {
 			data, _ := json.Marshal(event)
 			sseEvent(w, flusher, event.QualifiedType(), string(data))
@@ -175,6 +180,36 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			}
 		},
 		TraceID: traceSpan.TraceID,
+	}
+
+	if slashResp, handled, slashErr := g.tryHandleSlashCommand(ctx, planReq); handled {
+		if slashErr != nil {
+			errData, _ := json.Marshal(map[string]string{"code": "SLASH_COMMAND_ERROR", "message": slashErr.Error()})
+			sseEvent(w, flusher, "error", string(errData))
+			observe.EndSpan(traceSpan, slashErr)
+			return
+		}
+
+		reply := slashResp.Result.Reply
+		runes := []rune(reply)
+		chunkSize := 20
+		for i := 0; i < len(runes); i += chunkSize {
+			end := i + chunkSize
+			if end > len(runes) {
+				end = len(runes)
+			}
+			chunk := string(runes[i:end])
+			data, _ := json.Marshal(map[string]string{"content": chunk})
+			sseEvent(w, flusher, "delta", string(data))
+		}
+
+		doneBytes, _ := json.Marshal(slashResp.Raw)
+		sseEvent(w, flusher, "done", string(doneBytes))
+		if req.SessionID != "" {
+			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
+		}
+		observe.EndSpan(traceSpan, nil)
+		return
 	}
 
 	result, err := g.planner.Run(ctx, planReq)
@@ -204,6 +239,12 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		sseEvent(w, flusher, "actions", string(actJSON))
 	}
 
+	// Stream reasoning content (thinking) if present
+	if result.ReasoningContent != "" {
+		thinkData, _ := json.Marshal(map[string]string{"content": result.ReasoningContent})
+		sseEvent(w, flusher, "thinking", string(thinkData))
+	}
+
 	// Stream final reply as delta events (chunked for smooth UX)
 	reply := result.Reply
 	runes := []rune(reply)
@@ -225,8 +266,14 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		"skills_used": result.SkillsUsed,
 		"steps":       result.Steps,
 	}
+	if result.ReasoningContent != "" {
+		doneData["reasoning_content"] = result.ReasoningContent
+	}
 	if len(result.Actions) > 0 {
 		doneData["actions"] = result.Actions
+	}
+	if browserSummary := summarizeBrowserPlanArtifact(result.Plan); browserSummary != nil {
+		doneData["browser_summary"] = browserSummary
 	}
 	roots := []string{".", filepath.Join(".", "data"), filepath.Join(".", "data", "output"), filepath.Join(".", "data", "tasks")}
 	rich := RenderAgentActions(result.Actions)
@@ -240,6 +287,12 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	if emotionHint != nil && emotionHint.Emotion != emotion.EmotionNeutral {
 		doneData["emotion"] = emotionHint
 	}
+	// Suggestions: follow-up questions + skill save hint
+	suggestions := buildSuggestions(result, req.Messages)
+	if len(suggestions) > 0 {
+		doneData["suggestions"] = suggestions
+	}
+
 	doneBytes, _ := json.Marshal(doneData)
 	sseEvent(w, flusher, "done", string(doneBytes))
 
@@ -265,7 +318,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		if lastUserMsg != "" {
 			pReply := reply
 			pTID := tid
-			go func() {
+			safego.Go("agentic-memory-pipeline", func() {
 				chatMsgs := []memory.ChatMessage{
 					{Role: "user", Content: lastUserMsg},
 					{Role: "assistant", Content: pReply},
@@ -279,7 +332,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 						g.factHook.OnExtracted(result.ExtractedFacts)
 					}
 				}
-			}()
+			})
 		}
 	}
 
@@ -299,4 +352,80 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	g.metrics.RecordRequest(time.Since(start), estTokens, estTokens, nil)
 
 	observe.EndSpan(traceSpan, nil)
+}
+
+// buildSuggestions generates follow-up suggestions and optional skill-save hint.
+func buildSuggestions(result *planner.PlanResult, msgs []llm.Message) []map[string]string {
+	if result == nil {
+		return nil
+	}
+	var out []map[string]string
+
+	// Skill save hint: if multiple skills were used, suggest saving as workflow
+	if result.Steps >= 3 && len(result.SkillsUsed) >= 2 {
+		out = append(out, map[string]string{
+			"type":  "save_skill",
+			"label": "将此流程保存为可复用技能",
+			"icon":  "save",
+		})
+	}
+
+	userMsg := ""
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			userMsg = msgs[i].Content
+			break
+		}
+	}
+	reply := result.Reply
+	rUser := []rune(userMsg)
+	rReply := []rune(reply)
+
+	// Only generate follow-ups for substantive conversations
+	if len(rUser) < 5 || len(rReply) < 20 {
+		return out
+	}
+
+	// Rule-based follow-up suggestions by detecting task type from skills used
+	skillSet := make(map[string]bool)
+	for _, s := range result.SkillsUsed {
+		skillSet[s] = true
+	}
+
+	if skillSet["web_search"] || skillSet["search"] || skillSet["searx"] {
+		out = append(out, map[string]string{
+			"type": "followup", "label": "帮我深入了解更多细节",
+		})
+		out = append(out, map[string]string{
+			"type": "followup", "label": "整理成一份简报",
+		})
+	} else if skillSet["file_write"] || skillSet["file_read"] {
+		out = append(out, map[string]string{
+			"type": "followup", "label": "帮我检查和优化这个文件",
+		})
+		out = append(out, map[string]string{
+			"type": "followup", "label": "还需要做什么修改？",
+		})
+	} else if skillSet["shell"] || skillSet["run_command"] {
+		out = append(out, map[string]string{
+			"type": "followup", "label": "执行结果有问题吗？",
+		})
+		out = append(out, map[string]string{
+			"type": "followup", "label": "接下来还需要做什么？",
+		})
+	} else if len(result.SkillsUsed) > 0 {
+		out = append(out, map[string]string{
+			"type": "followup", "label": "能再详细解释一下吗？",
+		})
+		out = append(out, map[string]string{
+			"type": "followup", "label": "还有其他相关的事情需要处理吗？",
+		})
+	} else {
+		// Pure conversational reply
+		out = append(out, map[string]string{
+			"type": "followup", "label": "继续聊这个话题",
+		})
+	}
+
+	return out
 }

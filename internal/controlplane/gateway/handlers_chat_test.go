@@ -276,3 +276,35 @@ func TestSummarizeBrowserSlashArtifact_ContentPreview(t *testing.T) {
 		t.Fatalf("unexpected next_label: %#v", summary)
 	}
 }
+
+func TestSummarizeBrowserPlanArtifact_UsesLatestBrowserStep(t *testing.T) {
+	summary := summarizeBrowserPlanArtifact([]planner.PlanStep{
+		{Skill: "web_search", Status: planner.StepDone, Result: `{"ok":true}`},
+		{Skill: "browser_navigate", Status: planner.StepDone, Args: map[string]any{"url": "https://example.com"}, Result: `{"ok":true,"url":"https://example.com","title":"Example"}`},
+		{Skill: "browser_get_content", Status: planner.StepDone, Args: map[string]any{"url": "https://example.com"}, Result: `{"ok":true,"url":"https://example.com","title":"Example","content":"hello from browser"}`},
+	})
+	if summary == nil {
+		t.Fatal("expected browser summary")
+	}
+	if summary["skill"] != "browser_get_content" {
+		t.Fatalf("unexpected skill: %#v", summary)
+	}
+	if summary["preview"] != "hello from browser" {
+		t.Fatalf("unexpected preview: %#v", summary)
+	}
+	if summary["next_command"] != "/mark" {
+		t.Fatalf("unexpected next_command: %#v", summary)
+	}
+}
+
+func TestSummarizeBrowserPlanArtifact_HandlesFailedBrowserStep(t *testing.T) {
+	summary := summarizeBrowserPlanArtifact([]planner.PlanStep{
+		{Skill: "browser_click", Status: planner.StepFailed, Args: map[string]any{"selector": "button.buy"}, Error: "element not found"},
+	})
+	if summary == nil {
+		t.Fatal("expected browser summary")
+	}
+	if summary["error"] != "element not found" {
+		t.Fatalf("unexpected error summary: %#v", summary)
+	}
+}

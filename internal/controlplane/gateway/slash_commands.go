@@ -381,6 +381,42 @@ func summarizeBrowserSlashReply(skill string, args map[string]any, result Browse
 	}
 }
 
+func isBrowserSkill(skill string) bool {
+	return strings.HasPrefix(skill, "browser_")
+}
+
+func parseBrowserResultText(raw string) BrowserResult {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return BrowserResult{}
+	}
+	var result BrowserResult
+	if err := json.Unmarshal([]byte(raw), &result); err == nil {
+		return result
+	}
+	return BrowserResult{OK: true, Content: raw}
+}
+
+func summarizeBrowserPlanArtifact(plan []planner.PlanStep) map[string]any {
+	for i := len(plan) - 1; i >= 0; i-- {
+		step := plan[i]
+		if !isBrowserSkill(step.Skill) {
+			continue
+		}
+		result := parseBrowserResultText(step.Result)
+		if step.Error != "" && result.Error == "" {
+			result.OK = false
+			result.Error = step.Error
+		}
+		if step.Status == planner.StepFailed && result.Error == "" {
+			result.OK = false
+			result.Error = "browser action failed"
+		}
+		return summarizeBrowserSlashArtifact(step.Skill, step.Args, result)
+	}
+	return nil
+}
+
 func suggestedBrowserNextStep(skill string, result BrowserResult) (string, string) {
 	switch skill {
 	case "browser_mark_elements":
