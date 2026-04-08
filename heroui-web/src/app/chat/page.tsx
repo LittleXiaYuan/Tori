@@ -120,6 +120,26 @@ function getSlashState(input: string) {
   return { visible: true, query: commandPart };
 }
 
+function parseSlashBrowserCommand(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed.startsWith("/")) return null;
+  const [cmdRaw, ...restParts] = trimmed.split(/\s+/);
+  const cmd = cmdRaw.toLowerCase();
+  const args = restParts.join(" ").trim();
+  const browserCommands: Record<string, { summary: string }> = {
+    "/navigate": { summary: args ? `???????${args}` : "????????" },
+    "/screenshot": { summary: "????????" },
+    "/content": { summary: "??????????" },
+    "/mark": { summary: "??????????" },
+    "/unmark": { summary: "????????" },
+    "/scroll": { summary: args ? `???????${args}` : "??????" },
+    "/click": { summary: args ? `???????${args}` : "????????" },
+    "/type": { summary: args ? `???????${args.slice(0, 32)}` : "??????" },
+  };
+  if (!browserCommands[cmd]) return null;
+  return { command: cmd, args, ...browserCommands[cmd] };
+}
+
 // 閳光偓閳光偓 Chat state reducer 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 
 interface ChatState {
@@ -335,6 +355,8 @@ export default function ChatPage() {
     bridgeActionPending,
     bridgeNotice,
     sendBridgeAction,
+    syncBridgeState,
+    setBridgeNotice,
   } = useBrowserBridge({
     onActionStart: (type, extra) => {
       pushBrowserTrace(makeBrowserTraceEvent(`??????????${type.replace("bridge/", "")}`, { action: type, stage: "start", ...extra }, "tool_start"));
@@ -595,6 +617,18 @@ export default function ChatPage() {
     const text = (overrideText || chat.input).trim();
     if (!text || chat.loading) return;
 
+    const slashBrowserCommand = parseSlashBrowserCommand(text);
+    if (slashBrowserCommand) {
+      setSuggestedTab("browser");
+      setShowComputer(true);
+      setBridgeNotice({ tone: "info", text: `??????????? ${slashBrowserCommand.command}?` });
+      pushBrowserTrace(makeBrowserTraceEvent(
+        `Slash ??????${slashBrowserCommand.command}`,
+        { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
+        "tool_start",
+      ));
+    }
+
     const mediaPreviews = pendingFiles.filter(f => (f.type === "image" || f.type === "video") && f.base64).map(f => f.base64!);
     const userMsg: Message = { role: "user", content: text, id: newId(), ...(mediaPreviews.length > 0 ? { images: mediaPreviews } : {}) };
     const asstMsg: Message = { role: "assistant", content: "", id: newId(), traceEvents: [] };
@@ -677,6 +711,12 @@ export default function ChatPage() {
                 if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
                 chatD({ type: "UPDATE_LAST", updates });
+                if (slashBrowserCommand) {
+                  syncBridgeState();
+                  const used = Array.isArray(doneData.skills_used) ? doneData.skills_used : [];
+                  const commandSummary = used.length > 0 ? `??????????${used.join(", ")}` : `??????????${slashBrowserCommand.command}`;
+                  pushBrowserTrace(makeBrowserTraceEvent(commandSummary, { command: slashBrowserCommand.command, done: doneData }, "tool_result"));
+                }
               } catch { /* ignore */ }
               continue;
             }
@@ -747,7 +787,7 @@ export default function ChatPage() {
       abortRef.current = null;
       loadConversations();
     }
-  }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations]);
+  }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, syncBridgeState]);
 
   const stopGeneration = () => abortRef.current?.abort();
 
