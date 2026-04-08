@@ -28,10 +28,22 @@ export interface BrowserSessionNotice {
   text: string;
 }
 
+export interface BrowserActionArtifactSummary {
+  action?: string;
+  url?: string;
+  title?: string;
+  elementCount?: number;
+  tabId?: number | null;
+  hasScreenshot?: boolean;
+  textLength?: number;
+  updatedAt?: number;
+}
+
 interface BrowserSessionCardProps {
   state: BrowserBridgeState | null;
   pendingAction?: string | null;
   notice?: BrowserSessionNotice | null;
+  artifact?: BrowserActionArtifactSummary | null;
   traceEvents?: AgentEvent[];
   onAction: (type: string, extra?: Record<string, unknown>) => void;
   onOpenBrowserPage?: () => void;
@@ -42,6 +54,7 @@ export function BrowserSessionCard({
   state,
   pendingAction,
   notice,
+  artifact,
   traceEvents,
   onAction,
   onOpenBrowserPage,
@@ -82,6 +95,10 @@ export function BrowserSessionCard({
 
   const updatedLabel = session?.updatedAt
     ? new Date(session.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const artifactUpdatedLabel = artifact?.updatedAt
+    ? new Date(artifact.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
 
   return (
@@ -141,6 +158,59 @@ export function BrowserSessionCard({
           {notice && (
             <div className="mt-2 inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[11px]" style={noticeStyle}>
               {notice.text}
+            </div>
+          )}
+          {artifact && (
+            <div className="mt-3 rounded-2xl border px-3 py-2.5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>
+                ????
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
+                {artifact.action && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
+                    {artifact.action.replace("bridge/", "")}
+                  </span>
+                )}
+                {typeof artifact.elementCount === "number" && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
+                    {artifact.elementCount} ???
+                  </span>
+                )}
+                {typeof artifact.textLength === "number" && artifact.textLength > 0 && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
+                    {artifact.textLength} chars
+                  </span>
+                )}
+                {artifact.hasScreenshot && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(34,197,94,0.12)", color: "#86efac" }}>
+                    ?????
+                  </span>
+                )}
+                {artifact.tabId && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
+                    Tab #{artifact.tabId}
+                  </span>
+                )}
+                {artifactUpdatedLabel && (
+                  <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
+                    ??? {artifactUpdatedLabel}
+                  </span>
+                )}
+              </div>
+              {(artifact.title || artifact.url) && (
+                <div className="mt-2 min-w-0">
+                  {artifact.title && (
+                    <div className="truncate text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+                      {artifact.title}
+                    </div>
+                  )}
+                  {artifact.url && (
+                    <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                      {artifact.url}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {traceEvents && traceEvents.length > 0 && (

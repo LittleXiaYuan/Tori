@@ -354,6 +354,7 @@ export default function ChatPage() {
     bridgeState,
     bridgeActionPending,
     bridgeNotice,
+    lastArtifact,
     sendBridgeAction,
     syncBridgeState,
     setBridgeNotice,
@@ -1467,6 +1468,7 @@ export default function ChatPage() {
                   state={bridgeState}
                   pendingAction={bridgeActionPending}
                   notice={bridgeNotice}
+                  artifact={lastArtifact}
                   traceEvents={browserTraceEvents}
                   onAction={sendBridgeAction}
                   onOpenBrowserPage={() => window.open("/browser", "_blank", "noopener,noreferrer")}

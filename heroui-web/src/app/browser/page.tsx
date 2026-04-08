@@ -31,6 +31,7 @@ export default function BrowserPage() {
     bridgeState,
     bridgeActionPending,
     bridgeNotice,
+    lastArtifact,
     sendBridgeAction,
   } = useBrowserBridge({
     onActionError: (_action, _payload, message) => {
@@ -253,6 +254,7 @@ export default function BrowserPage() {
         state={bridgeState}
         pendingAction={bridgeActionPending}
         notice={bridgeNotice}
+        artifact={lastArtifact}
         onAction={(type, extra) => sendBridgeAction(type, type === "bridge/takeover" ? { reason: "User takeover from Yunque browser page", ...extra } : extra || {})}
       />
 

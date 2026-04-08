@@ -1,12 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
+import type { BrowserActionArtifactSummary, BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 
 interface UseBrowserBridgeOptions {
   onActionStart?: (type: string, extra: Record<string, unknown>) => void;
   onActionSuccess?: (type: string | undefined, result: unknown, successText: string) => void;
   onActionError?: (type: string | undefined, payload: unknown, message: string) => void;
+}
+
+function summarizeActionArtifact(action: string | undefined, result: any): BrowserActionArtifactSummary | null {
+  if (!result || typeof result !== "object") return null;
+  return {
+    action,
+    url: result.url || result.currentUrl || result.state?.runtimeSession?.currentUrl || "",
+    title: result.title || result.state?.runtimeSession?.title || "",
+    elementCount: typeof result.total === "number" ? result.total : (Array.isArray(result.elements) ? result.elements.length : undefined),
+    tabId: result.tabId ?? result.state?.runtimeSession?.currentTabId ?? null,
+    hasScreenshot: Boolean(result.screenshot),
+    textLength: typeof result.content === "string" ? result.content.length : 0,
+    updatedAt: Date.now(),
+  };
 }
 
 function actionSuccessText(action: string | undefined) {
@@ -24,6 +38,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
   const [bridgeState, setBridgeState] = useState<BrowserBridgeState | null>(null);
   const [bridgeActionPending, setBridgeActionPending] = useState<string | null>(null);
   const [bridgeNotice, setBridgeNotice] = useState<BrowserSessionNotice | null>(null);
+  const [lastArtifact, setLastArtifact] = useState<BrowserActionArtifactSummary | null>(null);
 
   const postBridgeMessage = useCallback((type: string, extra: Record<string, unknown> = {}, requestId?: string) => {
     if (typeof window === "undefined") return;
@@ -73,6 +88,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
         } else {
           const successText = actionSuccessText(action);
           setBridgeNotice({ tone: action === "bridge/takeover" ? "warning" : "success", text: successText });
+          setLastArtifact(summarizeActionArtifact(action, result));
           onActionSuccess?.(action, result, successText);
         }
         return;
@@ -112,6 +128,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
     bridgeState,
     bridgeActionPending,
     bridgeNotice,
+    lastArtifact,
     sendBridgeAction,
     syncBridgeState,
     setBridgeNotice,
