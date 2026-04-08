@@ -20,7 +20,7 @@ import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
-import { browserActionLabel } from "@/lib/browser-action-labels";
+import { browserActionLabel, browserActionPhase } from "@/lib/browser-action-labels";
 
 interface Suggestion {
   type: "followup" | "save_skill";
@@ -46,6 +46,10 @@ interface Message {
 
 let msgId = 0;
 function newId() { return `msg-${++msgId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
+
+function browserTraceSummary(action?: string | null, stage: "start" | "success" | "error" | "handoff" = "success") {
+  return browserActionPhase(action, stage);
+}
 
 function makeBrowserTraceEvent(summary: string, detail?: unknown, kind: "tool_start" | "tool_result" | "reflect" = "tool_result"): AgentEvent {
   const now = new Date().toISOString();
@@ -379,13 +383,13 @@ export default function ChatPage() {
     setLastArtifact,
   } = useBrowserBridge({
     onActionStart: (type, extra) => {
-      pushBrowserTrace(makeBrowserTraceEvent(`??????????${browserActionLabel(type)}`, { action: type, stage: "start", ...extra }, "tool_start"));
+      pushBrowserTrace(makeBrowserTraceEvent(browserTraceSummary(type, "start"), { action: type, stage: "start", ...extra }, "tool_start"));
     },
     onActionSuccess: (action, result, successText) => {
-      pushBrowserTrace(makeBrowserTraceEvent(successText, { action, result }, action === "bridge/takeover" ? "reflect" : "tool_result"));
+      pushBrowserTrace(makeBrowserTraceEvent(action === "bridge/takeover" ? browserTraceSummary(action, "handoff") : browserTraceSummary(action, "success"), { action, result, successText }, action === "bridge/takeover" ? "reflect" : "tool_result"));
     },
     onActionError: (action, payload, message) => {
-      pushBrowserTrace(makeBrowserTraceEvent(action ? `??????????${browserActionLabel(action)}` : "???????", { action, payload, message }, "tool_result"));
+      pushBrowserTrace(makeBrowserTraceEvent(action ? browserTraceSummary(action, "error") : "Browser action failed", { action, payload, message }, "tool_result"));
       showToast(message, "error");
     },
   });
@@ -641,9 +645,9 @@ export default function ChatPage() {
     if (slashBrowserCommand) {
       setSuggestedTab("browser");
       setShowComputer(true);
-      setBridgeNotice({ tone: "info", text: `???????????${browserActionLabel(slashBrowserCommand.command)}?` });
+      setBridgeNotice({ tone: "info", text: browserTraceSummary(slashBrowserCommand.command, "start") });
       pushBrowserTrace(makeBrowserTraceEvent(
-        `Slash ??????${browserActionLabel(slashBrowserCommand.command)}`,
+        browserTraceSummary(slashBrowserCommand.command, "start"),
         { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
         "tool_start",
       ));
@@ -740,7 +744,7 @@ export default function ChatPage() {
                 if (slashBrowserCommand) {
                   syncBridgeState();
                   const used = Array.isArray(doneData.skills_used) ? doneData.skills_used : [];
-                  const commandSummary = used.length > 0 ? `??????????${used.join(", ")}` : `??????????${browserActionLabel(slashBrowserCommand.command)}`;
+                  const commandSummary = used.length > 0 ? `${used.join(", ")} completed` : browserTraceSummary(slashBrowserCommand.command, "success");
                   pushBrowserTrace(makeBrowserTraceEvent(commandSummary, { command: slashBrowserCommand.command, done: doneData }, "tool_result"));
                 }
               } catch { /* ignore */ }
