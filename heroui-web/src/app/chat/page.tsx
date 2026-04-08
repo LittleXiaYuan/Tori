@@ -126,6 +126,14 @@ function getSlashState(input: string) {
   return { visible: true, query: commandPart };
 }
 
+function getActiveSlashCommand(input: string) {
+  const trimmed = input.trimStart();
+  if (!trimmed.startsWith("/")) return null;
+  const firstLine = trimmed.split("\n")[0];
+  const match = firstLine.match(/^\/([^\s]+)/);
+  return match?.[1] || null;
+}
+
 function mapBrowserSummary(summary: any): BrowserActionArtifactSummary {
   return {
     action: summary?.skill,
@@ -308,6 +316,7 @@ export default function ChatPage() {
   const [showConnectors, setShowConnectors] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
+  const [activeSlashCommand, setActiveSlashCommand] = useState<string | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [computerWidth, setComputerWidth] = useState(420);
@@ -656,6 +665,8 @@ export default function ChatPage() {
     const mediaPreviews = pendingFiles.filter(f => (f.type === "image" || f.type === "video") && f.base64).map(f => f.base64!);
     const userMsg: Message = { role: "user", content: text, id: newId(), ...(mediaPreviews.length > 0 ? { images: mediaPreviews } : {}) };
     const asstMsg: Message = { role: "assistant", content: "", id: newId(), traceEvents: [] };
+    setActiveSlashCommand(null);
+    setShowSlashMenu(false);
     chatD({ type: "START_SEND" });
     chatD({ type: "ADD_PAIR", userMsg, asstMsg });
     pendingFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
@@ -832,13 +843,19 @@ export default function ChatPage() {
     const slashState = getSlashState(val);
     setShowSlashMenu(slashState.visible);
     setSlashQuery(slashState.query);
+    setActiveSlashCommand(getActiveSlashCommand(val));
   };
 
   const handleSlashSelect = (commandText: string) => {
     chatD({ type: "SET_INPUT", value: commandText });
     setShowSlashMenu(false);
     setSlashQuery("");
-    inputRef.current?.focus();
+    setActiveSlashCommand(getActiveSlashCommand(commandText));
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      const len = commandText.length;
+      inputRef.current?.setSelectionRange(len, len);
+    });
   };
 
   const handleCopy = (id: string, content: string) => {
@@ -1556,7 +1573,7 @@ export default function ChatPage() {
                     size="sm"
                     variant="ghost"
                     className="rounded-full px-3"
-                    onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); inputRef.current?.focus(); }}
+                    onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}
                   >
                     <Sparkles size={13} />
                     命令
@@ -1608,9 +1625,14 @@ export default function ChatPage() {
                   onClose={() => setShowSlashMenu(false)}
                   anchorRef={inputShellRef}
                 />
-                {showSlashMenu && (
-                  <div className="pointer-events-none absolute left-5 top-0 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
-                    命令模式
+                {(showSlashMenu || activeSlashCommand) && (
+                  <div className="pointer-events-none absolute left-5 top-0 flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
+                    <span>{showSlashMenu ? "????" : "Slash command"}</span>
+                    {activeSlashCommand && (
+                      <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,0.12)", color: "var(--yunque-text)" }}>
+                        /{activeSlashCommand}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
