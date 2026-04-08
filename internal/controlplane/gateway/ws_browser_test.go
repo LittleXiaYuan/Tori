@@ -170,3 +170,37 @@ func TestBrowserStatusIsTenantScoped(t *testing.T) {
 		t.Fatalf("expected other tenant to see disconnected browser, got %d body=%s", otherRes.Code, otherRes.Body.String())
 	}
 }
+
+func TestValidateBrowserActionRejectsInvalidInput(t *testing.T) {
+	tests := []BrowserAction{
+		{Type: "browser_navigate", URL: "javascript:alert(1)"},
+		{Type: "browser_scroll", Direction: "sideways"},
+		{Type: "browser_input"},
+		{Type: "browser_switch_tab", TabID: 0},
+		{Type: "session_status", Status: "hijack"},
+		{Type: "browser_root_shell"},
+	}
+
+	for _, tc := range tests {
+		if err := validateBrowserAction(tc); err == nil {
+			t.Fatalf("expected validation failure for %+v", tc)
+		}
+	}
+}
+
+func TestValidateBrowserActionAcceptsSupportedInput(t *testing.T) {
+	tests := []BrowserAction{
+		{Type: "browser_navigate", URL: "https://example.com"},
+		{Type: "browser_new_tab", URL: "about:blank"},
+		{Type: "browser_scroll", Direction: "down"},
+		{Type: "browser_input", Text: "hello"},
+		{Type: "browser_switch_tab", TabID: 1},
+		{Type: "session_status", Status: "take_over"},
+	}
+
+	for _, tc := range tests {
+		if err := validateBrowserAction(tc); err != nil {
+			t.Fatalf("expected validation success for %+v, got %v", tc, err)
+		}
+	}
+}

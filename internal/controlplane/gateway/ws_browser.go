@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -139,6 +140,10 @@ func (h *BrowserHub) writeMessage(messageType int, data []byte) error {
 
 // SendAction sends a command to the browser extension and waits for the result.
 func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (BrowserResult, error) {
+	if err := validateBrowserAction(action); err != nil {
+		return BrowserResult{OK: false, Error: err.Error()}, err
+	}
+
 	h.mu.Lock()
 	if !h.connected || h.conn == nil {
 		h.mu.Unlock()
@@ -173,6 +178,77 @@ func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (Brow
 		delete(h.pending, reqID)
 		h.mu.Unlock()
 		return BrowserResult{OK: false, Error: "action timeout"}, nil
+	}
+}
+
+func validateBrowserAction(action BrowserAction) error {
+	switch action.Type {
+	case "browser_navigate":
+		return validateBrowserURL(action.URL, true)
+	case "browser_new_tab":
+		if strings.TrimSpace(action.URL) == "" {
+			return nil
+		}
+		return validateBrowserURL(action.URL, false)
+	case "browser_click":
+		if action.Target == nil || strings.TrimSpace(action.Target.Strategy) == "" {
+			return fmt.Errorf("browser_click requires a target")
+		}
+	case "browser_input":
+		if action.Text == "" {
+			return fmt.Errorf("browser_input requires text")
+		}
+	case "browser_scroll":
+		switch action.Direction {
+		case "up", "down", "left", "right":
+		default:
+			return fmt.Errorf("browser_scroll direction must be up, down, left, or right")
+		}
+	case "browser_press_key":
+		if strings.TrimSpace(action.Key) == "" {
+			return fmt.Errorf("browser_press_key requires key")
+		}
+	case "browser_switch_tab", "browser_close_tab":
+		if action.TabID <= 0 {
+			return fmt.Errorf("%s requires a positive tabId", action.Type)
+		}
+	case "browser_screenshot", "browser_view", "browser_get_content", "browser_get_structured_content",
+		"browser_move_mouse", "browser_mark_elements", "browser_unmark_elements",
+		"browser_get_elements", "browser_list_tabs":
+		return nil
+	case "session_status":
+		switch action.Status {
+		case "paused", "take_over", "resumed", "running", "stopped":
+			return nil
+		default:
+			return fmt.Errorf("session_status contains unsupported status")
+		}
+	default:
+		return fmt.Errorf("unsupported browser action type")
+	}
+	return nil
+}
+
+func validateBrowserURL(raw string, requireValue bool) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		if requireValue {
+			return fmt.Errorf("url is required")
+		}
+		return nil
+	}
+	if raw == "about:blank" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("url must be a valid absolute http(s) URL")
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		return nil
+	default:
+		return fmt.Errorf("url scheme must be http or https")
 	}
 }
 
