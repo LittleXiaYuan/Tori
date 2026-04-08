@@ -107,7 +107,7 @@ func TestBrowserHubPendingRequestsFailOnDisconnect(t *testing.T) {
 	hub.pending["req-1"] = pendingCh
 	hub.mu.Unlock()
 
-	hub.setConn(nil)
+	hub.setConn(nil, "")
 
 	select {
 	case result := <-pendingCh:
@@ -123,5 +123,50 @@ func TestBrowserHubPendingRequestsFailOnDisconnect(t *testing.T) {
 	hub.mu.Unlock()
 	if remaining != 0 {
 		t.Fatalf("expected pending requests to be cleared, got %d", remaining)
+	}
+}
+
+func TestBrowserHubConnectedForTenant(t *testing.T) {
+	hub := NewBrowserHub()
+	hub.mu.Lock()
+	hub.connected = true
+	hub.tenantID = "tenant-a"
+	hub.mu.Unlock()
+
+	if !hub.ConnectedForTenant("tenant-a") {
+		t.Fatal("expected matching tenant to see connected browser hub")
+	}
+	if hub.ConnectedForTenant("tenant-b") {
+		t.Fatal("expected different tenant to be denied browser hub access")
+	}
+}
+
+func TestBrowserStatusIsTenantScoped(t *testing.T) {
+	gw, tm := newTestGateway()
+	hub := NewBrowserHub()
+	gw.SetBrowserHub(hub)
+	owner := tm.Register("owner")
+	other := tm.Register("other")
+
+	hub.mu.Lock()
+	hub.connected = true
+	hub.tenantID = owner.ID
+	hub.version = "0.2.0"
+	hub.mu.Unlock()
+
+	ownerReq := httptest.NewRequest("GET", "/v1/browser/status", nil)
+	ownerReq.Header.Set("X-API-Key", owner.APIKey)
+	ownerRes := httptest.NewRecorder()
+	gw.ServeHTTP(ownerRes, ownerReq)
+	if ownerRes.Code != http.StatusOK || !strings.Contains(ownerRes.Body.String(), `"connected":true`) {
+		t.Fatalf("expected owner to see connected browser, got %d body=%s", ownerRes.Code, ownerRes.Body.String())
+	}
+
+	otherReq := httptest.NewRequest("GET", "/v1/browser/status", nil)
+	otherReq.Header.Set("X-API-Key", other.APIKey)
+	otherRes := httptest.NewRecorder()
+	gw.ServeHTTP(otherRes, otherReq)
+	if otherRes.Code != http.StatusOK || !strings.Contains(otherRes.Body.String(), `"connected":false`) {
+		t.Fatalf("expected other tenant to see disconnected browser, got %d body=%s", otherRes.Code, otherRes.Body.String())
 	}
 }

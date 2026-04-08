@@ -82,6 +82,7 @@ type BrowserHub struct {
 	writeMu   sync.Mutex
 	conn      *websocket.Conn
 	connected bool
+	tenantID  string
 	version   string
 	pending   map[string]chan BrowserResult
 	listeners []func(BrowserResult)
@@ -100,6 +101,20 @@ func (h *BrowserHub) Connected() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.connected
+}
+
+// ConnectedForTenant returns true when the connected browser extension belongs to the same tenant.
+func (h *BrowserHub) ConnectedForTenant(tenantID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.connected && h.tenantID != "" && h.tenantID == tenantID
+}
+
+// TenantID returns the tenant currently owning the browser extension connection.
+func (h *BrowserHub) TenantID() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.tenantID
 }
 
 // OnEvent registers a callback for browser events (screenshots, status changes).
@@ -205,13 +220,18 @@ func (h *BrowserHub) handleResult(result BrowserResult) {
 	}
 }
 
-func (h *BrowserHub) setConn(conn *websocket.Conn) {
+func (h *BrowserHub) setConn(conn *websocket.Conn, tenantID string) {
 	h.mu.Lock()
 	if h.conn != nil && h.conn != conn {
 		h.conn.Close()
 	}
 	h.conn = conn
 	h.connected = conn != nil
+	if conn != nil {
+		h.tenantID = tenantID
+	} else {
+		h.tenantID = ""
+	}
 	if conn == nil {
 		h.failPendingLocked("browser extension disconnected")
 	}
@@ -276,13 +296,13 @@ func (g *Gateway) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub.setConn(conn)
+	hub.setConn(conn, tenantID)
 	slog.Info("browser extension connected", "tenant", tenantID)
 
 	done := make(chan struct{})
 	defer func() {
 		close(done)
-		hub.setConn(nil)
+		hub.setConn(nil, "")
 		conn.Close()
 		slog.Info("browser extension disconnected", "tenant", tenantID)
 	}()

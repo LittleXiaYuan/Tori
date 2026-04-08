@@ -118,7 +118,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msgs = g.augmentMessagesForBrowserIntent(msgs)
+	msgs = g.augmentMessagesForBrowserIntent(msgs, tid)
 	// Memory: write user message(s) to short-term
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {

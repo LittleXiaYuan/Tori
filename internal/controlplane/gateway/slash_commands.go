@@ -118,7 +118,7 @@ func (g *Gateway) tryHandleSlashCommand(ctx context.Context, req planner.PlanReq
 
 func (g *Gateway) handleSlashBrowserAction(ctx context.Context, req planner.PlanRequest, skill string, args map[string]any) (*slashCommandResponse, bool, error) {
 	hub := g.browserHub
-	if hub == nil || !hub.Connected() {
+	if hub == nil || !hub.ConnectedForTenant(req.TenantID) {
 		return slashError("浏览器扩展未连接。请先安装并连接 Yunque Browser Connector。"), true, nil
 	}
 

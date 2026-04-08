@@ -7,8 +7,12 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"yunque-agent/pkg/safego"
 
 	"yunque-agent/internal/agentcore/adaptive"
 	"yunque-agent/internal/agentcore/emotion"
@@ -54,13 +58,14 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Messages  []llm.Message `json:"messages"`
-		SessionID string        `json:"session_id"`
-		TaskID    string        `json:"task_id"`
-		ClassID   string        `json:"class_id"`
-		TeacherID string        `json:"teacher_id"`
-		StudentID string        `json:"student_id"`
-		Platform  string        `json:"platform,omitempty"` // target platform for sticker suggestions (e.g., "line", "telegram")
+		Messages      []llm.Message `json:"messages"`
+		SessionID     string        `json:"session_id"`
+		TaskID        string        `json:"task_id"`
+		ClassID       string        `json:"class_id"`
+		TeacherID     string        `json:"teacher_id"`
+		StudentID     string        `json:"student_id"`
+		Platform      string        `json:"platform,omitempty"`       // target platform for sticker suggestions
+		ThinkingLevel string        `json:"thinking_level,omitempty"` // "none" | "auto" | "deep" → override model tier
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
@@ -136,6 +141,7 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	msgs = g.augmentMessagesForBrowserIntent(msgs, tid)
 	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
@@ -145,19 +151,36 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Smart router: classify query → select optimal model tier
+	// Thinking level: per-request override > env default > smart router.
+	// "deep" → expert, "none" → fast, "auto"/empty → smart router.
+	thinkingLevel := req.ThinkingLevel
+	if thinkingLevel == "" {
+		thinkingLevel = os.Getenv("THINKING_LEVEL") // global default from settings
+	}
+
 	var routedTier string
 	var routedModelID string
-	if g.smartRouter != nil && len(msgs) > 0 {
-		lastMsg := msgs[len(msgs)-1].Content
-		routedModel, tier := g.smartRouter.Route(r.Context(), lastMsg, false)
-		routedTier = tier.String()
-		if routedModel != nil {
-			routedModelID = routedModel.ModelID
+	switch thinkingLevel {
+	case "deep":
+		routedTier = "expert"
+		traceSpan.Attrs["thinking_level"] = "deep"
+	case "none":
+		routedTier = "fast"
+		traceSpan.Attrs["thinking_level"] = "none"
+	default:
+		// Auto: use smart router
+		if g.smartRouter != nil && len(msgs) > 0 {
+			lastMsg := msgs[len(msgs)-1].Content
+			routedModel, tier := g.smartRouter.Route(r.Context(), lastMsg, false)
+			routedTier = tier.String()
+			if routedModel != nil {
+				routedModelID = routedModel.ModelID
+			}
 		}
-		traceSpan.Attrs["router_tier"] = routedTier
-		traceSpan.Attrs["router_model"] = routedModelID
+		traceSpan.Attrs["thinking_level"] = "auto"
 	}
+	traceSpan.Attrs["router_tier"] = routedTier
+	traceSpan.Attrs["router_model"] = routedModelID
 
 	// Budget pre-check
 	if g.costTracker != nil {
@@ -198,7 +221,7 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result, err := g.planner.Run(r.Context(), planner.PlanRequest{
+	planReq := planner.PlanRequest{
 		Messages:      msgs,
 		ClassID:       req.ClassID,
 		TeacherID:     req.TeacherID,
@@ -208,7 +231,22 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		EmotionHint:   emotionHint,
 		TaskID:        req.TaskID,
 		TaskContext:   taskContext,
-	})
+		TraceID:       traceSpan.TraceID,
+	}
+	if slashResp, handled, slashErr := g.tryHandleSlashCommand(r.Context(), planReq); handled {
+		if slashErr != nil {
+			apperror.Write(w, apperror.Wrap(apperror.CodeLLMError, "slash command execution failed", slashErr))
+			return
+		}
+		if req.SessionID != "" {
+			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: slashResp.Result.Reply})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Trace-ID", observe.TraceIDFromContext(r.Context()))
+		json.NewEncoder(w).Encode(slashResp.Raw)
+		return
+	}
+	result, err := g.planner.Run(r.Context(), planReq)
 	if err != nil {
 		slog.Error("planner error", "err", err, "tenant", tid)
 		g.metrics.RecordRequest(time.Since(start), 0, 0, err)
@@ -218,18 +256,18 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		if g.healer != nil && len(req.Messages) > 0 {
 			lastMsg := req.Messages[len(req.Messages)-1].Content
 			errMsg := err.Error()
-			go func() {
-				healCtx, healCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer healCancel()
-				if g.healer.ShouldHeal(lastMsg, errMsg) {
-					generated, healErr := g.healer.GenerateAndInstall(healCtx, lastMsg+"\nError: "+errMsg)
-					if healErr != nil {
-						slog.Warn("selfheal: generation failed", "err", healErr)
-					} else {
-						slog.Info("selfheal: plugin generated and installed", "name", generated.Name)
-					}
+		safego.Go("selfheal", func() {
+			healCtx, healCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer healCancel()
+			if g.healer.ShouldHeal(lastMsg, errMsg) {
+				generated, healErr := g.healer.GenerateAndInstall(healCtx, lastMsg+"\nError: "+errMsg)
+				if healErr != nil {
+					slog.Warn("selfheal: generation failed", "err", healErr)
+				} else {
+					slog.Info("selfheal: plugin generated and installed", "name", generated.Name)
 				}
-			}()
+			}
+		})
 		}
 
 		apperror.Write(w, apperror.Wrap(apperror.CodeLLMError, "planner execution failed", err))
@@ -273,9 +311,30 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Save assistant reply to session
+	// Save assistant reply to session (with ExecutionSummary for multi-turn continuity)
 	if req.SessionID != "" {
-		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: result.Reply})
+		assistantContent := result.Reply
+		if summary := result.ExecutionSummary(); summary != "" {
+			assistantContent = summary + "\n\n" + assistantContent
+		}
+		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
+
+		// Auto-title: generate a conversation title after the first exchange (like ChatGPT).
+		sess := g.convStore.GetSession(req.SessionID)
+		if sess != nil && sess.Name == "" && len(req.Messages) > 0 {
+			userMsg := req.Messages[len(req.Messages)-1].Content
+			assistReply := result.Reply
+			sessionID := req.SessionID
+		safego.Go("auto-title", func() {
+			titleCtx, titleCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer titleCancel()
+			title := g.generateConversationTitle(titleCtx, userMsg, assistReply)
+			if title != "" {
+				g.convStore.Rename(sessionID, title)
+				slog.Debug("auto-titled conversation", "session", sessionID, "title", title)
+			}
+		})
+		}
 	}
 
 	// ── Memory: write assistant reply to short-term ──
@@ -296,24 +355,23 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		if lastUserMsg != "" {
 			pipelineReply := result.Reply
 			pipelineTID := tid
-			go func() {
-				pipeCtx, pipeCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer pipeCancel()
-				chatMsgs := []memory.ChatMessage{
-					{Role: "user", Content: lastUserMsg},
-					{Role: "assistant", Content: pipelineReply},
+		safego.Go("memory-pipeline", func() {
+			pipeCtx, pipeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer pipeCancel()
+			chatMsgs := []memory.ChatMessage{
+				{Role: "user", Content: lastUserMsg},
+				{Role: "assistant", Content: pipelineReply},
+			}
+			result, err := g.pipeline.Process(pipeCtx, pipelineTID, chatMsgs)
+			if err != nil {
+				slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
+			} else if result != nil && len(result.ExtractedFacts) > 0 {
+				slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
+				if g.factHook != nil {
+					g.factHook.OnExtracted(result.ExtractedFacts)
 				}
-				result, err := g.pipeline.Process(pipeCtx, pipelineTID, chatMsgs)
-				if err != nil {
-					slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
-				} else if result != nil && len(result.ExtractedFacts) > 0 {
-					slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
-					// Event-driven Reverie trigger: notify on high-value fact extraction.
-					if g.factHook != nil {
-						g.factHook.OnExtracted(result.ExtractedFacts)
-					}
-				}
-			}()
+			}
+		})
 		}
 	}
 
@@ -332,11 +390,11 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	// Adaptive loop: observe interaction for behavior adaptation
 	if g.adaptiveLoop != nil && len(req.Messages) > 0 {
 		userMsg := req.Messages[len(req.Messages)-1].Content
-		go func() {
-			adaptCtx, adaptCancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer adaptCancel()
-			g.adaptiveLoop.ObserveInteraction(adaptCtx, userMsg, result.Reply)
-		}()
+	safego.Go("adaptive-loop", func() {
+		adaptCtx, adaptCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer adaptCancel()
+		g.adaptiveLoop.ObserveInteraction(adaptCtx, userMsg, result.Reply)
+	})
 		// Feed emotion signal into adaptive emoji dimension
 		if emotionHint != nil && emotionHint.IsPositive() {
 			g.adaptiveLoop.RecordFeedback(adaptive.Feedback{
@@ -391,4 +449,43 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(resp)
+}
+
+// generateConversationTitle uses a fast LLM call to generate a short title for the conversation.
+func (g *Gateway) generateConversationTitle(ctx context.Context, userMsg, assistReply string) string {
+	client := g.planner.LLMClientFor("fast")
+	if client == nil {
+		client = g.planner.LLMClientFor("")
+	}
+	if client == nil {
+		return ""
+	}
+
+	// Truncate inputs to save tokens
+	if len(userMsg) > 300 {
+		userMsg = userMsg[:300]
+	}
+	if len(assistReply) > 300 {
+		assistReply = assistReply[:300]
+	}
+
+	msgs := []llm.Message{
+		{Role: "system", Content: "你是一个对话标题生成器。根据用户的第一条消息和助手的回复，生成一个简短的对话标题（5-15个字）。只输出标题文本，不要加引号、标点或解释。"},
+		{Role: "user", Content: fmt.Sprintf("用户消息：%s\n助手回复：%s", userMsg, assistReply)},
+	}
+
+	title, err := client.Chat(ctx, msgs, 0.3)
+	if err != nil {
+		slog.Debug("auto-title generation failed", "err", err)
+		return ""
+	}
+
+	// Clean up: remove quotes, trim whitespace, limit length
+	title = strings.TrimSpace(title)
+	title = strings.Trim(title, "\"'「」《》【】")
+	title = strings.TrimSpace(title)
+	if len([]rune(title)) > 30 {
+		title = string([]rune(title)[:30])
+	}
+	return title
 }
