@@ -20,6 +20,7 @@ import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
+import { browserActionLabel } from "@/lib/browser-action-labels";
 
 interface Suggestion {
   type: "followup" | "save_skill";
@@ -360,13 +361,13 @@ export default function ChatPage() {
     setBridgeNotice,
   } = useBrowserBridge({
     onActionStart: (type, extra) => {
-      pushBrowserTrace(makeBrowserTraceEvent(`??????????${type.replace("bridge/", "")}`, { action: type, stage: "start", ...extra }, "tool_start"));
+      pushBrowserTrace(makeBrowserTraceEvent(`??????????${browserActionLabel(type)}`, { action: type, stage: "start", ...extra }, "tool_start"));
     },
     onActionSuccess: (action, result, successText) => {
       pushBrowserTrace(makeBrowserTraceEvent(successText, { action, result }, action === "bridge/takeover" ? "reflect" : "tool_result"));
     },
     onActionError: (action, payload, message) => {
-      pushBrowserTrace(makeBrowserTraceEvent(action ? `??????????${action}` : "???????", { action, payload, message }, "tool_result"));
+      pushBrowserTrace(makeBrowserTraceEvent(action ? `??????????${browserActionLabel(action)}` : "???????", { action, payload, message }, "tool_result"));
       showToast(message, "error");
     },
   });
@@ -622,9 +623,9 @@ export default function ChatPage() {
     if (slashBrowserCommand) {
       setSuggestedTab("browser");
       setShowComputer(true);
-      setBridgeNotice({ tone: "info", text: `??????????? ${slashBrowserCommand.command}?` });
+      setBridgeNotice({ tone: "info", text: `???????????${browserActionLabel(slashBrowserCommand.command)}?` });
       pushBrowserTrace(makeBrowserTraceEvent(
-        `Slash ??????${slashBrowserCommand.command}`,
+        `Slash ??????${browserActionLabel(slashBrowserCommand.command)}`,
         { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
         "tool_start",
       ));
@@ -715,7 +716,7 @@ export default function ChatPage() {
                 if (slashBrowserCommand) {
                   syncBridgeState();
                   const used = Array.isArray(doneData.skills_used) ? doneData.skills_used : [];
-                  const commandSummary = used.length > 0 ? `??????????${used.join(", ")}` : `??????????${slashBrowserCommand.command}`;
+                  const commandSummary = used.length > 0 ? `??????????${used.join(", ")}` : `??????????${browserActionLabel(slashBrowserCommand.command)}`;
                   pushBrowserTrace(makeBrowserTraceEvent(commandSummary, { command: slashBrowserCommand.command, done: doneData }, "tool_result"));
                 }
               } catch { /* ignore */ }

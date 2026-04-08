@@ -3,6 +3,7 @@
 import { Button, Chip } from "@heroui/react";
 import { AlertTriangle, ExternalLink, Monitor } from "lucide-react";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
+import { browserActionLabel } from "@/lib/browser-action-labels";
 
 export interface BrowserRuntimeSession {
   id?: string | null;
@@ -146,7 +147,7 @@ export function BrowserSessionCard({
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
             {session?.lastAction && (
               <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
-                ?????{session.lastAction}
+                ?????{browserActionLabel(session.lastAction)}
               </span>
             )}
             {updatedLabel && (
@@ -168,7 +169,7 @@ export function BrowserSessionCard({
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
                 {artifact.action && (
                   <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
-                    {artifact.action.replace("bridge/", "")}
+                    {browserActionLabel(artifact.action)}
                   </span>
                 )}
                 {typeof artifact.elementCount === "number" && (

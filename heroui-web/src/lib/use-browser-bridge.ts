@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { BrowserActionArtifactSummary, BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
+import { browserActionLabel } from "@/lib/browser-action-labels";
 
 interface UseBrowserBridgeOptions {
   onActionStart?: (type: string, extra: Record<string, unknown>) => void;
@@ -25,12 +26,12 @@ function summarizeActionArtifact(action: string | undefined, result: any): Brows
 
 function actionSuccessText(action: string | undefined) {
   return action === "bridge/switch-to-tab"
-    ? "????????????"
+    ? `?${browserActionLabel(action)}`
     : action === "bridge/takeover"
       ? "??????????"
       : action === "bridge/resume"
         ? "???????"
-        : "????????";
+        : `???${browserActionLabel(action)}`;
 }
 
 export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
