@@ -381,6 +381,22 @@ func summarizeBrowserSlashReply(skill string, args map[string]any, result Browse
 	}
 }
 
+func suggestedBrowserNextStep(skill string, result BrowserResult) (string, string) {
+	switch skill {
+	case "browser_mark_elements":
+		if result.Total > 0 {
+			return "/click ", "Click a marked element"
+		}
+	case "browser_navigate":
+		return "/content", "Read this page"
+	case "browser_click", "browser_input", "browser_scroll":
+		return "/content", "Inspect the updated page"
+	case "browser_get_content":
+		return "/mark", "Mark interactive elements"
+	}
+	return "", ""
+}
+
 func summarizeBrowserSlashArtifact(skill string, args map[string]any, result BrowserResult) map[string]any {
 	target, _ := args["url"].(string)
 	summary := map[string]any{
@@ -403,6 +419,10 @@ func summarizeBrowserSlashArtifact(skill string, args map[string]any, result Bro
 		}
 		summary["preview"] = preview
 	}
+	if nextCommand, nextLabel := suggestedBrowserNextStep(skill, result); nextCommand != "" {
+		summary["next_command"] = nextCommand
+		summary["next_label"] = nextLabel
+	}
 	return summary
 }
 
@@ -412,9 +432,9 @@ func emitSlashToolEvent(req planner.PlanRequest, eventType, skill, summary strin
 	}
 	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, eventType, summary)
 	evt.Meta = observe.EventMeta{
-		TenantID:  req.TenantID,
-		TaskID:    req.TaskID,
-		Skill:     skill,
+		TenantID: req.TenantID,
+		TaskID:   req.TaskID,
+		Skill:    skill,
 	}
 	if eventType == observe.EventToolStart {
 		evt.Detail = observe.ToolStartDetail{Skill: skill, Args: args}

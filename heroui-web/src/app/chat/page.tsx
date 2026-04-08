@@ -122,6 +122,22 @@ function getSlashState(input: string) {
   return { visible: true, query: commandPart };
 }
 
+function mapBrowserSummary(summary: any): BrowserActionArtifactSummary {
+  return {
+    action: summary?.skill,
+    url: summary?.url,
+    title: summary?.title,
+    elementCount: summary?.element_count,
+    tabId: summary?.tab_id,
+    hasScreenshot: summary?.has_screenshot,
+    textLength: summary?.text_length,
+    preview: summary?.preview,
+    suggestedCommand: summary?.next_command,
+    suggestedLabel: summary?.next_label,
+    updatedAt: Date.now(),
+  };
+}
+
 function parseSlashBrowserCommand(input: string) {
   const trimmed = input.trim();
   if (!trimmed.startsWith("/")) return null;
@@ -715,29 +731,11 @@ export default function ChatPage() {
                 if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
                 if (doneData.browser_summary) {
-                  updates.browserSummary = {
-                    action: doneData.browser_summary.skill,
-                    url: doneData.browser_summary.url,
-                    title: doneData.browser_summary.title,
-                    elementCount: doneData.browser_summary.element_count,
-                    tabId: doneData.browser_summary.tab_id,
-                    hasScreenshot: doneData.browser_summary.has_screenshot,
-                    textLength: doneData.browser_summary.text_length,
-                    updatedAt: Date.now(),
-                  };
+                  updates.browserSummary = mapBrowserSummary(doneData.browser_summary);
                 }
                 chatD({ type: "UPDATE_LAST", updates });
                 if (doneData.browser_summary) {
-                  setLastArtifact({
-                    action: doneData.browser_summary.skill,
-                    url: doneData.browser_summary.url,
-                    title: doneData.browser_summary.title,
-                    elementCount: doneData.browser_summary.element_count,
-                    tabId: doneData.browser_summary.tab_id,
-                    hasScreenshot: doneData.browser_summary.has_screenshot,
-                    textLength: doneData.browser_summary.text_length,
-                    updatedAt: Date.now(),
-                  });
+                  setLastArtifact(mapBrowserSummary(doneData.browser_summary));
                 }
                 if (slashBrowserCommand) {
                   syncBridgeState();
@@ -1385,6 +1383,35 @@ export default function ChatPage() {
                             )}
                           </div>
                         )}
+                        {msg.browserSummary.preview && (
+                          <div className="mt-2 rounded-2xl px-3 py-2 text-xs leading-6" style={{ background: "rgba(15,23,42,0.35)", color: "var(--yunque-text-secondary)" }}>
+                            {msg.browserSummary.preview}
+                          </div>
+                        )}
+                        {(msg.browserSummary.suggestedCommand || msg.browserSummary.url) && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {msg.browserSummary.suggestedCommand && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="rounded-full px-3"
+                                onPress={() => handleSlashSelect(msg.browserSummary?.suggestedCommand || "/")}
+                              >
+                                {msg.browserSummary.suggestedLabel || "Use next command"}
+                              </Button>
+                            )}
+                            {msg.browserSummary.url && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="rounded-full px-3"
+                                onPress={() => window.open(msg.browserSummary?.url, "_blank", "noopener,noreferrer")}
+                              >
+                                Open page
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     {/* Generated file downloads */}
@@ -1542,6 +1569,7 @@ export default function ChatPage() {
                   traceEvents={browserTraceEvents}
                   onAction={sendBridgeAction}
                   onOpenBrowserPage={() => window.open("/browser", "_blank", "noopener,noreferrer")}
+                  onSuggestCommand={handleSlashSelect}
                 />
               </div>
 

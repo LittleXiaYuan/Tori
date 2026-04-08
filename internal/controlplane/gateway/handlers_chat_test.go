@@ -269,4 +269,10 @@ func TestSummarizeBrowserSlashArtifact_ContentPreview(t *testing.T) {
 	if summary["url"] != "https://example.com" {
 		t.Fatalf("unexpected url: %#v", summary)
 	}
+	if summary["next_command"] != "/mark" {
+		t.Fatalf("unexpected next_command: %#v", summary)
+	}
+	if summary["next_label"] != "Mark interactive elements" {
+		t.Fatalf("unexpected next_label: %#v", summary)
+	}
 }

@@ -37,6 +37,9 @@ export interface BrowserActionArtifactSummary {
   tabId?: number | null;
   hasScreenshot?: boolean;
   textLength?: number;
+  preview?: string;
+  suggestedCommand?: string;
+  suggestedLabel?: string;
   updatedAt?: number;
 }
 
@@ -48,6 +51,7 @@ interface BrowserSessionCardProps {
   traceEvents?: AgentEvent[];
   onAction: (type: string, extra?: Record<string, unknown>) => void;
   onOpenBrowserPage?: () => void;
+  onSuggestCommand?: (command: string) => void;
   className?: string;
 }
 
@@ -59,6 +63,7 @@ export function BrowserSessionCard({
   traceEvents,
   onAction,
   onOpenBrowserPage,
+  onSuggestCommand,
   className = "",
 }: BrowserSessionCardProps) {
   const session = state?.runtimeSession;
@@ -209,6 +214,35 @@ export function BrowserSessionCard({
                     <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                       {artifact.url}
                     </div>
+                  )}
+                </div>
+              )}
+              {artifact.preview && (
+                <div className="mt-2 rounded-2xl px-3 py-2 text-xs leading-6" style={{ background: "rgba(15,23,42,0.35)", color: "var(--yunque-text-secondary)" }}>
+                  {artifact.preview}
+                </div>
+              )}
+              {(artifact.suggestedCommand || artifact.url) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {artifact.suggestedCommand && onSuggestCommand && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-3"
+                      onPress={() => onSuggestCommand(artifact.suggestedCommand!)}
+                    >
+                      {artifact.suggestedLabel || "Use next command"}
+                    </Button>
+                  )}
+                  {artifact.url && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-3"
+                      onPress={() => window.open(artifact.url, "_blank", "noopener,noreferrer")}
+                    >
+                      Open page
+                    </Button>
                   )}
                 </div>
               )}

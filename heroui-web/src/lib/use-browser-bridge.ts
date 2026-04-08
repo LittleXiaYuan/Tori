@@ -4,6 +4,42 @@ import { useCallback, useEffect, useState } from "react";
 import type { BrowserActionArtifactSummary, BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 import { browserActionLabel } from "@/lib/browser-action-labels";
 
+function buildArtifactPreview(content: unknown) {
+  if (typeof content !== "string") return "";
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  return normalized.length > 220 ? `${normalized.slice(0, 220)}...` : normalized;
+}
+
+function suggestNextBrowserAction(action: string | undefined, result: any): Pick<BrowserActionArtifactSummary, "suggestedCommand" | "suggestedLabel"> {
+  const normalized = action || "";
+  if (normalized.includes("mark") || typeof result?.total === "number") {
+    return {
+      suggestedCommand: "/click ",
+      suggestedLabel: "Click a marked element",
+    };
+  }
+  if (normalized.includes("navigate")) {
+    return {
+      suggestedCommand: "/content",
+      suggestedLabel: "Read this page",
+    };
+  }
+  if (normalized.includes("click") || normalized.includes("resume")) {
+    return {
+      suggestedCommand: "/content",
+      suggestedLabel: "Inspect current page",
+    };
+  }
+  if (normalized.includes("content")) {
+    return {
+      suggestedCommand: "/mark",
+      suggestedLabel: "Mark interactive elements",
+    };
+  }
+  return {};
+}
+
 interface UseBrowserBridgeOptions {
   onActionStart?: (type: string, extra: Record<string, unknown>) => void;
   onActionSuccess?: (type: string | undefined, result: unknown, successText: string) => void;
@@ -20,6 +56,8 @@ function summarizeActionArtifact(action: string | undefined, result: any): Brows
     tabId: result.tabId ?? result.state?.runtimeSession?.currentTabId ?? null,
     hasScreenshot: Boolean(result.screenshot),
     textLength: typeof result.content === "string" ? result.content.length : 0,
+    preview: buildArtifactPreview(result.content),
+    ...suggestNextBrowserAction(action, result),
     updatedAt: Date.now(),
   };
 }
