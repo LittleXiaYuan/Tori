@@ -59,6 +59,34 @@ func TestBrowserWSAcceptsAPIKeyQuery(t *testing.T) {
 	}
 }
 
+func TestBrowserWSAcceptsAPIKeyHeader(t *testing.T) {
+	gw, tm := newTestGateway()
+	hub := NewBrowserHub()
+	gw.SetBrowserHub(hub)
+	tenant := tm.Register("browser-test")
+
+	srv := httptest.NewServer(gw)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/browser"
+	header := http.Header{}
+	header.Set("X-API-Key", tenant.APIKey)
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err != nil {
+		t.Fatalf("expected websocket dial success, got %v", err)
+	}
+
+	if !waitForCondition(2*time.Second, hub.Connected) {
+		conn.Close()
+		t.Fatal("browser hub never reported connected")
+	}
+
+	_ = conn.Close()
+	if !waitForCondition(2*time.Second, func() bool { return !hub.Connected() }) {
+		t.Fatal("browser hub never reported disconnected")
+	}
+}
+
 func waitForCondition(timeout time.Duration, fn func() bool) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {

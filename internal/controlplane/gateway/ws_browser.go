@@ -240,7 +240,10 @@ func allowBrowserWSOrigin(r *http.Request) bool {
 
 // handleBrowserWS is the HTTP handler for /ws/browser.
 func (g *Gateway) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
-	token := authTokenFromRequest(r)
+	token := authTokenFromHeaders(r)
+	if token == "" {
+		token = authTokenFromQuery(r)
+	}
 	if token == "" {
 		http.Error(w, "missing credentials", http.StatusUnauthorized)
 		return

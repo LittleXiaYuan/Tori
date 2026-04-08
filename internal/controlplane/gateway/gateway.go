@@ -792,14 +792,7 @@ const ctxTenantKey ctxKey = "tenant_id"
 
 func (g *Gateway) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract token from X-API-Key or Authorization header
-		token := r.Header.Get("X-API-Key")
-		if token == "" {
-			auth := r.Header.Get("Authorization")
-			if strings.HasPrefix(auth, "Bearer ") {
-				token = strings.TrimPrefix(auth, "Bearer ")
-			}
-		}
+		token := authTokenFromHeaders(r)
 
 		// Localhost bypass is disabled — all access requires authentication.
 		// Set LOCALHOST_BYPASS=true in .env to re-enable for development.

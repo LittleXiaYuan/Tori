@@ -92,6 +92,17 @@ func TestAuthWithAPIKey(t *testing.T) {
 	}
 }
 
+func TestAuthRejectsAPIKeyInQuery(t *testing.T) {
+	gw, tm := newTestGateway()
+	t1 := tm.Register("test-org")
+	req := httptest.NewRequest("GET", "/v1/skills?api_key="+t1.APIKey, nil)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != 401 {
+		t.Fatalf("expected 401 when api key is only present in query, got %d", w.Code)
+	}
+}
+
 func TestRateLimiter(t *testing.T) {
 	rl := NewRateLimiter(3, time.Minute)
 	for i := 0; i < 3; i++ {

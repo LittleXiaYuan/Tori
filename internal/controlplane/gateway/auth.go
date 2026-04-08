@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"yunque-agent/internal/apperror"
 )
 
 // JWTConfig holds JWT authentication settings.
@@ -26,12 +28,12 @@ type jwtHeader struct {
 
 // jwtClaims is the JWT payload.
 type jwtClaims struct {
-	Sub      string `json:"sub"`       // tenant ID
+	Sub      string `json:"sub"` // tenant ID
 	Iss      string `json:"iss"`
 	Iat      int64  `json:"iat"`
 	Exp      int64  `json:"exp"`
 	TenantID string `json:"tenant_id"`
-	Role     string `json:"role"`      // "admin", "user"
+	Role     string `json:"role"` // "admin", "user"
 }
 
 // GenerateJWT creates a signed JWT token for a tenant.
@@ -107,42 +109,53 @@ const (
 // requireAuthJWT is a middleware that supports both API Key and JWT.
 func (g *Gateway) requireAuthJWT(jwtCfg *JWTConfig, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Try API Key first (backward compatible)
-		apiKey := r.Header.Get("X-API-Key")
-		if apiKey == "" {
-			auth := r.Header.Get("Authorization")
-			if strings.HasPrefix(auth, "Bearer ") {
-				token := strings.TrimPrefix(auth, "Bearer ")
-				// Try as API Key
-				if t := g.tenants.ByAPIKey(token); t != nil {
-					ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
-					next(w, r.WithContext(ctx))
-					return
-				}
-				// Try as JWT
-				if jwtCfg != nil {
-					claims, err := ValidateJWT(*jwtCfg, token)
-					if err == nil {
-						ctx := context.WithValue(r.Context(), ctxTenantKey, claims.TenantID)
-						ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
-						next(w, r.WithContext(ctx))
-						return
-					}
-				}
-			}
-		} else {
-			if t := g.tenants.ByAPIKey(apiKey); t != nil {
-				ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
+		token := authTokenFromHeaders(r)
+		if token == "" {
+			apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
+			return
+		}
+
+		if t := g.tenants.ByAPIKey(token); t != nil {
+			ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		if jwtCfg != nil {
+			claims, err := ValidateJWT(*jwtCfg, token)
+			if err == nil {
+				ctx := context.WithValue(r.Context(), ctxTenantKey, claims.TenantID)
+				ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
 				next(w, r.WithContext(ctx))
 				return
 			}
 		}
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
 	}
 }
 
-const ctxRoleKey ctxKey = "role"
+func authTokenFromHeaders(r *http.Request) string {
+	token := r.Header.Get("X-API-Key")
+	if token == "" {
+		auth := r.Header.Get("Authorization")
+		if strings.HasPrefix(auth, "Bearer ") {
+			token = strings.TrimPrefix(auth, "Bearer ")
+		}
+	}
+	return strings.TrimSpace(token)
+}
+
+func authTokenFromQuery(r *http.Request) string {
+	q := r.URL.Query()
+	for _, key := range []string{"key", "api_key", "token", "access_token"} {
+		if v := strings.TrimSpace(q.Get(key)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+const ctxRoleKey ctxKeyType = "role"
 
 func roleFromCtx(ctx context.Context) string {
 	if v, ok := ctx.Value(ctxRoleKey).(string); ok {
