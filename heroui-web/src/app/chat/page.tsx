@@ -15,7 +15,7 @@ import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { ConnectorPopover } from "@/components/connector-popover";
-import { BrowserSessionCard, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
+import { BrowserSessionCard, type BrowserActionArtifactSummary, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
 import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
@@ -41,6 +41,7 @@ interface Message {
   suggestions?: Suggestion[];
   images?: string[];
   reasoning?: string;
+  browserSummary?: BrowserActionArtifactSummary;
 }
 
 let msgId = 0;
@@ -713,6 +714,18 @@ export default function ChatPage() {
                 if (doneData.actions?.length > 0) updates.actions = doneData.actions;
                 if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
+                if (doneData.browser_summary) {
+                  updates.browserSummary = {
+                    action: doneData.browser_summary.skill,
+                    url: doneData.browser_summary.url,
+                    title: doneData.browser_summary.title,
+                    elementCount: doneData.browser_summary.element_count,
+                    tabId: doneData.browser_summary.tab_id,
+                    hasScreenshot: doneData.browser_summary.has_screenshot,
+                    textLength: doneData.browser_summary.text_length,
+                    updatedAt: Date.now(),
+                  };
+                }
                 chatD({ type: "UPDATE_LAST", updates });
                 if (doneData.browser_summary) {
                   setLastArtifact({
@@ -1329,6 +1342,49 @@ export default function ChatPage() {
                           Suggested actions
                         </div>
                         <AgentActions actions={msg.actions} onAction={handleAction} />
+                      </div>
+                    )}
+                    {msg.role === "assistant" && msg.browserSummary && (
+                      <div className="mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
+                          Browser artifact
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
+                          {msg.browserSummary.action && (
+                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
+                              {browserActionLabel(msg.browserSummary.action)}
+                            </span>
+                          )}
+                          {typeof msg.browserSummary.elementCount === "number" && (
+                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                              {msg.browserSummary.elementCount} elements
+                            </span>
+                          )}
+                          {msg.browserSummary.hasScreenshot && (
+                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.1)", color: "#86efac" }}>
+                              screenshot ready
+                            </span>
+                          )}
+                          {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && (
+                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                              {msg.browserSummary.textLength} chars
+                            </span>
+                          )}
+                        </div>
+                        {(msg.browserSummary.title || msg.browserSummary.url) && (
+                          <div className="mt-2 min-w-0">
+                            {msg.browserSummary.title && (
+                              <div className="truncate text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+                                {msg.browserSummary.title}
+                              </div>
+                            )}
+                            {msg.browserSummary.url && (
+                              <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                                {msg.browserSummary.url}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     {/* Generated file downloads */}
