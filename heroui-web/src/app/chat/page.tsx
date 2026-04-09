@@ -67,7 +67,7 @@ function makeBrowserTraceEvent(summary: string, detail?: unknown, kind: "tool_st
   };
 }
 
-/** Map technical error messages to user-friendly Chinese text */
+/** Map technical error messages to user-friendly text */
 function friendlyError(msg: string): string {
   const m = (msg || "").toLowerCase();
   if (m.includes("no provider") || m.includes("provider not")) return "当前还没有可用的模型提供商，请先到设置中添加 API Key。";
@@ -1610,7 +1610,7 @@ export default function ChatPage() {
                         onClick={() => { if (f.preview) URL.revokeObjectURL(f.preview); setPendingFiles(prev => prev.filter((_, j) => j !== i)); }}
                         className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0"
                         style={{ background: "rgba(239,68,68,0.9)", color: "#fff" }}
-                      >?</button>
+                      >×</button>
                     </div>
                   ))}
                 </div>
