@@ -70,15 +70,16 @@ function makeBrowserTraceEvent(summary: string, detail?: unknown, kind: "tool_st
 /** Map technical error messages to user-friendly text */
 function friendlyError(msg: string): string {
   const m = (msg || "").toLowerCase();
-  if (m.includes("no provider") || m.includes("provider not")) return "当前还没有可用的模型提供商，请先到设置中添加 API Key。";
-  if (m.includes("planner_error") || m.includes("planner error")) return "Agent 规划阶段失败，请重试或切换模型。";
-  if (m.includes("context deadline") || m.includes("timeout")) return "请求超时了，请稍后再试。";
-  if (m.includes("rate limit") || m.includes("429")) return "当前请求过于频繁，模型提供商正在限流，请稍后重试。";
-  if (m.includes("401") || m.includes("unauthorized") || m.includes("invalid api key")) return "API Key 可能无效或已过期，请检查提供商设置。";
-  if (m.includes("502") || m.includes("503") || m.includes("bad gateway")) return "上游模型服务暂时不可用，请稍后再试。";
-  if (m.includes("request failed")) return "请求执行失败，请检查网络或服务状态后重试。";
+  if (m.includes("no provider") || m.includes("provider not")) return "No model provider is configured yet. Add an API key in Settings first.";
+  if (m.includes("planner_error") || m.includes("planner error")) return "The planning step failed. Retry or switch models.";
+  if (m.includes("context deadline") || m.includes("timeout")) return "The request timed out. Please try again.";
+  if (m.includes("rate limit") || m.includes("429")) return "Too many requests right now. Please retry in a moment.";
+  if (m.includes("401") || m.includes("unauthorized") || m.includes("invalid api key")) return "The API key looks invalid or expired. Check provider settings.";
+  if (m.includes("502") || m.includes("503") || m.includes("bad gateway")) return "The upstream model service is temporarily unavailable.";
+  if (m.includes("request failed")) return "The request failed. Check network or service status and try again.";
   return msg;
 }
+
 
 function collectGeneratedFiles(traceEvents?: AgentEvent[]) {
   const files: Array<{ path: string; name: string; size?: number }> = [];
@@ -933,7 +934,7 @@ export default function ChatPage() {
           {/* Sidebar Header */}
           <div className="p-2.5 space-y-2.5">
             <div className="rounded-[18px] border px-3 py-2.5" style={{ background: "linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <div className="flex h-8 w-8 items-center justify-center rounded-[14px]" style={{ background: "rgba(255,255,255,0.08)", color: "#dbeafe" }}>
                   <Sparkles size={16} />
                 </div>
@@ -1030,7 +1031,7 @@ export default function ChatPage() {
                   )}
                   <div className="mt-0.5 truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{c.summary || "暂无摘要"}</div>
                   <div className="mt-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{new Date(c.updated_at).toLocaleDateString([], { month: "numeric", day: "numeric" })}</span>
                       {c.pinned && (
                         <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
@@ -1086,9 +1087,9 @@ export default function ChatPage() {
               <MessageCircle size={16} />
             </button>
 
-            <div className="hidden md:flex items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
-                <Sparkles size={12} />
+            <div className="hidden lg:flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.035)", color: "var(--yunque-text-secondary)" }}>
+                <Sparkles size={11} />
                 <span>工作台模式</span>
               </div>
             </div>
@@ -1127,7 +1128,7 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Preset selector */}
             {presets.length > 0 && (
               <Dropdown>
@@ -1211,12 +1212,12 @@ export default function ChatPage() {
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center chat-hero-icon" style={{ background: "rgba(0,111,238,0.1)" }}>
                 <Sparkles size={24} style={{ color: "var(--yunque-accent)" }} />
               </div>
-              <div className="text-center space-y-1.5 max-w-xl">
+              <div className="max-w-lg text-center space-y-1.5">
                 <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>从这里开始一轮真正可执行的工作</h1>
                 <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>发起研究、浏览网页、调用连接器、生成代码，或把需求沉淀成任务。</p>
               </div>
 
-              <div className="w-full max-w-[560px] grid grid-cols-2 gap-2 mt-2">
+              <div className="mt-1 grid w-full max-w-[520px] grid-cols-2 gap-2">
                 {[
                   { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
                   { icon: <Search size={14} />, label: "研究一个主题", desc: "发起研究流程，整理来源、结论和下一步建议。" },
@@ -1226,13 +1227,13 @@ export default function ChatPage() {
                   <button
                     key={label}
                     onClick={() => { chatD({ type: "SET_INPUT", value: label }); inputRef.current?.focus(); }}
-                    className="flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-200 hover-lift"
+                    className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
                     style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
                   >
                     <span className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }}>{icon}</span>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{label}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
+                      <div className="text-[13px] font-medium" style={{ color: "var(--yunque-text)" }}>{label}</div>
+                      <div className="mt-0.5 text-[10px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
                     </div>
                   </button>
                 ))}
@@ -1364,7 +1365,7 @@ export default function ChatPage() {
                         )
                       ) : (
                         !msg.images?.length && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <Spinner size="sm" color="current" /> Thinking…
                           </div>
                         )
