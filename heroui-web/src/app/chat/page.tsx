@@ -968,18 +968,16 @@ export default function ChatPage() {
             <div className="text-[10px] font-semibold uppercase tracking-widest px-2 py-2" style={{ color: "var(--yunque-text-muted)" }}>
               {conv.showArchived ? "归档对话" : "最近对话"} ({filteredConversations.length})
             </div>
-            <div className="space-y-0.5">
+            <div className="chat-thread-list space-y-1">
               {filteredConversations.map((c) => (
                 <div
                   key={c.id}
                   onClick={() => { if (conv.renameId !== c.id) switchConversation(c.id); }}
-                  className="conv-item w-full text-left px-3 py-3 rounded-[20px] group relative"
+                  className="conv-item chat-thread-item w-full text-left px-3 py-3 rounded-[20px] group relative"
                   data-active={conv.activeId === c.id || undefined}
                   style={{ color: conv.activeId === c.id ? "var(--yunque-accent)" : "var(--yunque-text-secondary)" }}
                 >
-                  {conv.activeId === c.id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style={{ background: "var(--yunque-accent)" }} />
-                  )}
+                  <div className="chat-thread-indicator" aria-hidden="true" />
                   {c.pinned && (
                     <Pin size={10} className="absolute right-2 top-2" style={{ color: "var(--yunque-accent)", opacity: 0.6 }} />
                   )}
@@ -1010,7 +1008,7 @@ export default function ChatPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="chat-thread-actions flex items-center gap-0.5">
                       <Button isIconOnly aria-label="重命名对话" variant="ghost" size="sm"
                         onPress={() => convD({ type: "START_RENAME", id: c.id, text: c.name || c.id })}
                       >
@@ -1213,13 +1211,13 @@ export default function ChatPage() {
           ) : (
             <div className="max-w-3xl mx-auto space-y-5">
               {chat.messages.map((msg, idx) => (
-                <div key={msg.id} className={`group flex gap-3 animate-fade-in-up ${msg.role === "user" ? "justify-end" : ""}`}>
+                <div key={msg.id} className={`group chat-message-row flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
-                    <Avatar size="sm" className="shrink-0 mt-1" style={{ background: "var(--yunque-accent)" }}>
+                    <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: "var(--yunque-accent)" }}>
                       <Avatar.Fallback className="text-white text-xs font-bold">Y</Avatar.Fallback>
                     </Avatar>
                   )}
-                  <div className={`max-w-[78%] ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
+                  <div className={`chat-message-stack max-w-[78%] ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
                     {/* Step summary (compact, replaces full trace in chat) */}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
                       const isLive = chat.streaming && msg.id === chat.messages[chat.messages.length - 1]?.id;
@@ -1235,7 +1233,7 @@ export default function ChatPage() {
                       });
                       return (
                         <>
-                          <div className="mb-2 rounded-[18px] border px-3 py-3" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
+                          <div className="chat-inline-panel mb-2 rounded-[18px] border px-3 py-3" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                               <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
                                 {isLive ? "运行中" : "已完成"}
@@ -1277,7 +1275,7 @@ export default function ChatPage() {
                             const uniqueSkills = [...new Set(toolEvents.map(e => e.meta?.skill).filter(Boolean))];
                             const lastSkill = toolEvents[toolEvents.length - 1]?.meta?.skill || "";
                             return (
-                              <div className="mb-2 flex items-center gap-2 text-[11px] rounded-lg px-3 py-1.5"
+                              <div className="chat-inline-panel mb-2 flex items-center gap-2 text-[11px] rounded-lg px-3 py-1.5"
                                 style={{ background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-muted)" }}>
                                 {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
                                 <span>
@@ -1295,7 +1293,7 @@ export default function ChatPage() {
                       );
                     })()}
                     <div
-                      className={`px-4 py-3 rounded-[22px] text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "assistant" ? "assistant-message-shell" : ""}`}
+                      className={`chat-message-card px-4 py-3 rounded-[22px] text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}`}
                       style={{
                         background: msg.role === "user"
                           ? "linear-gradient(180deg, rgba(59,130,246,0.96), rgba(37,99,235,0.92))"
@@ -1356,7 +1354,7 @@ export default function ChatPage() {
                     )}
                     {/* Agent action buttons */}
                     {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
-                      <div className="mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Suggested actions
                         </div>
@@ -1364,7 +1362,7 @@ export default function ChatPage() {
                       </div>
                     )}
                     {msg.role === "assistant" && msg.browserSummary && (
-                      <div className="mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Browser artifact
                         </div>
@@ -1440,7 +1438,7 @@ export default function ChatPage() {
                       const files = collectGeneratedFiles(msg.traceEvents);
                       if (files.length === 0) return null;
                       return (
-                        <div className="mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                           <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                             Generated files
                           </div>
@@ -1479,7 +1477,7 @@ export default function ChatPage() {
                     })()}
                     {/* Follow-up suggestions */}
                     {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !chat.streaming && (
-                      <div className="mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Next moves
                         </div>
@@ -1492,7 +1490,7 @@ export default function ChatPage() {
                               sendMessage(s.label);
                             }
                           }}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 cursor-pointer"
+                            className="chat-followup-chip px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer"
                             style={{
                               background: s.type === "save_skill" ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.08)",
                               border: `1px solid ${s.type === "save_skill" ? "rgba(139,92,246,0.3)" : "rgba(59,130,246,0.15)"}`,
@@ -1510,7 +1508,7 @@ export default function ChatPage() {
                       </div>
                     )}
                     {msg.content && (
-                      <div className="hidden group-hover:flex gap-0.5 mt-1 animate-fade-in" style={{ justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                      <div className="chat-message-tools flex gap-0.5 mt-1" style={{ justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
                         {msg.role === "user" && (
                           <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm"><Pencil size={11} /></Button><Tooltip.Content>编辑</Tooltip.Content></Tooltip>
                         )}
