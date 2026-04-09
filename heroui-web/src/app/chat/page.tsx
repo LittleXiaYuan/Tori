@@ -654,6 +654,36 @@ export default function ChatPage() {
     if (slashBrowserCommand) {
       setSuggestedTab("browser");
       setShowComputer(true);
+      const extStatus = await api.browserExtStatus().catch(() => ({ connected: false }));
+      if (!extStatus.connected) {
+        setShowConnectors(true);
+        setBridgeNotice({ tone: "warning", text: "Browser extension not connected. Opened install guide for you." });
+        pushBrowserTrace(makeBrowserTraceEvent(
+          "Browser extension required",
+          { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
+          "reflect",
+        ));
+        const userMsg: Message = { role: "user", content: text, id: newId() };
+        const asstMsg: Message = {
+          role: "assistant",
+          content: [
+            "The browser extension is not connected yet.",
+            "I opened the connectors panel for you. Please finish installing and connecting **Yunque Browser Connector**, then run this `/navigate` command again.",
+            "",
+            "You can also open the browser workspace for the install guide: [/browser](/browser)",
+          ].join("\n"),
+          id: newId(),
+          traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-slash", command: slashBrowserCommand.command }, "reflect")],
+        };
+        chatD({ type: "SET_INPUT", value: "" });
+        chatD({ type: "ADD_PAIR", userMsg, asstMsg });
+        setActiveSlashCommand(null);
+        setShowSlashMenu(false);
+        if (typeof window !== "undefined") {
+          window.setTimeout(() => window.open("/browser", "_blank", "noopener,noreferrer"), 80);
+        }
+        return;
+      }
       setBridgeNotice({ tone: "info", text: browserTraceSummary(slashBrowserCommand.command, "start") });
       pushBrowserTrace(makeBrowserTraceEvent(
         browserTraceSummary(slashBrowserCommand.command, "start"),
