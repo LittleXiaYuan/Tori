@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Button, Drawer, Input, ListBox, Label, Description, Spinner } from "@heroui/react";
+import { createPortal } from "react-dom";
+import { Button, Input, ListBox, Label, Description, Spinner } from "@heroui/react";
 import { api } from "@/lib/api";
 import type { ConnectorView, ConnectorDef } from "@/lib/api-types";
 import { useI18n } from "@/lib/i18n";
@@ -19,6 +20,7 @@ import {
   Monitor,
   Link2,
   ShieldCheck,
+  X,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -134,25 +136,50 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
   const SelectedIcon = selected ? (iconMap[selected.icon] || Plug) : Plug;
   const tone = selected ? statusTone(selected.status) : statusTone("disconnected");
 
-  return (
-    <Drawer.Backdrop isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()} variant="blur">
-      <Drawer.Content placement="right" className="max-w-[860px]">
-        <Drawer.Dialog
-          aria-label={t("connector.title")}
-          className="animate-drawer-panel h-full border-l border-white/10"
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const prevOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[140]">
+      <button
+        type="button"
+        aria-label="Close connectors"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="absolute inset-y-0 right-0 flex w-full justify-end">
+        <div
+          className="animate-drawer-panel flex h-full w-full max-w-[860px] flex-col border-l border-white/10 shadow-2xl"
           style={{ background: "linear-gradient(180deg, rgba(17,24,39,0.96), rgba(9,9,11,0.98))" }}
         >
-          <Drawer.CloseTrigger />
-          <Drawer.Header className="border-b border-white/8 pb-4">
-            <div className="w-full">
-              <Drawer.Heading className="text-xl font-semibold">{t("connector.title")}</Drawer.Heading>
+          <div className="flex items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold">{t("connector.title")}</h2>
               <p className="mt-1 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
                 {t("connector.subtitle")}
               </p>
             </div>
-          </Drawer.Header>
+            <Button isIconOnly variant="ghost" aria-label="Close connectors" onPress={onClose}>
+              <X size={18} />
+            </Button>
+          </div>
 
-          <Drawer.Body className="overflow-hidden p-0">
+          <div className="min-h-0 flex-1 overflow-hidden p-0">
             {loading ? (
               <div className="flex h-full items-center justify-center">
                 <Spinner size="lg" />
@@ -204,7 +231,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                             </div>
                             <div className="min-w-0 flex-1">
                               <Label className="block text-sm font-medium leading-6 break-words">{conn.name}</Label>
-                              <Description className="mt-1 block text-xs leading-6 break-words">{conn.description}</Description>
+                              <Description className="mt-1 block text-xs leading-5 break-words">{conn.description}</Description>
                               <div className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                                 <span className="rounded-full px-2 py-0.5" style={{ background: connTone.bg, color: connTone.text }}>
                                   {connTone.label}
@@ -330,9 +357,10 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                 </div>
               </div>
             )}
-          </Drawer.Body>
-        </Drawer.Dialog>
-      </Drawer.Content>
-    </Drawer.Backdrop>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
