@@ -109,7 +109,7 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
   return (
     <div
       ref={menuRef}
-      className="absolute bottom-full left-0 z-50 mb-3 overflow-hidden rounded-[22px] border"
+      className="animate-command-panel absolute bottom-full left-0 z-50 mb-3 overflow-hidden rounded-[22px] border"
       style={{
         width: Math.min(680, Math.max(420, inputWidth || 560)),
         background: "rgba(15,16,20,0.96)",
@@ -142,10 +142,12 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
                 key={cmd.id}
                 data-idx={idx}
                 type="button"
-                className="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition-all last:mb-0"
+                className="interactive-list-item mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left last:mb-0"
+                data-active={active ? "true" : "false"}
                 style={{
                   background: active ? "rgba(59,130,246,0.12)" : "transparent",
                   border: active ? "1px solid rgba(59,130,246,0.22)" : "1px solid transparent",
+                  boxShadow: active ? "0 10px 24px rgba(59,130,246,0.08)" : "none",
                 }}
                 onMouseEnter={() => setSelectedIdx(idx)}
                 onClick={() => onSelect(`${cmd.command} `)}
@@ -165,7 +167,7 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
           })}
         </div>
 
-        <div className="flex flex-col justify-between px-4 py-4">
+        <div className="animate-content-fade flex flex-col justify-between px-4 py-4">
           {activeCommand && (
             <>
               <div>
@@ -174,12 +176,12 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
                   <span>{activeCommand.category}</span>
                 </div>
 
-                <div className="mt-4 rounded-[18px] border p-4" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.025)" }}>
+                <div className="interactive-preview-panel mt-4 rounded-[18px] border p-4" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.025)" }}>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("slash.insert")}</div>
                   <div className="mt-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{activeCommand.command}{activeCommand.placeholder ? ` ${activeCommand.placeholder}` : ""}</div>
                 </div>
 
-                <div className="mt-3 rounded-[18px] border p-4" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.02)" }}>
+                <div className="interactive-preview-panel mt-3 rounded-[18px] border p-4" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.02)" }}>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("slash.usage")}</div>
                   <div className="mt-2 text-sm leading-6" style={{ color: "var(--yunque-text-secondary)" }}>{t("slash.usageDesc")}</div>
                 </div>

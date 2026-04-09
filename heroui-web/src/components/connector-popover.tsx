@@ -137,7 +137,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
       <Drawer.Content placement="right" className="max-w-[760px]">
         <Drawer.Dialog
           aria-label="连接器"
-          className="h-full border-l border-white/10"
+          className="animate-drawer-panel h-full border-l border-white/10"
           style={{ background: "linear-gradient(180deg, rgba(17,24,39,0.96), rgba(9,9,11,0.98))" }}
         >
           <Drawer.CloseTrigger />
@@ -173,7 +173,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedId(null)}
-                    className="mb-3 flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors"
+                    className="interactive-list-item mb-3 flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors"
                     style={{
                       background: browserState ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
                       borderColor: browserState ? "rgba(34,197,94,0.22)" : "rgba(255,255,255,0.08)",
@@ -218,7 +218,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                   </ListBox>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto p-5">
+                <div className="animate-content-fade min-h-0 overflow-y-auto p-5">
                   {selected ? (
                     <div className="space-y-4">
                       <div className="flex items-start gap-3">

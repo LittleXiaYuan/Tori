@@ -100,7 +100,7 @@ export function BrowserSessionCard({
 
   return (
     <div
-      className={`rounded-[22px] border px-3 py-3 ${className}`.trim()}
+      className={`browser-session-animated rounded-[22px] border px-3 py-3 ${className}`.trim()}
       style={{
         background: takeover
           ? "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))"
@@ -118,7 +118,7 @@ export function BrowserSessionCard({
               {takeover ? <AlertTriangle size={14} style={{ color: "#f59e0b" }} /> : <Monitor size={14} style={{ color: "#60a5fa" }} />}
             </div>
             <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{t("browser.runtime")}</div>
-            <Chip size="sm" style={{ ...statusStyle, fontSize: "var(--text-2xs)" }}>{statusLabel}</Chip>
+            <Chip size="sm" style={{ ...statusStyle, fontSize: "var(--text-2xs)", transition: "all var(--duration-base) ease" }}>{statusLabel}</Chip>
             {typeof state?.sessions === "number" && state.sessions > 0 && (
               <span className="rounded-full px-2 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-muted)" }}>
                 {state.sessions} tabs
@@ -146,7 +146,7 @@ export function BrowserSessionCard({
           {notice && <div className="mt-2 inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[11px]" style={noticeStyle}>{notice.text}</div>}
 
           {artifact && (
-            <div className="mt-3 rounded-2xl border px-3 py-2.5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
+            <div className="animate-content-fade interactive-preview-panel mt-3 rounded-2xl border px-3 py-2.5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>{t("browser.latest")}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
                 {artifact.action && <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(artifact.action)}</span>}
