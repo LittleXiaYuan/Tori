@@ -194,6 +194,17 @@ func TestIngestKnowledgeWithMinerU(t *testing.T) {
 		},
 	}
 
+	parsed, err := g.parseFileWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if parsed.Parse["parser"] != "mineru" {
+		t.Fatalf("expected parser metadata, got %#v", parsed.Parse)
+	}
+	if parsed.Parse["preview"] == "" {
+		t.Fatalf("expected preview metadata, got %#v", parsed.Parse)
+	}
+
 	res, err := g.ingestKnowledgeWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -700,7 +700,14 @@ export default function ChatPage() {
     } else {
       setPendingFiles(prev => [...prev, { name: file.name, size: file.size, type: isText ? "text" : "binary" }]);
       api.uploadFile(file).then(res => {
-        chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + `Uploaded file: ${res.path}` });
+        const parsePreview = typeof res.parse?.preview === "string" ? res.parse.preview.trim() : "";
+        const uploadLine = parsePreview
+          ? [`[Parsed document: ${file.name}]`, `Workspace path: ${res.path}`, "", parsePreview].join("\n")
+          : `Uploaded file: ${res.path}`;
+        chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + uploadLine });
+        if (res.parse?.parser === "mineru") {
+          showToast(`Parsed ${file.name} with MinerU.`, "success");
+        }
       }).catch(() => {
         if (isText) {
           const reader = new FileReader();

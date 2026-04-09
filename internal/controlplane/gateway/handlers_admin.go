@@ -825,6 +825,14 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	snippet := TryParseFile(header.Filename, content)
+	if isMinerUSupportedExt(ext) && g.documentParser != nil && g.documentParser.Enabled() {
+		if parsed, perr := g.parseFileWithMinerU(r.Context(), header.Filename, content); perr != nil {
+			slog.Warn("upload MinerU parse failed", "name", header.Filename, "err", perr)
+		} else {
+			snippet = parsed.Markdown
+			resp["parse"] = parsed.Parse
+		}
+	}
 	if g.planner != nil {
 		if analysis, aerr := g.planner.AnalyzeUploadedFile(r.Context(), header.Filename, snippet); aerr != nil {
 			slog.Debug("upload template analysis skipped", "err", aerr)

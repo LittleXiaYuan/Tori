@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/knowledge"
+	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/pkg/safego"
 )
 
@@ -150,6 +151,12 @@ func (g *Gateway) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+type mineruParsePayload struct {
+	Result   *mineru.ParseResult
+	Markdown string
+	Parse    map[string]any
+}
+
 type mineruKnowledgeIngestResult struct {
 	Source *knowledge.Source
 	Parse  map[string]any
@@ -162,7 +169,7 @@ func (r *mineruKnowledgeIngestResult) Response() map[string]any {
 	return r.Parse
 }
 
-func (g *Gateway) ingestKnowledgeWithMinerU(ctx context.Context, filename string, data []byte) (*mineruKnowledgeIngestResult, error) {
+func (g *Gateway) parseFileWithMinerU(ctx context.Context, filename string, data []byte) (*mineruParsePayload, error) {
 	if g.documentParser == nil || !g.documentParser.Enabled() {
 		return nil, fmt.Errorf("MinerU is not enabled")
 	}
@@ -193,12 +200,34 @@ func (g *Gateway) ingestKnowledgeWithMinerU(ctx context.Context, filename string
 	if markdown == "" {
 		return nil, fmt.Errorf("MinerU did not return markdown content")
 	}
+	preview := markdown
+	if len(preview) > 1200 {
+		preview = preview[:1200] + "..."
+	}
+	return &mineruParsePayload{
+		Result:   result,
+		Markdown: markdown,
+		Parse: map[string]any{
+			"parser":          "mineru",
+			"backend":         result.Backend,
+			"markdown_chars":  len(markdown),
+			"has_layout_json": strings.TrimSpace(result.JSON) != "",
+			"preview":         preview,
+		},
+	}, nil
+}
 
+func (g *Gateway) ingestKnowledgeWithMinerU(ctx context.Context, filename string, data []byte) (*mineruKnowledgeIngestResult, error) {
+	parsed, err := g.parseFileWithMinerU(ctx, filename, data)
+	if err != nil {
+		return nil, err
+	}
 	name := filename
+	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != "" {
 		name = strings.TrimSuffix(filename, ext) + ".md"
 	}
-	src, err := g.knowledgeStore.IngestText(name, markdown)
+	src, err := g.knowledgeStore.IngestText(name, parsed.Markdown)
 	if err != nil {
 		return nil, err
 	}
@@ -207,15 +236,7 @@ func (g *Gateway) ingestKnowledgeWithMinerU(ctx context.Context, filename string
 		src.Path = filename
 	}
 
-	return &mineruKnowledgeIngestResult{
-		Source: src,
-		Parse: map[string]any{
-			"parser":          "mineru",
-			"backend":         result.Backend,
-			"markdown_chars":  len(markdown),
-			"has_layout_json": strings.TrimSpace(result.JSON) != "",
-		},
-	}, nil
+	return &mineruKnowledgeIngestResult{Source: src, Parse: parsed.Parse}, nil
 }
 
 func isMinerUSupportedExt(ext string) bool {
