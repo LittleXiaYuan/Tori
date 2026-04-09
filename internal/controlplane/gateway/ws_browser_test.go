@@ -153,6 +153,75 @@ func TestBrowserWSAcceptsTicketHandshake(t *testing.T) {
 	}
 }
 
+func TestBrowserWSTicketRejectsNonceMismatch(t *testing.T) {
+	gw, tm := newTestGateway()
+	hub := NewBrowserHub()
+	gw.SetBrowserHub(hub)
+	tenant := tm.Register("browser-test")
+	record, err := gw.browserSessions.Issue(tenant.ID)
+	if err != nil {
+		t.Fatalf("issue browser session: %v", err)
+	}
+
+	srv := httptest.NewServer(gw)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/browser?ticket=" + record.Ticket + "&nonce=wrong"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if conn != nil {
+		conn.Close()
+	}
+	if err == nil {
+		t.Fatal("expected websocket dial failure when nonce mismatches")
+	}
+}
+
+func TestBrowserWSTicketCannotBeReused(t *testing.T) {
+	gw, tm := newTestGateway()
+	hub := NewBrowserHub()
+	gw.SetBrowserHub(hub)
+	tenant := tm.Register("browser-test")
+	record, err := gw.browserSessions.Issue(tenant.ID)
+	if err != nil {
+		t.Fatalf("issue browser session: %v", err)
+	}
+
+	srv := httptest.NewServer(gw)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/browser?ticket=" + record.Ticket + "&nonce=" + record.Nonce
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("first dial should succeed: %v", err)
+	}
+	defer conn.Close()
+
+	_, data, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read challenge: %v", err)
+	}
+	var msg BrowserResult
+	if err := json.Unmarshal(data, &msg); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+	sum := sha256.Sum256([]byte(record.Ticket + ":" + record.Nonce + ":" + msg.Challenge))
+	proof := hex.EncodeToString(sum[:])
+	if err := conn.WriteJSON(BrowserResult{Type: "challenge_response", Proof: proof}); err != nil {
+		t.Fatalf("write proof: %v", err)
+	}
+	if !waitForCondition(2*time.Second, func() bool { return hub.ConnectedForTenant(tenant.ID) }) {
+		t.Fatal("browser hub never reported tenant-scoped connected state")
+	}
+
+	reuseConn, _, reuseErr := websocket.DefaultDialer.Dial(wsURL, nil)
+	if reuseConn != nil {
+		reuseConn.Close()
+	}
+	if reuseErr == nil {
+		t.Fatal("expected reused ticket dial to fail")
+	}
+}
+
 func waitForCondition(timeout time.Duration, fn func() bool) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
