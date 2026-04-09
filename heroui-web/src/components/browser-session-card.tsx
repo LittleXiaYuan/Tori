@@ -128,7 +128,7 @@ export function BrowserSessionCard({
             )}
           </div>
 
-          <div className={`mt-2 text-xs ${compact ? "line-clamp-2" : ""}`} style={{ color: "var(--yunque-text-muted)" }}>{statusHint}</div>
+          {(!compact || takeover || !connected) && <div className={`mt-2 text-xs ${compact ? "line-clamp-1" : ""}`} style={{ color: "var(--yunque-text-muted)" }}>{statusHint}</div>}
           {session?.title && <div className="mt-2 truncate text-sm" style={{ color: "var(--yunque-text-secondary)" }}>{session.title}</div>}
           {session?.currentUrl && <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{session.currentUrl}</div>}
 
@@ -150,12 +150,12 @@ export function BrowserSessionCard({
           {artifact && (
             <div className={`animate-content-fade interactive-preview-panel mt-3 border ${compact ? "rounded-[16px] px-2.5 py-2" : "rounded-2xl px-3 py-2.5"}`} style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>{t("browser.latest")}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
+              <div className={`mt-2 flex flex-wrap items-center ${compact ? "gap-1.5" : "gap-2"} text-[11px]`} style={{ color: "var(--yunque-text-secondary)" }}>
                 {artifact.action && <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(artifact.action)}</span>}
                 {typeof artifact.elementCount === "number" && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{artifact.elementCount} {t("browser.elements")}</span>}
-                {typeof artifact.textLength === "number" && artifact.textLength > 0 && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{artifact.textLength} chars</span>}
+                {!compact && typeof artifact.textLength === "number" && artifact.textLength > 0 && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{artifact.textLength} chars</span>}
                 {artifact.hasScreenshot && <span className="rounded-full px-2 py-1" style={{ background: "rgba(34,197,94,0.12)", color: "#86efac" }}>{t("browser.screenshot")}</span>}
-                {artifact.tabId && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>Tab #{artifact.tabId}</span>}
+                {!compact && artifact.tabId && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>Tab #{artifact.tabId}</span>}
                 {artifactUpdatedLabel && <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>{t("browser.updated")} {artifactUpdatedLabel}</span>}
               </div>
               {(artifact.title || artifact.url) && (

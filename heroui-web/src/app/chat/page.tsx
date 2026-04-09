@@ -1076,7 +1076,7 @@ export default function ChatPage() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="flex items-center justify-between px-5 py-3 shrink-0" style={{ borderBottom: "1px solid var(--yunque-border)", background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0))" }}>
+        <header className="flex items-center justify-between px-4 py-2.5 shrink-0 xl:px-5" style={{ borderBottom: "1px solid var(--yunque-border)", background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0))" }}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
@@ -1097,7 +1097,7 @@ export default function ChatPage() {
             {currentModel && (
               availableModels.length > 1 ? (
                 <Dropdown>
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs font-mono rounded-lg"
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 rounded-full px-2.5 text-[11px] font-mono"
                     style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
                     <Cpu size={12} />
                     {currentModel.length > 25 ? `${currentModel.slice(0, 25)}…` : currentModel}
@@ -1134,7 +1134,7 @@ export default function ChatPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-xs font-medium rounded-lg"
+                  className="h-8 gap-1.5 rounded-full px-2.5 text-[11px] font-medium"
                   style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}
                 >
                   <Heart size={12} />
@@ -1154,7 +1154,7 @@ export default function ChatPage() {
             )}
 
             {chat.streaming && (
-              <Chip className="animate-pulse-dot" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
+              <Chip className="animate-pulse-dot hidden lg:inline-flex" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
                 <Sparkles size={11} className="mr-1" /> 流式生成中
               </Chip>
             )}
@@ -1162,7 +1162,7 @@ export default function ChatPage() {
             {/* Computer panel toggle */}
             <Tooltip delay={0}>
               <Button
-                isIconOnly variant="ghost" size="sm"
+                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
                 onPress={() => setShowComputer(!showComputer)}
                 style={{ color: showComputer ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}
               >
@@ -1172,7 +1172,7 @@ export default function ChatPage() {
             </Tooltip>
 
             {/* Thinking level pills */}
-            <div className="flex items-center gap-0.5 p-0.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
               {thinkingOptions.map(({ key, label, icon }) => (
                 <button
                   key={key}
@@ -1180,7 +1180,7 @@ export default function ChatPage() {
                     setThinkingLevel(key);
                     setThinkingEnabled(key === "deep" ? true : key === "none" ? false : null);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all"
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
                   style={{
                     background: thinkingLevel === key ? "var(--yunque-accent)" : "transparent",
                     color: thinkingLevel === key ? "#fff" : "var(--yunque-text-muted)",
@@ -1579,29 +1579,30 @@ export default function ChatPage() {
           <div className="max-w-4xl mx-auto">
             <div
               ref={inputShellRef}
-              className="chat-input-wrap chat-composer rounded-[26px] overflow-visible transition-all"
+              className="chat-input-wrap chat-composer rounded-[24px] overflow-visible transition-all"
               data-busy={chat.loading ? "true" : "false"}
               style={{
-                background: "linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.01)), var(--yunque-card)",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.024), rgba(255,255,255,0.008)), var(--yunque-card)",
                 border: isDragging ? "1px dashed var(--yunque-accent)" : "1px solid var(--yunque-border)",
                 boxShadow: isDragging
                   ? "0 0 0 1px rgba(59,130,246,0.22), 0 14px 36px rgba(15,23,42,0.32)"
-                  : "0 14px 42px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.03)",
+                  : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
               }}
             >
-              <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+              <div className="flex items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                 <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                   Tori 负责执行，云雀负责工作台与上下文组织。
                 </div>
-                <div className="composer-toolbar-fade hidden items-center gap-2 md:flex">
-                  <Button size="sm" variant="ghost" className="chat-tool-btn rounded-full px-3" onPress={() => setShowConnectors(true)}>
+                <div className="composer-toolbar-fade hidden items-center gap-1.5 md:flex">
+                  <Button size="sm" variant="ghost" className="chat-tool-btn h-8 rounded-full px-2.5 text-[11px]" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(true)}>
                     <Plug size={13} />
                     连接器
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="chat-tool-btn rounded-full px-3"
+                    className="chat-tool-btn h-8 rounded-full px-2.5 text-[11px]"
+                    data-active={showSlashMenu || activeSlashCommand ? "true" : undefined}
                     onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}
                   >
                     <Sparkles size={13} />
@@ -1610,7 +1611,7 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              <div className="px-4 pt-3">
+              <div className="px-4 pt-2.5">
                 <BrowserSessionCard
                   compact
                   state={bridgeState}
@@ -1647,7 +1648,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              <div className="relative px-4 pt-3">
+              <div className="relative px-4 pt-2.5">
                 <SlashCommandMenu
                   query={slashQuery}
                   visible={showSlashMenu}
@@ -1656,7 +1657,7 @@ export default function ChatPage() {
                   anchorRef={inputShellRef}
                 />
                 {(showSlashMenu || activeSlashCommand) && (
-                  <div className="slash-trigger-pill pointer-events-none absolute left-5 top-0 flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)", boxShadow: "0 8px 24px rgba(59,130,246,0.12)" }}>
+                  <div className="slash-trigger-pill pointer-events-none absolute left-4 top-0 flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)", boxShadow: "0 8px 24px rgba(59,130,246,0.12)" }}>
                     <span>{showSlashMenu ? "Command menu" : "Slash command"}</span>
                     {activeSlashCommand && (
                       <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,0.12)", color: "var(--yunque-text)" }}>
@@ -1674,12 +1675,12 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="输入消息，或输入 / 使用命令、连接器与内置技能…"
                 rows={1}
-                className="chat-composer-textarea w-full resize-none px-5 pt-3 pb-2 text-[15px] outline-none bg-transparent"
-                style={{ color: "var(--yunque-text)", minHeight: 72, maxHeight: 180, lineHeight: 1.7 }}
+                className="chat-composer-textarea w-full resize-none bg-transparent px-4 pt-2.5 pb-1.5 text-[14px] outline-none"
+                style={{ color: "var(--yunque-text)", minHeight: 60, maxHeight: 180, lineHeight: 1.65 }}
                 disabled={chat.loading}
               />
 
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3.5 pt-2">
                 <div className="flex items-center gap-1">
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                   <Tooltip delay={0}>
@@ -1705,7 +1706,7 @@ export default function ChatPage() {
                   </Tooltip>
                   <div className="relative">
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => setShowConnectors(!showConnectors)}>
+                      <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(!showConnectors)}>
                         <Plug size={14} />
                       </Button>
                       <Tooltip.Content>连接器</Tooltip.Content>
