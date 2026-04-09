@@ -1552,6 +1552,7 @@ export default function ChatPage() {
             <div
               ref={inputShellRef}
               className="chat-input-wrap chat-composer rounded-[26px] overflow-visible transition-all"
+              data-busy={chat.loading ? "true" : "false"}
               style={{
                 background: "linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.01)), var(--yunque-card)",
                 border: isDragging ? "1px dashed var(--yunque-accent)" : "1px solid var(--yunque-border)",
@@ -1564,15 +1565,15 @@ export default function ChatPage() {
                 <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                   Tori 负责执行，云雀负责工作台与上下文组织。
                 </div>
-                <div className="hidden items-center gap-2 md:flex">
-                  <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={() => setShowConnectors(true)}>
+                <div className="composer-toolbar-fade hidden items-center gap-2 md:flex">
+                  <Button size="sm" variant="ghost" className="chat-tool-btn rounded-full px-3" onPress={() => setShowConnectors(true)}>
                     <Plug size={13} />
                     连接器
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="rounded-full px-3"
+                    className="chat-tool-btn rounded-full px-3"
                     onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}
                   >
                     <Sparkles size={13} />
@@ -1626,7 +1627,7 @@ export default function ChatPage() {
                   anchorRef={inputShellRef}
                 />
                 {(showSlashMenu || activeSlashCommand) && (
-                  <div className="pointer-events-none absolute left-5 top-0 flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
+                  <div className="slash-trigger-pill pointer-events-none absolute left-5 top-0 flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)", boxShadow: "0 8px 24px rgba(59,130,246,0.12)" }}>
                     <span>{showSlashMenu ? "????" : "Slash command"}</span>
                     {activeSlashCommand && (
                       <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,0.12)", color: "var(--yunque-text)" }}>
@@ -1653,11 +1654,11 @@ export default function ChatPage() {
                 <div className="flex items-center gap-1">
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                   <Tooltip delay={0}>
-                    <Button isIconOnly variant="ghost" size="sm" onPress={() => fileInputRef.current?.click()}><Paperclip size={14} /></Button>
+                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => fileInputRef.current?.click()}><Paperclip size={14} /></Button>
                     <Tooltip.Content>添加文件</Tooltip.Content>
                   </Tooltip>
                   <Tooltip delay={0}>
-                    <Button isIconOnly variant="ghost" size="sm" onPress={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}><ImageIcon size={14} /></Button>
+                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}><ImageIcon size={14} /></Button>
                     <Tooltip.Content>添加图片</Tooltip.Content>
                   </Tooltip>
                   <Tooltip delay={0}>
@@ -1665,6 +1666,7 @@ export default function ChatPage() {
                       isIconOnly
                       variant="ghost"
                       size="sm"
+                      className="chat-tool-btn"
                       onPress={isRecording ? stopRecording : startRecording}
                       style={isRecording ? { color: "#ef4444" } : {}}
                     >
@@ -1674,7 +1676,7 @@ export default function ChatPage() {
                   </Tooltip>
                   <div className="relative">
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" onPress={() => setShowConnectors(!showConnectors)}>
+                      <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => setShowConnectors(!showConnectors)}>
                         <Plug size={14} />
                       </Button>
                       <Tooltip.Content>连接器</Tooltip.Content>
@@ -1703,7 +1705,8 @@ export default function ChatPage() {
                 ) : (
                   <Button
                     isIconOnly aria-label="发送" size="sm"
-                    className={`h-11 w-11 rounded-2xl ${chat.input.trim() ? "chat-send-active" : ""}`}
+                    className={`chat-send-btn h-11 w-11 rounded-2xl ${chat.input.trim() ? "chat-send-active" : ""}`}
+                    data-active={chat.input.trim() ? "true" : "false"}
                     isDisabled={!chat.input.trim()}
                     style={{
                       background: chat.input.trim() ? "var(--yunque-accent)" : "rgba(255,255,255,0.06)",

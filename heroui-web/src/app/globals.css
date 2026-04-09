@@ -185,6 +185,19 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.0); }
   50% { box-shadow: 0 0 0 6px rgba(59,130,246,0.08); }
 }
+@keyframes composerPulse {
+  0%, 100% { box-shadow: 0 14px 36px rgba(0,0,0,0.22), 0 0 0 1px rgba(59,130,246,0.10); }
+  50% { box-shadow: 0 16px 40px rgba(0,0,0,0.24), 0 0 0 1px rgba(59,130,246,0.18); }
+}
+@keyframes pillReveal {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes buttonPop {
+  0% { transform: scale(0.98); }
+  55% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
 
 .animate-fade-in-up     { animation: fadeInUp 0.4s ease-out both; }
 .animate-fade-in        { animation: fadeIn 0.3s ease-out both; }
@@ -680,14 +693,18 @@ button, [role="button"] { border-radius: var(--radius-md); }
 
 /* Chat input glow when focused */
 .chat-input-wrap {
-  transition: box-shadow var(--duration-base) ease, border-color var(--duration-base) ease, transform var(--duration-fast) ease;
+  transition: box-shadow var(--duration-base) ease, border-color var(--duration-base) ease, transform var(--duration-fast) ease, background-color var(--duration-base) ease;
 }
 .chat-input-wrap:hover {
   border-color: rgba(255,255,255,0.1) !important;
+  transform: translateY(-1px);
 }
 .chat-input-wrap:focus-within {
   border-color: rgba(59,130,246,0.32) !important;
   box-shadow: 0 14px 36px rgba(0,0,0,0.22), 0 0 0 1px rgba(59,130,246,0.18);
+}
+.chat-input-wrap[data-busy="true"] {
+  animation: composerPulse 2.1s ease-in-out infinite;
 }
 .chat-composer {
   position: relative;
@@ -715,6 +732,47 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* Chat send button glow */
 .chat-send-active {
   box-shadow: 0 0 0 1px rgba(59,130,246,0.18), 0 8px 20px rgba(59,130,246,0.22);
+}
+.chat-send-btn {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+.chat-send-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.02);
+}
+.chat-send-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.chat-send-btn[data-active="true"] {
+  animation: buttonPop 180ms var(--ease-out) 1;
+}
+
+.chat-tool-btn {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
+}
+.chat-tool-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.08) !important;
+}
+
+.slash-trigger-pill {
+  animation: pillReveal 160ms var(--ease-out) both;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
+}
+
+.composer-toolbar-fade {
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out);
 }
 
 .assistant-message-shell {
