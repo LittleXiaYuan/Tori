@@ -929,7 +929,7 @@ export default function ChatPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
       {/* Conversation Sidebar */}
       {showSidebar && (
-        <div className="w-64 flex flex-col h-full shrink-0 animate-slide-in-left" style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)" }}>
+        <div className="w-[244px] xl:w-[260px] flex flex-col h-full shrink-0 animate-slide-in-left" style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)" }}>
           {/* Sidebar Header */}
           <div className="p-3 space-y-3">
             <div className="rounded-[24px] border px-3 py-3" style={{ background: "linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
@@ -1194,7 +1194,7 @@ export default function ChatPage() {
         </header>
 
         {/* Chat Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar xl:px-6">
           {chat.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up">
               {setupNeeded && (
@@ -1216,7 +1216,7 @@ export default function ChatPage() {
                 <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>发起研究、浏览网页、调用连接器、生成代码，或把需求沉淀成任务。</p>
               </div>
 
-              <div className="w-full max-w-lg grid grid-cols-2 gap-2 mt-2">
+              <div className="w-full max-w-[560px] grid grid-cols-2 gap-2 mt-2">
                 {[
                   { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
                   { icon: <Search size={14} />, label: "研究一个主题", desc: "发起研究流程，整理来源、结论和下一步建议。" },
@@ -1239,7 +1239,7 @@ export default function ChatPage() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto space-y-5">
+            <div className="max-w-4xl mx-auto space-y-5">
               {chat.messages.map((msg, idx) => (
                 <div key={msg.id} className={`group chat-message-row flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
@@ -1574,9 +1574,9 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="px-6 py-3 shrink-0" style={{ borderTop: chat.messages.length > 0 ? "1px solid var(--yunque-border)" : "none" }}
+        <div className="px-5 py-3 shrink-0 xl:px-6" style={{ borderTop: chat.messages.length > 0 ? "1px solid var(--yunque-border)" : "none" }}
           onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}>
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div
               ref={inputShellRef}
               className="chat-input-wrap chat-composer rounded-[26px] overflow-visible transition-all"
@@ -1612,6 +1612,7 @@ export default function ChatPage() {
 
               <div className="px-4 pt-3">
                 <BrowserSessionCard
+                  compact
                   state={bridgeState}
                   pendingAction={bridgeActionPending}
                   notice={bridgeNotice}

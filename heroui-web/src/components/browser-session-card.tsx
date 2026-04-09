@@ -54,6 +54,7 @@ interface BrowserSessionCardProps {
   onOpenBrowserPage?: () => void;
   onSuggestCommand?: (command: string) => void;
   className?: string;
+  compact?: boolean;
 }
 
 export function BrowserSessionCard({
@@ -66,6 +67,7 @@ export function BrowserSessionCard({
   onOpenBrowserPage,
   onSuggestCommand,
   className = "",
+  compact = false,
 }: BrowserSessionCardProps) {
   const { t } = useI18n();
   const session = state?.runtimeSession;
@@ -100,7 +102,7 @@ export function BrowserSessionCard({
 
   return (
     <div
-      className={`browser-session-animated rounded-[22px] border px-3 py-3 ${className}`.trim()}
+      className={`browser-session-animated ${compact ? "rounded-[18px] px-2.5 py-2.5" : "rounded-[22px] px-3 py-3"} border ${className}`.trim()}
       style={{
         background: takeover
           ? "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))"
@@ -108,7 +110,7 @@ export function BrowserSessionCard({
         borderColor: takeover ? "rgba(245,158,11,0.22)" : "rgba(59,130,246,0.18)",
       }}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div className={`flex ${compact ? "flex-col gap-2" : "flex-col gap-3 md:flex-row md:items-start md:justify-between"}`}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <div
@@ -126,11 +128,11 @@ export function BrowserSessionCard({
             )}
           </div>
 
-          <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{statusHint}</div>
+          <div className={`mt-2 text-xs ${compact ? "line-clamp-2" : ""}`} style={{ color: "var(--yunque-text-muted)" }}>{statusHint}</div>
           {session?.title && <div className="mt-2 truncate text-sm" style={{ color: "var(--yunque-text-secondary)" }}>{session.title}</div>}
           {session?.currentUrl && <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{session.currentUrl}</div>}
 
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+          <div className={`mt-2 flex flex-wrap items-center ${compact ? "gap-1.5" : "gap-2"} text-[11px]`} style={{ color: "var(--yunque-text-muted)" }}>
             {session?.lastAction && (
               <span className="rounded-full px-2 py-1" style={{ background: "rgba(255,255,255,0.05)" }}>
                 {browserActionLabel(session.lastAction)}
@@ -146,7 +148,7 @@ export function BrowserSessionCard({
           {notice && <div className="mt-2 inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[11px]" style={noticeStyle}>{notice.text}</div>}
 
           {artifact && (
-            <div className="animate-content-fade interactive-preview-panel mt-3 rounded-2xl border px-3 py-2.5" style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
+            <div className={`animate-content-fade interactive-preview-panel mt-3 border ${compact ? "rounded-[16px] px-2.5 py-2" : "rounded-2xl px-3 py-2.5"}`} style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.06)" }}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>{t("browser.latest")}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
                 {artifact.action && <span className="rounded-full px-2 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(artifact.action)}</span>}
@@ -162,7 +164,7 @@ export function BrowserSessionCard({
                   {artifact.url && <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{artifact.url}</div>}
                 </div>
               )}
-              {artifact.preview && <div className="mt-2 rounded-2xl px-3 py-2 text-xs leading-6" style={{ background: "rgba(15,23,42,0.35)", color: "var(--yunque-text-secondary)" }}>{artifact.preview}</div>}
+              {!compact && artifact.preview && <div className="mt-2 rounded-2xl px-3 py-2 text-xs leading-6" style={{ background: "rgba(15,23,42,0.35)", color: "var(--yunque-text-secondary)" }}>{artifact.preview}</div>}
               {(artifact.suggestedCommand || artifact.url) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {artifact.suggestedCommand && onSuggestCommand && (
@@ -180,14 +182,14 @@ export function BrowserSessionCard({
             </div>
           )}
 
-          {traceEvents && traceEvents.length > 0 && (
+          {!compact && traceEvents && traceEvents.length > 0 && (
             <div className="mt-3">
               <ExecutionTrace events={traceEvents} />
             </div>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+        <div className={`flex flex-wrap items-center ${compact ? "gap-1.5" : "gap-2"} md:justify-end`}>
           <Button
             size="sm"
             variant="ghost"
