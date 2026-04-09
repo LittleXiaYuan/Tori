@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Spinner } from "@heroui/react";
+import { useI18n } from "@/lib/i18n";
 
 const PUBLIC_PATHS = ["/login", "/setup"];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useI18n();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (PUBLIC_PATHS.some((p) => pathname?.startsWith(p))) {
+    if (PUBLIC_PATHS.some((path) => pathname?.startsWith(path))) {
       setChecking(false);
       return;
     }
@@ -23,33 +25,39 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Validate token with backend
+    const controller = new AbortController();
+    setChecking(true);
+
     fetch("/v1/auth/status", {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
-        if (!data.authenticated) {
+        if (!data?.authenticated) {
           localStorage.removeItem("yunque_token");
           router.replace("/login");
-        } else {
-          setChecking(false);
+          return;
         }
+        setChecking(false);
       })
-      .catch(() => {
-        // If backend is down, allow access with existing token
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
         setChecking(false);
       });
+
+    return () => controller.abort();
   }, [pathname, router]);
 
-  if (PUBLIC_PATHS.some((p) => pathname?.startsWith(p))) {
+  if (PUBLIC_PATHS.some((path) => pathname?.startsWith(path))) {
     return <>{children}</>;
   }
 
   if (checking) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: "var(--yunque-bg)" }}>
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ background: "var(--yunque-bg)" }}>
         <Spinner size="lg" />
+        <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("auth.loading")}</div>
       </div>
     );
   }

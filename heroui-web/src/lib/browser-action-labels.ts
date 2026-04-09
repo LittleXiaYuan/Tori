@@ -1,5 +1,5 @@
 const ACTION_LABELS: Record<string, string> = {
-  "bridge/switch-to-tab": "Return to browser tab",
+  "bridge/switch-to-tab": "Return to tab",
   "bridge/takeover": "Hand control to you",
   "bridge/resume": "Resume browser run",
   "/navigate": "Open page",
@@ -38,7 +38,7 @@ export function browserActionPhase(action?: string | null, stage: "start" | "suc
     case "error":
       return `${label} failed`;
     case "handoff":
-      return `${label} and waiting for you`;
+      return `${label}; waiting for you`;
     default:
       return `${label} completed`;
   }

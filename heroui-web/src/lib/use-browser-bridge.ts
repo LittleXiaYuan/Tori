@@ -14,28 +14,16 @@ function buildArtifactPreview(content: unknown) {
 function suggestNextBrowserAction(action: string | undefined, result: any): Pick<BrowserActionArtifactSummary, "suggestedCommand" | "suggestedLabel"> {
   const normalized = action || "";
   if (normalized.includes("mark") || typeof result?.total === "number") {
-    return {
-      suggestedCommand: "/click ",
-      suggestedLabel: "Click a marked element",
-    };
+    return { suggestedCommand: "/click ", suggestedLabel: "Click a marked element" };
   }
   if (normalized.includes("navigate")) {
-    return {
-      suggestedCommand: "/content",
-      suggestedLabel: "Read this page",
-    };
+    return { suggestedCommand: "/content", suggestedLabel: "Read this page" };
   }
   if (normalized.includes("click") || normalized.includes("resume")) {
-    return {
-      suggestedCommand: "/content",
-      suggestedLabel: "Inspect current page",
-    };
+    return { suggestedCommand: "/content", suggestedLabel: "Inspect current page" };
   }
   if (normalized.includes("content")) {
-    return {
-      suggestedCommand: "/mark",
-      suggestedLabel: "Mark interactive elements",
-    };
+    return { suggestedCommand: "/mark", suggestedLabel: "Mark interactive elements" };
   }
   return {};
 }
@@ -52,7 +40,7 @@ function summarizeActionArtifact(action: string | undefined, result: any): Brows
     action,
     url: result.url || result.currentUrl || result.state?.runtimeSession?.currentUrl || "",
     title: result.title || result.state?.runtimeSession?.title || "",
-    elementCount: typeof result.total === "number" ? result.total : (Array.isArray(result.elements) ? result.elements.length : undefined),
+    elementCount: typeof result.total === "number" ? result.total : Array.isArray(result.elements) ? result.elements.length : undefined,
     tabId: result.tabId ?? result.state?.runtimeSession?.currentTabId ?? null,
     hasScreenshot: Boolean(result.screenshot),
     textLength: typeof result.content === "string" ? result.content.length : 0,
@@ -63,13 +51,10 @@ function summarizeActionArtifact(action: string | undefined, result: any): Brows
 }
 
 function actionSuccessText(action: string | undefined) {
-  return action === "bridge/switch-to-tab"
-    ? `?${browserActionLabel(action)}`
-    : action === "bridge/takeover"
-      ? "??????????"
-      : action === "bridge/resume"
-        ? "???????"
-        : `???${browserActionLabel(action)}`;
+  if (action === "bridge/switch-to-tab") return `${browserActionLabel(action)}.`;
+  if (action === "bridge/takeover") return "Browser handed over to you.";
+  if (action === "bridge/resume") return "Browser run resumed.";
+  return `${browserActionLabel(action)} completed.`;
 }
 
 export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
@@ -92,7 +77,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
   const sendBridgeAction = useCallback((type: string, extra: Record<string, unknown> = {}) => {
     if (typeof window === "undefined") return;
     setBridgeActionPending(type);
-    setBridgeNotice({ tone: "info", text: "??????????" });
+    setBridgeNotice({ tone: "info", text: `${browserActionLabel(type)}...` });
     onActionStart?.(type, extra);
     postBridgeMessage(type, extra, `bridge-action-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   }, [onActionStart, postBridgeMessage]);
@@ -121,7 +106,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
         const action = data.payload?.action as string | undefined;
         if (result?.state) setBridgeState(result.state);
         if (result?.ok === false || result?.error) {
-          const message = result?.error || "???????";
+          const message = result?.error || "Browser action failed.";
           setBridgeNotice({ tone: "error", text: message });
           onActionError?.(action, result, message);
         } else {
@@ -135,7 +120,7 @@ export function useBrowserBridge(options: UseBrowserBridgeOptions = {}) {
 
       if (data.type === "bridge/error") {
         setBridgeActionPending(null);
-        const message = data.payload?.error || "???????";
+        const message = data.payload?.error || "Browser action failed.";
         setBridgeNotice({ tone: "error", text: message });
         onActionError?.(undefined, data.payload, message);
       }

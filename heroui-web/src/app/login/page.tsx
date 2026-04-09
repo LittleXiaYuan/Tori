@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Button, TextField, Input, Label, FieldError, Checkbox, Spinner } from "@heroui/react";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { Button, Card, Checkbox, FieldError, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Eye, EyeOff, Shield } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [needsSetup, setNeedsSetup] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const token = localStorage.getItem("yunque_token");
@@ -24,110 +27,159 @@ export default function LoginPage() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const data = await res.json();
-        if (data.authenticated) { router.replace("/"); return; }
-        if (!data.password_set) setNeedsSetup(true);
-      } catch { /* ignore */ }
-      setCheckingAuth(false);
+        if (!mounted) return;
+        if (data?.authenticated) {
+          router.replace("/");
+          return;
+        }
+        setNeedsSetup(!data?.password_set);
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) setCheckingAuth(false);
+      }
     })();
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError("");
+
     if (needsSetup) {
-      if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
-      if (password !== confirmPassword) { setError("两次密码不一致"); return; }
-      setLoading(true);
-      try {
+      if (password.length < 8) {
+        setError(t("auth.passwordTooShort"));
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError(t("auth.passwordMismatch"));
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      if (needsSetup) {
         const res = await fetch("/v1/auth/set-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password }),
         });
-        if (!res.ok) { const d = await res.json().catch(() => ({ error: "设置失败" })); setError(d.error); setLoading(false); return; }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data?.error || t("auth.networkError"));
+          return;
+        }
         setNeedsSetup(false);
-        setPassword(""); setConfirmPassword("");
-      } catch { setError("连接失败"); }
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
       const res = await fetch("/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, remember }),
       });
-      if (!res.ok) { const d = await res.json().catch(() => ({ error: "密码错误" })); setError(d.error || "密码错误"); setLoading(false); return; }
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || "Login failed");
+        return;
+      }
       localStorage.setItem("yunque_token", data.token);
       localStorage.removeItem("yunque_api_key");
       router.replace("/");
-    } catch { setError("连接失败，请检查服务是否运行"); }
-    setLoading(false);
+    } catch {
+      setError(t("auth.networkError"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (checkingAuth) {
-    return <div className="fixed inset-0 flex items-center justify-center" style={{ background: "var(--yunque-bg)" }}><Spinner size="lg" /></div>;
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3" style={{ background: "var(--yunque-bg)" }}>
+        <Spinner size="lg" />
+        <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("auth.loading")}</div>
+      </div>
+    );
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center" style={{ background: "var(--yunque-bg)" }}>
-      {/* Subtle radial glow behind the card */}
+    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ background: "var(--yunque-bg)" }}>
       <div
-        className="absolute pointer-events-none"
+        className="pointer-events-none absolute"
         style={{
-          width: 480, height: 480,
+          width: 480,
+          height: 480,
           borderRadius: "50%",
           background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)",
           filter: "blur(40px)",
         }}
       />
-      <Card className="section-card w-full max-w-[400px] animate-scale-in relative">
+      <Card className="section-card relative w-full max-w-[420px] animate-scale-in">
         <Card.Header className="flex flex-col items-center gap-4 pt-10 pb-4">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center transition-transform duration-300 hover:scale-110"
+            className="flex h-16 w-16 items-center justify-center rounded-2xl"
             style={{
               background: "var(--yunque-accent)",
-              boxShadow: "0 0 32px rgba(59,130,246,0.3), 0 0 8px rgba(59,130,246,0.2)",
+              boxShadow: "0 0 32px rgba(59,130,246,0.28), 0 0 8px rgba(59,130,246,0.18)",
             }}
           >
-            <Shield size={32} className="text-white" />
+            <Shield size={30} className="text-white" />
           </div>
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-bold" style={{ color: "var(--yunque-text)" }}>
-              {needsSetup ? "设置访问密码" : "登录云雀 Agent"}
-            </h2>
+          <div className="space-y-1 text-center">
+            <h1 className="text-xl font-bold" style={{ color: "var(--yunque-text)" }}>
+              {needsSetup ? t("auth.setupTitle") : t("auth.loginTitle")}
+            </h1>
             <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              {needsSetup ? "首次使用，请设置保护密码" : "输入密码以继续"}
+              {needsSetup ? t("auth.setupSubtitle") : t("auth.loginSubtitle")}
             </p>
           </div>
         </Card.Header>
+
         <Card.Content className="px-8 pb-8">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {error && (
-              <div className="text-xs text-red-400 bg-red-400/10 px-3 py-2.5 rounded-lg animate-fade-in flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse-dot" />
+              <div className="flex items-center gap-2 rounded-lg bg-red-400/10 px-3 py-2.5 text-xs text-red-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                 {error}
               </div>
             )}
 
             <TextField isRequired name="password" type={showPassword ? "text" : "password"} value={password} onChange={setPassword} autoFocus>
-              <Label>密码</Label>
+              <Label>{t("auth.password")}</Label>
               <div className="relative">
-                <Input placeholder="请输入密码" />
-                <Button isIconOnly aria-label="隐藏" variant="ghost" size="sm" onPress={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--yunque-text-muted)" }}>
+                <Input placeholder={t("auth.passwordPlaceholder")} />
+                <Button
+                  isIconOnly
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </Button>
               </div>
             </TextField>
 
             {needsSetup && (
-              <TextField isRequired name="confirm" type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} isInvalid={confirmPassword.length > 0 && password !== confirmPassword}>
-                <Label>确认密码</Label>
-                <Input placeholder="再次输入密码" />
-                {confirmPassword.length > 0 && password !== confirmPassword && (
-                  <FieldError>两次密码不一致</FieldError>
+              <TextField
+                isRequired
+                name="confirm-password"
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                isInvalid={confirmPassword.length > 0 && confirmPassword !== password}
+              >
+                <Label>{t("auth.confirmPassword")}</Label>
+                <Input placeholder={t("auth.confirmPasswordPlaceholder")} />
+                {confirmPassword.length > 0 && confirmPassword !== password && (
+                  <FieldError>{t("auth.passwordMismatch")}</FieldError>
                 )}
               </TextField>
             )}
@@ -138,18 +190,15 @@ export default function LoginPage() {
                   <Checkbox.Indicator />
                 </Checkbox.Control>
                 <Checkbox.Content>
-                  <Label htmlFor="remember-login" className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>记住登录</Label>
+                  <Label htmlFor="remember-login" className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+                    {t("auth.remember")}
+                  </Label>
                 </Checkbox.Content>
               </Checkbox>
             )}
 
-            <Button
-              type="submit"
-              isPending={loading}
-              variant="primary"
-              className="w-full rounded-lg transition-all duration-200 mt-1 btn-accent"
-            >
-              {loading ? <><Spinner size="sm" color="current" /> 请稍候...</> : (needsSetup ? "设置密码" : "登录")}
+            <Button type="submit" isPending={loading} variant="primary" className="btn-accent mt-1 w-full rounded-lg">
+              {loading ? t("auth.submitting") : needsSetup ? t("auth.setupSubmit") : t("auth.submit")}
             </Button>
           </form>
         </Card.Content>
