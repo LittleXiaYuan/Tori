@@ -58,6 +58,7 @@ import (
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
+	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/plugin"
@@ -67,6 +68,11 @@ import (
 type ctxKeyType string
 
 const ctxKeyReqID ctxKeyType = "req_id"
+
+type documentParser interface {
+	Enabled() bool
+	ParseFile(ctx context.Context, filePath string) (*mineru.ParseResult, error)
+}
 
 // RequestID extracts the request ID from context.
 func RequestID(ctx context.Context) string {
@@ -78,86 +84,89 @@ func RequestID(ctx context.Context) string {
 
 // Gateway is the HTTP API server for the agent.
 type Gateway struct {
-	planner          *planner.Planner
-	tenants          *tenant.Manager
-	memory           *memory.Manager
-	registry         *skills.Registry
-	scheduler        *scheduler.Scheduler
-	convStore        *session.Store
-	pluginReg        *plugin.Registry
-	feishuAPI        *channel.FeishuAPI
-	learning         *reflectpkg.LearningLoop
-	limiter          *RateLimiter
-	jwtCfg           *JWTConfig
-	passwordStore    *PasswordStore
-	usage            *UsageTracker
-	metrics          *observe.Metrics
-	pipeline         *memory.Pipeline
-	persona          *persona.Persona
-	personaChain     *persona.PriorityChain
-	heartbeat        *heartbeat.Service
-	inbox            *inbox.Store
-	botMgr           *bots.Manager
-	searchReg        *websearch.Registry
-	smartRouter      *router.Router
-	identityRes      *identity.Resolver
-	healer           *selfheal.Healer
-	lifecycle        *selfheal.Lifecycle
-	costTracker      *costtrack.Tracker
-	forkTree         *session.ForkTree
-	forkPersister    *session.ForkPersister
-	embedResolver    *embeddings.Resolver
-	subagentMgr      *subagent.Manager
-	handoffReg       *subagent.HandoffRegistry
-	orchestrator     *memory.Orchestrator
-	zhGuard          *guardrails.Pipeline
-	adaptiveLoop     *adaptive.Loop
-	auditChain       *audit.Chain
-	skillMarket      *skillmarket.Market
-	fedHub           *federation.Hub
-	fedBridge        *federation.OPPBridge // OPP v3 bridge (model-aware federation)
-	fedTransport     *federation.Transport // federation HTTP transport
-	knowledgeStore   *knowledge.Store
-	cronMgr          *cron.Manager
-	toolsMgr         *tools.ProcessManager
-	runtimePool      *agentrt.Pool
-	bindingRouter    *agentrt.Router
-	toolGuard        *guardrails.ToolGuard
-	egressGuard      *guardrails.EgressGuard
-	skillInstaller   *skillmarket.Installer
-	skillPolicy      *skillmarket.SecurityPolicy
-	clawHub          *skillmarket.ClawHubProvider
-	toriHub          *skillmarket.ToriHubProvider
-	pluginLoader     *plugin.Loader
-	iterateEngine    *iterate.Engine
-	trustTracker     *trust.Tracker
-	distiller        *distill.Distiller
-	reviewGate       *review.Gate
-	skillGrow        *skillgrow.Detector
-	auditTrail       *audit.Trail
-	providerReg      *llm.ProviderRegistry
-	speechReg        *speech.Registry
-	emotionAnalyzer  *emotion.Analyzer
-	emotionHistory   *emotion.History
-	stickerMap       *emotion.StickerMap
-	stickerCollector *emotion.StickerCollector
-	channelReg       *channel.Registry
-	emotionShift     *planner.EmotionShiftDetector // event-driven Reverie trigger
-	factHook         *planner.FactEventHook        // event-driven Reverie trigger on high-value facts
-	modeManager      *modes.ModeManager            // persona mode management
-	reverie          *planner.Reverie              // Reverie inner monologue system (for API access)
-	taskStore        task.Store                    // task runtime persistence
-	taskRunner       *task.Runner                  // task execution engine
-	gapAnalyzer      *task.GapAnalyzer             // capability gap detection
-	stateKernel      *state.Kernel                 // structured state kernel
-	experienceStore  *reflectpkg.ExperienceStore   // reflection experience store
-	templateStore    *task.TemplateStore           // task template store
-	workMemMgr       *task.WorkingMemoryManager    // task working memory
-	threadMgr        *task.ThreadManager           // task thread manager
-	triggerRT        *trigger.Runtime              // trigger runtime (legacy)
-	triggerMgr       *trigger.Manager              // unified trigger manager
-	preAckEmojis     []string                      // emoji list for pre-ack reactions (e.g., ["👍","🤔","💡"])
-	allowedOrigins   []string
+	planner              *planner.Planner
+	tenants              *tenant.Manager
+	memory               *memory.Manager
+	registry             *skills.Registry
+	scheduler            *scheduler.Scheduler
+	convStore            *session.Store
+	pluginReg            *plugin.Registry
+	feishuAPI            *channel.FeishuAPI
+	learning             *reflectpkg.LearningLoop
+	limiter              *RateLimiter
+	jwtCfg               *JWTConfig
+	passwordStore        *PasswordStore
+	usage                *UsageTracker
+	metrics              *observe.Metrics
+	pipeline             *memory.Pipeline
+	persona              *persona.Persona
+	personaChain         *persona.PriorityChain
+	heartbeat            *heartbeat.Service
+	inbox                *inbox.Store
+	botMgr               *bots.Manager
+	searchReg            *websearch.Registry
+	smartRouter          *router.Router
+	identityRes          *identity.Resolver
+	healer               *selfheal.Healer
+	lifecycle            *selfheal.Lifecycle
+	costTracker          *costtrack.Tracker
+	forkTree             *session.ForkTree
+	forkPersister        *session.ForkPersister
+	embedResolver        *embeddings.Resolver
+	subagentMgr          *subagent.Manager
+	handoffReg           *subagent.HandoffRegistry
+	orchestrator         *memory.Orchestrator
+	zhGuard              *guardrails.Pipeline
+	adaptiveLoop         *adaptive.Loop
+	auditChain           *audit.Chain
+	skillMarket          *skillmarket.Market
+	fedHub               *federation.Hub
+	fedBridge            *federation.OPPBridge // OPP v3 bridge (model-aware federation)
+	fedTransport         *federation.Transport // federation HTTP transport
+	knowledgeStore       *knowledge.Store
+	cronMgr              *cron.Manager
+	toolsMgr             *tools.ProcessManager
+	runtimePool          *agentrt.Pool
+	bindingRouter        *agentrt.Router
+	toolGuard            *guardrails.ToolGuard
+	egressGuard          *guardrails.EgressGuard
+	skillInstaller       *skillmarket.Installer
+	skillPolicy          *skillmarket.SecurityPolicy
+	clawHub              *skillmarket.ClawHubProvider
+	toriHub              *skillmarket.ToriHubProvider
+	pluginLoader         *plugin.Loader
+	iterateEngine        *iterate.Engine
+	trustTracker         *trust.Tracker
+	distiller            *distill.Distiller
+	reviewGate           *review.Gate
+	skillGrow            *skillgrow.Detector
+	auditTrail           *audit.Trail
+	providerReg          *llm.ProviderRegistry
+	speechReg            *speech.Registry
+	emotionAnalyzer      *emotion.Analyzer
+	emotionHistory       *emotion.History
+	stickerMap           *emotion.StickerMap
+	stickerCollector     *emotion.StickerCollector
+	channelReg           *channel.Registry
+	emotionShift         *planner.EmotionShiftDetector // event-driven Reverie trigger
+	factHook             *planner.FactEventHook        // event-driven Reverie trigger on high-value facts
+	skillSuggester       *memory.SkillSuggester        // auto skill suggestion from conversations
+	pendingSuggestions   map[string][]memory.SkillSuggestion
+	pendingSuggestionsMu sync.Mutex
+	modeManager          *modes.ModeManager          // persona mode management
+	reverie              *planner.Reverie            // Reverie inner monologue system (for API access)
+	taskStore            task.Store                  // task runtime persistence
+	taskRunner           *task.Runner                // task execution engine
+	gapAnalyzer          *task.GapAnalyzer           // capability gap detection
+	stateKernel          *state.Kernel               // structured state kernel
+	experienceStore      *reflectpkg.ExperienceStore // reflection experience store
+	templateStore        *task.TemplateStore         // task template store
+	workMemMgr           *task.WorkingMemoryManager  // task working memory
+	threadMgr            *task.ThreadManager         // task thread manager
+	triggerRT            *trigger.Runtime            // trigger runtime (legacy)
+	triggerMgr           *trigger.Manager            // unified trigger manager
+	preAckEmojis         []string                    // emoji list for pre-ack reactions (e.g., ["👍","🤔","💡"])
+	allowedOrigins       []string
 
 	// Workflow Engine
 	workflowStore  workflow.Store
@@ -183,11 +192,12 @@ type Gateway struct {
 	lastPlanCache *sync.Map
 
 	// Browser Extension Hub (replaces headless browser engine)
-	browserHub *BrowserHub
+	browserHub      *BrowserHub
 	browserSessions *BrowserSessionStore
 
 	// Connector Registry (GitHub, Gmail, Calendar, etc.)
-	connectorReg *connectors.Registry
+	connectorReg   *connectors.Registry
+	documentParser documentParser
 
 	notifier *notify.Notifier
 

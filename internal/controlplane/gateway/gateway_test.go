@@ -14,6 +14,7 @@ import (
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/scheduler"
+	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -156,5 +157,63 @@ func TestBuildKnowledgeImportTree(t *testing.T) {
 	}
 	if len(tree.Children[0].Children) != 1 || tree.Children[0].Children[0].Title != "Startup" {
 		t.Fatal("expected nested Startup child")
+	}
+}
+
+type stubDocumentParser struct {
+	enabled bool
+	result  *mineru.ParseResult
+	err     error
+}
+
+func (s stubDocumentParser) Enabled() bool { return s.enabled }
+
+func (s stubDocumentParser) ParseFile(ctx context.Context, filePath string) (*mineru.ParseResult, error) {
+	return s.result, s.err
+}
+
+func TestIsMinerUSupportedExt(t *testing.T) {
+	for _, ext := range []string{".pdf", ".docx", ".pptx", ".png", ".jpeg", ".tiff"} {
+		if !isMinerUSupportedExt(ext) {
+			t.Fatalf("expected supported ext: %s", ext)
+		}
+	}
+	for _, ext := range []string{".txt", ".md", ".zip", ""} {
+		if isMinerUSupportedExt(ext) {
+			t.Fatalf("expected unsupported ext: %s", ext)
+		}
+	}
+}
+
+func TestIngestKnowledgeWithMinerU(t *testing.T) {
+	g := &Gateway{
+		knowledgeStore: knowledge.NewStore(200),
+		documentParser: stubDocumentParser{
+			enabled: true,
+			result:  &mineru.ParseResult{Backend: "cli", Markdown: "# Parsed\n\nHello MinerU", JSON: `{}`},
+		},
+	}
+
+	res, err := g.ingestKnowledgeWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res == nil || res.Source == nil {
+		t.Fatal("expected knowledge source")
+	}
+	if res.Source.Name != "demo.md" {
+		t.Fatalf("expected converted markdown source name, got %s", res.Source.Name)
+	}
+	if res.Source.Path != "demo.pdf" {
+		t.Fatalf("expected original path recorded, got %s", res.Source.Path)
+	}
+	if res.Parse["parser"] != "mineru" {
+		t.Fatalf("expected parser metadata, got %#v", res.Parse)
+	}
+	if got := res.Parse["has_layout_json"]; got != true {
+		t.Fatalf("expected layout json metadata, got %#v", got)
+	}
+	if len(g.knowledgeStore.Sources()) != 1 {
+		t.Fatalf("expected source ingested, got %d", len(g.knowledgeStore.Sources()))
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/knowledge"
+	"yunque-agent/pkg/safego"
 )
 
 var (
@@ -106,12 +108,27 @@ func (g *Gateway) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	var src any
-	switch ext {
-	case ".txt", ".md":
+	var (
+		src       any
+		parseMeta map[string]any
+	)
+	switch {
+	case ext == ".txt" || ext == ".md":
 		src, err = g.knowledgeStore.IngestText(header.Filename, string(data))
+	case isMinerUSupportedExt(ext):
+		if g.documentParser == nil || !g.documentParser.Enabled() {
+			json.NewEncoder(w).Encode(map[string]string{"error": "unsupported format: " + ext + " (enable MinerU to parse this file type)"})
+			return
+		}
+		parseResult, parseErr := g.ingestKnowledgeWithMinerU(r.Context(), header.Filename, data)
+		if parseErr != nil {
+			json.NewEncoder(w).Encode(map[string]string{"error": parseErr.Error()})
+			return
+		}
+		src = parseResult.Source
+		parseMeta = parseResult.Response()
 	default:
-		json.NewEncoder(w).Encode(map[string]string{"error": "unsupported format: " + ext + " (use .txt, .md)"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "unsupported format: " + ext + " (use .txt, .md or enable MinerU for PDF/Office/image files)"})
 		return
 	}
 	if err != nil {
@@ -120,13 +137,94 @@ func (g *Gateway) handleKBUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Rebuild semantic index in background
-	go func() {
+	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after upload failed", "err", err)
 		}
-	}()
+	})
 
-	json.NewEncoder(w).Encode(map[string]any{"source": src, "stats": g.knowledgeStore.Stats()})
+	resp := map[string]any{"source": src, "stats": g.knowledgeStore.Stats()}
+	if parseMeta != nil {
+		resp["parse"] = parseMeta
+	}
+	json.NewEncoder(w).Encode(resp)
+}
+
+type mineruKnowledgeIngestResult struct {
+	Source *knowledge.Source
+	Parse  map[string]any
+}
+
+func (r *mineruKnowledgeIngestResult) Response() map[string]any {
+	if r == nil {
+		return nil
+	}
+	return r.Parse
+}
+
+func (g *Gateway) ingestKnowledgeWithMinerU(ctx context.Context, filename string, data []byte) (*mineruKnowledgeIngestResult, error) {
+	if g.documentParser == nil || !g.documentParser.Enabled() {
+		return nil, fmt.Errorf("MinerU is not enabled")
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("uploaded file is empty")
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	tmpFile, err := os.CreateTemp("", "yunque-mineru-*"+ext)
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("close temp file: %w", err)
+	}
+
+	result, err := g.documentParser.ParseFile(ctx, tmpPath)
+	if err != nil {
+		return nil, err
+	}
+	markdown := strings.TrimSpace(result.Markdown)
+	if markdown == "" {
+		return nil, fmt.Errorf("MinerU did not return markdown content")
+	}
+
+	name := filename
+	if ext != "" {
+		name = strings.TrimSuffix(filename, ext) + ".md"
+	}
+	src, err := g.knowledgeStore.IngestText(name, markdown)
+	if err != nil {
+		return nil, err
+	}
+	if src != nil {
+		src.Type = knowledge.SourceFile
+		src.Path = filename
+	}
+
+	return &mineruKnowledgeIngestResult{
+		Source: src,
+		Parse: map[string]any{
+			"parser":          "mineru",
+			"backend":         result.Backend,
+			"markdown_chars":  len(markdown),
+			"has_layout_json": strings.TrimSpace(result.JSON) != "",
+		},
+	}, nil
+}
+
+func isMinerUSupportedExt(ext string) bool {
+	switch strings.ToLower(strings.TrimSpace(ext)) {
+	case ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff":
+		return true
+	default:
+		return false
+	}
 }
 
 // handleKBIngest handles direct text ingestion.
@@ -155,11 +253,11 @@ func (g *Gateway) handleKBIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
+	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after ingest failed", "err", err)
 		}
-	}()
+	})
 
 	json.NewEncoder(w).Encode(map[string]any{"source": src, "stats": g.knowledgeStore.Stats()})
 }
@@ -220,11 +318,11 @@ func (g *Gateway) handleKBImportURL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	go func() {
+	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after import-url failed", "err", err)
 		}
-	}()
+	})
 
 	json.NewEncoder(w).Encode(map[string]any{"source": src, "sources": imported, "imported": len(imported), "tree": buildKnowledgeImportTree(page, imported), "stats": g.knowledgeStore.Stats()})
 }
@@ -250,11 +348,11 @@ func (g *Gateway) handleKBImportRepo(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
-	go func() {
+	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after import-repo failed", "err", err)
 		}
-	}()
+	})
 	json.NewEncoder(w).Encode(map[string]any{"source": src, "stats": g.knowledgeStore.Stats()})
 }
 
@@ -277,11 +375,11 @@ func (g *Gateway) handleKBDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
+	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after delete failed", "err", err)
 		}
-	}()
+	})
 
 	json.NewEncoder(w).Encode(map[string]any{"deleted": sourceID, "stats": g.knowledgeStore.Stats()})
 }
