@@ -1242,13 +1242,13 @@ export default function ChatPage() {
           ) : (
             <div className="max-w-4xl mx-auto space-y-5">
               {chat.messages.map((msg, idx) => (
-                <div key={msg.id} className={`group chat-message-row flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
+                <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
                     <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: "var(--yunque-accent)" }}>
                       <Avatar.Fallback className="text-white text-xs font-bold">Y</Avatar.Fallback>
                     </Avatar>
                   )}
-                  <div className={`chat-message-stack max-w-[78%] ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
+                  <div className={`chat-message-stack max-w-[74%] xl:max-w-[72%] ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
                     {/* Step summary (compact, replaces full trace in chat) */}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
                       const isLive = chat.streaming && msg.id === chat.messages[chat.messages.length - 1]?.id;
@@ -1264,7 +1264,7 @@ export default function ChatPage() {
                       });
                       return (
                         <>
-                          <div className="chat-inline-panel mb-2 rounded-[18px] border px-3 py-3" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
+                          <div className="chat-inline-panel mb-2 rounded-[16px] border px-2.5 py-2.5" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                               <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
                                 {isLive ? "运行中" : "已完成"}
@@ -1306,7 +1306,7 @@ export default function ChatPage() {
                             const uniqueSkills = [...new Set(toolEvents.map(e => e.meta?.skill).filter(Boolean))];
                             const lastSkill = toolEvents[toolEvents.length - 1]?.meta?.skill || "";
                             return (
-                              <div className="chat-inline-panel mb-2 flex items-center gap-2 text-[11px] rounded-lg px-3 py-1.5"
+                              <div className="chat-inline-panel mb-2 flex items-center gap-2 rounded-[14px] px-2.5 py-1.5 text-[10px]"
                                 style={{ background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-muted)" }}>
                                 {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
                                 <span>
@@ -1324,16 +1324,16 @@ export default function ChatPage() {
                       );
                     })()}
                     <div
-                      className={`chat-message-card px-4 py-3 rounded-[22px] text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}`}
+                      className={`chat-message-card px-3.5 py-2.5 rounded-[18px] text-[14px] leading-7 whitespace-pre-wrap ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}`}
                       style={{
                         background: msg.role === "user"
-                          ? "linear-gradient(180deg, rgba(59,130,246,0.96), rgba(37,99,235,0.92))"
-                          : "linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015)), var(--yunque-card)",
+                          ? "linear-gradient(180deg, rgba(59,130,246,0.9), rgba(37,99,235,0.86))"
+                          : "linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.008)), var(--yunque-card)",
                         color: msg.role === "user" ? "#fff" : "var(--yunque-text)",
-                        border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(59,130,246,0.16)",
-                        borderBottomRightRadius: msg.role === "user" ? "6px" : undefined,
-                        borderBottomLeftRadius: msg.role === "assistant" ? "6px" : undefined,
-                        boxShadow: msg.role === "assistant" ? "0 14px 34px rgba(0,0,0,0.18)" : "0 14px 28px rgba(37,99,235,0.18)",
+                        border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(59,130,246,0.12)",
+                        borderBottomRightRadius: msg.role === "user" ? "8px" : undefined,
+                        borderBottomLeftRadius: msg.role === "assistant" ? "8px" : undefined,
+                        boxShadow: msg.role === "assistant" ? "0 8px 22px rgba(0,0,0,0.14)" : "0 8px 20px rgba(37,99,235,0.14)",
                       }}
                     >
                       {msg.role === "user" && msg.images && msg.images.length > 0 && (
@@ -1345,7 +1345,7 @@ export default function ChatPage() {
                         </div>
                       )}
                       {msg.role === "assistant" && msg.reasoning && (
-                        <details className="mb-2" open={chat.streaming && idx === chat.messages.length - 1} style={{ fontSize: "var(--text-sm)" }}>
+                        <details className="mb-2" open={false} style={{ fontSize: "var(--text-sm)" }}>
                           <summary style={{ cursor: "pointer", color: "var(--yunque-text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
                             <span style={{ fontSize: "var(--text-xs)", background: "rgba(245,158,11,0.12)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4 }}>
                               {chat.streaming && idx === chat.messages.length - 1 ? "推理中…" : "推理过程"}
@@ -1385,7 +1385,7 @@ export default function ChatPage() {
                     )}
                     {/* Agent action buttons */}
                     {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
-                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[16px] border p-2.5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Suggested actions
                         </div>
@@ -1393,7 +1393,7 @@ export default function ChatPage() {
                       </div>
                     )}
                     {msg.role === "assistant" && msg.browserSummary && (
-                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[16px] border p-2.5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Browser artifact
                         </div>
@@ -1469,7 +1469,7 @@ export default function ChatPage() {
                       const files = collectGeneratedFiles(msg.traceEvents);
                       if (files.length === 0) return null;
                       return (
-                        <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                        <div className="chat-inline-panel mt-3 rounded-[16px] border p-2.5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                           <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                             Generated files
                           </div>
@@ -1508,7 +1508,7 @@ export default function ChatPage() {
                     })()}
                     {/* Follow-up suggestions */}
                     {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !chat.streaming && (
-                      <div className="chat-inline-panel mt-3 rounded-[20px] border p-3" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                      <div className="chat-inline-panel mt-3 rounded-[16px] border p-2.5" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
                         <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           Next moves
                         </div>
@@ -1534,9 +1534,12 @@ export default function ChatPage() {
                       </div>
                     )}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
-                      <div className="mt-3">
-                        <ExecutionTrace events={msg.traceEvents} isLive={chat.streaming && idx === chat.messages.length - 1} />
-                      </div>
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>Execution trace</summary>
+                        <div className="mt-2">
+                          <ExecutionTrace events={msg.traceEvents} isLive={chat.streaming && idx === chat.messages.length - 1} />
+                        </div>
+                      </details>
                     )}
                     {msg.content && (
                       <div className="chat-message-tools flex gap-0.5 mt-1" style={{ justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>

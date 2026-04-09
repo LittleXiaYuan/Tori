@@ -162,15 +162,15 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="absolute inset-y-0 right-0 flex w-full justify-end">
+      <div className="absolute inset-0 flex items-start justify-end p-3 md:p-5">
         <div
-          className="animate-drawer-panel flex h-full w-full max-w-[860px] flex-col border-l border-white/10 shadow-2xl"
-          style={{ background: "linear-gradient(180deg, rgba(17,24,39,0.96), rgba(9,9,11,0.98))" }}
+          className="animate-command-panel mt-12 flex h-[min(78vh,760px)] w-full max-w-[620px] flex-col overflow-hidden rounded-[24px] border border-white/10 shadow-2xl"
+          style={{ background: "linear-gradient(180deg, rgba(17,24,39,0.96), rgba(9,9,11,0.98))", backdropFilter: "blur(18px)" }}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
+          <div className="flex items-start justify-between gap-4 border-b border-white/8 px-4 py-3.5">
             <div className="min-w-0">
-              <h2 className="text-xl font-semibold">{t("connector.title")}</h2>
-              <p className="mt-1 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+              <h2 className="text-lg font-semibold">{t("connector.title")}</h2>
+              <p className="mt-1 text-[13px]" style={{ color: "var(--yunque-text-secondary)" }}>
                 {t("connector.subtitle")}
               </p>
             </div>
@@ -185,9 +185,9 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                 <Spinner size="lg" />
               </div>
             ) : (
-              <div className="grid h-full min-h-0 grid-cols-[320px_1fr]">
-                <div className="min-w-0 border-r border-white/8 p-4">
-                  <div className="mb-3 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/4 px-3 py-2">
+              <div className="grid h-full min-h-0 grid-cols-[240px_1fr]">
+                <div className="min-w-0 border-r border-white/8 p-3">
+                  <div className="mb-3 flex items-center gap-2 rounded-[16px] border border-white/8 bg-white/4 px-3 py-2">
                     <Search size={15} style={{ color: "var(--yunque-text-muted)" }} />
                     <Input
                       aria-label={t("connector.search")}
@@ -202,7 +202,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedId(null)}
-                    className="interactive-list-item mb-3 flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors"
+                    className="interactive-list-item mb-3 flex w-full items-center gap-3 rounded-[16px] border px-3 py-2.5 text-left transition-colors"
                     style={{
                       background: browserState ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
                       borderColor: browserState ? "rgba(34,197,94,0.22)" : "rgba(255,255,255,0.08)",
@@ -247,16 +247,16 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                   </ListBox>
                 </div>
 
-                <div className="animate-content-fade min-h-0 overflow-y-auto p-5">
+                <div className="animate-content-fade min-h-0 overflow-y-auto p-4">
                   {selected ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       <div className="flex items-start gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-[20px]" style={{ background: tone.bg, color: tone.text }}>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-[16px]" style={{ background: tone.bg, color: tone.text }}>
                           <SelectedIcon size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">{selected.name}</h3>
+                            <h3 className="text-[16px] font-semibold">{selected.name}</h3>
                             <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: tone.bg, color: tone.text }}>
                               {tone.label}
                             </span>
@@ -267,7 +267,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/8 bg-white/3 p-4">
+                      <div className="rounded-[18px] border border-white/8 bg-white/3 p-3.5">
                         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           <ShieldCheck size={12} />
                           Connection status
@@ -283,7 +283,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                             {busy === selected.id ? "Disconnecting..." : t("connector.disconnect")}
                           </Button>
                         ) : (
-                          <div className="mt-4 flex items-end gap-3">
+                          <div className="mt-3 flex items-end gap-2.5">
                             <div className="flex-1">
                               <Input
                                 type="password"
@@ -300,7 +300,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                         )}
                       </div>
 
-                      <div className="rounded-2xl border border-white/8 bg-white/3 p-4">
+                      <div className="rounded-[18px] border border-white/8 bg-white/3 p-3.5">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                             {t("connector.actions")}
@@ -316,9 +316,9 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                             Loading actions...
                           </div>
                         ) : selectedActions.length > 0 ? (
-                          <div className="grid gap-2 md:grid-cols-2">
+                          <div className="grid gap-2">
                             {selectedActions.slice(0, 6).map((action) => (
-                              <div key={action.id} className="rounded-2xl border border-white/8 bg-white/2 p-3">
+                              <div key={action.id} className="rounded-[16px] border border-white/8 bg-white/2 p-2.5">
                                 <div className="text-sm font-medium break-words">{action.name}</div>
                                 <div className="mt-1 text-xs leading-5 break-words" style={{ color: "var(--yunque-text-secondary)" }}>
                                   {action.description}
@@ -338,7 +338,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
+                    <div className="rounded-[18px] border border-white/8 bg-white/3 p-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/6">
                           <Monitor size={20} style={{ color: browserState ? "#22c55e" : "var(--yunque-text-secondary)" }} />
