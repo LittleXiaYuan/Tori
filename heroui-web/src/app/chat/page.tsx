@@ -157,14 +157,14 @@ function parseSlashBrowserCommand(input: string) {
   const cmd = cmdRaw.toLowerCase();
   const args = restParts.join(" ").trim();
   const browserCommands: Record<string, { summary: string }> = {
-    "/navigate": { summary: args ? `???????${args}` : "????????" },
-    "/screenshot": { summary: "????????" },
-    "/content": { summary: "??????????" },
-    "/mark": { summary: "??????????" },
-    "/unmark": { summary: "????????" },
-    "/scroll": { summary: args ? `???????${args}` : "??????" },
-    "/click": { summary: args ? `???????${args}` : "????????" },
-    "/type": { summary: args ? `???????${args.slice(0, 32)}` : "??????" },
+    "/navigate": { summary: args ? `Open page: ${args}` : "Open page" },
+    "/screenshot": { summary: "Capture page" },
+    "/content": { summary: "Read page content" },
+    "/mark": { summary: "Mark page elements" },
+    "/unmark": { summary: "Clear marked elements" },
+    "/scroll": { summary: args ? `Scroll page: ${args}` : "Scroll page" },
+    "/click": { summary: args ? `Click target: ${args}` : "Click element" },
+    "/type": { summary: args ? `Type input: ${args.slice(0, 32)}` : "Type input" },
   };
   if (!browserCommands[cmd]) return null;
   return { command: cmd, args, ...browserCommands[cmd] };
@@ -1626,7 +1626,7 @@ export default function ChatPage() {
                 />
                 {(showSlashMenu || activeSlashCommand) && (
                   <div className="slash-trigger-pill pointer-events-none absolute left-5 top-0 flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)", boxShadow: "0 8px 24px rgba(59,130,246,0.12)" }}>
-                    <span>{showSlashMenu ? "????" : "Slash command"}</span>
+                    <span>{showSlashMenu ? "Command menu" : "Slash command"}</span>
                     {activeSlashCommand && (
                       <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,0.12)", color: "var(--yunque-text)" }}>
                         /{activeSlashCommand}

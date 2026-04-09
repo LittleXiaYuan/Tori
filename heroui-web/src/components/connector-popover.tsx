@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button, Drawer, Input, ListBox, Label, Description, Spinner } from "@heroui/react";
 import { api } from "@/lib/api";
 import type { ConnectorView, ConnectorDef } from "@/lib/api-types";
+import { useI18n } from "@/lib/i18n";
 import {
   GitBranch,
   Mail,
@@ -39,17 +40,18 @@ interface Props {
 function statusTone(status: ConnectorView["status"]) {
   switch (status) {
     case "connected":
-      return { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.24)", text: "#22c55e", label: "已连接" };
+      return { bg: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.24)", text: "#22c55e", label: "Connected" };
     case "connecting":
-      return { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.24)", text: "#60a5fa", label: "连接中" };
+      return { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.24)", text: "#60a5fa", label: "Connecting" };
     case "error":
-      return { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.24)", text: "#f87171", label: "需处理" };
+      return { bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.24)", text: "#f87171", label: "Needs attention" };
     default:
-      return { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.08)", text: "var(--yunque-text-muted)", label: "未连接" };
+      return { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.08)", text: "var(--yunque-text-muted)", label: "Disconnected" };
   }
 }
 
 export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
+  const { t } = useI18n();
   const [connectors, setConnectors] = useState<ConnectorView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConnectorDef | null>(null);
@@ -134,18 +136,18 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()} variant="blur">
-      <Drawer.Content placement="right" className="max-w-[760px]">
+      <Drawer.Content placement="right" className="max-w-[860px]">
         <Drawer.Dialog
-          aria-label="连接器"
+          aria-label={t("connector.title")}
           className="animate-drawer-panel h-full border-l border-white/10"
           style={{ background: "linear-gradient(180deg, rgba(17,24,39,0.96), rgba(9,9,11,0.98))" }}
         >
           <Drawer.CloseTrigger />
           <Drawer.Header className="border-b border-white/8 pb-4">
             <div className="w-full">
-              <Drawer.Heading className="text-xl font-semibold">连接器</Drawer.Heading>
+              <Drawer.Heading className="text-xl font-semibold">{t("connector.title")}</Drawer.Heading>
               <p className="mt-1 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-                连接外部工具，让 Agent 在聊天里直接读取真实上下文。
+                {t("connector.subtitle")}
               </p>
             </div>
           </Drawer.Header>
@@ -156,14 +158,14 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                 <Spinner size="lg" />
               </div>
             ) : (
-              <div className="grid h-full min-h-0 grid-cols-[280px_1fr]">
-                <div className="border-r border-white/8 p-4">
+              <div className="grid h-full min-h-0 grid-cols-[320px_1fr]">
+                <div className="min-w-0 border-r border-white/8 p-4">
                   <div className="mb-3 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/4 px-3 py-2">
                     <Search size={15} style={{ color: "var(--yunque-text-muted)" }} />
                     <Input
-                      aria-label="搜索连接器"
+                      aria-label={t("connector.search")}
                       className="w-full"
-                      placeholder="搜索连接器"
+                      placeholder={t("connector.search")}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       variant="secondary"
@@ -183,14 +185,14 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                       <Monitor size={18} style={{ color: browserState ? "#22c55e" : "var(--yunque-text-secondary)" }} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">我的浏览器</div>
+                      <div className="text-sm font-medium">{t("connector.browser")}</div>
                       <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                        {browserState ? "扩展已连接" : "未连接"}
+                        {browserState ? t("connector.browserConnected") : t("connector.browserDisconnected")}
                       </div>
                     </div>
                   </button>
 
-                  <ListBox aria-label="连接器列表" selectionMode="single" selectionBehavior="replace" selectedKeys={selectedId ? new Set([selectedId]) : new Set()}>
+                  <ListBox aria-label="Connector list" selectionMode="single" selectionBehavior="replace" selectedKeys={selectedId ? new Set([selectedId]) : new Set()}>
                     {filteredConnectors.map((conn) => {
                       const Icon = iconMap[conn.icon] || Plug;
                       const connTone = statusTone(conn.status);
@@ -201,13 +203,13 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                               <Icon size={18} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <Label>{conn.name}</Label>
-                              <Description>{conn.description}</Description>
+                              <Label className="block text-sm font-medium leading-6 break-words">{conn.name}</Label>
+                              <Description className="mt-1 block text-xs leading-6 break-words">{conn.description}</Description>
                               <div className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
                                 <span className="rounded-full px-2 py-0.5" style={{ background: connTone.bg, color: connTone.text }}>
                                   {connTone.label}
                                 </span>
-                                <span>{conn.action_count} 个动作</span>
+                                <span>{conn.action_count} actions</span>
                               </div>
                             </div>
                             {conn.status === "connected" ? <CheckCircle2 size={16} style={{ color: "#22c55e" }} /> : null}
@@ -232,7 +234,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                               {tone.label}
                             </span>
                           </div>
-                          <p className="mt-1 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
+                          <p className="mt-1 text-sm break-words" style={{ color: "var(--yunque-text-secondary)" }}>
                             {selected.description}
                           </p>
                         </div>
@@ -241,31 +243,31 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                       <div className="rounded-2xl border border-white/8 bg-white/3 p-4">
                         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
                           <ShieldCheck size={12} />
-                          连接状态
+                          Connection status
                         </div>
                         <div className="text-sm" style={{ color: selected.status === "connected" ? "#86efac" : "var(--yunque-text-secondary)" }}>
                           {selected.status === "connected"
-                            ? (selected.user_info || "该连接器已可在聊天中直接使用。")
-                            : "连接一次后，Agent 就可以直接从聊天里调用它。"}
+                            ? (selected.user_info || "This connector is ready to use from chat.")
+                            : "Once connected, the agent can call this connector directly from the current thread."}
                         </div>
 
                         {selected.status === "connected" ? (
                           <Button className="mt-4" variant="danger" onPress={() => handleDisconnect(selected.id)}>
-                            {busy === selected.id ? "断开中…" : "断开连接"}
+                            {busy === selected.id ? "Disconnecting..." : t("connector.disconnect")}
                           </Button>
                         ) : (
                           <div className="mt-4 flex items-end gap-3">
                             <div className="flex-1">
                               <Input
                                 type="password"
-                                placeholder={selected.auth_type === "oauth2" ? "粘贴 OAuth Token" : "粘贴 API Token"}
+                                placeholder={selected.auth_type === "oauth2" ? "Paste OAuth token" : "Paste API token"}
                                 value={tokenInput}
                                 onChange={(e) => setTokenInput(e.target.value)}
                                 variant="secondary"
                               />
                             </div>
                             <Button isDisabled={!tokenInput.trim() || busy === selected.id} onPress={() => handleConnect(selected.id)}>
-                              {busy === selected.id ? "连接中…" : "连接"}
+                              {busy === selected.id ? "Connecting..." : t("connector.connect")}
                             </Button>
                           </div>
                         )}
@@ -274,24 +276,24 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                       <div className="rounded-2xl border border-white/8 bg-white/3 p-4">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                            可用动作
+                            {t("connector.actions")}
                           </div>
                           <span className="rounded-full bg-white/6 px-2 py-0.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                            {selected.action_count} 个
+                            {selected.action_count}
                           </span>
                         </div>
 
                         {detailLoading ? (
                           <div className="flex items-center gap-2 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
                             <Spinner size="sm" />
-                            正在加载动作…
+                            Loading actions...
                           </div>
                         ) : selectedActions.length > 0 ? (
                           <div className="grid gap-2 md:grid-cols-2">
                             {selectedActions.slice(0, 6).map((action) => (
                               <div key={action.id} className="rounded-2xl border border-white/8 bg-white/2 p-3">
-                                <div className="text-sm font-medium">{action.name}</div>
-                                <div className="mt-1 text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                                <div className="text-sm font-medium break-words">{action.name}</div>
+                                <div className="mt-1 text-xs leading-5 break-words" style={{ color: "var(--yunque-text-secondary)" }}>
                                   {action.description}
                                 </div>
                                 <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/5 px-2 py-1 text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -303,7 +305,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                           </div>
                         ) : (
                           <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-                            暂无动作元数据，但你仍然可以连接并在聊天里调用该连接器。
+                            No action metadata yet, but you can still connect it and call it from chat.
                           </div>
                         )}
                       </div>
@@ -315,9 +317,11 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
                           <Monitor size={20} style={{ color: browserState ? "#22c55e" : "var(--yunque-text-secondary)" }} />
                         </div>
                         <div>
-                          <div className="text-lg font-semibold">我的浏览器</div>
+                          <div className="text-lg font-semibold">{t("connector.browser")}</div>
                           <div className="mt-1 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-                            {browserState ? "浏览器扩展已连接，可以直接执行导航、点击、标记与提取。" : "浏览器扩展尚未连接。"}
+                            {browserState
+                              ? "The browser extension is connected and ready for navigation, marking, clicking, and extraction."
+                              : "The browser extension is not connected yet."}
                           </div>
                         </div>
                       </div>
