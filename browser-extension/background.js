@@ -5,6 +5,7 @@ const CDP_VERSION = "1.3";
 const RECONNECT_DELAY = 3000;
 const SESSION_TIMEOUT = 60000;
 const DEFAULT_WS_URL = "ws://localhost:9090/ws/browser";
+const DEFAULT_TORI_API_BASE = "http://localhost:3000";
 const RUNTIME_STATE_KEY = "yunque_runtime_state";
 const MAX_OUTBOUND_QUEUE = 100;
 
@@ -16,6 +17,7 @@ let outboundQueue = [];
 let lastBroadcastSignature = "";
 let sessions = new Map();   // tabId → { target, lastUsed }
 let connected = false;
+let lastConnectionError = "";
 let runtimeSession = {
   id: null,
   status: "idle",
@@ -27,7 +29,7 @@ let runtimeSession = {
   updatedAt: 0,
 };
 
-function buildWebSocketURL(baseUrl, apiKey) {
+function buildWebSocketURL(baseUrl) {
   try {
     const url = new URL(baseUrl || DEFAULT_WS_URL);
     return url.toString();
@@ -46,48 +48,257 @@ function buildSessionURL(baseUrl) {
   }
 }
 
+function buildToriURL(baseUrl, path) {
+  const normalized = (baseUrl || DEFAULT_TORI_API_BASE).trim().replace(/\/$/, "");
+  return `${normalized}${path}`;
+}
+
+function storageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(values) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve();
+    });
+  });
+}
+
+function storageRemove(keys) {
+  return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
+}
+
 async function sha256Hex(text) {
   const encoded = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function fetchBrowserSession(baseUrl, apiKey) {
-  const res = await fetch(buildSessionURL(baseUrl), {
+async function sha256Base64Url(text) {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  const bytes = new Uint8Array(digest);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function randomToken(length = 48) {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join("");
+}
+
+function toFormBody(data) {
+  const params = new URLSearchParams();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) params.set(key, String(value));
+  });
+  return params.toString();
+}
+
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(url, options);
+  const raw = await res.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    data = null;
+  }
+  if (!res.ok) {
+    throw new Error((data && (data.message || data.error)) || `${res.status} ${raw}`);
+  }
+  return data;
+}
+
+async function getStoredToriState() {
+  const data = await storageGet(["yunque_tori_api_base", "yunque_tori_oauth", "yunque_extension_token"]);
+  return {
+    apiBase: data.yunque_tori_api_base || DEFAULT_TORI_API_BASE,
+    oauth: data.yunque_tori_oauth || null,
+    extensionToken: data.yunque_extension_token || "",
+  };
+}
+
+async function refreshToriAccessTokenIfNeeded(force = false) {
+  const state = await getStoredToriState();
+  if (!state.oauth?.refreshToken) return state;
+  const expiresAt = state.oauth.expiresAt || 0;
+  if (!force && Date.now() < expiresAt - 60_000) return state;
+  const tokenData = await fetchJSON(buildToriURL(state.apiBase, "/oauth/token"), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: toFormBody({
+      grant_type: "refresh_token",
+      client_id: "yunque-browser-extension",
+      refresh_token: state.oauth.refreshToken,
+    }),
+  });
+  state.oauth = {
+    ...state.oauth,
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token || state.oauth.refreshToken,
+    expiresAt: Date.now() + (Number(tokenData.expires_in || 3600) * 1000),
+    scope: tokenData.scope || state.oauth.scope || "browser:connect",
+  };
+  await storageSet({ yunque_tori_oauth: state.oauth, yunque_tori_api_base: state.apiBase });
+  return state;
+}
+
+async function fetchToriUserInfo(state) {
+  return fetchJSON(buildToriURL(state.apiBase, "/oauth/userinfo"), {
+    headers: { Authorization: `Bearer ${state.oauth.accessToken}` },
+  });
+}
+
+async function createExtensionGrant(state) {
+  const payload = await fetchJSON(buildToriURL(state.apiBase, "/api/extension/grants"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": apiKey,
+      Authorization: `Bearer ${state.oauth.accessToken}`,
     },
+    body: JSON.stringify({
+      name: "Yunque Browser Connector",
+      scope: "browser:connect",
+      expires_in_days: 30,
+    }),
+  });
+  return payload?.data || payload;
+}
+
+async function connectTori(apiBase) {
+  const verifier = randomToken(64);
+  const challenge = await sha256Base64Url(verifier);
+  const state = randomToken(24);
+  const redirectURI = chrome.identity.getRedirectURL("tori");
+  const authorizeURL = new URL(buildToriURL(apiBase, "/oauth/authorize"));
+  authorizeURL.searchParams.set("client_id", "yunque-browser-extension");
+  authorizeURL.searchParams.set("redirect_uri", redirectURI);
+  authorizeURL.searchParams.set("response_type", "code");
+  authorizeURL.searchParams.set("scope", "browser:connect");
+  authorizeURL.searchParams.set("state", state);
+  authorizeURL.searchParams.set("code_challenge", challenge);
+  authorizeURL.searchParams.set("code_challenge_method", "S256");
+
+  const callbackURL = await chrome.identity.launchWebAuthFlow({
+    url: authorizeURL.toString(),
+    interactive: true,
+  });
+  if (!callbackURL) throw new Error("OAuth login was cancelled");
+  const callback = new URL(callbackURL);
+  if (callback.searchParams.get("state") !== state) throw new Error("OAuth state mismatch");
+  const code = callback.searchParams.get("code");
+  if (!code) throw new Error(callback.searchParams.get("error") || "OAuth authorization failed");
+
+  const tokenData = await fetchJSON(buildToriURL(apiBase, "/oauth/token"), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: toFormBody({
+      grant_type: "authorization_code",
+      client_id: "yunque-browser-extension",
+      code,
+      redirect_uri: redirectURI,
+      code_verifier: verifier,
+    }),
+  });
+
+  const oauthState = {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token || "",
+    expiresAt: Date.now() + (Number(tokenData.expires_in || 3600) * 1000),
+    scope: tokenData.scope || "browser:connect",
+  };
+  await storageSet({ yunque_tori_api_base: apiBase, yunque_tori_oauth: oauthState });
+
+  const freshState = await refreshToriAccessTokenIfNeeded();
+  const profile = await fetchToriUserInfo(freshState);
+  const grant = await createExtensionGrant(freshState);
+  await storageSet({
+    yunque_extension_token: grant.token,
+    yunque_tori_oauth: {
+      ...freshState.oauth,
+      profile,
+      grantId: grant.id,
+      grantName: grant.name,
+      extensionScope: grant.scope,
+    },
+  });
+  return { profile, grant };
+}
+
+async function disconnectTori() {
+  const state = await getStoredToriState();
+  try {
+    if (state.oauth?.accessToken && state.oauth?.grantId) {
+      await fetch(buildToriURL(state.apiBase, `/api/extension/grants/${state.oauth.grantId}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${state.oauth.accessToken}` },
+      });
+    }
+    if (state.oauth?.refreshToken) {
+      await fetch(buildToriURL(state.apiBase, "/oauth/revoke"), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: toFormBody({ token: state.oauth.refreshToken }),
+      });
+    }
+  } catch (e) {
+    log("warn", `Tori disconnect cleanup failed: ${e.message}`);
+  }
+  await storageRemove(["yunque_tori_oauth", "yunque_extension_token"]);
+}
+
+async function resolveSessionCredential() {
+  const data = await storageGet(["yunque_api_key", "yunque_extension_token"]);
+  const apiKey = (data.yunque_api_key || "").trim();
+  const extensionToken = (data.yunque_extension_token || "").trim();
+  if (apiKey) return { type: "api_key", value: apiKey, label: "manual" };
+  if (extensionToken) return { type: "bearer", value: extensionToken, label: "tori" };
+  return { type: "none", value: "", label: "anonymous" };
+}
+
+async function fetchBrowserSession(baseUrl, credential) {
+  const headers = { "Content-Type": "application/json" };
+  if (credential?.type === "api_key" && credential.value) headers["X-API-Key"] = credential.value;
+  if (credential?.type === "bearer" && credential.value) headers["Authorization"] = `Bearer ${credential.value}`;
+  const res = await fetch(buildSessionURL(baseUrl), {
+    method: "POST",
+    headers,
     body: "{}",
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Session request failed: ${res.status} ${text}`);
+    const body = await res.text();
+    throw new Error(`Session request failed: ${res.status} ${body}`);
   }
   return res.json();
 }
 
-// ─── WebSocket Connection ────────────────────────────
 function connect() {
   if (ws && ws.readyState <= 1) return;
 
-  chrome.storage.local.get(["yunque_ws_url", "yunque_api_key"], async (r) => {
+  chrome.storage.local.get(["yunque_ws_url"], async (r) => {
     wsUrl = r.yunque_ws_url || DEFAULT_WS_URL;
-    const apiKey = (r.yunque_api_key || "").trim();
     let session;
-    let socketUrl = buildWebSocketURL(wsUrl, "");
+    let socketUrl = buildWebSocketURL(wsUrl);
     try {
-      if (apiKey) {
-        session = await fetchBrowserSession(wsUrl, apiKey);
+      const credential = await resolveSessionCredential();
+      if (credential.type !== "none") {
+        session = await fetchBrowserSession(wsUrl, credential);
         const url = new URL(session.ws_url || socketUrl);
         url.searchParams.set("ticket", session.ticket);
         url.searchParams.set("nonce", session.nonce);
         socketUrl = url.toString();
       }
+      lastConnectionError = "";
     } catch (e) {
+      lastConnectionError = e.message;
       log("error", `Session bootstrap failed: ${e.message}`);
       scheduleReconnect();
+      broadcastRuntimeState({ force: true });
       return;
     }
     log("info", `Connecting to ${socketUrl.replace(/([?&](?:ticket|nonce)=)[^&]+/g, "$1***")}`);
@@ -105,6 +316,7 @@ function connect() {
     socket.onopen = () => {
       if (ws !== socket) return;
       connected = true;
+      lastConnectionError = "";
       log("info", "WebSocket connected");
       clearTimeout(reconnectTimer);
       sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
@@ -144,6 +356,7 @@ function connect() {
 
     socket.onerror = () => {
       if (ws !== socket) return;
+      lastConnectionError = "WebSocket error";
       log("error", "WebSocket error");
       updateBadge("ERR", "#F44336");
       persistRuntimeState();
@@ -287,6 +500,7 @@ function getRuntimeState() {
     wsUrl,
     sessions: sessions.size,
     takeover: takeover.active,
+    lastConnectionError,
     runtimeSession: {
       ...runtimeSession,
       takeover: takeover.active,
@@ -876,10 +1090,13 @@ restoreRuntimeState().finally(connect);
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "get_status") {
-    chrome.storage.local.get(["yunque_api_key"], (r) => {
+    chrome.storage.local.get(["yunque_api_key", "yunque_tori_api_base", "yunque_tori_oauth", "yunque_extension_token"], (r) => {
       sendResponse({
         ...getRuntimeState(),
         apiKey: r.yunque_api_key || "",
+        toriApiBase: r.yunque_tori_api_base || DEFAULT_TORI_API_BASE,
+        extensionTokenPresent: !!r.yunque_extension_token,
+        tori: r.yunque_tori_oauth || null,
       });
     });
     return true;
@@ -923,11 +1140,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })().catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+  if (msg.type === "connect_tori") {
+    (async () => {
+      const apiBase = (msg.apiBase || DEFAULT_TORI_API_BASE).trim();
+      const result = await connectTori(apiBase);
+      sendResponse({ ok: true, ...result });
+    })().catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg.type === "disconnect_tori") {
+    (async () => {
+      await disconnectTori();
+      sendResponse({ ok: true });
+    })().catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
   if (msg.type === "set_ws_url") {
     wsUrl = msg.url;
     chrome.storage.local.set({
       yunque_ws_url: msg.url,
       yunque_api_key: msg.apiKey || "",
+      ...(msg.toriApiBase ? { yunque_tori_api_base: msg.toriApiBase } : {}),
     });
     if (ws) ws.close();
     connect();

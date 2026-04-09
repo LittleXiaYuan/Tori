@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -181,4 +183,81 @@ func base64URLDecode(s string) ([]byte, error) {
 		s += "="
 	}
 	return base64.URLEncoding.DecodeString(s)
+}
+
+func (g *Gateway) requireBrowserSessionAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := authTokenFromHeaders(r)
+		if token == "" {
+			apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
+			return
+		}
+
+		if t := g.tenants.ByAPIKey(token); t != nil {
+			ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		if g.jwtCfg != nil {
+			claims, err := ValidateJWT(*g.jwtCfg, token)
+			if err == nil {
+				ctx := context.WithValue(r.Context(), ctxTenantKey, claims.TenantID)
+				ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
+				next(w, r.WithContext(ctx))
+				return
+			}
+		}
+
+		if tenantID, info, err := g.resolveBrowserExtensionTenant(r.Context(), token); err == nil && tenantID != "" {
+			ctx := context.WithValue(r.Context(), ctxTenantKey, tenantID)
+			ctx = context.WithValue(ctx, ctxRoleKey, "user")
+			ctx = context.WithValue(ctx, ctxKeyType("browser_ext_subject"), info.Subject())
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		apperror.WriteCode(w, apperror.CodeUnauthorized, "invalid or missing credentials")
+	}
+}
+
+type browserExtensionIdentity struct {
+	GrantID  string `json:"grant_id"`
+	Name     string `json:"name"`
+	Scope    string `json:"scope"`
+	ClientID string `json:"client_id"`
+	User     struct {
+		ID       int    `json:"id"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	} `json:"user"`
+}
+
+func (i browserExtensionIdentity) Subject() string {
+	if i.User.Username != "" {
+		return i.User.Username
+	}
+	if i.User.Email != "" {
+		return i.User.Email
+	}
+	return i.GrantID
+}
+
+func (g *Gateway) resolveBrowserExtensionTenant(ctx context.Context, token string) (string, browserExtensionIdentity, error) {
+	baseURL := strings.TrimSpace(os.Getenv("TORI_API_BASE_URL"))
+	if baseURL == "" {
+		return "", browserExtensionIdentity{}, fmt.Errorf("TORI_API_BASE_URL not configured")
+	}
+	info, err := fetchBrowserExtensionIdentity(ctx, baseURL, token)
+	if err != nil {
+		return "", browserExtensionIdentity{}, err
+	}
+	defaultTenantID := strings.TrimSpace(os.Getenv("DEFAULT_TENANT_ID"))
+	if defaultTenantID == "" {
+		defaultTenantID = "default"
+	}
+	if g.tenants == nil || g.tenants.ByID(defaultTenantID) == nil {
+		return "", browserExtensionIdentity{}, fmt.Errorf("default tenant not available")
+	}
+	return defaultTenantID, info, nil
 }

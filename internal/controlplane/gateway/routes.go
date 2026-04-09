@@ -162,6 +162,7 @@ func (g *Gateway) registerPluginRoutes() {
 	g.mux.HandleFunc("/api/skillhub/policy", g.requireAuth(g.handleSkillHubPolicy))
 	g.mux.HandleFunc("/api/skillhub/policy/check", g.requireAuth(g.handleSkillHubPolicyCheck))
 	g.mux.HandleFunc("/api/skillhub/analytics", g.requireAuth(g.handleSkillHubAnalytics))
+	g.mux.HandleFunc("/v1/skill-suggestions", g.requireAuth(g.handleSkillSuggestions))
 }
 
 // ──────────────────────────────────────────────
@@ -344,7 +345,7 @@ func (g *Gateway) registerBrowserRoutes() {
 
 	// Browser Extension (Connector) API
 	g.mux.HandleFunc("/api/browser/ext/status", g.requireAuth(g.handleBrowserExtStatus))
-	g.mux.HandleFunc("/api/browser/ext/session", g.requireAuth(g.handleBrowserExtSession))
+	g.mux.HandleFunc("/api/browser/ext/session", g.requireBrowserSessionAuth(g.handleBrowserExtSession))
 	g.mux.HandleFunc("/api/browser/ext/action", g.requireAuth(g.handleBrowserExtAction))
 	g.mux.HandleFunc("/api/browser/ext/scenarios", g.requireAuth(g.handleBrowserScenarios))
 	g.mux.HandleFunc("/api/browser/ext/scenarios/run", g.requireAuth(g.handleBrowserRunScenario))

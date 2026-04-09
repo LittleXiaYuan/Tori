@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+
+	"yunque-agent/internal/appdir"
 )
 
 // Config holds all agent configuration.
 type Config struct {
+	DataDir         string // root data directory (default: "data")
 	Addr            string // HTTP listen address
 	LLMBaseURL      string
 	LLMAPIKey       string
@@ -24,10 +28,12 @@ type Config struct {
 	VLLMModel       string
 	LocalModelTier  string // tier assignment for local models: fast/smart/expert
 	HostReadPaths   string // comma-separated host paths for read-only access
+	HostWritePaths  string // comma-separated host paths for writable access
 	TelegramToken   string
 	FeishuAppID     string
 	FeishuAppSecret string
 	JWTSecret       string
+	ToriAPIBaseURL  string
 	// Self-iteration
 	SelfIterateEnabled     bool
 	SelfIterateTokenBudget int
@@ -61,27 +67,30 @@ func Load() Config {
 		}
 	}
 	return Config{
-		Addr:                   getenv("AGENT_ADDR", ":9090"),
-		LLMBaseURL:             getenv("LLM_BASE_URL", "https://api-ai.gitcode.com/v1"),
-		LLMAPIKey:              getenv("LLM_API_KEY", ""),
-		LLMModel:               getenv("LLM_MODEL", "zai-org/GLM-5"),
-		LLMFastURL:             getenv("LLM_FAST_URL", ""),
-		LLMFastKey:             getenv("LLM_FAST_KEY", ""),
-		LLMFastModel:           getenv("LLM_FAST_MODEL", ""),
-		LLMExpertURL:           getenv("LLM_EXPERT_URL", ""),
-		LLMExpertKey:           getenv("LLM_EXPERT_KEY", ""),
-		LLMExpertModel:         getenv("LLM_EXPERT_MODEL", ""),
-		OllamaBaseURL:          getenv("OLLAMA_BASE_URL", ""),
-		OllamaModel:            getenv("OLLAMA_MODEL", ""),
-		VLLMBaseURL:            getenv("VLLM_BASE_URL", ""),
-		VLLMModel:              getenv("VLLM_MODEL", ""),
-		LocalModelTier:         getenv("LOCAL_MODEL_TIER", "fast"),
+		DataDir:        getenv("DATA_DIR", appdir.DataDir()),
+		Addr:           getenv("AGENT_ADDR", ":9090"),
+		LLMBaseURL:     getenv("LLM_BASE_URL", "https://api-ai.gitcode.com/v1"),
+		LLMAPIKey:      getenv("LLM_API_KEY", ""),
+		LLMModel:       getenv("LLM_MODEL", "zai-org/GLM-5"),
+		LLMFastURL:     getenv("LLM_FAST_URL", ""),
+		LLMFastKey:     getenv("LLM_FAST_KEY", ""),
+		LLMFastModel:   getenv("LLM_FAST_MODEL", ""),
+		LLMExpertURL:   getenv("LLM_EXPERT_URL", ""),
+		LLMExpertKey:   getenv("LLM_EXPERT_KEY", ""),
+		LLMExpertModel: getenv("LLM_EXPERT_MODEL", ""),
+		OllamaBaseURL:  getenv("OLLAMA_BASE_URL", ""),
+		OllamaModel:    getenv("OLLAMA_MODEL", ""),
+		VLLMBaseURL:    getenv("VLLM_BASE_URL", ""),
+		VLLMModel:      getenv("VLLM_MODEL", ""),
+		LocalModelTier: getenv("LOCAL_MODEL_TIER", "fast"),
 
 		HostReadPaths:          getenv("HOST_READ_PATHS", ""),
+		HostWritePaths:         getenv("HOST_WRITE_PATHS", ""),
 		TelegramToken:          getenv("TELEGRAM_BOT_TOKEN", ""),
 		FeishuAppID:            getenv("FEISHU_APP_ID", ""),
 		FeishuAppSecret:        getenv("FEISHU_APP_SECRET", ""),
 		JWTSecret:              getenv("JWT_SECRET", ""),
+		ToriAPIBaseURL:         getenv("TORI_API_BASE_URL", ""),
 		SelfIterateEnabled:     getenv("SELF_ITERATE_ENABLED", "") == "true",
 		SelfIterateTokenBudget: iterBudget,
 		SelfIterateMaxRounds:   iterRounds,
@@ -108,9 +117,32 @@ func (c Config) Validate() error {
 	return nil
 }
 
+// DataPath joins sub-paths to the configured data directory root.
+// Usage: cfg.DataPath("memory", "daily") → "data/memory/daily"
+func (c Config) DataPath(elem ...string) string {
+	parts := append([]string{c.DataDir}, elem...)
+	return strings.Join(parts, "/")
+}
+
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return fallback
+}
+
+// ParsePaths splits a comma-separated path list, trims whitespace, and drops empties.
+func ParsePaths(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
