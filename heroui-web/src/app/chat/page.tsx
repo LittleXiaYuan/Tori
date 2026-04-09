@@ -929,12 +929,12 @@ export default function ChatPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
       {/* Conversation Sidebar */}
       {showSidebar && (
-        <div className="w-[244px] xl:w-[260px] flex flex-col h-full shrink-0 animate-slide-in-left" style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)" }}>
+        <div className="w-[228px] xl:w-[244px] flex flex-col h-full shrink-0 animate-slide-in-left" style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)" }}>
           {/* Sidebar Header */}
-          <div className="p-3 space-y-3">
-            <div className="rounded-[24px] border px-3 py-3" style={{ background: "linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
+          <div className="p-2.5 space-y-2.5">
+            <div className="rounded-[18px] border px-3 py-2.5" style={{ background: "linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl" style={{ background: "rgba(255,255,255,0.08)", color: "#dbeafe" }}>
+                <div className="flex h-8 w-8 items-center justify-center rounded-[14px]" style={{ background: "rgba(255,255,255,0.08)", color: "#dbeafe" }}>
                   <Sparkles size={16} />
                 </div>
                 <div className="min-w-0">
@@ -942,20 +942,20 @@ export default function ChatPage() {
                   <div className="text-[11px]" style={{ color: "rgba(219,234,254,0.78)" }}>在一个工作区里对话、浏览、推理并执行任务。</div>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 text-[11px]">
+              <div className="mt-2 flex items-center gap-1.5 text-[10px]">
                 <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.08)", color: "var(--yunque-text-secondary)" }}>{filteredConversations.length} 个可见</span>
                 <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.08)", color: "var(--yunque-text-secondary)" }}>{conv.showArchived ? "归档视图" : "活跃线程"}</span>
               </div>
             </div>
             <Button
-              className="w-full justify-start gap-2 rounded-lg text-sm btn-accent"
+              className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
               size="sm"
               onPress={() => { convD({ type: "SET_ACTIVE", id: "new-" + Date.now() }); chatD({ type: "SET_MESSAGES", messages: [] }); }}
             >
               <Plus size={14} /> 新对话
             </Button>
             <div
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
+              className="flex items-center gap-2 rounded-[14px] px-2.5 py-1.5 text-[11px]"
               style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-muted)" }}
             >
               <Search size={12} />
@@ -970,10 +970,10 @@ export default function ChatPage() {
           </div>
 
           {/* Archive toggle */}
-          <div className="px-3 pb-2 flex gap-1">
+          <div className="px-2.5 pb-2 flex gap-1">
             <button
               onClick={() => convD({ type: "SET_ARCHIVED", show: false })}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors flex-1 justify-center"
+              className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
               style={{
                 color: !conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
                 background: !conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
@@ -983,7 +983,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => convD({ type: "SET_ARCHIVED", show: true })}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors flex-1 justify-center"
+              className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
               style={{
                 color: conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
                 background: conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
@@ -994,8 +994,8 @@ export default function ChatPage() {
           </div>
 
           {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto px-2 custom-scrollbar">
-            <div className="text-[10px] font-semibold uppercase tracking-widest px-2 py-2" style={{ color: "var(--yunque-text-muted)" }}>
+          <div className="flex-1 overflow-y-auto px-2 pb-2 custom-scrollbar">
+            <div className="px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: "var(--yunque-text-muted)" }}>
               {conv.showArchived ? "归档对话" : "最近对话"} ({filteredConversations.length})
             </div>
             <div className="chat-thread-list space-y-1">
@@ -1003,7 +1003,7 @@ export default function ChatPage() {
                 <div
                   key={c.id}
                   onClick={() => { if (conv.renameId !== c.id) switchConversation(c.id); }}
-                  className="conv-item chat-thread-item w-full text-left px-3 py-3 rounded-[20px] group relative"
+                  className="conv-item chat-thread-item w-full text-left px-3 py-2.5 rounded-[16px] group relative"
                   data-active={conv.activeId === c.id || undefined}
                   style={{ color: conv.activeId === c.id ? "var(--yunque-accent)" : "var(--yunque-text-secondary)" }}
                 >
@@ -1026,12 +1026,12 @@ export default function ChatPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <div className="text-xs font-medium truncate pr-4">{c.name || c.id}</div>
+                    <div className="text-[12px] font-medium truncate pr-4">{c.name || c.id}</div>
                   )}
-                  <div className="text-[11px] truncate mt-1" style={{ color: "var(--yunque-text-muted)" }}>{c.summary || "暂无摘要"}</div>
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="mt-0.5 truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{c.summary || "暂无摘要"}</div>
+                  <div className="mt-1.5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{new Date(c.updated_at).toLocaleDateString()}</span>
+                      <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{new Date(c.updated_at).toLocaleDateString([], { month: "numeric", day: "numeric" })}</span>
                       {c.pinned && (
                         <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
                           置顶
@@ -1681,14 +1681,14 @@ export default function ChatPage() {
               />
 
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3.5 pt-2">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                   <Tooltip delay={0}>
-                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => fileInputRef.current?.click()}><Paperclip size={14} /></Button>
+                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn compact-tool" onPress={() => fileInputRef.current?.click()}><Paperclip size={14} /></Button>
                     <Tooltip.Content>添加文件</Tooltip.Content>
                   </Tooltip>
                   <Tooltip delay={0}>
-                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" onPress={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}><ImageIcon size={14} /></Button>
+                    <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn compact-tool" onPress={() => { if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.click(); } }}><ImageIcon size={14} /></Button>
                     <Tooltip.Content>添加图片</Tooltip.Content>
                   </Tooltip>
                   <Tooltip delay={0}>
@@ -1696,7 +1696,7 @@ export default function ChatPage() {
                       isIconOnly
                       variant="ghost"
                       size="sm"
-                      className="chat-tool-btn"
+                      className="chat-tool-btn compact-tool"
                       onPress={isRecording ? stopRecording : startRecording}
                       style={isRecording ? { color: "#ef4444" } : {}}
                     >
@@ -1706,7 +1706,7 @@ export default function ChatPage() {
                   </Tooltip>
                   <div className="relative">
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(!showConnectors)}>
+                      <Button isIconOnly variant="ghost" size="sm" className="chat-tool-btn compact-tool" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(!showConnectors)}>
                         <Plug size={14} />
                       </Button>
                       <Tooltip.Content>连接器</Tooltip.Content>
@@ -1717,7 +1717,7 @@ export default function ChatPage() {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                <div className="hidden items-center gap-2 text-[10px] md:flex" style={{ color: "var(--yunque-text-muted)" }}>
                   <span className="hidden md:inline">Enter 发送</span>
                   <span className="hidden md:inline">·</span>
                   <span className="hidden md:inline">Shift + Enter 换行</span>
@@ -1735,7 +1735,7 @@ export default function ChatPage() {
                 ) : (
                   <Button
                     isIconOnly aria-label="发送" size="sm"
-                    className={`chat-send-btn h-11 w-11 rounded-2xl ${chat.input.trim() ? "chat-send-active" : ""}`}
+                    className={`chat-send-btn h-10 w-10 rounded-[18px] ${chat.input.trim() ? "chat-send-active" : ""}`}
                     data-active={chat.input.trim() ? "true" : "false"}
                     isDisabled={!chat.input.trim()}
                     style={{
@@ -1749,16 +1749,16 @@ export default function ChatPage() {
                 )}
               </div>
               {!chat.loading && (
-                <div className="border-t px-5 py-3" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                    <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.04)" }}>
+                <div className="border-t px-4 py-2.5" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                  <div className="chat-footer-meta">
+                    <span className="chat-footer-pill">
                       {chat.messages.length === 0 ? "等待新的任务" : `当前线程 ${chat.messages.length} 条消息`}
                     </span>
-                    <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <span className="chat-footer-pill">
                       {showComputer ? "计算机面板已展开" : "计算机面板已隐藏"}
                     </span>
                     {pendingFiles.length > 0 && (
-                      <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
+                      <span className="chat-footer-pill" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
                         {pendingFiles.length} 个附件待发送
                       </span>
                     )}
