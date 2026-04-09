@@ -11,29 +11,35 @@ import (
 
 // Config holds all agent configuration.
 type Config struct {
-	DataDir         string // root data directory (default: "data")
-	Addr            string // HTTP listen address
-	LLMBaseURL      string
-	LLMAPIKey       string
-	LLMModel        string
-	LLMFastURL      string // optional: separate endpoint for fast/cheap model
-	LLMFastKey      string
-	LLMFastModel    string
-	LLMExpertURL    string // optional: separate endpoint for expert/powerful model
-	LLMExpertKey    string
-	LLMExpertModel  string
-	OllamaBaseURL   string // optional: Ollama local model endpoint
-	OllamaModel     string
-	VLLMBaseURL     string // optional: vLLM local model endpoint
-	VLLMModel       string
-	LocalModelTier  string // tier assignment for local models: fast/smart/expert
-	HostReadPaths   string // comma-separated host paths for read-only access
-	HostWritePaths  string // comma-separated host paths for writable access
-	TelegramToken   string
-	FeishuAppID     string
-	FeishuAppSecret string
-	JWTSecret       string
-	ToriAPIBaseURL  string
+	DataDir          string // root data directory (default: "data")
+	Addr             string // HTTP listen address
+	LLMBaseURL       string
+	LLMAPIKey        string
+	LLMModel         string
+	LLMFastURL       string // optional: separate endpoint for fast/cheap model
+	LLMFastKey       string
+	LLMFastModel     string
+	LLMExpertURL     string // optional: separate endpoint for expert/powerful model
+	LLMExpertKey     string
+	LLMExpertModel   string
+	OllamaBaseURL    string // optional: Ollama local model endpoint
+	OllamaModel      string
+	VLLMBaseURL      string // optional: vLLM local model endpoint
+	VLLMModel        string
+	LocalModelTier   string // tier assignment for local models: fast/smart/expert
+	HostReadPaths    string // comma-separated host paths for read-only access
+	HostWritePaths   string // comma-separated host paths for writable access
+	TelegramToken    string
+	FeishuAppID      string
+	FeishuAppSecret  string
+	JWTSecret        string
+	ToriAPIBaseURL   string
+	MinerUEnabled    bool
+	MinerUBackend    string
+	MinerUCommand    string
+	MinerUCLIArgs    string
+	MinerUOutputDir  string
+	MinerUTimeoutSec int
 	// Self-iteration
 	SelfIterateEnabled     bool
 	SelfIterateTokenBudget int
@@ -91,6 +97,12 @@ func Load() Config {
 		FeishuAppSecret:        getenv("FEISHU_APP_SECRET", ""),
 		JWTSecret:              getenv("JWT_SECRET", ""),
 		ToriAPIBaseURL:         getenv("TORI_API_BASE_URL", ""),
+		MinerUEnabled:          getenv("MINERU_ENABLED", "") == "true",
+		MinerUBackend:          getenv("MINERU_BACKEND", "cli"),
+		MinerUCommand:          getenv("MINERU_COMMAND", "mineru"),
+		MinerUCLIArgs:          getenv("MINERU_CLI_ARGS", "-p {input_file} -o {output_dir} -b pipeline"),
+		MinerUOutputDir:        getenv("MINERU_OUTPUT_DIR", ""),
+		MinerUTimeoutSec:       getenvInt("MINERU_TIMEOUT_SEC", 300),
 		SelfIterateEnabled:     getenv("SELF_ITERATE_ENABLED", "") == "true",
 		SelfIterateTokenBudget: iterBudget,
 		SelfIterateMaxRounds:   iterRounds,
@@ -129,6 +141,18 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getenvInt(key string, fallback int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
 // ParsePaths splits a comma-separated path list, trims whitespace, and drops empties.
