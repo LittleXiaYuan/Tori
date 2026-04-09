@@ -155,6 +155,10 @@ func authTokenFromQuery(r *http.Request) string {
 	return ""
 }
 
+func browserTicketFromQuery(r *http.Request) string {
+	return strings.TrimSpace(r.URL.Query().Get("ticket"))
+}
+
 const ctxRoleKey ctxKeyType = "role"
 
 func roleFromCtx(ctx context.Context) string {

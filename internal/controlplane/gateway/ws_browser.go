@@ -75,6 +75,9 @@ type BrowserResult struct {
 	Headings   json.RawMessage `json:"headings,omitempty"`
 	Links      json.RawMessage `json:"links,omitempty"`
 	Images     json.RawMessage `json:"images,omitempty"`
+	Challenge  string          `json:"challenge,omitempty"`
+	Proof      string          `json:"proof,omitempty"`
+	Nonce      string          `json:"nonce,omitempty"`
 }
 
 // BrowserHub manages the WebSocket connection to the browser extension.
@@ -84,6 +87,7 @@ type BrowserHub struct {
 	conn      *websocket.Conn
 	connected bool
 	tenantID  string
+	ticket    string
 	version   string
 	pending   map[string]chan BrowserResult
 	listeners []func(BrowserResult)
@@ -128,9 +132,8 @@ func (h *BrowserHub) OnEvent(fn func(BrowserResult)) {
 func (h *BrowserHub) writeMessage(messageType int, data []byte) error {
 	h.mu.Lock()
 	conn := h.conn
-	connected := h.connected
 	h.mu.Unlock()
-	if !connected || conn == nil {
+	if conn == nil {
 		return fmt.Errorf("browser extension not connected")
 	}
 	h.writeMu.Lock()
@@ -296,17 +299,19 @@ func (h *BrowserHub) handleResult(result BrowserResult) {
 	}
 }
 
-func (h *BrowserHub) setConn(conn *websocket.Conn, tenantID string) {
+func (h *BrowserHub) setConn(conn *websocket.Conn, tenantID string, connected bool, ticket string) {
 	h.mu.Lock()
 	if h.conn != nil && h.conn != conn {
 		h.conn.Close()
 	}
 	h.conn = conn
-	h.connected = conn != nil
+	h.connected = conn != nil && connected
 	if conn != nil {
 		h.tenantID = tenantID
+		h.ticket = ticket
 	} else {
 		h.tenantID = ""
+		h.ticket = ""
 	}
 	if conn == nil {
 		h.failPendingLocked("browser extension disconnected")
@@ -336,23 +341,31 @@ func allowBrowserWSOrigin(r *http.Request) bool {
 
 // handleBrowserWS is the HTTP handler for /ws/browser.
 func (g *Gateway) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
-	token := authTokenFromHeaders(r)
-	if token == "" {
-		token = authTokenFromQuery(r)
-	}
-	if token == "" {
-		http.Error(w, "missing credentials", http.StatusUnauthorized)
-		return
-	}
-
 	tenantID := ""
+	var ticket browserSessionTicket
+	var ticketValue string
+
+	token := authTokenFromHeaders(r)
 	switch {
-	case g.tenants != nil && g.tenants.ByAPIKey(token) != nil:
-		tenantID = g.tenants.ByAPIKey(token).ID
-	case g.jwtCfg != nil:
-		claims, err := ValidateJWT(*g.jwtCfg, token)
-		if err == nil {
-			tenantID = claims.TenantID
+	case token != "":
+		switch {
+		case g.tenants != nil && g.tenants.ByAPIKey(token) != nil:
+			tenantID = g.tenants.ByAPIKey(token).ID
+		case g.jwtCfg != nil:
+			claims, err := ValidateJWT(*g.jwtCfg, token)
+			if err == nil {
+				tenantID = claims.TenantID
+			}
+		}
+	default:
+		ticketValue = browserTicketFromQuery(r)
+		nonce := strings.TrimSpace(r.URL.Query().Get("nonce"))
+		if g.browserSessions != nil && ticketValue != "" && nonce != "" {
+			record, err := g.browserSessions.Consume(ticketValue, nonce)
+			if err == nil {
+				ticket = record
+				tenantID = record.TenantID
+			}
 		}
 	}
 	if tenantID == "" {
@@ -372,16 +385,51 @@ func (g *Gateway) handleBrowserWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub.setConn(conn, tenantID)
+	hub.setConn(conn, tenantID, ticketValue == "", ticketValue)
 	slog.Info("browser extension connected", "tenant", tenantID)
 
 	done := make(chan struct{})
 	defer func() {
 		close(done)
-		hub.setConn(nil, "")
+		hub.setConn(nil, "", false, "")
+		if ticketValue != "" && g.browserSessions != nil {
+			g.browserSessions.Invalidate(ticketValue)
+		}
 		conn.Close()
 		slog.Info("browser extension disconnected", "tenant", tenantID)
 	}()
+
+	if ticketValue != "" {
+		challenge, err := randomHex(16)
+		if err != nil {
+			slog.Error("browser ws challenge creation failed", "err", err)
+			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "challenge failed"), time.Now().Add(2*time.Second))
+			return
+		}
+		payload, _ := json.Marshal(BrowserResult{Type: "challenge", Challenge: challenge, Nonce: ticket.Nonce})
+		if err := hub.writeMessage(websocket.TextMessage, payload); err != nil {
+			slog.Warn("browser ws challenge send failed", "err", err)
+			return
+		}
+		conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			slog.Warn("browser ws challenge read failed", "err", err)
+			return
+		}
+		var resp BrowserResult
+		if err := json.Unmarshal(data, &resp); err != nil {
+			slog.Warn("browser ws challenge invalid json", "err", err)
+			return
+		}
+		expected := browserChallengeProof(ticketValue, ticket.Nonce, challenge)
+		if resp.Type != "challenge_response" || resp.Proof != expected {
+			slog.Warn("browser ws challenge mismatch", "tenant", tenantID)
+			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "challenge mismatch"), time.Now().Add(2*time.Second))
+			return
+		}
+		hub.setConn(conn, tenantID, true, ticketValue)
+	}
 
 	conn.SetReadLimit(1 << 20) // 1MB max message
 	conn.SetPongHandler(func(string) error {

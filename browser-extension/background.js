@@ -30,23 +30,67 @@ let runtimeSession = {
 function buildWebSocketURL(baseUrl, apiKey) {
   try {
     const url = new URL(baseUrl || DEFAULT_WS_URL);
-    if (apiKey && !url.searchParams.get("key") && !url.searchParams.get("api_key")) {
-      url.searchParams.set("key", apiKey);
-    }
     return url.toString();
   } catch (_) {
     return baseUrl || DEFAULT_WS_URL;
   }
 }
 
+function buildSessionURL(baseUrl) {
+  try {
+    const ws = new URL(baseUrl || DEFAULT_WS_URL);
+    const protocol = ws.protocol === "wss:" ? "https:" : "http:";
+    return `${protocol}//${ws.host}/api/browser/ext/session`;
+  } catch (_) {
+    return "http://localhost:9090/api/browser/ext/session";
+  }
+}
+
+async function sha256Hex(text) {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function fetchBrowserSession(baseUrl, apiKey) {
+  const res = await fetch(buildSessionURL(baseUrl), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: "{}",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Session request failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
 // ─── WebSocket Connection ────────────────────────────
 function connect() {
   if (ws && ws.readyState <= 1) return;
 
-  chrome.storage.local.get(["yunque_ws_url", "yunque_api_key"], (r) => {
+  chrome.storage.local.get(["yunque_ws_url", "yunque_api_key"], async (r) => {
     wsUrl = r.yunque_ws_url || DEFAULT_WS_URL;
-    const socketUrl = buildWebSocketURL(wsUrl, r.yunque_api_key || "");
-    log("info", `Connecting to ${socketUrl.replace(/([?&](?:key|api_key)=)[^&]+/, "$1***")}`);
+    const apiKey = (r.yunque_api_key || "").trim();
+    let session;
+    let socketUrl = buildWebSocketURL(wsUrl, "");
+    try {
+      if (apiKey) {
+        session = await fetchBrowserSession(wsUrl, apiKey);
+        const url = new URL(session.ws_url || socketUrl);
+        url.searchParams.set("ticket", session.ticket);
+        url.searchParams.set("nonce", session.nonce);
+        socketUrl = url.toString();
+      }
+    } catch (e) {
+      log("error", `Session bootstrap failed: ${e.message}`);
+      scheduleReconnect();
+      return;
+    }
+    log("info", `Connecting to ${socketUrl.replace(/([?&](?:ticket|nonce)=)[^&]+/g, "$1***")}`);
 
     let socket;
     try {
@@ -73,6 +117,14 @@ function connect() {
       if (ws !== socket) return;
       try {
         const msg = JSON.parse(evt.data);
+        if (msg?.type === "challenge") {
+          if (!session?.ticket || !msg.challenge || !msg.nonce) {
+            throw new Error("Missing challenge context");
+          }
+          const proof = await sha256Hex(`${session.ticket}:${msg.nonce}:${msg.challenge}`);
+          sendToBackend({ type: "challenge_response", proof }, { queueIfOffline: false });
+          return;
+        }
         await handleCommand(msg);
       } catch (e) {
         log("error", `Message handling error: ${e.message}`);

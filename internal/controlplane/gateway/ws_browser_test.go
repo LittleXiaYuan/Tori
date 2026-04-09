@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,7 +36,7 @@ func TestBrowserWSRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestBrowserWSAcceptsAPIKeyQuery(t *testing.T) {
+func TestBrowserWSRejectsAPIKeyQuery(t *testing.T) {
 	gw, tm := newTestGateway()
 	hub := NewBrowserHub()
 	gw.SetBrowserHub(hub)
@@ -44,18 +47,11 @@ func TestBrowserWSAcceptsAPIKeyQuery(t *testing.T) {
 
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/browser?key=" + tenant.APIKey
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	if err != nil {
-		t.Fatalf("expected websocket dial success, got %v", err)
-	}
-
-	if !waitForCondition(2*time.Second, hub.Connected) {
+	if conn != nil {
 		conn.Close()
-		t.Fatal("browser hub never reported connected")
 	}
-
-	_ = conn.Close()
-	if !waitForCondition(2*time.Second, func() bool { return !hub.Connected() }) {
-		t.Fatal("browser hub never reported disconnected")
+	if err == nil {
+		t.Fatal("expected websocket dial failure for raw query api key")
 	}
 }
 
@@ -87,6 +83,76 @@ func TestBrowserWSAcceptsAPIKeyHeader(t *testing.T) {
 	}
 }
 
+func TestBrowserExtSessionIssuesTicket(t *testing.T) {
+	gw, tm := newTestGateway()
+	tenant := tm.Register("browser-test")
+	req := httptest.NewRequest(http.MethodPost, "/api/browser/ext/session", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+
+	gw.handleBrowserExtSession(w, req.WithContext(contextWithTenant(req.Context(), tenant.ID)))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		OK     bool   `json:"ok"`
+		WSURL  string `json:"ws_url"`
+		Ticket string `json:"ticket"`
+		Nonce  string `json:"nonce"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !resp.OK || resp.Ticket == "" || resp.Nonce == "" || !strings.Contains(resp.WSURL, "/ws/browser") {
+		t.Fatalf("unexpected session response: %+v", resp)
+	}
+}
+
+func TestBrowserWSAcceptsTicketHandshake(t *testing.T) {
+	gw, tm := newTestGateway()
+	hub := NewBrowserHub()
+	gw.SetBrowserHub(hub)
+	tenant := tm.Register("browser-test")
+	record, err := gw.browserSessions.Issue(tenant.ID)
+	if err != nil {
+		t.Fatalf("issue browser session: %v", err)
+	}
+
+	srv := httptest.NewServer(gw)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/browser?ticket=" + record.Ticket + "&nonce=" + record.Nonce
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("expected websocket dial success, got %v", err)
+	}
+	defer conn.Close()
+
+	_, data, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read challenge: %v", err)
+	}
+	var msg BrowserResult
+	if err := json.Unmarshal(data, &msg); err != nil {
+		t.Fatalf("decode challenge: %v", err)
+	}
+	if msg.Type != "challenge" || msg.Challenge == "" || msg.Nonce != record.Nonce {
+		t.Fatalf("unexpected challenge payload: %+v", msg)
+	}
+
+	sum := sha256.Sum256([]byte(record.Ticket + ":" + record.Nonce + ":" + msg.Challenge))
+	proof := hex.EncodeToString(sum[:])
+	if err := conn.WriteJSON(BrowserResult{Type: "challenge_response", Proof: proof}); err != nil {
+		t.Fatalf("write proof: %v", err)
+	}
+
+	if !waitForCondition(2*time.Second, func() bool { return hub.ConnectedForTenant(tenant.ID) }) {
+		t.Fatal("browser hub never reported tenant-scoped connected state")
+	}
+}
+
 func waitForCondition(timeout time.Duration, fn func() bool) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -107,7 +173,7 @@ func TestBrowserHubPendingRequestsFailOnDisconnect(t *testing.T) {
 	hub.pending["req-1"] = pendingCh
 	hub.mu.Unlock()
 
-	hub.setConn(nil, "")
+	hub.setConn(nil, "", false, "")
 
 	select {
 	case result := <-pendingCh:
