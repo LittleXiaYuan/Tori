@@ -7,6 +7,7 @@ import { Globe, RefreshCw, Camera, Monitor, ShieldAlert, Check, XCircle, Play, Z
 import { showToast } from "@/components/toast-provider";
 import { BrowserSessionCard } from "@/components/browser-session-card";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
+import { useI18n } from "@/lib/i18n";
 
 export default function BrowserPage() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -25,6 +26,8 @@ export default function BrowserPage() {
   const [scenarios, setScenarios] = useState<BrowserScenario[]>([]);
   const [runningScenario, setRunningScenario] = useState<string | null>(null);
   const [extConnected, setExtConnected] = useState(false);
+
+  const { t } = useI18n();
 
   const { bridgeState, bridgeActionPending, bridgeNotice, lastArtifact, sendBridgeAction } = useBrowserBridge({
     onActionError: (_action, _payload, message) => {
@@ -127,7 +130,7 @@ export default function BrowserPage() {
       } catch {
         // ignore
       }
-      showToast(`Scenario "${scenario?.name || scenarioId}" completed`, "success");
+      showToast(`${t("browserPage.scenarioComplete")}: ${scenario?.name || scenarioId}`, "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Scenario failed", "error");
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] Scenario failed: ${e}`, ...prev].slice(0, 50));
@@ -140,7 +143,7 @@ export default function BrowserPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Globe size={20} style={{ color: "var(--yunque-accent)" }} />
-          <h1 className="page-title">Browser workspace</h1>
+          <h1 className="page-title">{t("browserPage.title")}</h1>
           {browserStatus && (
             <Chip
               size="sm"
@@ -150,7 +153,7 @@ export default function BrowserPage() {
                 fontSize: "var(--text-2xs)",
               }}
             >
-              {browserStatus.connected ? "Connected" : "Disconnected"}
+              {browserStatus.connected ? t("browserPage.connected") : t("browserPage.disconnected")}
             </Chip>
           )}
           <Chip
@@ -161,7 +164,7 @@ export default function BrowserPage() {
               fontSize: "var(--text-2xs)",
             }}
           >
-            {extConnected ? "Extension connected" : "Extension disconnected"}
+            {extConnected ? t("browserPage.extConnected") : t("browserPage.extDisconnected")}
           </Chip>
         </div>
         <div className="flex items-center gap-2">
@@ -169,7 +172,7 @@ export default function BrowserPage() {
             <Switch isSelected={autoRefresh} onChange={setAutoRefresh} size="sm" aria-label="Auto refresh">
               <Switch.Control><Switch.Thumb /></Switch.Control>
             </Switch>
-            <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>Auto refresh</span>
+            <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.autoRefresh")}</span>
             {autoRefresh && (
               <Select selectedKey={String(refreshInterval)} onSelectionChange={(k) => setRefreshInterval(Number(k))} className="w-[56px]" aria-label="Auto refresh">
                 <Select.Trigger className="h-5 min-h-0 px-1 text-[10px]"><Select.Value /><Select.Indicator /></Select.Trigger>
@@ -185,7 +188,7 @@ export default function BrowserPage() {
             <Button isIconOnly variant="ghost" size="sm" onPress={takeScreenshot} isPending={loading}>
               <Camera size={16} />
             </Button>
-            <Tooltip.Content>Capture screenshot</Tooltip.Content>
+            <Tooltip.Content>{t("browserPage.captureScreenshot")}</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={0}>
             <Button isIconOnly variant="ghost" size="sm" onPress={() => {
@@ -194,7 +197,7 @@ export default function BrowserPage() {
             }}>
               <RefreshCw size={16} />
             </Button>
-            <Tooltip.Content>Refresh status</Tooltip.Content>
+            <Tooltip.Content>{t("browserPage.refreshStatus")}</Tooltip.Content>
           </Tooltip>
         </div>
       </div>
@@ -207,34 +210,34 @@ export default function BrowserPage() {
                 <Download size={20} style={{ color: "#3b82f6" }} />
               </div>
               <div className="flex-1">
-                <h3 className="mb-1 text-sm font-semibold">Install Yunque Browser Connector</h3>
+                <h3 className="mb-1 text-sm font-semibold">{t("browserPage.install.title")}</h3>
                 <p className="mb-3 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                  Connect the extension so the agent can navigate, mark, click, and read content inside your real browser session.
+                  {t("browserPage.install.desc")}
                 </p>
                 <div className="space-y-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>1</span>
-                    <span>Open the Chrome / Edge extensions page: <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>chrome://extensions</code></span>
+                    <span>{t("browserPage.install.step1")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>chrome://extensions</code></span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>2</span>
-                    <span>Enable <strong>Developer mode</strong>, click <strong>Load unpacked</strong>, then choose <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>yunque-agent/browser-extension</code></span>
+                    <span>{t("browserPage.install.step2a")} <strong>{t("browserPage.install.step2b")}</strong>{t("browserPage.install.step2c")} <strong>{t("browserPage.install.step2d")}</strong>{t("browserPage.install.step2e")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>yunque-agent/browser-extension</code></span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>3</span>
-                    <span>Fill in <strong>Agent Address</strong>: <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>ws://localhost:9090/ws/browser</code></span>
+                    <span>{t("browserPage.install.step3a")} <strong>{t("browserPage.install.step3b")}</strong></span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>4</span>
-                    <span>Fill in <strong>Agent API Key</strong>: <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>DEFAULT_API_KEY</code>, then click Connect</span>
+                    <span>{t("browserPage.install.step4a")} <strong>{t("browserPage.install.step4b")}</strong> <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>ws://localhost:9090/ws/browser</code>{t("browserPage.install.step4c")}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>5</span>
-                    <span>After the connection succeeds, switch the extension status to <strong style={{ color: "#22c55e" }}>ON</strong>.</span>
+                    <span>{t("browserPage.install.step5a")} <strong style={{ color: "#22c55e" }}>ON</strong>.</span>
                   </div>
                 </div>
                 <p className="mt-3 text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>
-                  If your service is not running on :9090, replace it with your current WebSocket address.
+                  {t("browserPage.install.note")}
                 </p>
               </div>
             </div>
@@ -253,12 +256,12 @@ export default function BrowserPage() {
       <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as string)}>
         <Tabs.ListContainer>
           <Tabs.List aria-label="Browser workspace">
-            <Tabs.Tab id="browser">Browser<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="ocr"><Tabs.Separator />OCR<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="opp"><Tabs.Separator />OPP approvals (preview){oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="log"><Tabs.Separator />Action log{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />Scenarios{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="config"><Tabs.Separator />Config<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="browser">{t("browserPage.tab.browser")}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="ocr"><Tabs.Separator />{t("browserPage.tab.ocr")}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="opp"><Tabs.Separator />{t("browserPage.tab.opp")}{oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />{t("browserPage.tab.scenarios")}{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="config"><Tabs.Separator />{t("browserPage.tab.config")}<Tabs.Indicator /></Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
 
@@ -267,14 +270,14 @@ export default function BrowserPage() {
             {screenshot ? (
               <div className="p-2">
                 <img src={`data:image/png;base64,${screenshot}`} alt="Browser screenshot" className="w-full rounded-lg" style={{ border: "1px solid var(--yunque-border)" }} />
-                {screenshotTs && <div className="mt-1 text-center text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>Captured at: {screenshotTs}</div>}
-                {autoRefresh && <div className="text-center text-[10px]" style={{ color: "#22c55e" }}>Live refresh ({refreshInterval}s)</div>}
+                {screenshotTs && <div className="mt-1 text-center text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.capturedAt")}: {screenshotTs}</div>}
+                {autoRefresh && <div className="text-center text-[10px]" style={{ color: "#22c55e" }}>{t("browserPage.liveRefresh")} ({refreshInterval}s)</div>}
               </div>
             ) : (
               <div className="flex items-center justify-center py-20">
                 <div className="text-center">
                   <Monitor size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
-                  <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>Capture a screenshot or connect the extension to inspect the current page.</div>
+                  <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.empty")}</div>
                   {browserStatus?.current_url && <div className="mt-2 text-xs font-mono" style={{ color: "var(--yunque-text-secondary)" }}>{browserStatus.current_url}</div>}
                 </div>
               </div>
@@ -290,13 +293,13 @@ export default function BrowserPage() {
                   {mode.toUpperCase()}
                 </button>
               ))}
-              <Button size="sm" onPress={runOcr} isPending={loading} className="btn-accent">Run OCR</Button>
+              <Button size="sm" onPress={runOcr} isPending={loading} className="btn-accent">{t("browserPage.runOcr")}</Button>
             </div>
             <Card className="section-card p-4">
               {ocrResult ? (
                 <pre className="whitespace-pre-wrap text-sm font-mono" style={{ color: "var(--yunque-text)" }}>{ocrResult}</pre>
               ) : (
-                <div className="py-8 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>Choose an OCR mode and run it.</div>
+                <div className="py-8 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.ocrEmpty")}</div>
               )}
             </Card>
           </div>
@@ -307,9 +310,9 @@ export default function BrowserPage() {
             {oppItems.length === 0 ? (
               <Card className="section-card p-12 text-center">
                 <ShieldAlert size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
-                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>Browser OPP queue is not enabled in this build</div>
+                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.oppEmpty")}</div>
                 <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>
-                  This page is currently preview-only. Allow / deny actions will be enabled after the real approval queue is connected.
+                  {t("browserPage.oppPreview")}
                 </div>
               </Card>
             ) : oppItems.map((item) => (
@@ -328,10 +331,10 @@ export default function BrowserPage() {
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" isPending={deciding === item.id} onPress={() => handleOPPDecide(item.id, "allow")} style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>
-                      <Check size={14} /> Allow
+                      <Check size={14} /> {t("browserPage.allow")}
                     </Button>
                     <Button size="sm" isPending={deciding === item.id} onPress={() => handleOPPDecide(item.id, "deny")} style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
-                      <XCircle size={14} /> Deny
+                      <XCircle size={14} /> {t("browserPage.deny")}
                     </Button>
                   </div>
                 </div>
@@ -344,11 +347,11 @@ export default function BrowserPage() {
           <div className="mt-4">
             <Card className="section-card p-4">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Action log</div>
-                {actionLog.length > 0 && <Button size="sm" variant="ghost" onPress={() => setActionLog([])}>Clear</Button>}
+                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{t("browserPage.actionLog")}</div>
+                {actionLog.length > 0 && <Button size="sm" variant="ghost" onPress={() => setActionLog([])}>{t("browserPage.clear")}</Button>}
               </div>
               {actionLog.length === 0 ? (
-                <div className="py-8 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>No activity yet</div>
+                <div className="py-8 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.noActivity")}</div>
               ) : (
                 <div className="max-h-[60vh] space-y-1 overflow-y-auto">
                   {actionLog.map((log, i) => (
@@ -369,8 +372,8 @@ export default function BrowserPage() {
                 <div className="flex items-center gap-3">
                   <Zap size={20} style={{ color: "#f59e0b" }} />
                   <div>
-                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Browser extension required</div>
-                    <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>Install Yunque Browser Connector first, then return here to run scenarios.</div>
+                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{t("browserPage.extRequired")}</div>
+                    <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.extRequiredDesc")}</div>
                   </div>
                 </div>
               </Card>
@@ -383,7 +386,7 @@ export default function BrowserPage() {
                       <span className="text-lg">{scenario.icon}</span>
                       <div>
                         <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{scenario.name}</div>
-                        <div className="mt-0.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{scenario.steps.length} ?</div>
+                        <div className="mt-0.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{scenario.steps.length} {t("browserPage.steps")}</div>
                       </div>
                     </div>
                     <Button size="sm" isIconOnly isPending={runningScenario === scenario.id} isDisabled={!extConnected || !!runningScenario} onPress={() => runScenario(scenario.id)} className="btn-accent">
@@ -397,7 +400,7 @@ export default function BrowserPage() {
             {scenarios.length === 0 && extConnected && (
               <Card className="section-card p-12 text-center">
                 <Zap size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
-                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>No scenarios available</div>
+                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.noScenarios")}</div>
               </Card>
             )}
           </div>
@@ -406,12 +409,12 @@ export default function BrowserPage() {
         <Tabs.Panel id="config">
           <div className="mt-4">
             <Card className="section-card p-4">
-              <div className="mb-3 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Browser config</div>
+              <div className="mb-3 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{t("browserPage.browserConfig")}</div>
               {browserStatus && (
                 <div className="mb-4 space-y-2">
-                  <div className="flex justify-between text-xs"><span style={{ color: "var(--yunque-text-muted)" }}>Connection</span><span>{browserStatus.connected ? "Connected" : "Disconnected"}</span></div>
-                  {browserStatus.current_url && <div className="flex justify-between gap-4 text-xs"><span className="shrink-0" style={{ color: "var(--yunque-text-muted)" }}>Current URL</span><span className="truncate font-mono">{browserStatus.current_url}</span></div>}
-                  {browserStatus.page_title && <div className="flex justify-between gap-4 text-xs"><span className="shrink-0" style={{ color: "var(--yunque-text-muted)" }}>Page title</span><span className="truncate">{browserStatus.page_title}</span></div>}
+                  <div className="flex justify-between text-xs"><span style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.connection")}</span><span>{browserStatus.connected ? t("browserPage.connected") : t("browserPage.disconnected")}</span></div>
+                  {browserStatus.current_url && <div className="flex justify-between gap-4 text-xs"><span className="shrink-0" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.currentUrl")}</span><span className="truncate font-mono">{browserStatus.current_url}</span></div>}
+                  {browserStatus.page_title && <div className="flex justify-between gap-4 text-xs"><span className="shrink-0" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.pageTitle")}</span><span className="truncate">{browserStatus.page_title}</span></div>}
                 </div>
               )}
               {browserConfig ? (
@@ -419,7 +422,7 @@ export default function BrowserPage() {
                   {JSON.stringify(browserConfig, null, 2)}
                 </pre>
               ) : (
-                <div className="py-4 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>No activity yet</div>
+                <div className="py-4 text-center text-sm" style={{ color: "var(--yunque-text-muted)" }}>{t("browserPage.noActivity")}</div>
               )}
             </Card>
           </div>
