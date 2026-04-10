@@ -658,9 +658,14 @@ async function handleCommand(msg) {
 // ─── CDP Session Management ──────────────────────────
 async function getOrCreateSession(tabId) {
   if (!tabId) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) throw new Error("No active tab");
-    tabId = tab.id;
+    if (runtimeSession.currentTabId) {
+      tabId = runtimeSession.currentTabId;
+    } else {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) throw new Error("No active tab");
+      if (isProtectedTab(tab)) throw new Error("Cannot attach debugger to the Yunque WebUI tab. Use browser_navigate to open a target URL first.");
+      tabId = tab.id;
+    }
   }
 
   let session = sessions.get(tabId);
@@ -780,13 +785,28 @@ async function addTabToAgentGroup(tabId, title) {
 
 // ─── Browser Actions ─────────────────────────────────
 
+function isProtectedTab(tab) {
+  if (!tab || !tab.url) return false;
+  try {
+    const u = new URL(tab.url);
+    return u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "0.0.0.0";
+  } catch (_) { return false; }
+}
+
 async function doNavigate(action) {
   let tabId = null;
 
   if (agentTabGroupId != null) {
     const groupTabs = await chrome.tabs.query({ groupId: agentTabGroupId }).catch(() => []);
-    const existingTab = groupTabs.find((t) => t.url !== "about:blank");
+    const existingTab = groupTabs.find((t) => t.url && t.url !== "about:blank" && !isProtectedTab(t));
     if (existingTab) tabId = existingTab.id;
+  }
+
+  if (tabId) {
+    const current = await chrome.tabs.get(tabId).catch(() => null);
+    if (current && isProtectedTab(current)) {
+      tabId = null;
+    }
   }
 
   if (tabId) {
@@ -794,11 +814,12 @@ async function doNavigate(action) {
   } else {
     const tab = await chrome.tabs.create({ url: action.url, active: true });
     tabId = tab.id;
-    await addTabToAgentGroup(tabId, runtimeSession.title);
+    await addTabToAgentGroup(tabId, runtimeSession.title || "Yunque AI");
   }
 
   await getOrCreateSession(tabId);
   await waitForLoad(tabId);
+  runtimeSession.currentTabId = tabId;
   const screenshot = await captureScreenshot(tabId);
   return { ok: true, url: action.url, tabId, screenshot };
 }
