@@ -119,10 +119,16 @@ func (s *inputSkill) Execute(ctx context.Context, args map[string]any, _ *skills
 type screenshotSkill struct{ ctrl BrowserController }
 
 func (s *screenshotSkill) Name() string        { return "browser_screenshot" }
-func (s *screenshotSkill) Description() string  { return "Capture a screenshot of the current browser page." }
+func (s *screenshotSkill) Description() string  { return "View the current browser page. Returns page title, URL, and interactive elements (use element index for browser_click)." }
 func (s *screenshotSkill) Parameters() map[string]any { return jsonSchema(nil) }
 func (s *screenshotSkill) Execute(ctx context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
-	return callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_screenshot"})
+	screenshotResult, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_screenshot"})
+	if err != nil {
+		return screenshotResult, err
+	}
+	contentResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_get_structured_content"})
+	elementsResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_mark_elements"})
+	return fmt.Sprintf("%s\n[Page content]: %s\n[Interactive elements]: %s", screenshotResult, contentResult, elementsResult), nil
 }
 
 // ─── Scroll ──────────────────────────────────────────
