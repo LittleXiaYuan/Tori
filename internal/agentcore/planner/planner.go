@@ -243,6 +243,9 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 	if p.domainPrompt != "" {
 		stablePrefix += "\n\n" + p.domainPrompt
 	}
+	if req.GroupSystemPrompt != "" {
+		stablePrefix += "\n\n" + req.GroupSystemPrompt
+	}
 	msgs := []llm.Message{{Role: "system", Content: stablePrefix}}
 
 	// ── 2. Dynamic context: memory + graph (per-query, separate message to preserve prefix cache) ──
