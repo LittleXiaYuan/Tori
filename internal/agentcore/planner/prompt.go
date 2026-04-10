@@ -62,11 +62,19 @@ func (p *Planner) buildSystemPrompt() string {
 		indexItems = p.skillIndex()
 	}
 
+	// ── Category flags: drive template sections from registry state ──
+	categories := p.registry.Categories()
+	catMap := make(map[string]bool, len(categories))
+	for _, c := range categories {
+		catMap[c.ID] = len(c.SkillNames) > 0
+	}
+
 	// Execute template
 	data := map[string]any{
 		"SkillDefinitions": string(defsJSON),
 		"SkillIndex":       indexItems,
 		"NativeFC":         p.useNativeFC,
+		"Categories":       catMap,
 	}
 
 	var buf bytes.Buffer
