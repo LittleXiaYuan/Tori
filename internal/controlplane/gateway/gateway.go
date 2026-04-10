@@ -3,16 +3,19 @@ package gateway
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"yunque-agent/internal/agentcore/adaptive"
+	"yunque-agent/internal/agentcore/browserskill"
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
@@ -126,6 +129,7 @@ type Gateway struct {
 	knowledgeStore       *knowledge.Store
 	cronMgr              *cron.Manager
 	toolsMgr             *tools.ProcessManager
+	shellPolicy          *tools.ShellExecPolicy
 	runtimePool          *agentrt.Pool
 	bindingRouter        *agentrt.Router
 	toolGuard            *guardrails.ToolGuard
@@ -290,16 +294,40 @@ func (g *Gateway) MountPluginRoutes() {
 	}
 }
 
-// SetBrowserHub attaches the BrowserHub for browser extension WebSocket.
+// SetBrowserHub attaches the BrowserHub for browser extension WebSocket
+// and registers browser skills (navigate, click, input, etc.) into the
+// planner's skill registry so the LLM can invoke them via function calling.
 func (g *Gateway) SetBrowserHub(hub *BrowserHub) {
 	g.browserHub = hub
 	g.mux.HandleFunc("/ws/browser", g.handleBrowserWS)
+	if g.registry != nil {
+		browserskill.RegisterSkills(g.registry, &browserHubAdapter{hub: hub})
+	}
 	slog.Info("browser extension WebSocket endpoint registered", "path", "/ws/browser")
+	slog.Info("browser extension hub initialized")
 }
 
 // BrowserHub returns the BrowserHub instance.
 func (g *Gateway) BrowserHub() *BrowserHub {
 	return g.browserHub
+}
+
+type browserHubAdapter struct{ hub *BrowserHub }
+
+func (a *browserHubAdapter) Connected() bool { return a.hub.Connected() }
+
+func (a *browserHubAdapter) SendAction(ctx context.Context, action any) (any, error) {
+	raw, err := json.Marshal(action)
+	if err != nil {
+		return nil, err
+	}
+	result, err := a.hub.SendActionRaw(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	_ = json.Unmarshal(result, &out)
+	return out, nil
 }
 
 // SetAllowedOrigins configures CORS allowed origins. Use "*" for wildcard (dev only).
@@ -309,6 +337,37 @@ func (g *Gateway) SetAllowedOrigins(origins []string) {
 
 func (g *Gateway) SetOutputDir(dir string) {
 	g.outputDir = dir
+}
+
+// checkWSOrigin validates WebSocket upgrade origins against allowedOrigins
+// and localhost addresses. Used by all WS endpoints except browser extension
+// which has its own origin checker (allowBrowserWSOrigin).
+func (g *Gateway) checkWSOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		slog.Debug("ws: empty Origin header, allowing (non-browser client)", "path", r.URL.Path)
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+	if u.Scheme == "chrome-extension" {
+		return true
+	}
+	for _, o := range g.allowedOrigins {
+		if o == "*" {
+			return true
+		}
+		if o == origin {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Gateway) corsOrigin(origin string) string {
@@ -518,22 +577,21 @@ func tenantFromCtx(ctx context.Context) string {
 	return v
 }
 
-// requireSetupOrAuth allows unauthenticated access only during first-run setup
-// (when the core LLM configuration is still incomplete). After setup is complete,
-// it falls back to normal requireAuth.
+// requireSetupOrAuth allows unauthenticated access only during true first-run
+// setup: when both the admin password is NOT yet set AND the LLM configuration
+// is incomplete. Once the admin password has been set, all setup endpoints
+// require authentication — even if the LLM config is still missing.
 func (g *Gateway) requireSetupOrAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Allow unauthenticated access only if system is not yet configured.
-		// API keys are optional for local providers such as Ollama, so readiness
-		// should be based on base URL + model rather than API key presence alone.
+		passwordSet := g.passwordStore != nil && g.passwordStore.IsSetup()
 		values := readEnvFile()
-		if values["LLM_BASE_URL"] == "" || values["LLM_MODEL"] == "" {
-			// First-run: core provider config not ready yet, allow setup.
+		llmConfigured := values["LLM_BASE_URL"] != "" && values["LLM_MODEL"] != ""
+
+		if !passwordSet && !llmConfigured {
 			ctx := contextWithTenant(r.Context(), "setup")
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		// System is configured ? require authentication.
 		g.requireAuth(next).ServeHTTP(w, r)
 	}
 }
