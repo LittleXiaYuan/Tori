@@ -222,6 +222,12 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	cats := p.registry.Categories()
 
+	var catNames []string
+	for _, c := range cats {
+		catNames = append(catNames, fmt.Sprintf("%s(%d)", c.ID, len(c.SkillNames)))
+	}
+	slog.Info("buildFunctionDefs", "total_skills", len(allSkills), "categories", len(cats), "cat_detail", strings.Join(catNames, ","), "msg_prefix", truncate(userMessage, 50))
+
 	// Strategy 1: Dynamic filtering by intent
 	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
 		filtered := p.registry.FilterByIntent(userMessage)

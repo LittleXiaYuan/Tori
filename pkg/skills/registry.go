@@ -226,8 +226,10 @@ func joinNames(names []string) string {
 // intentKeywords maps intent keywords to category IDs for dynamic filtering.
 var intentKeywords = map[string][]string{
 	"browser": {"浏览", "网页", "网站", "打开", "搜索", "截图", "点击", "输入", "滚动",
+		"查看", "访问", "前往", "跳转", "去看", "帮我看", "登录", "注册",
+		"youtube", "google", "baidu", "bilibili", "twitter", "facebook", "instagram",
 		"browse", "navigate", "web", "click", "screenshot", "tab", "mark", "element",
-		"url", "http", "google", "baidu"},
+		"url", "http", "open"},
 	"connector": {"github", "仓库", "repo", "issue", "pr", "邮件", "gmail", "email",
 		"日历", "calendar", "notion", "slack", "linear", "jira", "outlook"},
 	"research": {"研究", "调研", "报告", "research", "report", "分析", "综述"},
