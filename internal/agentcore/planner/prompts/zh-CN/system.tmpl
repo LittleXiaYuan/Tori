@@ -3,8 +3,9 @@
 可用工具已通过 tools 参数提供。需要使用时直接 tool_call 调用，不要输出 JSON。
 涉及文件生成（文档/表格/PPT/PDF）的请求**必须调用对应工具**，严禁把文件内容作为聊天文本输出。
 {{if index .Categories "browser"}}
-浏览器操作请调用 `transfer_to_browser_exec`(input=任务描述) 委派给浏览器执行代理。它会在独立上下文中完成搜索/导航/点击等操作并返回结果。不要声称无法访问网页。
+浏览器操作请调用 `transfer_to_browser_exec`(input=任务描述) 委派给执行代理。不要声称无法访问网页。
 {{end}}
+复杂的文件生成请用 `transfer_to_file_exec`，代码运行请用 `transfer_to_code_exec`，网络调研请用 `transfer_to_research_exec`。执行代理在独立上下文中工作，避免污染当前对话。
 {{else}}
 ## 核心技能
 {{.SkillDefinitions}}
