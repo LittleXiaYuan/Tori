@@ -781,15 +781,22 @@ async function addTabToAgentGroup(tabId, title) {
 // ─── Browser Actions ─────────────────────────────────
 
 async function doNavigate(action) {
-  let tabId = action.tabId || runtimeSession.currentTabId;
-  if (!tabId) {
+  let tabId = null;
+
+  if (agentTabGroupId != null) {
+    const groupTabs = await chrome.tabs.query({ groupId: agentTabGroupId }).catch(() => []);
+    const existingTab = groupTabs.find((t) => t.url !== "about:blank");
+    if (existingTab) tabId = existingTab.id;
+  }
+
+  if (tabId) {
+    await chrome.tabs.update(tabId, { url: action.url, active: true });
+  } else {
     const tab = await chrome.tabs.create({ url: action.url, active: true });
     tabId = tab.id;
     await addTabToAgentGroup(tabId, runtimeSession.title);
-  } else {
-    await chrome.tabs.update(tabId, { url: action.url });
-    await addTabToAgentGroup(tabId, runtimeSession.title);
   }
+
   await getOrCreateSession(tabId);
   await waitForLoad(tabId);
   const screenshot = await captureScreenshot(tabId);
