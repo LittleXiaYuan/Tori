@@ -3,6 +3,7 @@
 
 const CDP_VERSION = "1.3";
 const RECONNECT_DELAY = 3000;
+const NO_CREDENTIAL_RECONNECT_DELAY = 30000;
 const SESSION_TIMEOUT = 60000;
 const DEFAULT_WS_URL = "ws://localhost:9090/ws/browser";
 const DEFAULT_TORI_API_BASE = "http://localhost:3000";
@@ -253,11 +254,13 @@ async function disconnectTori() {
 }
 
 async function resolveSessionCredential() {
-  const data = await storageGet(["yunque_api_key", "yunque_extension_token"]);
+  const data = await storageGet(["yunque_api_key", "yunque_extension_token", "yunque_jwt"]);
   const apiKey = (data.yunque_api_key || "").trim();
   const extensionToken = (data.yunque_extension_token || "").trim();
+  const jwt = (data.yunque_jwt || "").trim();
   if (apiKey) return { type: "api_key", value: apiKey, label: "manual" };
   if (extensionToken) return { type: "bearer", value: extensionToken, label: "tori" };
+  if (jwt) return { type: "bearer", value: jwt, label: "jwt" };
   return { type: "none", value: "", label: "anonymous" };
 }
 
@@ -286,13 +289,19 @@ function connect() {
     let socketUrl = buildWebSocketURL(wsUrl);
     try {
       const credential = await resolveSessionCredential();
-      if (credential.type !== "none") {
-        session = await fetchBrowserSession(wsUrl, credential);
-        const url = new URL(session.ws_url || socketUrl);
-        url.searchParams.set("ticket", session.ticket);
-        url.searchParams.set("nonce", session.nonce);
-        socketUrl = url.toString();
+      if (credential.type === "none") {
+        lastConnectionError =
+          "缺少凭证：请在扩展弹窗填写 Yunque API Key（云雀 WebUI → 设置），或通过 Tori 登录获取连接器令牌。未携带凭证时无法连接 /ws/browser。";
+        log("error", lastConnectionError);
+        scheduleReconnect(NO_CREDENTIAL_RECONNECT_DELAY);
+        broadcastRuntimeState({ force: true });
+        return;
       }
+      session = await fetchBrowserSession(wsUrl, credential);
+      const url = new URL(session.ws_url || socketUrl);
+      url.searchParams.set("ticket", session.ticket);
+      url.searchParams.set("nonce", session.nonce);
+      socketUrl = url.toString();
       lastConnectionError = "";
     } catch (e) {
       lastConnectionError = e.message;
@@ -313,14 +322,18 @@ function connect() {
       return;
     }
 
+    let challengeDone = !session?.ticket;
+
     socket.onopen = () => {
       if (ws !== socket) return;
       connected = true;
       lastConnectionError = "";
       log("info", "WebSocket connected");
       clearTimeout(reconnectTimer);
-      sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
-      flushOutboundQueue();
+      if (challengeDone) {
+        sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
+        flushOutboundQueue();
+      }
       restoreBadgeFromState();
       broadcastRuntimeState({ force: true });
     };
@@ -335,6 +348,9 @@ function connect() {
           }
           const proof = await sha256Hex(`${session.ticket}:${msg.nonce}:${msg.challenge}`);
           sendToBackend({ type: "challenge_response", proof }, { queueIfOffline: false });
+          challengeDone = true;
+          sendToBackend({ type: "hello", version: chrome.runtime.getManifest().version }, { queueIfOffline: false });
+          flushOutboundQueue();
           return;
         }
         await handleCommand(msg);
@@ -365,10 +381,22 @@ function connect() {
   });
 }
 
-function scheduleReconnect() {
+function scheduleReconnect(delayMs) {
   clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(connect, RECONNECT_DELAY);
+  reconnectTimer = setTimeout(connect, delayMs ?? RECONNECT_DELAY);
 }
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  if (!changes.yunque_api_key && !changes.yunque_extension_token && !changes.yunque_ws_url && !changes.yunque_jwt) return;
+  clearTimeout(reconnectTimer);
+  if (ws) {
+    try {
+      ws.close();
+    } catch (_) {}
+  }
+  connect();
+});
 
 function sendToBackend(msg, options = {}) {
   const { queueIfOffline = true, fromQueue = false } = options;
@@ -1090,12 +1118,13 @@ restoreRuntimeState().finally(connect);
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "get_status") {
-    chrome.storage.local.get(["yunque_api_key", "yunque_tori_api_base", "yunque_tori_oauth", "yunque_extension_token"], (r) => {
+    chrome.storage.local.get(["yunque_api_key", "yunque_tori_api_base", "yunque_tori_oauth", "yunque_extension_token", "yunque_jwt"], (r) => {
       sendResponse({
         ...getRuntimeState(),
         apiKey: r.yunque_api_key || "",
         toriApiBase: r.yunque_tori_api_base || DEFAULT_TORI_API_BASE,
         extensionTokenPresent: !!r.yunque_extension_token,
+        jwtPresent: !!r.yunque_jwt,
         tori: r.yunque_tori_oauth || null,
       });
     });
