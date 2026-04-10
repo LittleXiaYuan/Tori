@@ -391,7 +391,12 @@ type ConvAction =
   | { type: "SET_RENAME_TEXT"; text: string }
   | { type: "CANCEL_RENAME" };
 
-const convInit: ConvState = { list: [], activeId: "default", showArchived: false, searchQuery: "", renameId: null, renameText: "" };
+const ACTIVE_CONV_KEY = "yunque_active_conv";
+const convInit: ConvState = {
+  list: [],
+  activeId: (typeof window !== "undefined" ? localStorage.getItem(ACTIVE_CONV_KEY) : null) || "default",
+  showArchived: false, searchQuery: "", renameId: null, renameText: "",
+};
 
 function convReducer(state: ConvState, action: ConvAction): ConvState {
   switch (action.type) {
@@ -402,6 +407,7 @@ function convReducer(state: ConvState, action: ConvAction): ConvState {
     case "REMOVE":
       return { ...state, list: state.list.filter((c) => c.id !== action.id) };
     case "SET_ACTIVE":
+      if (typeof window !== "undefined") localStorage.setItem(ACTIVE_CONV_KEY, action.id);
       return { ...state, activeId: action.id };
     case "SET_ARCHIVED":
       return { ...state, showArchived: action.show };
@@ -476,6 +482,16 @@ export default function ChatPage() {
   }, [conv.showArchived]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  // Restore active conversation messages on mount
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (conv.activeId && conv.activeId !== "default") {
+      switchConversation(conv.activeId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if LLM setup is needed
   useEffect(() => {
