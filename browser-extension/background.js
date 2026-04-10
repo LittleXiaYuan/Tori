@@ -19,6 +19,8 @@ let lastBroadcastSignature = "";
 let sessions = new Map();   // tabId → { target, lastUsed }
 let connected = false;
 let lastConnectionError = "";
+let agentTabGroupId = null;
+const AGENT_GROUP_COLOR = "blue";
 let runtimeSession = {
   id: null,
   status: "idle",
@@ -731,14 +733,67 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   }
 });
 
+// ─── Tab Group Isolation ─────────────────────────────
+
+let _agentGroupSeedTabId = null;
+
+async function ensureAgentTabGroup(title) {
+  if (agentTabGroupId != null) {
+    try {
+      const group = await chrome.tabGroups.get(agentTabGroupId);
+      if (group) {
+        if (title) await chrome.tabGroups.update(agentTabGroupId, { title }).catch(() => {});
+        return agentTabGroupId;
+      }
+    } catch (_) {
+      agentTabGroupId = null;
+    }
+  }
+  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+  _agentGroupSeedTabId = tab.id;
+  const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
+  await chrome.tabGroups.update(groupId, {
+    title: title || "Yunque AI",
+    color: AGENT_GROUP_COLOR,
+    collapsed: false,
+  });
+  agentTabGroupId = groupId;
+  return groupId;
+}
+
+async function cleanupSeedTab() {
+  if (_agentGroupSeedTabId != null) {
+    try { await chrome.tabs.remove(_agentGroupSeedTabId); } catch (_) {}
+    _agentGroupSeedTabId = null;
+  }
+}
+
+async function addTabToAgentGroup(tabId, title) {
+  const groupId = await ensureAgentTabGroup(title);
+  try {
+    await chrome.tabs.group({ tabIds: [tabId], groupId });
+    await cleanupSeedTab();
+  } catch (e) {
+    log("warn", `Failed to add tab ${tabId} to agent group: ${e.message}`);
+  }
+}
+
 // ─── Browser Actions ─────────────────────────────────
 
 async function doNavigate(action) {
-  const { tabId } = await getOrCreateSession(action.tabId);
-  await chrome.tabs.update(tabId, { url: action.url });
+  let tabId = action.tabId || runtimeSession.currentTabId;
+  if (!tabId) {
+    const tab = await chrome.tabs.create({ url: action.url, active: true });
+    tabId = tab.id;
+    await addTabToAgentGroup(tabId, runtimeSession.title);
+  } else {
+    await chrome.tabs.update(tabId, { url: action.url });
+    await addTabToAgentGroup(tabId, runtimeSession.title);
+  }
+  await getOrCreateSession(tabId);
   await waitForLoad(tabId);
   const screenshot = await captureScreenshot(tabId);
-  return { ok: true, url: action.url, screenshot };
+  return { ok: true, url: action.url, tabId, screenshot };
 }
 
 async function doClick(action) {
@@ -960,6 +1015,7 @@ async function doSwitchTab(action) {
 
 async function doNewTab(action) {
   const tab = await chrome.tabs.create({ url: action.url || "about:blank", active: true });
+  await addTabToAgentGroup(tab.id, runtimeSession.title);
   if (action.url) await waitForLoad(tab.id);
   const screenshot = await captureScreenshot(tab.id);
   return { ok: true, tabId: tab.id, screenshot };
@@ -970,6 +1026,12 @@ async function doCloseTab(action) {
   if (!tabId) return { ok: false, error: "tabId is required" };
   await detachSession(tabId);
   await chrome.tabs.remove(tabId);
+  if (agentTabGroupId != null) {
+    try {
+      const tabs = await chrome.tabs.query({ groupId: agentTabGroupId });
+      if (!tabs || tabs.length === 0) agentTabGroupId = null;
+    } catch (_) { agentTabGroupId = null; }
+  }
   return { ok: true };
 }
 
@@ -978,16 +1040,30 @@ async function doCloseTab(action) {
 async function doSessionStatus(action) {
   const { status, sessionTitle, tabId } = action;
 
+  if (sessionTitle && agentTabGroupId != null) {
+    try { await chrome.tabGroups.update(agentTabGroupId, { title: sessionTitle }); } catch (_) {}
+  }
+
   if (status === "paused" || status === "take_over") {
+    if (agentTabGroupId != null) {
+      try { await chrome.tabGroups.update(agentTabGroupId, { color: "yellow" }); } catch (_) {}
+    }
     log("info", `User takeover activated: ${sessionTitle || "User takeover"}`);
     return syncTakeoverState(status, sessionTitle || "User takeover", tabId, true);
   }
   if (status === "resumed" || status === "running") {
+    if (agentTabGroupId != null) {
+      try { await chrome.tabGroups.update(agentTabGroupId, { color: AGENT_GROUP_COLOR }); } catch (_) {}
+    }
     log("info", "User takeover ended, AI resumed");
     return syncTakeoverState(status, sessionTitle || "", tabId, true);
   }
-  if (status === "stopped" && tabId) {
-    await detachSession(tabId);
+  if (status === "stopped") {
+    if (tabId) await detachSession(tabId);
+    if (agentTabGroupId != null) {
+      try { await chrome.tabGroups.update(agentTabGroupId, { color: "grey" }); } catch (_) {}
+    }
+    agentTabGroupId = null;
   }
 
   applyTakeoverState(false, "");
