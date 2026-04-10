@@ -190,7 +190,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				r.output = fmt.Sprintf("执行失败: %v", r.err)
 			}
 			planSteps = append(planSteps, step)
-			messages = append(messages, llm.ToolResultMessage(r.id, r.output))
+			messages = append(messages, buildToolResultMsg(r.id, r.output))
 
 			// Notify: tool_result
 			if req.StepCallback != nil {
@@ -302,4 +302,26 @@ func extractUserMessage(req PlanRequest) string {
 		}
 	}
 	return ""
+}
+
+// buildToolResultMsg creates a tool result message. If the output contains
+// a "_screenshot_b64" field, it builds a multimodal message (text + image)
+// so vision-capable models can "see" the page. Non-vision models auto-strip
+// images via the existing stripImages fallback in functions.go.
+func buildToolResultMsg(toolCallID, output string) llm.Message {
+	var parsed map[string]string
+	if json.Unmarshal([]byte(output), &parsed) == nil {
+		if b64, ok := parsed["_screenshot_b64"]; ok && b64 != "" {
+			text := parsed["text"]
+			return llm.Message{
+				Role:       "tool",
+				ToolCallID: toolCallID,
+				ContentParts: []llm.ContentPart{
+					{Type: "text", Text: text},
+					{Type: "image_url", ImageURL: &llm.MediaURL{URL: "data:image/jpeg;base64," + b64}},
+				},
+			}
+		}
+	}
+	return llm.ToolResultMessage(toolCallID, output)
 }

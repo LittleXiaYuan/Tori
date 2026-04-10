@@ -119,15 +119,31 @@ func (s *inputSkill) Execute(ctx context.Context, args map[string]any, _ *skills
 type screenshotSkill struct{ ctrl BrowserController }
 
 func (s *screenshotSkill) Name() string        { return "browser_screenshot" }
-func (s *screenshotSkill) Description() string  { return "View the current browser page. Returns page title, URL, text content, and clickable elements with indices (use indices for browser_click)." }
+func (s *screenshotSkill) Description() string  { return "View the current browser page. Returns page title, URL, text content, and clickable elements with indices (use indices for browser_click). Also captures a visual screenshot for vision-capable models." }
 func (s *screenshotSkill) Parameters() map[string]any { return jsonSchema(nil) }
 func (s *screenshotSkill) Execute(ctx context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
+	screenshotResult, _ := callBrowserOpts(ctx, s.ctrl, map[string]any{"type": "browser_screenshot"}, true)
 	contentResult, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_get_structured_content"})
 	if err != nil {
 		return contentResult, err
 	}
 	elementsResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_mark_elements"})
-	return fmt.Sprintf("[Page content]: %s\n[Interactive elements]: %s", contentResult, elementsResult), nil
+
+	var screenshot string
+	var parsed map[string]any
+	if json.Unmarshal([]byte(screenshotResult), &parsed) == nil {
+		if b64, ok := parsed["screenshot"].(string); ok && b64 != "" && b64 != "[captured]" {
+			screenshot = b64
+		}
+	}
+
+	text := fmt.Sprintf("[Page content]: %s\n[Interactive elements]: %s", contentResult, elementsResult)
+	if screenshot == "" {
+		return text, nil
+	}
+	result := map[string]string{"text": text, "_screenshot_b64": screenshot}
+	data, _ := json.Marshal(result)
+	return string(data), nil
 }
 
 // ─── Scroll ──────────────────────────────────────────
@@ -316,6 +332,10 @@ func jsonSchema(params []paramDef) map[string]any {
 }
 
 func callBrowser(ctx context.Context, ctrl BrowserController, action map[string]any) (string, error) {
+	return callBrowserOpts(ctx, ctrl, action, false)
+}
+
+func callBrowserOpts(ctx context.Context, ctrl BrowserController, action map[string]any, keepScreenshot bool) (string, error) {
 	if !ctrl.Connected() {
 		return "browser extension not connected — please install and connect the Yunque Browser Connector extension", nil
 	}
@@ -324,7 +344,7 @@ func callBrowser(ctx context.Context, ctrl BrowserController, action map[string]
 		return "", err
 	}
 	resultMap, _ := result.(map[string]any)
-	if resultMap != nil {
+	if resultMap != nil && !keepScreenshot {
 		if _, has := resultMap["screenshot"]; has {
 			resultMap["screenshot"] = "[captured]"
 		}
