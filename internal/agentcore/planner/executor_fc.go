@@ -260,37 +260,9 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 		}
 	}
 
-	// Strategy 2: Hierarchical meta-tools
-	useHierarchical := len(allSkills) > 25 && len(cats) > 0
-	if useHierarchical {
-		hDefs := p.registry.HierarchicalDefs()
-		defs := make([]llm.FunctionDef, 0, len(hDefs))
-		for _, d := range hDefs {
-			name, _ := d["name"].(string)
-			desc, _ := d["description"].(string)
-			params, _ := d["parameters"].(map[string]any)
-			defs = append(defs, llm.FunctionDef{
-				Name:        name,
-				Description: desc,
-				Parameters:  params,
-			})
-		}
-
-		if p.handoffReg != nil {
-			for _, hd := range p.handoffReg.ToolDefinitions() {
-				fn, _ := hd["function"].(map[string]any)
-				if fn == nil {
-					continue
-				}
-				name, _ := fn["name"].(string)
-				desc, _ := fn["description"].(string)
-				params, _ := fn["parameters"].(map[string]any)
-				defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
-			}
-		}
-		return defs
-	}
-
+	// All tools: present every registered skill directly to the LLM.
+	// Modern models handle 80+ tools well; hierarchical meta-tools
+	// confuse weaker models and add dispatch complexity.
 	defs := make([]llm.FunctionDef, 0, len(allSkills))
 	for _, s := range allSkills {
 		defs = append(defs, llm.FunctionDef{
