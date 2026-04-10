@@ -357,11 +357,12 @@
     s.textContent = `
       #${OVERLAY_ID}-top {
         position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
-        height: 36px; display: flex; align-items: center; justify-content: space-between;
-        padding: 0 16px;
-        background: linear-gradient(90deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
-        color: #e0e7ff; font: 500 13px/36px -apple-system, "Segoe UI", sans-serif;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        height: 28px; display: flex; align-items: center; justify-content: space-between;
+        padding: 0 12px;
+        background: linear-gradient(90deg, rgba(30,27,75,0.88) 0%, rgba(49,46,129,0.88) 40%, rgba(67,56,202,0.88) 100%);
+        backdrop-filter: blur(4px);
+        color: #e0e7ff; font: 500 12px/28px -apple-system, "Segoe UI", sans-serif;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
         transform: translateY(-100%); transition: transform 0.3s ease;
         user-select: none;
       }
@@ -453,8 +454,16 @@
     });
   }
 
+  function isLocalPage() {
+    try {
+      const h = window.location.hostname;
+      return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "";
+    } catch (_) { return false; }
+  }
+
   function updateOperatorOverlay(runtimeState) {
     if (!runtimeState) return;
+    if (isLocalPage()) return;
 
     const session = runtimeState.runtimeSession;
     const isRunning = session?.status === "running";
