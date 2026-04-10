@@ -398,6 +398,18 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   connect();
 });
 
+function enqueueOutboundMessage(msg) {
+  if (outboundQueue.length >= MAX_OUTBOUND_QUEUE) outboundQueue.shift();
+  outboundQueue.push(msg);
+}
+
+function flushOutboundQueue() {
+  while (outboundQueue.length > 0) {
+    const msg = outboundQueue.shift();
+    sendToBackend(msg, { queueIfOffline: false, fromQueue: true });
+  }
+}
+
 function sendToBackend(msg, options = {}) {
   const { queueIfOffline = true, fromQueue = false } = options;
   if (ws && ws.readyState === WebSocket.OPEN) {
