@@ -675,7 +675,18 @@ export default function ChatPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [pendingFiles, setPendingFiles] = useState<Array<{ name: string; size: number; preview?: string; base64?: string; type: "image" | "video" | "text" | "binary" }>>([]);
+  type PendingFile = {
+    id: string;
+    name: string;
+    size: number;
+    preview?: string;
+    base64?: string;
+    type: "image" | "video" | "text" | "binary";
+    status?: "ready" | "uploading" | "parsed" | "error";
+    note?: string;
+  };
+
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
   const TEXT_EXTS = new Set(["txt","md","csv","json","yaml","yml","toml","xml","html","css","js","ts","tsx","jsx","py","go","rs","rb","java","c","cpp","h","sh","bash","sql","ini","cfg","env","log","gitignore","dockerfile"]);
@@ -685,6 +696,7 @@ export default function ChatPage() {
   };
 
   const processFile = useCallback((file: File) => {
+    const fileId = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
     const isText = isTextFile(file.name) || file.type.startsWith("text/");
@@ -694,26 +706,33 @@ export default function ChatPage() {
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        setPendingFiles(prev => [...prev, { name: file.name, size: file.size, preview: previewUrl, base64, type: isImage ? "image" : "video" }]);
+        setPendingFiles(prev => [...prev, { id: fileId, name: file.name, size: file.size, preview: previewUrl, base64, type: isImage ? "image" : "video", status: "ready", note: isImage ? "Image ready" : "Video ready" }]);
       };
       reader.readAsDataURL(file);
     } else {
-      setPendingFiles(prev => [...prev, { name: file.name, size: file.size, type: isText ? "text" : "binary" }]);
+      setPendingFiles(prev => [...prev, { id: fileId, name: file.name, size: file.size, type: isText ? "text" : "binary", status: "uploading", note: "Uploading to workspace..." }]);
       api.uploadFile(file).then(res => {
         const parsePreview = typeof res.parse?.preview === "string" ? res.parse.preview.trim() : "";
         const uploadLine = parsePreview
           ? [`[Parsed document: ${file.name}]`, `Workspace path: ${res.path}`, "", parsePreview].join("\n")
           : `Uploaded file: ${res.path}`;
         chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + uploadLine });
+        setPendingFiles(prev => prev.map(item => item.id === fileId ? {
+          ...item,
+          status: res.parse?.parser === "mineru" ? "parsed" : "ready",
+          note: res.parse?.parser === "mineru" ? "Parsed by MinerU" : `Saved to ${res.path}`,
+        } : item));
         if (res.parse?.parser === "mineru") {
           showToast(`Parsed ${file.name} with MinerU.`, "success");
         }
       }).catch(() => {
+        setPendingFiles(prev => prev.map(item => item.id === fileId ? { ...item, status: "error", note: "Upload failed, using local fallback" } : item));
         if (isText) {
           const reader = new FileReader();
           reader.onload = () => {
             const text = reader.result as string;
-            chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + `[File: ${file.name}]\n${text.slice(0, 4000)}` });
+            chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + `[File: ${file.name}]
+${text.slice(0, 4000)}` });
           };
           reader.readAsText(file);
         } else {
@@ -1825,24 +1844,41 @@ export default function ChatPage() {
 
               {pendingFiles.length > 0 && (
                 <div className="flex gap-2 px-5 pt-4 flex-wrap">
-                  {pendingFiles.map((f, i) => (
-                    <div key={i} className="relative group/file flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--yunque-border)" }}>
-                      {f.type === "image" && f.preview ? (
-                        <img src={f.preview} alt={f.name} className="w-8 h-8 rounded object-cover" />
-                      ) : f.type === "video" && f.preview ? (
-                        <video src={f.preview} className="w-8 h-8 rounded object-cover" muted />
-                      ) : (
-                        <Paperclip size={12} style={{ color: "var(--yunque-text-muted)" }} />
-                      )}
-                      <span className="truncate max-w-[120px]" style={{ color: "var(--yunque-text-secondary)" }}>{f.name}</span>
-                      <button
-                        onClick={() => { if (f.preview) URL.revokeObjectURL(f.preview); setPendingFiles(prev => prev.filter((_, j) => j !== i)); }}
-                        className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0"
-                        style={{ background: "rgba(239,68,68,0.9)", color: "#fff" }}
-                      >×</button>
-                    </div>
-                  ))}
+                  {pendingFiles.map((f) => {
+                    const statusColor = f.status === "parsed"
+                      ? "#4ade80"
+                      : f.status === "uploading"
+                        ? "#60a5fa"
+                        : f.status === "error"
+                          ? "#f87171"
+                          : "#94a3b8";
+                    return (
+                      <div key={f.id} className="relative group/file flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--yunque-border)" }}>
+                        {f.type === "image" && f.preview ? (
+                          <img src={f.preview} alt={f.name} className="w-8 h-8 rounded object-cover" />
+                        ) : f.type === "video" && f.preview ? (
+                          <video src={f.preview} className="w-8 h-8 rounded object-cover" muted />
+                        ) : (
+                          <Paperclip size={12} style={{ color: "var(--yunque-text-muted)" }} />
+                        )}
+                        <div className="min-w-0">
+                          <div className="truncate max-w-[140px]" style={{ color: "var(--yunque-text-secondary)" }}>{f.name}</div>
+                          {f.note && (
+                            <div className="flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
+                              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: statusColor }} />
+                              <span className="truncate max-w-[160px]">{f.note}</span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => { if (f.preview) URL.revokeObjectURL(f.preview); setPendingFiles(prev => prev.filter((item) => item.id !== f.id)); }}
+                          className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0"
+                          style={{ background: "rgba(239,68,68,0.9)", color: "#fff" }}
+                        >?</button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
