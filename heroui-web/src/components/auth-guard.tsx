@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Spinner } from "@heroui/react";
 import { useI18n } from "@/lib/i18n";
@@ -12,9 +12,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { t } = useI18n();
   const [checking, setChecking] = useState(true);
+  const authedRef = useRef(false);
 
   useEffect(() => {
     if (PUBLIC_PATHS.some((path) => pathname?.startsWith(path))) {
+      setChecking(false);
+      return;
+    }
+
+    if (authedRef.current) {
       setChecking(false);
       return;
     }
@@ -39,10 +45,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           router.replace("/login");
           return;
         }
+        authedRef.current = true;
         setChecking(false);
       })
       .catch((error) => {
         if (error?.name === "AbortError") return;
+        authedRef.current = true;
         setChecking(false);
       });
 

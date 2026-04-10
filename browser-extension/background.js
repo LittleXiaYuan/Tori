@@ -556,11 +556,16 @@ function broadcastRuntimeState(options = {}) {
   const signature = JSON.stringify(state);
   if (!force && signature === lastBroadcastSignature) return;
   lastBroadcastSignature = signature;
-  const payload = { type: "bridge_state_update", state };
+  const targetTabId = runtimeSession.currentTabId;
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (!tab.id) continue;
-      chrome.tabs.sendMessage(tab.id, payload, () => void chrome.runtime.lastError);
+      const isTarget = tab.id === targetTabId;
+      chrome.tabs.sendMessage(tab.id, {
+        type: "bridge_state_update",
+        state,
+        isTargetTab: isTarget,
+      }, () => void chrome.runtime.lastError);
     }
   });
 }

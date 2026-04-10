@@ -527,16 +527,30 @@
 
   // ─── State Listeners ──────────────────────────────
 
+  let isTargetTab = false;
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "bridge_state_update") {
+      isTargetTab = !!msg.isTargetTab;
       emitBridgeEvent("bridge/state-update", { state: msg.state });
-      updateOperatorOverlay(msg.state);
+      if (isTargetTab) {
+        updateOperatorOverlay(msg.state);
+      } else {
+        hideOperatorOverlay();
+      }
     }
   });
 
+  function hideOperatorOverlay() {
+    const t = document.getElementById(`${OVERLAY_ID}-top`);
+    const b = document.getElementById(`${OVERLAY_ID}-bottom`);
+    if (t) t.classList.remove("yunque-overlay-show");
+    if (b) b.classList.remove("yunque-overlay-show");
+    overlayState.visible = false;
+  }
+
   requestBridgeState().then((state) => {
     emitBridgeEvent("bridge/ready", { state });
-    if (state) updateOperatorOverlay(state);
   }).catch(() => {});
 
   injectStyles();
