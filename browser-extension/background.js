@@ -1195,6 +1195,12 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  // Only track tab activation for agent-owned tabs to prevent
+  // hijacking the session when the user switches to Yunque WebUI or other tabs
+  if (agentTabGroupId != null) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab || tab.groupId !== agentTabGroupId) return;
+  }
   await updateRuntimeSession({
     currentTabId: tabId,
     status: takeover.active ? "takeover" : runtimeSession.status,
