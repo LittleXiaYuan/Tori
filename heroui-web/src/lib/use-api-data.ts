@@ -1,11 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
 /**
- * Generic data-fetching hook that replaces the repeated pattern of
- *   const [data, setData] = useState(initial);
- *   const [loading, setLoading] = useState(true);
- *   const load = useCallback(async () => { ... setLoading(false); }, []);
- *   useEffect(() => { load(); }, [load]);
+ * Generic data-fetching hook with automatic cancellation on unmount
+ * to prevent state updates on stale / unmounted components during
+ * rapid navigation.
  */
 export function useApiData<T>(
   fetcher: () => Promise<T>,
@@ -16,15 +14,27 @@ export function useApiData<T>(
   const [loading, setLoading] = useState(true);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  const mountedRef = useRef(true);
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const load = useCallback(async () => {
+    const seq = ++seqRef.current;
     try {
       const result = await fetcherRef.current();
-      setData(result);
+      if (mountedRef.current && seq === seqRef.current) {
+        setData(result);
+      }
     } catch {
       /* offline / error — keep previous data */
     } finally {
-      setLoading(false);
+      if (mountedRef.current && seq === seqRef.current) {
+        setLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);

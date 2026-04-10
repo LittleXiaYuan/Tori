@@ -43,7 +43,7 @@ import {
   Bell,
   Languages,
 } from "lucide-react";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -167,6 +167,7 @@ export default function Sidebar() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [version, setVersion] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -344,7 +345,18 @@ export default function Sidebar() {
                     {group.items.map(({ href, label, labelEn, icon }) => {
                       const active = pathname === href || (href !== "/settings" && pathname?.startsWith(href + "/"));
                       return (
-                        <Link key={href} href={href} className="sidebar-link" data-active={active || undefined}>
+                        <Link
+                          key={href}
+                          href={href}
+                          className="sidebar-link"
+                          data-active={active || undefined}
+                          data-pending={isPending && !active ? "" : undefined}
+                          onClick={(e) => {
+                            if (active || isPending) { e.preventDefault(); return; }
+                            e.preventDefault();
+                            startTransition(() => { router.push(href); });
+                          }}
+                        >
                           <span className="sidebar-link-icon">{icon}</span>
                           <span>{locale === "zh" ? label : labelEn}</span>
                         </Link>
