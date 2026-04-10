@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/execution/browser"
 	"yunque-agent/internal/observe"
 )
 
@@ -21,8 +20,9 @@ import (
 func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult, error) {
 	env := p.buildEnv(req)
 
-	messages := p.BuildMessages(ctx, req)
-	tools := p.buildFunctionDefs()
+	messages, ctxLayers := p.BuildMessages(ctx, req)
+	userMsg := extractUserMessage(req)
+	tools := p.buildFunctionDefs(userMsg)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -33,7 +33,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
@@ -75,7 +75,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					continue
 				}
 			}
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		}
 
 		// Append assistant message with tool calls reference
@@ -120,32 +120,23 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					}
 				}
 
-				// Check for browser tool calls (browser_*)
-				if p.browserDispatch != nil && strings.HasPrefix(tc.Function.Name, "browser_") {
-					slog.Info("planner: browser tool call", "tool", tc.Function.Name, "step", steps)
-					if req.StepCallback != nil {
-						tsEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolStart,
-							fmt.Sprintf("🌐 正在调用 [%s]...", tc.Function.Name))
-						tsEvt.Meta.Skill = tc.Function.Name
-						tsEvt.Detail = observe.ToolStartDetail{Skill: tc.Function.Name, Args: args}
-						req.StepCallback(tsEvt)
-					}
-					t0 := time.Now()
-					br := p.browserDispatch.Dispatch(tc.Function.Name, args)
-					dur := time.Since(t0)
-					if p.skillMetrics != nil {
-						var brErr error
-						if br.Error != "" {
-							brErr = fmt.Errorf("%s", br.Error)
-						}
-						p.skillMetrics(tc.Function.Name, dur, brErr)
-					}
-					out, _ := json.Marshal(br)
-					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: string(out)}
-					return
-				}
-
 				skill, ok := p.registry.Get(tc.Function.Name)
+				if !ok {
+					// Resolve hierarchical meta-tool: use_browser{action:"browser_navigate", args:{...}} → browser_navigate(args)
+					if strings.HasPrefix(tc.Function.Name, "use_") {
+						actionName, _ := args["action"].(string)
+						innerArgs, _ := args["args"].(map[string]any)
+						if actionName != "" {
+							if realSkill, found := p.registry.Get(actionName); found {
+								skill = realSkill
+								ok = true
+								if innerArgs != nil {
+									args = innerArgs
+								}
+							}
+						}
+					}
+				}
 				if !ok {
 					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: fmt.Sprintf("未知技能: %s", tc.Function.Name)}
 					return
@@ -220,12 +211,80 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	if err != nil {
 		return nil, fmt.Errorf("planner fc final: %w", err)
 	}
-	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 }
 
 // buildFunctionDefs converts skill definitions to LLM FunctionDef format.
-func (p *Planner) buildFunctionDefs() []llm.FunctionDef {
+// Uses two optimization strategies:
+// 1. Dynamic filtering: keyword-based intent matching to select relevant skills
+// 2. Hierarchical fallback: category meta-tools when filtered set is still large
+func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	allSkills := p.registry.All()
+	cats := p.registry.Categories()
+
+	// Strategy 1: Dynamic filtering by intent
+	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
+		filtered := p.registry.FilterByIntent(userMessage)
+		if len(filtered) < len(allSkills) && len(filtered) > 0 {
+			slog.Info("skill dynamic filter applied",
+				"total", len(allSkills),
+				"filtered", len(filtered),
+				"message_prefix", truncate(userMessage, 50))
+			defs := make([]llm.FunctionDef, 0, len(filtered))
+			for _, s := range filtered {
+				defs = append(defs, llm.FunctionDef{
+					Name:        s.Name(),
+					Description: s.Description(),
+					Parameters:  s.Parameters(),
+				})
+			}
+			if p.handoffReg != nil {
+				for _, hd := range p.handoffReg.ToolDefinitions() {
+					fn, _ := hd["function"].(map[string]any)
+					if fn == nil {
+						continue
+					}
+					name, _ := fn["name"].(string)
+					desc, _ := fn["description"].(string)
+					params, _ := fn["parameters"].(map[string]any)
+					defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
+				}
+			}
+			return defs
+		}
+	}
+
+	// Strategy 2: Hierarchical meta-tools
+	useHierarchical := len(allSkills) > 25 && len(cats) > 0
+	if useHierarchical {
+		hDefs := p.registry.HierarchicalDefs()
+		defs := make([]llm.FunctionDef, 0, len(hDefs))
+		for _, d := range hDefs {
+			name, _ := d["name"].(string)
+			desc, _ := d["description"].(string)
+			params, _ := d["parameters"].(map[string]any)
+			defs = append(defs, llm.FunctionDef{
+				Name:        name,
+				Description: desc,
+				Parameters:  params,
+			})
+		}
+
+		if p.handoffReg != nil {
+			for _, hd := range p.handoffReg.ToolDefinitions() {
+				fn, _ := hd["function"].(map[string]any)
+				if fn == nil {
+					continue
+				}
+				name, _ := fn["name"].(string)
+				desc, _ := fn["description"].(string)
+				params, _ := fn["parameters"].(map[string]any)
+				defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
+			}
+		}
+		return defs
+	}
+
 	defs := make([]llm.FunctionDef, 0, len(allSkills))
 	for _, s := range allSkills {
 		defs = append(defs, llm.FunctionDef{
@@ -253,23 +312,14 @@ func (p *Planner) buildFunctionDefs() []llm.FunctionDef {
 		}
 	}
 
-	// Append browser tool definitions if browser is enabled
-	if p.browserDispatch != nil {
-		for _, bd := range browser.ToolDefinitions() {
-			fn, _ := bd["function"].(map[string]any)
-			if fn == nil {
-				continue
-			}
-			name, _ := fn["name"].(string)
-			desc, _ := fn["description"].(string)
-			params, _ := fn["parameters"].(map[string]any)
-			defs = append(defs, llm.FunctionDef{
-				Name:        name,
-				Description: desc,
-				Parameters:  params,
-			})
+	return defs
+}
+
+func extractUserMessage(req PlanRequest) string {
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			return req.Messages[i].Content
 		}
 	}
-
-	return defs
+	return ""
 }

@@ -1,8 +1,8 @@
 package planner
 
-// executor_text.go — Text-based skill call execution engine.
-// Handles LLM text parsing for tool_calls JSON, parallel skill dispatch,
-// and multi-step planning when native FC is not available.
+// executor_text.go — Text-based skill execution fallback.
+// Parses tool_calls JSON from free-form LLM output when native FC isn't
+// available. For the native FC path, see executor_fc.go.
 
 import (
 	"context"
@@ -13,17 +13,39 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/observe"
 )
 
-// skillCall represents a parsed tool/skill invocation from LLM text output.
 type skillCall struct {
 	Name string         `json:"name"`
 	Args map[string]any `json:"arguments"`
 }
 
-// parseSkillCalls extracts tool_calls from LLM text output.
+// parseSkillCalls extracts tool calls from free-form LLM text.
+// Supports multiple formats that different models produce:
+//   - {"tool_calls": [...]}   or  {"skill_calls": [...]}   (standard wrapper)
+//   - <function_calls>\n{"name":"...", "arguments":"..."}   (Qwen-style)
 func (p *Planner) parseSkillCalls(text string) []skillCall {
-	// Look for JSON tool_calls in text
+	// Strategy 1: standard {"tool_calls": [...]} wrapper
+	if calls := p.parseWrappedCalls(text); len(calls) > 0 {
+		return calls
+	}
+
+	// Strategy 2: Qwen-style <function_calls> tag with inline JSON objects
+	if calls := p.parseFunctionCallsTag(text); len(calls) > 0 {
+		return calls
+	}
+
+	// Strategy 3: bare skill_name followed by JSON object (no wrapper)
+	// e.g. "docx_create\n{\"path\": \"...\", ...}"
+	if calls := p.parseBareSkillCall(text); len(calls) > 0 {
+		return calls
+	}
+
+	return nil
+}
+
+func (p *Planner) parseWrappedCalls(text string) []skillCall {
 	idx := strings.Index(text, `"tool_calls"`)
 	if idx < 0 {
 		idx = strings.Index(text, `"skill_calls"`)
@@ -31,8 +53,6 @@ func (p *Planner) parseSkillCalls(text string) []skillCall {
 	if idx < 0 {
 		return nil
 	}
-
-	// Find enclosing braces
 	start := strings.LastIndex(text[:idx], "{")
 	if start < 0 {
 		return nil
@@ -41,7 +61,6 @@ func (p *Planner) parseSkillCalls(text string) []skillCall {
 	if end < 0 {
 		return nil
 	}
-
 	var wrapper struct {
 		ToolCalls  []skillCall `json:"tool_calls"`
 		SkillCalls []skillCall `json:"skill_calls"`
@@ -55,15 +74,153 @@ func (p *Planner) parseSkillCalls(text string) []skillCall {
 	return wrapper.SkillCalls
 }
 
-// runTextBased uses text-based skill call parsing with multi-step planning.
-// Phase 1: Decompose — ask LLM to break task into steps (or handle directly for simple queries).
-// Phase 2: Execute — run steps respecting dependencies, parallel when independent.
-// Phase 3: Reflect — after tool results, assess if plan needs adjustment.
-// Phase 4: Synthesize — produce final reply from all step results.
+// parseFunctionCallsTag handles the <function_calls> format produced by Qwen
+// and similar models: the body contains one or more JSON objects with "name"
+// and "arguments" (the latter is a JSON-encoded string of the actual args).
+func (p *Planner) parseFunctionCallsTag(text string) []skillCall {
+	const openTag = "<function_calls>"
+	const closeTag = "</function_calls>"
+	start := strings.Index(text, openTag)
+	if start < 0 {
+		return nil
+	}
+	body := text[start+len(openTag):]
+	if end := strings.Index(body, closeTag); end >= 0 {
+		body = body[:end]
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return nil
+	}
+
+	var calls []skillCall
+	for len(body) > 0 {
+		idx := strings.Index(body, "{")
+		if idx < 0 {
+			break
+		}
+		end := findClosingBrace(body, idx)
+		if end < 0 {
+			break
+		}
+		chunk := body[idx : end+1]
+		body = body[end+1:]
+
+		var raw struct {
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		}
+		if err := json.Unmarshal([]byte(chunk), &raw); err != nil || raw.Name == "" {
+			continue
+		}
+
+		args := make(map[string]any)
+		// "arguments" may be a JSON string (double-encoded) or a direct object.
+		var argsStr string
+		if json.Unmarshal(raw.Arguments, &argsStr) == nil {
+			_ = json.Unmarshal([]byte(argsStr), &args)
+		} else {
+			_ = json.Unmarshal(raw.Arguments, &args)
+		}
+		calls = append(calls, skillCall{Name: raw.Name, Args: args})
+	}
+	return calls
+}
+
+// parseBareSkillCall detects a known skill name on its own line followed by
+// a JSON object.  Example:
+//
+//	docx_create
+//	{"path":"data/output/report.docx","title":"Report","content":"..."}
+//
+// This pattern appears when the LLM outputs a tool call as plain text without
+// any wrapper format.
+func (p *Planner) parseBareSkillCall(text string) []skillCall {
+	if p.registry == nil {
+		return nil
+	}
+	lines := strings.Split(text, "\n")
+	var calls []skillCall
+	for i := 0; i < len(lines); i++ {
+		name := strings.TrimSpace(lines[i])
+		if name == "" || strings.ContainsAny(name, " \t{}[]()\"'<>") {
+			continue
+		}
+		resolvedName := name
+		if _, ok := p.registry.Get(name); !ok {
+			resolvedName = p.fuzzyMatchSkill(name)
+			if resolvedName == "" {
+				continue
+			}
+			slog.Info("planner: fuzzy matched skill name", "raw", name, "resolved", resolvedName)
+		}
+		// Found a known skill name; look for a JSON object in subsequent lines.
+		jsonStart := -1
+		for j := i + 1; j < len(lines); j++ {
+			trimmed := strings.TrimSpace(lines[j])
+			if trimmed == "" {
+				continue
+			}
+			if trimmed[0] == '{' {
+				jsonStart = j
+				break
+			}
+			break
+		}
+		if jsonStart < 0 {
+			continue
+		}
+		remaining := strings.Join(lines[jsonStart:], "\n")
+		braceEnd := findClosingBrace(remaining, 0)
+		if braceEnd < 0 {
+			continue
+		}
+		chunk := remaining[:braceEnd+1]
+		var args map[string]any
+		if err := json.Unmarshal([]byte(chunk), &args); err != nil {
+			continue
+		}
+		calls = append(calls, skillCall{Name: resolvedName, Args: args})
+		slog.Info("planner: parsed bare skill call from text", "skill", resolvedName, "raw", name)
+	}
+	return calls
+}
+
+// fuzzyMatchSkill attempts to match a raw tool name to a registered skill.
+// Rules: "docx" → "docx_create", "xlsx" → "xlsx_create", "search" → "web_search", etc.
+func (p *Planner) fuzzyMatchSkill(raw string) string {
+	if p.registry == nil {
+		return ""
+	}
+	lower := strings.ToLower(raw)
+
+	// Strategy 1: exact match with common suffixes
+	for _, suffix := range []string{"_create", "_edit", "_fill"} {
+		candidate := lower + suffix
+		if _, ok := p.registry.Get(candidate); ok {
+			return candidate
+		}
+	}
+
+	// Strategy 2: registered skill that starts with the raw name
+	var match string
+	for _, sk := range p.registry.All() {
+		skName := strings.ToLower(sk.Name())
+		if strings.HasPrefix(skName, lower+"_") || strings.HasPrefix(skName, lower) {
+			if match == "" || len(skName) < len(match) {
+				match = sk.Name()
+			}
+		}
+	}
+	return match
+}
+
+// runTextBased: multi-step planning loop using text-parsed skill calls.
+// Decompose → Execute (parallel) → Reflect → Synthesize.
 func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResult, error) {
 	env := p.buildEnv(req)
 
-	messages := p.BuildMessages(ctx, req)
+	messages, ctxLayers := p.BuildMessages(ctx, req)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -74,13 +231,12 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
 
-		client := p.LLMClientFor(req.ModelOverride)
-		reply, err := client.Chat(ctx, messages, 0.7)
+		reply, err := p.chatFallback(ctx, req, messages)
 		if err != nil {
 			return nil, fmt.Errorf("planner step %d: %w", steps, err)
 		}
@@ -104,7 +260,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				}
 			}
 
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		}
 
 		// Execute tool calls in parallel
@@ -213,10 +369,20 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 		)
 	}
 
-	clientFinal := p.LLMClientFor(req.ModelOverride)
-	reply, err := clientFinal.Chat(ctx, messages, 0.7)
+	var streamCB llm.StreamDeltaFunc
+	if req.StepCallback != nil {
+		streamCB = func(contentDelta, reasoningDelta string) {
+			if reasoningDelta != "" {
+				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking, reasoningDelta)
+				evt.Meta.TenantID = req.TenantID
+				evt.Detail = map[string]string{"stream_type": "thinking_delta"}
+				req.StepCallback(evt)
+			}
+		}
+	}
+	finalResult, err := p.chatFallbackFull(ctx, req, messages, streamCB)
 	if err != nil {
 		return nil, fmt.Errorf("planner final: %w", err)
 	}
-	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps}, nil
+	return &PlanResult{Reply: p.cleanReply(finalResult.Content), ReasoningContent: finalResult.ReasoningContent, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 }

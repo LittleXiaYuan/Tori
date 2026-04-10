@@ -12,26 +12,24 @@ import (
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/internal/agentcore/subagent"
-	"yunque-agent/internal/execution/browser"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
 )
 
-// SkillMetricsFunc records a skill call's duration and error.
 type SkillMetricsFunc func(skillName string, duration time.Duration, err error)
 
-// SkillIndexEntry is a lightweight descriptor for the L2 skill index (name + description only).
+// SkillIndexEntry is a lightweight slug+description pair for the L2 skill index.
 type SkillIndexEntry struct {
 	Slug        string
 	Description string
 }
 
-// SkillIndexFunc returns the current list of installed skills for the L2 index.
 type SkillIndexFunc func() []SkillIndexEntry
 
-// Planner uses LLM to understand intent, decompose tasks, and orchestrate skills.
+// Planner is the brain: understands intent, breaks tasks into steps, and drives skills.
 type Planner struct {
 	llm              *llm.Client
 	llmPool          *llm.Pool // multi-model pool (nil = single model mode)
@@ -60,7 +58,7 @@ type Planner struct {
 	dynContextBudget int                                  // max tokens for dynamic context layer assembly (0 = unlimited)
 	ackEnabled       bool                                 // send typing indicators / ack
 	locale           string                               // agent locale (e.g. "zh-CN")
-	browserDispatch  *browser.Dispatcher                  // browser tool dispatcher (nil = disabled)
+	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
 	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
 	trustCheck       func(skillName string) error         // trust gate: returns non-nil to block skill
 	cognitiveContext CognitiveContextFunc                 // CognitivePlugin dynamic context injector
@@ -68,60 +66,56 @@ type Planner struct {
 	reactMode        bool                                 // if true, use ReAct mode instead of basic FC loop
 	longHorizonMode  bool                                 // if true, use DAG planner for complex multi-step tasks
 	runState         RunStateAccessor                     // per-session interrupt checking (nil = no interrupt support)
+	localBrain       *localbrain.LocalBrain               // local small model decision layer (nil = disabled)
+	agenticThinking  *localbrain.AgenticThinking          // agentic thinking engine (nil = disabled)
+	skillGrowth      *SkillGrowth                         // autonomous skill acquisition (nil = disabled)
+	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
+	dataCollector    *DataCollector                       // training data collector (nil = disabled)
+	providerReg      *llm.ProviderRegistry               // capability-aware provider registry (nil = use pool only)
 }
 
-// MemorySearchFunc searches memory and returns context string.
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
-// ReflectFunc evaluates result quality, returns true if satisfied.
 type ReflectFunc func(ctx context.Context, intent, reply string) bool
 
-// SetMemory attaches a memory search function.
 func (p *Planner) SetMemory(fn MemorySearchFunc) { p.memory = fn }
 
-// SetReflect attaches a reflection function.
 func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
 
-// SetPersonaPrompt attaches a dynamic persona prompt function (from Persona.SystemPrompt).
 func (p *Planner) SetPersonaPrompt(fn func() string) { p.personaPrompt = fn }
 
-// SetGraphContext attaches a knowledge graph context function.
-// It receives the user query and returns relevant entity/relation context.
+// SetGraphContext: fn(query) returns relevant entities/relations as text.
 func (p *Planner) SetGraphContext(fn func(query string) string) { p.graphContext = fn }
 
-// SetBrowser attaches a browser tool dispatcher.
-func (p *Planner) SetBrowser(d *browser.Dispatcher) { p.browserDispatch = d }
+// GraphContext returns the current graphContext callback (may be nil).
+func (p *Planner) GraphContext() func(query string) string { return p.graphContext }
 
-// SetCodeContext attaches a code knowledge context function.
-// It searches repo-type knowledge sources and returns formatted code snippets.
+// SetBrowser is a no-op kept for backward compatibility — browser skills are now in the skill registry.
+
+// SetCodeContext: fn(query) returns formatted code snippets from repo-type knowledge.
 func (p *Planner) SetCodeContext(fn func(query string) string) { p.codeContext = fn }
 
-// SetStateContext attaches a state kernel context function.
 func (p *Planner) SetStateContext(fn func() string) { p.stateContext = fn }
 
-// SetStrategyContext attaches a reflection strategy context function.
 func (p *Planner) SetStrategyContext(fn func() string) { p.strategyContext = fn }
 
-// SetDynContextBudget sets the max token budget for dynamic context layers (0 = unlimited).
 func (p *Planner) SetDynContextBudget(tokens int) { p.dynContextBudget = tokens }
 
-// SetDomainPrompt sets additional domain-specific system prompt from plugins.
 func (p *Planner) SetDomainPrompt(prompt string) { p.domainPrompt = prompt }
 
-// SetNativeFC enables native LLM function calling instead of text-based parsing.
-func (p *Planner) SetNativeFC(enabled bool) { p.useNativeFC = enabled }
+func (p *Planner) SetNativeFC(enabled bool) {
+	p.useNativeFC = enabled
+	p.InvalidatePromptCache()
+}
 
-// SetWindowConfig sets context window trimming config.
 func (p *Planner) SetWindowConfig(cfg ctxwindow.WindowConfig) { p.windowCfg = &cfg }
 
-// SetContextManager sets the multi-stage context compression manager.
 func (p *Planner) SetContextManager(mgr *ctxwindow.Manager) { p.ctxManager = mgr }
 
-// SetSkillMetrics attaches a function to record skill call metrics.
 func (p *Planner) SetSkillMetrics(fn SkillMetricsFunc) { p.skillMetrics = fn }
 
-// SetSkillIndex attaches a function that provides the L2 installed skill index.
-// These skills appear as name+description in the prompt; the model uses use_skill(slug) to load full details.
+// SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
+// loaded on demand via use_skill(slug).
 func (p *Planner) SetSkillIndex(fn SkillIndexFunc) { p.skillIndex = fn }
 
 // SetLLMPool attaches a multi-model LLM pool for dynamic model selection.
@@ -161,6 +155,24 @@ func (p *Planner) SetLongHorizonMode(enabled bool) { p.longHorizonMode = enabled
 
 // SetRunStateAccessor attaches the per-session interrupt checking function.
 func (p *Planner) SetRunStateAccessor(fn RunStateAccessor) { p.runState = fn }
+
+// SetLocalBrain attaches the local small model decision layer.
+func (p *Planner) SetLocalBrain(lb *localbrain.LocalBrain) { p.localBrain = lb }
+
+// SetAgenticThinking attaches the agentic thinking engine.
+func (p *Planner) SetAgenticThinking(at *localbrain.AgenticThinking) { p.agenticThinking = at }
+
+// SetSkillGrowth attaches the autonomous skill acquisition module.
+func (p *Planner) SetSkillGrowth(sg *SkillGrowth) { p.skillGrowth = sg }
+
+// SetDataCollector attaches the training data collector for LoRA pipeline.
+func (p *Planner) SetDataCollector(dc *DataCollector) { p.dataCollector = dc }
+
+// SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
+func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) { p.providerReg = reg }
+
+// LocalBrain returns the attached local brain (may be nil).
+func (p *Planner) LocalBrain() *localbrain.LocalBrain { return p.localBrain }
 
 // LLMPool returns the attached LLM pool (may be nil).
 func (p *Planner) LLMPool() *llm.Pool { return p.llmPool }
@@ -215,7 +227,7 @@ func (p *Planner) buildEnv(req PlanRequest) *skills.Environment {
 //   - Timestamp injected into last user message, NOT system prompt �?avoids cache invalidation
 //   - Goal recitation inserted before last user message in multi-turn �?keeps model focused
 //   - Errors preserved (append-only context) �?model learns from failures
-func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) []llm.Message {
+func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Message, []string) {
 	// ── 1. Stable prefix: base + persona + domain (rarely changes, KV-cache friendly) ──
 	stablePrefix := p.buildSystemPrompt()
 	if p.personaPrompt != nil {
@@ -229,6 +241,7 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) []llm.Mess
 	msgs := []llm.Message{{Role: "system", Content: stablePrefix}}
 
 	// ── 2. Dynamic context: memory + graph (per-query, separate message to preserve prefix cache) ──
+	var includedLayers []string
 	if len(req.Messages) > 0 {
 		pb := NewPromptBuilder(p)
 		assembled := pb.BuildDynamicContext(ctx, DynamicContextRequest{
@@ -237,6 +250,7 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) []llm.Mess
 			TaskContext: req.TaskContext,
 			EmotionHint: req.EmotionHint,
 		})
+		includedLayers = pb.LastIncludedLayers
 		if assembled != "" {
 			msgs = append(msgs, llm.Message{
 				Role:    "system",
@@ -253,9 +267,30 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) []llm.Mess
 		// Inject timestamp into the last user message (avoids system prompt cache invalidation)
 		for i := len(convMsgs) - 1; i >= 0; i-- {
 			if convMsgs[i].Role == "user" {
-				convMsgs[i] = llm.Message{
-					Role:    "user",
-					Content: fmt.Sprintf("[时间: %s]\n%s", time.Now().Format("2006-01-02 15:04"), convMsgs[i].Content),
+				ts := fmt.Sprintf("[时间: %s]\n", time.Now().Format("2006-01-02 15:04"))
+				if len(convMsgs[i].ContentParts) > 0 {
+					// Multimodal message: prepend timestamp to first text part, preserve all parts
+					updated := convMsgs[i]
+					parts := make([]llm.ContentPart, len(updated.ContentParts))
+					copy(parts, updated.ContentParts)
+					prefixed := false
+					for j := range parts {
+						if parts[j].Type == "text" && !prefixed {
+							parts[j].Text = ts + parts[j].Text
+							prefixed = true
+						}
+					}
+					if !prefixed {
+						parts = append([]llm.ContentPart{{Type: "text", Text: ts}}, parts...)
+					}
+					updated.ContentParts = parts
+					updated.Content = ts + updated.Content
+					convMsgs[i] = updated
+				} else {
+					convMsgs[i] = llm.Message{
+						Role:    "user",
+						Content: ts + convMsgs[i].Content,
+					}
 				}
 				break
 			}
@@ -321,16 +356,16 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) []llm.Mess
 			for i, m := range result.Messages {
 				trimmed[i] = llm.Message{Role: m.Role, Content: m.Content}
 			}
-			return trimmed
+			return trimmed, includedLayers
 		}
 	}
-	return msgs
+	return msgs, includedLayers
 }
 
 // NewPlanner creates a planner with the given LLM client and skill registry.
 func NewPlanner(llmClient *llm.Client, registry *skills.Registry, maxSteps int) *Planner {
 	if maxSteps <= 0 {
-		maxSteps = 8
+		maxSteps = 15
 	}
 	return &Planner{llm: llmClient, registry: registry, maxSteps: maxSteps, toolTimeout: 60 * time.Second}
 }
@@ -372,6 +407,7 @@ type PlanRequest struct {
 	InboxContext      string          // buffered group inbox messages for context
 	StepCallback      StepCallback    // optional: called for each intermediate step (thinking, tool call, etc.)
 	TraceID           string          // trace context ID for unified event protocol
+	ThinkingEnabled   *bool           // nil = model default; true/false = explicit override
 }
 
 // StepEventType classifies the kind of intermediate step event.
@@ -426,11 +462,13 @@ type PlanStep struct {
 
 // PlanResult is the output of the planner.
 type PlanResult struct {
-	Reply      string        `json:"reply"`
-	Actions    []AgentAction `json:"actions,omitempty"`
-	SkillsUsed []string      `json:"skills_used"`
-	Steps      int           `json:"steps"`
-	Plan       []PlanStep    `json:"plan,omitempty"`
+	Reply            string        `json:"reply"`
+	ReasoningContent string        `json:"reasoning_content,omitempty"`
+	Actions          []AgentAction `json:"actions,omitempty"`
+	SkillsUsed       []string      `json:"skills_used"`
+	Steps            int           `json:"steps"`
+	Plan             []PlanStep    `json:"plan,omitempty"`
+	ContextLayers    []string      `json:"context_layers,omitempty"`
 }
 
 // ExecutionSummary builds a concise summary of skill executions for session persistence.
@@ -470,12 +508,60 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 	}
 	result, err := p.runInner(ctx, req)
 	observe.EndSpan(span, err)
+
+	if err == nil && p.dataCollector != nil && result != nil {
+		var reflectScore float64
+		if p.reflect != nil && result.Reply != "" {
+			goal := extractGoal(req)
+			if p.reflect(ctx, goal, result.Reply) {
+				reflectScore = 0.8
+			} else {
+				reflectScore = 0.3
+			}
+		}
+		p.dataCollector.Collect(ctx, req, result, reflectScore)
+	}
+
 	return result, err
 }
 
 func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, error) {
 	if req.ModelOverride != "" {
 		slog.Debug("planner: model override", "override", req.ModelOverride)
+	}
+
+	// LocalBrain 预分类：用本地小模型决定路由（省 API token）
+	var lbNoTools bool
+	if p.localBrain != nil && req.ModelOverride == "" {
+		query := extractGoal(req)
+		if decision, err := p.localBrain.Classify(ctx, query, req.TenantID); err == nil {
+			slog.Info("planner: localbrain decision", "handler", decision.Handler, "intent", decision.Intent.Category, "need_tools", decision.Intent.NeedTools, "reason", decision.Reason)
+			if decision.Handler != "local" {
+				req.ModelOverride = decision.Handler
+			}
+			if !decision.Intent.NeedTools {
+				lbNoTools = true
+			}
+			if p.ledger != nil {
+				tracer := p.ledger.Reasoning(req.TaskID, "localbrain")
+				tracer.Decide(ctx, decision.Handler, decision.Reason, decision.Intent.Confidence, map[string]interface{}{
+					"category":   decision.Intent.Category,
+					"complexity": decision.Intent.Complexity,
+					"need_tools": decision.Intent.NeedTools,
+				})
+			}
+		}
+	}
+
+	// Fast-path: LocalBrain determined no tools needed → pure chat, skip all tool-enabled engines.
+	if lbNoTools {
+		slog.Info("planner: NeedTools=false, using tool-free chat path")
+		messages, layers := p.BuildMessages(ctx, req)
+		reply, err := p.chatFallback(ctx, req, messages)
+		if err != nil {
+			return nil, fmt.Errorf("planner tool-free chat: %w", err)
+		}
+		return &PlanResult{Reply: p.cleanReply(reply), Steps: 1, ContextLayers: layers}, nil
 	}
 
 	if p.longHorizonMode && p.isComplexTask(req) {
@@ -497,6 +583,215 @@ func (p *Planner) isComplexTask(req PlanRequest) bool {
 		return true
 	}
 	return plan.NeedsPlan(goal)
+}
+
+// adaptiveRoute determines whether the request requires an elevated reasoning model.
+func (p *Planner) adaptiveRoute(req PlanRequest) string {
+	if req.ModelOverride != "" {
+		return req.ModelOverride
+	}
+	lastMsg := ""
+	if len(req.Messages) > 0 {
+		lastMsg = req.Messages[len(req.Messages)-1].Content
+	}
+
+	// Autonomously elevate to 'expert' tier when dealing with long prompts or complex instructions.
+	if len([]rune(lastMsg)) > 300 || strings.Contains(lastMsg, "代码") || strings.Contains(lastMsg, "分析") || strings.Contains(lastMsg, "逻辑") {
+		slog.Info("planner: adaptive reasoning activated, elevating to expert tier")
+		return "expert"
+	}
+	return "fast"
+}
+
+// selectClientWithCaps returns the best LLM client considering both tier and required capabilities.
+// If messages contain images/video, it prefers providers with CapVision.
+func (p *Planner) selectClientWithCaps(req PlanRequest, messages []llm.Message) *llm.Client {
+	var requiredCaps []llm.Capability
+	for _, m := range messages {
+		for _, part := range m.ContentParts {
+			if part.Type == "image_url" || part.Type == "video_url" {
+				requiredCaps = append(requiredCaps, llm.CapVision)
+				break
+			}
+		}
+		if len(requiredCaps) > 0 {
+			break
+		}
+	}
+
+	if len(requiredCaps) > 0 && p.providerReg != nil {
+		if vp := p.providerReg.SelectByCapability(requiredCaps...); vp != nil {
+			slog.Info("planner: capability routing selected vision-capable provider",
+				"provider", vp.Config.ID, "model", vp.Config.Model, "caps", requiredCaps)
+			return vp.Client
+		}
+		slog.Warn("planner: no vision-capable provider found, falling back to default")
+	}
+
+	return p.LLMClientFor(p.adaptiveRoute(req))
+}
+
+// chatFallback wraps text-based chat calls with a graceful degradation retry loop.
+func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []llm.Message) (string, error) {
+	// Capability-aware routing: if messages contain media, prepend a vision-capable client
+	capClient := p.selectClientWithCaps(req, messages)
+	targetModel := p.adaptiveRoute(req)
+	var chain []*llm.Client
+	if p.llmPool != nil {
+		chain = p.llmPool.GetFallbackChain(targetModel)
+	} else {
+		chain = []*llm.Client{p.llm}
+	}
+	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
+		chain = append([]*llm.Client{capClient}, chain...)
+	}
+
+	var lastErr error
+	for i, client := range chain {
+		if i > 0 {
+			// Intercept model timeouts/failures and silently drop down to the next fallback node
+			slog.Warn("planner: degrading LLM client", "fallback_to", client.Model(), "err", lastErr)
+			if req.StepCallback != nil {
+				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, fmt.Sprintf("监测到主模型延迟，已静默切换至备用引擎 [%s]", client.Model()))
+				evt.Meta.TenantID = req.TenantID
+				req.StepCallback(evt)
+			}
+		}
+		reply, err := client.Chat(ctx, messages, 0.7)
+		if err == nil {
+			return reply, nil
+		}
+		if ctx.Err() != nil {
+			return "", err // user canceled context, do not retry
+		}
+		lastErr = err
+	}
+	return "", fmt.Errorf("all fallback LLM clients failed: %w", lastErr)
+}
+
+// chatFallbackFull is like chatFallback but returns ChatResult with reasoning_content.
+// Optional onDelta streams each token in real-time.
+func (p *Planner) chatFallbackFull(ctx context.Context, req PlanRequest, messages []llm.Message, onDelta ...llm.StreamDeltaFunc) (llm.ChatResult, error) {
+	capClient := p.selectClientWithCaps(req, messages)
+	targetModel := p.adaptiveRoute(req)
+	var chain []*llm.Client
+	if p.llmPool != nil {
+		chain = p.llmPool.GetFallbackChain(targetModel)
+	} else {
+		chain = []*llm.Client{p.llm}
+	}
+	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
+		chain = append([]*llm.Client{capClient}, chain...)
+	}
+
+	var lastErr error
+	for i, client := range chain {
+		if i > 0 {
+			slog.Warn("planner: degrading LLM client (full)", "fallback_to", client.Model(), "err", lastErr)
+		}
+		result, err := client.ChatFull(ctx, messages, 0.7, onDelta...)
+		if err == nil {
+			return result, nil
+		}
+		if ctx.Err() != nil {
+			return llm.ChatResult{}, err
+		}
+		lastErr = err
+	}
+	return llm.ChatResult{}, fmt.Errorf("all fallback LLM clients failed: %w", lastErr)
+}
+
+// chatWithToolsFallback wraps native FC chat calls with a graceful degradation retry loop.
+func (p *Planner) chatWithToolsFallback(ctx context.Context, req PlanRequest, messages []llm.Message, tools []llm.FunctionDef) (string, []llm.ToolCall, string, error) {
+	capClient := p.selectClientWithCaps(req, messages)
+	targetModel := p.adaptiveRoute(req)
+	var chain []*llm.Client
+	if p.llmPool != nil {
+		chain = p.llmPool.GetFallbackChain(targetModel)
+	} else {
+		chain = []*llm.Client{p.llm}
+	}
+	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
+		chain = append([]*llm.Client{capClient}, chain...)
+	}
+
+	// Resolve thinking mode: nil = auto (detect from message complexity)
+	thinkingFlag := req.ThinkingEnabled
+	if thinkingFlag == nil {
+		if shouldAutoThink(req.Messages) {
+			t := true
+			thinkingFlag = &t
+			slog.Info("planner: auto-thinking enabled (complex query detected)")
+		}
+	}
+
+	var lastErr error
+	thinkingRetried := false
+	for i, client := range chain {
+		if i > 0 {
+			slog.Warn("planner: degrading LLM client (FC)", "fallback_to", client.Model(), "err", lastErr)
+			if req.StepCallback != nil {
+				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, fmt.Sprintf("调用栈降级，正在级联唤醒备用引擎 [%s]...", client.Model()))
+				evt.Meta.TenantID = req.TenantID
+				req.StepCallback(evt)
+			}
+		}
+		var lastReasoning string
+		fcOpts := &llm.ChatWithToolsOpts{ThinkingEnabled: thinkingFlag, LastReasoningOut: &lastReasoning}
+		if req.StepCallback != nil {
+			fcOpts.OnReasoning = func(reasoning string) {
+				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventThinking, reasoning)
+				evt.Meta.TenantID = req.TenantID
+				evt.Detail = map[string]any{"stream_type": "reasoning_batch"}
+				req.StepCallback(evt)
+			}
+		}
+		reply, toolCalls, err := client.ChatWithToolsEx(ctx, messages, tools, 0.7, fcOpts)
+		if err == nil {
+			return reply, toolCalls, lastReasoning, nil
+		}
+		if !thinkingRetried && thinkingFlag != nil && *thinkingFlag && strings.Contains(err.Error(), "status 400") {
+			slog.Warn("planner: thinking caused 400, retrying without thinking", "model", client.Model())
+			f := false
+			thinkingFlag = &f
+			fcOpts.ThinkingEnabled = thinkingFlag
+			reply, toolCalls, err = client.ChatWithToolsEx(ctx, messages, tools, 0.7, fcOpts)
+			thinkingRetried = true
+			if err == nil {
+				return reply, toolCalls, lastReasoning, nil
+			}
+		}
+		if ctx.Err() != nil {
+			return "", nil, "", err
+		}
+		lastErr = err
+	}
+	return "", nil, "", fmt.Errorf("all fallback LLM clients failed (FC): %w", lastErr)
+}
+
+// shouldAutoThink heuristically determines if a query is complex enough to warrant thinking.
+func shouldAutoThink(messages []llm.Message) bool {
+	if len(messages) == 0 {
+		return false
+	}
+	last := messages[len(messages)-1].Content
+	runes := []rune(last)
+	if len(runes) > 200 {
+		return true
+	}
+	complexIndicators := []string{
+		"分析", "论文", "代码", "编写", "设计", "调研", "对比",
+		"生成", "创建", "优化", "实现", "解释", "推理", "计算",
+		"compare", "analyze", "implement", "design", "explain",
+		"write", "create", "optimize", "debug", "review",
+	}
+	lower := strings.ToLower(last)
+	for _, ind := range complexIndicators {
+		if strings.Contains(lower, ind) {
+			return true
+		}
+	}
+	return false
 }
 
 // Execution engines are split into separate files:

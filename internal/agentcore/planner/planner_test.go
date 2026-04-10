@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -253,8 +254,8 @@ func (s *mockSkill) Execute(ctx context.Context, args map[string]any, env *skill
 func TestPlannerDefaults(t *testing.T) {
 	client := mockLLMServer(t, func(_ []llm.Message) string { return "hi" })
 	p := NewPlanner(client, skills.NewRegistry(), 0)
-	if p.maxSteps != 8 {
-		t.Errorf("expected default maxSteps=8, got %d", p.maxSteps)
+	if p.maxSteps != 15 {
+		t.Errorf("expected default maxSteps=15, got %d", p.maxSteps)
 	}
 	if p.toolTimeout != 60*time.Second {
 		t.Errorf("expected default toolTimeout=60s, got %v", p.toolTimeout)
@@ -442,6 +443,49 @@ func TestSetToolTimeout(t *testing.T) {
 	p.SetToolTimeout(30 * time.Second)
 	if p.toolTimeout != 30*time.Second {
 		t.Errorf("expected 30s, got %v", p.toolTimeout)
+	}
+}
+
+func TestContextLayers_NoCrossContamination(t *testing.T) {
+	client := mockLLMServer(t, func(_ []llm.Message) string { return "reply" })
+	reg := skills.NewRegistry()
+	p := NewPlanner(client, reg, 8)
+
+	p.SetMemory(func(_ context.Context, _, query string) string {
+		time.Sleep(10 * time.Millisecond)
+		if contains(query, "memory-a") {
+			return "fact-a"
+		}
+		return ""
+	})
+
+	const N = 20
+	results := make([]*PlanResult, N)
+	errs := make([]error, N)
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			msg := fmt.Sprintf("request-%d", idx)
+			if idx%2 == 0 {
+				msg = "memory-a " + msg
+			}
+			results[idx], errs[idx] = p.Run(context.Background(), PlanRequest{
+				Messages: []llm.Message{{Role: "user", Content: msg}},
+				TenantID: fmt.Sprintf("tenant-%d", idx),
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < N; i++ {
+		if errs[i] != nil {
+			t.Fatalf("request %d failed: %v", i, errs[i])
+		}
+		if results[i] == nil {
+			t.Fatalf("request %d: nil result", i)
+		}
 	}
 }
 
