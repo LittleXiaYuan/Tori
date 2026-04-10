@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"context"
+	"log/slog"
 	"sync"
 
 	"yunque-agent/internal/agentcore/adaptive"
@@ -176,8 +178,22 @@ func (g *Gateway) SetDistiller(d *distill.Distiller) { g.distiller = d }
 // SetReviewGate attaches the risk-graded review gate.
 func (g *Gateway) SetReviewGate(rg *review.Gate) { g.reviewGate = rg }
 
-// SetSkillGrow attaches the skill growth detector.
-func (g *Gateway) SetSkillGrow(sg *skillgrow.Detector) { g.skillGrow = sg }
+// SetSkillGrow attaches the skill growth detector and wires its proposal
+// callback to surface suggestions in the frontend via /v1/skill-suggestions.
+func (g *Gateway) SetSkillGrow(sg *skillgrow.Detector) {
+	g.skillGrow = sg
+	if sg != nil {
+		sg.SetOnProposal(func(_ context.Context, pattern, suggestion string) {
+			slog.Info("skillgrow: proposal", "pattern", pattern, "suggestion", suggestion)
+			g.storePendingSuggestions("default", []memory.SkillSuggestion{{
+				Name:        "自动化: " + truncateStr(pattern, 30),
+				Description: suggestion,
+				Trigger:     pattern,
+				Confidence:  7,
+			}})
+		})
+	}
+}
 
 // SetAuditTrail attaches the task audit trail.
 func (g *Gateway) SetAuditTrail(at *audit.Trail) { g.auditTrail = at }
@@ -300,3 +316,11 @@ func (g *Gateway) SetNotifier(n *notify.Notifier) { g.notifier = n }
 
 // Notifier returns the notification dispatcher.
 func (g *Gateway) Notifier() *notify.Notifier { return g.notifier }
+
+func truncateStr(s string, maxRunes int) string {
+	r := []rune(s)
+	if len(r) <= maxRunes {
+		return s
+	}
+	return string(r[:maxRunes]) + "..."
+}

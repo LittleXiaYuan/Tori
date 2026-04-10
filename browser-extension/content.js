@@ -494,7 +494,6 @@
     if (!isActive) return;
 
     const dot = document.querySelector(`#${OVERLAY_ID}-top .yunque-op-dot`);
-    const text = document.querySelector(`#${OVERLAY_ID}-top .yunque-op-text`);
     const spinner = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-spinner`);
     const status = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-status`);
     const btn = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-takeover`);

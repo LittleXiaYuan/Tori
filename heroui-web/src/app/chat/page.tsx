@@ -2009,7 +2009,32 @@ ${text.slice(0, 4000)}` });
                   : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
               }}
             >
-              {/* Browser runtime merged into bottom toolbar — no separate top bar */}
+              {/* Frosted glass top bar */}
+              <div
+                className="flex items-center justify-between gap-3 rounded-t-[24px] px-4 py-2"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  backdropFilter: "blur(16px) saturate(1.6)",
+                  WebkitBackdropFilter: "blur(16px) saturate(1.6)",
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div className="text-[11px] truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                  {bridgeState?.connected
+                    ? <span className="flex items-center gap-1.5"><Monitor size={11} /><span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" /> 浏览器已连接</span>
+                    : "Yunque Agent"}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(true)}>
+                    <Plug size={11} /> 连接器
+                  </Button>
+                  <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]"
+                    data-active={showSlashMenu || activeSlashCommand ? "true" : undefined}
+                    onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}>
+                    <Sparkles size={11} /> 命令
+                  </Button>
+                </div>
+              </div>
 
               {pendingFiles.length > 0 && (
                 <div className="flex gap-2 px-5 pt-4 flex-wrap">
@@ -2119,40 +2144,6 @@ ${text.slice(0, 4000)}` });
                       onClose={() => setShowConnectors(false)}
                     />
                   </div>
-
-                  {/* Browser status pill — inline with toolbar */}
-                  {bridgeState?.connected && (
-                    <Popover>
-                      <Popover.Trigger>
-                        <button
-                          className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-                          style={{
-                            background: "rgba(59,130,246,0.08)",
-                            color: "#60a5fa",
-                            border: "1px solid rgba(59,130,246,0.15)",
-                          }}
-                        >
-                          <Monitor size={11} />
-                          <span className={`w-1.5 h-1.5 rounded-full bg-blue-400`} />
-                        </button>
-                      </Popover.Trigger>
-                      <Popover.Content className="w-[380px] max-w-[calc(100vw-48px)] p-0" placement="top" offset={8}>
-                        <Popover.Dialog className="p-0">
-                          <BrowserSessionCard
-                            compact
-                            state={bridgeState}
-                            pendingAction={bridgeActionPending}
-                            notice={bridgeNotice}
-                            artifact={lastArtifact}
-                            traceEvents={browserTraceEvents}
-                            onAction={sendBridgeAction}
-                            onOpenBrowserPage={() => window.open("/browser", "_blank", "noopener,noreferrer")}
-                            onSuggestCommand={handleSlashSelect}
-                          />
-                        </Popover.Dialog>
-                      </Popover.Content>
-                    </Popover>
-                  )}
                 </div>
                 <div className="hidden items-center gap-2 text-[10px] md:flex" style={{ color: "var(--yunque-text-muted)" }}>
                   <span>Enter 发送</span>
