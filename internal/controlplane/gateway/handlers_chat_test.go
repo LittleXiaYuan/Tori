@@ -308,3 +308,78 @@ func TestSummarizeBrowserPlanArtifact_HandlesFailedBrowserStep(t *testing.T) {
 		t.Fatalf("unexpected error summary: %#v", summary)
 	}
 }
+
+func TestDetectRequestIntent_BrowserConnected(t *testing.T) {
+	gw, _ := newTestGateway()
+	gw.browserHub = &BrowserHub{connected: true, tenantID: "t1"}
+
+	intent := gw.detectRequestIntent("请打开 https://owo.today 并总结页面内容", "t1")
+	if !intent.RequiresBrowser {
+		t.Fatal("expected browser runtime requirement")
+	}
+	if !intent.BrowserConnected {
+		t.Fatal("expected browser to be marked connected")
+	}
+	if !strings.Contains(intent.BrowserHint, "browser_navigate") {
+		t.Fatalf("unexpected browser hint: %q", intent.BrowserHint)
+	}
+}
+
+func TestDetectRequestIntent_BrowserDisconnected(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	intent := gw.detectRequestIntent("请打开 https://owo.today 并总结页面内容", "t1")
+	if !intent.RequiresBrowser {
+		t.Fatal("expected browser runtime requirement")
+	}
+	if intent.BrowserConnected {
+		t.Fatal("expected browser to be disconnected")
+	}
+	if !strings.Contains(strings.ToLower(intent.BrowserHint), "do not silently substitute web_search") {
+		t.Fatalf("unexpected browser hint: %q", intent.BrowserHint)
+	}
+}
+
+func TestDetectRequestIntent_ParsedDocument(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	intent := gw.detectRequestIntent("[Parsed document: report.pdf]\n请总结这份文档的核心观点", "t1")
+	if !intent.ReferencesDocument {
+		t.Fatal("expected document intent")
+	}
+	if !strings.Contains(intent.DocumentHint, "primary source of truth") {
+		t.Fatalf("unexpected document hint: %q", intent.DocumentHint)
+	}
+}
+
+func TestDetectRequestIntent_SkillGrowth(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	intent := gw.detectRequestIntent("把这个重复流程做成以后都能复用的自动化技能", "t1")
+	if !intent.ShouldSuggestSkill {
+		t.Fatal("expected skill growth hint")
+	}
+	if !strings.Contains(strings.ToLower(intent.SkillGrowthHint), "reusable workflow") {
+		t.Fatalf("unexpected skill growth hint: %q", intent.SkillGrowthHint)
+	}
+}
+
+func TestAugmentMessagesForIntent_InsertsSystemHints(t *testing.T) {
+	gw, _ := newTestGateway()
+	gw.browserHub = &BrowserHub{connected: true, tenantID: "t1"}
+
+	msgs := []llm.Message{{Role: "user", Content: "请打开 https://owo.today 并总结页面内容，还想把这个流程做成可复用自动化"}}
+	augmented := gw.augmentMessagesForIntent(msgs, "t1")
+	if len(augmented) != 3 {
+		t.Fatalf("expected 3 messages after augmentation, got %d", len(augmented))
+	}
+	if augmented[0].Role != "system" || !strings.Contains(augmented[0].Content, "[Browser routing]") {
+		t.Fatalf("unexpected first injected hint: %#v", augmented[0])
+	}
+	if augmented[1].Role != "system" || !strings.Contains(augmented[1].Content, "[Workflow growth]") {
+		t.Fatalf("unexpected second injected hint: %#v", augmented[1])
+	}
+	if augmented[2].Role != "user" {
+		t.Fatalf("expected original user message last, got %#v", augmented[2])
+	}
+}

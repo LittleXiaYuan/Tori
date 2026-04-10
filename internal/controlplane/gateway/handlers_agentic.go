@@ -118,7 +118,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msgs = g.augmentMessagesForBrowserIntent(msgs, tid)
+	msgs = g.augmentMessagesForIntent(msgs, tid)
 	// Memory: write user message(s) to short-term
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
@@ -343,6 +343,14 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			lastUserMsgForHook = req.Messages[i].Content
 			break
 		}
+	}
+	if g.skillGrow != nil && lastUserMsgForHook != "" {
+		growMsg := lastUserMsgForHook
+		safego.Go("agentic-skill-grow", func() {
+			growCtx, growCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer growCancel()
+			g.skillGrow.Observe(growCtx, growMsg)
+		})
 	}
 	g.InvokeReplyHooks(ctx, channelpkg.Message{ChannelType: "webui", Content: lastUserMsgForHook}, channelpkg.Reply{Content: reply})
 

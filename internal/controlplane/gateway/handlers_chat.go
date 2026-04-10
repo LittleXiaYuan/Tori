@@ -141,7 +141,7 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msgs = g.augmentMessagesForBrowserIntent(msgs, tid)
+	msgs = g.augmentMessagesForIntent(msgs, tid)
 	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
@@ -402,6 +402,24 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 				Dimension:   adaptive.DimEmoji,
 				UserMessage: req.Messages[len(req.Messages)-1].Content,
 				Correction:  "with_emoji",
+			})
+		}
+	}
+
+	// Skill growth detector: judge whether this user task is becoming a reusable workflow pattern.
+	if g.skillGrow != nil && len(req.Messages) > 0 {
+		lastUserMsg := ""
+		for i := len(req.Messages) - 1; i >= 0; i-- {
+			if req.Messages[i].Role == "user" {
+				lastUserMsg = req.Messages[i].Content
+				break
+			}
+		}
+		if lastUserMsg != "" {
+			safego.Go("skill-grow", func() {
+				growCtx, growCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer growCancel()
+				g.skillGrow.Observe(growCtx, lastUserMsg)
 			})
 		}
 	}
