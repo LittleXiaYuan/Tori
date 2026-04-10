@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/observe"
 )
@@ -190,7 +191,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				r.output = fmt.Sprintf("执行失败: %v", r.err)
 			}
 			planSteps = append(planSteps, step)
-			messages = append(messages, buildToolResultMsg(r.id, r.output))
+			pruned := pruneToolResult(r.output, steps)
+			messages = append(messages, buildToolResultMsg(r.id, pruned))
 
 			// Notify: tool_result
 			if req.StepCallback != nil {
@@ -213,6 +215,15 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	if err != nil {
 		return nil, fmt.Errorf("planner fc final: %w", err)
 	}
+
+	// Update recency for future intent routing
+	if len(usedSkills) > 0 {
+		p.recentSkills = append(usedSkills, p.recentSkills...)
+		if len(p.recentSkills) > 20 {
+			p.recentSkills = p.recentSkills[:20]
+		}
+	}
+
 	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 }
 
@@ -230,9 +241,13 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	}
 	slog.Info("buildFunctionDefs", "total_skills", len(allSkills), "categories", len(cats), "cat_detail", strings.Join(catNames, ","), "msg_prefix", truncate(userMessage, 50))
 
-	// Strategy 1: Dynamic filtering by intent
+	// Strategy 1: Dynamic filtering by intent (keyword + Ledger success + recency)
 	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
-		filtered := p.registry.FilterByIntent(userMessage)
+		scorer := p.skillScorer
+		if scorer != nil && len(p.recentSkills) > 0 {
+			scorer.RecentSkills = p.recentSkills
+		}
+		filtered := p.registry.FilterByIntentScored(userMessage, scorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
 			slog.Info("skill dynamic filter applied",
 				"total", len(allSkills),
@@ -302,6 +317,22 @@ func extractUserMessage(req PlanRequest) string {
 		}
 	}
 	return ""
+}
+
+// pruneToolResult applies progressive compression to tool outputs.
+// Earlier steps get compressed more aggressively to save context for later steps.
+func pruneToolResult(output string, stepNum int) string {
+	maxBytes := 8000
+	if stepNum > 3 {
+		maxBytes = 4000
+	}
+	if stepNum > 6 {
+		maxBytes = 2000
+	}
+	if len(output) <= maxBytes {
+		return output
+	}
+	return ctxwindow.PruneToolOutput(output, maxBytes)
 }
 
 // buildToolResultMsg creates a tool result message. If the output contains

@@ -57,6 +57,8 @@ type Planner struct {
 	strategyContext  func() string                        // reflection loop strategy context
 	dynContextBudget int                                  // max tokens for dynamic context layer assembly (0 = unlimited)
 	ackEnabled       bool                                 // send typing indicators / ack
+	skillScorer      *skills.SkillScorer                  // Ledger-driven skill scoring for intent routing
+	recentSkills     []string                             // last N skills used (for routing recency bonus)
 	locale           string                               // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
 	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
@@ -113,6 +115,9 @@ func (p *Planner) SetWindowConfig(cfg ctxwindow.WindowConfig) { p.windowCfg = &c
 func (p *Planner) SetContextManager(mgr *ctxwindow.Manager) { p.ctxManager = mgr }
 
 func (p *Planner) SetSkillMetrics(fn SkillMetricsFunc) { p.skillMetrics = fn }
+
+// SetSkillScorer sets the Ledger-derived skill scoring data for intent-based routing.
+func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) { p.skillScorer = scorer }
 
 // SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
 // loaded on demand via use_skill(slug).
@@ -322,7 +327,14 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 		msgs = append(msgs, convMsgs...)
 	}
 
-	// ── 4. Context compression + window trimming ──
+	// ── 4. Pre-compress tool results ──
+	for i := range msgs {
+		if msgs[i].Role == "tool" && len(msgs[i].Content) > 6000 {
+			msgs[i].Content = ctxwindow.PruneToolOutput(msgs[i].Content, 6000)
+		}
+	}
+
+	// ── 5. Context compression + window trimming ──
 
 	// Multi-stage compression (enforce turns �?LLM summary �?emergency halve)
 	if p.ctxManager != nil {

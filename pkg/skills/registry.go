@@ -223,7 +223,7 @@ func joinNames(names []string) string {
 	return out
 }
 
-// intentKeywords maps intent keywords to category IDs for dynamic filtering.
+// intentKeywords maps intent keywords to category IDs for keyword scoring.
 var intentKeywords = map[string][]string{
 	"browser": {"浏览", "网页", "网站", "打开", "搜索", "截图", "点击", "输入", "滚动",
 		"查看", "访问", "前往", "跳转", "去看", "帮我看", "登录", "注册",
@@ -234,23 +234,82 @@ var intentKeywords = map[string][]string{
 		"日历", "calendar", "notion", "slack", "linear", "jira", "outlook"},
 	"research": {"研究", "调研", "报告", "research", "report", "分析", "综述"},
 	"file": {"文件", "保存", "生成", "写入", "导出", "file", "save", "export", "write",
-		"markdown", "html", "csv", "json", "pdf", "docx", "pptx", "xlsx", "??", "??", "????", "??"},
+		"markdown", "html", "csv", "json", "pdf", "docx", "pptx", "xlsx"},
 	"image":    {"图片", "图像", "画", "生成图", "image", "picture", "draw", "illustration"},
 	"workflow": {"工作流", "workflow", "自动化", "流程", "automation"},
 }
 
-// FilterByIntent returns skills relevant to the given user message using keyword matching.
-// Always returns uncategorized skills + skills from matched categories.
-func (r *Registry) FilterByIntent(message string) []Skill {
-	msg := strings.ToLower(message)
+// SkillScorer provides scoring-based skill routing. Categories are scored by
+// keyword overlap, Ledger success rates, and recency — higher score means more
+// likely relevant to the user's intent.
+type SkillScorer struct {
+	SuccessRates map[string]float64 // skill_name → [0,1] success rate from Ledger
+	RecentSkills []string           // last N skill names used (most recent first)
+}
 
-	matchedCats := make(map[string]bool)
+// ScoreCategories returns a score for each registered category based on the
+// user message. Score = keyword_hits + success_rate_bonus + recency_bonus.
+func (r *Registry) ScoreCategories(message string, scorer *SkillScorer) map[string]float64 {
+	msg := strings.ToLower(message)
+	scores := make(map[string]float64)
+
 	for catID, keywords := range intentKeywords {
+		if _, exists := r.categories[catID]; !exists {
+			continue
+		}
+		hits := 0
 		for _, kw := range keywords {
 			if strings.Contains(msg, kw) {
-				matchedCats[catID] = true
-				break
+				hits++
 			}
+		}
+		if hits == 0 {
+			continue
+		}
+		score := float64(hits) * 1.0
+
+		if scorer != nil {
+			cat := r.categories[catID]
+			var avgSuccess float64
+			var successCount int
+			for _, sn := range cat.SkillNames {
+				if rate, ok := scorer.SuccessRates[sn]; ok {
+					avgSuccess += rate
+					successCount++
+				}
+			}
+			if successCount > 0 {
+				score += (avgSuccess / float64(successCount)) * 2.0
+			}
+
+			for i, recent := range scorer.RecentSkills {
+				if cat := r.skillToCat[recent]; cat == catID {
+					score += 1.0 / float64(i+1)
+					break
+				}
+			}
+		}
+		scores[catID] = score
+	}
+	return scores
+}
+
+// FilterByIntent returns skills relevant to the given user message using
+// multi-signal scoring: keyword matching + success rate + recency.
+// Always returns uncategorized skills + skills from matched categories.
+func (r *Registry) FilterByIntent(message string) []Skill {
+	return r.FilterByIntentScored(message, nil)
+}
+
+// FilterByIntentScored is like FilterByIntent but accepts a scorer
+// for Ledger-driven success rate and recency data.
+func (r *Registry) FilterByIntentScored(message string, scorer *SkillScorer) []Skill {
+	scores := r.ScoreCategories(message, scorer)
+
+	matchedCats := make(map[string]bool)
+	for catID, score := range scores {
+		if score > 0.5 {
+			matchedCats[catID] = true
 		}
 	}
 
@@ -264,7 +323,6 @@ func (r *Registry) FilterByIntent(message string) []Skill {
 		}
 	}
 
-	// If no category matched, return all (fallback)
 	if len(matchedCats) == 0 {
 		return r.All()
 	}

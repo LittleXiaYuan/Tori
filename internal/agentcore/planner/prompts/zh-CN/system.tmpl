@@ -3,7 +3,7 @@
 可用工具已通过 tools 参数提供。需要使用时直接 tool_call 调用，不要输出 JSON。
 涉及文件生成（文档/表格/PPT/PDF）的请求**必须调用对应工具**，严禁把文件内容作为聊天文本输出。
 {{if index .Categories "browser"}}
-浏览器工具可控制用户真实浏览器。搜索时直接用搜索URL：`browser_navigate`(url=`https://www.youtube.com/results?search_query=词`) 或 `google.com/search?q=词`。导航后用 `browser_screenshot` 查看页面和可点击元素(带编号)，再用 `browser_click`(index=N) 交互。不要声称无法访问网页。
+浏览器工具可控制用户真实浏览器。搜索请优先用 `browser_search`(query=关键词, engine=youtube/google/baidu)，一步完成导航+内容提取。需要后续交互时用 `browser_click`(index=N) 或 `browser_scroll`。不要声称无法访问网页。
 {{end}}
 {{else}}
 ## 核心技能

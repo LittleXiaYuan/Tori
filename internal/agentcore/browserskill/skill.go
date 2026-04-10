@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"yunque-agent/pkg/skills"
 )
@@ -31,6 +32,7 @@ func RegisterSkills(reg *skills.Registry, ctrl BrowserController) {
 	reg.Register(&newTabSkill{ctrl: ctrl})
 	reg.Register(&closeTabSkill{ctrl: ctrl})
 	reg.Register(&takeoverSkill{ctrl: ctrl})
+	reg.Register(&searchSkill{ctrl: ctrl})
 }
 
 // ─── Navigate ────────────────────────────────────────
@@ -304,6 +306,95 @@ func (s *takeoverSkill) Execute(ctx context.Context, args map[string]any, _ *ski
 		status = "resumed"
 	}
 	return callBrowser(ctx, s.ctrl, map[string]any{"type": "session_status", "status": status, "sessionTitle": reason})
+}
+
+// ─── Search (Composite Pipeline) ─────────────────────
+
+type searchSkill struct{ ctrl BrowserController }
+
+func (s *searchSkill) Name() string { return "browser_search" }
+func (s *searchSkill) Description() string {
+	return "Search YouTube/Google/Baidu/Bing/etc. in one step. Automatically navigates, waits, and returns page content + interactive elements. Use this instead of manually chaining browser_navigate + browser_screenshot for searches."
+}
+func (s *searchSkill) Parameters() map[string]any {
+	return jsonSchema([]paramDef{
+		{Name: "query", Type: "string", Desc: "Search query text", Required: true},
+		{Name: "engine", Type: "string", Desc: "Search engine: google, youtube, baidu, bing, duckduckgo (default: google)"},
+	})
+}
+func (s *searchSkill) Execute(ctx context.Context, args map[string]any, _ *skills.Environment) (string, error) {
+	query, _ := args["query"].(string)
+	if query == "" {
+		return "", fmt.Errorf("query is required")
+	}
+	engine, _ := args["engine"].(string)
+	if engine == "" {
+		engine = "google"
+	}
+
+	url := buildSearchURL(engine, query)
+
+	if _, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_navigate", "url": url}); err != nil {
+		return "", fmt.Errorf("navigate failed: %w", err)
+	}
+
+	contentResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_get_structured_content"})
+	elementsResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_mark_elements"})
+
+	text := fmt.Sprintf("[Search: %s on %s]\n[URL]: %s\n[Page content]: %s\n[Interactive elements]: %s",
+		query, engine, url, contentResult, elementsResult)
+
+	compressed := CompressBrowserResult(text, 6000)
+	return compressed, nil
+}
+
+// buildSearchURL maps engine name + query to a direct search URL.
+func buildSearchURL(engine, query string) string {
+	q := strings.ReplaceAll(query, " ", "+")
+	switch strings.ToLower(engine) {
+	case "youtube":
+		return "https://www.youtube.com/results?search_query=" + q
+	case "baidu":
+		return "https://www.baidu.com/s?wd=" + q
+	case "bing":
+		return "https://www.bing.com/search?q=" + q
+	case "duckduckgo", "ddg":
+		return "https://duckduckgo.com/?q=" + q
+	default:
+		return "https://www.google.com/search?q=" + q
+	}
+}
+
+// CompressBrowserResult applies content-aware compression to browser results.
+// Keeps page metadata and top interactive elements, truncates verbose DOM text.
+func CompressBrowserResult(text string, maxRunes int) string {
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+
+	sections := strings.SplitN(text, "[Interactive elements]:", 2)
+	if len(sections) < 2 {
+		return string(runes[:maxRunes]) + "\n...[truncated]"
+	}
+
+	contentBudget := maxRunes * 2 / 3
+	elementsBudget := maxRunes - contentBudget
+
+	contentPart := sections[0]
+	elementsPart := sections[1]
+
+	contentRunes := []rune(contentPart)
+	if len(contentRunes) > contentBudget {
+		contentPart = string(contentRunes[:contentBudget]) + "\n...[content truncated]"
+	}
+
+	elementsRunes := []rune(elementsPart)
+	if len(elementsRunes) > elementsBudget {
+		elementsPart = string(elementsRunes[:elementsBudget]) + "\n...[elements truncated]"
+	}
+
+	return contentPart + "[Interactive elements]:" + elementsPart
 }
 
 // ─── Helpers ─────────────────────────────────────────
