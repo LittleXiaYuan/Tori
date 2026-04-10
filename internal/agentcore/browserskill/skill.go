@@ -38,7 +38,7 @@ func RegisterSkills(reg *skills.Registry, ctrl BrowserController) {
 type navigateSkill struct{ ctrl BrowserController }
 
 func (s *navigateSkill) Name() string        { return "browser_navigate" }
-func (s *navigateSkill) Description() string  { return "Navigate the browser to a URL. After navigation, use browser_mark_elements to find interactive elements, then browser_input/browser_click to interact." }
+func (s *navigateSkill) Description() string  { return "Navigate the browser to a URL. For searches, use the search URL directly: youtube.com/results?search_query=..., google.com/search?q=..., etc. After navigation, use browser_screenshot to view results, then browser_click on element indices to interact." }
 func (s *navigateSkill) Parameters() map[string]any {
 	return jsonSchema([]paramDef{{Name: "url", Type: "string", Desc: "The URL to navigate to", Required: true}})
 }
@@ -119,16 +119,15 @@ func (s *inputSkill) Execute(ctx context.Context, args map[string]any, _ *skills
 type screenshotSkill struct{ ctrl BrowserController }
 
 func (s *screenshotSkill) Name() string        { return "browser_screenshot" }
-func (s *screenshotSkill) Description() string  { return "View the current browser page. Returns page title, URL, and interactive elements (use element index for browser_click)." }
+func (s *screenshotSkill) Description() string  { return "View the current browser page. Returns page title, URL, text content, and clickable elements with indices (use indices for browser_click)." }
 func (s *screenshotSkill) Parameters() map[string]any { return jsonSchema(nil) }
 func (s *screenshotSkill) Execute(ctx context.Context, _ map[string]any, _ *skills.Environment) (string, error) {
-	screenshotResult, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_screenshot"})
+	contentResult, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_get_structured_content"})
 	if err != nil {
-		return screenshotResult, err
+		return contentResult, err
 	}
-	contentResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_get_structured_content"})
 	elementsResult, _ := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_mark_elements"})
-	return fmt.Sprintf("%s\n[Page content]: %s\n[Interactive elements]: %s", screenshotResult, contentResult, elementsResult), nil
+	return fmt.Sprintf("[Page content]: %s\n[Interactive elements]: %s", contentResult, elementsResult), nil
 }
 
 // ─── Scroll ──────────────────────────────────────────
