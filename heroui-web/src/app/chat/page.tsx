@@ -2009,64 +2009,7 @@ ${text.slice(0, 4000)}` });
                   : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
               }}
             >
-              <div className="flex items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-                <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                  Tori 负责执行，云雀负责工作台与上下文组织。
-                </div>
-                <div className="composer-toolbar-fade hidden items-center gap-1.5 md:flex">
-                  <Button size="sm" variant="ghost" className="chat-tool-btn h-8 rounded-full px-2.5 text-[11px]" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(true)}>
-                    <Plug size={13} />
-                    连接器
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="chat-tool-btn h-8 rounded-full px-2.5 text-[11px]"
-                    data-active={showSlashMenu || activeSlashCommand ? "true" : undefined}
-                    onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}
-                  >
-                    <Sparkles size={13} />
-                    命令
-                  </Button>
-                </div>
-              </div>
-
-              {/* Browser runtime: small pill + HeroUI Popover */}
-              {(bridgeState?.connected || bridgeState?.runtimeSession?.id || bridgeState?.takeover || bridgeState?.runtimeSession?.takeover) && (
-                <div className="px-4 pt-2">
-                  <Popover>
-                    <Popover.Trigger>
-                      <button
-                        className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all"
-                        style={{
-                          background: bridgeState?.connected ? "rgba(59,130,246,0.1)" : "rgba(248,113,113,0.1)",
-                          color: bridgeState?.connected ? "#60a5fa" : "#f87171",
-                          border: `1px solid ${bridgeState?.connected ? "rgba(59,130,246,0.2)" : "rgba(248,113,113,0.2)"}`,
-                        }}
-                      >
-                        <Monitor size={13} />
-                        <span>{bridgeState?.connected ? "浏览器已连接" : "浏览器未连接"}</span>
-                        <span className={`w-1.5 h-1.5 rounded-full ${bridgeState?.connected ? "bg-blue-400" : "bg-red-400"}`} />
-                      </button>
-                    </Popover.Trigger>
-                    <Popover.Content className="w-[380px] max-w-[calc(100vw-48px)] p-0" placement="top" offset={8}>
-                      <Popover.Dialog className="p-0">
-                        <BrowserSessionCard
-                          compact
-                          state={bridgeState}
-                          pendingAction={bridgeActionPending}
-                          notice={bridgeNotice}
-                          artifact={lastArtifact}
-                          traceEvents={browserTraceEvents}
-                          onAction={sendBridgeAction}
-                          onOpenBrowserPage={() => window.open("/browser", "_blank", "noopener,noreferrer")}
-                          onSuggestCommand={handleSlashSelect}
-                        />
-                      </Popover.Dialog>
-                    </Popover.Content>
-                  </Popover>
-                </div>
-              )}
+              {/* Browser runtime merged into bottom toolbar — no separate top bar */}
 
               {pendingFiles.length > 0 && (
                 <div className="flex gap-2 px-5 pt-4 flex-wrap">
@@ -2133,10 +2076,10 @@ ${text.slice(0, 4000)}` });
                 value={chat.input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="输入消息，或输入 / 使用命令、连接器与内置技能…"
+                placeholder="输入消息，/ 打开命令…"
                 rows={1}
                 className="chat-composer-textarea w-full resize-none bg-transparent px-4 pt-2.5 pb-1.5 text-[14px] outline-none"
-                style={{ color: "var(--yunque-text)", minHeight: 60, maxHeight: 180, lineHeight: 1.65 }}
+                style={{ color: "var(--yunque-text)", minHeight: 42, maxHeight: 160, lineHeight: 1.65 }}
                 disabled={chat.loading}
               />
 
@@ -2176,13 +2119,45 @@ ${text.slice(0, 4000)}` });
                       onClose={() => setShowConnectors(false)}
                     />
                   </div>
+
+                  {/* Browser status pill — inline with toolbar */}
+                  {bridgeState?.connected && (
+                    <Popover>
+                      <Popover.Trigger>
+                        <button
+                          className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
+                          style={{
+                            background: "rgba(59,130,246,0.08)",
+                            color: "#60a5fa",
+                            border: "1px solid rgba(59,130,246,0.15)",
+                          }}
+                        >
+                          <Monitor size={11} />
+                          <span className={`w-1.5 h-1.5 rounded-full bg-blue-400`} />
+                        </button>
+                      </Popover.Trigger>
+                      <Popover.Content className="w-[380px] max-w-[calc(100vw-48px)] p-0" placement="top" offset={8}>
+                        <Popover.Dialog className="p-0">
+                          <BrowserSessionCard
+                            compact
+                            state={bridgeState}
+                            pendingAction={bridgeActionPending}
+                            notice={bridgeNotice}
+                            artifact={lastArtifact}
+                            traceEvents={browserTraceEvents}
+                            onAction={sendBridgeAction}
+                            onOpenBrowserPage={() => window.open("/browser", "_blank", "noopener,noreferrer")}
+                            onSuggestCommand={handleSlashSelect}
+                          />
+                        </Popover.Dialog>
+                      </Popover.Content>
+                    </Popover>
+                  )}
                 </div>
                 <div className="hidden items-center gap-2 text-[10px] md:flex" style={{ color: "var(--yunque-text-muted)" }}>
-                  <span className="hidden md:inline">Enter 发送</span>
-                  <span className="hidden md:inline">·</span>
-                  <span className="hidden md:inline">Shift + Enter 换行</span>
-                  <span className="hidden md:inline">·</span>
-                  <span>/ 打开命令</span>
+                  <span>Enter 发送</span>
+                  <span>·</span>
+                  <span>⇧↵ 换行</span>
                 </div>
                 {chat.loading ? (
                   <Button
