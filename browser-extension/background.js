@@ -1257,6 +1257,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })().catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+  if (msg.type === "bridge_stop_session") {
+    (async () => {
+      sendToBackend({ type: "session_status", status: "stopped" });
+      applyTakeoverState(false, "");
+      await updateRuntimeSession({ status: "idle" }, { forceBroadcast: true });
+      if (agentTabGroupId != null) {
+        try { await chrome.tabGroups.update(agentTabGroupId, { color: "grey" }); } catch (_) {}
+        agentTabGroupId = null;
+      }
+      sendResponse({ ok: true });
+    })().catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
   if (msg.type === "resume_takeover") {
     (async () => {
       const result = await syncTakeoverState("resumed", "", msg.tabId || runtimeSession.currentTabId, true);

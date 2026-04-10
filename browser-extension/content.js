@@ -345,14 +345,190 @@
     }
   });
 
+  // ─── Operator Overlay (Manus-style) ────────────────
+
+  const OVERLAY_ID = "yunque-operator-overlay";
+  let overlayState = { visible: false, status: "idle", takeover: false };
+
+  function injectOperatorStyles() {
+    if (document.getElementById("yunque-operator-styles")) return;
+    const s = document.createElement("style");
+    s.id = "yunque-operator-styles";
+    s.textContent = `
+      #${OVERLAY_ID}-top {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
+        height: 36px; display: flex; align-items: center; justify-content: space-between;
+        padding: 0 16px;
+        background: linear-gradient(90deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+        color: #e0e7ff; font: 500 13px/36px -apple-system, "Segoe UI", sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        transform: translateY(-100%); transition: transform 0.3s ease;
+        user-select: none;
+      }
+      #${OVERLAY_ID}-top.yunque-overlay-show { transform: translateY(0); }
+      #${OVERLAY_ID}-top .yunque-op-left { display: flex; align-items: center; gap: 8px; }
+      #${OVERLAY_ID}-top .yunque-op-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: #34d399;
+        animation: yunque-op-pulse 1.5s infinite;
+      }
+      #${OVERLAY_ID}-top .yunque-op-dot.paused { background: #fbbf24; animation: none; }
+      #${OVERLAY_ID}-top .yunque-op-dot.error { background: #f87171; animation: none; }
+      #${OVERLAY_ID}-top .yunque-op-cancel {
+        background: #dc2626; color: #fff; border: none; border-radius: 4px;
+        padding: 2px 12px; font: 500 12px/20px inherit; cursor: pointer;
+        transition: background 0.15s;
+      }
+      #${OVERLAY_ID}-top .yunque-op-cancel:hover { background: #b91c1c; }
+      @keyframes yunque-op-pulse {
+        0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+      }
+
+      #${OVERLAY_ID}-bottom {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
+        z-index: 2147483647;
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 20px; border-radius: 24px;
+        background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+        color: #e2e8f0; font: 500 13px/1.4 -apple-system, "Segoe UI", sans-serif;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        opacity: 0; user-select: none;
+      }
+      #${OVERLAY_ID}-bottom.yunque-overlay-show { transform: translateX(-50%) translateY(0); opacity: 1; }
+      #${OVERLAY_ID}-bottom .yunque-op-spinner {
+        width: 16px; height: 16px; border: 2px solid #4f46e5;
+        border-top-color: transparent; border-radius: 50%;
+        animation: yunque-op-spin 0.8s linear infinite;
+      }
+      @keyframes yunque-op-spin { to { transform: rotate(360deg); } }
+      #${OVERLAY_ID}-bottom .yunque-op-takeover {
+        background: #4f46e5; color: #fff; border: none; border-radius: 16px;
+        padding: 4px 16px; font: 600 12px/20px inherit; cursor: pointer;
+        transition: background 0.15s;
+      }
+      #${OVERLAY_ID}-bottom .yunque-op-takeover:hover { background: #4338ca; }
+      #${OVERLAY_ID}-bottom .yunque-op-takeover.active {
+        background: #f59e0b; color: #1e1b4b;
+      }
+      #${OVERLAY_ID}-bottom .yunque-op-takeover.active:hover { background: #d97706; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function createOperatorOverlay() {
+    if (document.getElementById(`${OVERLAY_ID}-top`)) return;
+    injectOperatorStyles();
+
+    const top = document.createElement("div");
+    top.id = `${OVERLAY_ID}-top`;
+    top.innerHTML = `
+      <div class="yunque-op-left">
+        <div class="yunque-op-dot"></div>
+        <span class="yunque-op-text">Yunque AI 正在浏览此页面</span>
+      </div>
+      <button class="yunque-op-cancel">停止</button>
+    `;
+    document.body.appendChild(top);
+
+    const bottom = document.createElement("div");
+    bottom.id = `${OVERLAY_ID}-bottom`;
+    bottom.innerHTML = `
+      <div class="yunque-op-spinner"></div>
+      <span class="yunque-op-status">Yunque is browsing...</span>
+      <button class="yunque-op-takeover">Take over</button>
+    `;
+    document.body.appendChild(bottom);
+
+    top.querySelector(".yunque-op-cancel").addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "bridge_stop_session" });
+    });
+
+    bottom.querySelector(".yunque-op-takeover").addEventListener("click", () => {
+      const btn = bottom.querySelector(".yunque-op-takeover");
+      if (overlayState.takeover) {
+        chrome.runtime.sendMessage({ type: "bridge_resume" });
+      } else {
+        chrome.runtime.sendMessage({ type: "bridge_takeover", reason: "User takeover via overlay" });
+      }
+    });
+  }
+
+  function updateOperatorOverlay(runtimeState) {
+    if (!runtimeState) return;
+
+    const session = runtimeState.runtimeSession;
+    const isRunning = session?.status === "running";
+    const isTakeover = runtimeState.takeover || session?.status === "takeover";
+    const isError = session?.status === "error";
+    const isActive = isRunning || isTakeover || isError;
+
+    if (isActive && !overlayState.visible) {
+      createOperatorOverlay();
+      requestAnimationFrame(() => {
+        const t = document.getElementById(`${OVERLAY_ID}-top`);
+        const b = document.getElementById(`${OVERLAY_ID}-bottom`);
+        if (t) t.classList.add("yunque-overlay-show");
+        if (b) b.classList.add("yunque-overlay-show");
+      });
+      overlayState.visible = true;
+    }
+
+    if (!isActive && overlayState.visible) {
+      const t = document.getElementById(`${OVERLAY_ID}-top`);
+      const b = document.getElementById(`${OVERLAY_ID}-bottom`);
+      if (t) t.classList.remove("yunque-overlay-show");
+      if (b) b.classList.remove("yunque-overlay-show");
+      overlayState.visible = false;
+      return;
+    }
+
+    if (!isActive) return;
+
+    const dot = document.querySelector(`#${OVERLAY_ID}-top .yunque-op-dot`);
+    const text = document.querySelector(`#${OVERLAY_ID}-top .yunque-op-text`);
+    const spinner = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-spinner`);
+    const status = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-status`);
+    const btn = document.querySelector(`#${OVERLAY_ID}-bottom .yunque-op-takeover`);
+
+    if (dot) {
+      dot.classList.toggle("paused", isTakeover);
+      dot.classList.toggle("error", isError);
+    }
+
+    if (text) {
+      if (isTakeover) text.textContent = "用户已接管浏览器";
+      else if (isError) text.textContent = "Yunque AI 遇到错误";
+      else text.textContent = `Yunque AI 正在浏览此页面`;
+    }
+
+    if (spinner) spinner.style.display = isTakeover ? "none" : "";
+
+    if (status) {
+      if (isTakeover) status.textContent = "已暂停 — 用户操作中";
+      else status.textContent = "Yunque is browsing...";
+    }
+
+    if (btn) {
+      btn.classList.toggle("active", isTakeover);
+      btn.textContent = isTakeover ? "Resume AI" : "Take over";
+    }
+
+    overlayState.status = session?.status;
+    overlayState.takeover = isTakeover;
+  }
+
+  // ─── State Listeners ──────────────────────────────
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "bridge_state_update") {
       emitBridgeEvent("bridge/state-update", { state: msg.state });
+      updateOperatorOverlay(msg.state);
     }
   });
 
   requestBridgeState().then((state) => {
     emitBridgeEvent("bridge/ready", { state });
+    if (state) updateOperatorOverlay(state);
   }).catch(() => {});
 
   injectStyles();
