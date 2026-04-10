@@ -302,6 +302,19 @@ func (g *Gateway) SetBrowserHub(hub *BrowserHub) {
 	g.mux.HandleFunc("/ws/browser", g.handleBrowserWS)
 	if g.registry != nil {
 		browserskill.RegisterSkills(g.registry, &browserHubAdapter{hub: hub})
+		browserSkillNames := []string{
+			"browser_navigate", "browser_click", "browser_input",
+			"browser_screenshot", "browser_scroll", "browser_get_content",
+			"browser_press_key", "browser_mark_elements", "browser_unmark_elements",
+			"browser_get_elements", "browser_list_tabs", "browser_switch_tab",
+			"browser_new_tab", "browser_close_tab", "browser_takeover",
+		}
+		g.registry.DefineCategory(skills.SkillCategory{
+			ID:          "browser",
+			Name:        "浏览器",
+			Description: "Control the user's real browser via the Yunque Browser Connector extension. Pass 'action' with the browser skill name (e.g. 'browser_navigate') and 'args' with its parameters. Use these tools when the user asks to open a website, search the web, click elements, fill forms, or take screenshots.",
+			SkillNames:  browserSkillNames,
+		})
 	}
 	slog.Info("browser extension WebSocket endpoint registered", "path", "/ws/browser")
 	slog.Info("browser extension hub initialized")

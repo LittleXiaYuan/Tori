@@ -9,8 +9,9 @@ import {
   Paperclip, ImageIcon, Trash2, Volume2, Pin, Archive,
   PanelRightOpen, PanelRightClose, VolumeX, ArchiveRestore, Edit3, Heart,
   PinOff, MoreHorizontal, Monitor, AlertTriangle, Plug,
+  ArrowRight, Blocks,
 } from "lucide-react";
-import { api, type ConversationInfo, type EmotionResult, type StickerSuggestion, type PresetInfo } from "@/lib/api";
+import { api, type ConversationInfo, type EmotionResult, type StickerSuggestion, type PresetInfo, type SkillInfo } from "@/lib/api";
 import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
@@ -47,6 +48,7 @@ interface Message {
   browserSummary?: BrowserActionArtifactSummary;
   browserRequirement?: BrowserRequirement;
   skillSuggestions?: SkillGrowthSuggestion[];
+  contextLayers?: string[];
 }
 
 let msgId = 0;
@@ -441,12 +443,17 @@ export default function ChatPage() {
   const [browserTraceEvents, setBrowserTraceEvents] = useState<AgentEvent[]>([]);
   const [resumePromptForBrowser, setResumePromptForBrowser] = useState<string | null>(null);
   const [browserResumePending, setBrowserResumePending] = useState(false);
+  const [heroSkills, setHeroSkills] = useState<SkillInfo[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputShellRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  useEffect(() => {
+    api.skills().then((list) => setHeroSkills(list.slice(0, 4))).catch(() => {});
+  }, []);
 
   // Load providers for model selector
   useEffect(() => {
@@ -981,6 +988,7 @@ ${text.slice(0, 4000)}` });
                 if (doneData.skills_used) updates.skills_used = doneData.skills_used;
                 if (doneData.actions?.length > 0) updates.actions = doneData.actions;
                 if (doneData.suggestions?.length > 0) updates.suggestions = doneData.suggestions;
+                if (doneData.context_layers?.length > 0) updates.contextLayers = doneData.context_layers;
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
                 if (doneData.browser_summary) {
                   updates.browserSummary = mapBrowserSummary(doneData.browser_summary);
@@ -1523,25 +1531,47 @@ ${text.slice(0, 4000)}` });
               </div>
 
               <div className="mt-1 grid w-full max-w-[520px] grid-cols-2 gap-2">
-                {[
-                  { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
-                  { icon: <Search size={14} />, label: "研究一个主题", desc: "发起研究流程，整理来源、结论和下一步建议。" },
-                  { icon: <Brain size={14} />, label: "规划多步骤任务", desc: "先拆解步骤，再执行，减少长任务中的混乱。" },
-                  { icon: <Zap size={14} />, label: "编写或修复代码", desc: "结合代码上下文、工具与连接器完成开发任务。" },
-                ].map(({ icon, label, desc }) => (
-                  <button
-                    key={label}
-                    onClick={() => { chatD({ type: "SET_INPUT", value: label }); inputRef.current?.focus(); }}
-                    className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
-                    style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
-                  >
-                    <span className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium" style={{ color: "var(--yunque-text)" }}>{label}</div>
-                      <div className="mt-0.5 text-[10px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
-                    </div>
-                  </button>
-                ))}
+                {(() => {
+                  const fixedCards = [
+                    { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
+                    { icon: <Search size={14} />, label: "研究一个主题", desc: "发起研究流程，整理来源、结论和下一步建议。" },
+                  ];
+                  const fallbackCards = [
+                    { icon: <Brain size={14} />, label: "规划多步骤任务", desc: "先拆解步骤，再执行，减少长任务中的混乱。" },
+                    { icon: <Zap size={14} />, label: "编写或修复代码", desc: "结合代码上下文、工具与连接器完成开发任务。" },
+                  ];
+                  const dynamicCards = heroSkills.slice(0, 2).map((sk) => ({
+                    icon: <Package size={14} />,
+                    label: sk.name,
+                    desc: sk.description || "已安装技能，点击直接使用",
+                  }));
+                  const cards = [...fixedCards, ...(dynamicCards.length >= 2 ? dynamicCards : fallbackCards)];
+                  return cards.map(({ icon, label, desc }) => (
+                    <button
+                      key={label}
+                      onClick={() => { chatD({ type: "SET_INPUT", value: label }); inputRef.current?.focus(); }}
+                      className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
+                      style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
+                    >
+                      <span className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }}>{icon}</span>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium" style={{ color: "var(--yunque-text)" }}>{label}</div>
+                        <div className="mt-0.5 text-[10px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
+                      </div>
+                    </button>
+                  ));
+                })()}
+              </div>
+
+              <div className="mt-2 flex w-full max-w-[520px] items-center justify-center gap-3">
+                <a href="/skills" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
+                  style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
+                  <Package size={12} /> 浏览技能库 <ArrowRight size={10} />
+                </a>
+                <a href="/workflows" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
+                  style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
+                  <Blocks size={12} /> 浏览工作流 <ArrowRight size={10} />
+                </a>
               </div>
             </div>
           ) : (
@@ -1687,6 +1717,34 @@ ${text.slice(0, 4000)}` });
                     {/* Skill tags */}
                     {msg.role === "assistant" && msg.skills_used && msg.skills_used.length > 0 && (
                       <SkillTags skills={msg.skills_used} />
+                    )}
+                    {msg.role === "assistant" && msg.contextLayers && msg.contextLayers.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {msg.contextLayers.includes("memory") && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                            style={{ background: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
+                            <Brain size={9} /> 参考了记忆
+                          </span>
+                        )}
+                        {(msg.contextLayers.includes("graph") || msg.contextLayers.includes("code")) && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                            style={{ background: "rgba(6,182,212,0.1)", color: "#22d3ee" }}>
+                            <Library size={9} /> 引用了知识
+                          </span>
+                        )}
+                        {msg.contextLayers.includes("emotion") && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                            style={{ background: "rgba(236,72,153,0.1)", color: "#f472b6" }}>
+                            <Heart size={9} /> 情绪感知
+                          </span>
+                        )}
+                        {msg.contextLayers.includes("strategy") && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                            style={{ background: "rgba(245,158,11,0.1)", color: "#fbbf24" }}>
+                            <Sparkles size={9} /> 运用了经验
+                          </span>
+                        )}
+                      </div>
                     )}
                     {/* Agent action buttons */}
                     {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (

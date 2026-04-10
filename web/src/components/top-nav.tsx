@@ -7,124 +7,24 @@ import { motion, AnimatePresence } from "motion/react";
 import { useI18n } from "@/lib/i18n";
 import { api, type PluginUITab } from "@/lib/api";
 import {
-  Gauge,
-  Terminal,
-  ScanFace,
-  MailWarning,
-  Radar,
-  Blocks,
-  Cpu,
-  Cog,
-  Package,
-  UsersRound,
-  BarChart3,
-  Settings,
-  BookOpen,
-  Clock,
-  TerminalSquare,
-  Shield,
-  HardDriveDownload,
-  SmilePlus,
-  BrainCircuit,
+  Puzzle,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ListTodo,
-  Lightbulb,
-  Layers,
-  FileDown,
-  MessageSquareText,
-  Puzzle,
-  Wrench,
-  Zap,
-  Brain,
-  Server,
-  Palette,
   Globe,
-  GitBranch,
+  Settings,
+  Code2,
   type LucideIcon,
 } from "lucide-react";
+import {
+  iconMap,
+  normalNavGroups,
+  devNavGroups,
+  allNavItems,
+  type NavItem,
+  type NavGroup,
+} from "@/lib/navigation";
 
-const iconMap: Record<string, LucideIcon> = {
-  Gauge, Terminal, ScanFace, MailWarning, Radar, Blocks, Cpu, Cog, Package,
-  UsersRound, BarChart3, Settings, BookOpen, Clock, TerminalSquare, Shield,
-  HardDriveDownload, SmilePlus, BrainCircuit, ListTodo, Lightbulb, Layers, FileDown, MessageSquareText, Puzzle, Palette, GitBranch,
-};
-
-interface NavItem {
-  href: string;
-  key: string;
-  icon: LucideIcon;
-  _label?: string;
-}
-
-interface NavGroup {
-  key: string;
-  icon: LucideIcon;
-  items: NavItem[];
-}
-
-// Grouped navigation: 5 top-level groups (P2 信息架构收口)
-const navGroups: NavGroup[] = [
-  {
-    key: "nav.group.workbench",
-    icon: Gauge,
-    items: [
-      { href: "/", key: "nav.dashboard", icon: Gauge },
-      { href: "/chat", key: "nav.chat", icon: Terminal },
-      { href: "/inbox", key: "nav.inbox", icon: MailWarning },
-    ],
-  },
-  {
-    key: "nav.group.tasks",
-    icon: ListTodo,
-    items: [
-      { href: "/tasks", key: "nav.tasks", icon: ListTodo },
-      { href: "/automation", key: "nav.automation", icon: Zap },
-      { href: "/workflows", key: "nav.workflows", icon: GitBranch },
-      { href: "/templates", key: "nav.templates", icon: Layers },
-      { href: "/cron", key: "nav.cron", icon: Clock },
-    ],
-  },
-  {
-    key: "nav.group.skills",
-    icon: Wrench,
-    items: [
-      { href: "/skills", key: "nav.skills", icon: Package },
-      { href: "/plugins", key: "nav.plugins", icon: Puzzle },
-      { href: "/skill-policy", key: "nav.skillPolicy", icon: Shield },
-      { href: "/skill-analytics", key: "nav.skillAnalytics", icon: BarChart3 },
-      { href: "/docgen", key: "nav.docgen", icon: FileDown },
-    ],
-  },
-  {
-    key: "nav.group.cognition",
-    icon: Brain,
-    items: [
-      { href: "/memory", key: "nav.memory", icon: Brain },
-      { href: "/knowledge", key: "nav.knowledge", icon: BookOpen },
-      { href: "/reverie", key: "nav.reverie", icon: BrainCircuit },
-      { href: "/reflect", key: "nav.reflect", icon: Lightbulb },
-      { href: "/persona", key: "nav.persona", icon: ScanFace },
-    ],
-  },
-  {
-    key: "nav.group.system",
-    icon: Server,
-    items: [
-      { href: "/audit", key: "nav.audit", icon: Shield },
-      { href: "/metrics", key: "nav.metrics", icon: BarChart3 },
-      { href: "/browser", key: "nav.browser", icon: Globe },
-      { href: "/tenants", key: "nav.tenants", icon: UsersRound },
-      { href: "/backup", key: "nav.backup", icon: HardDriveDownload },
-      { href: "/settings/theme", key: "nav.theme", icon: Palette },
-      { href: "/settings", key: "nav.settings", icon: Settings },
-    ],
-  },
-];
-
-// Flatten for lookup
-const allNavItems = navGroups.flatMap((g) => g.items);
 
 export function TopNav() {
   const pathname = usePathname();
@@ -134,6 +34,21 @@ export function TopNav() {
   const navRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pluginTabs, setPluginTabs] = useState<PluginUITab[]>([]);
+  const [devMode, setDevMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("yunque_dev_mode") === "1";
+  });
+
+  // Sync devMode across sidebar/top-nav via storage event
+  useEffect(() => {
+    const handler = () => {
+      setDevMode(localStorage.getItem("yunque_dev_mode") === "1");
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  const navGroups = devMode ? devNavGroups : normalNavGroups;
 
   // Load plugin UI tabs once
   useEffect(() => {
@@ -142,9 +57,9 @@ export function TopNav() {
       .catch(() => {});
   }, []);
 
-  // Inject plugin tabs into the Skills group
+  // Inject plugin tabs into the Skills group (if present in current mode)
   const groups = useMemo(() => {
-    const result = navGroups.map((g) => ({ ...g, items: [...g.items] }));
+    const result = navGroups.map((g: NavGroup) => ({ ...g, items: [...g.items] }));
     const skillGroup = result.find((g) => g.key === "nav.group.skills");
     if (skillGroup && pluginTabs.length > 0) {
       for (const tab of pluginTabs) {
@@ -160,7 +75,7 @@ export function TopNav() {
       }
     }
     return result;
-  }, [pluginTabs, locale]);
+  }, [pluginTabs, locale, navGroups]);
 
   // Find which group the current page belongs to
   const activeGroup = groups.find((g) => g.items.some((i) => i.href === pathname));
@@ -360,6 +275,21 @@ export function TopNav() {
             title={locale === "zh" ? "Switch to English" : "切换到中文"}
           >
             {locale === "zh" ? "EN" : "中"}
+          </button>
+
+          {/* Dev mode toggle */}
+          <button
+            onClick={() => {
+              const next = !devMode;
+              localStorage.setItem("yunque_dev_mode", next ? "1" : "0");
+              setDevMode(next);
+              window.dispatchEvent(new StorageEvent("storage", { key: "yunque_dev_mode" }));
+            }}
+            className="relative flex items-center px-2 py-1.5 rounded-full text-xs transition-colors duration-200 cursor-pointer z-10"
+            style={{ color: devMode ? "var(--accent)" : "var(--text-muted)" }}
+            title={devMode ? "切换到普通模式" : "切换到开发模式"}
+          >
+            <Code2 size={13} />
           </button>
 
           {/* Collapse / Expand toggle */}

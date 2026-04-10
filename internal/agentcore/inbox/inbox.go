@@ -1,12 +1,20 @@
 package inbox
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// kvStore abstracts Ledger KV to avoid import cycles with internal/ledger.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
 
 // Action defines what the agent should do with an inbox item.
 const (
@@ -37,6 +45,8 @@ type Store struct {
 	mu      sync.RWMutex
 	items   []Item
 	maxSize int
+	kvs     kvStore
+	dirty   int
 }
 
 // NewStore creates an inbox store with the given max capacity.
@@ -48,6 +58,62 @@ func NewStore(maxSize int) *Store {
 		items:   make([]Item, 0),
 		maxSize: maxSize,
 	}
+}
+
+// SetKVStore enables Ledger KV-backed persistence for inbox.
+func (s *Store) SetKVStore(kvs kvStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var items []Item
+	found, err := kvs.Get(ctx, "items", &items)
+	if err != nil {
+		slog.Warn("inbox: KV load failed", "err", err)
+		return
+	}
+	if found && len(items) > 0 {
+		s.items = items
+		slog.Info("inbox: loaded from KV", "count", len(items))
+	}
+}
+
+// FlushToKV persists current items to KV. Called during shutdown.
+func (s *Store) FlushToKV() {
+	s.mu.RLock()
+	kvs := s.kvs
+	snap := make([]Item, len(s.items))
+	copy(snap, s.items)
+	s.mu.RUnlock()
+
+	if kvs == nil || len(snap) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := kvs.Put(ctx, "items", snap); err != nil {
+		slog.Error("inbox: flush to KV failed", "err", err)
+	}
+}
+
+func (s *Store) persistKV() {
+	s.dirty++
+	if s.kvs == nil || s.dirty < 5 {
+		return
+	}
+	s.dirty = 0
+	snap := make([]Item, len(s.items))
+	copy(snap, s.items)
+	kvs := s.kvs
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "items", snap); err != nil {
+			slog.Warn("inbox: KV save failed", "err", err)
+		}
+	}()
 }
 
 // Push adds a new item to the inbox.
@@ -75,10 +141,10 @@ func (s *Store) Push(source, content, action string, header map[string]any) (*It
 	defer s.mu.Unlock()
 
 	s.items = append(s.items, item)
-	// Evict oldest if over capacity
 	if len(s.items) > s.maxSize {
 		s.items = s.items[len(s.items)-s.maxSize:]
 	}
+	s.persistKV()
 	return &item, nil
 }
 
@@ -138,6 +204,9 @@ func (s *Store) MarkRead(ids []string) int {
 			count++
 		}
 	}
+	if count > 0 {
+		s.persistKV()
+	}
 	return count
 }
 
@@ -155,6 +224,9 @@ func (s *Store) MarkAllRead() int {
 			count++
 		}
 	}
+	if count > 0 {
+		s.persistKV()
+	}
 	return count
 }
 
@@ -166,6 +238,7 @@ func (s *Store) Delete(id string) bool {
 	for i := range s.items {
 		if s.items[i].ID == id {
 			s.items = append(s.items[:i], s.items[i+1:]...)
+			s.persistKV()
 			return true
 		}
 	}

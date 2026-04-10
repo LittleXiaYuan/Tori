@@ -1,12 +1,20 @@
 package bots
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// kvStore abstracts Ledger KV to avoid import cycles with internal/ledger.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
 
 // Bot represents an independent agent instance with its own identity and config.
 type Bot struct {
@@ -50,11 +58,61 @@ const (
 type Manager struct {
 	mu   sync.RWMutex
 	bots map[string]*Bot
+	kvs  kvStore
 }
 
 // NewManager creates a multi-bot manager.
 func NewManager() *Manager {
 	return &Manager{bots: make(map[string]*Bot)}
+}
+
+// SetKVStore enables Ledger KV-backed persistence for bots.
+func (m *Manager) SetKVStore(kvs kvStore) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.kvs = kvs
+
+	if len(m.bots) > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "bots", m.bots); err != nil {
+			slog.Warn("bots: KV migration failed", "err", err)
+		} else {
+			slog.Info("bots: migrated to KV", "count", len(m.bots))
+		}
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var bots map[string]*Bot
+	found, err := kvs.Get(ctx, "bots", &bots)
+	if err != nil {
+		slog.Warn("bots: KV load failed", "err", err)
+		return
+	}
+	if found && len(bots) > 0 {
+		m.bots = bots
+		slog.Info("bots: loaded from KV", "count", len(bots))
+	}
+}
+
+func (m *Manager) persistKV() {
+	if m.kvs == nil {
+		return
+	}
+	snap := make(map[string]*Bot, len(m.bots))
+	for k, v := range m.bots {
+		snap[k] = v
+	}
+	kvs := m.kvs
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "bots", snap); err != nil {
+			slog.Warn("bots: KV save failed", "err", err)
+		}
+	}()
 }
 
 // Create adds a new bot instance.
@@ -85,6 +143,7 @@ func (m *Manager) Create(name, description string, cfg BotConfig) (*Bot, error) 
 		UpdatedAt:   time.Now(),
 	}
 	m.bots[bot.ID] = bot
+	m.persistKV()
 	return bot, nil
 }
 
@@ -166,6 +225,7 @@ func (m *Manager) Update(id string, name, description *string, cfg *BotConfig) (
 		}
 	}
 	b.UpdatedAt = time.Now()
+	m.persistKV()
 	copy := *b
 	return &copy, nil
 }
@@ -185,6 +245,7 @@ func (m *Manager) SetActive(id string, active bool) error {
 		b.Status = StatusStopped
 	}
 	b.UpdatedAt = time.Now()
+	m.persistKV()
 	return nil
 }
 
@@ -196,6 +257,7 @@ func (m *Manager) Delete(id string) error {
 		return fmt.Errorf("bot not found: %s", id)
 	}
 	delete(m.bots, id)
+	m.persistKV()
 	return nil
 }
 

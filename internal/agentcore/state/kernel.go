@@ -3,14 +3,22 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
+
+// kvStore abstracts Ledger KV to avoid import cycles with internal/ledger.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
 
 // ---------- 数据结构 ----------
 
@@ -84,7 +92,46 @@ type Kernel struct {
 	actions   []ActionRecord
 	caps      CapSnapshot
 	dataDir   string
+	kvs       kvStore
 	listeners []func(event string)
+}
+
+// SetKVStore enables Ledger KV-backed persistence for state kernel.
+func (k *Kernel) SetKVStore(kvs kvStore) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.kvs = kvs
+
+	hasData := len(k.goals) > 0 || len(k.resources) > 0 || k.focus != ""
+	if hasData {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		data := persistData{Goals: k.goals, Resources: k.resources, Focus: k.focus, Topics: k.topics}
+		if err := kvs.Put(ctx, "state", data); err != nil {
+			slog.Warn("state kernel: KV migration failed", "err", err)
+		} else {
+			slog.Info("state kernel: migrated to KV")
+		}
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var data persistData
+	found, err := kvs.Get(ctx, "state", &data)
+	if err != nil {
+		slog.Warn("state kernel: KV load failed", "err", err)
+		return
+	}
+	if found {
+		k.goals = data.Goals
+		if data.Resources != nil {
+			k.resources = data.Resources
+		}
+		k.focus = data.Focus
+		k.topics = data.Topics
+		slog.Info("state kernel: loaded from KV", "goals", len(k.goals))
+	}
 }
 
 // NewKernel 创建状态内核
@@ -442,23 +489,33 @@ type persistData struct {
 	Topics    []string             `json:"topics"`
 }
 
-// Save 持久化到磁盘
+// Save 持久化到 KV (优先) 或磁盘 (回退)
 func (k *Kernel) Save() error {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
-
-	if k.dataDir == "" {
-		return nil
-	}
-	if err := os.MkdirAll(k.dataDir, 0o755); err != nil {
-		return err
-	}
 
 	data := persistData{
 		Goals:     k.goals,
 		Resources: k.resources,
 		Focus:     k.focus,
 		Topics:    k.topics,
+	}
+
+	if k.kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := k.kvs.Put(ctx, "state", data); err != nil {
+			slog.Warn("state kernel: KV save failed, falling back to file", "err", err)
+		} else {
+			return nil
+		}
+	}
+
+	if k.dataDir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(k.dataDir, 0o755); err != nil {
+		return err
 	}
 	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {

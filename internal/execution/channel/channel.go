@@ -9,6 +9,8 @@ import (
 	rdebug "runtime/debug"
 	"sync"
 	"time"
+
+	iledger "yunque-agent/internal/ledger"
 )
 
 // GroupInfo describes a group/guild/room the bot is a member of.
@@ -91,15 +93,16 @@ type StickerSender interface {
 
 // Registry manages multiple channels.
 type Registry struct {
-	channels    map[string]Channel
-	tracker     *GroupTracker
-	groupFilter *GroupFilterConfig
-	engagement  *EngagementProfile
-	inbox       *InboxChannel
-	interceptor *CommandInterceptor                  // universal command handler
-	enricher    *StickerEnricher                     // auto-sticker on emotion
-	onMessage   func(channelType string)            // called on incoming message
-	onSend      func(channelType string, err error) // called on outgoing reply
+	channels        map[string]Channel
+	tracker         *GroupTracker
+	groupFilter     *GroupFilterConfig
+	engagement      *EngagementProfile
+	inbox           *InboxChannel
+	interceptor     *CommandInterceptor                  // universal command handler
+	enricher        *StickerEnricher                     // auto-sticker on emotion
+	progressTracker *ProgressTracker                     // progress trace for IM
+	onMessage       func(channelType string)            // called on incoming message
+	onSend          func(channelType string, err error) // called on outgoing reply
 }
 
 // NewRegistry creates a channel registry.
@@ -129,6 +132,12 @@ func (r *Registry) SetStickerEnricher(se *StickerEnricher) {
 func (r *Registry) Register(ch Channel) {
 	r.channels[ch.Type()] = ch
 }
+
+// GetInterceptor returns the current CommandInterceptor (may be nil).
+func (r *Registry) GetInterceptor() *CommandInterceptor { return r.interceptor }
+
+// SetProgressTracker attaches a progress tracker for IM channels.
+func (r *Registry) SetProgressTracker(pt *ProgressTracker) { r.progressTracker = pt }
 
 // Get returns a channel by type.
 func (r *Registry) Get(typ string) (Channel, bool) {
@@ -243,6 +252,7 @@ type GroupTracker struct {
 	mu     sync.RWMutex
 	groups map[string]GroupInfo // key = channelType + ":" + groupID
 	path   string              // persistence path (e.g. data/groups.json)
+	kvs    *iledger.KVConfigStore
 }
 
 // NewGroupTracker creates a new tracker that persists to the given file path.
@@ -253,6 +263,14 @@ func NewGroupTracker(path string) *GroupTracker {
 	}
 	t.load()
 	return t
+}
+
+// SetKVStore enables Ledger KV-backed persistence.
+func (t *GroupTracker) SetKVStore(kvs *iledger.KVConfigStore) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.kvs = kvs
+	t.loadFromKV()
 }
 
 // Track records a group. Call this when a group message is received.
@@ -285,7 +303,7 @@ func (t *GroupTracker) Groups(typ string) []GroupInfo {
 func (t *GroupTracker) load() {
 	data, err := os.ReadFile(t.path)
 	if err != nil {
-		return // file not found is OK
+		return
 	}
 	var groups []GroupInfo
 	if err := json.Unmarshal(data, &groups); err != nil {
@@ -299,13 +317,40 @@ func (t *GroupTracker) load() {
 	t.mu.Unlock()
 }
 
+func (t *GroupTracker) loadFromKV() {
+	if t.kvs == nil {
+		return
+	}
+	var groups []GroupInfo
+	found, err := t.kvs.Get(context.Background(), "groups", &groups)
+	if err != nil {
+		slog.Warn("group tracker: kv load failed", "err", err)
+		return
+	}
+	if found {
+		for _, g := range groups {
+			t.groups[g.ChannelType+":"+g.ID] = g
+		}
+		slog.Info("group tracker: loaded from Ledger KV", "groups", len(groups))
+	}
+}
+
 func (t *GroupTracker) save() {
 	t.mu.RLock()
 	groups := make([]GroupInfo, 0, len(t.groups))
 	for _, g := range t.groups {
 		groups = append(groups, g)
 	}
+	kvs := t.kvs
 	t.mu.RUnlock()
+
+	if kvs != nil {
+		if err := kvs.Put(context.Background(), "groups", groups); err != nil {
+			slog.Warn("group tracker: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	data, err := json.MarshalIndent(groups, "", "  ")
 	if err != nil {
 		return

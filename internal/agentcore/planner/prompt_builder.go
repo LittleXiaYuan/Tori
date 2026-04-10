@@ -2,9 +2,13 @@ package planner
 
 import (
 	"context"
+	"log/slog"
+	"strings"
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/emotion"
+	"yunque-agent/internal/agentcore/localbrain"
+	"yunque-agent/pkg/safego"
 )
 
 // CognitiveContextFunc collects dynamic context from all CognitivePlugins.
@@ -14,6 +18,8 @@ type CognitiveContextFunc func(ctx context.Context, userMessage string) string
 // used by BuildMessages. Extracting this logic makes it testable
 // and pluggable independently of the Planner's execution loop.
 type PromptBuilder struct {
+	LastIncludedLayers []string
+
 	// Data sources (injected from Planner's callbacks)
 	memory           func(ctx context.Context, tenantID, query string) string
 	graphContext     func(query string) string
@@ -24,6 +30,7 @@ type PromptBuilder struct {
 	skillOptimizer   *SkillOptimizer
 	cognitiveContext CognitiveContextFunc // CognitivePlugin dynamic context
 	dynBudget        int
+	contextFilter    *localbrain.LocalBrain // System 1 context filter (nil = disabled)
 }
 
 // NewPromptBuilder creates a PromptBuilder from Planner's callbacks.
@@ -38,6 +45,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		skillOptimizer:   p.skillOptimizer,
 		cognitiveContext: p.cognitiveContext,
 		dynBudget:        p.dynContextBudget,
+		contextFilter:    p.localBrain,
 	}
 }
 
@@ -66,6 +74,9 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 
 	// P2+P3: Memory, graph, and code retrieval run in parallel
 	// These are independent I/O calls — parallelizing saves ~200-500ms per request
+	//
+	// Short messages (greetings, single words) skip retrieval entirely to avoid
+	// injecting low-relevance memories that pollute the context.
 	type layerResult struct {
 		name     string
 		priority ctxwindow.LayerPriority
@@ -74,46 +85,101 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 	results := make(chan layerResult, 3)
 	pending := 0
+	skipRetrieval := len([]rune(req.LastMessage)) < 12
 
-	if pb.memory != nil {
+	if pb.memory != nil && !skipRetrieval {
 		pending++
-		go func() {
+		safego.Go("prompt-memory-recall", func() {
 			if memCtx := pb.memory(ctx, req.TenantID, req.LastMessage); memCtx != "" {
 				results <- layerResult{"memory", ctxwindow.LayerPriorityMemory, "## 记忆上下文\n", memCtx}
 			} else {
 				results <- layerResult{}
 			}
-		}()
+		})
 	}
-	if pb.graphContext != nil {
+	if pb.graphContext != nil && !skipRetrieval {
 		pending++
-		go func() {
+		safego.Go("prompt-graph-context", func() {
 			if graphCtx := pb.graphContext(req.LastMessage); graphCtx != "" {
 				results <- layerResult{"graph", ctxwindow.LayerPriorityRetrieval, "## 知识图谱\n", graphCtx}
 			} else {
 				results <- layerResult{}
 			}
-		}()
+		})
 	}
-	if pb.codeContext != nil {
+	if pb.codeContext != nil && !skipRetrieval {
 		pending++
-		go func() {
+		safego.Go("prompt-code-context", func() {
 			if codeCtx := pb.codeContext(req.LastMessage); codeCtx != "" {
 				results <- layerResult{"code", ctxwindow.LayerPriorityRetrieval, "", codeCtx}
 			} else {
 				results <- layerResult{}
 			}
-		}()
+		})
 	}
 
 	// Collect parallel results
+	var rawRetrieval []layerResult
 	for i := 0; i < pending; i++ {
 		r := <-results
 		if r.content != "" {
+			rawRetrieval = append(rawRetrieval, r)
+		}
+	}
+
+	// System 1 Filter: if LocalBrain is available, use it to score and filter
+	// retrieval results before injecting them as context layers.
+	// High-importance items bypass the filter (旁路 in the cognitive architecture).
+	if pb.contextFilter != nil && len(rawRetrieval) > 0 {
+		var filterItems []localbrain.ContextItem
+		for _, r := range rawRetrieval {
+			filterItems = append(filterItems, localbrain.ContextItem{
+				Source:  r.name,
+				Content: r.content,
+			})
+		}
+		filtered, err := pb.contextFilter.FilterContext(ctx, req.LastMessage, filterItems, 6)
+		if err != nil {
+			slog.Warn("prompt_builder: context filter failed, using unfiltered", "err", err)
+			for _, r := range rawRetrieval {
+				layers = append(layers, ctxwindow.Layer{
+					Name: r.name, Priority: r.priority, Content: r.prefix + r.content,
+				})
+			}
+		} else {
+			slog.Info("prompt_builder: context filtered",
+				"before", len(rawRetrieval), "after", len(filtered.Items),
+				"filtered_out", filtered.Filtered, "elapsed", filtered.Elapsed)
+			for _, item := range filtered.Items {
+				var prefix string
+				switch item.Source {
+			case "memory":
+				prefix = "## 记忆上下文\n" +
+					"以下是与当前对话相关的记忆片段。使用规则：\n" +
+					"- 如果记忆与用户问题直接相关，自然地融入回答中\n" +
+					"- 如果记忆是用户偏好，默默遵循即可，不要特意提及\n" +
+					"- 如果记忆与当前话题无关，完全忽略\n\n"
+			case "graph":
+				prefix = "## 知识图谱\n" +
+					"以下是相关的实体关系。仅在有助于回答时引用。\n\n"
+				default:
+					prefix = ""
+				}
+				prio := ctxwindow.LayerPriorityRetrieval
+				if item.Source == "memory" {
+					prio = ctxwindow.LayerPriorityMemory
+				}
+				layers = append(layers, ctxwindow.Layer{
+					Name:     item.Source,
+					Priority: prio,
+					Content:  prefix + strings.TrimSpace(item.Content),
+				})
+			}
+		}
+	} else {
+		for _, r := range rawRetrieval {
 			layers = append(layers, ctxwindow.Layer{
-				Name:     r.name,
-				Priority: r.priority,
-				Content:  r.prefix + r.content,
+				Name: r.name, Priority: r.priority, Content: r.prefix + r.content,
 			})
 		}
 	}
@@ -134,10 +200,11 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	// Emotion and strategy have higher priority than reverie (which is speculative).
 	if req.EmotionHint != nil {
 		if snippet := req.EmotionHint.ContextSnippet(); snippet != "" {
+			toneGuide := buildToneGuide(req.EmotionHint)
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "emotion",
 				Priority: ctxwindow.LayerPriorityCognition,
-				Content:  "## 情绪感知\n" + snippet,
+				Content:  "## 情绪感知\n" + snippet + toneGuide,
 			})
 		}
 	}
@@ -146,7 +213,9 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "strategy",
 				Priority: ctxwindow.LayerPriorityCognition,
-				Content:  "## 行动指南（基于过去经验）\n" + strCtx,
+				Content: "## 经验与策略\n" +
+					"以下是从过去对话中学到的经验。如果某条策略改善了你的回答质量，" +
+					"可以简要提及「根据之前的经验」。\n\n" + strCtx,
 			})
 		}
 	}
@@ -159,13 +228,16 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			})
 		}
 	}
-	// Reverie is lowest-priority cognition — only inject when genuinely relevant
+	// Reverie: inject only high-relevance inner thoughts with natural delivery guidance
 	if pb.reverie != nil {
 		if jctx := pb.reverie.JournalContext(2, req.LastMessage); jctx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "reverie",
-				Priority: ctxwindow.LayerPriorityHints, // demoted: hints level, not cognition
-				Content:  jctx,
+				Priority: ctxwindow.LayerPriorityHints,
+				Content: "## 内心洞察\n" +
+					"以下是我在空闲时产生的与当前话题相关的想法。\n" +
+					"如果某个洞察能直接帮助用户，可以自然分享（如「我之前想过这个问题...」），\n" +
+					"否则默默参考即可。\n\n" + jctx,
 			})
 		}
 	}
@@ -177,6 +249,21 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 				Name:     "skill_hints",
 				Priority: ctxwindow.LayerPriorityHints,
 				Content:  "## 技能优化\n" + hints,
+			})
+		}
+	}
+
+	// P4.5: Reflection visibility — if there's a recent learning from reflect loop,
+	// inject it as a hint for the LLM to surface in its response.
+	if pb.strategyContext != nil {
+		if strCtx := pb.strategyContext(); strCtx != "" && len(strCtx) > 20 {
+			layers = append(layers, ctxwindow.Layer{
+				Name:     "reflect_visibility",
+				Priority: ctxwindow.LayerPriorityHints,
+				Content: "## 学习标记\n" +
+					"如果你在回答中运用了上面「经验与策略」中的某条经验，" +
+					"可以自然地在回答末尾用一句话提及，如「我记得你之前说过...所以这次...」。" +
+					"不要生硬，只在确实改善了回答时提及。",
 			})
 		}
 	}
@@ -196,6 +283,26 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	assembler := ctxwindow.NewLayerAssembler(budget).
 		WithPerLayerLimit(perLayer).
 		WithDedup()
-	assembled, _ := assembler.Assemble(layers)
+	assembled, included := assembler.Assemble(layers)
+	pb.LastIncludedLayers = included
 	return assembled
+}
+
+// buildToneGuide generates a tone/style instruction based on detected emotion.
+func buildToneGuide(e *emotion.Result) string {
+	if e == nil {
+		return ""
+	}
+	switch {
+	case e.Emotion == emotion.EmotionSad:
+		return "\n\n【语调引导】用户当前情绪低落。请用温暖、耐心的语气回应，避免过于直接或冷冰冰的表述。"
+	case e.Emotion == emotion.EmotionAngry:
+		return "\n\n【语调引导】用户当前有些不满。请保持冷静、专业，先共情再给方案，避免推诿。"
+	case e.Emotion == emotion.EmotionFearful:
+		return "\n\n【语调引导】用户当前有些紧张。请用确定性强的语言，给出清晰的步骤，减少不确定感。"
+	case e.Emotion == emotion.EmotionHappy:
+		return "\n\n【语调引导】用户当前心情不错。可以稍微轻松一些回应。"
+	default:
+		return ""
+	}
 }

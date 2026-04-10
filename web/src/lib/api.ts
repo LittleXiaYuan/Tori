@@ -79,6 +79,33 @@ export interface SkillInfo {
   parameters: Record<string, unknown>;
 }
 
+export interface DynamicSkillDef {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  instruction: string;
+  composed_of: string[];
+  source: string;
+  approval_status: string; // "draft" | "approved"
+}
+
+export interface PersonaMemoryBlock {
+  id: string;
+  content: string;
+  label: string;
+  max_chars: number;
+  read_only: boolean;
+  created_at: string;
+  updated_at: string;
+  version: number;
+}
+
+export interface PersonaMemoryEditRequest {
+  id: string;
+  label: string;
+  content: string; // empty means delete
+}
+
 export interface PluginInfo {
   name: string;
   description: string;
@@ -133,6 +160,15 @@ export const api = {
   metrics: () => fetcher<MetricsSnapshot>("/v1/metrics"),
 
   skills: () => fetcher<{ skills: SkillInfo[]; count: number }>("/v1/skills").then((r) => Array.isArray(r.skills) ? r.skills : []),
+  getDynamicSkills: () => fetcher<{ skills: DynamicSkillDef[] }>("/v1/skills/dynamic").then((r) => Array.isArray(r.skills) ? r.skills : []),
+  approveDynamicSkill: (name: string, instruction?: string) =>
+    fetcher<{ status: string }>("/v1/skills/approve", { method: "POST", body: JSON.stringify({ name, instruction }) }),
+  rejectDynamicSkill: (name: string) =>
+    fetcher<{ status: string }>("/v1/skills/reject", { method: "POST", body: JSON.stringify({ name }) }),
+
+  getMemoryPersona: () => fetcher<{ blocks: PersonaMemoryBlock[] }>("/v1/memory/persona").then((r) => Array.isArray(r.blocks) ? r.blocks : []),
+  updateMemoryPersona: (req: PersonaMemoryEditRequest) =>
+    fetcher<{ success: boolean; error?: string }>("/v1/memory/update", { method: "POST", body: JSON.stringify(req) }),
 
   tenants: () => fetcher<{ tenants: TenantInfo[]; count: number }>("/v1/tenants"),
   createTenant: (name: string) =>
@@ -141,24 +177,26 @@ export const api = {
       body: JSON.stringify({ name }),
     }),
 
-  chat: (messages: Array<{ role: string; content: string }>, sessionId?: string) =>
+  chat: (messages: Array<{ role: string; content: string }>, sessionId?: string, thinkingLevel?: string) =>
     fetcher<ChatResponse>("/v1/chat", {
       method: "POST",
-      body: JSON.stringify({ messages, session_id: sessionId }),
+      body: JSON.stringify({ messages, session_id: sessionId, ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}) }),
     }),
 
   chatStream: async function* (
     messages: Array<{ role: string; content: string }>,
-    sessionId?: string
+    sessionId?: string,
+    thinkingLevel?: string,
+    signal?: AbortSignal
   ): AsyncGenerator<string> {
-    const key = getApiKey();
     const res = await fetch(`${BASE}/v1/chat/agentic`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(key ? { "X-API-Key": key } : {}),
+        ...getAuthHeaders(),
       },
-      body: JSON.stringify({ messages, session_id: sessionId }),
+      body: JSON.stringify({ messages, session_id: sessionId, ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}) }),
+      signal,
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const reader = res.body?.getReader();
@@ -200,7 +238,15 @@ export const api = {
               if (done.sticker_suggestions) {
                 yield `\n<!--stickers:${JSON.stringify(done.sticker_suggestions)}-->`;
               }
+              if (done.actions && done.actions.length > 0) {
+                yield `\n<!--actions:${JSON.stringify(done.actions)}-->`;
+              }
             } catch { /* ignore parse errors */ }
+            continue;
+          }
+          if (currentEvent === "actions") {
+            // Standalone actions SSE event (emitted before done)
+            yield `\n<!--actions:${raw}-->`;
             continue;
           }
           // Parse delta or step events
@@ -463,7 +509,7 @@ export const api = {
     return res.json() as Promise<BackupRestoreResult>;
   },
 
-  // Speech (TTS)
+  // Speech (TTS/STT)
   tts: async (text: string, voice?: string): Promise<ArrayBuffer> => {
     const key = getApiKey();
     const res = await fetch(`${BASE}/v1/speech/tts`, {
@@ -479,6 +525,24 @@ export const api = {
       throw new Error(`${res.status}: ${msg}`);
     }
     return res.arrayBuffer();
+  },
+  stt: async (audio: Blob, language?: string): Promise<{ text: string; emotion?: { emotion: string; confidence: number } }> => {
+    const key = getApiKey();
+    const params = new URLSearchParams();
+    if (language) params.set("language", language);
+    params.set("detect_emotion", "true");
+    const res = await fetch(`${BASE}/v1/speech/stt?${params}`, {
+      method: "POST",
+      headers: {
+        ...(key ? { "X-API-Key": key } : {}),
+      },
+      body: audio,
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`${res.status}: ${msg}`);
+    }
+    return res.json();
   },
   voices: () =>
     fetcher<{ voices: Array<{ id: string; name: string; language: string; gender?: string }>; providers: string[] }>("/v1/speech/voices"),
@@ -670,6 +734,148 @@ export const api = {
     fetcher<{ persona: string; reply: string }>("/v1/ext/qqchat/roleplay", { method: "POST", body: JSON.stringify({ id, persona, message }) }),
   qqDelete: (id: string) =>
     fetcher<{ status: string }>(`/v1/ext/qqchat/delete?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  // Mission NL Parse
+  missionParse: (description: string) =>
+    fetcher<{ type: string; name: string; description: string; config: Record<string, unknown>; confidence: number; explanation: string }>("/v1/missions/parse", {
+      method: "POST",
+      body: JSON.stringify({ description }),
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Approval System
+  // ══════════════════════════════════════════════════════════════════════
+
+  approvalsList: (status?: string) => {
+    const q = status ? `?status=${status}` : "";
+    return fetcher<{ approvals: ApprovalRequest[]; total: number }>(`/v1/approvals${q}`);
+  },
+  approvalDecide: (id: string, decision: "allow_once" | "allow_always" | "deny_always", reason?: string) =>
+    fetcher<{ status: string; approval_id: string }>("/v1/approvals/decide", {
+      method: "POST",
+      body: JSON.stringify({ id, decision, reason }),
+    }),
+  approvalRules: () =>
+    fetcher<{ rules: ApprovalRule[]; total: number }>("/v1/approvals/rules"),
+  approvalRuleCreate: (rule: Partial<ApprovalRule>) =>
+    fetcher<ApprovalRule>("/v1/approvals/rules", {
+      method: "POST",
+      body: JSON.stringify(rule),
+    }),
+  approvalRuleDelete: (id: string) =>
+    fetcher<{ deleted: string }>(`/v1/approvals/rules?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Setup / Environment Detection
+  // ══════════════════════════════════════════════════════════════════════
+
+  setupDetect: () =>
+    fetcher<SetupEnvironment>("/v1/setup/detect"),
+  setupHealth: () =>
+    fetcher<SetupHealthResult>("/v1/setup/health"),
+  setupTemplates: () =>
+    fetcher<{ templates: SetupTemplate[]; count: number }>("/v1/setup/templates"),
+  setupApply: (templateId: string, overrides?: Record<string, unknown>) =>
+    fetcher<{ status: string; applied: string }>("/v1/setup/apply", {
+      method: "POST",
+      body: JSON.stringify({ template_id: templateId, overrides }),
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Session Queue
+  // ══════════════════════════════════════════════════════════════════════
+
+  sessionQueueStatus: (sessionId?: string) => {
+    const q = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    return fetcher<SessionQueueInfo>(`/v1/sessions/queue${q}`);
+  },
+  sessionQueueCancel: (sessionId: string, taskId: string) =>
+    fetcher<{ status: string; cancelled: string }>("/v1/sessions/queue/cancel", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, task_id: taskId }),
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Trust — progressive trust & one-click delegation
+  // ══════════════════════════════════════════════════════════════════════
+
+  trustScores: () =>
+    fetcher<{ scores: Record<string, TrustEntry>; count: number }>("/api/trust/scores"),
+  trustReset: (slug: string) =>
+    fetcher<{ status: string; slug: string }>("/api/trust/reset", {
+      method: "POST",
+      body: JSON.stringify({ slug }),
+    }),
+  /** Grant full trust to one skill, or pass slug="*" for all skills. */
+  trustGrant: (slug: string) =>
+    fetcher<{ status: string; slug?: string; upgraded?: number; level?: string }>("/api/trust/grant", {
+      method: "POST",
+      body: JSON.stringify({ slug }),
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // RBAC — role-based access control
+  // ══════════════════════════════════════════════════════════════════════
+
+  rbacRoles: () =>
+    fetcher<{ roles: RBACRole[] }>("/v1/rbac/roles"),
+  rbacCreateRole: (role: Partial<RBACRole>) =>
+    fetcher<{ status: string }>("/v1/rbac/roles", {
+      method: "POST",
+      body: JSON.stringify(role),
+    }),
+  rbacAssign: (subjectId: string, roleId: string, tenantId?: string) =>
+    fetcher<{ status: string }>("/v1/rbac/assign", {
+      method: "POST",
+      body: JSON.stringify({ subject_id: subjectId, role_id: roleId, tenant_id: tenantId }),
+    }),
+  rbacRevoke: (subjectId: string, roleId: string, tenantId?: string) =>
+    fetcher<{ status: string }>("/v1/rbac/revoke", {
+      method: "POST",
+      body: JSON.stringify({ subject_id: subjectId, role_id: roleId, tenant_id: tenantId }),
+    }),
+  rbacCheck: (subjectId: string, resource: string, action: string, tenantId?: string) =>
+    fetcher<{ allowed: boolean; resource: string; action: string }>("/v1/rbac/check", {
+      method: "POST",
+      body: JSON.stringify({ subject_id: subjectId, resource, action, tenant_id: tenantId }),
+    }),
+  rbacMyRoles: () =>
+    fetcher<{ roles: RBACRole[]; subject_id: string }>("/v1/rbac/my-roles"),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Iterate — self-improvement engine
+  // ══════════════════════════════════════════════════════════════════════
+
+  iterateProposals: () =>
+    fetcher<{ proposals: IterateProposal[]; count: number }>("/api/iterate/proposals"),
+  iterateApprove: (id: string) =>
+    fetcher<{ status: string }>("/api/iterate/approve", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    }),
+  iterateReject: (id: string) =>
+    fetcher<{ status: string }>("/api/iterate/reject", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    }),
+  iterateTrigger: () =>
+    fetcher<{ status: string }>("/api/iterate/trigger", { method: "POST" }),
+  iterateStatus: () =>
+    fetcher<IterateStatus>("/api/iterate/status"),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // SkillGrow — skill growth detection
+  // ══════════════════════════════════════════════════════════════════════
+
+  skillGrowPatterns: () =>
+    fetcher<{ patterns: SkillGrowPattern[]; count: number }>("/api/skillgrow/patterns"),
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Review — security review gate
+  // ══════════════════════════════════════════════════════════════════════
+
+  reviewStatus: () =>
+    fetcher<{ enabled: boolean; trust_enabled: boolean }>("/api/review/status"),
 };
 
 // --- Types ---
@@ -1406,4 +1612,123 @@ export interface TriggerEventPayload {
   task_id?: string;
   thread_id?: string;
   channel_id?: string;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// New API Types — Approvals / Setup / Queue
+// ══════════════════════════════════════════════════════════════════════════
+
+export interface ApprovalRequest {
+  id: string;
+  tool_name: string;
+  action: string;
+  args: Record<string, unknown>;
+  risk_level: "safe" | "caution" | "danger" | "critical";
+  status: "pending" | "approved" | "denied";
+  requester: string;
+  reason?: string;
+  created_at: string;
+  decided_at?: string;
+}
+
+export interface ApprovalRule {
+  id: string;
+  pattern: string;
+  scope: "session" | "user" | "global";
+  action: "allow" | "deny";
+  created_at: string;
+}
+
+export interface SetupEnvironment {
+  os: string;
+  arch: string;
+  gpu: { available: boolean; name?: string; vram_mb?: number };
+  docker: { installed: boolean; running: boolean };
+  ollama: { installed: boolean; running: boolean; models?: string[] };
+  python: { installed: boolean; version?: string };
+  node: { installed: boolean; version?: string };
+}
+
+export interface SetupHealthResult {
+  providers: Array<{
+    name: string;
+    status: "healthy" | "degraded" | "down";
+    latency_ms: number;
+    error?: string;
+  }>;
+  overall: "healthy" | "degraded" | "down";
+}
+
+export interface SetupTemplate {
+  id: string;
+  name: string;
+  description: string;
+  scenario: string;
+  requirements: string[];
+  config: Record<string, unknown>;
+}
+
+export interface SessionQueueInfo {
+  session_id: string;
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: "queued" | "running" | "completed" | "cancelled";
+    priority: number;
+    created_at: string;
+  }>;
+  total: number;
+  running: number;
+}
+
+// Trust
+export interface TrustEntry {
+  score: number;
+  executions: number;
+  failures: number;
+  last_promoted?: string;
+}
+
+// RBAC
+export interface RBACPermission {
+  resource: string;
+  action: string;
+  conditions?: string[];
+}
+
+export interface RBACRole {
+  id: string;
+  name: string;
+  description: string;
+  permissions: RBACPermission[];
+  is_built_in: boolean;
+  created_at: string;
+}
+
+// Iterate
+export interface IterateProposal {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  status: "pending" | "approved" | "rejected" | "applied";
+  created_at: string;
+}
+
+export interface IterateStatus {
+  enabled: boolean;
+  running: boolean;
+  last_run?: string;
+  proposals_pending: number;
+  token_budget: number;
+  tokens_used: number;
+}
+
+// SkillGrow
+export interface SkillGrowPattern {
+  pattern: string;
+  count: number;
+  suggestion: string;
+  first_seen: string;
+  last_seen: string;
 }

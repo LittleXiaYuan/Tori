@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // ──────────────────────────────────────────────
@@ -119,7 +121,8 @@ type WorkingMemoryManager struct {
 	memories    map[string]*WorkingMemory // taskID → memory
 	llmCall     LLMFunc                   // for compression/summarization
 	summarizer  Summarizer                // pluggable summarizer (local model support)
-	persistPath string                    // file path for persistence (empty = no persistence)
+	persistPath string  // legacy file path for persistence
+	kvs         kvStore // Ledger KV (preferred when set)
 
 	// CompressThreshold is the token estimate threshold that triggers auto-compression.
 	// Default: 1000.
@@ -150,6 +153,14 @@ func (m *WorkingMemoryManager) SetSummarizer(s Summarizer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.summarizer = s
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+func (m *WorkingMemoryManager) SetKVStore(kvs kvStore) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.kvs = kvs
+	m.loadFromKV()
 }
 
 // Init initializes working memory for a task.
@@ -219,11 +230,11 @@ func (m *WorkingMemoryManager) UpdateAfterStep(t *Task, step *Step) {
 		threshold = 1000
 	}
 	if wm.TokenEstimate > threshold && m.summarizer != nil {
-		go func() {
+		safego.Go("wm-auto-compress-"+t.ID, func() {
 			if err := m.Compress(context.Background(), t.ID); err != nil {
 				slog.Warn("working memory auto-compress failed", "task", t.ID, "err", err)
 			}
-		}()
+		})
 	}
 
 	m.persist()
@@ -405,13 +416,21 @@ func (m *WorkingMemoryManager) GetAll() map[string]*WorkingMemory {
 
 // ── Persistence ──
 
-// persist is a no-op when persistPath is empty (called under mu.Lock from callers,
-// but we need separate lock handling since some callers already hold the lock).
 func (m *WorkingMemoryManager) persist() {
+	if m.kvs != nil {
+		snapshot := make(map[string]*WorkingMemory, len(m.memories))
+		for k, v := range m.memories {
+			snapshot[k] = v
+		}
+		if err := m.kvs.Put(context.Background(), "data", snapshot); err != nil {
+			slog.Warn("working memory: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	if m.persistPath == "" {
 		return
 	}
-	// snapshot while holding read lock (callers already hold write lock)
 	snapshot := make(map[string]*WorkingMemory, len(m.memories))
 	for k, v := range m.memories {
 		snapshot[k] = v
@@ -423,6 +442,22 @@ func (m *WorkingMemoryManager) persist() {
 	}
 	if err := os.WriteFile(m.persistPath, data, 0644); err != nil {
 		slog.Warn("working memory persist failed", "err", err)
+	}
+}
+
+func (m *WorkingMemoryManager) loadFromKV() {
+	if m.kvs == nil {
+		return
+	}
+	var loaded map[string]*WorkingMemory
+	found, err := m.kvs.Get(context.Background(), "data", &loaded)
+	if err != nil {
+		slog.Warn("working memory: kv load failed", "err", err)
+		return
+	}
+	if found && len(loaded) > 0 {
+		m.memories = loaded
+		slog.Info("working memory: loaded from Ledger KV", "tasks", len(loaded))
 	}
 }
 

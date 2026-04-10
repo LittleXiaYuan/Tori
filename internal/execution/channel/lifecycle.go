@@ -84,6 +84,10 @@ func (l *Lifecycle) StartAll(ctx context.Context, handler func(Message) Reply) {
 	if l.registry.interceptor != nil {
 		wrapped = l.registry.interceptor.Wrap(wrapped)
 	}
+	// Progress tracker is outermost: sends "thinking..." before interceptor/enricher
+	if l.registry.progressTracker != nil {
+		wrapped = l.registry.progressTracker.Wrap(wrapped)
+	}
 	l.handler = wrapped
 	for typ, ch := range l.registry.channels {
 		l.mu.Lock()

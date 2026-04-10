@@ -53,6 +53,7 @@ func (s *JSONStore) Create(req CreateRequest) (*Task, error) {
 		Description: req.Description,
 		Status:      StatusPending,
 		TenantID:    req.TenantID,
+		Constraints: req.Constraints,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

@@ -1,12 +1,17 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/apperror"
+
+	"github.com/gorilla/websocket"
 )
 
 // handleTTS handles POST /v1/speech/tts — synthesize speech from text.
@@ -127,4 +132,91 @@ func (g *Gateway) handleVoices(w http.ResponseWriter, r *http.Request) {
 		"voices":    voices,
 		"providers": g.speechReg.ListTTS(),
 	})
+}
+
+// handleSTTStream handles WebSocket /v1/speech/stt/stream — real-time audio transcription.
+// Client sends binary audio chunks via WebSocket; server transcribes each chunk and sends
+// back JSON text results in real-time.
+func (g *Gateway) handleSTTStream(w http.ResponseWriter, r *http.Request) {
+	if g.speechReg == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "speech not configured")
+		return
+	}
+
+	upgrader := websocket.Upgrader{
+		CheckOrigin:     g.checkWSOrigin,
+		ReadBufferSize:  64 * 1024,
+		WriteBufferSize: 4 * 1024,
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("stt stream: upgrade failed", "err", err)
+		return
+	}
+	defer conn.Close()
+
+	lang := r.URL.Query().Get("language")
+	if lang == "" {
+		lang = "zh"
+	}
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		return nil
+	})
+
+	for {
+		msgType, data, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				slog.Warn("stt stream: read error", "err", err)
+			}
+			break
+		}
+
+		if msgType == websocket.TextMessage {
+			// Control message: {"action": "stop"} to end the stream
+			var ctrl struct {
+				Action string `json:"action"`
+			}
+			if json.Unmarshal(data, &ctrl) == nil && ctrl.Action == "stop" {
+				break
+			}
+			continue
+		}
+
+		if msgType != websocket.BinaryMessage || len(data) == 0 {
+			continue
+		}
+
+		// Transcribe the audio chunk
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		text, sttErr := g.speechReg.SpeechToText(ctx, data, speech.STTOptions{Language: lang})
+		cancel()
+
+		resp := map[string]any{"text": text, "final": false}
+		if sttErr != nil {
+			resp["error"] = sttErr.Error()
+			resp["text"] = ""
+		}
+
+		// Optional emotion detection
+		if text != "" && g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() {
+			if emotionResult, emotErr := g.emotionAnalyzer.AnalyzeText(r.Context(), text); emotErr == nil && emotionResult != nil {
+				emotionResult.Source = "audio"
+				resp["emotion"] = emotionResult
+			}
+		}
+
+		respBytes, _ := json.Marshal(resp)
+		if err := conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
+			break
+		}
+	}
+
+	// Send final message
+	finalResp, _ := json.Marshal(map[string]any{"text": "", "final": true})
+	conn.WriteMessage(websocket.TextMessage, finalResp)
 }

@@ -31,7 +31,17 @@ vendor/
 web/node_modules/
 web/.next/
 web/out/
+web/build_output.txt
 docs/node_modules/
+heroui-web/node_modules/
+heroui-web/.next/
+heroui-web/out/
+heroui-web/.env.local
+heroui-web/tsconfig.tsbuildinfo
+.next/
+
+# ── Runtime-generated task snapshots ──
+internal/agentcore/task/*/
 
 # ── Environment (keep .env.example, ignore actual .env) ──
 .env

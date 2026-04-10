@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/safego"
 )
 
 // Session holds a conversation's message history.
@@ -94,6 +95,48 @@ func (s *Store) SetRepo(repo Repo) {
 	s.repo = repo
 }
 
+// LoadFromRepo restores sessions from the persistence backend into memory.
+// Should be called once after SetRepo during startup.
+func (s *Store) LoadFromRepo(tenantID string) int {
+	if s.repo == nil {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sessions, err := s.repo.ListByTenant(ctx, tenantID)
+	if err != nil {
+		slog.Error("session store: failed to load from repo", "err", err)
+		return 0
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	loaded := 0
+	for _, sess := range sessions {
+		if _, exists := s.sessions[sess.ID]; exists {
+			continue
+		}
+		restored := &Session{
+			ID:         sess.ID,
+			TenantID:   sess.TenantID,
+			Name:       sess.Name,
+			Summary:    sess.Summary,
+			Pinned:     sess.Pinned,
+			ArchivedAt: sess.ArchivedAt,
+			CreatedAt:  sess.CreatedAt,
+			UpdatedAt:  sess.UpdatedAt,
+		}
+		if msgs, err := s.repo.GetMessages(ctx, sess.ID, s.maxMsgs); err == nil {
+			restored.Messages = msgs
+		}
+		s.sessions[sess.ID] = restored
+		loaded++
+	}
+	return loaded
+}
+
 // GetOrCreate returns an existing session or creates a new one.
 func (s *Store) GetOrCreate(sessionID, tenantID string) *Session {
 	s.mu.Lock()
@@ -139,15 +182,15 @@ func (s *Store) Append(sessionID string, msgs ...llm.Message) {
 		persistMsgs := make([]llm.Message, len(msgs))
 		copy(persistMsgs, msgs)
 		sid := sessionID
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			for _, m := range persistMsgs {
-				if err := s.repo.Append(ctx, sid, m.Role, m.Content); err != nil {
-					slog.Error("session repo Append", "err", err)
-				}
+	safego.Go("session-persist", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, m := range persistMsgs {
+			if err := s.repo.Append(ctx, sid, m.Role, m.Content); err != nil {
+				slog.Error("session repo Append", "err", err)
 			}
-		}()
+		}
+	})
 	}
 
 	// Trim: keep system message + last N messages

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBrain, faWrench, faCircleCheck, faCircleXmark,
-  faArrowsRotate, faCommentDots, faGears, faClipboardList,
-  faLock, faLockOpen, faBan, faMapPin,
-  faChevronDown, faChevronRight, faPlus, faMinus,
-} from "@fortawesome/free-solid-svg-icons";
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+  Brain, Wrench, CheckCircle2, XCircle,
+  RefreshCw, MessageCircle, Settings2, ClipboardList,
+  Lock, Unlock, Ban, MapPin,
+  ChevronDown, ChevronRight, Plus, Minus,
+  type LucideIcon,
+} from "lucide-react";
 import "./execution-trace.css";
 
 /** Mirrors observe.AgentEvent from the Go backend. */
@@ -32,33 +31,33 @@ export interface AgentEvent {
   };
 }
 
-function domainIcon(domain: string, type: string): IconDefinition {
+function domainIcon(domain: string, type: string): LucideIcon {
   if (domain === "planner") {
     switch (type) {
-      case "thinking": return faBrain;
-      case "tool_start": return faWrench;
-      case "tool_result": return type.includes("fail") ? faCircleXmark : faCircleCheck;
-      case "reflect": return faArrowsRotate;
-      default: return faCommentDots;
+      case "thinking": return Brain;
+      case "tool_start": return Wrench;
+      case "tool_result": return type.includes("fail") ? XCircle : CheckCircle2;
+      case "reflect": return RefreshCw;
+      default: return MessageCircle;
     }
   }
   if (domain === "workflow") {
     switch (type) {
-      case "node_start": return faGears;
-      case "node_done": return faCircleCheck;
-      case "node_failed": return faCircleXmark;
-      default: return faClipboardList;
+      case "node_start": return Settings2;
+      case "node_done": return CheckCircle2;
+      case "node_failed": return XCircle;
+      default: return ClipboardList;
     }
   }
   if (domain === "approval") {
     switch (type) {
-      case "request": return faLock;
-      case "approved": return faLockOpen;
-      case "denied": return faBan;
-      default: return faClipboardList;
+      case "request": return Lock;
+      case "approved": return Unlock;
+      case "denied": return Ban;
+      default: return ClipboardList;
     }
   }
-  return faMapPin;
+  return MapPin;
 }
 
 function domainColor(domain: string, type: string): string {
@@ -115,7 +114,7 @@ export function ExecutionTrace({ events, isLive }: ExecutionTraceProps) {
         aria-expanded={expanded}
       >
         <span className="execution-trace__toggle">
-          <FontAwesomeIcon icon={expanded ? faChevronDown : faChevronRight} size="xs" />
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
         <span className="execution-trace__title">
           执行过程 ({events.length} 步, {totalDuration})
@@ -137,7 +136,7 @@ export function ExecutionTrace({ events, isLive }: ExecutionTraceProps) {
 
 function TraceItem({ event, startTs }: { event: AgentEvent; startTs: string }) {
   const [detailOpen, setDetailOpen] = useState(false);
-  const icon = domainIcon(event.domain, event.type);
+  const Icon = domainIcon(event.domain, event.type);
   const color = domainColor(event.domain, event.type);
   const offset = formatDuration(startTs, event.ts);
   const hasDetail = event.detail !== null && event.detail !== undefined;
@@ -152,7 +151,7 @@ function TraceItem({ event, startTs }: { event: AgentEvent; startTs: string }) {
           onClick={() => hasDetail && setDetailOpen(!detailOpen)}
           style={{ cursor: hasDetail ? "pointer" : "default" }}
         >
-          <span className="trace-item__icon"><FontAwesomeIcon icon={icon} fixedWidth /></span>
+          <span className="trace-item__icon"><Icon size={14} /></span>
           <span className="trace-item__label">{event.domain}.{event.type}</span>
           {event.meta.skill && (
             <span className="trace-item__skill">{event.meta.skill}</span>
@@ -162,7 +161,7 @@ function TraceItem({ event, startTs }: { event: AgentEvent; startTs: string }) {
           )}
           <span className="trace-item__offset">+{offset}</span>
           {hasDetail && (
-            <span className="trace-item__expand"><FontAwesomeIcon icon={detailOpen ? faMinus : faPlus} size="xs" /></span>
+            <span className="trace-item__expand">{detailOpen ? <Minus size={10} /> : <Plus size={10} />}</span>
           )}
         </div>
         <div className="trace-item__summary">{event.summary}</div>

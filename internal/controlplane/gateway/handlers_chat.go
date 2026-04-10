@@ -499,6 +499,9 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	if result.Plan != nil {
 		resp["plan"] = result.Plan
 	}
+	if len(result.ContextLayers) > 0 {
+		resp["context_layers"] = result.ContextLayers
+	}
 	if emotionHint != nil && emotionHint.Emotion != emotion.EmotionNeutral && emotionHint.Emotion != emotion.EmotionUnknown {
 		resp["emotion"] = emotionHint
 		// Include sticker suggestion: if platform specified, return that one; otherwise return all platforms.

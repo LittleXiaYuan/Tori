@@ -19,8 +19,8 @@ func NewWorkflowGenSkill() *WorkflowGenSkill {
 	return &WorkflowGenSkill{}
 }
 
-// SetStore injects the shared workflow store so generated definitions
-// are immediately visible to the Gateway API (same in-memory map).
+// SetStore wires up the shared store so generated workflows show up
+// in the Gateway API immediately (same in-memory map).
 func (s *WorkflowGenSkill) SetStore(st workflow.Store) {
 	s.store = st
 }

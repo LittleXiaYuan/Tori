@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { api, type SkillInfo, type SkillHubItem, type SkillHubInstalledItem } from "@/lib/api";
+import { api, type SkillInfo, type SkillHubItem, type SkillHubInstalledItem, type DynamicSkillDef } from "@/lib/api";
 import { BlurFade } from "@/components/ui/blur-fade";
 import {
   Package, Search, Download, Trash2, Star, ChevronDown, ChevronRight, ChevronLeft,
@@ -10,7 +10,7 @@ import {
 import PermissionApproval from "@/components/permission-approval";
 import Link from "next/link";
 
-type Tab = "installed" | "market";
+type Tab = "installed" | "market" | "dynamic";
 const PAGE_SIZE = 48; // fetch page size from ClawHub API
 const DISPLAY_PAGE_SIZE = 24; // items per display page
 
@@ -18,6 +18,7 @@ export default function SkillsPage() {
   const [tab, setTab] = useState<Tab>("installed");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [hubInstalled, setHubInstalled] = useState<SkillHubInstalledItem[]>([]);
+  const [dynamicSkills, setDynamicSkills] = useState<DynamicSkillDef[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +41,7 @@ export default function SkillsPage() {
     return Promise.all([
       api.skills().then(setSkills).catch(() => {}),
       api.skillHubInstalled().then((r) => setHubInstalled(Array.isArray(r.skills) ? r.skills : [])).catch(() => {}),
+      api.getDynamicSkills().then(setDynamicSkills).catch(() => {}),
     ]);
   }, []);
 
@@ -158,6 +160,37 @@ export default function SkillsPage() {
     finally { setInstalling(null); }
   };
 
+  const [editingInstruction, setEditingInstruction] = useState<string>("");
+  const [editTarget, setEditTarget] = useState<string | null>(null);
+
+  const startEditDynamic = (def: DynamicSkillDef) => {
+    setEditTarget(def.name);
+    setEditingInstruction(def.instruction);
+  };
+
+  const approveDynamic = async (name: string) => {
+    setInstalling(name);
+    try {
+      if (editTarget === name) {
+        await api.approveDynamicSkill(name, editingInstruction);
+        setEditTarget(null);
+      } else {
+        await api.approveDynamicSkill(name);
+      }
+      await refreshInstalled();
+    } catch { /* ignore */ }
+    finally { setInstalling(null); }
+  };
+
+  const rejectDynamic = async (name: string) => {
+    setInstalling(name);
+    try {
+      await api.rejectDynamicSkill(name);
+      await refreshInstalled();
+    } catch { /* ignore */ }
+    finally { setInstalling(null); }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -184,7 +217,7 @@ export default function SkillsPage() {
             </Link>
           </div>
           <div className="flex gap-1 p-1 rounded-full border" style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}>
-            {([["installed", "Installed"], ["market", "Market"]] as const).map(([key, label]) => (
+            {([["installed", "Installed"], ["market", "Market"], ["dynamic", "Dynamic"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setTab(key)}
@@ -424,6 +457,95 @@ export default function SkillsPage() {
             )}
           </div>
           )}
+        </BlurFade>
+      )}
+
+      {tab === "dynamic" && (
+        <BlurFade delay={0.05}>
+          <div className="mb-4">
+            <div className="text-xs font-medium uppercase tracking-wider mb-3 flex items-center gap-2"
+              style={{ color: "var(--text-muted)" }}>
+              <TrendingUp size={12} />
+              Self-Generated Skills ({dynamicSkills.length})
+            </div>
+            
+            <div className="space-y-4">
+              {dynamicSkills.length === 0 ? (
+                <div className="rounded-xl border p-8 text-center" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
+                  <Wrench size={32} className="mx-auto mb-3" style={{ color: "var(--text-muted)", opacity: 0.3 }} />
+                  <div className="text-sm" style={{ color: "var(--text-muted)" }}>No dynamic skills generated yet</div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-muted)", opacity: 0.6 }}>The agent will generate skills autonomously during complex tasks</div>
+                </div>
+              ) : (
+                dynamicSkills.map((s) => (
+                  <div key={s.name} className="rounded-xl border p-5 flex flex-col gap-3 transition-colors"
+                    style={{ background: "var(--bg-card)", borderColor: s.approval_status === "draft" ? "var(--warning-border, #f59e0b50)" : "var(--border)" }}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Wrench size={16} style={{ color: s.approval_status === "draft" ? "#f59e0b" : "var(--accent)" }} />
+                          <h3 className="font-semibold text-sm">{s.name}</h3>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full uppercase"
+                            style={{ background: s.approval_status === "draft" ? "#f59e0b20" : "var(--bg-hover)", color: s.approval_status === "draft" ? "#f59e0b" : "var(--text-muted)" }}>
+                            {s.approval_status}
+                          </span>
+                        </div>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{s.description}</p>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        {s.approval_status === "draft" && editTarget !== s.name && (
+                          <button onClick={() => startEditDynamic(s)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors" title="Edit Instruction">
+                            <Wrench size={14} style={{ color: "var(--text-muted)" }} />
+                          </button>
+                        )}
+                        <button onClick={() => rejectDynamic(s.name)} disabled={installing === s.name} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] hover:text-red-500 transition-colors" title="Reject">
+                          {installing === s.name ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                        {s.approval_status === "draft" && (
+                          <button onClick={() => approveDynamic(s.name)} disabled={installing === s.name} className="text-xs px-3 py-1 bg-[var(--text)] text-[var(--bg)] rounded-lg font-medium">
+                            {installing === s.name ? <Loader2 size={12} className="animate-spin" /> : "Approve"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {editTarget === s.name ? (
+                      <div>
+                        <label className="text-xs font-medium block mb-1">Execution Instruction Prompt</label>
+                        <textarea
+                          value={editingInstruction}
+                          onChange={(e) => setEditingInstruction(e.target.value)}
+                          className="w-full p-3 rounded-lg border text-xs font-mono"
+                          style={{ background: "var(--bg)", borderColor: "var(--border)", minHeight: 100 }}
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => setEditTarget(null)} className="px-3 py-1.5 text-xs rounded-lg border">Cancel</button>
+                          <button onClick={() => approveDynamic(s.name)} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--text)] text-[var(--bg)] font-medium">Save & Approve</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-[var(--bg-hover)] p-3 rounded-lg">
+                        <div className="text-[10px] uppercase font-semibold mb-1" style={{ color: "var(--text-muted)" }}>Instruction</div>
+                        <pre className="text-xs whitespace-pre-wrap font-mono" style={{ color: "var(--text)" }}>{s.instruction}</pre>
+                        
+                        {s.composed_of && s.composed_of.length > 0 && (
+                          <div className="mt-3">
+                            <div className="text-[10px] uppercase font-semibold mb-1" style={{ color: "var(--text-muted)" }}>Composed Of</div>
+                            <div className="flex gap-1 flex-wrap">
+                              {s.composed_of.map(c => (
+                                <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border mb-1" style={{ borderColor: "var(--border)" }}>{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </BlurFade>
       )}
 

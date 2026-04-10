@@ -3,15 +3,19 @@ package general
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"yunque-agent/pkg/skills"
 )
 
-// PdfCreateSkill writes a minimal single-page PDF from plain text / Markdown-like lines.
+// PdfCreateSkill generates PDF from text.
+// ASCII-only → fast pure-Go path (raw PDF 1.4 objects).
+// CJK/Unicode → shells out to Python+reportlab for proper font embedding.
 type PdfCreateSkill struct {
 	allowedDirs []string
 }
@@ -23,7 +27,7 @@ func NewPdfCreateSkill(allowedDirs []string) *PdfCreateSkill {
 func (s *PdfCreateSkill) Name() string { return "pdf_create" }
 
 func (s *PdfCreateSkill) Description() string {
-	return "从纯文本或简单 Markdown（按行）生成基础 PDF 文件，适合清单、简报导出"
+	return "生成 PDF 文件，支持中英文混排。适合清单、简报、通知书导出"
 }
 
 func (s *PdfCreateSkill) Parameters() map[string]any {
@@ -67,9 +71,22 @@ func (s *PdfCreateSkill) Execute(ctx context.Context, args map[string]any, env *
 		return "", err
 	}
 	lines := formatPDFLines(title, content)
-	if err := writeSimplePDF(absPath, lines); err != nil {
-		return "", err
+
+	// Pick rendering path based on character content
+	var writeErr error
+	if containsNonASCII(content) || containsNonASCII(title) {
+		writeErr = writePDFViaReportlab(ctx, absPath, title, lines)
+		if writeErr != nil {
+			// Fallback to Go path if reportlab isn't available
+			writeErr = writeSimplePDF(absPath, lines)
+		}
+	} else {
+		writeErr = writeSimplePDF(absPath, lines)
 	}
+	if writeErr != nil {
+		return "", writeErr
+	}
+
 	st, _ := os.Stat(absPath)
 	sz := int64(0)
 	if st != nil {
@@ -164,3 +181,115 @@ func sanitizePDFLine(s string) string {
 	}
 	return out
 }
+
+func containsNonASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return true
+		}
+	}
+	return false
+}
+
+// writePDFViaReportlab uses Python + reportlab for proper CJK font embedding.
+func writePDFViaReportlab(ctx context.Context, outPath, title string, lines []string) error {
+	payload := map[string]any{"title": title, "lines": lines}
+	dataBytes, _ := json.Marshal(payload)
+	tmpData, err := os.CreateTemp("", "pdf_data_*.json")
+	if err != nil {
+		return err
+	}
+	tmpData.Write(dataBytes)
+	tmpData.Close()
+	defer os.Remove(tmpData.Name())
+
+	tmpPy, err := os.CreateTemp("", "pdf_render_*.py")
+	if err != nil {
+		return err
+	}
+	tmpPy.WriteString(pdfReportlabScript)
+	tmpPy.Close()
+	defer os.Remove(tmpPy.Name())
+
+	cmd := exec.CommandContext(ctx, "python", tmpPy.Name(), tmpData.Name(), outPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("reportlab PDF generation failed:\n%s\nError: %w", string(output), err)
+	}
+	return nil
+}
+
+const pdfReportlabScript = `import sys, json
+
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+except ImportError:
+    sys.exit("reportlab is not installed. Run: pip install reportlab")
+
+def main():
+    data_path = sys.argv[1]
+    out_path = sys.argv[2]
+
+    with open(data_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    title = data.get('title', '')
+    lines = data.get('lines', [])
+
+    # Register CJK font
+    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+
+    c = canvas.Canvas(out_path, pagesize=A4)
+    width, height = A4
+    y = height - 60
+    margin = 50
+    line_height = 16
+    max_width = width - 2 * margin
+
+    # Title
+    if title:
+        c.setFont('STSong-Light', 18)
+        c.drawString(margin, y, title)
+        y -= 30
+
+    c.setFont('STSong-Light', 11)
+    for line in lines:
+        line = line.rstrip()
+        if line.startswith('#'):
+            c.setFont('STSong-Light', 14)
+            line = line.lstrip('# ')
+            y -= 6
+        else:
+            c.setFont('STSong-Light', 11)
+
+        # Simple line wrapping
+        while len(line) > 0:
+            # Estimate char count per line (CJK chars are ~2x width)
+            fit = 0
+            w = 0
+            for ch in line:
+                cw = 11 if ord(ch) > 127 else 6  # rough estimate
+                if w + cw > max_width:
+                    break
+                w += cw
+                fit += 1
+            if fit == 0:
+                fit = 1
+            segment = line[:fit]
+            line = line[fit:]
+            c.drawString(margin, y, segment)
+            y -= line_height
+            if y < 60:
+                c.showPage()
+                c.setFont('STSong-Light', 11)
+                y = height - 60
+
+    c.save()
+
+if __name__ == '__main__':
+    main()
+`
+

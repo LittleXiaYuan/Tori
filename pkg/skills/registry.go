@@ -1,6 +1,9 @@
 package skills
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // Skill is an atomic capability unit that the planner can invoke.
 type Skill interface {
@@ -30,26 +33,48 @@ type Environment struct {
 	MemorySearch MemorySearchFunc
 }
 
+// SkillCategory groups skills under a named category for hierarchical invocation.
+type SkillCategory struct {
+	ID          string
+	Name        string
+	Description string
+	SkillNames  []string
+}
+
 // Registry holds all registered skills.
 type Registry struct {
-	skills  map[string]Skill
-	version int // monotonically increasing counter, incremented on Register/Clear
+	skills     map[string]Skill
+	categories map[string]*SkillCategory
+	skillToCat map[string]string
+	version    int // monotonically increasing counter, incremented on Register/Clear
 }
 
 // NewRegistry creates an empty skill registry.
 func NewRegistry() *Registry {
-	return &Registry{skills: make(map[string]Skill)}
+	return &Registry{
+		skills:     make(map[string]Skill),
+		categories: make(map[string]*SkillCategory),
+		skillToCat: make(map[string]string),
+	}
 }
 
 // Clear removes all skills from the registry.
 func (r *Registry) Clear() {
 	r.skills = make(map[string]Skill)
+	r.categories = make(map[string]*SkillCategory)
+	r.skillToCat = make(map[string]string)
 	r.version++
 }
 
 // Register adds a skill to the registry.
 func (r *Registry) Register(s Skill) {
 	r.skills[s.Name()] = s
+	r.version++
+}
+
+// Remove deletes a skill from the registry.
+func (r *Registry) Remove(name string) {
+	delete(r.skills, name)
 	r.version++
 }
 
@@ -84,4 +109,162 @@ func (r *Registry) Definitions() []map[string]any {
 		})
 	}
 	return defs
+}
+
+// DefineCategory registers a skill category for hierarchical calling.
+func (r *Registry) DefineCategory(cat SkillCategory) {
+	r.categories[cat.ID] = &cat
+	for _, sn := range cat.SkillNames {
+		r.skillToCat[sn] = cat.ID
+	}
+}
+
+// AssignCategory puts an existing skill into a category.
+func (r *Registry) AssignCategory(skillName, catID string) {
+	cat, ok := r.categories[catID]
+	if !ok {
+		return
+	}
+	for _, n := range cat.SkillNames {
+		if n == skillName {
+			return
+		}
+	}
+	cat.SkillNames = append(cat.SkillNames, skillName)
+	r.skillToCat[skillName] = catID
+}
+
+// Categories returns all defined categories.
+func (r *Registry) Categories() []*SkillCategory {
+	out := make([]*SkillCategory, 0, len(r.categories))
+	for _, c := range r.categories {
+		out = append(out, c)
+	}
+	return out
+}
+
+// CategorySkills returns all skills belonging to a category.
+func (r *Registry) CategorySkills(catID string) []Skill {
+	cat, ok := r.categories[catID]
+	if !ok {
+		return nil
+	}
+	var out []Skill
+	for _, name := range cat.SkillNames {
+		if s, ok := r.skills[name]; ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// UncategorizedSkills returns skills not assigned to any category.
+func (r *Registry) UncategorizedSkills() []Skill {
+	var out []Skill
+	for name, s := range r.skills {
+		if _, ok := r.skillToCat[name]; !ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// HierarchicalDefs returns a reduced set of tool definitions:
+// - One "meta tool" per category (use_browser, use_connector, etc.)
+// - All uncategorized skills directly
+// This reduces the total tools sent to the LLM.
+func (r *Registry) HierarchicalDefs() []map[string]any {
+	var defs []map[string]any
+
+	for _, cat := range r.categories {
+		if len(cat.SkillNames) == 0 {
+			continue
+		}
+		defs = append(defs, map[string]any{
+			"name":        "use_" + cat.ID,
+			"description": cat.Description,
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"action": map[string]any{
+						"type":        "string",
+						"description": "The specific action to perform. Available: " + joinNames(cat.SkillNames),
+					},
+					"args": map[string]any{
+						"type":        "object",
+						"description": "Arguments for the chosen action",
+					},
+				},
+				"required": []string{"action"},
+			},
+		})
+	}
+
+	for name, s := range r.skills {
+		if _, ok := r.skillToCat[name]; !ok {
+			defs = append(defs, map[string]any{
+				"name":        s.Name(),
+				"description": s.Description(),
+				"parameters":  s.Parameters(),
+			})
+		}
+	}
+	return defs
+}
+
+func joinNames(names []string) string {
+	out := ""
+	for i, n := range names {
+		if i > 0 {
+			out += ", "
+		}
+		out += n
+	}
+	return out
+}
+
+// intentKeywords maps intent keywords to category IDs for dynamic filtering.
+var intentKeywords = map[string][]string{
+	"browser": {"浏览", "网页", "网站", "打开", "搜索", "截图", "点击", "输入", "滚动",
+		"browse", "navigate", "web", "click", "screenshot", "tab", "mark", "element",
+		"url", "http", "google", "baidu"},
+	"connector": {"github", "仓库", "repo", "issue", "pr", "邮件", "gmail", "email",
+		"日历", "calendar", "notion", "slack", "linear", "jira", "outlook"},
+	"research": {"研究", "调研", "报告", "research", "report", "分析", "综述"},
+	"file": {"文件", "保存", "生成", "写入", "导出", "file", "save", "export", "write",
+		"markdown", "html", "csv", "json", "pdf", "docx", "pptx", "xlsx", "??", "??", "????", "??"},
+	"image":    {"图片", "图像", "画", "生成图", "image", "picture", "draw", "illustration"},
+	"workflow": {"工作流", "workflow", "自动化", "流程", "automation"},
+}
+
+// FilterByIntent returns skills relevant to the given user message using keyword matching.
+// Always returns uncategorized skills + skills from matched categories.
+func (r *Registry) FilterByIntent(message string) []Skill {
+	msg := strings.ToLower(message)
+
+	matchedCats := make(map[string]bool)
+	for catID, keywords := range intentKeywords {
+		for _, kw := range keywords {
+			if strings.Contains(msg, kw) {
+				matchedCats[catID] = true
+				break
+			}
+		}
+	}
+
+	var out []Skill
+	for name, s := range r.skills {
+		catID, inCat := r.skillToCat[name]
+		if !inCat {
+			out = append(out, s)
+		} else if matchedCats[catID] {
+			out = append(out, s)
+		}
+	}
+
+	// If no category matched, return all (fallback)
+	if len(matchedCats) == 0 {
+		return r.All()
+	}
+	return out
 }

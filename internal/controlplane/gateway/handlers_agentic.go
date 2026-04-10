@@ -317,6 +317,9 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	if result.Plan != nil {
 		doneData["plan"] = result.Plan
 	}
+	if len(result.ContextLayers) > 0 {
+		doneData["context_layers"] = result.ContextLayers
+	}
 	if emotionHint != nil && emotionHint.Emotion != emotion.EmotionNeutral {
 		doneData["emotion"] = emotionHint
 	}

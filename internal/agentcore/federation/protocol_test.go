@@ -119,10 +119,12 @@ func TestReceivePing(t *testing.T) {
 	h := newTestHub()
 	h.AddPeer("bot2@remote:9090", []string{})
 
-	reply, err := h.Receive(context.Background(), Message{
+	msg := Message{
 		ID: "test1", Type: MsgPing, From: "bot2@remote:9090",
 		To: h.LocalID(), Payload: "ping", Timestamp: time.Now(), TTL: 3,
-	})
+	}
+	msg.Signature = h.sign(msg)
+	reply, err := h.Receive(context.Background(), msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,10 +135,12 @@ func TestReceivePing(t *testing.T) {
 
 func TestReceiveTTLExpired(t *testing.T) {
 	h := newTestHub()
-	_, err := h.Receive(context.Background(), Message{
+	msg := Message{
 		ID: "test1", Type: MsgChat, From: "bot2@r:1",
 		To: h.LocalID(), Payload: "hi", Timestamp: time.Now(), TTL: 0,
-	})
+	}
+	msg.Signature = h.sign(msg)
+	_, err := h.Receive(context.Background(), msg)
 	if err == nil {
 		t.Error("expected TTL expired error")
 	}
@@ -144,10 +148,12 @@ func TestReceiveTTLExpired(t *testing.T) {
 
 func TestReceiveNoHandler(t *testing.T) {
 	h := newTestHub()
-	_, err := h.Receive(context.Background(), Message{
+	msg := Message{
 		ID: "test1", Type: MsgChat, From: "bot2@r:1",
 		To: h.LocalID(), Payload: "hi", Timestamp: time.Now(), TTL: 3,
-	})
+	}
+	msg.Signature = h.sign(msg)
+	_, err := h.Receive(context.Background(), msg)
 	if err == nil {
 		t.Error("expected no handler error")
 	}
@@ -162,10 +168,12 @@ func TestRegisterHandler(t *testing.T) {
 		}, nil
 	})
 
-	reply, err := h.Receive(context.Background(), Message{
+	msg := Message{
 		ID: "test1", Type: MsgChat, From: "bot2@r:1",
 		To: h.LocalID(), Payload: "hello", Timestamp: time.Now(), TTL: 3,
-	})
+	}
+	msg.Signature = h.sign(msg)
+	reply, err := h.Receive(context.Background(), msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,5 +261,20 @@ func TestSignatureVerification(t *testing.T) {
 	_, err = h.Receive(context.Background(), msg2)
 	if err == nil {
 		t.Error("expected error for invalid signature")
+	}
+}
+
+func TestSignatureVerification_RejectsMissingSignature(t *testing.T) {
+	h := newTestHub()
+	h.RegisterHandler(MsgTask, func(ctx context.Context, msg Message) (*Message, error) {
+		return nil, nil
+	})
+
+	_, err := h.Receive(context.Background(), Message{
+		ID: "test3", Type: MsgTask, From: "bot2@r:1",
+		To: h.LocalID(), Payload: "do stuff", TTL: 3,
+	})
+	if err == nil {
+		t.Fatal("expected error for missing signature")
 	}
 }

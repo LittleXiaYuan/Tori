@@ -1,8 +1,11 @@
 package emotion
 
 import (
+	"context"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // HistoryEntry records a single emotion detection event.
@@ -15,10 +18,13 @@ type HistoryEntry struct {
 }
 
 // History stores emotion detection events in memory with a configurable cap.
+// When a kvStore is attached via SetKVStore, entries are periodically persisted.
 type History struct {
 	mu      sync.RWMutex
 	entries []HistoryEntry
 	maxSize int
+	kvs     kvStore
+	dirty   int // records since last KV flush
 }
 
 // NewHistory creates a new history store with the given max capacity.
@@ -32,7 +38,6 @@ func NewHistory(maxSize int) *History {
 // Record adds an emotion event to the history.
 func (h *History) Record(sessionID string, e Emotion, confidence float64, source string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.entries = append(h.entries, HistoryEntry{
 		Timestamp:  time.Now(),
 		SessionID:  sessionID,
@@ -42,6 +47,24 @@ func (h *History) Record(sessionID string, e Emotion, confidence float64, source
 	})
 	if len(h.entries) > h.maxSize {
 		h.entries = h.entries[len(h.entries)-h.maxSize:]
+	}
+	h.dirty++
+	shouldFlush := h.kvs != nil && h.dirty >= 20
+	h.mu.Unlock()
+
+	if shouldFlush {
+		safego.Go("emotion-kv-flush", func() {
+			h.mu.Lock()
+			h.dirty = 0
+			snap := make([]HistoryEntry, len(h.entries))
+			copy(snap, h.entries)
+			kvs := h.kvs
+			h.mu.Unlock()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_ = kvs.Put(ctx, "entries", snap)
+		})
 	}
 }
 

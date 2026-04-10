@@ -81,6 +81,43 @@
     details { border-top: 1px solid var(--border); padding-top: 12px; }
     summary { cursor: pointer; color: var(--muted); font-weight: 700; }
     .error { color: #fca5a5; font-size: 12px; }
+    .credential-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(245,158,11,0.45);
+      background: rgba(245,158,11,0.12);
+      color: #fde68a;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .credential-banner strong { color: #fff; }
+    .import-hero {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08));
+      border: 1px solid rgba(96,165,250,0.22);
+    }
+    .import-hero .import-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+    .import-hero .import-sub { font-size: 11px; color: var(--muted); line-height: 1.4; margin-bottom: 10px; }
+    .btn-block { width: 100%; }
+    details.optional-block { border-top: none; padding-top: 0; margin-top: 0; }
+    details.optional-block > summary {
+      list-style: none;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    details.optional-block > summary::-webkit-details-marker { display: none; }
+    details.optional-block > summary::after {
+      content: "▾"; font-size: 10px; opacity: 0.7;
+      display: inline-block; transition: transform 0.15s ease;
+    }
+    details.optional-block[open] > summary::after { transform: rotate(180deg); }
+    .divider {
+      height: 1px; background: var(--border); margin: 12px 0;
+    }
   </style>
 </head>
 <body>
@@ -89,7 +126,7 @@
       <div class="header">
         <div>
           <div class="title">Yunque Browser</div>
-          <div class="meta">Real-browser bridge for Yunque Agent and Tori</div>
+          <div class="meta">云雀真实浏览器桥接</div>
         </div>
         <div class="pill"><span id="statusDot" class="dot off"></span><span id="statusText">Offline</span></div>
       </div>
@@ -98,13 +135,41 @@
     </div>
 
     <div class="card">
-      <div class="status-line">
-        <div>
-          <div class="title" style="font-size:14px;">Connect Tori</div>
-          <div class="hint">Use OAuth + PKCE, then mint an extension token automatically.</div>
-        </div>
+      <div class="title" style="font-size:14px;">本机连接</div>
+      <div class="hint" style="margin-top:4px;">先在本机打开云雀 Web（localhost）并登录，再一键导入；或手动填写。</div>
+      <div class="credential-banner" id="credentialBanner" style="display:none;">
+        <strong>需要凭证</strong>：点下方 <strong>从云雀页面导入</strong>，或展开「手动填写 API Key」，或使用可选的 Tori。
+      </div>
+      <div class="import-hero">
+        <div class="import-title">从云雀页面导入</div>
+        <div class="import-sub">保持云雀标签页为当前页，点击后读取该页的登录信息（API Key 或 JWT），无需手抄。</div>
+        <button class="primary btn-block" type="button" id="importFromTabBtn">从云雀页面导入</button>
       </div>
       <div class="field" style="margin-top:12px;">
+        <label class="label" for="wsUrl">Agent WebSocket</label>
+        <input type="text" id="wsUrl" placeholder="ws://localhost:9090/ws/browser">
+      </div>
+      <div class="divider"></div>
+      <details id="apiKeyDetails" style="margin-top:0;">
+        <summary>手动填写 API Key</summary>
+        <div class="field" style="margin-top:10px;">
+          <label class="label" for="apiKey">API Key</label>
+          <input type="password" id="apiKey" placeholder="从云雀 Web → 设置 复制">
+        </div>
+      </details>
+      <div class="row" style="margin-top:12px;">
+        <button class="primary" id="connectBtn">保存并连接</button>
+        <button class="secondary" id="reconnectBtn">重连</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button class="secondary" id="markBtn">标记元素</button>
+        <button class="secondary" id="resumeBtn">恢复 AI</button>
+      </div>
+    </div>
+
+    <details class="card optional-block" id="toriDetails">
+      <summary>Tori 云端（可选）</summary>
+      <div class="field" style="margin-top:4px;">
         <label class="label" for="toriApiBase">Tori API Base</label>
         <input type="text" id="toriApiBase" placeholder="http://localhost:3000">
       </div>
@@ -113,39 +178,15 @@
         <span class="meta" id="accountMeta"></span>
       </div>
       <div class="row" style="margin-top:12px;">
-        <button class="primary" id="connectToriBtn">Connect Tori</button>
-        <button class="danger" id="disconnectToriBtn">Sign out</button>
+        <button class="primary" id="connectToriBtn">登录 Tori</button>
+        <button class="danger" id="disconnectToriBtn">退出</button>
       </div>
-      <div class="hint" style="margin-top:10px;">Tip: your local agent must trust this token via <code>TORI_API_BASE_URL</code>.</div>
-    </div>
-
-    <div class="card">
-      <div class="title" style="font-size:14px;">Local Agent</div>
-      <div class="hint" style="margin-top:4px;">Choose the local bridge endpoint for the browser WebSocket session.</div>
-      <div class="field" style="margin-top:12px;">
-        <label class="label" for="wsUrl">Agent WebSocket</label>
-        <input type="text" id="wsUrl" placeholder="ws://localhost:9090/ws/browser">
-      </div>
-      <details style="margin-top:12px;">
-        <summary>Advanced manual API key</summary>
-        <div class="field" style="margin-top:10px;">
-          <label class="label" for="apiKey">API Key</label>
-          <input type="password" id="apiKey" placeholder="Leave empty to use Tori extension token">
-        </div>
-      </details>
-      <div class="row" style="margin-top:12px;">
-        <button class="primary" id="connectBtn">Connect bridge</button>
-        <button class="secondary" id="reconnectBtn">Reconnect</button>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button class="secondary" id="markBtn">Mark</button>
-        <button class="secondary" id="resumeBtn">Resume AI</button>
-      </div>
-    </div>
+      <div class="hint" style="margin-top:10px;">服务端需配置 <code>TORI_API_BASE_URL</code> 以校验令牌。</div>
+    </details>
 
     <div class="card">
       <div class="status-line">
-        <div class="title" style="font-size:14px;">Open Tabs</div>
+        <div class="title" style="font-size:14px;">当前窗口标签</div>
         <span class="meta" id="sessionCount"></span>
       </div>
       <div class="tabs" id="tabList" style="margin-top:10px;"></div>

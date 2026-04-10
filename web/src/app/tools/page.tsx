@@ -23,7 +23,7 @@ export default function ToolsPage() {
   useEffect(() => { refreshSessions(); }, []);
 
   const doExec = async () => {
-    if (!command.trim()) return;
+    if (!command.trim() || running) return;
     setRunning(true);
     setOutput("");
     try {

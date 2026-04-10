@@ -33,6 +33,20 @@ func (p *Pool) Register(key string, client *Client) {
 	slog.Info("llm pool: registered", "key", key, "model", client.Model())
 }
 
+// Unregister removes a client by key.
+func (p *Pool) Unregister(key string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.clients, key)
+	if p.primary == key {
+		p.primary = ""
+		for k := range p.clients {
+			p.primary = k
+			break
+		}
+	}
+}
+
 // SetPrimary designates which key is the primary/fallback client.
 func (p *Pool) SetPrimary(key string) {
 	p.mu.Lock()
@@ -55,6 +69,38 @@ func (p *Pool) GetOrFallback(key string) *Client {
 		return c
 	}
 	return p.clients[p.primary]
+}
+
+// GetFallbackChain returns a prioritized fallback chain of LLM clients.
+// Order: requested model -> expert -> smart -> fast -> local (Ollama).
+func (p *Pool) GetFallbackChain(key string) []*Client {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	var chain []*Client
+	
+	// Define the standard degradation sequence for intelligence vs reliability
+	sequence := []string{key, "expert", "smart", "fast", "local"}
+	
+	seen := make(map[string]bool)
+	for _, k := range sequence {
+		if k == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		if c, ok := p.clients[k]; ok {
+			chain = append(chain, c)
+		}
+	}
+	
+	// Append primary model as the final failsafe if not already included
+	if p.primary != "" && !seen[p.primary] {
+		if c, ok := p.clients[p.primary]; ok {
+			chain = append(chain, c)
+		}
+	}
+
+	return chain
 }
 
 // Primary returns the primary/default client.

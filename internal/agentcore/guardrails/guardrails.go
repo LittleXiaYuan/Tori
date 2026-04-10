@@ -8,10 +8,8 @@ import (
 	"sync"
 )
 
-// ──────────────────────────────────────────────
-// Guardrails — input validation & safety checks
-// Inspired by Agno: PII detection, prompt injection, input validation
-// ──────────────────────────────────────────────
+// Guardrails — input validation & safety checks.
+// Loosely inspired by Agno's guard pipeline.
 
 // CheckResult captures the outcome of a guardrail check.
 type CheckResult struct {
@@ -22,19 +20,13 @@ type CheckResult struct {
 	Rule    string   `json:"rule,omitempty"`
 }
 
-// ──────────────────────────────────────────────
-// Guard interface
-// ──────────────────────────────────────────────
-
-// Guard is a single guardrail check.
+// Guard is a single check in the guardrail pipeline.
 type Guard interface {
 	Name() string
 	Check(ctx context.Context, input string) CheckResult
 }
 
-// ──────────────────────────────────────────────
-// PIIGuard — detect personally identifiable information
-// ──────────────────────────────────────────────
+// ---- PII detection ----
 
 var (
 	emailRegex    = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
@@ -44,12 +36,12 @@ var (
 	ipRegex       = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 )
 
-// PIIGuard detects and optionally redacts PII.
 type PIIGuard struct {
 	redact bool // if true, redact PII instead of blocking
 }
 
-// NewPIIGuard creates a PII detection guard.
+// NewPIIGuard returns a PII guard. If redact is true, PII is masked
+// rather than blocking the entire message.
 func NewPIIGuard(redact bool) *PIIGuard {
 	return &PIIGuard{redact: redact}
 }
@@ -92,11 +84,7 @@ func (g *PIIGuard) Check(_ context.Context, input string) CheckResult {
 	return result
 }
 
-// ──────────────────────────────────────────────
-// InjectionGuard — detect prompt injection attempts
-// ──────────────────────────────────────────────
-
-// InjectionGuard detects prompt injection patterns.
+// ---- prompt injection detection ----
 type InjectionGuard struct {
 	patterns []injectionPattern
 }
@@ -106,7 +94,6 @@ type injectionPattern struct {
 	pattern string
 }
 
-// NewInjectionGuard creates a prompt injection guard.
 func NewInjectionGuard() *InjectionGuard {
 	return &InjectionGuard{
 		patterns: []injectionPattern{
@@ -128,7 +115,6 @@ func NewInjectionGuard() *InjectionGuard {
 
 func (g *InjectionGuard) Name() string { return "injection" }
 
-// AddPattern adds a custom injection pattern.
 func (g *InjectionGuard) AddPattern(name, pattern string) {
 	g.patterns = append(g.patterns, injectionPattern{name, pattern})
 }
@@ -148,17 +134,12 @@ func (g *InjectionGuard) Check(_ context.Context, input string) CheckResult {
 	return result
 }
 
-// ──────────────────────────────────────────────
-// LengthGuard — enforce input length limits
-// ──────────────────────────────────────────────
-
-// LengthGuard checks input length.
+// ---- length limits ----
 type LengthGuard struct {
 	maxChars int
 	maxWords int
 }
 
-// NewLengthGuard creates a length guard.
 func NewLengthGuard(maxChars, maxWords int) *LengthGuard {
 	return &LengthGuard{maxChars: maxChars, maxWords: maxWords}
 }
@@ -185,16 +166,11 @@ func (g *LengthGuard) Check(_ context.Context, input string) CheckResult {
 	return result
 }
 
-// ──────────────────────────────────────────────
-// TopicGuard — block off-topic or forbidden topics
-// ──────────────────────────────────────────────
-
-// TopicGuard blocks messages containing forbidden topics.
+// ---- topic blocklist ----
 type TopicGuard struct {
 	forbidden []string
 }
 
-// NewTopicGuard creates a topic guard.
 func NewTopicGuard(forbidden []string) *TopicGuard {
 	return &TopicGuard{forbidden: forbidden}
 }
@@ -215,22 +191,18 @@ func (g *TopicGuard) Check(_ context.Context, input string) CheckResult {
 	return result
 }
 
-// ──────────────────────────────────────────────
-// Pipeline — chains multiple guards
-// ──────────────────────────────────────────────
+// ---- pipeline (chains guards) ----
 
-// Pipeline runs multiple guards in sequence.
+// Pipeline runs guards in order; stops at first block.
 type Pipeline struct {
 	mu     sync.RWMutex
 	guards []Guard
 }
 
-// NewPipeline creates a guardrail pipeline.
 func NewPipeline() *Pipeline {
 	return &Pipeline{}
 }
 
-// Add appends a guard to the pipeline.
 func (p *Pipeline) Add(g Guard) *Pipeline {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -238,7 +210,6 @@ func (p *Pipeline) Add(g Guard) *Pipeline {
 	return p
 }
 
-// Run executes all guards. Stops at first block (unless collecting all).
 func (p *Pipeline) Run(ctx context.Context, input string) CheckResult {
 	p.mu.RLock()
 	guards := make([]Guard, len(p.guards))
@@ -266,7 +237,7 @@ func (p *Pipeline) Run(ctx context.Context, input string) CheckResult {
 	return final
 }
 
-// RunAll executes all guards and collects all results.
+// RunAll collects results from every guard (doesn't short-circuit).
 func (p *Pipeline) RunAll(ctx context.Context, input string) []CheckResult {
 	p.mu.RLock()
 	guards := make([]Guard, len(p.guards))
@@ -280,7 +251,6 @@ func (p *Pipeline) RunAll(ctx context.Context, input string) []CheckResult {
 	return results
 }
 
-// Guards returns the number of guards.
 func (p *Pipeline) Guards() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

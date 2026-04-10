@@ -352,5 +352,192 @@ func isBinary(path string) bool {
 	return binaryExts[ext]
 }
 
+// ──────────────────────────────────────────────
+// Extended file operations
+// ──────────────────────────────────────────────
+
+// StatResult provides detailed file information.
+type StatResult struct {
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	IsDir   bool   `json:"is_dir"`
+	ModTime string `json:"mod_time"`
+	Mode    string `json:"mode"`
+	Exists  bool   `json:"exists"`
+}
+
+// Stat returns file information.
+func (fs *FileSystem) Stat(path string) (*StatResult, error) {
+	abs, err := fs.resolve(path)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(abs)
+	if os.IsNotExist(err) {
+		return &StatResult{Path: path, Exists: false}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("stat: %w", err)
+	}
+	return &StatResult{
+		Path:    path,
+		Size:    info.Size(),
+		IsDir:   info.IsDir(),
+		ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
+		Mode:    info.Mode().String(),
+		Exists:  true,
+	}, nil
+}
+
+// Mkdir creates a directory (including parents).
+func (fs *FileSystem) Mkdir(path string) error {
+	abs, err := fs.resolve(path)
+	if err != nil {
+		return err
+	}
+	return os.MkdirAll(abs, 0o755)
+}
+
+// Delete removes a file or empty directory. Does NOT do recursive delete for safety.
+func (fs *FileSystem) Delete(path string) error {
+	abs, err := fs.resolve(path)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+	if info.IsDir() {
+		entries, _ := os.ReadDir(abs)
+		if len(entries) > 0 {
+			return fmt.Errorf("delete: directory %q is not empty (use recursive=true if intended)", path)
+		}
+		return os.Remove(abs)
+	}
+	return os.Remove(abs)
+}
+
+// MoveResult represents the result of a move/rename operation.
+type MoveResult struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// Move renames or moves a file/directory within the workspace.
+func (fs *FileSystem) Move(src, dst string) (*MoveResult, error) {
+	absSrc, err := fs.resolve(src)
+	if err != nil {
+		return nil, fmt.Errorf("move: source: %w", err)
+	}
+	absDst, err := fs.resolve(dst)
+	if err != nil {
+		return nil, fmt.Errorf("move: dest: %w", err)
+	}
+	// Ensure destination directory exists
+	if err := os.MkdirAll(filepath.Dir(absDst), 0o755); err != nil {
+		return nil, fmt.Errorf("move: mkdir: %w", err)
+	}
+	if err := os.Rename(absSrc, absDst); err != nil {
+		return nil, fmt.Errorf("move: %w", err)
+	}
+	return &MoveResult{From: src, To: dst}, nil
+}
+
+// Copy copies a file within the workspace.
+func (fs *FileSystem) Copy(src, dst string) (*WriteResult, error) {
+	absSrc, err := fs.resolve(src)
+	if err != nil {
+		return nil, fmt.Errorf("copy: source: %w", err)
+	}
+	absDst, err := fs.resolve(dst)
+	if err != nil {
+		return nil, fmt.Errorf("copy: dest: %w", err)
+	}
+
+	info, err := os.Stat(absSrc)
+	if err != nil {
+		return nil, fmt.Errorf("copy: %w", err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("copy: cannot copy directory (use move or shell)")
+	}
+
+	data, err := os.ReadFile(absSrc)
+	if err != nil {
+		return nil, fmt.Errorf("copy: read: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(absDst), 0o755); err != nil {
+		return nil, fmt.Errorf("copy: mkdir: %w", err)
+	}
+
+	_, statErr := os.Stat(absDst)
+	if err := os.WriteFile(absDst, data, 0o644); err != nil {
+		return nil, fmt.Errorf("copy: write: %w", err)
+	}
+
+	return &WriteResult{
+		Path:    dst,
+		Written: len(data),
+		Created: os.IsNotExist(statErr),
+	}, nil
+}
+
+// TreeEntry represents a node in a directory tree.
+type TreeEntry struct {
+	Name     string      `json:"name"`
+	Path     string      `json:"path"`
+	IsDir    bool        `json:"is_dir"`
+	Size     int64       `json:"size,omitempty"`
+	Children []TreeEntry `json:"children,omitempty"`
+}
+
+// Tree returns a recursive directory listing (max depth limited).
+func (fs *FileSystem) Tree(path string, maxDepth int) (*TreeEntry, error) {
+	abs, err := fs.resolve(path)
+	if err != nil {
+		return nil, err
+	}
+	if maxDepth <= 0 {
+		maxDepth = 3
+	}
+	return fs.buildTree(abs, path, maxDepth, 0)
+}
+
+func (fs *FileSystem) buildTree(absPath, relPath string, maxDepth, depth int) (*TreeEntry, error) {
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	entry := &TreeEntry{
+		Name:  info.Name(),
+		Path:  relPath,
+		IsDir: info.IsDir(),
+		Size:  info.Size(),
+	}
+
+	if !info.IsDir() || depth >= maxDepth {
+		return entry, nil
+	}
+
+	children, err := os.ReadDir(absPath)
+	if err != nil {
+		return entry, nil
+	}
+
+	for _, child := range children {
+		childAbs := filepath.Join(absPath, child.Name())
+		childRel := filepath.Join(relPath, child.Name())
+		childEntry, _ := fs.buildTree(childAbs, childRel, maxDepth, depth+1)
+		if childEntry != nil {
+			entry.Children = append(entry.Children, *childEntry)
+		}
+	}
+
+	return entry, nil
+}
+
 // Ensure json import is used
 var _ = json.Marshal

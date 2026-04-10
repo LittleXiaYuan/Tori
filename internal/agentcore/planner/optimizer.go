@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 )
 
@@ -21,19 +23,21 @@ type SkillOptimizer struct {
 	metrics      *observe.Metrics
 	history      []SkillPerformance // persisted historical performance
 	saveFile     string
+	kvs          *iledger.KVConfigStore
 	lastAnalysis time.Time
 	analyzeCount int // throttle: analyze at most every 5 calls or 60 seconds
 }
 
 // SkillPerformance tracks a skill's performance over time.
 type SkillPerformance struct {
-	Name        string  `json:"name"`
-	Total       int64   `json:"total"`
-	Success     int64   `json:"success"`
-	Failed      int64   `json:"failed"`
-	SuccessRate float64 `json:"success_rate"`
-	AvgLatency  float64 `json:"avg_latency_ms"`
-	LastUpdated string  `json:"last_updated"`
+	Name         string  `json:"name"`
+	Total        int64   `json:"total"`
+	Success      int64   `json:"success"`
+	Failed       int64   `json:"failed"`
+	SuccessRate  float64 `json:"success_rate"`
+	AvgLatency   float64 `json:"avg_latency_ms"`
+	LastUpdated  string  `json:"last_updated"`
+	LastFailedAt string  `json:"last_failed_at,omitempty"` // RFC3339 timestamp of most recent failure
 }
 
 // NewSkillOptimizer creates an optimizer linked to the metrics system.
@@ -44,6 +48,14 @@ func NewSkillOptimizer(met *observe.Metrics, saveFile string) *SkillOptimizer {
 	}
 	opt.loadHistory()
 	return opt
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+func (o *SkillOptimizer) SetKVStore(kvs *iledger.KVConfigStore) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.kvs = kvs
+	o.loadHistoryFromKV()
 }
 
 // Analyze collects current metrics snapshot and merges with historical data.
@@ -88,9 +100,12 @@ func (o *SkillOptimizer) Analyze() {
 				p.SuccessRate = s.SuccessRate
 				p.AvgLatency = s.Latency.Avg
 				p.LastUpdated = now
+				if s.Failed > 0 {
+					p.LastFailedAt = now
+				}
 			}
 		} else {
-			o.history = append(o.history, SkillPerformance{
+			entry := SkillPerformance{
 				Name:        s.Name,
 				Total:       s.Total,
 				Success:     s.Success,
@@ -98,7 +113,11 @@ func (o *SkillOptimizer) Analyze() {
 				SuccessRate: s.SuccessRate,
 				AvgLatency:  s.Latency.Avg,
 				LastUpdated: now,
-			})
+			}
+			if s.Failed > 0 {
+				entry.LastFailedAt = now
+			}
+			o.history = append(o.history, entry)
 		}
 	}
 
@@ -168,6 +187,19 @@ func (o *SkillOptimizer) OptimizationHints() string {
 		b.WriteString("\n")
 	}
 
+	// Show suppressed skills
+	suppressed := o.suppressedLocked()
+	if len(suppressed) > 0 {
+		b.WriteString("🚫 已暂停(成功率过低): ")
+		for i, name := range suppressed {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(name)
+		}
+		b.WriteString("\n")
+	}
+
 	return b.String()
 }
 
@@ -187,7 +219,7 @@ func (o *SkillOptimizer) loadHistory() {
 	}
 	data, err := os.ReadFile(o.saveFile)
 	if err != nil {
-		return // file doesn't exist yet, start fresh
+		return
 	}
 	var history []SkillPerformance
 	if err := json.Unmarshal(data, &history); err != nil {
@@ -198,7 +230,30 @@ func (o *SkillOptimizer) loadHistory() {
 	slog.Info("skill optimizer: loaded history", "skills", len(history))
 }
 
+func (o *SkillOptimizer) loadHistoryFromKV() {
+	if o.kvs == nil {
+		return
+	}
+	var history []SkillPerformance
+	found, err := o.kvs.Get(context.Background(), "history", &history)
+	if err != nil {
+		slog.Warn("skill optimizer: kv load failed", "err", err)
+		return
+	}
+	if found && len(history) > 0 {
+		o.history = history
+		slog.Info("skill optimizer: loaded from Ledger KV", "skills", len(history))
+	}
+}
+
 func (o *SkillOptimizer) persistHistory() {
+	if o.kvs != nil {
+		if err := o.kvs.Put(context.Background(), "history", o.history); err != nil {
+			slog.Warn("skill optimizer: kv persist failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	if o.saveFile == "" {
 		return
 	}
@@ -209,4 +264,50 @@ func (o *SkillOptimizer) persistHistory() {
 	if err := os.WriteFile(o.saveFile, data, 0644); err != nil {
 		slog.Warn("skill optimizer: persist failed", "err", err)
 	}
+}
+
+// ShouldSuppress returns true if a skill should be hidden from the LLM tool list.
+// Criteria: success rate < 30% AND failed > 5 AND last failure within 24 hours.
+func (o *SkillOptimizer) ShouldSuppress(skillName string) bool {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	for _, p := range o.history {
+		if p.Name == skillName {
+			return o.isSkillSuppressed(p)
+		}
+	}
+	return false
+}
+
+// SuppressedSkills returns the list of skill names currently suppressed.
+func (o *SkillOptimizer) SuppressedSkills() []string {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.suppressedLocked()
+}
+
+// suppressedLocked returns suppressed skill names. Caller must hold at least RLock.
+func (o *SkillOptimizer) suppressedLocked() []string {
+	var result []string
+	for _, p := range o.history {
+		if o.isSkillSuppressed(p) {
+			result = append(result, p.Name)
+		}
+	}
+	return result
+}
+
+// isSkillSuppressed checks suppression criteria for a single skill entry.
+func (o *SkillOptimizer) isSkillSuppressed(p SkillPerformance) bool {
+	if p.Total < 6 || p.SuccessRate >= 0.3 || p.Failed <= 5 {
+		return false
+	}
+	if p.LastFailedAt == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, p.LastFailedAt)
+	if err != nil {
+		return false
+	}
+	return time.Since(t) < 24*time.Hour
 }

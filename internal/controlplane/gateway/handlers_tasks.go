@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"yunque-agent/pkg/safego"
+
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/apperror"
@@ -94,13 +96,12 @@ func (g *Gateway) handleTaskRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Run async — return immediately, client polls for status
-	go func() {
+	safego.Go("task-run-"+req.ID, func() {
 		ctx := context.Background()
 		if err := g.taskRunner.Run(ctx, req.ID); err != nil {
 			slog.Warn("task execution failed", "task", req.ID, "err", err)
 		}
-	}()
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -214,13 +215,12 @@ func (g *Gateway) handleTaskResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resume async
-	go func() {
+	safego.Go("task-resume-"+req.ID, func() {
 		ctx := context.Background()
 		if err := g.taskRunner.Resume(ctx, req.ID); err != nil {
 			slog.Warn("task resume failed", "task", req.ID, "err", err)
 		}
-	}()
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -260,13 +260,12 @@ func (g *Gateway) handleTaskRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Restart async
-	go func() {
+	safego.Go("task-restart-"+req.ID, func() {
 		ctx := context.Background()
 		if err := g.taskRunner.Restart(ctx, req.ID); err != nil {
 			slog.Warn("task restart failed", "task", req.ID, "err", err)
 		}
-	}()
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)

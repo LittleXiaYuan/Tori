@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/config"
 )
 
 // configGroup defines a group of env vars shown in the Settings UI.
@@ -60,6 +63,7 @@ var configSchema = []configGroup{
 			{Key: "SELF_ITERATE_ENABLED", Label: "Self-Iterate", LabelZh: "自我迭代", Type: "select", Options: []string{"true", "false"}},
 			{Key: "SELF_ITERATE_TOKEN_BUDGET", Label: "Iterate Token Budget", LabelZh: "迭代 Token 预算", Type: "number", Placeholder: "5000"},
 			{Key: "SELF_ITERATE_AUTO_APPROVE", Label: "Auto-Approve Proposals", LabelZh: "自动审批提案", Type: "select", Options: []string{"false", "true"}},
+			{Key: "THINKING_LEVEL", Label: "Thinking Level", LabelZh: "思考深度", Type: "select", Options: []string{"auto", "none", "deep"}},
 			{Key: "REACT_ENABLED", Label: "ReAct Mode", LabelZh: "ReAct 推理模式", Type: "select", Options: []string{"false", "true"}},
 			{Key: "REFLECT_MODE", Label: "Reflect Mode", LabelZh: "反思评估模式", Type: "select", Options: []string{"learning", "strict", "off"}},
 			{Key: "REFLECT_MODEL", Label: "Reflect Eval Model", LabelZh: "反思评估器模型", Type: "text", Placeholder: "fast (留空=主模型)"},
@@ -85,6 +89,13 @@ var configSchema = []configGroup{
 			{Key: "QQ_APP_ID", Label: "QQ Bot App ID", LabelZh: "QQ 机器人 AppID", Type: "text"},
 			{Key: "QQ_APP_SECRET", Label: "QQ Bot App Secret", LabelZh: "QQ 机器人 AppSecret", Type: "password", Sensitive: true},
 			{Key: "QQ_SANDBOX", Label: "QQ Sandbox Mode", LabelZh: "QQ 沙箱模式", Type: "select", Options: []string{"false", "true"}},
+		},
+	},
+	{
+		Key: "filesystem", Label: "File System Access", LabelZh: "文件系统访问",
+		Fields: []configField{
+			{Key: "HOST_READ_PATHS", Label: "Read-Only Paths", LabelZh: "只读访问路径", Type: "text", Placeholder: "C:\\Users\\me\\Desktop,C:\\Users\\me\\Documents"},
+			{Key: "HOST_WRITE_PATHS", Label: "Writable Paths", LabelZh: "可写访问路径", Type: "text", Placeholder: "data/output,data/tasks"},
 		},
 	},
 	{
@@ -219,20 +230,22 @@ func (g *Gateway) handleSettingsCheck(w http.ResponseWriter, r *http.Request) {
 	values := readEnvFile()
 	hasLLMKey := values["LLM_API_KEY"] != ""
 	hasLLMURL := values["LLM_BASE_URL"] != ""
+	hasLLMModel := values["LLM_MODEL"] != ""
 
-	// Test LLM connectivity
+	// Test LLM connectivity. API keys are optional for local providers.
 	apiOK := false
-	if hasLLMKey && hasLLMURL {
+	if hasLLMURL {
 		apiOK = testLLMAPI(values["LLM_BASE_URL"], values["LLM_API_KEY"])
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"env_exists":   envExists,
-		"has_llm_key":  hasLLMKey,
-		"has_llm_url":  hasLLMURL,
-		"api_ok":       apiOK,
-		"setup_needed": !envExists || !hasLLMKey,
+		"env_exists":    envExists,
+		"has_llm_key":   hasLLMKey,
+		"has_llm_url":   hasLLMURL,
+		"has_llm_model": hasLLMModel,
+		"api_ok":        apiOK,
+		"setup_needed":  !envExists || !hasLLMURL || !hasLLMModel,
 	})
 }
 
@@ -297,7 +310,126 @@ func writeEnvFile(values map[string]string) error {
 		lines = append(lines, "")
 	}
 
-	return os.WriteFile(".env", []byte(strings.Join(lines, "\n")+"\n"), 0644)
+	// Atomic write: write to temp file first, then rename
+	tmp := ".env.tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")+"\n"), 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, ".env")
+}
+
+// handleConfigReload re-reads .env, recreates LLM clients, and hot-swaps them
+// into the running system. This avoids requiring a full process restart after
+// changing LLM settings in the UI.
+func (g *Gateway) handleConfigReload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	vals := readEnvFile()
+	baseURL := vals["LLM_BASE_URL"]
+	apiKey := vals["LLM_API_KEY"]
+	model := vals["LLM_MODEL"]
+
+	if baseURL == "" || apiKey == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"error":   "LLM_BASE_URL 和 LLM_API_KEY 不能为空",
+		})
+		return
+	}
+
+	// Test connectivity first
+	if !testLLMAPI(baseURL, apiKey) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"error":   "无法连接到 LLM 服务，请检查 API 地址和密钥",
+		})
+		return
+	}
+
+	reloaded := []string{"smart"}
+
+	// Hot-swap primary (smart tier) client in the provider registry's pool
+	if g.providerReg != nil {
+		pool := g.providerReg.Pool()
+		if pool != nil {
+			if model == "" {
+				model = "gpt-4.1-mini"
+			}
+			newClient := llm.NewClient(baseURL, apiKey, model)
+			pool.Register("smart", newClient)
+			pool.SetPrimary("smart")
+
+			// Hot-swap fast tier if configured
+			fastURL := vals["LLM_FAST_URL"]
+			fastKey := vals["LLM_FAST_KEY"]
+			fastModel := vals["LLM_FAST_MODEL"]
+			if fastModel != "" {
+				if fastURL == "" {
+					fastURL = baseURL
+				}
+				if fastKey == "" {
+					fastKey = apiKey
+				}
+				pool.Register("fast", llm.NewClient(fastURL, fastKey, fastModel))
+				reloaded = append(reloaded, "fast")
+			}
+
+			// Hot-swap expert tier if configured
+			expertURL := vals["LLM_EXPERT_URL"]
+			expertKey := vals["LLM_EXPERT_KEY"]
+			expertModel := vals["LLM_EXPERT_MODEL"]
+			if expertModel != "" {
+				if expertURL == "" {
+					expertURL = baseURL
+				}
+				if expertKey == "" {
+					expertKey = apiKey
+				}
+				pool.Register("expert", llm.NewClient(expertURL, expertKey, expertModel))
+				reloaded = append(reloaded, "expert")
+			}
+		}
+	}
+
+	// Re-export env vars so downstream code that reads os.Getenv also sees the change
+	for k, v := range vals {
+		os.Setenv(k, v)
+	}
+
+	// Hot-reload file system paths into the general plugin (if paths changed)
+	if hrp := vals["HOST_READ_PATHS"]; hrp != "" {
+		reloaded = append(reloaded, "fs_read_paths")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"success":  true,
+		"reloaded": reloaded,
+		"message":  fmt.Sprintf("已热重载 %d 个配置层", len(reloaded)),
+	})
+}
+
+// handleDetectDirs auto-discovers user directories (Desktop, Documents, Downloads, etc.)
+// for one-click HOST_READ_PATHS configuration.
+func (g *Gateway) handleDetectDirs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	dirs := config.DetectUserDirs()
+	defaults := config.DefaultReadPaths()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"dirs":          dirs,
+		"default_paths": defaults,
+		"current_read":  readEnvFile()["HOST_READ_PATHS"],
+		"current_write": readEnvFile()["HOST_WRITE_PATHS"],
+	})
 }
 
 func testLLMAPI(baseURL, apiKey string) bool {

@@ -22,13 +22,12 @@ func TestDynamicSkillExecute(t *testing.T) {
 		}
 		return "你好，欢迎使用！", nil
 	}
-
-	sk := NewDynamicSkill(def, mockLLM, skills.NewRegistry(), nil)
+	sk := NewDynamicSkill(def, skills.NewRegistry())
 	if sk.Name() != "greet" {
 		t.Fatalf("expected greet, got %s", sk.Name())
 	}
 
-	result, err := sk.Execute(context.Background(), map[string]any{"name": "Alice"}, nil)
+	result, err := sk.Execute(context.Background(), map[string]any{"name": "Alice"}, &skills.Environment{LLMCall: skills.LLMCallFunc(mockLLM)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +100,7 @@ func TestSkillGeneratorFromGap(t *testing.T) {
 		"to":      "admin@example.com",
 		"subject": "Test",
 		"body":    "Hello",
-	}, nil)
+	}, &skills.Environment{LLMCall: skills.LLMCallFunc(mockLLM)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +143,8 @@ func TestGrowthLoopIntegrated(t *testing.T) {
 	gap := NewGapAnalyzer(mockLLM)
 	gen := NewSkillGenerator(mockLLM, reg, nil)
 
-	runner := NewRunner(s, reg, mockLLM, nil)
+	env := &skills.Environment{LLMCall: skills.LLMCallFunc(mockLLM)}
+	runner := NewRunner(s, reg, mockLLM, env)
 	runner.SetGapAnalyzer(gap)
 	runner.SetSkillGenerator(gen)
 
@@ -182,13 +182,13 @@ func TestDynamicSkillNameConflict(t *testing.T) {
 	reg := skills.NewRegistry()
 	reg.Register(&mockSkill{name: "web_search", result: "ok"}) // conflict target
 
+	def := DynamicSkillDef{
+		Name:        "web_search", // conflicts with existing
+		Description: "另一个搜索技能",
+		Instruction: "搜索网络。",
+	}
+	b, _ := json.Marshal(def)
 	mockLLM := func(ctx context.Context, system, user string) (string, error) {
-		def := DynamicSkillDef{
-			Name:        "web_search", // conflicts with existing
-			Description: "另一个搜索技能",
-			Instruction: "搜索网络。",
-		}
-		b, _ := json.Marshal(def)
 		return string(b), nil
 	}
 

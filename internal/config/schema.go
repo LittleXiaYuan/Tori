@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // ──────────────────────────────────────────────
@@ -315,7 +317,7 @@ func (l *Loader) Watch(interval time.Duration) {
 	if l.reload == ReloadOff {
 		return
 	}
-	go func() {
+	safego.Go("config-watcher", func() {
 		var lastMod time.Time
 		info, err := os.Stat(l.path)
 		if err == nil {
@@ -364,7 +366,7 @@ func (l *Loader) Watch(interval time.Duration) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // Stop stops watching.

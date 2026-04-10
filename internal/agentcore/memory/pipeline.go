@@ -12,13 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// FactTransformFunc is called after fact extraction, before decision.
-// Plugins can use this to enrich, filter, or tag extracted facts.
-// Return nil to suppress all facts.
+// FactTransformFunc is a hook for plugins to enrich/filter/tag facts
+// after extraction but before the decision phase. Return nil to suppress all.
 type FactTransformFunc func(ctx context.Context, facts []string) []string
 
-// Pipeline orchestrates the intelligent memory lifecycle:
-// conversation → extract facts → transform (plugins) → decide mutations → apply to store → optional compaction.
+// Pipeline orchestrates the memory lifecycle:
+// conversation → extract facts → transform (plugins) → decide mutations → apply → compact.
 type Pipeline struct {
 	extractor      *Extractor
 	decider        *Decider
@@ -29,7 +28,6 @@ type Pipeline struct {
 	factTransform  FactTransformFunc // optional: plugin fact transformation hook
 }
 
-// NewPipeline creates a memory pipeline with LLM-driven fact processing.
 func NewPipeline(chatFn ChatFunc, manager *Manager) *Pipeline {
 	return &Pipeline{
 		extractor: NewExtractor(chatFn),
@@ -40,7 +38,6 @@ func NewPipeline(chatFn ChatFunc, manager *Manager) *Pipeline {
 	}
 }
 
-// ProcessResult contains the outcome of a pipeline run.
 type ProcessResult struct {
 	ExtractedFacts []string `json:"extracted_facts"`
 	Added          int      `json:"added"`
@@ -51,20 +48,14 @@ type ProcessResult struct {
 	Relations      int      `json:"relations"`
 }
 
-// Graph returns the knowledge graph managed by this pipeline.
 func (p *Pipeline) Graph() *Graph { return p.graph }
 
-// SetGraph replaces the knowledge graph instance.
 func (p *Pipeline) SetGraph(g *Graph) { p.graph = g }
 
-// SetDailyDir configures a directory for daily markdown memory persistence.
 func (p *Pipeline) SetDailyDir(dir string) { p.dailyDir = dir }
 
-// SetFactTransform attaches a hook that transforms extracted facts before they
-// enter the decision phase. Used by CognitivePlugin.OnMemoryExtract and HookManager.
 func (p *Pipeline) SetFactTransform(fn FactTransformFunc) { p.factTransform = fn }
 
-// Process runs the full extract → decide → apply pipeline on a conversation.
 func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []ChatMessage) (*ProcessResult, error) {
 	result := &ProcessResult{}
 
@@ -84,7 +75,7 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 	facts := extracted.Facts
 	if p.factTransform != nil {
 		facts = p.factTransform(ctx, facts)
-		if facts == nil || len(facts) == 0 {
+		if len(facts) == 0 {
 			slog.Info("memory pipeline: all facts suppressed by transform hook")
 			return result, nil
 		}
@@ -181,7 +172,6 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 	return result, nil
 }
 
-// gatherCandidates searches existing memories that might be related to the new facts.
 func (p *Pipeline) gatherCandidates(ctx context.Context, tenantID string, facts []string) ([]Candidate, error) {
 	query := strings.Join(facts, " ")
 	if len(query) > 500 {
@@ -204,7 +194,6 @@ func (p *Pipeline) gatherCandidates(ctx context.Context, tenantID string, facts 
 	return candidates, nil
 }
 
-// Compact triggers memory consolidation for a tenant.
 func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, decayDays int) (*CompactOutput, error) {
 	existing, err := p.manager.Mid.List(ctx, tenantID, "", 0)
 	if err != nil {
@@ -253,8 +242,8 @@ func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, de
 	return output, nil
 }
 
-// extractToGraph parses extracted facts and populates the knowledge graph with entities and relations.
-// Uses pattern matching to identify entity types and relationships from natural language facts.
+// extractToGraph: pattern-match facts into entities and relations.
+// HACK: this is keyword-based; should be replaced with an LLM extraction call.
 func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
 	// Entity type detection patterns (Chinese + English)
 	personPatterns := []string{"用户", "他", "她", "我", "Alice", "Bob", "老师", "同事", "朋友", "user", "person"}
@@ -341,6 +330,7 @@ func matchAny(s string, patterns []string) bool {
 	return false
 }
 
+// Simple deterministic ID (FNV-1a) from fact text.
 func entityID(fact string) string {
 	// Simple deterministic ID from fact content
 	var h uint64 = 14695981039346656037
@@ -366,11 +356,7 @@ func truncateLog(s string) string {
 	return s
 }
 
-// ──────────────────────────────────────────────
-// Daily Markdown Persistence (OpenClaw MEMORY.md style)
-// ──────────────────────────────────────────────
-
-// appendDailyFile appends extracted facts to data/memory/daily/YYYY-MM-DD.md.
+// ---- daily markdown persistence (similar to OpenClaw's MEMORY.md) ----
 func appendDailyFile(dir, tenantID string, facts []string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -392,8 +378,7 @@ func appendDailyFile(dir, tenantID string, facts []string) error {
 	return nil
 }
 
-// LoadDailyFiles reads all daily markdown files and loads facts into mid-term memory.
-// Used at startup to rehydrate memory from persisted daily files.
+// LoadDailyFiles rehydrates mid-term memory from persisted daily markdown files.
 func LoadDailyFiles(dir string, mgr *Manager) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

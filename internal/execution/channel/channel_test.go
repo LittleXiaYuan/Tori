@@ -102,15 +102,31 @@ func TestTelegramParseCommand(t *testing.T) {
 	}
 }
 
-func TestTelegramHandleCommand(t *testing.T) {
-	tg := NewTelegram("fake")
-	reply, ok := tg.handleCommand("/start")
-	if !ok || reply.Content == "" {
-		t.Fatal("start command should return non-empty reply")
+func TestAgentCommandsHandler(t *testing.T) {
+	ac := &AgentCommands{
+		GetThinkingLevel: func(_, _ string) string { return "auto" },
+		SetThinkingLevel: func(_, _, level string) string { return "set to " + level },
+		GetStatus:        func() string { return "ok" },
 	}
-	_, ok = tg.handleCommand("/unknown")
+	handler := ac.Handler()
+	msg := Message{ChannelType: "telegram", UserID: "123"}
+
+	// /start should be handled
+	reply, ok := handler(msg, "/start", "")
+	if !ok || reply.Content == "" {
+		t.Fatal("/start should return non-empty reply")
+	}
+
+	// /help should be handled
+	reply, ok = handler(msg, "/help", "")
+	if !ok || reply.Content == "" {
+		t.Fatal("/help should return non-empty reply")
+	}
+
+	// /unknown should not be handled
+	_, ok = handler(msg, "/unknown", "")
 	if ok {
-		t.Fatal("unknown command should not be handled by Telegram's built-in handler")
+		t.Fatal("/unknown should not be handled by AgentCommands")
 	}
 }
 

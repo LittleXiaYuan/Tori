@@ -1,8 +1,10 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +51,7 @@ type TemplateStore struct {
 	mu   sync.RWMutex
 	data map[string]*Template
 	dir  string
+	kvs  kvStore
 }
 
 // NewTemplateStore creates a template store persisting to the given directory.
@@ -58,11 +61,47 @@ func NewTemplateStore(dir string) *TemplateStore {
 	return ts
 }
 
-// Create adds a new template.
-func (ts *TemplateStore) Create(t *Template) error {
+// SetKVStore enables Ledger KV-backed persistence for templates.
+// Migrates existing file-based templates to KV on first call.
+func (ts *TemplateStore) SetKVStore(kvs kvStore) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
+	ts.kvs = kvs
 
+	if len(ts.data) == 0 {
+		ts.loadFromKV()
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := kvs.Put(ctx, "templates", ts.data); err != nil {
+		slog.Warn("template store: KV migration failed", "err", err)
+		return
+	}
+	slog.Info("template store: migrated to Ledger KV", "count", len(ts.data))
+}
+
+func (ts *TemplateStore) loadFromKV() {
+	if ts.kvs == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var data map[string]*Template
+	found, err := ts.kvs.Get(ctx, "templates", &data)
+	if err != nil {
+		slog.Warn("template store: KV load failed", "err", err)
+		return
+	}
+	if found && len(data) > 0 {
+		ts.data = data
+		slog.Info("template store: loaded from KV", "count", len(data))
+	}
+}
+
+// Create adds a new template.
+func (ts *TemplateStore) Create(t *Template) error {
 	if t.Name == "" {
 		return fmt.Errorf("template name is required")
 	}
@@ -73,8 +112,11 @@ func (ts *TemplateStore) Create(t *Template) error {
 		t.CreatedAt = time.Now()
 	}
 
+	ts.mu.Lock()
 	ts.data[t.ID] = t
-	return ts.saveOne(t)
+	ts.mu.Unlock()
+
+	return ts.persistAll()
 }
 
 // Get retrieves a template by ID.
@@ -105,6 +147,7 @@ func (ts *TemplateStore) Delete(id string) bool {
 	}
 	delete(ts.data, id)
 	os.Remove(filepath.Join(ts.dir, id+".json"))
+	_ = ts.persistAllLocked()
 	return true
 }
 
@@ -178,6 +221,47 @@ func substituteArgsVars(args map[string]any, vars map[string]string) map[string]
 		}
 	}
 	return result
+}
+
+func (ts *TemplateStore) persistAll() error {
+	ts.mu.RLock()
+	snap := make(map[string]*Template, len(ts.data))
+	for k, v := range ts.data {
+		snap[k] = v
+	}
+	kvs := ts.kvs
+	ts.mu.RUnlock()
+
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "templates", snap); err != nil {
+			slog.Warn("template store: KV save failed, falling back to file", "err", err)
+		} else {
+			return nil
+		}
+	}
+
+	for _, t := range snap {
+		if err := ts.saveOne(t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// persistAllLocked is like persistAll but assumes mu is already held.
+func (ts *TemplateStore) persistAllLocked() error {
+	if ts.kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := ts.kvs.Put(ctx, "templates", ts.data); err != nil {
+			slog.Warn("template store: KV save failed", "err", err)
+		} else {
+			return nil
+		}
+	}
+	return nil
 }
 
 func (ts *TemplateStore) load() {

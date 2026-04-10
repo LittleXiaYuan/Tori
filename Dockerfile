@@ -3,12 +3,22 @@
 # ╚══════════════════════════════════════════╝
 
 # ── Stage 1: Build Go agent ──
+# NOTE: Build context must be the PARENT directory containing both yunque-agent/
+# and ledger/. Run: docker build -f yunque-agent/Dockerfile -t yunque-agent .
+# from the parent directory, or use docker compose which handles this.
 FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
-COPY go.mod go.sum ./
+
+# Copy ledger dependency first (referenced by go.mod replace directive)
+COPY ledger/ /src/ledger/
+
+# Copy yunque-agent source
+COPY yunque-agent/go.mod yunque-agent/go.sum /src/yunque-agent/
+WORKDIR /src/yunque-agent
 RUN go mod download
-COPY . .
+
+COPY yunque-agent/ /src/yunque-agent/
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown

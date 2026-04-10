@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/observe"
+	"yunque-agent/pkg/safego"
 	"yunque-agent/pkg/skills"
 )
 
@@ -40,24 +41,24 @@ type KnowledgeExecutor func(ctx context.Context, query string, topK int) (string
 
 // Engine executes workflow DAGs.
 type Engine struct {
-	store    Store
-	skills   *skills.Registry
+	store       Store
+	skills      *skills.Registry
 	execSkill   SkillExecutor
 	execLLM     LLMExecutor
 	execBrowser BrowserExecutor
 	execCode    CodeExecutor
 	execKnow    KnowledgeExecutor
 
-	mu       sync.Mutex
-	running  map[string]context.CancelFunc // instanceID → cancel
+	mu      sync.Mutex
+	running map[string]context.CancelFunc // instanceID → cancel
 
-	eventMu    sync.RWMutex
-	listeners  []WorkflowEventListener
+	eventMu   sync.RWMutex
+	listeners []WorkflowEventListener
 }
 
 // WorkflowEvent describes a workflow execution event.
 type WorkflowEvent struct {
-	Type       string `json:"type"`        // e.g. "node_start", "node_done", "node_failed", "workflow_done"
+	Type       string `json:"type"` // e.g. "node_start", "node_done", "node_failed", "workflow_done"
 	InstanceID string `json:"instance_id"`
 	NodeID     string `json:"node_id,omitempty"`
 	NodeName   string `json:"node_name,omitempty"`
@@ -180,7 +181,7 @@ func (e *Engine) Run(ctx context.Context, instanceID string) error {
 				ns.Status = NodeSkipped
 				now := time.Now()
 				ns.FinishedAt = &now
-				
+
 				n := findNode(def, sid)
 				e.emit(WorkflowEvent{
 					Type: "node_skipped", InstanceID: inst.ID,
@@ -240,12 +241,12 @@ func (e *Engine) Run(ctx context.Context, instanceID string) error {
 			for _, nodeID := range readyNodes {
 				nid := nodeID
 				wg.Add(1)
-				go func() {
+				safego.Go("workflow-node-"+nid, func() {
 					defer wg.Done()
 					if err := e.executeNode(ctx, def, inst, nid); err != nil {
 						errCh <- err
 					}
-				}()
+				})
 			}
 			wg.Wait()
 			close(errCh)
@@ -326,6 +327,9 @@ func (e *Engine) executeNode(ctx context.Context, def *Definition, inst *Instanc
 	case NodeParallel, NodeJoin:
 		// Structural nodes — auto-complete
 		result = "ok"
+	case NodeStart, NodeEnd:
+		// Entry/exit nodes — pass-through
+		result = "ok"
 	case NodeSubflow:
 		result, err = e.execSubflowNode(ctx, node, inst)
 	case NodeBrowser:
@@ -349,7 +353,7 @@ func (e *Engine) executeNode(ctx context.Context, def *Definition, inst *Instanc
 			Type: "node_failed", InstanceID: inst.ID,
 			NodeID: nodeID, NodeName: node.Name, NodeType: string(node.Type),
 			Message: fmt.Sprintf("节点 [%s] 执行失败", node.Name),
-			Error: err.Error(),
+			Error:   err.Error(),
 		})
 		return fmt.Errorf("node %s (%s): %w", nodeID, node.Name, err)
 	}
@@ -576,7 +580,7 @@ func (e *Engine) findReadyNodes(def *Definition, inst *Instance, graph *adjacenc
 		if ns.Status != NodePending {
 			continue
 		}
-		
+
 		allDone := true
 		shouldSkip := false
 

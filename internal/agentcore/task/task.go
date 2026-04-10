@@ -55,6 +55,22 @@ type Task struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+
+	// ── Constraints (execution guardrails) ──
+	Constraints *TaskConstraints `json:"constraints,omitempty"`
+}
+
+// TaskConstraints defines execution guardrails for a task.
+type TaskConstraints struct {
+	MaxSteps        int            `json:"max_steps,omitempty"`        // 0 = use default (8)
+	TimeoutSec      int            `json:"timeout_sec,omitempty"`      // 0 = no global timeout
+	MaxCostUSD      float64        `json:"max_cost_usd,omitempty"`     // 0 = no cost limit
+	SuccessCriteria string         `json:"success_criteria,omitempty"` // natural-language acceptance condition
+	TestCommand     string         `json:"test_command,omitempty"`     // shell command to verify result (exit 0 = pass)
+	Priority        string         `json:"priority,omitempty"`         // low / medium / high
+	AutoApprove     bool           `json:"auto_approve,omitempty"`     // skip human approval for medium-risk ops
+	Tags            []string       `json:"tags,omitempty"`
+	Extra           map[string]any `json:"extra,omitempty"` // extensible metadata
 }
 
 // Step is one unit of execution within a task.
@@ -86,9 +102,10 @@ type Artifact struct {
 
 // CreateRequest is the input for creating a new task.
 type CreateRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	TenantID    string `json:"-"` // injected from auth
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	TenantID    string           `json:"-"` // injected from auth
+	Constraints *TaskConstraints `json:"constraints,omitempty"`
 }
 
 // Validate checks the create request.

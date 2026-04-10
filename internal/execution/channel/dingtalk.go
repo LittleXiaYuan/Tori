@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // DingTalk implements the Channel interface for DingTalk (钉钉) Bot.
@@ -80,12 +82,12 @@ func (d *DingTalk) Start(ctx context.Context, handler func(Message) Reply) error
 	addr := fmt.Sprintf("%s:%s", d.bindAddr, d.port)
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 
-	go func() {
+	safego.Go("dingtalk-server", func() {
 		slog.Info("dingtalk callback server started", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("dingtalk callback server error", "err", err)
 		}
-	}()
+	})
 
 	// Process incoming messages
 	for {

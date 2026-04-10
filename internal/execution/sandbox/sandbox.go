@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// Result is the output of a sandbox execution.
 type Result struct {
 	ExitCode int    `json:"exit_code"`
 	Stdout   string `json:"stdout"`
@@ -19,7 +18,7 @@ type Result struct {
 	Duration string `json:"duration"`
 }
 
-// Policy defines what a sandbox is allowed to do.
+// Policy controls what the sandbox can and can't do.
 type Policy struct {
 	AllowCommands  []string // whitelist of allowed commands (empty = all)
 	BlockCommands  []string // blacklist of blocked commands
@@ -30,7 +29,7 @@ type Policy struct {
 	AllowNetwork   bool
 }
 
-// DefaultPolicy returns a safe default policy with allowlist-only commands.
+// DefaultPolicy is conservative: allowlist-only, no network.
 func DefaultPolicy() Policy {
 	return Policy{
 		AllowCommands:  []string{"echo", "cat", "head", "tail", "wc", "sort", "grep", "find", "ls", "dir", "type", "python3", "python", "node"},
@@ -41,12 +40,9 @@ func DefaultPolicy() Policy {
 	}
 }
 
-// ──────────────────────────────────────────────
-// Sandbox Tier Templates
-// Three pre-configured security levels for different deployment contexts.
-// ──────────────────────────────────────────────
+// ---- tier templates ----
 
-// TierName identifies a pre-configured sandbox security level.
+// TierName is one of personal/family/public.
 type TierName string
 
 const (
@@ -55,7 +51,7 @@ const (
 	TierPublic   TierName = "public"   // public-facing service — strict
 )
 
-// PersonalPolicy is relaxed: most commands allowed, network on, longer timeouts.
+// PersonalPolicy: your own machine, mostly unrestricted.
 func PersonalPolicy() Policy {
 	return Policy{
 		AllowCommands:  nil, // no whitelist → all allowed
@@ -66,7 +62,7 @@ func PersonalPolicy() Policy {
 	}
 }
 
-// FamilyPolicy is moderate: curated command list, no network, standard timeout.
+// FamilyPolicy: shared device, curated allowlist, no network.
 func FamilyPolicy() Policy {
 	return Policy{
 		AllowCommands:  []string{"echo", "cat", "head", "tail", "wc", "sort", "grep", "find", "ls", "dir", "type", "python3", "python", "node"},
@@ -77,7 +73,7 @@ func FamilyPolicy() Policy {
 	}
 }
 
-// PublicPolicy is strict: minimal commands, Docker isolation expected, tight limits.
+// PublicPolicy: public-facing, very locked down. Pair with Docker.
 func PublicPolicy() Policy {
 	return Policy{
 		AllowCommands:  []string{"echo", "cat", "head", "ls"},
@@ -88,7 +84,6 @@ func PublicPolicy() Policy {
 	}
 }
 
-// PolicyForTier returns the policy template for a given tier name.
 func PolicyForTier(tier TierName) Policy {
 	switch tier {
 	case TierPersonal:
@@ -102,7 +97,6 @@ func PolicyForTier(tier TierName) Policy {
 	}
 }
 
-// Sandbox executes commands in a controlled environment.
 type Sandbox struct {
 	workDir   string
 	policy    Policy
@@ -110,7 +104,7 @@ type Sandbox struct {
 	dockerImg string
 }
 
-// New creates a sandbox with an isolated working directory.
+// New spins up a sandbox with its own workdir under baseDir.
 func New(baseDir string, policy Policy) (*Sandbox, error) {
 	workDir := filepath.Join(baseDir, fmt.Sprintf("sandbox_%d", time.Now().UnixNano()))
 	if err := os.MkdirAll(workDir, 0755); err != nil {
@@ -119,7 +113,7 @@ func New(baseDir string, policy Policy) (*Sandbox, error) {
 	return &Sandbox{workDir: workDir, policy: policy}, nil
 }
 
-// NewDocker creates a Docker-isolated sandbox. Falls back to local if Docker unavailable.
+// NewDocker tries Docker isolation, falls back to local process if docker isn't available.
 func NewDocker(baseDir string, policy Policy, image string) (*Sandbox, error) {
 	sb, err := New(baseDir, policy)
 	if err != nil {
@@ -137,10 +131,8 @@ func NewDocker(baseDir string, policy Policy, image string) (*Sandbox, error) {
 	return sb, nil
 }
 
-// WorkDir returns the sandbox working directory.
 func (s *Sandbox) WorkDir() string { return s.workDir }
 
-// Exec runs a command inside the sandbox.
 func (s *Sandbox) Exec(ctx context.Context, command string, args ...string) (*Result, error) {
 	// Security check
 	fullCmd := command + " " + strings.Join(args, " ")
@@ -204,11 +196,10 @@ func (s *Sandbox) Exec(ctx context.Context, command string, args ...string) (*Re
 	return result, nil
 }
 
-// WriteFile creates a file in the sandbox.
 func (s *Sandbox) WriteFile(name, content string) error {
-	path := filepath.Join(s.workDir, filepath.Clean(name))
-	if !strings.HasPrefix(path, s.workDir) {
-		return fmt.Errorf("path escape: %s", name)
+	path, err := s.resolveWorkPath(name)
+	if err != nil {
+		return err
 	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -217,17 +208,15 @@ func (s *Sandbox) WriteFile(name, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
-// ReadFile reads a file from the sandbox.
 func (s *Sandbox) ReadFile(name string) (string, error) {
-	path := filepath.Join(s.workDir, filepath.Clean(name))
-	if !strings.HasPrefix(path, s.workDir) {
-		return "", fmt.Errorf("path escape: %s", name)
+	path, err := s.resolveWorkPath(name)
+	if err != nil {
+		return "", err
 	}
 	b, err := os.ReadFile(path)
 	return string(b), err
 }
 
-// ListFiles lists files in the sandbox directory.
 func (s *Sandbox) ListFiles() ([]string, error) {
 	var files []string
 	err := filepath.Walk(s.workDir, func(path string, info os.FileInfo, err error) error {
@@ -243,8 +232,7 @@ func (s *Sandbox) ListFiles() ([]string, error) {
 	return files, err
 }
 
-// ReadHostFile reads a file from the host system (read-only).
-// Only paths under HostReadPaths in the policy are allowed.
+// ReadHostFile reads from the host filesystem. Respects HostReadPaths allowlist.
 func (s *Sandbox) ReadHostFile(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -260,7 +248,6 @@ func (s *Sandbox) ReadHostFile(path string) (string, error) {
 	return truncate(string(b), s.policy.MaxOutputBytes), nil
 }
 
-// CopyFromHost copies a host file into the sandbox (read-only copy).
 func (s *Sandbox) CopyFromHost(hostPath, sandboxName string) error {
 	abs, err := filepath.Abs(hostPath)
 	if err != nil {
@@ -276,7 +263,6 @@ func (s *Sandbox) CopyFromHost(hostPath, sandboxName string) error {
 	return s.WriteFile(sandboxName, string(data))
 }
 
-// ListHostDir lists files in a host directory (read-only).
 func (s *Sandbox) ListHostDir(path string) ([]string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -300,7 +286,6 @@ func (s *Sandbox) ListHostDir(path string) ([]string, error) {
 	return names, nil
 }
 
-// SearchHostFiles searches for files matching a pattern under allowed host paths.
 func (s *Sandbox) SearchHostFiles(rootPath, pattern string) ([]string, error) {
 	abs, err := filepath.Abs(rootPath)
 	if err != nil {
@@ -327,7 +312,6 @@ func (s *Sandbox) SearchHostFiles(rootPath, pattern string) ([]string, error) {
 	return matches, nil
 }
 
-// GrepHostFile searches file content for a query string (read-only).
 func (s *Sandbox) GrepHostFile(filePath, query string) ([]string, error) {
 	content, err := s.ReadHostFile(filePath)
 	if err != nil {
@@ -347,6 +331,18 @@ func (s *Sandbox) GrepHostFile(filePath, query string) ([]string, error) {
 	return matches, nil
 }
 
+func (s *Sandbox) resolveWorkPath(name string) (string, error) {
+	path := filepath.Join(s.workDir, filepath.Clean(name))
+	rel, err := filepath.Rel(s.workDir, path)
+	if err != nil {
+		return "", fmt.Errorf("path escape: %s", name)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("path escape: %s", name)
+	}
+	return path, nil
+}
+
 func (s *Sandbox) isHostPathAllowed(abs string) bool {
 	if len(s.policy.HostReadPaths) == 0 {
 		return false
@@ -361,9 +357,17 @@ func (s *Sandbox) isHostPathAllowed(abs string) bool {
 	return false
 }
 
-// execDocker runs a command inside a Docker container with the sandbox workdir mounted.
 func (s *Sandbox) execDocker(ctx context.Context, start time.Time, command string, args ...string) (*Result, error) {
-	dockerArgs := []string{"run", "--rm", "-v", s.workDir + ":/workspace", "-w", "/workspace"}
+	dockerArgs := []string{
+		"run", "--rm",
+		"-v", s.workDir + ":/workspace",
+		"-w", "/workspace",
+		"--read-only",
+		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+		"--pids-limit", "64",
+		"--security-opt", "no-new-privileges",
+		"--user", "65534:65534",
+	}
 	if !s.policy.AllowNetwork {
 		dockerArgs = append(dockerArgs, "--network", "none")
 	}
@@ -395,10 +399,8 @@ func (s *Sandbox) execDocker(ctx context.Context, start time.Time, command strin
 	return result, nil
 }
 
-// UseDocker returns whether Docker isolation is active.
 func (s *Sandbox) UseDocker() bool { return s.useDocker }
 
-// Cleanup removes the sandbox directory.
 func (s *Sandbox) Cleanup() error {
 	return os.RemoveAll(s.workDir)
 }

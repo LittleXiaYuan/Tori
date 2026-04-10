@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // WeCom implements the Channel interface for WeCom (企业微信) Bot API.
@@ -89,12 +91,12 @@ func (w *WeCom) Start(ctx context.Context, handler func(Message) Reply) error {
 	addr := fmt.Sprintf("%s:%s", w.bindAddr, w.port)
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 
-	go func() {
+	safego.Go("wecom-server", func() {
 		slog.Info("wecom callback server started", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("wecom callback server error", "err", err)
 		}
-	}()
+	})
 
 	// Process incoming messages
 	for {

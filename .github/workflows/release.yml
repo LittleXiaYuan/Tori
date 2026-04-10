@@ -46,10 +46,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: heroui-web/package-lock.json
 
       - name: Build dashboard
-        run: cd web && npm ci && npm run build
+        run: cd heroui-web && npm ci && npm run build
 
       - name: Build binaries (6 platforms)
         run: |

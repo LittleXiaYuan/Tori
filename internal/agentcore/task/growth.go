@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"yunque-agent/pkg/skills"
 )
@@ -27,26 +30,23 @@ type DynamicSkillDef struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
 	Parameters  map[string]any    `json:"parameters"`
-	Instruction string            `json:"instruction"` // system prompt for LLM execution
-	ComposedOf  []string          `json:"composed_of"` // existing skills this can delegate to
-	Source      string            `json:"source"`       // "self_generated"
+	Instruction    string            `json:"instruction"` // system prompt for LLM execution
+	ComposedOf     []string          `json:"composed_of"` // existing skills this can delegate to
+	Source         string            `json:"source"`      // "self_generated"
+	ApprovalStatus string            `json:"approval_status"` // "draft", "approved"
 }
 
 // DynamicSkill implements skills.Skill backed by LLM.
 type DynamicSkill struct {
 	def      DynamicSkillDef
-	llmCall  LLMFunc
 	registry *skills.Registry
-	env      *skills.Environment
 }
 
 // NewDynamicSkill creates an LLM-backed skill from a definition.
-func NewDynamicSkill(def DynamicSkillDef, llmCall LLMFunc, registry *skills.Registry, env *skills.Environment) *DynamicSkill {
+func NewDynamicSkill(def DynamicSkillDef, registry *skills.Registry) *DynamicSkill {
 	return &DynamicSkill{
 		def:      def,
-		llmCall:  llmCall,
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -77,7 +77,11 @@ func (d *DynamicSkill) Execute(ctx context.Context, args map[string]any, env *sk
 
 	userPrompt := fmt.Sprintf("请执行以下操作:\n参数: %s", string(argsJSON))
 
-	result, err := d.llmCall(ctx, systemPrompt, userPrompt)
+	if env == nil || env.LLMCall == nil {
+		return "", fmt.Errorf("dynamic skill %s requires LLMCall in environment", d.def.Name)
+	}
+
+	result, err := env.LLMCall(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return "", fmt.Errorf("dynamic skill %s: %w", d.def.Name, err)
 	}
@@ -88,7 +92,11 @@ func (d *DynamicSkill) Execute(ctx context.Context, args map[string]any, env *sk
 // Def returns the skill definition (for persistence).
 func (d *DynamicSkill) Def() DynamicSkillDef { return d.def }
 
-// ──────────────────────────────────────────────
+// UpdateInstruction updates the prompt.
+func (d *DynamicSkill) UpdateInstruction(inst string) { d.def.Instruction = inst }
+
+// SetApprovalStatus updates the status.
+func (d *DynamicSkill) SetApprovalStatus(status string) { d.def.ApprovalStatus = status }
 // SkillGenerator — creates DynamicSkills from capability gaps
 // ──────────────────────────────────────────────
 
@@ -162,6 +170,7 @@ func (g *SkillGenerator) Generate(ctx context.Context, gap *GapRecord) (*Dynamic
 	}
 
 	def.Source = "self_generated"
+	def.ApprovalStatus = "draft"
 
 	// Check for name conflict with existing skills
 	if _, exists := g.registry.Get(def.Name); exists {
@@ -169,8 +178,10 @@ func (g *SkillGenerator) Generate(ctx context.Context, gap *GapRecord) (*Dynamic
 	}
 
 	// Create and register
-	skill := NewDynamicSkill(def, g.llmCall, g.registry, g.env)
+	skill := NewDynamicSkill(def, g.registry)
 	g.registry.Register(skill)
+
+	SaveDynamicSkills(g.registry, "data/dynamic_skills.json")
 
 	slog.Info("growth: generated skill", "name", def.Name, "composed_of", def.ComposedOf)
 	return skill, nil
@@ -182,3 +193,75 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// dynamicSkillsKV is the optional Ledger KV store for dynamic skills.
+// Set via SetDynamicSkillsKV at startup.
+var dynamicSkillsKV kvStore
+
+// SetDynamicSkillsKV enables Ledger KV-backed persistence for dynamic skills.
+func SetDynamicSkillsKV(kvs kvStore) { dynamicSkillsKV = kvs }
+
+func SaveDynamicSkills(registry *skills.Registry, path string) error {
+	var defs []DynamicSkillDef
+	for _, sk := range registry.All() {
+		if ds, ok := sk.(*DynamicSkill); ok {
+			defs = append(defs, ds.Def())
+		}
+	}
+
+	if dynamicSkillsKV != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := dynamicSkillsKV.Put(ctx, "defs", defs); err != nil {
+			slog.Warn("dynamic skills: KV save failed, falling back to file", "err", err)
+		} else {
+			return nil
+		}
+	}
+
+	data, err := json.MarshalIndent(defs, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
+}
+
+func LoadDynamicSkills(registry *skills.Registry, path string) error {
+	if dynamicSkillsKV != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		var defs []DynamicSkillDef
+		found, err := dynamicSkillsKV.Get(ctx, "defs", &defs)
+		if err == nil && found && len(defs) > 0 {
+			for _, def := range defs {
+				registry.Register(NewDynamicSkill(def, registry))
+			}
+			slog.Info("dynamic skills: loaded from KV", "count", len(defs))
+			return nil
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var defs []DynamicSkillDef
+	if err := json.Unmarshal(data, &defs); err != nil {
+		return err
+	}
+	for _, def := range defs {
+		registry.Register(NewDynamicSkill(def, registry))
+	}
+	return nil
+}
+

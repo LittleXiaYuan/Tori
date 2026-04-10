@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,6 +76,11 @@ func TestHtmlExportSkill(t *testing.T) {
 }
 
 func TestPptxCreateSkill(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		if _, err2 := exec.LookPath("python"); err2 != nil {
+			t.Skip("skipping: python not found in PATH")
+		}
+	}
 	dir := t.TempDir()
 	s := NewPptxCreateSkill([]string{dir})
 

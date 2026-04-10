@@ -5,12 +5,18 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestDocxCreate(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		if _, err2 := exec.LookPath("python"); err2 != nil {
+			t.Skip("skipping: python not found in PATH")
+		}
+	}
 	dir := t.TempDir()
 	skill := NewDocxCreateSkill([]string{dir})
 

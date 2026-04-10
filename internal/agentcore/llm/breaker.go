@@ -112,3 +112,12 @@ func (cb *CircuitBreaker) Failures() int {
 	defer cb.mu.Unlock()
 	return cb.failures
 }
+
+// Reset forces the circuit breaker back to closed state.
+func (cb *CircuitBreaker) Reset() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.state = stateClosed
+	cb.failures = 0
+	cb.halfOpenPassed = 0
+}

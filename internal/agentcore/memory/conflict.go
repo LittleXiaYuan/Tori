@@ -9,19 +9,11 @@ import (
 	"time"
 )
 
-// ──────────────────────────────────────────────
-// ConflictDetector — detects and resolves contradictions between new
-// and existing memories. When a user says "我搬到上海了" but an
-// existing memory says "用户住在北京", these facts conflict.
+// ConflictDetector — finds contradictions between memories.
+// Example: user says "我搬到上海了" but we stored "用户住在北京”.
 //
-// Resolution strategies:
-//   - Overwrite:  new fact supersedes old (high confidence)
-//   - Merge:      both facts can coexist with temporal annotation
-//   - KeepBoth:   ambiguous, flag for human review
-//   - Tombstone:  mark old fact as deprecated
-// ──────────────────────────────────────────────
-
-// Resolution describes how a conflict should be resolved.
+// Resolution strategies: Overwrite (new wins), Merge (coexist with
+// temporal annotation), KeepBoth (flag for review).
 type Resolution string
 
 const (
@@ -30,7 +22,6 @@ const (
 	ResKeepBoth  Resolution = "keep_both" // ambiguous, needs review
 )
 
-// Conflict represents a detected contradiction between memories.
 type Conflict struct {
 	Subject    string     `json:"subject"`     // the entity/topic
 	OldFact    string     `json:"old_fact"`    // existing memory content
@@ -41,21 +32,17 @@ type Conflict struct {
 	DetectedAt time.Time  `json:"detected_at"`
 }
 
-// LLMConflictFunc calls the LLM to analyze whether two facts conflict.
 type LLMConflictFunc func(ctx context.Context, system, user string) (string, error)
 
-// ConflictDetector checks new facts against existing memories for contradictions.
 type ConflictDetector struct {
 	llmCall LLMConflictFunc // nil = use heuristic only
 }
 
-// NewConflictDetector creates a detector. llmCall can be nil for heuristic-only mode.
+// NewConflictDetector: llmCall can be nil for heuristic-only mode.
 func NewConflictDetector(llmCall LLMConflictFunc) *ConflictDetector {
 	return &ConflictDetector{llmCall: llmCall}
 }
 
-// DetectConflicts compares newContent against a set of existing memory items
-// and returns any detected contradictions.
 func (d *ConflictDetector) DetectConflicts(
 	ctx context.Context,
 	newContent string,
@@ -72,8 +59,8 @@ func (d *ConflictDetector) DetectConflicts(
 	return d.detectHeuristic(newContent, existing)
 }
 
-// detectHeuristic uses keyword-based contradiction detection.
-// Looks for negation patterns and entity overlaps.
+// detectHeuristic: keyword-based contradiction check.
+// Looks for negation words + entity overlap between old and new facts.
 func (d *ConflictDetector) detectHeuristic(newContent string, existing []RecallItem) []Conflict {
 	newLower := strings.ToLower(newContent)
 
@@ -115,7 +102,6 @@ func (d *ConflictDetector) detectHeuristic(newContent string, existing []RecallI
 	return conflicts
 }
 
-// detectWithLLM uses the LLM to analyze conflicts precisely.
 func (d *ConflictDetector) detectWithLLM(ctx context.Context, newContent string, existing []RecallItem) []Conflict {
 	// Build existing facts list (limit to top 10 by score to save tokens)
 	var factList strings.Builder
@@ -192,9 +178,9 @@ func (d *ConflictDetector) detectWithLLM(ctx context.Context, newContent string,
 	return conflicts
 }
 
-// ── Helpers ──
+// ---- helpers ----
 
-// wordOverlap counts shared meaningful words (length > 1 rune) between two strings.
+// wordOverlap counts shared words (>1 rune) between two lowercased strings.
 func (d *ConflictDetector) wordOverlap(a, b string) int {
 	wordsA := strings.Fields(a)
 	wordSet := make(map[string]bool, len(wordsA))
@@ -212,7 +198,6 @@ func (d *ConflictDetector) wordOverlap(a, b string) int {
 	return overlap
 }
 
-// extractSubject tries to find a common entity between two texts.
 func (d *ConflictDetector) extractSubject(a, b string) string {
 	wordsA := strings.Fields(a)
 	wordSet := make(map[string]bool)
@@ -229,7 +214,6 @@ func (d *ConflictDetector) extractSubject(a, b string) string {
 	return ""
 }
 
-// extractJSONArray finds a JSON array in a string.
 func extractJSONArray(s string) string {
 	start := strings.Index(s, "[")
 	if start < 0 {

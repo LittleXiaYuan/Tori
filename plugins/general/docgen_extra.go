@@ -1,20 +1,19 @@
 package general
 
 import (
-	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"yunque-agent/pkg/skills"
 )
 
-// ──────────────────────────────────────────────
-// HtmlExportSkill — convert Markdown content to a standalone HTML file
-// Pure Go, zero external dependencies.
-// ──────────────────────────────────────────────
+// ---- HTML export (pure Go, no deps) ----
 
 type HtmlExportSkill struct {
 	allowedDirs []string
@@ -86,7 +85,8 @@ func (s *HtmlExportSkill) Execute(ctx context.Context, args map[string]any, env 
 	return fmt.Sprintf("已生成 HTML 文件: %s (%d bytes)", path, size), nil
 }
 
-// renderMarkdownToHTML converts a simple Markdown subset to HTML.
+// renderMarkdownToHTML: simple subset converter (headings, lists, code blocks, bold/italic).
+// Not a full MD parser — just enough for report generation.
 func renderMarkdownToHTML(title, md string) string {
 	var body strings.Builder
 	lines := strings.Split(md, "\n")
@@ -205,7 +205,7 @@ ul { padding-left: 24px; }
 </html>`, htmlEscapeText(title), body.String())
 }
 
-// inlineFormat handles **bold** and *italic* in text.
+// inlineFormat: **bold** and *italic* only.
 func inlineFormat(s string) string {
 	escaped := htmlEscapeText(s)
 	// Bold: **text**
@@ -238,18 +238,23 @@ func htmlEscapeText(s string) string {
 	return s
 }
 
-// ──────────────────────────────────────────────
-// PptxCreateSkill — generate .pptx presentations
-// PPTX is Open XML format: a zip file containing XML slides.
-// Pure Go, zero external dependencies.
-// ──────────────────────────────────────────────
+// ---- PPTX generation ----
+//
+// Dual-engine approach: Python (python-pptx) for best quality,
+// Go native OOXML as zero-dependency fallback.
 
 type PptxCreateSkill struct {
 	allowedDirs []string
+	pythonBin   string // optional: injected Python binary path
 }
 
 func NewPptxCreateSkill(allowedDirs []string) *PptxCreateSkill {
 	return &PptxCreateSkill{allowedDirs: allowedDirs}
+}
+
+// SetPythonBin injects the Python binary path from PythonEnv.
+func (s *PptxCreateSkill) SetPythonBin(bin string) {
+	s.pythonBin = bin
 }
 
 func (s *PptxCreateSkill) Name() string { return "pptx_create" }
@@ -275,19 +280,19 @@ func (s *PptxCreateSkill) Parameters() map[string]any {
 }
 
 func (s *PptxCreateSkill) Execute(ctx context.Context, args map[string]any, env *skills.Environment) (string, error) {
-	path, _ := args["path"].(string)
+	pathStr, _ := args["path"].(string)
 	content, _ := args["content"].(string)
 
-	if path == "" || content == "" {
+	if pathStr == "" || content == "" {
 		return "", fmt.Errorf("path and content are required")
 	}
 
-	absPath, err := filepath.Abs(path)
+	absPath, err := filepath.Abs(pathStr)
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
 	if !isUnderAllowed(absPath, s.allowedDirs) {
-		return "", fmt.Errorf("access denied: path %s is not under allowed directories", path)
+		return "", fmt.Errorf("access denied: path %s is not under allowed directories", pathStr)
 	}
 	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
 		return "", fmt.Errorf("cannot create directory: %w", err)
@@ -298,8 +303,27 @@ func (s *PptxCreateSkill) Execute(ctx context.Context, args map[string]any, env 
 		return "", fmt.Errorf("no slides found (separate slides with ---)")
 	}
 
-	if err := writePptx(absPath, slides); err != nil {
-		return "", fmt.Errorf("pptx generation failed: %w", err)
+	pyBin := s.pythonBin
+	if pyBin == "" {
+		pyBin = findPython()
+	}
+
+	var engine string
+	if pyBin != "" {
+		if err := tryPythonPptx(ctx, pyBin, absPath, slides); err != nil {
+			slog.Info("pptx: python-pptx failed, falling back to Go engine", "err", err)
+			if err2 := writePptxGo(absPath, slides); err2 != nil {
+				return "", fmt.Errorf("pptx generation failed: %w", err2)
+			}
+			engine = "Go-OOXML(fallback)"
+		} else {
+			engine = "python-pptx"
+		}
+	} else {
+		if err := writePptxGo(absPath, slides); err != nil {
+			return "", fmt.Errorf("pptx generation failed: %w", err)
+		}
+		engine = "Go-OOXML"
 	}
 
 	info, _ := os.Stat(absPath)
@@ -307,7 +331,36 @@ func (s *PptxCreateSkill) Execute(ctx context.Context, args map[string]any, env 
 	if info != nil {
 		size = info.Size()
 	}
-	return fmt.Sprintf("已生成演示文稿: %s (%d bytes, %d 张幻灯片)", path, size, len(slides)), nil
+	return fmt.Sprintf("已生成演示文稿: %s (%d bytes, %d 张幻灯片, engine=%s)", pathStr, size, len(slides), engine), nil
+}
+
+func tryPythonPptx(ctx context.Context, pyBin, absPath string, slides []slideData) error {
+	tmpDir := os.TempDir()
+	jsonPath := filepath.Join(tmpDir, "pptx_data.json")
+
+	jsonBytes, err := json.Marshal(slides)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(jsonPath, jsonBytes, 0644); err != nil {
+		return err
+	}
+	defer os.Remove(jsonPath)
+
+	pyPath := filepath.Join(tmpDir, "pptx_renderer.py")
+	if err := os.WriteFile(pyPath, []byte(pptxPythonScript), 0644); err != nil {
+		return err
+	}
+	defer os.Remove(pyPath)
+
+	templatePath := filepath.Join("data", "templates", "business.pptx")
+	absTemplate, _ := filepath.Abs(templatePath)
+
+	cmd := exec.CommandContext(ctx, pyBin, pyPath, jsonPath, absPath, absTemplate)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%s: %w", string(out), err)
+	}
+	return nil
 }
 
 type slideData struct {
@@ -336,123 +389,45 @@ func parseSlides(content string) []slideData {
 	return slides
 }
 
-func writePptx(path string, slides []slideData) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+const pptxPythonScript = `import sys, json, os
+try:
+    from pptx import Presentation
+except ImportError:
+    sys.exit("python-pptx is not installed. Please run: pip install python-pptx")
 
-	w := zip.NewWriter(f)
-	defer w.Close()
+def main():
+    json_path = sys.argv[1]
+    out_path = sys.argv[2]
+    template_path = sys.argv[3] if len(sys.argv) > 3 else None
 
-	// [Content_Types].xml
-	writeZipFile(w, "[Content_Types].xml", pptxContentTypes(len(slides)))
+    with open(json_path, 'r', encoding='utf-8') as f:
+        slides_data = json.load(f)
 
-	// _rels/.rels
-	writeZipFile(w, "_rels/.rels", pptxRootRels)
+    if template_path and os.path.exists(template_path):
+        prs = Presentation(template_path)
+    else:
+        prs = Presentation()
 
-	// ppt/presentation.xml
-	writeZipFile(w, "ppt/presentation.xml", pptxPresentation(len(slides)))
+    for slide in slides_data:
+        layout_idx = 1 if len(prs.slide_layouts) > 1 else 0
+        new_slide = prs.slides.add_slide(prs.slide_layouts[layout_idx])
+        
+        title = slide.get('Title', '')
+        body = slide.get('Body', '')
+        
+        if new_slide.shapes.title:
+            new_slide.shapes.title.text = title
+            
+        try:
+            for ph in new_slide.placeholders:
+                if ph.placeholder_format.idx == 1:
+                    ph.text = body
+                    break
+        except Exception:
+            pass
 
-	// ppt/_rels/presentation.xml.rels
-	writeZipFile(w, "ppt/_rels/presentation.xml.rels", pptxPresRels(len(slides)))
+    prs.save(out_path)
 
-	// Each slide
-	for i, slide := range slides {
-		n := i + 1
-		writeZipFile(w, fmt.Sprintf("ppt/slides/slide%d.xml", n), pptxSlideXML(slide))
-	}
-
-	return nil
-}
-
-func pptxContentTypes(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-`)
-	for i := 1; i <= n; i++ {
-		sb.WriteString(fmt.Sprintf(`  <Override PartName="/ppt/slides/slide%d.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
-`, i))
-	}
-	sb.WriteString("</Types>")
-	return sb.String()
-}
-
-const pptxRootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-</Relationships>`
-
-func pptxPresentation(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
-                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-                xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldIdLst>
-`)
-	for i := 1; i <= n; i++ {
-		sb.WriteString(fmt.Sprintf(`    <p:sldId id="%d" r:id="rId%d"/>
-`, 255+i, i))
-	}
-	sb.WriteString(`  </p:sldIdLst>
-  <p:sldSz cx="9144000" cy="6858000" type="screen4x3"/>
-</p:presentation>`)
-	return sb.String()
-}
-
-func pptxPresRels(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-`)
-	for i := 1; i <= n; i++ {
-		sb.WriteString(fmt.Sprintf(`  <Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide%d.xml"/>
-`, i, i))
-	}
-	sb.WriteString("</Relationships>")
-	return sb.String()
-}
-
-func pptxSlideXML(slide slideData) string {
-	// EMU: 1 inch = 914400 EMU. Slide is 9144000 x 6858000
-	titleEsc := docXMLEscape(slide.Title)
-	bodyEsc := docXMLEscape(slide.Body)
-
-	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
-       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-       xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>
-    <p:spTree>
-      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-      <p:grpSpPr/>
-      <p:sp>
-        <p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
-        <p:spPr>
-          <a:xfrm><a:off x="457200" y="274638"/><a:ext cx="8229600" cy="1143000"/></a:xfrm>
-        </p:spPr>
-        <p:txBody>
-          <a:bodyPr/>
-          <a:p><a:r><a:rPr lang="zh-CN" sz="3200" b="1"/><a:t>%s</a:t></a:r></a:p>
-        </p:txBody>
-      </p:sp>
-      <p:sp>
-        <p:nvSpPr><p:cNvPr id="3" name="Body"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr>
-        <p:spPr>
-          <a:xfrm><a:off x="457200" y="1600200"/><a:ext cx="8229600" cy="4525963"/></a:xfrm>
-        </p:spPr>
-        <p:txBody>
-          <a:bodyPr/>
-          <a:p><a:r><a:rPr lang="zh-CN" sz="2000"/><a:t>%s</a:t></a:r></a:p>
-        </p:txBody>
-      </p:sp>
-    </p:spTree>
-  </p:cSld>
-</p:sld>`, titleEsc, bodyEsc)
-}
+if __name__ == '__main__':
+    main()
+`

@@ -78,6 +78,20 @@ func TestPathEscapePrevention(t *testing.T) {
 	}
 }
 
+func TestPathEscapePreventionSiblingPrefix(t *testing.T) {
+	dir := t.TempDir()
+	b := NewBuiltin(dir)
+	ctx := context.Background()
+
+	res, _ := b.CallTool(ctx, "file_write", map[string]any{
+		"path":    "../" + filepath.Base(dir) + "_escape/evil.txt",
+		"content": "bad",
+	})
+	if !res.IsError {
+		t.Fatal("expected sibling prefix escape error")
+	}
+}
+
 func TestUnknownTool(t *testing.T) {
 	b := NewBuiltin(t.TempDir())
 	_, err := b.CallTool(context.Background(), "nonexistent", nil)

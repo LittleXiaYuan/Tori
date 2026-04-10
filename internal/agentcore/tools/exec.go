@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"yunque-agent/pkg/safego"
+
 	"github.com/google/uuid"
 )
 
@@ -195,7 +197,7 @@ func (pm *ProcessManager) Exec(ctx context.Context, opts ExecOptions) (*ExecResu
 	doneCh := make(chan struct{})
 	var resultLines []string
 
-	go func() {
+	safego.Go("exec-stdout-"+sess.ID, func() {
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 		for scanner.Scan() {
@@ -203,7 +205,7 @@ func (pm *ProcessManager) Exec(ctx context.Context, opts ExecOptions) (*ExecResu
 			sess.appendLine(line)
 		}
 		close(doneCh)
-	}()
+	})
 
 	select {
 	case <-doneCh:
@@ -227,7 +229,7 @@ func (pm *ProcessManager) Exec(ctx context.Context, opts ExecOptions) (*ExecResu
 		pm.mu.Lock()
 		pm.sessions[sess.ID] = sess
 		pm.mu.Unlock()
-		go func() {
+		safego.Go("exec-bg-wait-"+sess.ID, func() {
 			<-doneCh
 			cmd.Wait()
 			now := time.Now()
@@ -237,7 +239,7 @@ func (pm *ProcessManager) Exec(ctx context.Context, opts ExecOptions) (*ExecResu
 			sess.State = ProcessFinished
 			sess.mu.Unlock()
 			slog.Info("exec: backgrounded process finished", "id", sess.ID, "exit", sess.ExitCode)
-		}()
+		})
 		return &ExecResult{
 			Output:    strings.Join(sess.Output(), "\n"),
 			State:     ProcessRunning,

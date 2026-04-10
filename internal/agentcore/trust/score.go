@@ -1,11 +1,14 @@
 package trust
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
+
+	iledger "yunque-agent/internal/ledger"
 )
 
 // PermLevel defines what a skill is allowed to do at a given trust level.
@@ -56,9 +59,10 @@ func (e Entry) Allowed() PermLevel {
 
 // Tracker manages trust scores for all skills.
 type Tracker struct {
-	mu      sync.RWMutex
-	scores  map[string]*Entry
-	path    string // persistence path
+	mu     sync.RWMutex
+	scores map[string]*Entry
+	path   string // legacy JSON persistence path
+	kvs    *iledger.KVConfigStore
 }
 
 // NewTracker creates a trust tracker, optionally loading from file.
@@ -69,6 +73,15 @@ func NewTracker(persistPath string) *Tracker {
 	}
 	t.load()
 	return t
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+// Once set, all save/load operations go through Ledger KV.
+func (t *Tracker) SetKVStore(kvs *iledger.KVConfigStore) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.kvs = kvs
+	t.loadFromKV()
 }
 
 // Get returns the trust entry for a skill (zero-value if unknown).
@@ -126,6 +139,35 @@ func (t *Tracker) Reset(slug string) {
 	t.save()
 }
 
+// GrantFull sets a skill's trust to the maximum level (100), granting full
+// permissions including shell access. This is the "one-click full trust" API.
+func (t *Tracker) GrantFull(slug string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	e := t.getOrCreate(slug)
+	e.Score = 100
+	e.LastPromoted = time.Now()
+	t.save()
+	slog.Info("trust: granted full trust", "slug", slug, "score", e.Score)
+}
+
+// GrantFullAll sets all tracked skills' trust to the maximum level.
+func (t *Tracker) GrantFullAll() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	count := 0
+	for _, e := range t.scores {
+		if e.Score < 100 {
+			e.Score = 100
+			e.LastPromoted = time.Now()
+			count++
+		}
+	}
+	t.save()
+	slog.Info("trust: granted full trust to all skills", "upgraded", count)
+	return count
+}
+
 // CheckPermission returns true if the skill has enough trust for the requested level.
 func (t *Tracker) CheckPermission(slug string, required PermLevel) bool {
 	return t.Get(slug).Allowed() >= required
@@ -162,7 +204,30 @@ func (t *Tracker) load() {
 	json.Unmarshal(data, &t.scores)
 }
 
+func (t *Tracker) loadFromKV() {
+	if t.kvs == nil {
+		return
+	}
+	var scores map[string]*Entry
+	found, err := t.kvs.Get(context.Background(), "scores", &scores)
+	if err != nil {
+		slog.Warn("trust: kv load failed", "err", err)
+		return
+	}
+	if found && len(scores) > 0 {
+		t.scores = scores
+		slog.Info("trust: loaded from Ledger KV", "skills", len(scores))
+	}
+}
+
 func (t *Tracker) save() {
+	if t.kvs != nil {
+		if err := t.kvs.Put(context.Background(), "scores", t.scores); err != nil {
+			slog.Warn("trust: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	if t.path == "" {
 		return
 	}

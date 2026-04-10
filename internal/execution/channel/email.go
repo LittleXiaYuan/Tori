@@ -121,7 +121,7 @@ func (e *Email) Send(_ context.Context, target string, reply Reply) error {
 }
 
 func (e *Email) defaultDialer() (*smtp.Client, error) {
-	addr := fmt.Sprintf("%s:%d", e.cfg.Host, e.cfg.Port)
+	addr := net.JoinHostPort(e.cfg.Host, fmt.Sprintf("%d", e.cfg.Port))
 
 	if e.cfg.UseTLS || e.cfg.Port == 587 {
 		conn, err := net.DialTimeout("tcp", addr, 10*time.Second)

@@ -75,6 +75,63 @@ func TestTransition_InvalidPath(t *testing.T) {
 	}
 }
 
+func TestTransition_DelegateResume(t *testing.T) {
+	delegate := NewDelegate("agent", "sub-agent", "s1", DelegatePayload{
+		Intent: IntentEnvelope{Name: "ops.deploy", Version: "1.0"},
+	})
+	delegateResult := NewDelegateResult("sub-agent", "agent", "s1", "t1", DelegateResultPayload{
+		DelegatedTo: "sub-agent",
+		Result:      ResultPayload{Status: "success", Output: "deployed"},
+	})
+
+	state, err := Transition(StateRunning, delegate)
+	assertTransition(t, state, StateWaitingInput, err)
+
+	state, err = Transition(state, delegateResult)
+	assertTransition(t, state, StateRunning, err)
+}
+
+func TestTransition_FeedbackOnCompleted(t *testing.T) {
+	fb := NewFeedback("caller", "agent", "s1", "t1", FeedbackPayload{
+		TaskID: "t1", Rating: 0.9,
+	})
+
+	state, err := Transition(StateCompleted, fb)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state != StateCompleted {
+		t.Fatalf("state = %s, want completed (feedback doesn't change state)", state)
+	}
+
+	state, err = Transition(StateFailed, fb)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state != StateFailed {
+		t.Fatalf("state = %s, want failed", state)
+	}
+
+	// Feedback on running is also allowed
+	state, err = Transition(StateRunning, fb)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if state != StateRunning {
+		t.Fatalf("state = %s, want running", state)
+	}
+}
+
+func TestTransition_FeedbackOnPending(t *testing.T) {
+	fb := NewFeedback("caller", "agent", "s1", "t1", FeedbackPayload{
+		TaskID: "t1", Rating: 0.5,
+	})
+	_, err := Transition(StatePending, fb)
+	if !errors.Is(err, ErrTransition) {
+		t.Errorf("expected ErrTransition for feedback on pending, got %v", err)
+	}
+}
+
 func assertTransition(t *testing.T, got, want TaskState, err error) {
 	t.Helper()
 	if err != nil {

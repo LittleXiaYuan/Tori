@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // MessageType classifies federation messages.
@@ -220,8 +222,12 @@ func (h *Hub) Receive(ctx context.Context, msg Message) (*Message, error) {
 		return nil, fmt.Errorf("message TTL expired")
 	}
 
-	// Signature verification (before TTL decrement so hash matches)
-	if h.secret != "" && msg.Signature != "" {
+	// Signature verification (before TTL decrement so hash matches).
+	// When a shared secret is configured, every inbound message must be signed.
+	if h.secret != "" {
+		if msg.Signature == "" {
+			return nil, fmt.Errorf("missing message signature")
+		}
 		expected := h.sign(msg)
 		if !hmac.Equal([]byte(msg.Signature), []byte(expected)) {
 			return nil, fmt.Errorf("invalid message signature")
@@ -252,15 +258,14 @@ func (h *Hub) Receive(ctx context.Context, msg Message) (*Message, error) {
 		return &reply, nil
 	}
 
-	// Built-in discover
-	if msg.Type == MsgDiscover {
-		h.mu.RLock()
-		var caps []string
-		for _, handler := range h.handlers {
-			_ = handler // just count registered handlers
-		}
-		h.mu.RUnlock()
-		capJSON, _ := json.Marshal(caps)
+	// Dispatch to registered handler (takes priority over built-in defaults)
+	h.mu.RLock()
+	handler, ok := h.handlers[msg.Type]
+	h.mu.RUnlock()
+
+	// Built-in discover fallback (only when no custom handler is registered)
+	if !ok && msg.Type == MsgDiscover {
+		capJSON, _ := json.Marshal([]string{})
 		reply := Message{
 			ID:        fmt.Sprintf("ofp_%d", time.Now().UnixNano()),
 			Type:      MsgCapReply,
@@ -273,11 +278,6 @@ func (h *Hub) Receive(ctx context.Context, msg Message) (*Message, error) {
 		}
 		return &reply, nil
 	}
-
-	// Dispatch to registered handler
-	h.mu.RLock()
-	handler, ok := h.handlers[msg.Type]
-	h.mu.RUnlock()
 
 	if !ok {
 		return nil, fmt.Errorf("no handler for message type: %s", msg.Type)
@@ -298,11 +298,19 @@ func (h *Hub) Ping(ctx context.Context, peer PeerID) (time.Duration, error) {
 		Timestamp: time.Now(),
 		TTL:       3,
 	}
+	if h.secret != "" {
+		msg.Signature = h.sign(msg)
+	}
 
-	reply, err := h.Receive(ctx, Message{
+	inbound := Message{
 		ID: msg.ID, Type: MsgPing, From: peer, To: h.localID,
 		Payload: "ping", Timestamp: time.Now(), TTL: 3,
-	})
+	}
+	if h.secret != "" {
+		inbound.Signature = h.sign(inbound)
+	}
+
+	reply, err := h.Receive(ctx, inbound)
 	latency := time.Since(start)
 
 	if err != nil {
@@ -383,7 +391,7 @@ func (h *Hub) sign(msg Message) string {
 
 // StartWorker runs a background worker that processes inbox messages.
 func (h *Hub) StartWorker(ctx context.Context) {
-	go func() {
+	safego.Go("federation-inbox-worker", func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -403,7 +411,7 @@ func (h *Hub) StartWorker(ctx context.Context) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // Enqueue adds a message to the inbox for async processing.

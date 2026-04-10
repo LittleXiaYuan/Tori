@@ -6,18 +6,21 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"fmt"
+
+	"yunque-agent/pkg/safego"
 
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
-	channelpkg "yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/apperror"
+	channelpkg "yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/observe"
 )
 
@@ -54,11 +57,12 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Messages  []llm.Message `json:"messages"`
-		SessionID string        `json:"session_id"`
-		ClassID   string        `json:"class_id"`
-		TeacherID string        `json:"teacher_id"`
-		StudentID string        `json:"student_id"`
+		Messages      []llm.Message `json:"messages"`
+		SessionID     string        `json:"session_id"`
+		ClassID       string        `json:"class_id"`
+		TeacherID     string        `json:"teacher_id"`
+		StudentID     string        `json:"student_id"`
+		ThinkingLevel string        `json:"thinking_level,omitempty"` // "none" | "auto" | "deep"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -127,16 +131,31 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Smart router: classify query → select optimal model tier (streaming)
+	// Thinking level: per-request override > env default > smart router.
+	thinkingLevel := req.ThinkingLevel
+	if thinkingLevel == "" {
+		thinkingLevel = os.Getenv("THINKING_LEVEL")
+	}
+
 	var routedTier string
-	if g.smartRouter != nil && len(msgs) > 0 {
-		lastMsg := msgs[len(msgs)-1].Content
-		routedModel, tier := g.smartRouter.Route(ctx, lastMsg, false)
-		routedTier = tier.String()
-		traceSpan.Attrs["router_tier"] = routedTier
-		if routedModel != nil {
-			traceSpan.Attrs["router_model"] = routedModel.ModelID
+	switch thinkingLevel {
+	case "deep":
+		routedTier = "expert"
+		traceSpan.Attrs["thinking_level"] = "deep"
+	case "none":
+		routedTier = "fast"
+		traceSpan.Attrs["thinking_level"] = "none"
+	default:
+		if g.smartRouter != nil && len(msgs) > 0 {
+			lastMsg := msgs[len(msgs)-1].Content
+			routedModel, tier := g.smartRouter.Route(ctx, lastMsg, false)
+			routedTier = tier.String()
+			traceSpan.Attrs["router_tier"] = routedTier
+			if routedModel != nil {
+				traceSpan.Attrs["router_model"] = routedModel.ModelID
+			}
 		}
+		traceSpan.Attrs["thinking_level"] = "auto"
 	}
 
 	// Emotion analysis (streaming path): detect user emotion before planning
@@ -170,122 +189,82 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build full message list via planner (includes system prompt + memory + domain)
-	planReq := planner.PlanRequest{
+	// ── SSE-aware Planner execution via StepCallback ──
+	// Use Planner.Run() so tools (docx_create, web_search, etc.) are properly invoked.
+	// StepCallback pushes intermediate events (thinking, tool_start, tool_result) as SSE.
+	traceID := observe.TraceIDFromContext(ctx)
+	stepCB := func(event observe.AgentEvent) {
+		stepData, _ := json.Marshal(map[string]any{
+			"type":    event.QualifiedType(),
+			"summary": event.Summary,
+			"detail":  event.Detail,
+		})
+		sseEvent(w, flusher, "step", string(stepData))
+	}
+
+	var emotionHintForPlanner *emotion.Result
+	if streamEmotionHint != nil {
+		emotionHintForPlanner = &emotion.Result{
+			Emotion:    emotion.Emotion(streamEmotionHint.Emotion),
+			Confidence: streamEmotionHint.Confidence,
+			Source:     streamEmotionHint.Source,
+		}
+	}
+
+	result, err := g.planner.Run(ctx, planner.PlanRequest{
 		Messages:      msgs,
 		ClassID:       req.ClassID,
 		TeacherID:     req.TeacherID,
 		StudentID:     req.StudentID,
 		TenantID:      tid,
 		ModelOverride: routedTier,
-	}
-	messages := g.planner.BuildMessages(ctx, planReq)
-
-	// Use real LLM streaming with routed model client
-	streamClient := g.planner.LLMClientFor(routedTier)
-	_, llmSpan := observe.StartSpan(ctx, "llm.ChatStream")
-	deltaCh, err := streamClient.ChatStream(ctx, messages, 0.7)
+		EmotionHint:   emotionHintForPlanner,
+		StepCallback:  stepCB,
+		TraceID:       traceID,
+	})
 	if err != nil {
-		observe.EndSpan(llmSpan, err)
+		slog.Error("planner error (stream)", "err", err, "tenant", tid)
 		sseEvent(w, flusher, "error", `{"code":"LLM_ERROR","message":"`+err.Error()+`"}`)
 		g.metrics.RecordRequest(time.Since(start), 0, 0, err)
 		observe.EndSpan(traceSpan, err)
 		return
 	}
 
-	var fullReply strings.Builder
-	var jsonBuf strings.Builder
-	buffering := false
+	reply := result.Reply
 
-	flushBuf := func() {
-		if jsonBuf.Len() > 0 {
-			bufText := jsonBuf.String()
-			jsonBuf.Reset()
-			data, _ := json.Marshal(map[string]string{"content": bufText})
-			sseEvent(w, flusher, "delta", string(data))
-		}
-		buffering = false
+	// Stream the final reply text as delta events for smooth UI rendering
+	replyChunks := chunkText(reply, 20)
+	for _, chunk := range replyChunks {
+		data, _ := json.Marshal(map[string]string{"content": chunk})
+		sseEvent(w, flusher, "delta", string(data))
 	}
-
-	for delta := range deltaCh {
-		if delta.Finished {
-			break
-		}
-		if delta.Content == "" {
-			continue
-		}
-		fullReply.WriteString(delta.Content)
-
-		if buffering {
-			jsonBuf.WriteString(delta.Content)
-			accumulated := jsonBuf.String()
-			if strings.Contains(accumulated, `"tool_calls"`) || strings.Contains(accumulated, `"skill_calls"`) {
-				depth := 0
-				closed := false
-				for _, ch := range accumulated {
-					if ch == '{' {
-						depth++
-					} else if ch == '}' {
-						depth--
-						if depth == 0 {
-							closed = true
-							break
-						}
-					}
-				}
-				if closed {
-					jsonBuf.Reset()
-					buffering = false
-				}
-			} else {
-				depth := 0
-				for _, ch := range accumulated {
-					if ch == '{' {
-						depth++
-					} else if ch == '}' {
-						depth--
-					}
-				}
-				if depth <= 0 {
-					flushBuf()
-				}
-				if jsonBuf.Len() > 500 {
-					flushBuf()
-				}
-			}
-		} else {
-			if strings.Contains(delta.Content, "{") {
-				idx := strings.Index(delta.Content, "{")
-				if idx > 0 {
-					safe := delta.Content[:idx]
-					data, _ := json.Marshal(map[string]string{"content": safe})
-					sseEvent(w, flusher, "delta", string(data))
-				}
-				jsonBuf.WriteString(delta.Content[idx:])
-				buffering = true
-			} else {
-				data, _ := json.Marshal(map[string]string{"content": delta.Content})
-				sseEvent(w, flusher, "delta", string(data))
-			}
-		}
-	}
-	flushBuf()
-	observe.EndSpan(llmSpan, nil)
-	reply := fullReply.String()
 
 	// Output moderation: check agent reply for safety (post-stream)
 	if g.zhGuard != nil && reply != "" {
 		outResult := g.zhGuard.Run(ctx, reply)
 		if outResult.Redacted != "" {
 			reply = outResult.Redacted
+			result.Reply = reply
 		}
 	}
 
-	// Send done event with full reply (uses moderated version)
+	// Send done event with full reply and real planner results
 	doneData := map[string]any{
 		"reply":       reply,
-		"skills_used": []string{},
-		"steps":       1,
+		"skills_used": result.SkillsUsed,
+		"steps":       result.Steps,
+	}
+	if len(result.Actions) > 0 {
+		doneData["actions"] = result.Actions
+	}
+	roots := []string{".", "data", "data/output", "data/tasks"}
+	rich := RenderAgentActions(result.Actions)
+	rich = AttachFilesToRich(rich, result, roots)
+	if rich != nil && len(rich.Components) > 0 {
+		doneData["rich"] = json.RawMessage(rich.ToJSON())
+	}
+	if result.Plan != nil {
+		doneData["plan"] = result.Plan
 	}
 	if streamEmotionHint != nil && streamEmotionHint.Emotion != "neutral" && streamEmotionHint.Emotion != "unknown" {
 		doneData["emotion"] = streamEmotionHint
@@ -302,9 +281,14 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 	doneBytes, _ := json.Marshal(doneData)
 	sseEvent(w, flusher, "done", string(doneBytes))
-	// Save assistant reply to session
+
+	// Save assistant reply to session (with ExecutionSummary for multi-turn continuity)
 	if req.SessionID != "" {
-		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
+		assistantContent := result.Reply
+		if summary := result.ExecutionSummary(); summary != "" {
+			assistantContent = summary + "\n\n" + assistantContent
+		}
+		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
 	}
 
 	// Memory: write assistant reply to short-term
@@ -324,7 +308,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		if lastUserMsg != "" {
 			pipelineReply := reply
 			pipelineTID := tid
-			go func() {
+		safego.Go("ws-memory-pipeline", func() {
 				chatMsgs := []memory.ChatMessage{
 					{Role: "user", Content: lastUserMsg},
 					{Role: "assistant", Content: pipelineReply},
@@ -334,12 +318,11 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 					slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
 				} else if result != nil && len(result.ExtractedFacts) > 0 {
 					slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
-					// Event-driven Reverie trigger: notify on high-value fact extraction.
 					if g.factHook != nil {
 						g.factHook.OnExtracted(result.ExtractedFacts)
 					}
 				}
-			}()
+			})
 		}
 	}
 
@@ -352,15 +335,15 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 				quality = eval.Quality
 			}
 		}
-		g.learning.AfterInteraction(ctx, userMsg, reply, nil, quality)
+		g.learning.AfterInteraction(ctx, userMsg, reply, result.SkillsUsed, quality)
 	}
 
 	// Adaptive loop: observe interaction
 	if g.adaptiveLoop != nil && len(req.Messages) > 0 {
 		userMsg := req.Messages[len(req.Messages)-1].Content
-		go func() {
-			g.adaptiveLoop.ObserveInteraction(context.Background(), userMsg, reply)
-		}()
+	safego.Go("ws-adaptive-loop", func() {
+		g.adaptiveLoop.ObserveInteraction(context.Background(), userMsg, reply)
+	})
 	}
 
 	// ReplyHook broadcast
@@ -374,14 +357,18 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	g.InvokeReplyHooks(ctx, channelpkg.Message{ChannelType: "webui", Content: lastUserMsgForHook}, channelpkg.Reply{Content: reply})
 
 	// Record usage
-	estTokens := int64(fullReply.Len()/4 + 100)
-	g.usage.RecordStream(tid, estTokens)
-	g.metrics.RecordRequest(time.Since(start), estTokens, estTokens, nil)
+	estTokensIn := int64(len(fmt.Sprint(msgs))/4 + 50)
+	estTokensOut := int64(len(reply)/4 + 50)
+	g.usage.RecordStream(tid, estTokensIn+estTokensOut)
+	g.metrics.RecordRequest(time.Since(start), estTokensIn, estTokensOut, nil)
+	for _, sk := range result.SkillsUsed {
+		g.metrics.RecordSkillCall(sk, 0, nil)
+	}
 
 	// Cost tracking (use routed model)
 	if g.costTracker != nil {
 		model := g.planner.LLMClientFor(routedTier).Model()
-		cost, alert := g.costTracker.Record(model, tid, "", req.SessionID, int(estTokens), int(estTokens), time.Since(start))
+		cost, alert := g.costTracker.Record(model, tid, "", req.SessionID, int(estTokensIn), int(estTokensOut), time.Since(start))
 		traceSpan.Attrs["cost_usd"] = fmt.Sprintf("%.6f", cost)
 		if alert != nil {
 			slog.Warn("cost alert", "type", alert.Type, "message", alert.Message)
@@ -389,7 +376,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	observe.EndSpan(traceSpan, nil)
-	slog.Info("stream chat done", "tenant", tid, "len", fullReply.Len(), "trace_id", traceSpan.TraceID)
+	slog.Info("stream chat done", "tenant", tid, "skills", result.SkillsUsed, "steps", result.Steps, "trace_id", traceSpan.TraceID)
 }
 
 type streamEvent struct {

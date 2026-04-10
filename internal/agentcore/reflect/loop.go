@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/safego"
 )
 
 // LearningLoop implements continuous self-improvement.
@@ -56,7 +57,7 @@ func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply
 	}
 
 	// Lower quality — ask LLM to extract lessons
-	go func() {
+	safego.Go("reflect-extract-lessons", func() {
 		lessons := l.extractLessons(ctx, userMsg, agentReply, skillsUsed, quality)
 		outcome := "partial"
 		if quality < 5 {
@@ -72,7 +73,7 @@ func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply
 					truncateStr(userMsg, 80), skillsUsed)
 			}
 		}
-	}()
+	})
 }
 
 func (l *LearningLoop) extractLessons(ctx context.Context, userMsg, agentReply string, skillsUsed []string, quality int) []Lesson {

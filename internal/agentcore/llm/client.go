@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -16,11 +17,20 @@ import (
 	"yunque-agent/internal/observe"
 )
 
-// Client is an OpenAI-compatible LLM caller.
+// Dialect determines the API format used by the client.
+type Dialect string
+
+const (
+	DialectOpenAI    Dialect = ""          // OpenAI-compatible (default)
+	DialectAnthropic Dialect = "anthropic" // Anthropic Messages API
+)
+
+// Client is an LLM caller supporting OpenAI-compatible and Anthropic APIs.
 type Client struct {
 	baseURL string
 	apiKey  string
 	model   string
+	dialect Dialect
 	http    *http.Client
 	breaker *CircuitBreaker
 	cache   *ResponseCache
@@ -34,17 +44,17 @@ type Client struct {
 func newOptimizedTransport() *http.Transport {
 	return &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,  // TCP connect timeout
+			Timeout:   15 * time.Second, // TCP connect timeout (generous for CN proxies)
 			KeepAlive: 30 * time.Second, // TCP keep-alive probe interval
 		}).DialContext,
 		MaxIdleConns:          100,              // total idle connections across all hosts
 		MaxIdleConnsPerHost:   10,               // idle connections per LLM API host
 		MaxConnsPerHost:       20,               // max concurrent connections per host
 		IdleConnTimeout:       90 * time.Second, // kill idle connections after 90s
-		TLSHandshakeTimeout:   10 * time.Second, // TLS handshake limit
+		TLSHandshakeTimeout:   15 * time.Second, // TLS handshake limit
 		ExpectContinueTimeout: 1 * time.Second,  // 100-continue wait
-		ResponseHeaderTimeout: 30 * time.Second, // time to first response byte
-		ForceAttemptHTTP2:     true,              // prefer HTTP/2 for multiplexing
+		ResponseHeaderTimeout: 60 * time.Second, // time to first response byte (tool calls need more)
+		ForceAttemptHTTP2:     false,            // disable HTTP/2 — causes h2 timeout with some CN proxies
 		TLSClientConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		},
@@ -55,12 +65,22 @@ func newOptimizedTransport() *http.Transport {
 // No global timeout — each request uses context deadline instead,
 // allowing streaming calls to run longer than non-streaming ones.
 func NewClient(baseURL, apiKey, model string) *Client {
+	return newClientWithDialect(baseURL, apiKey, model, DialectOpenAI)
+}
+
+// NewClaudeClient creates a client configured for the Anthropic Messages API.
+func NewClaudeClient(baseURL, apiKey, model string) *Client {
+	return newClientWithDialect(baseURL, apiKey, model, DialectAnthropic)
+}
+
+func newClientWithDialect(baseURL, apiKey, model string, dialect Dialect) *Client {
 	return &Client{
 		baseURL: baseURL,
+		dialect: dialect,
 		apiKey:  apiKey,
 		model:   model,
 		http:    &http.Client{Transport: newOptimizedTransport()},
-		breaker: NewCircuitBreaker(5, 30*time.Second),
+		breaker: NewCircuitBreaker(8, 15*time.Second),
 		cache:   NewResponseCache(60*time.Second, 256),
 	}
 }
@@ -71,21 +91,110 @@ func (c *Client) Breaker() *CircuitBreaker { return c.breaker }
 // Model returns the current default model ID.
 func (c *Client) Model() string { return c.model }
 
-// Message is a chat message.
+// ContentPart represents one segment of a multimodal message.
+// Supports text, image_url (vision), and video_url (Kimi K2.5 / Qwen VL).
+type ContentPart struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *MediaURL `json:"image_url,omitempty"`
+	VideoURL *MediaURL `json:"video_url,omitempty"`
+}
+
+// MediaURL carries base64 or URL for vision / video models.
+type MediaURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// ImageURL is an alias kept for backward compatibility.
+type ImageURL = MediaURL
+
+// Message is a chat message. For multimodal, populate ContentParts instead of Content.
 type Message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	Role             string        `json:"role"`
+	Content          string        `json:"content"`
+	ContentParts     []ContentPart `json:"content_parts,omitempty"`
+	ToolCallID       string        `json:"tool_call_id,omitempty"`
+	ToolCalls        []ToolCall    `json:"tool_calls,omitempty"`
+	ReasoningContent string        `json:"-"` // preserved for multi-turn thinking (Kimi K2.5 etc.)
+}
+
+// MarshalJSON produces OpenAI-compatible JSON: if ContentParts is set, "content" becomes an array.
+func (m Message) MarshalJSON() ([]byte, error) {
+	type plain struct {
+		Role             string     `json:"role"`
+		Content          any        `json:"content"`
+		ToolCallID       string     `json:"tool_call_id,omitempty"`
+		ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+		ReasoningContent string     `json:"reasoning_content,omitempty"`
+	}
+	p := plain{Role: m.Role, ToolCallID: m.ToolCallID, ToolCalls: m.ToolCalls, ReasoningContent: m.ReasoningContent}
+	if len(m.ContentParts) > 0 {
+		p.Content = m.ContentParts
+	} else {
+		p.Content = m.Content
+	}
+	return json.Marshal(p)
+}
+
+// UnmarshalJSON handles both string and array "content" from API responses.
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type plain struct {
+		Role             string          `json:"role"`
+		Content          json.RawMessage `json:"content"`
+		ToolCallID       string          `json:"tool_call_id,omitempty"`
+		ToolCalls        []ToolCall      `json:"tool_calls,omitempty"`
+		ReasoningContent string          `json:"reasoning_content,omitempty"`
+	}
+	var p plain
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	m.Role = p.Role
+	m.ToolCallID = p.ToolCallID
+	m.ToolCalls = p.ToolCalls
+	m.ReasoningContent = p.ReasoningContent
+	if len(p.Content) > 0 && p.Content[0] == '"' {
+		return json.Unmarshal(p.Content, &m.Content)
+	}
+	if len(p.Content) > 0 && p.Content[0] == '[' {
+		if err := json.Unmarshal(p.Content, &m.ContentParts); err == nil {
+			for _, part := range m.ContentParts {
+				if part.Type == "text" {
+					m.Content += part.Text
+				}
+			}
+			return nil
+		}
+	}
+	m.Content = string(p.Content)
+	return nil
 }
 
 // ChatRequest is the request to the LLM.
 type ChatRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	Temperature float64   `json:"temperature,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Stream      bool      `json:"stream"`
+	Model       string         `json:"model"`
+	Messages    []Message      `json:"messages"`
+	Temperature float64        `json:"temperature,omitempty"`
+	MaxTokens   int            `json:"max_tokens,omitempty"`
+	Stream      bool           `json:"stream"`
+	Extra       map[string]any `json:"-"` // provider-specific params merged at marshal time
+}
+
+// MarshalJSON merges Extra fields into the top-level JSON object.
+func (r ChatRequest) MarshalJSON() ([]byte, error) {
+	type plain ChatRequest
+	b, err := json.Marshal(plain(r))
+	if err != nil || len(r.Extra) == 0 {
+		return b, err
+	}
+	var m map[string]json.RawMessage
+	_ = json.Unmarshal(b, &m)
+	for k, v := range r.Extra {
+		raw, _ := json.Marshal(v)
+		m[k] = raw
+	}
+	return json.Marshal(m)
 }
 
 // ChatResponse is the non-streaming LLM response.
@@ -96,20 +205,39 @@ type ChatResponse struct {
 }
 
 // streamChunk is a single SSE chunk from the streaming API.
+// Supports reasoning_content (DeepSeek R1, Kimi K2.5, etc.)
 type streamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
+			Role             string `json:"role"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
 }
 
+// ChatResult contains the full response including optional reasoning content.
+type ChatResult struct {
+	Content          string
+	ReasoningContent string
+}
+
+// StreamDeltaFunc is called for each token during streaming.
+// contentDelta is normal reply text, reasoningDelta is thinking/reasoning text.
+type StreamDeltaFunc func(contentDelta, reasoningDelta string)
+
 // Chat sends messages to the LLM and returns the assistant reply.
 // Retries up to 2 times on transient errors (5xx, timeout).
 // Cache returns the response cache for stats/inspection.
 func (c *Client) Cache() *ResponseCache { return c.cache }
+
+// Close releases resources held by the client (stops cache eviction loop).
+func (c *Client) Close() {
+	if c.cache != nil {
+		c.cache.Stop()
+	}
+}
 
 func (c *Client) Chat(ctx context.Context, messages []Message, temperature float64) (string, error) {
 	// Streaming responses need generous timeout (LLM generation can take time)
@@ -132,6 +260,7 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 	}
 	const maxRetries = 3
 	var lastErr error
+	hasImages := messagesHaveImages(messages)
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			backoff := time.Duration(attempt*attempt) * 500 * time.Millisecond
@@ -149,6 +278,12 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 			return result, nil
 		}
 		lastErr = err
+		// Vision fallback: if model returns 400 and messages contain images, strip images and retry
+		if hasImages && strings.Contains(err.Error(), "status 400") {
+			slog.Warn("llm: 400 with images, falling back to text-only", "model", c.model)
+			messages = stripImages(messages)
+			hasImages = false
+		}
 		if ctx.Err() != nil {
 			observe.EndSpan(span, ctx.Err())
 			return "", ctx.Err()
@@ -160,11 +295,81 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 	return "", finalErr
 }
 
+// ChatFull is like Chat but returns both content and reasoning_content.
+// Optional onDelta streams each token in real-time.
+func (c *Client) ChatFull(ctx context.Context, messages []Message, temperature float64, onDelta ...StreamDeltaFunc) (ChatResult, error) {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		defer cancel()
+	}
+	if err := c.breaker.Allow(); err != nil {
+		return ChatResult{}, err
+	}
+	result, err := c.chatOnceFull(ctx, messages, temperature, onDelta...)
+	if err == nil {
+		c.breaker.RecordSuccess()
+	} else {
+		c.breaker.RecordFailure()
+	}
+	return result, err
+}
+
+func (c *Client) chatOnceFull(ctx context.Context, messages []Message, temperature float64, onDelta ...StreamDeltaFunc) (ChatResult, error) {
+	if c.dialect == DialectAnthropic {
+		return c.chatOnceAnthropicFull(ctx, messages, temperature, onDelta...)
+	}
+	temp := temperature
+	if GetConstraints(c.model).FixedTemperature {
+		temp = 0
+	}
+	req := ChatRequest{Model: c.model, Messages: messages, Temperature: temp, MaxTokens: 4096, Stream: true}
+	b, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(b))
+	if err != nil {
+		return ChatResult{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return ChatResult{}, fmt.Errorf("llm request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return ChatResult{}, fmt.Errorf("llm api %d: %.500s", resp.StatusCode, string(body))
+	}
+	ct := resp.Header.Get("Content-Type")
+	if strings.Contains(ct, "text/event-stream") {
+		return c.readSSEFull(resp.Body, onDelta...)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ChatResult{}, fmt.Errorf("read llm response: %w", err)
+	}
+	var chatResp ChatResponse
+	if err := json.Unmarshal(body, &chatResp); err != nil {
+		return ChatResult{}, fmt.Errorf("decode llm response: %w", err)
+	}
+	if len(chatResp.Choices) == 0 {
+		return ChatResult{}, fmt.Errorf("llm: no choices")
+	}
+	return ChatResult{Content: chatResp.Choices[0].Message.Content}, nil
+}
+
 func (c *Client) chatOnce(ctx context.Context, messages []Message, temperature float64) (string, error) {
+	if c.dialect == DialectAnthropic {
+		return c.chatOnceAnthropic(ctx, messages, temperature)
+	}
+	temp := temperature
+	if GetConstraints(c.model).FixedTemperature {
+		temp = 0
+	}
 	req := ChatRequest{
 		Model:       c.model,
 		Messages:    messages,
-		Temperature: temperature,
+		Temperature: temp,
 		MaxTokens:   4096,
 		Stream:      true,
 	}
@@ -212,11 +417,24 @@ func (c *Client) chatOnce(ctx context.Context, messages []Message, temperature f
 // readSSE parses a Server-Sent Events stream and concatenates delta content.
 // Limits total accumulated response to 10MB to prevent OOM from malicious streams.
 func (c *Client) readSSE(body io.Reader) (string, error) {
+	r, err := c.readSSEFull(body)
+	if err != nil {
+		return r.Content, err
+	}
+	return r.Content, nil
+}
+
+// readSSEFull parses SSE and returns both content and reasoning_content.
+// If onDelta is non-nil, each chunk is streamed to it in real-time.
+func (c *Client) readSSEFull(body io.Reader, onDelta ...StreamDeltaFunc) (ChatResult, error) {
+	var cb StreamDeltaFunc
+	if len(onDelta) > 0 {
+		cb = onDelta[0]
+	}
 	scanner := bufio.NewScanner(body)
-	// Set max token size to 1MB per line to handle large SSE chunks
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	const maxResponseBytes = 10 * 1024 * 1024 // 10MB
-	var sb strings.Builder
+	const maxResponseBytes = 10 * 1024 * 1024
+	var content, reasoning strings.Builder
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data:") {
@@ -229,21 +447,30 @@ func (c *Client) readSSE(body io.Reader) (string, error) {
 		}
 		var chunk streamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue // skip malformed chunks
+			continue
 		}
 		for _, choice := range chunk.Choices {
-			sb.WriteString(choice.Delta.Content)
+			content.WriteString(choice.Delta.Content)
+			reasoning.WriteString(choice.Delta.ReasoningContent)
+			if cb != nil && (choice.Delta.Content != "" || choice.Delta.ReasoningContent != "") {
+				cb(choice.Delta.Content, choice.Delta.ReasoningContent)
+			}
 		}
-		if sb.Len() > maxResponseBytes {
-			return sb.String(), fmt.Errorf("llm: response exceeded %d bytes limit", maxResponseBytes)
+		if content.Len()+reasoning.Len() > maxResponseBytes {
+			return ChatResult{Content: content.String(), ReasoningContent: reasoning.String()},
+				fmt.Errorf("llm: response exceeded %d bytes limit", maxResponseBytes)
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return sb.String(), fmt.Errorf("sse read: %w", err)
+		return ChatResult{Content: content.String(), ReasoningContent: reasoning.String()},
+			fmt.Errorf("sse read: %w", err)
 	}
-	result := sb.String()
-	if result == "" {
-		return "", fmt.Errorf("llm: empty response from stream")
+	result := ChatResult{Content: content.String(), ReasoningContent: reasoning.String()}
+	if result.Content == "" && result.ReasoningContent == "" {
+		return result, fmt.Errorf("llm: empty response from stream")
+	}
+	if result.Content == "" && result.ReasoningContent != "" {
+		result.Content = result.ReasoningContent
 	}
 	return result, nil
 }
@@ -292,6 +519,9 @@ func (c *Client) chatJSONOnce(ctx context.Context, messages []Message) (string, 
 		"temperature":     0,
 		"stream":          true,
 		"response_format": map[string]string{"type": "json_object"},
+	}
+	if adj := SanitizeRequestBody(reqBody, c.model); len(adj) > 0 {
+		slog.Info("llm: sanitized JSON request", "model", c.model, "adjusted", adj)
 	}
 	b, _ := json.Marshal(reqBody)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(b))
@@ -378,10 +608,14 @@ func (c *Client) ChatWithModel(ctx context.Context, model string, messages []Mes
 
 // chatOnceWithModel is like chatOnce but uses the specified model instead of c.model.
 func (c *Client) chatOnceWithModel(ctx context.Context, model string, messages []Message, temperature float64) (string, error) {
+	temp := temperature
+	if GetConstraints(model).FixedTemperature {
+		temp = 0
+	}
 	req := ChatRequest{
 		Model:       model,
 		Messages:    messages,
-		Temperature: temperature,
+		Temperature: temp,
 		MaxTokens:   4096,
 		Stream:      true,
 	}
@@ -422,4 +656,39 @@ func (c *Client) chatOnceWithModel(ctx context.Context, model string, messages [
 		return "", fmt.Errorf("llm: no choices")
 	}
 	return chatResp.Choices[0].Message.Content, nil
+}
+
+func messagesHaveMedia(msgs []Message) bool {
+	for _, m := range msgs {
+		for _, p := range m.ContentParts {
+			if p.Type == "image_url" || p.Type == "video_url" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// messagesHaveImages kept for backward compat (also checks video).
+func messagesHaveImages(msgs []Message) bool { return messagesHaveMedia(msgs) }
+
+func stripImages(msgs []Message) []Message {
+	out := make([]Message, len(msgs))
+	for i, m := range msgs {
+		out[i] = m
+		if len(m.ContentParts) > 0 {
+			var textOnly []ContentPart
+			for _, p := range m.ContentParts {
+				if p.Type == "text" {
+					textOnly = append(textOnly, p)
+				}
+			}
+			out[i].ContentParts = nil
+			out[i].Content = ""
+			for _, p := range textOnly {
+				out[i].Content += p.Text
+			}
+		}
+	}
+	return out
 }

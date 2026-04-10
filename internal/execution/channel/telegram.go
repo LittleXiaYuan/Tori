@@ -11,12 +11,23 @@ import (
 	"time"
 )
 
+// TelegramCallbackHandler handles InlineKeyboard button callbacks.
+// action is the callback_data string; chatID and messageID identify the original message.
+// Return a Reply to update the message, or nil to fall through to the default handler.
+type TelegramCallbackHandler func(chatID, messageID, userID, action string) *Reply
+
 // Telegram implements the Channel interface for Telegram Bot API.
 type Telegram struct {
-	token      string
-	client     *http.Client
-	webhookURL string // if set, use webhook mode instead of polling
-	msgCh      chan Message
+	token          string
+	client         *http.Client
+	webhookURL     string // if set, use webhook mode instead of polling
+	msgCh          chan Message
+	callbackAction TelegramCallbackHandler
+}
+
+// SetCallbackActionHandler registers a handler for InlineKeyboard callbacks.
+func (t *Telegram) SetCallbackActionHandler(h TelegramCallbackHandler) {
+	t.callbackAction = h
 }
 
 // NewTelegram creates a Telegram channel with the given bot token.
@@ -211,14 +222,19 @@ func (t *Telegram) processMessage(ctx context.Context, msg Message, handler func
 
 	if cqID := msg.Extra["callback_query_id"]; cqID != "" {
 		defer t.answerCallbackQuery(cqID)
+
+		// If a CallbackActionHandler is registered, try it first.
+		if t.callbackAction != nil {
+			msgID := msg.Extra["message_id"]
+			if reply := t.callbackAction(chatID, msgID, msg.UserID, msg.Content); reply != nil {
+				_ = t.Send(ctx, chatID, *reply)
+				return
+			}
+		}
 	}
 
-	// Handle built-in commands
-	if cmd := t.parseCommand(msg.Content); cmd != "" {
-		reply := t.handleCommand(cmd)
-		_ = t.Send(ctx, chatID, reply)
-		return
-	}
+	// Commands are now handled universally by the CommandInterceptor in the handler chain.
+	// No need for Telegram-specific command handling here.
 
 	// Show typing indicator
 	t.sendChatAction(chatID, "typing")
@@ -432,19 +448,6 @@ func (t *Telegram) parseCommand(text string) string {
 		cmd = cmd[:idx]
 	}
 	return cmd
-}
-
-func (t *Telegram) handleCommand(cmd string) Reply {
-	switch cmd {
-	case "/start":
-		return Reply{Content: "👋 你好！我是云鸢智能助手。\n\n直接发消息即可对话，也可使用命令：\n/help - 帮助\n/skills - 查看技能", Format: "text"}
-	case "/help":
-		return Reply{Content: "📖 *使用说明*\n\n• 直接发送文字即可对话\n• 支持多轮上下文\n• 可执行代码、搜索、分析等\n\n/skills - 查看可用技能", Format: "markdown"}
-	case "/skills":
-		return Reply{Content: "🔧 *可用技能*\n\n• web\\_search - 搜索\n• code\\_execute - 代码执行\n• file\\_search - 文件搜索\n• lesson\\_plan - 教案生成\n• quiz\\_generate - 出题\n• grade\\_work - 批改", Format: "markdown"}
-	default:
-		return Reply{Content: "未知命令: " + cmd + "\n使用 /help 查看帮助", Format: "text"}
-	}
 }
 
 // React adds an emoji reaction to a Telegram message.

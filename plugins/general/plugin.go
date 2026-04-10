@@ -5,19 +5,19 @@ import (
 	"yunque-agent/pkg/skills"
 )
 
-// GeneralPlugin bundles all general-purpose skills.
+// GeneralPlugin bundles general-purpose skills (search, code exec, file ops, doc gen).
 type GeneralPlugin struct {
 	hostReadPaths  []string
 	hostWritePaths []string
 	searchFn       SearchFunc
 	wfStore        workflow.Store
+	pythonBin      string // injected from PythonEnv; empty = auto-detect
 }
 
 func New(hostReadPaths []string) *GeneralPlugin {
 	return &GeneralPlugin{hostReadPaths: hostReadPaths}
 }
 
-// SetHostWritePaths sets directories where file_write and zip skills can write.
 func (p *GeneralPlugin) SetHostWritePaths(paths []string) {
 	p.hostWritePaths = paths
 }
@@ -27,14 +27,17 @@ func (p *GeneralPlugin) Description() string {
 	return "通用插件：搜索、代码执行、文件浏览"
 }
 
-// SetSearchFunc injects an external search function into the web search skill.
 func (p *GeneralPlugin) SetSearchFunc(fn SearchFunc) {
 	p.searchFn = fn
 }
 
-// SetWorkflowStore injects the shared workflow store.
 func (p *GeneralPlugin) SetWorkflowStore(s workflow.Store) {
 	p.wfStore = s
+}
+
+// SetPythonBin injects the resolved Python binary for Office skills.
+func (p *GeneralPlugin) SetPythonBin(bin string) {
+	p.pythonBin = bin
 }
 
 func (p *GeneralPlugin) Skills() []skills.Skill {
@@ -43,10 +46,11 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		ws.SetExternalSearch(p.searchFn)
 	}
 
-	// Default write dirs: data/tasks for task artifacts, data/output for general output
+	// Default write dirs: data/tasks for task artifacts, data/output for general output,
+	// plus "." and "output" to be more forgiving for desktop/CLI usage.
 	writeDirs := p.hostWritePaths
 	if len(writeDirs) == 0 {
-		writeDirs = []string{"data/tasks", "data/output"}
+		writeDirs = []string{"data/tasks", "data/output", "output", "."}
 	}
 	// Read dirs for zip / xlsx_split: host read paths + write dirs (can read own outputs)
 	readDirs := append(append([]string{}, p.hostReadPaths...), writeDirs...)
@@ -62,15 +66,37 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewFileWriteSkill(writeDirs),
 		NewZipPackSkill(readDirs, writeDirs),
 		NewZipUnpackSkill(readDirs, writeDirs),
-		NewDocxCreateSkill(writeDirs),
+		p.docxSkill(writeDirs),
+		NewDocxFillSkill(readDirs, writeDirs),
+		NewDocxEditSkill(readDirs, writeDirs),
 		NewXlsxCreateSkill(writeDirs),
+		NewXlsxFillSkill(readDirs, writeDirs),
+		NewXlsxEditSkill(readDirs, writeDirs),
 		NewXlsxSplitSkill(readDirs, writeDirs),
 		NewPdfCreateSkill(writeDirs),
 		NewHtmlExportSkill(writeDirs),
-		NewPptxCreateSkill(writeDirs),
+		p.pptxSkill(writeDirs),
+		NewPptxFillSkill(readDirs, writeDirs),
+		NewPptxEditSkill(readDirs, writeDirs),
 		NewSendEmailSkill(),
 		newWorkflowGenWithStore(p.wfStore),
 	}
+}
+
+func (p *GeneralPlugin) docxSkill(dirs []string) skills.Skill {
+	s := NewDocxCreateSkill(dirs)
+	if p.pythonBin != "" {
+		s.SetPythonBin(p.pythonBin)
+	}
+	return s
+}
+
+func (p *GeneralPlugin) pptxSkill(dirs []string) skills.Skill {
+	s := NewPptxCreateSkill(dirs)
+	if p.pythonBin != "" {
+		s.SetPythonBin(p.pythonBin)
+	}
+	return s
 }
 
 func newWorkflowGenWithStore(store workflow.Store) skills.Skill {
@@ -82,22 +108,36 @@ func newWorkflowGenWithStore(store workflow.Store) skills.Skill {
 }
 
 func (p *GeneralPlugin) SystemPrompt() string {
-	return `你具备通用能力：
-- 网络搜索获取最新信息
-- 在安全沙盒中执行代码（Python/JavaScript/Go）
-- 浏览和搜索主机文件系统（只读）
-- 创建和写入文件（报告、代码、配置等任务产出物）
-- 打包文件成 zip 压缩包 / 解压 zip 文件
-- 解析文档文件（PDF/Word/Excel/CSV/TXT/Markdown），提取文本内容
-- 生成 Word 文档(.docx)：支持标题、段落、列表，使用 Markdown 子集语法描述内容
-- 生成 Excel 表格(.xlsx)：支持 CSV 格式数据输入，自动表头加粗
-- 拆分 Excel(.xlsx)：按指定列的去重值拆成多个带表头的 xlsx 文件
-- 生成简易 PDF(.pdf)：将多行文本导出为单页 PDF（拉丁字符最稳妥）
-- 导出 HTML 网页报告：将 Markdown 内容渲染为美观的独立 HTML 页面
-- 生成 PowerPoint 演示文稿(.pptx)：用 --- 分隔幻灯片，每张第一行为标题
-- 发送电子邮件（SMTP）：支持纯文本和 HTML 格式，抄送，自定义发件人名称
-- 多语言翻译（支持中英日韩法德西俄等20+语言，可指定翻译风格）
-- AI图片生成（根据文字描述生成图片，支持多种尺寸和风格）
-- 浏览器自动化（获取网页内容、提取正文、提取链接、查看HTTP头）
-- 自动生成工作流（NL2Workflow）：根据用户的口语化需求或想法，自动利用大模型创建具有逻辑拓扑的 Workflow 流程并入库执行。`
+	return `你具备通用能力，以下是各能力对应的工具名称（必须通过工具调用使用，不要直接输出内容替代）：
+
+**信息获取**
+- 网络搜索 → web_search
+- 浏览器自动化（获取网页内容、提取正文/链接/HTTP头）→ browser_*
+
+**代码与文件**
+- 安全沙盒执行代码（Python/JavaScript/Go）→ code_gen
+- 浏览和搜索主机文件 → file_search
+- 解析文档（PDF/Word/Excel/CSV/TXT/Markdown）→ doc_parse
+- 创建和写入文件 → file_write
+
+**文档生成（用户说"生成文档/写报告/做方案"时必须使用以下工具）**
+- 生成 Word(.docx) → docx_create（content 参数使用 Markdown 子集：# ## ### 标题、列表、表格、图片）
+- 填充 Word 模板 → docx_fill（{{key}} 占位符替换）
+- 编辑 Word → docx_edit（替换文字、插入/删除段落、添加表格）
+- 生成 Excel(.xlsx) → xlsx_create（CSV 格式数据）
+- 填充 Excel 模板 → xlsx_fill
+- 编辑 Excel → xlsx_edit
+- 拆分 Excel → xlsx_split
+- 生成 PDF → pdf_create
+- 导出 HTML 报告 → html_export
+- 生成 PPT(.pptx) → pptx_create（--- 分隔幻灯片）
+- 填充 PPT 模板 → pptx_fill
+- 编辑 PPT → pptx_edit
+
+**压缩与通信**
+- 打包 zip → zip_pack / 解压 → zip_unpack
+- 发送邮件(SMTP) → send_email
+- 多语言翻译 → translate
+- AI 图片生成 → image_gen
+- 自动生成工作流(NL2Workflow) → workflow_gen`
 }

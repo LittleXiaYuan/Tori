@@ -4,6 +4,18 @@
 
 Production-ready AI Agent with embedded WebUI, multi-model routing, self-iteration, and 90+ API endpoints.
 
+> **Language Note** — Code comments, godoc, and architecture docs are in English.
+> Log messages, system prompts, and user-facing strings are in Chinese, reflecting the primary target market.
+> Contributions in either language are welcome.
+
+## 仓库结构说明
+
+- 当前前端以 `heroui-web/` 为准，Go 服务嵌入的也是 `heroui-web/out/`
+- `web/` 已归档，仅保留给历史参考，详细说明见 `web/ARCHIVED.md`
+- `docs/` 用于面向用户的正式文档与文档站内容
+- `doc/` 用于开发过程文档、连续性记录、设计蓝图等内部沉淀
+- 仓库目录说明见 `docs/repo-layout.md`
+
 ## 一键启动
 
 ### 方式 1：双击运行 (Windows / macOS / Linux)

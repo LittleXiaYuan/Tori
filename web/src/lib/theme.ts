@@ -47,27 +47,35 @@ function hexToRgba(hex: string, alpha: number) {
 
 // ── Light mode color overrides ──
 const LIGHT_VARS: Record<string, string> = {
-  '--bg': '#f8f9fa',
-  '--bg-card': 'rgba(255, 255, 255, 0.7)',
+  '--bg': '#f8f9fc',
+  '--bg-card': 'rgba(255, 255, 255, 0.8)',
   '--bg-hover': 'rgba(0, 0, 0, 0.03)',
   '--bg-elevated': 'rgba(255, 255, 255, 0.9)',
   '--border': 'rgba(0, 0, 0, 0.08)',
   '--border-hover': 'rgba(0, 0, 0, 0.15)',
   '--text': '#1a1a2e',
-  '--text-secondary': '#4a4a5a',
-  '--text-muted': '#8a8a9a',
+  '--text-secondary': '#5a5a72',
+  '--text-muted': '#8e8ea0',
+  '--sidebar-bg': 'rgba(255, 255, 255, 0.95)',
+  '--shadow-sm': '0 1px 3px rgba(0, 0, 0, 0.08)',
+  '--shadow-md': '0 4px 12px rgba(0, 0, 0, 0.06)',
+  '--shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.1)',
 };
 
 const DARK_VARS: Record<string, string> = {
-  '--bg': '#030305',
-  '--bg-card': 'rgba(15, 15, 20, 0.4)',
-  '--bg-hover': 'rgba(255, 255, 255, 0.03)',
-  '--bg-elevated': 'rgba(30, 30, 40, 0.6)',
-  '--border': 'rgba(255, 255, 255, 0.08)',
-  '--border-hover': 'rgba(255, 255, 255, 0.15)',
-  '--text': '#ffffff',
-  '--text-secondary': '#a1a1aa',
-  '--text-muted': '#71717a',
+  '--bg': '#0d1117',
+  '--bg-card': 'rgba(22, 27, 34, 0.5)',
+  '--bg-hover': 'rgba(255, 255, 255, 0.04)',
+  '--bg-elevated': 'rgba(33, 38, 45, 0.6)',
+  '--border': 'rgba(255, 255, 255, 0.1)',
+  '--border-hover': 'rgba(255, 255, 255, 0.18)',
+  '--text': '#e6edf3',
+  '--text-secondary': '#9198a1',
+  '--text-muted': '#656d76',
+  '--sidebar-bg': 'rgba(13, 17, 23, 0.95)',
+  '--shadow-sm': '0 4px 12px rgba(0, 0, 0, 0.3)',
+  '--shadow-md': '0 8px 24px rgba(0, 0, 0, 0.4)',
+  '--shadow-lg': '0 16px 48px rgba(0, 0, 0, 0.5)',
 };
 
 function resolvePreset(preset: string): 'light' | 'dark' {

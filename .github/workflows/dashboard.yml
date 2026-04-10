@@ -4,10 +4,10 @@ on:
   push:
     branches: [master, main]
     paths:
-      - "web/**"
+      - "heroui-web/**"
   pull_request:
     paths:
-      - "web/**"
+      - "heroui-web/**"
   workflow_dispatch:
 
 jobs:
@@ -21,21 +21,21 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: heroui-web/package-lock.json
 
       - name: Install dependencies
-        run: cd web && npm ci
+        run: cd heroui-web && npm ci
 
       - name: Type check
-        run: cd web && npx tsc --noEmit
+        run: cd heroui-web && npx tsc --noEmit
 
       - name: Build
-        run: cd web && npm run build
+        run: cd heroui-web && npm run build
 
       - name: Upload build artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-${{ github.sha }}
-          path: web/.next/
+          path: heroui-web/out/
           retention-days: 7

@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // WhatsApp implements the Channel interface using the WhatsApp Cloud API.
@@ -69,10 +71,10 @@ func (w *WhatsApp) Start(ctx context.Context, handler func(Message) Reply) error
 		Handler: mux,
 	}
 
-	go func() {
+	safego.Go("whatsapp-shutdown", func() {
 		<-ctx.Done()
 		server.Shutdown(context.Background())
-	}()
+	})
 
 	slog.Info("whatsapp: webhook listening", "path", w.webhookPath, "addr", ":8443")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

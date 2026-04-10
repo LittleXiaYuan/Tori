@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"crypto/rand"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,60 +12,187 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"yunque-agent/internal/apperror"
 )
 
-// PasswordStore manages the admin password (bcrypt-style hashing).
-// The hashed password is stored in data/auth.json.
+const (
+	bcryptCost          = 12
+	minPasswordLen      = 8
+	loginLockoutMax     = 5
+	loginLockoutWindow  = 15 * time.Minute
+)
+
+// authKVStore abstracts Ledger KV to avoid import cycles.
+type authKVStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
+
+// PasswordStore manages the admin password with bcrypt hashing and brute-force protection.
+// Persisted to Ledger KV (preferred) or data/auth.json (fallback).
 type PasswordStore struct {
-	mu       sync.RWMutex
-	hash     string // SHA256(salt+password)
-	salt     string
-	path     string
-	isSetup  bool // true if a password has been configured
+	mu      sync.RWMutex
+	bcrypt  string // bcrypt hash (preferred)
+	legacy  string // SHA256(salt+password) — only used for migration
+	salt    string // only present for legacy hashes
+	path    string
+	isSetup bool
+	kvs     authKVStore
+
+	failMu   sync.Mutex
+	failures map[string]*loginFailure // IP → failure tracking
+}
+
+type loginFailure struct {
+	Count    int
+	LastFail time.Time
 }
 
 type authData struct {
-	Hash string `json:"hash"`
-	Salt string `json:"salt"`
+	Bcrypt string `json:"bcrypt,omitempty"`
+	Hash   string `json:"hash,omitempty"` // legacy SHA256
+	Salt   string `json:"salt,omitempty"` // legacy
 }
 
-// NewPasswordStore creates a password store that persists to the given path.
 func NewPasswordStore(path string) *PasswordStore {
-	ps := &PasswordStore{path: path}
+	ps := &PasswordStore{path: path, failures: make(map[string]*loginFailure)}
 	ps.load()
 	return ps
 }
 
-// IsSetup returns true if a password has been configured.
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+// Migrates existing file data to KV on first call.
+func (ps *PasswordStore) SetKVStore(kvs authKVStore) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.kvs = kvs
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if ps.isSetup {
+		ad := authData{Bcrypt: ps.bcrypt, Hash: ps.legacy, Salt: ps.salt}
+		if err := kvs.Put(ctx, "auth", ad); err != nil {
+			slog.Warn("auth: KV migration failed", "err", err)
+		} else {
+			slog.Info("auth: migrated to Ledger KV")
+		}
+	} else {
+		var ad authData
+		if found, err := kvs.Get(ctx, "auth", &ad); err == nil && found {
+			if ad.Bcrypt != "" {
+				ps.bcrypt = ad.Bcrypt
+				ps.isSetup = true
+			} else if ad.Hash != "" {
+				ps.legacy = ad.Hash
+				ps.salt = ad.Salt
+				ps.isSetup = true
+			}
+			slog.Info("auth: restored from Ledger KV")
+		}
+	}
+}
+
 func (ps *PasswordStore) IsSetup() bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	return ps.isSetup
 }
 
-// SetPassword sets a new admin password.
 func (ps *PasswordStore) SetPassword(password string) error {
-	if len(password) < 4 {
-		return fmt.Errorf("password must be at least 4 characters")
+	if len(password) < minPasswordLen {
+		return fmt.Errorf("password must be at least %d characters", minPasswordLen)
 	}
-	salt := generateSalt()
-	hash := hashPassword(password, salt)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		return fmt.Errorf("bcrypt hash: %w", err)
+	}
 	ps.mu.Lock()
-	ps.hash = hash
-	ps.salt = salt
+	ps.bcrypt = string(hash)
+	ps.legacy = ""
+	ps.salt = ""
 	ps.isSetup = true
 	ps.mu.Unlock()
 	return ps.save()
 }
 
-// Verify checks if the given password matches.
+// Verify checks the password. If a legacy SHA256 hash matches, it auto-migrates to bcrypt.
 func (ps *PasswordStore) Verify(password string) bool {
 	ps.mu.RLock()
-	defer ps.mu.RUnlock()
-	if !ps.isSetup {
+	bcryptHash := ps.bcrypt
+	legacyHash := ps.legacy
+	salt := ps.salt
+	setup := ps.isSetup
+	ps.mu.RUnlock()
+
+	if !setup {
 		return false
 	}
-	return hashPassword(password, ps.salt) == ps.hash
+
+	if bcryptHash != "" {
+		return bcrypt.CompareHashAndPassword([]byte(bcryptHash), []byte(password)) == nil
+	}
+
+	// Legacy SHA256 path — verify then migrate
+	if legacyHash != "" && legacySHA256(password, salt) == legacyHash {
+		go ps.migrateToBycrpt(password)
+		return true
+	}
+	return false
+}
+
+func (ps *PasswordStore) migrateToBycrpt(password string) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		slog.Warn("auth: bcrypt migration failed", "err", err)
+		return
+	}
+	ps.mu.Lock()
+	ps.bcrypt = string(hash)
+	ps.legacy = ""
+	ps.salt = ""
+	ps.mu.Unlock()
+	if err := ps.save(); err != nil {
+		slog.Warn("auth: bcrypt migration save failed", "err", err)
+	} else {
+		slog.Info("auth: migrated password hash from SHA256 to bcrypt")
+	}
+}
+
+// CheckLockout returns true if the IP is locked out due to too many failures.
+func (ps *PasswordStore) CheckLockout(ip string) bool {
+	ps.failMu.Lock()
+	defer ps.failMu.Unlock()
+	f, ok := ps.failures[ip]
+	if !ok {
+		return false
+	}
+	if time.Since(f.LastFail) > loginLockoutWindow {
+		delete(ps.failures, ip)
+		return false
+	}
+	return f.Count >= loginLockoutMax
+}
+
+func (ps *PasswordStore) RecordFailure(ip string) {
+	ps.failMu.Lock()
+	defer ps.failMu.Unlock()
+	f, ok := ps.failures[ip]
+	if !ok || time.Since(f.LastFail) > loginLockoutWindow {
+		ps.failures[ip] = &loginFailure{Count: 1, LastFail: time.Now()}
+		return
+	}
+	f.Count++
+	f.LastFail = time.Now()
+}
+
+func (ps *PasswordStore) ClearFailures(ip string) {
+	ps.failMu.Lock()
+	defer ps.failMu.Unlock()
+	delete(ps.failures, ip)
 }
 
 func (ps *PasswordStore) load() {
@@ -74,37 +201,50 @@ func (ps *PasswordStore) load() {
 		return
 	}
 	var auth authData
-	if json.Unmarshal(data, &auth) == nil && auth.Hash != "" {
-		ps.hash = auth.Hash
+	if json.Unmarshal(data, &auth) != nil {
+		return
+	}
+	if auth.Bcrypt != "" {
+		ps.bcrypt = auth.Bcrypt
+		ps.isSetup = true
+	} else if auth.Hash != "" {
+		ps.legacy = auth.Hash
 		ps.salt = auth.Salt
 		ps.isSetup = true
 	}
 }
 
 func (ps *PasswordStore) save() error {
-	data, _ := json.MarshalIndent(authData{Hash: ps.hash, Salt: ps.salt}, "", "  ")
+	ps.mu.RLock()
+	ad := authData{Bcrypt: ps.bcrypt, Hash: ps.legacy, Salt: ps.salt}
+	kvs := ps.kvs
+	ps.mu.RUnlock()
+
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "auth", ad); err != nil {
+			slog.Warn("auth: KV save failed, falling back to file", "err", err)
+		} else {
+			return nil
+		}
+	}
+
+	data, _ := json.MarshalIndent(ad, "", "  ")
 	return os.WriteFile(ps.path, data, 0600)
 }
 
-func generateSalt() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
-func hashPassword(password, salt string) string {
+func legacySHA256(password, salt string) string {
 	h := sha256.Sum256([]byte(salt + password))
 	return hex.EncodeToString(h[:])
 }
 
 // ── HTTP Handlers ──
 
-// handleAuthLogin handles POST /v1/auth/login.
-// Request: {"password": "xxx", "remember": true}
-// Response: {"token": "jwt...", "expires_in": 604800}
+// handleAuthLogin handles POST /v1/auth/login with IP-based lockout.
 func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST required")
 		return
 	}
 
@@ -113,25 +253,34 @@ func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		Remember bool   `json:"remember"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
 		return
 	}
 
 	if g.passwordStore == nil || !g.passwordStore.IsSetup() {
-		http.Error(w, `{"error":"password not configured, run setup first"}`, http.StatusServiceUnavailable)
+		apperror.Write(w, apperror.New(apperror.CodeInternal, "password not configured, run setup first"))
+		return
+	}
+
+	ip := extractHost(r)
+	if g.passwordStore.CheckLockout(ip) {
+		slog.Warn("auth: IP locked out", "ip", ip)
+		apperror.WriteCode(w, apperror.CodeTooManyReqs, fmt.Sprintf("too many failed attempts, try again in %d minutes", int(loginLockoutWindow.Minutes())))
 		return
 	}
 
 	if !g.passwordStore.Verify(req.Password) {
-		slog.Warn("auth: failed login attempt", "remote", r.RemoteAddr)
-		time.Sleep(500 * time.Millisecond) // brute-force protection
-		http.Error(w, `{"error":"wrong password"}`, http.StatusUnauthorized)
+		g.passwordStore.RecordFailure(ip)
+		slog.Warn("auth: failed login attempt", "ip", ip)
+		time.Sleep(500 * time.Millisecond)
+		apperror.WriteCode(w, apperror.CodeUnauthorized, "wrong password")
 		return
 	}
 
-	// Generate JWT
+	g.passwordStore.ClearFailures(ip)
+
 	if g.jwtCfg == nil {
-		http.Error(w, `{"error":"JWT not configured"}`, http.StatusInternalServerError)
+		apperror.WriteCode(w, apperror.CodeInternal, "JWT not configured")
 		return
 	}
 
@@ -140,7 +289,6 @@ func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		expiry = 7 * 24 * time.Hour
 	}
 
-	// Temporarily set the JWT expiry for this token
 	cfgCopy := *g.jwtCfg
 	cfgCopy.Expiration = expiry
 
@@ -152,11 +300,11 @@ func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 
 	token, err := GenerateJWT(cfgCopy, tenantID, "admin")
 	if err != nil {
-		http.Error(w, `{"error":"token generation failed"}`, http.StatusInternalServerError)
+		apperror.WriteCode(w, apperror.CodeInternal, "token generation failed")
 		return
 	}
 
-	slog.Info("auth: login success", "remote", r.RemoteAddr, "remember", req.Remember)
+	slog.Info("auth: login success", "ip", ip, "remember", req.Remember)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
@@ -165,13 +313,11 @@ func (g *Gateway) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleAuthStatus returns whether a password is set and if the user is authenticated.
 func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	isSetup := g.passwordStore != nil && g.passwordStore.IsSetup()
 
-	// Check if the request has valid auth
 	isAuthenticated := false
 	token := r.Header.Get("X-API-Key")
 	if token == "" {
@@ -191,17 +337,15 @@ func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"password_set":    isSetup,
-		"authenticated":   isAuthenticated,
-		"localhost":       extractHost(r) == "127.0.0.1" || extractHost(r) == "::1",
+		"password_set":  isSetup,
+		"authenticated": isAuthenticated,
 	})
 }
 
 // handleAuthSetPassword sets or changes the admin password.
-// POST /v1/auth/set-password {"password": "new_password", "current": "old_password"}
 func (g *Gateway) handleAuthSetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST required")
 		return
 	}
 
@@ -210,29 +354,28 @@ func (g *Gateway) handleAuthSetPassword(w http.ResponseWriter, r *http.Request) 
 		Current  string `json:"current"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
 		return
 	}
 
 	if g.passwordStore == nil {
-		http.Error(w, `{"error":"password store not initialized"}`, http.StatusInternalServerError)
+		apperror.WriteCode(w, apperror.CodeInternal, "password store not initialized")
 		return
 	}
 
-	// If password is already set, require current password
 	if g.passwordStore.IsSetup() {
 		if !g.passwordStore.Verify(req.Current) {
-			http.Error(w, `{"error":"current password incorrect"}`, http.StatusForbidden)
+			apperror.WriteCode(w, apperror.CodeForbidden, "current password incorrect")
 			return
 		}
 	}
 
 	if err := g.passwordStore.SetPassword(req.Password); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
 
-	slog.Info("auth: password updated", "remote", r.RemoteAddr)
+	slog.Info("auth: password updated", "ip", extractHost(r))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

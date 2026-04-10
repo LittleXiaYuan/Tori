@@ -1,8 +1,10 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,12 +29,21 @@ type Store interface {
 	ListInstances(tenantID string, limit int) ([]*Instance, error)
 }
 
-// JSONStore persists workflows and instances as JSON files.
+// kvStore abstracts Ledger KV to avoid import cycles with internal/ledger.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+	Delete(ctx context.Context, key string) error
+}
+
+// JSONStore persists workflows and instances as JSON files,
+// with optional Ledger KV backing when SetKVStore is called.
 type JSONStore struct {
 	mu      sync.RWMutex
 	baseDir string
 	defs    map[string]*Definition
 	insts   map[string]*Instance
+	kvs     kvStore
 }
 
 // NewJSONStore creates a workflow store rooted at dir.
@@ -46,6 +57,36 @@ func NewJSONStore(dir string) *JSONStore {
 	return s
 }
 
+// SetKVStore enables Ledger KV-backed persistence.
+// Existing file data is automatically migrated on first call.
+func (s *JSONStore) SetKVStore(kvs kvStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	migrated := 0
+	for id, def := range s.defs {
+		if err := kvs.Put(ctx, "def:"+id, def); err != nil {
+			slog.Warn("workflow store: migrate def failed", "id", id, "err", err)
+		} else {
+			migrated++
+		}
+	}
+	for id, inst := range s.insts {
+		if err := kvs.Put(ctx, "inst:"+id, inst); err != nil {
+			slog.Warn("workflow store: migrate inst failed", "id", id, "err", err)
+		} else {
+			migrated++
+		}
+	}
+	if migrated > 0 {
+		slog.Info("workflow store: migrated to Ledger KV", "count", migrated)
+	}
+}
+
 // ── Definition operations ──
 
 func (s *JSONStore) SaveDefinition(def *Definition) error {
@@ -57,19 +98,51 @@ func (s *JSONStore) SaveDefinition(def *Definition) error {
 
 	s.mu.Lock()
 	s.defs[def.ID] = def
+	kvs := s.kvs
 	s.mu.Unlock()
 
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "def:"+def.ID, def); err != nil {
+			slog.Warn("workflow store: KV save def failed", "id", def.ID, "err", err)
+			return s.saveDef(def)
+		}
+		return nil
+	}
 	return s.saveDef(def)
 }
 
 func (s *JSONStore) GetDefinition(id string) (*Definition, error) {
+	s.mu.RLock()
+	kvs := s.kvs
+	def, ok := s.defs[id]
+	s.mu.RUnlock()
+
+	if ok {
+		return def, nil
+	}
+
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		var d Definition
+		found, err := kvs.Get(ctx, "def:"+id, &d)
+		if err == nil && found {
+			s.mu.Lock()
+			s.defs[id] = &d
+			s.mu.Unlock()
+			return &d, nil
+		}
+	}
+
 	s.mu.Lock()
 	s.loadAll()
 	s.mu.Unlock()
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	def, ok := s.defs[id]
+	def, ok = s.defs[id]
 	if !ok {
 		return nil, fmt.Errorf("workflow definition %s not found", id)
 	}
@@ -102,9 +175,16 @@ func (s *JSONStore) DeleteDefinition(id string) error {
 	if ok {
 		delete(s.defs, id)
 	}
+	kvs := s.kvs
 	s.mu.Unlock()
+
 	if ok {
 		os.Remove(filepath.Join(s.baseDir, "defs", id+".json"))
+	}
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = kvs.Delete(ctx, "def:"+id)
 	}
 	return nil
 }
@@ -162,7 +242,18 @@ func (s *JSONStore) SaveInstance(inst *Instance) error {
 	inst.UpdatedAt = time.Now()
 	s.mu.Lock()
 	s.insts[inst.ID] = inst
+	kvs := s.kvs
 	s.mu.Unlock()
+
+	if kvs != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := kvs.Put(ctx, "inst:"+inst.ID, inst); err != nil {
+			slog.Warn("workflow store: KV save inst failed", "id", inst.ID, "err", err)
+			return s.saveInst(inst)
+		}
+		return nil
+	}
 	return s.saveInst(inst)
 }
 

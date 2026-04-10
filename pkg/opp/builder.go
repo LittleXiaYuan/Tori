@@ -86,3 +86,46 @@ func NewHeartbeat(src, dst, sess, task string, hb HeartbeatPayload) *Message {
 func NewError(src, dst, sess string, code ErrorCode, msg string, retryable bool) *Message {
 	return newMsg(src, dst, sess, MsgError, OPPError{Code: code, Message: msg, Retryable: retryable})
 }
+
+// ── Agent Network (v3) builders ──
+
+func NewCapabilities(src, dst, sess string, caps CapabilitiesPayload) *Message {
+	return newMsg(src, dst, sess, MsgCapabilities, caps)
+}
+
+func NewDiscover(src, dst, sess string, d DiscoverPayload) *Message {
+	return newMsg(src, dst, sess, MsgDiscover, d)
+}
+
+func NewDelegate(src, dst, sess string, d DelegatePayload) *Message {
+	return newMsg(src, dst, sess, MsgDelegate, d)
+}
+
+func NewDelegateResult(src, dst, sess, task string, dr DelegateResultPayload) *Message {
+	return newMsg(src, dst, sess, MsgDelegateResult, dr).WithTask(task)
+}
+
+func NewFeedback(src, dst, sess, task string, fb FeedbackPayload) *Message {
+	fb.TaskID = task
+	return newMsg(src, dst, sess, MsgFeedback, fb).WithTask(task)
+}
+
+func NewNotify(src, dst, sess string, n NotifyPayload) *Message {
+	return newMsg(src, dst, sess, MsgNotify, n)
+}
+
+func NewSubscribe(src, dst, sess string, topics []string) *Message {
+	return newMsg(src, dst, sess, MsgSubscribe, SubscribePayload{Topics: topics})
+}
+
+func NewEvent(src, dst, sess, topic string, data map[string]any) *Message {
+	return newMsg(src, dst, sess, MsgEvent, EventPayload{Topic: topic, Data: data, Timestamp: time.Now().UnixMilli()})
+}
+
+// NewIntentWithModel creates an INTENT with model routing requirements.
+func NewIntentWithModel(src, dst, sess string, intent IntentEnvelope, reqs ModelRequirements) *Message {
+	return newMsg(src, dst, sess, MsgIntent, IntentPayload{
+		Intent:            intent,
+		ModelRequirements: &reqs,
+	})
+}

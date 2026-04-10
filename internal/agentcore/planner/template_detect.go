@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -12,10 +13,11 @@ import (
 
 // UploadAnalysis is the LLM interpretation of an uploaded file (template vs data, etc.).
 type UploadAnalysis struct {
-	FileKind    string   `json:"file_kind"`
-	IsTemplate  bool     `json:"is_template"`
-	Summary     string   `json:"summary"`
-	Suggestions []string `json:"suggestions,omitempty"`
+	FileKind     string   `json:"file_kind"`
+	IsTemplate   bool     `json:"is_template"`
+	Summary      string   `json:"summary"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+	Placeholders []string `json:"placeholders,omitempty"` // detected {{key}} field names
 }
 
 // AnalyzeUploadedFile runs a small structured JSON task on a text snippet of the file.
@@ -45,12 +47,19 @@ is_template：是否为表单/模板/需用户填写的范式文件。`
 	}
 	var a UploadAnalysis
 	if err := json.Unmarshal([]byte(raw), &a); err != nil {
-		return &UploadAnalysis{
+		a = UploadAnalysis{
 			FileKind:   "unknown",
 			Summary:    "无法自动解析元数据，可直接描述你的目标。",
 			IsTemplate: strings.Contains(strings.ToLower(filename), "模板"),
-		}, nil
+		}
 	}
+
+	// Detect {{placeholder}} patterns in file content — works regardless of LLM analysis
+	a.Placeholders = detectPlaceholders(snippet)
+	if len(a.Placeholders) > 0 {
+		a.IsTemplate = true
+	}
+
 	return &a, nil
 }
 
@@ -60,17 +69,66 @@ func AnalysisToActions(filePath string, a *UploadAnalysis) []AgentAction {
 		return nil
 	}
 	base := filepath.Base(filePath)
-	q := fmt.Sprintf("我收到了「%s」（类型：%s）。%s 你希望我怎么帮你？", base, a.FileKind, strings.TrimSpace(a.Summary))
-	opts := []AskOption{
-		{Label: "摘要与要点", Value: fmt.Sprintf("请阅读我上传的文件 %s 并给出结构化摘要与可执行建议。", base)},
-		{Label: "按模板/表格处理", Value: fmt.Sprintf("这是模板或表格文件（路径：%s），请说明如何填写或如何拆分/汇总。", filePath)},
-		{Label: "仅存档", Value: "好的，我已收到文件，暂不需要处理。"},
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	// Build the question text
+	q := fmt.Sprintf("我收到了「%s」（类型：%s）。%s", base, a.FileKind, strings.TrimSpace(a.Summary))
+	if len(a.Placeholders) > 0 {
+		q += fmt.Sprintf("\n\n检测到 %d 个模板占位符：%s", len(a.Placeholders), strings.Join(a.Placeholders, ", "))
 	}
-	if a.IsTemplate {
-		opts = append([]AskOption{
-			{Label: "按此模板生成内容", Value: fmt.Sprintf("请根据文件 %s 的结构，指导我填写并生成一版示例内容。", filePath)},
-		}, opts...)
+	q += "\n\n你希望怎么处理这个文件？"
+
+	var opts []AskOption
+
+	// If template with placeholders detected, offer fill as primary action
+	if len(a.Placeholders) > 0 {
+		fieldList := strings.Join(a.Placeholders, "、")
+		fillSkill := "docx_fill"
+		switch ext {
+		case ".xlsx":
+			fillSkill = "xlsx_fill"
+		case ".pptx":
+			fillSkill = "pptx_fill"
+		}
+		opts = append(opts, AskOption{
+			Label: "📝 填充此模板",
+			Value: fmt.Sprintf("请用 %s 填充模板 %s，需要填写的字段有：%s。请逐个问我每个字段的值，然后生成文件。", fillSkill, filePath, fieldList),
+		})
+	} else if a.IsTemplate {
+		opts = append(opts, AskOption{
+			Label: "📝 按此模板生成内容",
+			Value: fmt.Sprintf("请根据文件 %s 的结构，指导我填写并生成一版示例内容。", filePath),
+		})
 	}
+
+	// Edit option for editable formats
+	if ext == ".docx" || ext == ".xlsx" || ext == ".pptx" {
+		editSkill := "docx_edit"
+		switch ext {
+		case ".xlsx":
+			editSkill = "xlsx_edit"
+		case ".pptx":
+			editSkill = "pptx_edit"
+		}
+		opts = append(opts, AskOption{
+			Label: "✏️ 编辑此文件",
+			Value: fmt.Sprintf("我想编辑这个文件（%s），请告诉我你能做哪些修改，然后用 %s 执行。", filePath, editSkill),
+		})
+	}
+
+	// Reference / summary option (always available)
+	opts = append(opts, AskOption{
+		Label: "📖 作为参考资料",
+		Value: fmt.Sprintf("请阅读我上传的文件 %s 并给出结构化摘要与可执行建议。后续对话中可以引用其内容。", base),
+	})
+
+	// Archive option
+	opts = append(opts, AskOption{
+		Label: "📁 仅存档",
+		Value: "好的，我已收到文件，暂不需要处理。",
+	})
+
+	// LLM-suggested actions
 	for _, s := range a.Suggestions {
 		s = strings.TrimSpace(s)
 		if s == "" {
@@ -78,6 +136,7 @@ func AnalysisToActions(filePath string, a *UploadAnalysis) []AgentAction {
 		}
 		opts = append(opts, AskOption{Label: truncateRunes(s, 24), Value: s})
 	}
+
 	actions := []AgentAction{
 		AskAction(q, opts...),
 		FileAction(filePath, base, "", 0),
@@ -91,4 +150,24 @@ func truncateRunes(s string, n int) string {
 		return s
 	}
 	return string(r[:n]) + "…"
+}
+
+var placeholderRe = regexp.MustCompile(`\{\{\s*(\w+)\s*\}\}`)
+
+// detectPlaceholders scans text for {{key}} patterns and returns unique field names.
+func detectPlaceholders(text string) []string {
+	matches := placeholderRe.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range matches {
+		key := m[1]
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	return out
 }

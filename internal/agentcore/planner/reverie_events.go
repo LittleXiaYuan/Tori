@@ -28,6 +28,7 @@ const (
 	EventEmotionShift     ReverieEventType = "emotion_shift"
 	EventTaskFailureSpike ReverieEventType = "task_failure_spike"
 	EventHighValueFact    ReverieEventType = "high_value_fact"
+	EventMetaCogAlert     ReverieEventType = "metacog_alert"
 )
 
 // ReverieEvent carries context about what happened.

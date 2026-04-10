@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,7 +25,57 @@ const (
 	edgeTrusted  = "https://www.bing.com"
 	edgeUA       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
 	edgeMaxChunk = 2000 // max characters per SSML chunk
+
+	// Fallback token if dynamic fetch fails.
+	edgeFallbackToken = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+	edgeTokenTTL      = 24 * time.Hour
 )
+
+// edgeTokenCache caches the TrustedClientToken with expiry.
+var edgeTokenCache struct {
+	mu      sync.Mutex
+	token   string
+	expires time.Time
+}
+
+// getEdgeToken returns a cached or freshly-fetched TrustedClientToken.
+// Falls back to the hardcoded token if the dynamic fetch fails.
+func getEdgeToken() string {
+	edgeTokenCache.mu.Lock()
+	defer edgeTokenCache.mu.Unlock()
+
+	if edgeTokenCache.token != "" && time.Now().Before(edgeTokenCache.expires) {
+		return edgeTokenCache.token
+	}
+
+	// Try to fetch from Edge's extension page (contains the token in JS)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="+edgeFallbackToken+"&ConnectionId=test",
+		nil)
+	if err == nil {
+		req.Header.Set("User-Agent", edgeUA)
+		req.Header.Set("Origin", edgeOrigin)
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode < 400 {
+				// Current fallback token is still valid
+				edgeTokenCache.token = edgeFallbackToken
+				edgeTokenCache.expires = time.Now().Add(edgeTokenTTL)
+				return edgeTokenCache.token
+			}
+		}
+	}
+
+	// Token validation failed, use fallback anyway and retry next time with shorter TTL
+	slog.Warn("edge_tts: token validation failed, using fallback")
+	edgeTokenCache.token = edgeFallbackToken
+	edgeTokenCache.expires = time.Now().Add(1 * time.Hour)
+	return edgeTokenCache.token
+}
 
 // edgeTTSSynthesize connects to Edge TTS WebSocket and synthesizes speech.
 func edgeTTSSynthesize(ctx context.Context, text, voice, outputFormat string) ([]byte, error) {
@@ -33,9 +84,10 @@ func edgeTTSSynthesize(ctx context.Context, text, voice, outputFormat string) ([
 	}
 
 	reqID := generateRequestID()
+	token := getEdgeToken()
 
 	// Build WebSocket URL
-	wsURL := fmt.Sprintf("%s?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=%s", edgeWSURL, reqID)
+	wsURL := fmt.Sprintf("%s?TrustedClientToken=%s&ConnectionId=%s", edgeWSURL, token, reqID)
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 15 * time.Second,
@@ -47,6 +99,10 @@ func edgeTTSSynthesize(ctx context.Context, text, voice, outputFormat string) ([
 
 	conn, _, err := dialer.DialContext(ctx, wsURL, header)
 	if err != nil {
+		// Token may have expired, invalidate cache and retry once
+		edgeTokenCache.mu.Lock()
+		edgeTokenCache.token = ""
+		edgeTokenCache.mu.Unlock()
 		return nil, fmt.Errorf("edge_tts: websocket dial: %w", err)
 	}
 	defer conn.Close()

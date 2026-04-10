@@ -7,114 +7,24 @@ import { motion, AnimatePresence } from "motion/react";
 import { useI18n } from "@/lib/i18n";
 import { api, type PluginUITab } from "@/lib/api";
 import {
-  Gauge,
-  Terminal,
-  ScanFace,
-  MailWarning,
-  Blocks,
-  Package,
-  BarChart3,
-  Settings,
-  BookOpen,
-  Clock,
-  Shield,
-  HardDriveDownload,
-  BrainCircuit,
   ChevronDown,
-  ListTodo,
-  Lightbulb,
-  Layers,
-  FileDown,
-  Puzzle,
-  Wrench,
-  Zap,
-  Brain,
-  Server,
-  Palette,
   Globe,
-  GitBranch,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Puzzle,
+  Code2,
+  SquarePen,
+  Search,
   type LucideIcon,
 } from "lucide-react";
-
-const iconMap: Record<string, LucideIcon> = {
-  Gauge, Terminal, ScanFace, MailWarning, Blocks, Package,
-  BarChart3, Settings, BookOpen, Clock, Shield, HardDriveDownload,
-  BrainCircuit, ListTodo, Lightbulb, Layers, FileDown, Puzzle, Palette, GitBranch,
-};
-
-interface NavItem {
-  href: string;
-  key: string;
-  icon: LucideIcon;
-  _label?: string;
-}
-
-interface NavGroup {
-  key: string;
-  icon: LucideIcon;
-  items: NavItem[];
-}
-
-const navGroups: NavGroup[] = [
-  {
-    key: "nav.group.workbench",
-    icon: Gauge,
-    items: [
-      { href: "/", key: "nav.dashboard", icon: Gauge },
-      { href: "/chat", key: "nav.chat", icon: Terminal },
-      { href: "/inbox", key: "nav.inbox", icon: MailWarning },
-    ],
-  },
-  {
-    key: "nav.group.tasks",
-    icon: ListTodo,
-    items: [
-      { href: "/tasks", key: "nav.tasks", icon: ListTodo },
-      { href: "/automation", key: "nav.automation", icon: Zap },
-      { href: "/workflows", key: "nav.workflows", icon: GitBranch },
-      { href: "/templates", key: "nav.templates", icon: Layers },
-      { href: "/cron", key: "nav.cron", icon: Clock },
-    ],
-  },
-  {
-    key: "nav.group.skills",
-    icon: Wrench,
-    items: [
-      { href: "/skills", key: "nav.skills", icon: Package },
-      { href: "/plugins", key: "nav.plugins", icon: Puzzle },
-      { href: "/skill-policy", key: "nav.skillPolicy", icon: Shield },
-      { href: "/skill-analytics", key: "nav.skillAnalytics", icon: BarChart3 },
-      { href: "/docgen", key: "nav.docgen", icon: FileDown },
-    ],
-  },
-  {
-    key: "nav.group.cognition",
-    icon: Brain,
-    items: [
-      { href: "/memory", key: "nav.memory", icon: Brain },
-      { href: "/knowledge", key: "nav.knowledge", icon: BookOpen },
-      { href: "/reverie", key: "nav.reverie", icon: BrainCircuit },
-      { href: "/reflect", key: "nav.reflect", icon: Lightbulb },
-      { href: "/persona", key: "nav.persona", icon: ScanFace },
-    ],
-  },
-  {
-    key: "nav.group.system",
-    icon: Server,
-    items: [
-      { href: "/audit", key: "nav.audit", icon: Shield },
-      { href: "/metrics", key: "nav.metrics", icon: BarChart3 },
-      { href: "/browser", key: "nav.browser", icon: Globe },
-      { href: "/tenants", key: "nav.tenants", icon: Blocks },
-      { href: "/backup", key: "nav.backup", icon: HardDriveDownload },
-      { href: "/settings/theme", key: "nav.theme", icon: Palette },
-      { href: "/settings", key: "nav.settings", icon: Settings },
-    ],
-  },
-];
+import {
+  iconMap,
+  normalNavGroups,
+  devNavGroups,
+  type NavItem,
+  type NavGroup,
+} from "@/lib/navigation";
 
 const SIDEBAR_EXPANDED = 240;
 const SIDEBAR_COLLAPSED = 64;
@@ -125,6 +35,30 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
   const [pluginTabs, setPluginTabs] = useState<PluginUITab[]>([]);
+  const [devMode, setDevMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("yunque_dev_mode") === "1";
+  });
+
+  const toggleDevMode = useCallback(() => {
+    setDevMode((prev) => {
+      const next = !prev;
+      localStorage.setItem("yunque_dev_mode", next ? "1" : "0");
+      window.dispatchEvent(new StorageEvent("storage", { key: "yunque_dev_mode" }));
+      return next;
+    });
+  }, []);
+
+  // Sync devMode when toggled from top-nav
+  useEffect(() => {
+    const handler = () => {
+      setDevMode(localStorage.getItem("yunque_dev_mode") === "1");
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  const navGroups = devMode ? devNavGroups : normalNavGroups;
 
   useEffect(() => {
     api.pluginUITabs()
@@ -213,7 +147,7 @@ export function Sidebar() {
           minHeight: 64,
           flexShrink: 0,
         }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <div style={{
               width: 32,
               height: 32,
@@ -231,25 +165,90 @@ export function Sidebar() {
             </div>
             <AnimatePresence>
               {!collapsed && (
-                <motion.span
+                <motion.div
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.2 }}
-                  style={{
-                    fontWeight: 600,
+                  style={{ overflow: "hidden", whiteSpace: "nowrap" }}
+                >
+                  <span style={{
+                    fontWeight: 700,
                     fontSize: 15,
                     letterSpacing: "-0.02em",
                     color: "var(--text)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                  }}
-                >
-                  Yunque Agent
-                </motion.span>
+                  }}>
+                    云雀
+                  </span>
+                  <span style={{
+                    fontWeight: 400,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    marginLeft: 6,
+                  }}>
+                    Agent
+                  </span>
+                </motion.div>
               )}
             </AnimatePresence>
           </Link>
+        </div>
+
+        {/* New Task button + Search (Manus-style) */}
+        <div style={{
+          padding: collapsed ? "8px 6px" : "8px 12px",
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}>
+          <Link
+            href="/chat"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: collapsed ? "10px 0" : "10px 12px",
+              borderRadius: 10,
+              background: "var(--bg-hover)",
+              color: "var(--text)",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 500,
+              justifyContent: collapsed ? "center" : "flex-start",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+          >
+            <SquarePen size={16} />
+            {!collapsed && t("nav.newTask")}
+          </Link>
+          {!collapsed && (
+            <button
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 10,
+                background: "transparent",
+                border: "1px solid var(--border)",
+                color: "var(--text-muted)",
+                fontSize: 12,
+                cursor: "pointer",
+                width: "100%",
+                transition: "border-color 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--text-muted)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+              title="搜索"
+            >
+              <Search size={14} />
+              <span style={{ flex: 1, textAlign: "left" }}>搜索</span>
+              <span style={{ fontSize: 10, opacity: 0.5 }}>⌘K</span>
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -395,6 +394,14 @@ export function Sidebar() {
             onClick={handleLogout}
           />
           <SidebarButton
+            icon={Code2}
+            label={devMode ? (locale === "zh" ? "普通模式" : "Normal") : (locale === "zh" ? "开发者" : "Dev Mode")}
+            collapsed={collapsed}
+            title={devMode ? "Switch to normal mode" : "Switch to developer mode"}
+            onClick={toggleDevMode}
+            highlight={devMode}
+          />
+          <SidebarButton
             icon={collapsed ? PanelLeftOpen : PanelLeftClose}
             label={collapsed ? "展开" : "收起"}
             collapsed={collapsed}
@@ -413,12 +420,14 @@ function SidebarButton({
   collapsed,
   title,
   onClick,
+  highlight,
 }: {
   icon: LucideIcon;
   label: string;
   collapsed: boolean;
   title?: string;
   onClick: () => void;
+  highlight?: boolean;
 }) {
   return (
     <button
@@ -433,8 +442,8 @@ function SidebarButton({
         justifyContent: collapsed ? "center" : "flex-start",
         borderRadius: 8,
         border: "none",
-        background: "transparent",
-        color: "var(--text-muted)",
+        background: highlight ? "var(--accent-subtle)" : "transparent",
+        color: highlight ? "var(--accent)" : "var(--text-muted)",
         cursor: "pointer",
         fontSize: 13,
         width: "100%",

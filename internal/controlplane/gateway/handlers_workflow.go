@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"yunque-agent/pkg/safego"
+
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/internal/apperror"
 )
@@ -140,11 +142,11 @@ func (g *Gateway) handleWorkflowRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Run async
-	go func() {
+	safego.Go("workflow-run-"+inst.ID, func() {
 		if err := g.workflowEngine.Run(context.Background(), inst.ID); err != nil {
 			slog.Warn("workflow execution failed", "instance", inst.ID, "err", err)
 		}
-	}()
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)

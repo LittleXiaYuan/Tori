@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"yunque-agent/pkg/safego"
 )
 
 // ──────────────────────────────────────────────
@@ -117,12 +119,12 @@ func NewWebhookServer(bindAddr, port string) *WebhookServer {
 // Serve starts the HTTP server and blocks until ctx is cancelled.
 // Returns nil if the server was shut down cleanly via context cancellation.
 func (ws *WebhookServer) Serve(ctx context.Context) error {
-	go func() {
+	safego.Go("webhook-shutdown-watcher", func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = ws.srv.Shutdown(shutCtx)
-	}()
+	})
 
 	err := ws.srv.ListenAndServe()
 	if err == http.ErrServerClosed {
@@ -225,7 +227,7 @@ func (tm *TokenManager) ForceRefresh(ctx context.Context) (string, error) {
 
 // StartRefreshLoop starts a background loop that refreshes the token at the given interval.
 func (tm *TokenManager) StartRefreshLoop(ctx context.Context, interval time.Duration) {
-	go func() {
+	safego.Go("token-refresh-loop", func() {
 		// Initial refresh
 		if _, err := tm.ForceRefresh(ctx); err != nil {
 			slog.Warn("token initial refresh failed", "err", err)
@@ -242,7 +244,7 @@ func (tm *TokenManager) StartRefreshLoop(ctx context.Context, interval time.Dura
 				}
 			}
 		}
-	}()
+	})
 }
 
 // ──────────────────────────────────────────────

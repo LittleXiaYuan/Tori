@@ -12,6 +12,14 @@ func Transition(current TaskState, msg *Message) (TaskState, error) {
 		return StateCancelled, nil
 	}
 
+	// FEEDBACK is allowed on completed/failed tasks for post-mortem learning
+	if msg.Type == MsgFeedback {
+		if current == StateCompleted || current == StateFailed || current == StateRunning {
+			return current, nil
+		}
+		return current, fmt.Errorf("%w: feedback from %s", ErrTransition, current)
+	}
+
 	if msg.Type == MsgResult {
 		if IsTerminal(current) {
 			return current, fmt.Errorf("%w: result from %s", ErrTransition, current)
@@ -47,16 +55,19 @@ func Transition(current TaskState, msg *Message) (TaskState, error) {
 
 	case StateRunning:
 		switch msg.Type {
-		case MsgProgress, MsgHeartbeat, MsgObservation, MsgActionTaken:
+		case MsgProgress, MsgHeartbeat, MsgObservation, MsgActionTaken, MsgFeedback:
 			return StateRunning, nil
 		case MsgQuestion:
 			return StateWaitingInput, nil
 		case MsgProblem:
 			return StateBlocked, nil
+		case MsgDelegate:
+			return StateWaitingInput, nil
 		}
 
 	case StateWaitingInput:
-		if msg.Type == MsgAnswer {
+		switch msg.Type {
+		case MsgAnswer, MsgDelegateResult:
 			return StateRunning, nil
 		}
 

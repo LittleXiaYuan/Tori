@@ -1,45 +1,83 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #030305;
-  --bg-card: rgba(15, 15, 20, 0.4);
-  --bg-hover: rgba(255, 255, 255, 0.03);
-  --bg-elevated: rgba(30, 30, 40, 0.6);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  --text: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --accent: #38bdf8;
-  --accent-hover: #7dd3fc;
-  --accent-glow: rgba(56, 189, 248, 0.2);
-  --accent-subtle: rgba(56, 189, 248, 0.05);
+  --bg: #181818;
+  --bg-card: #262626;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-elevated: #2c2c2c;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --text: #e8e8e8;
+  --text-secondary: #999;
+  --text-muted: #666;
+  --accent: #6c8aff;
+  --accent-hover: #8da4ff;
+  --accent-glow: rgba(108, 138, 255, 0.10);
+  --accent-subtle: rgba(108, 138, 255, 0.06);
   --success: #10b981;
   --success-bg: rgba(16, 185, 129, 0.1);
   --warning: #f59e0b;
   --warning-bg: rgba(245, 158, 11, 0.1);
   --danger: #ef4444;
   --danger-bg: rgba(239, 68, 68, 0.1);
-  --gradient-1: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  --gradient-1: linear-gradient(135deg, #6c8aff 0%, #a78bfa 100%);
   --gradient-2: linear-gradient(135deg, #f472b6 0%, #c084fc 100%);
-  --gradient-accent: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
-  --shadow-glow: 0 0 20px var(--accent-glow);
+  --gradient-accent: linear-gradient(135deg, #6c8aff 0%, #a78bfa 50%, #c084fc 100%);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 16px var(--accent-glow);
   --backdrop-blur: blur(12px);
-  --glow-1: rgba(56, 189, 248, 0.08);
-  --glow-2: rgba(129, 140, 248, 0.06);
-  --glow-3: rgba(192, 132, 252, 0.05);
+  --glow-1: rgba(108, 138, 255, 0.02);
+  --glow-2: rgba(167, 139, 250, 0.015);
+  --glow-3: rgba(192, 132, 252, 0.01);
   --sidebar-width: 240px;
+  --sidebar-bg: #121212;
+}
+
+/* Light theme: professional, clean, Feishu-inspired */
+[data-theme="light"] {
+  --bg: #f8f9fc;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-elevated: rgba(255, 255, 255, 0.9);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text: #1a1a2e;
+  --text-secondary: #5a5a72;
+  --text-muted: #8e8ea0;
+  --accent: #2563eb;
+  --accent-hover: #3b82f6;
+  --accent-glow: rgba(37, 99, 235, 0.12);
+  --accent-subtle: rgba(37, 99, 235, 0.05);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.08);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.08);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --gradient-1: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  --gradient-2: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+  --gradient-accent: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #a855f7 100%);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 12px var(--accent-glow);
+  --glow-1: rgba(37, 99, 235, 0.03);
+  --glow-2: rgba(124, 58, 237, 0.02);
+  --glow-3: rgba(168, 85, 247, 0.02);
+  --sidebar-bg: rgba(255, 255, 255, 0.95);
+  color-scheme: light;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Nunito', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
 }
 
 /* When a custom background image is set, use ::before as dark overlay */
@@ -54,7 +92,7 @@ body.has-bg-image::after {
   display: none;
 }
 
-/* ── Animated aurora background with theme-aware glow orbs ── */
+/* ── Subtle background — clean like Manus ── */
 body::before {
   content: '';
   position: fixed;
@@ -64,11 +102,10 @@ body::before {
   bottom: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 30%, var(--glow-1, rgba(56, 189, 248, 0.08)) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 60%, var(--glow-2, rgba(129, 140, 248, 0.06)) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 50% at 50% 80%, var(--glow-3, rgba(192, 132, 252, 0.05)) 0%, transparent 70%);
-  filter: blur(40px);
-  animation: aurora-drift 20s ease-in-out infinite alternate;
+    radial-gradient(ellipse 60% 50% at 20% 30%, var(--glow-1) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 60%, var(--glow-2) 0%, transparent 70%);
+  filter: blur(60px);
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -508,3 +545,13 @@ select:focus {
   }
 }
 html { color-scheme: dark; }
+[data-theme="light"] .sidebar-root {
+  background: var(--sidebar-bg) !important;
+}
+[data-theme="light"] body::after {
+  opacity: 0;
+}
+[data-theme="light"] .btn-glow {
+  background: var(--accent);
+  color: #fff;
+}

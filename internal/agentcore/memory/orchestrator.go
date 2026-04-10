@@ -9,15 +9,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
-// ──────────────────────────────────────────────
-// MemoryOrchestrator — five-layer memory integration
-// Connects: ShortTerm → MidTerm → LongTerm → Graph → Editable → Observation
-// Provides: unified recall, auto-promotion, importance scoring, decay
-// ──────────────────────────────────────────────
+// MemoryOrchestrator — five-layer memory integration.
+// Connects: ShortTerm → MidTerm → LongTerm → Graph → Editable
+// Handles unified recall, auto-promotion, importance scoring, and time-decay.
 
-// Importance levels for memory promotion decisions.
+// Importance levels for promotion decisions.
 type Importance int
 
 const (
@@ -26,23 +26,20 @@ const (
 	ImportanceHigh   Importance = 3
 )
 
-// RecallItem is a unified search result from any memory layer.
 type RecallItem struct {
-	Content    string    `json:"content"`
-	Source     string    `json:"source"`     // "short", "mid", "long", "graph", "editable", "observation"
-	Category   string    `json:"category,omitempty"`
-	Score      float64   `json:"score"`      // final weighted score
-	RawScore   float64   `json:"raw_score"`  // score before weighting
-	Importance Importance `json:"importance"`
-	Age        time.Duration `json:"age"`
-	AccessCount int       `json:"access_count,omitempty"`
+	Content     string        `json:"content"`
+	Source      string        `json:"source"` // "short", "mid", "long", "graph", "editable", "observation"
+	Category    string        `json:"category,omitempty"`
+	Score       float64       `json:"score"`     // final weighted score
+	RawScore    float64       `json:"raw_score"` // score before weighting
+	Importance  Importance    `json:"importance"`
+	Age         time.Duration `json:"age"`
+	AccessCount int           `json:"access_count,omitempty"`
 }
 
-// ImportanceFunc evaluates the importance of a piece of content.
-// Returns ImportanceLow/Medium/High. Can use LLM or heuristics.
+// ImportanceFunc scores a piece of content. Can be LLM-backed or pure heuristic.
 type ImportanceFunc func(ctx context.Context, content string) Importance
 
-// OrchestratorConfig configures the memory orchestrator.
 type OrchestratorConfig struct {
 	// Layer weights for unified recall (0.0 - 1.0)
 	ShortWeight       float64 `json:"short_weight"`       // default: 0.5
@@ -53,14 +50,13 @@ type OrchestratorConfig struct {
 	ObservationWeight float64 `json:"observation_weight"` // default: 0.7
 
 	// Promotion thresholds
-	ShortToMidAccessCount int           `json:"short_to_mid_access"`  // promote after N accesses
-	MidToLongAccessCount  int           `json:"mid_to_long_access"`   // promote after N accesses
-	ShortToMidAge         time.Duration `json:"short_to_mid_age"`     // promote items older than this
-	DecayHalfLife         time.Duration `json:"decay_half_life"`      // score halves after this duration
+	ShortToMidAccessCount int           `json:"short_to_mid_access"` // promote after N accesses
+	MidToLongAccessCount  int           `json:"mid_to_long_access"`  // promote after N accesses
+	ShortToMidAge         time.Duration `json:"short_to_mid_age"`    // promote items older than this
+	DecayHalfLife         time.Duration `json:"decay_half_life"`     // score halves after this duration
 	MaxRecallResults      int           `json:"max_recall_results"`
 }
 
-// DefaultOrchestratorConfig returns sensible defaults.
 func DefaultOrchestratorConfig() OrchestratorConfig {
 	return OrchestratorConfig{
 		ShortWeight:           0.5,
@@ -77,17 +73,19 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 	}
 }
 
-// Orchestrator coordinates five memory layers into one unified system.
+// Orchestrator ties the five memory layers together.
 type Orchestrator struct {
 	mu               sync.RWMutex
 	config           OrchestratorConfig
-	manager          *Manager           // short + mid + long
-	graph            *Graph             // knowledge graph
-	editable         *EditableMemory    // agent-editable blocks
+	manager          *Manager        // short + mid + long
+	graph            *Graph          // knowledge graph
+	editable         *EditableMemory // agent-editable blocks
 	importanceFn     ImportanceFunc
-	conflictDetector *ConflictDetector  // optional: detects memory contradictions
+	conflictDetector *ConflictDetector // optional: detects memory contradictions
 	promotionLog     []promotionEntry
-	conflictLog      []Conflict         // recent conflicts detected
+	conflictLog      []Conflict // recent conflicts detected
+	lastPromote      time.Time  // throttle auto-promotion
+	ingestCount      int        // count ingests since last promotion
 }
 
 type promotionEntry struct {
@@ -97,7 +95,6 @@ type promotionEntry struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// NewOrchestrator creates a memory orchestrator.
 func NewOrchestrator(cfg OrchestratorConfig, mgr *Manager, g *Graph, em *EditableMemory) *Orchestrator {
 	return &Orchestrator{
 		config:   cfg,
@@ -107,17 +104,19 @@ func NewOrchestrator(cfg OrchestratorConfig, mgr *Manager, g *Graph, em *Editabl
 	}
 }
 
-// SetImportanceFunc sets the importance evaluator.
+// Editable returns the editable memory instances (Persona, etc).
+func (o *Orchestrator) Editable() *EditableMemory {
+	return o.editable
+}
+
 func (o *Orchestrator) SetImportanceFunc(fn ImportanceFunc) {
 	o.importanceFn = fn
 }
 
-// SetConflictDetector enables memory conflict detection.
 func (o *Orchestrator) SetConflictDetector(cd *ConflictDetector) {
 	o.conflictDetector = cd
 }
 
-// Conflicts returns the recent conflict log.
 func (o *Orchestrator) Conflicts() []Conflict {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -126,11 +125,10 @@ func (o *Orchestrator) Conflicts() []Conflict {
 	return out
 }
 
-// ──────────────────────────────────────────────
-// Unified Recall — search all layers at once
-// ──────────────────────────────────────────────
+// ---- unified recall ----
 
-// Recall performs a unified search across all memory layers.
+// Recall searches all memory layers in parallel and returns merged results,
+// ranked by (layerWeight * rawScore * timeDecay).
 func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit int) []RecallItem {
 	if limit <= 0 {
 		limit = o.config.MaxRecallResults
@@ -143,7 +141,7 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 
 	// 1. Short/Mid/Long via Manager
 	wg.Add(1)
-	go func() {
+	safego.Go("memory-recall-layers", func() {
 		defer wg.Done()
 		items, err := o.manager.SearchAll(ctx, tenantID, query, perLayer)
 		if err != nil {
@@ -170,12 +168,12 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 			allResults = append(allResults, ri)
 		}
 		mu.Unlock()
-	}()
+	})
 
 	// 2. Knowledge Graph
 	if o.graph != nil {
 		wg.Add(1)
-		go func() {
+		safego.Go("memory-recall-graph", func() {
 			defer wg.Done()
 			entities := o.graph.SearchEntities(query, perLayer)
 			mu.Lock()
@@ -192,13 +190,13 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 				allResults = append(allResults, ri)
 			}
 			mu.Unlock()
-		}()
+		})
 	}
 
 	// 3. Editable Memory blocks
 	if o.editable != nil {
 		wg.Add(1)
-		go func() {
+		safego.Go("memory-recall-editable", func() {
 			defer wg.Done()
 			blocks := o.editable.AllBlocks()
 			queryLower := strings.ToLower(query)
@@ -218,7 +216,7 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 				}
 			}
 			mu.Unlock()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -236,11 +234,11 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 	return allResults
 }
 
-// ──────────────────────────────────────────────
-// Ingest — store with automatic layer routing
-// ──────────────────────────────────────────────
+// ---- ingest ----
 
-// Ingest stores content in the appropriate layer based on importance.
+// Ingest routes content to the right layer based on importance.
+// High-importance facts get written to both mid and long.
+// TODO: consider using embeddings for smarter conflict detection
 func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, source string) error {
 	importance := o.evaluateImportance(ctx, content)
 
@@ -255,22 +253,42 @@ func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, 
 		go o.detectAndResolveConflicts(ctx, tenantID, content)
 	}
 
+	var err error
 	switch importance {
 	case ImportanceLow:
-		return o.manager.Short.Put(ctx, tenantID, item)
+		err = o.manager.Short.Put(ctx, tenantID, item)
 	case ImportanceMedium:
-		return o.manager.AddMid(ctx, tenantID, item)
+		err = o.manager.AddMid(ctx, tenantID, item)
 	case ImportanceHigh:
-		if err := o.manager.AddMid(ctx, tenantID, item); err != nil {
+		if err = o.manager.AddMid(ctx, tenantID, item); err != nil {
 			return err
 		}
-		return o.manager.AddLong(ctx, tenantID, item)
+		err = o.manager.AddLong(ctx, tenantID, item)
+	default:
+		err = o.manager.Short.Put(ctx, tenantID, item)
 	}
-	return o.manager.Short.Put(ctx, tenantID, item)
+	if err != nil {
+		return err
+	}
+
+	// Auto-promote: every 20 ingests or every 5 minutes
+	o.mu.Lock()
+	o.ingestCount++
+	shouldPromote := o.ingestCount >= 20 || time.Since(o.lastPromote) > 5*time.Minute
+	if shouldPromote {
+		o.ingestCount = 0
+		o.lastPromote = time.Now()
+	}
+	o.mu.Unlock()
+	if shouldPromote {
+		go o.Promote(ctx, tenantID)
+	}
+
+	return nil
 }
 
-// detectAndResolveConflicts runs asynchronously after Ingest to find and handle
-// contradictions between new content and existing memories.
+// detectAndResolveConflicts runs async after Ingest — finds contradictions
+// between new content and existing memories, then handles resolution.
 func (o *Orchestrator) detectAndResolveConflicts(ctx context.Context, tenantID, newContent string) {
 	// Recall existing memories related to the new content
 	existing := o.Recall(ctx, tenantID, newContent, 10)
@@ -331,12 +349,10 @@ func truncate(s string, maxRunes int) string {
 	return string(r[:maxRunes]) + "…"
 }
 
-// ──────────────────────────────────────────────
-// Auto-Promotion — move memories between layers
-// ──────────────────────────────────────────────
+// ---- auto-promotion ----
 
-// Promote scans short-term memory and promotes qualifying items to mid-term.
-// Also promotes frequently accessed mid-term items to long-term.
+// Promote moves qualifying items up the memory hierarchy.
+// Short→Mid after N accesses or age, Mid→Long after many accesses.
 func (o *Orchestrator) Promote(ctx context.Context, tenantID string) (promoted int) {
 	// Short → Mid: items accessed multiple times or aged
 	shortItems, _ := o.manager.Short.List(ctx, tenantID, "", 100)
@@ -376,11 +392,9 @@ func (o *Orchestrator) Promote(ctx context.Context, tenantID string) (promoted i
 	return promoted
 }
 
-// ──────────────────────────────────────────────
-// Graph Bridge — connect entities with memory items
-// ──────────────────────────────────────────────
+// ---- graph bridge ----
 
-// LinkEntityToMemory creates a relation between a graph entity and a memory item.
+// LinkEntityToMemory wires a graph entity to a memory item.
 func (o *Orchestrator) LinkEntityToMemory(entityID, memoryKey, relationType string) {
 	if o.graph == nil {
 		return
@@ -394,7 +408,7 @@ func (o *Orchestrator) LinkEntityToMemory(entityID, memoryKey, relationType stri
 	})
 }
 
-// RecallForEntity retrieves all memory context relevant to a specific entity.
+// RecallForEntity gets everything we know about a named entity — graph context + memory matches.
 func (o *Orchestrator) RecallForEntity(ctx context.Context, tenantID, entityName string, limit int) []RecallItem {
 	if o.graph == nil {
 		return nil
@@ -427,11 +441,10 @@ func (o *Orchestrator) RecallForEntity(ctx context.Context, tenantID, entityName
 	return results
 }
 
-// ──────────────────────────────────────────────
-// Compile — build system prompt memory context
-// ──────────────────────────────────────────────
+// ---- context compilation ----
 
-// CompileContext builds a memory-enriched context string for the system prompt.
+// CompileContext builds the memory block for the system prompt.
+// Includes editable memory + recalled items relevant to currentQuery.
 func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuery string) string {
 	var sb strings.Builder
 
@@ -458,15 +471,13 @@ func (o *Orchestrator) CompileContext(ctx context.Context, tenantID, currentQuer
 	return sb.String()
 }
 
-// ──────────────────────────────────────────────
-// Decay — time-based score reduction
-// ──────────────────────────────────────────────
+// ---- time decay ----
 
+// decayFactor: exponential decay, score * 0.5^(age/halfLife)
 func (o *Orchestrator) decayFactor(age time.Duration) float64 {
 	if o.config.DecayHalfLife <= 0 {
 		return 1.0
 	}
-	// Exponential decay: score * 0.5^(age/halfLife)
 	halfLives := float64(age) / float64(o.config.DecayHalfLife)
 	return math.Pow(0.5, halfLives)
 }
@@ -497,7 +508,9 @@ func (o *Orchestrator) evaluateImportance(ctx context.Context, content string) I
 	return heuristicImportance(content)
 }
 
-// heuristicImportance uses simple rules to estimate importance.
+// heuristicImportance: keyword-based fallback when no LLM evaluator is set.
+// NB: these keyword lists are intentionally broad — false positives are ok,
+// missed important facts are not.
 func heuristicImportance(content string) Importance {
 	lower := strings.ToLower(content)
 	length := len(content)
@@ -541,7 +554,6 @@ func (o *Orchestrator) logPromotion(from, to, content string) {
 	}
 }
 
-// PromotionLog returns recent promotions.
 func (o *Orchestrator) PromotionLog(limit int) []promotionEntry {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -554,15 +566,14 @@ func (o *Orchestrator) PromotionLog(limit int) []promotionEntry {
 	return out
 }
 
-// Stats returns orchestrator statistics.
 type OrchestratorStats struct {
-	ShortCount    int `json:"short_count"`
-	MidCount      int `json:"mid_count"`
-	LongCount     int `json:"long_count"`
-	GraphEntities int `json:"graph_entities"`
+	ShortCount     int `json:"short_count"`
+	MidCount       int `json:"mid_count"`
+	LongCount      int `json:"long_count"`
+	GraphEntities  int `json:"graph_entities"`
 	GraphRelations int `json:"graph_relations"`
 	EditableBlocks int `json:"editable_blocks"`
-	Promotions    int `json:"promotions"`
+	Promotions     int `json:"promotions"`
 }
 
 func (o *Orchestrator) Stats(tenantID string) OrchestratorStats {

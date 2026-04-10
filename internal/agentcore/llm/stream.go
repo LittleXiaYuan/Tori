@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"yunque-agent/pkg/safego"
 )
 
 // StreamDelta is a single token chunk from the LLM.
@@ -47,7 +49,7 @@ func (c *Client) ChatStream(ctx context.Context, messages []Message, temperature
 	}
 
 	ch := make(chan StreamDelta, 64)
-	go func() {
+	safego.Go("llm-stream-reader", func() {
 		defer resp.Body.Close()
 		defer close(ch)
 
@@ -84,7 +86,7 @@ func (c *Client) ChatStream(ctx context.Context, messages []Message, temperature
 				}
 			}
 		}
-	}()
+	})
 
 	return ch, nil
 }

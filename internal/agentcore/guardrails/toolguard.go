@@ -9,19 +9,14 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 )
 
-// ──────────────────────────────────────────────
-// ToolGuard — validates tool/skill call parameters before execution
-// Prevents path traversal, command injection, and unauthorized API access.
-// ──────────────────────────────────────────────
-
-// ToolGuardConfig defines whitelists for tool calls.
+// ToolGuard — validates tool/skill call params before execution.
+// Catches path traversal, command injection, unauthorized access.
 type ToolGuardConfig struct {
 	AllowedCommands []string // e.g. ["ls", "cat", "python3"]
 	AllowedPaths    []string // e.g. ["/data", "/tmp"] (prefix match)
 	BlockedParams   []string // patterns that must never appear in any param value
 }
 
-// DefaultToolGuardConfig returns a safe default config.
 func DefaultToolGuardConfig() ToolGuardConfig {
 	return ToolGuardConfig{
 		AllowedCommands: []string{
@@ -40,30 +35,26 @@ func DefaultToolGuardConfig() ToolGuardConfig {
 	}
 }
 
-// ToolGuard validates tool call parameters against whitelists.
 type ToolGuard struct {
 	config ToolGuardConfig
 	audit  *audit.Chain
 }
 
-// NewToolGuard creates a tool guard with the given config.
 func NewToolGuard(cfg ToolGuardConfig) *ToolGuard {
 	return &ToolGuard{config: cfg}
 }
 
-// SetAudit attaches an audit chain for logging denials.
 func (g *ToolGuard) SetAudit(chain *audit.Chain) { g.audit = chain }
 
 func (g *ToolGuard) Name() string { return "tool_guard" }
 
-// ToolCallInput represents a tool call to be validated.
 type ToolCallInput struct {
 	SkillName string
 	Command   string            // for command-execution skills
 	Params    map[string]string // flattened key=value of all parameters
 }
 
-// CheckToolCall validates a tool call against the guard's whitelist config.
+// CheckToolCall validates params against the allowlist. Returns block if the call looks dangerous.
 func (g *ToolGuard) CheckToolCall(_ context.Context, input ToolCallInput) CheckResult {
 	result := CheckResult{Passed: true}
 
@@ -122,7 +113,7 @@ func (g *ToolGuard) CheckToolCall(_ context.Context, input ToolCallInput) CheckR
 	return result
 }
 
-// Check implements Guard interface for pipeline compatibility (checks raw text).
+// Check is a no-op for raw text; use CheckToolCall for structured validation.
 func (g *ToolGuard) Check(_ context.Context, _ string) CheckResult {
 	return CheckResult{Passed: true} // text-level check is a no-op; use CheckToolCall
 }
@@ -147,7 +138,7 @@ func (g *ToolGuard) auditDeny(action, skill, detail string) {
 	}
 }
 
-// baseCommand extracts the base command name from a full command string.
+// baseCommand extracts the binary name from a command string (e.g. "/usr/bin/python3 foo" -> "python3").
 func baseCommand(cmd string) string {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
@@ -156,7 +147,7 @@ func baseCommand(cmd string) string {
 	return filepath.Base(parts[0])
 }
 
-// isPathParam heuristically determines if a parameter key represents a path.
+// isPathParam guesses whether a parameter key refers to a file path.
 func isPathParam(key string) bool {
 	lower := strings.ToLower(key)
 	return strings.Contains(lower, "path") ||

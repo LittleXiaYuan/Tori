@@ -69,3 +69,27 @@ func (p *QuestionPayload) Validate() error {
 	}
 	return nil
 }
+
+func (p *CapabilitiesPayload) Validate() error {
+	if p.AgentID == "" {
+		return fmt.Errorf("%w: agent_id required", ErrValidation)
+	}
+	return nil
+}
+
+func (p *DelegatePayload) Validate() error {
+	if p.Intent.Name == "" {
+		return fmt.Errorf("%w: intent.name required", ErrValidation)
+	}
+	return nil
+}
+
+func (p *FeedbackPayload) Validate() error {
+	if p.TaskID == "" {
+		return fmt.Errorf("%w: task_id required", ErrValidation)
+	}
+	if p.Rating < 0 || p.Rating > 1 {
+		return fmt.Errorf("%w: rating must be 0.0-1.0", ErrValidation)
+	}
+	return nil
+}

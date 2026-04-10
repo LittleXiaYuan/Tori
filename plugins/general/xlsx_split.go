@@ -14,7 +14,8 @@ import (
 	"yunque-agent/pkg/skills"
 )
 
-// XlsxSplitSkill splits an .xlsx (first sheet by default) into multiple files by distinct values in one column.
+// XlsxSplitSkill splits an xlsx by distinct values in one column.
+// Each output file keeps the header row + matching data rows.
 type XlsxSplitSkill struct {
 	readDirs  []string
 	writeDirs []string
@@ -155,6 +156,13 @@ func sanitizeFilePart(s string) string {
 	return s
 }
 
+// readXLSXMatrix opens an xlsx (which is a zip of OOXML parts) and reads
+// the first (or named) sheet into a string matrix.
+//
+// OOXML structure we care about:
+//   xl/sharedStrings.xml  — string table (cells reference these by index)
+//   xl/workbook.xml       — lists sheet names
+//   xl/worksheets/sheet1.xml — actual cell data
 func readXLSXMatrix(path, wantSheet string) ([][]string, string, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
@@ -208,6 +216,9 @@ func readXLSXMatrix(path, wantSheet string) ([][]string, string, error) {
 	return matrix, sheetTitle, err
 }
 
+// readMatrixFromSheetXML streams through <sheetData> XML.
+// Each <c> element has r="A1" (cell ref) and optionally t="s" (shared string).
+// We build a sparse map[row][col] then flatten to a dense [][]string.
 func readMatrixFromSheetXML(r io.Reader, shared []string) ([][]string, error) {
 	dec := xml.NewDecoder(r)
 	rowMap := map[int]map[int]string{}
@@ -290,6 +301,7 @@ func readMatrixFromSheetXML(r io.Reader, shared []string) ([][]string, error) {
 	return out, nil
 }
 
+// parseCellRef turns "B3" into (row=2, col=1). Returns zero-indexed.
 func parseCellRef(ref string) (row, col int, ok bool) {
 	i := 0
 	for i < len(ref) && ref[i] >= 'A' && ref[i] <= 'Z' {
@@ -306,6 +318,7 @@ func parseCellRef(ref string) (row, col int, ok bool) {
 	return rn - 1, col, true
 }
 
+// excelColToIndex: "A"->0, "B"->1, "AA"->26, etc.
 func excelColToIndex(col string) int {
 	idx := 0
 	for _, ch := range col {
@@ -314,6 +327,8 @@ func excelColToIndex(col string) int {
 	return idx - 1
 }
 
+// xlsxLoadSharedStrings reads xl/sharedStrings.xml — the string interning table.
+// Cells with t="s" store an index into this table rather than inline text.
 func xlsxLoadSharedStrings(zr *zip.Reader) []string {
 	for _, f := range zr.File {
 		if f.Name == "xl/sharedStrings.xml" {
@@ -362,6 +377,7 @@ func xlsxParseSharedStrings(r io.Reader) []string {
 	return out
 }
 
+// xlsxLoadSheetNames maps "xl/worksheets/sheet1.xml" -> "Sheet1" from workbook.xml.
 func xlsxLoadSheetNames(zr *zip.Reader) map[string]string {
 	result := make(map[string]string)
 	for _, f := range zr.File {

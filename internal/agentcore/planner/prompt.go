@@ -66,6 +66,7 @@ func (p *Planner) buildSystemPrompt() string {
 	data := map[string]any{
 		"SkillDefinitions": string(defsJSON),
 		"SkillIndex":       indexItems,
+		"NativeFC":         p.useNativeFC,
 	}
 
 	var buf bytes.Buffer

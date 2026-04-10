@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	iledger "yunque-agent/internal/ledger"
 )
 
 // ──────────────────────────────────────────────
@@ -47,6 +48,7 @@ type ExperienceStore struct {
 	mu   sync.RWMutex
 	data []Experience
 	path string
+	kvs  *iledger.KVConfigStore
 }
 
 // NewExperienceStore creates a store that persists to the given file path.
@@ -54,6 +56,14 @@ func NewExperienceStore(path string) *ExperienceStore {
 	s := &ExperienceStore{path: path}
 	s.load()
 	return s
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+func (s *ExperienceStore) SetKVStore(kvs *iledger.KVConfigStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+	s.loadFromKV()
 }
 
 // Add records a new experience.
@@ -188,7 +198,30 @@ func (s *ExperienceStore) load() {
 	}
 }
 
+func (s *ExperienceStore) loadFromKV() {
+	if s.kvs == nil {
+		return
+	}
+	var exps []Experience
+	found, err := s.kvs.Get(context.Background(), "data", &exps)
+	if err != nil {
+		slog.Warn("experience: kv load failed", "err", err)
+		return
+	}
+	if found && len(exps) > 0 {
+		s.data = exps
+		slog.Info("experience: loaded from Ledger KV", "count", len(exps))
+	}
+}
+
 func (s *ExperienceStore) save() {
+	if s.kvs != nil {
+		if err := s.kvs.Put(context.Background(), "data", s.data); err != nil {
+			slog.Warn("experience: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	data, err := json.MarshalIndent(s.data, "", "  ")
 	if err != nil {
 		return

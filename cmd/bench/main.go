@@ -20,13 +20,13 @@ func main() {
 	addr := flag.String("addr", "localhost:9090", "agent address")
 	total := flag.Int("n", 50, "total requests")
 	concurrency := flag.Int("c", 5, "concurrent workers")
-	apiKey := flag.String("key", "", "API key (default: ya_yunque_default_key_2024)")
+	apiKey := flag.String("key", "", "API key (default: DEFAULT_API_KEY or API_KEY)")
 	flag.Parse()
 
 	if *apiKey == "" {
-		*apiKey = os.Getenv("API_KEY")
+		*apiKey = os.Getenv("DEFAULT_API_KEY")
 		if *apiKey == "" {
-			*apiKey = "tori_default_key_2024"
+			*apiKey = os.Getenv("API_KEY")
 		}
 	}
 

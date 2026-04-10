@@ -120,7 +120,7 @@ func (m *Metrics) RecordLLMCall(model string, duration time.Duration, tokensIn, 
 // Snapshot returns a point-in-time copy of all metrics.
 func (m *Metrics) Snapshot() MetricsSnapshot {
 	snap := MetricsSnapshot{
-		Uptime:          time.Since(m.startTime),
+		Uptime:          time.Since(m.startTime).Seconds(),
 		RequestsTotal:   m.RequestsTotal.Load(),
 		RequestsSuccess: m.RequestsSuccess.Load(),
 		RequestsFailed:  m.RequestsFailed.Load(),
@@ -156,7 +156,7 @@ func (m *Metrics) PrometheusFormat() string {
 	w("yunque_requests_failed", "Failed requests", "counter", snap.RequestsFailed)
 	w("yunque_tokens_in", "Input tokens consumed", "counter", snap.TokensIn)
 	w("yunque_tokens_out", "Output tokens generated", "counter", snap.TokensOut)
-	w("yunque_uptime_seconds", "Agent uptime", "gauge", int(snap.Uptime.Seconds()))
+	w("yunque_uptime_seconds", "Agent uptime", "gauge", int(snap.Uptime))
 
 	if snap.RequestLatency.Count > 0 {
 		fmt.Fprintf(&b, "# HELP yunque_request_duration_ms Request latency\n# TYPE yunque_request_duration_ms summary\n")
@@ -238,7 +238,7 @@ func (m *Metrics) PrometheusFormat() string {
 // --- Snapshot types ---
 
 type MetricsSnapshot struct {
-	Uptime          time.Duration           `json:"uptime"`
+	Uptime          float64                 `json:"uptime"`
 	RequestsTotal   int64                   `json:"requests_total"`
 	RequestsSuccess int64                   `json:"requests_success"`
 	RequestsFailed  int64                   `json:"requests_failed"`

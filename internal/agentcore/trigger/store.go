@@ -1,12 +1,16 @@
 package trigger
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	iledger "yunque-agent/internal/ledger"
 
 	"github.com/google/uuid"
 )
@@ -23,8 +27,9 @@ type Store struct {
 	events   []TriggerEvent         // 事件日志（环形缓冲区）
 
 	dataDir   string
-	maxEvents int // 最大事件数（默认 1000）
-	maxRuns   int // 最大执行记录数（默认 500）
+	kvs       *iledger.KVConfigStore // Ledger KV (preferred when set)
+	maxEvents int                    // 最大事件数（默认 1000）
+	maxRuns   int                    // 最大执行记录数（默认 500）
 }
 
 // NewStore 创建触发器存储
@@ -45,6 +50,14 @@ func NewStore(dataDir string) *Store {
 
 	s.load()
 	return s
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+func (s *Store) SetKVStore(kvs *iledger.KVConfigStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+	s.loadFromKV()
 }
 
 // ──────────────────────────────────────────────
@@ -295,8 +308,40 @@ func (s *Store) persist() {
 	}
 	s.mu.RUnlock()
 
+	if s.kvs != nil {
+		if err := s.kvs.Put(context.Background(), "data", data); err != nil {
+			slog.Warn("trigger: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
+
 	b, _ := json.MarshalIndent(data, "", "  ")
 	os.WriteFile(filepath.Join(s.dataDir, "triggers.json"), b, 0o644)
+}
+
+func (s *Store) loadFromKV() {
+	if s.kvs == nil {
+		return
+	}
+	var data persistData
+	found, err := s.kvs.Get(context.Background(), "data", &data)
+	if err != nil {
+		slog.Warn("trigger: kv load failed", "err", err)
+		return
+	}
+	if found {
+		if data.Triggers != nil {
+			s.triggers = data.Triggers
+		}
+		if data.Runs != nil {
+			s.runs = data.Runs
+		}
+		if data.Events != nil {
+			s.events = data.Events
+		}
+		slog.Info("trigger: loaded from Ledger KV", "triggers", len(s.triggers), "runs", len(s.runs))
+	}
 }
 
 func (s *Store) load() {

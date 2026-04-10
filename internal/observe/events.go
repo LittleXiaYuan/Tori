@@ -114,7 +114,15 @@ type ToolStartDetail struct {
 
 // ToolResultDetail is the Detail payload for tool_result events.
 type ToolResultDetail struct {
-	Skill  string `json:"skill"`
-	Result string `json:"result,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Skill  string      `json:"skill"`
+	Result string      `json:"result,omitempty"`
+	Error  string      `json:"error,omitempty"`
+	Files  []FileEntry `json:"files,omitempty"`
+}
+
+// FileEntry describes a file produced by a tool invocation.
+type FileEntry struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	Name string `json:"name"`
 }

@@ -12,7 +12,14 @@ import (
 
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/session"
+	"yunque-agent/pkg/safego"
 )
+
+// kvStore abstracts Ledger KV to avoid import cycles with internal/ledger.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
 
 // ──────────────────────────────────────────────
 // Task Threads — Dedicated conversation per task
@@ -103,13 +110,19 @@ type threadMeta struct {
 // channelType is e.g. "telegram", target is the chat/group ID, content is text.
 type ChannelSendFunc func(ctx context.Context, channelType, target, content string) error
 
+// ChannelSendCardFunc pushes a structured card JSON to a specific channel target.
+// cardJSON is a pre-built interactive card payload (e.g. from channel.Card.Build()).
+type ChannelSendCardFunc func(ctx context.Context, channelType, target, cardJSON string) error
+
 // ThreadManager manages task-scoped conversation threads.
 type ThreadManager struct {
-	mu          sync.RWMutex
-	convStore   *session.Store
-	threads     map[string]*threadMeta // taskID → meta
-	dataFile    string                 // persistence path
-	channelSend ChannelSendFunc        // optional: push to channel
+	mu              sync.RWMutex
+	convStore       *session.Store
+	threads         map[string]*threadMeta // taskID → meta
+	dataFile        string  // legacy persistence path
+	kvs             kvStore // Ledger KV (preferred when set)
+	channelSend     ChannelSendFunc        // optional: push to channel (text)
+	channelSendCard ChannelSendCardFunc    // optional: push card to channel
 }
 
 // NewThreadManager creates a thread manager backed by a session store.
@@ -131,6 +144,22 @@ func (tm *ThreadManager) SetChannelSend(fn ChannelSendFunc) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	tm.channelSend = fn
+}
+
+// SetChannelSendCard sets the callback for pushing rich cards to channels.
+// If set, task progress events will be sent as interactive cards instead of plain text.
+func (tm *ThreadManager) SetChannelSendCard(fn ChannelSendCardFunc) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.channelSendCard = fn
+}
+
+// SetKVStore enables Ledger KV-backed persistence, replacing file I/O.
+func (tm *ThreadManager) SetKVStore(kvs kvStore) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.kvs = kvs
+	tm.loadFromKV()
 }
 
 // ────────── Session ID ──────────
@@ -252,6 +281,61 @@ func (tm *ThreadManager) PostTaskFailed(taskID, tenantID, errMsg string) {
 	tm.PostTyped(taskID, tenantID, "system", content, MsgTaskFailed, nil)
 	tm.SetState(taskID, ThreadClosed)
 	tm.pushToChannel(taskID, content)
+}
+
+// ────────── Rich card variants ──────────
+// These methods send interactive cards when channelSendCard is configured,
+// otherwise fall back to plain text via pushToChannel.
+
+// PostStepResultRich posts a step completion with an interactive card.
+func (tm *ThreadManager) PostStepResultRich(taskID, tenantID string, stepID, totalSteps int, taskTitle, action, result string) {
+	content := fmt.Sprintf("✅ 步骤 %d/%d 完成 — %s", stepID, totalSteps, action)
+	if len(result) > 200 {
+		content += "\n" + result[:200] + "..."
+	} else if result != "" {
+		content += "\n" + result
+	}
+	tm.PostTyped(taskID, tenantID, "system", content, MsgStepResult, map[string]any{
+		"step_id": stepID,
+		"action":  action,
+	})
+	cardJSON := buildStepCard(taskTitle, stepID, totalSteps, action, "done", result)
+	tm.pushCardToChannel(taskID, cardJSON, content)
+}
+
+// PostStepFailedRich posts a step failure with an interactive card.
+func (tm *ThreadManager) PostStepFailedRich(taskID, tenantID string, stepID, totalSteps int, taskTitle, action, errMsg string) {
+	content := fmt.Sprintf("❌ 步骤 %d/%d 失败 — %s: %s", stepID, totalSteps, action, errMsg)
+	tm.PostTyped(taskID, tenantID, "system", content, MsgStepFailed, map[string]any{
+		"step_id": stepID,
+		"action":  action,
+	})
+	cardJSON := buildStepCard(taskTitle, stepID, totalSteps, action, "failed", errMsg)
+	tm.pushCardToChannel(taskID, cardJSON, content)
+}
+
+// PostTaskCompletedRich posts a task completion with an interactive card.
+func (tm *ThreadManager) PostTaskCompletedRich(taskID, tenantID, taskTitle, summary string) {
+	content := "🎉 任务完成"
+	if summary != "" {
+		content += "\n" + summary
+	}
+	tm.PostTyped(taskID, tenantID, "system", content, MsgTaskCompleted, nil)
+	tm.SetState(taskID, ThreadClosed)
+	cardJSON := buildTaskCompletedCard(taskTitle, taskID, summary)
+	tm.pushCardToChannel(taskID, cardJSON, content)
+}
+
+// PostTaskFailedRich posts a task failure with an interactive card.
+func (tm *ThreadManager) PostTaskFailedRich(taskID, tenantID, taskTitle, errMsg string) {
+	content := "💥 任务失败"
+	if errMsg != "" {
+		content += ": " + errMsg
+	}
+	tm.PostTyped(taskID, tenantID, "system", content, MsgTaskFailed, nil)
+	tm.SetState(taskID, ThreadClosed)
+	cardJSON := buildTaskFailedCard(taskTitle, taskID, errMsg)
+	tm.pushCardToChannel(taskID, cardJSON, content)
 }
 
 // ────────── State management ──────────
@@ -390,7 +474,7 @@ func (tm *ThreadManager) pushToChannel(taskID, content string) {
 		return
 	}
 
-	go func() {
+	safego.Go("thread-push-"+taskID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := send(ctx, b.ChannelType, b.ChannelID, content); err != nil {
@@ -400,12 +484,60 @@ func (tm *ThreadManager) pushToChannel(taskID, content string) {
 				"target", b.ChannelID,
 				"error", err)
 		}
-	}()
+	})
+}
+
+// pushCardToChannel sends a rich card to the thread's bound channel.
+// Falls back to pushToChannel(text) if card sender is not configured.
+func (tm *ThreadManager) pushCardToChannel(taskID, cardJSON, fallbackText string) {
+	tm.mu.RLock()
+	meta, ok := tm.threads[taskID]
+	sendCard := tm.channelSendCard
+	sendText := tm.channelSend
+	tm.mu.RUnlock()
+
+	if !ok || meta.Binding == nil {
+		return
+	}
+
+	b := meta.Binding
+	if b.ChannelType == "" || b.ChannelID == "" {
+		return
+	}
+
+	safego.Go("thread-push-card-"+taskID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Try card first, fall back to plain text
+		if sendCard != nil {
+			if err := sendCard(ctx, b.ChannelType, b.ChannelID, cardJSON); err != nil {
+				slog.Warn("thread push card failed, falling back to text",
+					"task_id", taskID, "error", err)
+			} else {
+				return
+			}
+		}
+
+		if sendText != nil {
+			if err := sendText(ctx, b.ChannelType, b.ChannelID, fallbackText); err != nil {
+				slog.Warn("thread push to channel failed",
+					"task_id", taskID, "error", err)
+			}
+		}
+	})
 }
 
 // ────────── Persistence ──────────
 
 func (tm *ThreadManager) saveToDisk() {
+	if tm.kvs != nil {
+		if err := tm.kvs.Put(context.Background(), "threads", tm.threads); err != nil {
+			slog.Warn("thread: kv save failed, falling back to file", "err", err)
+		} else {
+			return
+		}
+	}
 	if tm.dataFile == "" {
 		return
 	}
@@ -419,6 +551,22 @@ func (tm *ThreadManager) saveToDisk() {
 		return
 	}
 	_ = os.WriteFile(tm.dataFile, data, 0o644)
+}
+
+func (tm *ThreadManager) loadFromKV() {
+	if tm.kvs == nil {
+		return
+	}
+	var loaded map[string]*threadMeta
+	found, err := tm.kvs.Get(context.Background(), "threads", &loaded)
+	if err != nil {
+		slog.Warn("thread: kv load failed", "err", err)
+		return
+	}
+	if found && len(loaded) > 0 {
+		tm.threads = loaded
+		slog.Info("thread: loaded from Ledger KV", "count", len(loaded))
+	}
 }
 
 func (tm *ThreadManager) loadFromDisk() {

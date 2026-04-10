@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"yunque-agent/internal/apperror"
 	"yunque-agent/pkg/skills"
@@ -65,7 +67,11 @@ func (g *Gateway) handleDocGenerate(w http.ResponseWriter, r *http.Request) {
 		if ext == "html" {
 			ext = "html"
 		}
-		req.Path = filepath.Join("data", "output", fmt.Sprintf("document.%s", ext))
+		base := "document"
+		if req.Title != "" {
+			base = sanitizeDocFilename(req.Title)
+		}
+		req.Path = filepath.Join("data", "output", fmt.Sprintf("%s-%d.%s", base, time.Now().Unix(), ext))
 	}
 
 	// Build args
@@ -92,4 +98,43 @@ func (g *Gateway) handleDocGenerate(w http.ResponseWriter, r *http.Request) {
 		"path":   req.Path,
 		"format": req.Format,
 	})
+}
+
+func sanitizeDocFilename(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	replacer := strings.NewReplacer(
+		"\\", "-",
+		"/", "-",
+		":", "-",
+		"*", "-",
+		"?", "-",
+		"\"", "-",
+		"<", "-",
+		">", "-",
+		"|", "-",
+		" ", "-",
+	)
+	s = replacer.Replace(s)
+	s = strings.Trim(s, "-.")
+	if s == "" {
+		return "document"
+	}
+	if len(s) > 48 {
+		s = s[:48]
+	}
+	return s
+}
+
+// handleDocTemplates returns the template catalog for document generation.
+// GET /v1/documents/templates
+func (g *Gateway) handleDocTemplates(w http.ResponseWriter, r *http.Request) {
+	catalogPath := filepath.Join("data", "templates", "catalog.json")
+	data, err := os.ReadFile(catalogPath)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"templates": []any{}})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
 }

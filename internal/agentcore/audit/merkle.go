@@ -217,20 +217,28 @@ func (c *Chain) Stats() map[string]any {
 	defer c.mu.RUnlock()
 
 	typeCounts := make(map[EventType]int)
+	actors := make(map[string]int)
 	for _, rec := range c.records {
 		typeCounts[rec.Type]++
+		if rec.Actor != "" {
+			actors[rec.Actor]++
+		}
 	}
 
 	stats := map[string]any{
+		"total":        c.seq,
 		"total_seq":    c.seq,
 		"in_memory":    len(c.records),
 		"max_size":     c.maxSize,
 		"last_hash":    c.lastHash,
 		"type_counts":  typeCounts,
+		"actors":       actors,
 		"has_file":     c.file != nil,
 	}
 
 	if len(c.records) > 0 {
+		stats["first_at"] = c.records[0].Timestamp
+		stats["last_at"] = c.records[len(c.records)-1].Timestamp
 		stats["oldest"] = c.records[0].Timestamp
 		stats["newest"] = c.records[len(c.records)-1].Timestamp
 	}

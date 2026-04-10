@@ -11,8 +11,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "?? Agent",
-  description: "?? Agent ? Powered by HeroUI",
+  title: "Yunque Agent",
+  description: "Yunque Agent - Powered by HeroUI",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="flex min-h-screen bg-background text-foreground">
-        <a href="#main-content" className="skip-link">??????</a>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <AppShell>{children}</AppShell>
       </body>
     </html>

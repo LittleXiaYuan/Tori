@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // startFunc is called during Start.
@@ -71,7 +73,7 @@ func (lc *Lifecycle) Stop(ctx context.Context) {
 		if e.stop != nil {
 			stopCtx, cancel := context.WithTimeout(ctx, perComponentTimeout)
 			done := make(chan error, 1)
-			go func() { done <- e.stop(stopCtx) }()
+			safego.Go("lifecycle-stop-"+e.name, func() { done <- e.stop(stopCtx) })
 			select {
 			case err := <-done:
 				if err != nil {

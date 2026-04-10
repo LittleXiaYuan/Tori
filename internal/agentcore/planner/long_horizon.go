@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/plan"
 	"yunque-agent/internal/observe"
 )
@@ -30,10 +31,10 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 				fmt.Sprintf("📋 步骤 %d/%d: %s", idx+1, total, step.Description))
 		case plan.StepCompleted:
 			evt = observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult,
-				fmt.Sprintf("✅ 步骤 %d/%d 完成 (%d/%d)", idx+1, total, c, total))
+				fmt.Sprintf("步骤 %d/%d 完成 (%d/%d)", idx+1, total, c, total))
 		case plan.StepFailed:
 			evt = observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult,
-				fmt.Sprintf("❌ 步骤 %d/%d 失败: %s", idx+1, total, step.Error))
+				fmt.Sprintf("步骤 %d/%d 失败: %s", idx+1, total, step.Error))
 		default:
 			return
 		}
@@ -163,7 +164,29 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 			prompt += fmt.Sprintf("\n[步骤%d结果]: %s", dep, out)
 		}
 	}
-	client := p.LLMClientFor(req.ModelOverride)
+
+	// AgenticThinking: 自适应选择模型层级
+	selectedTier := req.ModelOverride
+	if selectedTier == "" && p.agenticThinking != nil {
+		thinkReq := localbrain.ThinkRequest{
+			TaskID:   pl.ID,
+			TenantID: req.TenantID,
+			Query:    step.Description,
+			StepIndex: stepIndex,
+		}
+		if agResult, err := p.agenticThinking.Think(ctx, thinkReq); err == nil {
+			switch agResult.Level {
+			case localbrain.ThinkQuick:
+				selectedTier = "fast"
+			case localbrain.ThinkDeep:
+				selectedTier = "expert"
+			default:
+				selectedTier = "smart"
+			}
+		}
+	}
+
+	client := p.LLMClientFor(selectedTier)
 	reply, err := client.Chat(ctx, []llm.Message{
 		{Role: "system", Content: "基于信息完成分析，直接给出结果。"},
 		{Role: "user", Content: prompt},

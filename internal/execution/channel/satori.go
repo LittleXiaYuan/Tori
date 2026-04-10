@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // ──────────────────────────────────────────────
@@ -91,7 +93,7 @@ func (s *Satori) Start(ctx context.Context, handler func(Message) Reply) error {
 
 	// Message processing goroutine
 	wg.Add(1)
-	go func() {
+	safego.Go("satori-msg-processor", func() {
 		defer wg.Done()
 		for {
 			select {
@@ -107,15 +109,15 @@ func (s *Satori) Start(ctx context.Context, handler func(Message) Reply) error {
 				_ = s.sendMessage(ctx, platform, channelID, ContentWithButtonFallback(reply))
 			}
 		}
-	}()
+	})
 
 	slog.Info("satori channel starting", "addr", addr, "endpoint", s.endpoint)
-	go func() {
+	safego.Go("satori-shutdown", func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutCtx)
-	}()
+	})
 
 	err := srv.ListenAndServe()
 	wg.Wait()

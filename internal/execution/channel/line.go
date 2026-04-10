@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // ──────────────────────────────────────────────
@@ -87,7 +89,7 @@ func (l *LINE) Start(ctx context.Context, handler func(Message) Reply) error {
 
 	// Message processing goroutine
 	wg.Add(1)
-	go func() {
+	safego.Go("line-msg-processor", func() {
 		defer wg.Done()
 		for {
 			select {
@@ -110,15 +112,15 @@ func (l *LINE) Start(ctx context.Context, handler func(Message) Reply) error {
 				}
 			}
 		}
-	}()
+	})
 
 	slog.Info("line channel starting", "addr", addr)
-	go func() {
+	safego.Go("line-shutdown", func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutCtx)
-	}()
+	})
 
 	err := srv.ListenAndServe()
 	wg.Wait()

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"yunque-agent/pkg/safego"
+
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -80,12 +82,12 @@ func (d *Discord) Start(ctx context.Context, handler func(Message) Reply) error 
 				"guild_id":  i.GuildID,
 			},
 		}
-		go func() {
+		safego.Go("discord-interaction-reply", func() {
 			reply := handler(msg)
 			if err := d.Send(ctx, i.ChannelID, reply); err != nil {
 				slog.Error("discord send reply failed", "err", err)
 			}
-		}()
+		})
 	})
 
 	session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -150,7 +152,7 @@ func (d *Discord) Start(ctx context.Context, handler func(Message) Reply) error 
 			"type", chatType,
 		)
 
-		go func() {
+		safego.Go("discord-message-reply", func() {
 			// Show typing indicator
 			_ = s.ChannelTyping(m.ChannelID)
 
@@ -158,7 +160,7 @@ func (d *Discord) Start(ctx context.Context, handler func(Message) Reply) error 
 			if err := d.Send(ctx, m.ChannelID, reply); err != nil {
 				slog.Error("discord send reply failed", "err", err)
 			}
-		}()
+		})
 	})
 
 	if err := session.Open(); err != nil {

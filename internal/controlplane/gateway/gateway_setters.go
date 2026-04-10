@@ -134,6 +134,9 @@ func (g *Gateway) SetCronManager(cm *cron.Manager) { g.cronMgr = cm }
 // SetToolsManager attaches the process/tools manager.
 func (g *Gateway) SetToolsManager(tm *tools.ProcessManager) { g.toolsMgr = tm }
 
+// SetShellPolicy attaches the shell execution policy (approval + guard).
+func (g *Gateway) SetShellPolicy(sp *tools.ShellExecPolicy) { g.shellPolicy = sp }
+
 // SetPluginLoader attaches a plugin directory loader for CRUD operations.
 func (g *Gateway) SetPluginLoader(l *plugin.Loader) { g.pluginLoader = l }
 

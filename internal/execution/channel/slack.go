@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // Slack implements the Channel interface using the Slack Events API + Web API.
@@ -63,10 +65,10 @@ func (s *Slack) Start(ctx context.Context, handler func(Message) Reply) error {
 		Handler: mux,
 	}
 
-	go func() {
+	safego.Go("slack-shutdown", func() {
 		<-ctx.Done()
 		server.Shutdown(context.Background())
-	}()
+	})
 
 	slog.Info("slack: webhook listening", "path", s.webhookPath, "addr", ":8444")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -16,12 +16,28 @@ import (
 type Capability string
 
 const (
-	CapChat       Capability = "chat"
-	CapCompletion Capability = "completion"
-	CapEmbedding  Capability = "embedding"
-	CapVision     Capability = "vision"
-	CapTools      Capability = "tools"
-	CapThinking   Capability = "thinking"
+	CapChat             Capability = "chat"
+	CapCompletion       Capability = "completion"
+	CapEmbedding        Capability = "embedding"
+	CapVision           Capability = "vision"
+	CapTools            Capability = "tools"
+	CapThinking         Capability = "thinking"
+	CapReasoning        Capability = "reasoning"
+	CapFunctionCalling  Capability = "function_calling"
+	CapStructuredOutput Capability = "structured_output"
+	CapLongContext      Capability = "long_context"
+	CapWebSearch        Capability = "web_search"
+	CapFileSearch       Capability = "file_search"
+	CapCodeInterpreter  Capability = "code_interpreter"
+	CapComputerUse      Capability = "computer_use"
+	CapAudioIn          Capability = "audio_in"
+	CapAudioOut         Capability = "audio_out"
+	CapVideoIn          Capability = "video_in"
+	CapImageGen         Capability = "image_gen"
+	CapImageEdit        Capability = "image_edit"
+	CapStreaming         Capability = "streaming"
+	CapPromptCaching    Capability = "prompt_caching"
+	CapMCP              Capability = "mcp"
 )
 
 // ──────────────────────────────────────────────

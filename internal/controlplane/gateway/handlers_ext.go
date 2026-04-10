@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"yunque-agent/internal/agentcore/costtrack"
+	"yunque-agent/pkg/safego"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
@@ -210,7 +211,7 @@ func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	// Process message async and reply via Feishu API
 	if body.Event.Message.Content != "" {
-		go func() {
+		safego.Go("feishu-webhook-reply", func() {
 			ctx := context.Background()
 			result, err := g.planner.Run(ctx, planner.PlanRequest{
 				Messages: []llm.Message{{Role: "user", Content: body.Event.Message.Content}},
@@ -227,7 +228,7 @@ func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			slog.Info("feishu webhook reply", "chat_id", body.Event.Message.ChatID, "len", len(result.Reply))
-		}()
+		})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
@@ -417,11 +418,11 @@ func (g *Gateway) handleCostAlerts(w http.ResponseWriter, r *http.Request) {
 // persistForkTree saves the fork tree to disk if a persister is configured.
 func (g *Gateway) persistForkTree() {
 	if g.forkPersister != nil && g.forkTree != nil {
-		go func() {
+		safego.Go("fork-tree-persist", func() {
 			if err := g.forkPersister.Save(g.forkTree); err != nil {
 				slog.Error("fork tree persist failed", "err", err)
 			}
-		}()
+		})
 	}
 }
 

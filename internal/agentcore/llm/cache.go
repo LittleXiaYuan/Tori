@@ -15,6 +15,7 @@ type ResponseCache struct {
 	entries map[uint64]*cacheEntry
 	ttl     time.Duration
 	maxSize int
+	stopCh  chan struct{}
 }
 
 type cacheEntry struct {
@@ -35,9 +36,20 @@ func NewResponseCache(ttl time.Duration, maxSize int) *ResponseCache {
 		entries: make(map[uint64]*cacheEntry, maxSize),
 		ttl:     ttl,
 		maxSize: maxSize,
+		stopCh:  make(chan struct{}),
 	}
 	go c.evictLoop()
 	return c
+}
+
+// Stop shuts down the background eviction loop.
+func (c *ResponseCache) Stop() {
+	select {
+	case <-c.stopCh:
+		// already stopped
+	default:
+		close(c.stopCh)
+	}
 }
 
 // Get looks up a cached response for the given messages + temperature.
@@ -127,15 +139,20 @@ func (c *ResponseCache) evictOldest() {
 func (c *ResponseCache) evictLoop() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		c.mu.Lock()
-		now := time.Now()
-		for k, e := range c.entries {
-			if now.Sub(e.createdAt) > c.ttl {
-				delete(c.entries, k)
+	for {
+		select {
+		case <-c.stopCh:
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			now := time.Now()
+			for k, e := range c.entries {
+				if now.Sub(e.createdAt) > c.ttl {
+					delete(c.entries, k)
+				}
 			}
+			c.mu.Unlock()
 		}
-		c.mu.Unlock()
 	}
 }
 

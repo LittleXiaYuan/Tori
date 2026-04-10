@@ -29,6 +29,7 @@ const (
 	MsgObservation MessageType = "OBSERVATION"
 	MsgActionTaken MessageType = "ACTION_TAKEN"
 	MsgHeartbeat   MessageType = "HEARTBEAT"
+	MsgFeedback    MessageType = "FEEDBACK"
 
 	// Agent network level (v3)
 	MsgNotify         MessageType = "NOTIFY"

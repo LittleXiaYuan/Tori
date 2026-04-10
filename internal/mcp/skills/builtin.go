@@ -195,8 +195,8 @@ func (b *Builtin) fileRead(args map[string]any) (*mcp.CallResult, error) {
 		return mcp.ErrorResult("path is required"), nil
 	}
 
-	fullPath := filepath.Join(b.workDir, filepath.Clean(path))
-	if !strings.HasPrefix(fullPath, b.workDir) {
+	fullPath, err := b.resolveWorkPath(path)
+	if err != nil {
 		return mcp.ErrorResult("path escape not allowed"), nil
 	}
 
@@ -217,8 +217,8 @@ func (b *Builtin) fileWrite(args map[string]any) (*mcp.CallResult, error) {
 		return mcp.ErrorResult("path is required"), nil
 	}
 
-	fullPath := filepath.Join(b.workDir, filepath.Clean(path))
-	if !strings.HasPrefix(fullPath, b.workDir) {
+	fullPath, err := b.resolveWorkPath(path)
+	if err != nil {
 		return mcp.ErrorResult("path escape not allowed"), nil
 	}
 
@@ -235,8 +235,8 @@ func (b *Builtin) fileList(args map[string]any) (*mcp.CallResult, error) {
 		path = "."
 	}
 
-	fullPath := filepath.Join(b.workDir, filepath.Clean(path))
-	if !strings.HasPrefix(fullPath, b.workDir) {
+	fullPath, err := b.resolveWorkPath(path)
+	if err != nil {
 		return mcp.ErrorResult("path escape not allowed"), nil
 	}
 
@@ -261,4 +261,16 @@ func (b *Builtin) fileList(args map[string]any) (*mcp.CallResult, error) {
 		return mcp.SuccessResult("(empty directory)"), nil
 	}
 	return mcp.SuccessResult(strings.Join(lines, "\n")), nil
+}
+
+func (b *Builtin) resolveWorkPath(path string) (string, error) {
+	fullPath := filepath.Join(b.workDir, filepath.Clean(path))
+	rel, err := filepath.Rel(b.workDir, fullPath)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("path escape not allowed")
+	}
+	return fullPath, nil
 }

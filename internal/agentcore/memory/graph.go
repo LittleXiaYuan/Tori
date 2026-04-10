@@ -23,8 +23,8 @@ type Relation struct {
 	ID        string    `json:"id"`
 	FromID    string    `json:"from_id"`
 	ToID      string    `json:"to_id"`
-	Type      string    `json:"type"` // knows, likes, works_on, located_in, part_of, uses, created, etc.
-	Weight    float64   `json:"weight"` // strength of relation (0-1)
+	Type      string    `json:"type"`              // knows, likes, works_on, located_in, part_of, uses, created, etc.
+	Weight    float64   `json:"weight"`            // strength of relation (0-1)
 	Context   string    `json:"context,omitempty"` // the conversation context where this was established
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -197,6 +197,27 @@ func (g *Graph) GetRelations(entityID string) []Relation {
 		if r, ok := g.relations[rid]; ok {
 			cp := *r
 			results = append(results, cp)
+		}
+	}
+	return results
+}
+
+// AllRelations returns all relations in the graph (for visualization).
+func (g *Graph) AllRelations(limit int) []Relation {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if limit <= 0 {
+		limit = 500
+	}
+	cap := len(g.relations)
+	if cap > limit {
+		cap = limit
+	}
+	results := make([]Relation, 0, cap)
+	for _, r := range g.relations {
+		results = append(results, *r)
+		if len(results) >= limit {
+			break
 		}
 	}
 	return results

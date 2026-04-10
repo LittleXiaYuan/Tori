@@ -90,3 +90,38 @@ func (m *Message) DecodeError() (*OPPError, error) {
 	var p OPPError
 	return &p, m.DecodePayload(&p)
 }
+
+func (m *Message) DecodeCapabilities() (*CapabilitiesPayload, error) {
+	var p CapabilitiesPayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeDiscover() (*DiscoverPayload, error) {
+	var p DiscoverPayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeDelegate() (*DelegatePayload, error) {
+	var p DelegatePayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeDelegateResult() (*DelegateResultPayload, error) {
+	var p DelegateResultPayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeFeedback() (*FeedbackPayload, error) {
+	var p FeedbackPayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeSubscribe() (*SubscribePayload, error) {
+	var p SubscribePayload
+	return &p, m.DecodePayload(&p)
+}
+
+func (m *Message) DecodeEvent() (*EventPayload, error) {
+	var p EventPayload
+	return &p, m.DecodePayload(&p)
+}

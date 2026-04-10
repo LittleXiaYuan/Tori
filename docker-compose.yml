@@ -14,7 +14,8 @@ services:
   agent-lite:
     profiles: ["lite"]
     build:
-      context: .
+      context: ..
+      dockerfile: yunque-agent/Dockerfile
       args:
         VERSION: ${VERSION:-0.1.0}
         GIT_COMMIT: ${GIT_COMMIT:-dev}
@@ -115,7 +116,8 @@ services:
   agent:
     profiles: ["full"]
     build:
-      context: .
+      context: ..
+      dockerfile: yunque-agent/Dockerfile
       args:
         VERSION: ${VERSION:-0.1.0}
         GIT_COMMIT: ${GIT_COMMIT:-dev}

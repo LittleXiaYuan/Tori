@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/models"
 )
 
@@ -48,10 +49,19 @@ type Stats struct {
 
 // Router intelligently routes queries to the best model based on complexity.
 type Router struct {
-	registry *models.Registry
-	slots    map[Tier]string // tier -> model ID
-	mu       sync.RWMutex
-	stats    Stats
+	registry   *models.Registry
+	slots      map[Tier]string // tier -> model ID
+	mu         sync.RWMutex
+	stats      Stats
+	localBrain *localbrain.LocalBrain // 本地小模型分类器（nil = 退回启发式）
+}
+
+// SetLocalBrain attaches a local small model for intelligent classification.
+// When set, classify() uses the small model instead of keyword heuristics.
+func (r *Router) SetLocalBrain(lb *localbrain.LocalBrain) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.localBrain = lb
 }
 
 // New creates a smart router with the model registry.
@@ -163,12 +173,21 @@ func (r *Router) recordRoute(tier Tier) {
 	r.stats.mu.Unlock()
 }
 
-// classify determines the complexity tier of a query using heuristics.
-// No LLM call needed - this is instant and free.
+// classify determines the complexity tier of a query.
+// If LocalBrain is attached, uses the small model for classification (more accurate).
+// Otherwise falls back to keyword heuristics (free but less precise).
 func (r *Router) classify(query string, hasImages bool) Tier {
 	// Images always need a capable model
 	if hasImages {
 		return TierExpert
+	}
+
+	// 优先使用本地小模型分类（更准确）
+	if r.localBrain != nil {
+		if tier, ok := r.classifyWithLocalBrain(query); ok {
+			return tier
+		}
+		// 小模型失败 → 退回启发式
 	}
 
 	charCount := utf8.RuneCountInString(query)
@@ -279,4 +298,36 @@ func (r *Router) classify(query string, hasImages bool) Tier {
 	}
 
 	return TierSmart
+}
+
+// classifyWithLocalBrain uses the local small model for intent classification.
+func (r *Router) classifyWithLocalBrain(query string) (Tier, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	decision, err := r.localBrain.Classify(ctx, query, "")
+	if err != nil {
+		slog.Debug("router: localbrain classify failed, falling back", "err", err)
+		return TierSmart, false
+	}
+
+	switch decision.Intent.Complexity {
+	case "simple":
+		return TierFast, true
+	case "hard":
+		return TierExpert, true
+	default:
+		// 根据意图类别细分
+		switch decision.Intent.Category {
+		case "code", "complex":
+			return TierExpert, true
+		case "chat":
+			if decision.Intent.Confidence > 0.8 {
+				return TierFast, true
+			}
+			return TierSmart, true
+		default:
+			return TierSmart, true
+		}
+	}
 }

@@ -39,6 +39,9 @@ func (g *Gateway) registerTaskRoutes() {
 	g.mux.HandleFunc("/v1/tasks/templates", g.requireAuth(g.handleTemplates))
 	g.mux.HandleFunc("/v1/tasks/templates/instantiate", g.requireAuth(g.handleTemplateInstantiate))
 
+	// Missions
+	g.mux.HandleFunc("/v1/missions/parse", g.requireAuth(g.handleMissionParse))
+
 	// State Kernel
 	g.mux.HandleFunc("/v1/state", g.requireAuth(g.handleStateSnapshot))
 	g.mux.HandleFunc("/v1/state/goals", g.requireAuth(g.handleStateGoals))
@@ -51,4 +54,5 @@ func (g *Gateway) registerTaskRoutes() {
 
 	// Document Generation
 	g.mux.HandleFunc("/v1/documents/generate", g.requireAuth(g.handleDocGenerate))
+	g.mux.HandleFunc("/v1/documents/templates", g.requireAuth(g.handleDocTemplates))
 }

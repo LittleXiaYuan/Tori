@@ -77,6 +77,18 @@ func TestSandboxPathEscape(t *testing.T) {
 	}
 }
 
+func TestSandboxPathEscapeSiblingPrefix(t *testing.T) {
+	sb, err := New(os.TempDir(), DefaultPolicy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sb.Cleanup()
+
+	if err := sb.WriteFile("../"+filepath.Base(sb.WorkDir())+"_escape/evil.txt", "oops"); err == nil {
+		t.Fatal("expected sibling prefix escape to be rejected")
+	}
+}
+
 func TestHostReadAccess(t *testing.T) {
 	// Create a temp file on "host"
 	tmpDir := t.TempDir()

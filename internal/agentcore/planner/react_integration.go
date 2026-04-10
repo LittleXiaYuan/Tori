@@ -10,8 +10,11 @@ import (
 
 	ldg "ledger"
 
+	"yunque-agent/pkg/safego"
+
 	ageval "yunque-agent/internal/agentcore/eval"
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	agreact "yunque-agent/internal/agentcore/react"
 	"yunque-agent/internal/observe"
 )
@@ -50,9 +53,54 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	var planSteps []PlanStep
 
 	// ThinkFunc: uses LLM to produce thought + action
+	// 集成 AgenticThinking：小模型先判断思考深度，再选择对应层级的大模型
 	thinkFn := func(ctx context.Context, history []ldg.ReActStep) (*ldg.ThinkResult, error) {
+		// 第一阶段：Agentic Thinking 决定思考深度
+		selectedTier := req.ModelOverride
+		if p.agenticThinking != nil && len(history) > 0 {
+			lastObs := ""
+			if last := history[len(history)-1]; last.Result != nil {
+				if last.Result.Error != "" {
+					lastObs = "ERROR: " + last.Result.Error
+				} else {
+					lastObs = last.Result.Output
+				}
+			}
+
+			thinkReq := localbrain.ThinkRequest{
+				TaskID:           taskID,
+				TenantID:         req.TenantID,
+				Query:            initialObs,
+				PrevActionResult: lastObs,
+				StepIndex:        len(history),
+				StepHistory:      convertToStepSummary(history),
+			}
+			if agResult, err := p.agenticThinking.Think(ctx, thinkReq); err == nil {
+				// 如果 AgenticThinking 判断任务已完成
+				if agResult.ShouldStop {
+					return &ldg.ThinkResult{
+						Thought:    agResult.Thought,
+						Answer:     agResult.Thought,
+						Confidence: agResult.Confidence,
+					}, nil
+				}
+				// 根据思考深度选择模型层级
+				if selectedTier == "" {
+					switch agResult.Level {
+					case localbrain.ThinkQuick:
+						selectedTier = "fast"
+					case localbrain.ThinkDeep:
+						selectedTier = "expert"
+					default:
+						selectedTier = "smart"
+					}
+				}
+			}
+		}
+
+		// 第二阶段：用选定层级的 LLM 执行思考
 		messages := p.buildReActMessages(ctx, req, history, toolsDesc)
-		client := p.LLMClientFor(req.ModelOverride)
+		client := p.LLMClientFor(selectedTier)
 
 		reply, err := client.Chat(ctx, messages, 0.7)
 		if err != nil {
@@ -117,7 +165,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 				fmt.Sprintf("[%s] 完成 (%dms)", skillName, dur.Milliseconds()))
 			trEvt.Meta.Skill = skillName
 			trEvt.Meta.TenantID = req.TenantID
-			trEvt.Detail = observe.ToolResultDetail{Skill: skillName, Result: truncate(result, 500)}
+			trEvt.Detail = observe.ToolResultDetail{Skill: skillName, Result: truncate(result, 2000)}
 			req.StepCallback(trEvt)
 		}
 
@@ -150,7 +198,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 
 	// Post-execution: self-evaluation (if task exists)
 	if req.TaskID != "" && (result.Success || result.StopReason == "max_steps") {
-		go func() {
+		safego.Go("react-self-eval", func() {
 			evalCtx := context.Background()
 			evaluator := ageval.New(p.ledger)
 			evalResult, evalErr := evaluator.Evaluate(evalCtx, req.TaskID)
@@ -160,7 +208,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 					"score", evalResult.QualityScore,
 					"should_distill", evalResult.ShouldDistill)
 			}
-		}()
+		})
 	}
 
 	return &PlanResult{
@@ -358,4 +406,28 @@ func (p *Planner) parseReActResponse(reply string) (*ldg.ThinkResult, error) {
 	}
 
 	return result, nil
+}
+
+// convertToStepSummary converts Ledger ReActSteps to localbrain StepSummary format.
+func convertToStepSummary(steps []ldg.ReActStep) []localbrain.StepSummary {
+	summaries := make([]localbrain.StepSummary, 0, len(steps))
+	for _, s := range steps {
+		summary := localbrain.StepSummary{
+			Success: s.Result == nil || s.Result.Error == "",
+		}
+		if s.Action != nil {
+			summary.Action = s.Action.Name
+		} else {
+			summary.Action = "(think)"
+		}
+		if s.Result != nil {
+			if s.Result.Error != "" {
+				summary.Result = s.Result.Error
+			} else {
+				summary.Result = truncate(s.Result.Output, 200)
+			}
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries
 }

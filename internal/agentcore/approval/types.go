@@ -119,3 +119,58 @@ var SkillRisk = map[string]RiskLevel{
 	"deploy":         RiskCritical,
 	"install_plugin": RiskHigh,
 }
+
+// ── Tool-Level Permission Strategy ──
+
+// ToolPermission defines fine-grained permission for a specific tool/skill.
+type ToolPermission struct {
+	SkillName      string    `json:"skill_name"`
+	AllowedArgs    []string  `json:"allowed_args,omitempty"`    // allowed argument patterns (glob)
+	DeniedArgs     []string  `json:"denied_args,omitempty"`     // denied argument patterns (glob)
+	MaxCalls       int       `json:"max_calls,omitempty"`       // max calls per session (0=unlimited)
+	RequireApproval bool    `json:"require_approval"`          // always require approval
+	RiskOverride   RiskLevel `json:"risk_override,omitempty"`  // override default risk level
+}
+
+// PermissionInheritance defines how permissions cascade.
+// Priority: User > Session > Tenant > Global
+type PermissionInheritance struct {
+	GlobalPermissions  map[string]*ToolPermission `json:"global"`  // apply to all
+	TenantPermissions  map[string]*ToolPermission `json:"tenant"`  // per-tenant override
+	UserPermissions    map[string]*ToolPermission `json:"user"`    // per-user override
+	SessionPermissions map[string]*ToolPermission `json:"session"` // per-session override (transient)
+}
+
+// Resolve returns the effective permission for a skill, applying inheritance.
+// Priority: session > user > tenant > global.
+func (pi *PermissionInheritance) Resolve(skillName, userID, tenantID string) *ToolPermission {
+	key := skillName
+
+	// Session level (highest priority)
+	if pi.SessionPermissions != nil {
+		if p, ok := pi.SessionPermissions[key]; ok {
+			return p
+		}
+	}
+	// User level
+	if pi.UserPermissions != nil {
+		userKey := userID + ":" + key
+		if p, ok := pi.UserPermissions[userKey]; ok {
+			return p
+		}
+	}
+	// Tenant level
+	if pi.TenantPermissions != nil {
+		tenantKey := tenantID + ":" + key
+		if p, ok := pi.TenantPermissions[tenantKey]; ok {
+			return p
+		}
+	}
+	// Global level
+	if pi.GlobalPermissions != nil {
+		if p, ok := pi.GlobalPermissions[key]; ok {
+			return p
+		}
+	}
+	return nil // no specific permission → use default risk map
+}

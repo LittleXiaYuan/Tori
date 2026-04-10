@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/safego"
 )
 
 // WeChatOfficial implements the Channel interface for WeChat Official Account (微信公众号).
@@ -85,12 +87,12 @@ func (w *WeChatOfficial) Start(ctx context.Context, handler func(Message) Reply)
 	addr := fmt.Sprintf("%s:%s", w.bindAddr, w.port)
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 
-	go func() {
+	safego.Go("wechat-official-server", func() {
 		slog.Info("wechat official callback server started", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("wechat official callback server error", "err", err)
 		}
-	}()
+	})
 
 	// Process incoming messages
 	for {

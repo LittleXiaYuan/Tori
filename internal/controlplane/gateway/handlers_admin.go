@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
@@ -42,6 +43,91 @@ func (g *Gateway) handleSkills(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(map[string]any{"skills": out, "count": len(out)})
+}
+
+func (g *Gateway) handleSkillsDynamicGet(w http.ResponseWriter, r *http.Request) {
+	if g.registry == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "skill registry not configured")
+		return
+	}
+	allSkills := g.registry.All()
+	var dynamic []task.DynamicSkillDef
+	for _, sk := range allSkills {
+		if ds, ok := sk.(*task.DynamicSkill); ok {
+			dynamic = append(dynamic, ds.Def())
+		}
+	}
+	if dynamic == nil {
+		dynamic = []task.DynamicSkillDef{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"skills": dynamic})
+}
+
+func (g *Gateway) handleSkillsDynamicApprove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	var req struct {
+		Name        string `json:"name"`
+		Instruction string `json:"instruction,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeInvalidField, "invalid request")
+		return
+	}
+	sk, ok := g.registry.Get(req.Name)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "skill not found")
+		return
+	}
+	if ds, ok := sk.(*task.DynamicSkill); ok {
+		ds.SetApprovalStatus("approved")
+		if req.Instruction != "" {
+			ds.UpdateInstruction(req.Instruction)
+		}
+		if err := task.SaveDynamicSkills(g.registry, "data/dynamic_skills.json"); err != nil {
+			apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "save dynamic skills", err))
+			return
+		}
+	} else {
+		apperror.WriteCode(w, apperror.CodeInvalidField, "not a dynamic skill")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (g *Gateway) handleSkillsDynamicReject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeInvalidField, "invalid request")
+		return
+	}
+	sk, ok := g.registry.Get(req.Name)
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "skill not found")
+		return
+	}
+	if _, ok := sk.(*task.DynamicSkill); !ok {
+		apperror.WriteCode(w, apperror.CodeInvalidField, "not a dynamic skill")
+		return
+	}
+	g.registry.Remove(req.Name)
+	if err := task.SaveDynamicSkills(g.registry, "data/dynamic_skills.json"); err != nil {
+		apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "save dynamic skills", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (g *Gateway) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
@@ -303,380 +389,6 @@ func (g *Gateway) rebuildSkillsFromPlugins() {
 	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
 }
 
-// sanitizePluginName makes a name safe for use as directory name.
-func sanitizePluginName(name string) string {
-	safe := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			return r
-		}
-		return '_'
-	}, name)
-	if safe == "" {
-		safe = "plugin"
-	}
-	return safe
-}
-
-// pluginBoilerplate generates a starter handler file for the given language and template.
-func pluginBoilerplate(lang, pluginName, template string) (filename, code string) {
-	// Template-specific Python boilerplate
-	if lang == "python" && template != "" && template != "custom" {
-		return "handler.py", pythonTemplateCode(pluginName, template)
-	}
-
-	switch lang {
-	case "python":
-		return "handler.py", fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s
-
-Arguments are passed via:
-  - stdin (JSON)
-  - env var PLUGIN_ARGS (JSON)
-  - env var PLUGIN_SKILL (skill name)
-
-Print your result to stdout.
-"""
-import json
-import sys
-
-def main():
-    args = json.loads(sys.stdin.read())
-    user_input = args.get("input", "")
-
-    # --- Your logic here ---
-    result = f"Processed: {user_input}"
-
-    print(result)
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-
-	case "node":
-		if template == "node_tool" {
-			return "handler.js", fmt.Sprintf(`#!/usr/bin/env node
-/**
- * Plugin: %s
- *
- * Node.js tool plugin using npm ecosystem.
- * Install dependencies: npm init -y && npm install axios cheerio
- */
-const axios = require('axios');
-
-let data = '';
-process.stdin.on('data', chunk => { data += chunk; });
-process.stdin.on('end', async () => {
-  try {
-    const args = JSON.parse(data);
-    const url = args.url || args.input || '';
-
-    // Example: HTTP GET request
-    const response = await axios.get(url, { timeout: 10000 });
-    const result = {
-      status: response.status,
-      content_length: response.data.length,
-      preview: typeof response.data === 'string'
-        ? response.data.slice(0, 500)
-        : JSON.stringify(response.data).slice(0, 500),
-    };
-
-    console.log(JSON.stringify(result));
-  } catch (err) {
-    console.error(JSON.stringify({ error: err.message }));
-    process.exit(1);
-  }
-});
-`, pluginName)
-		}
-		return "handler.js", fmt.Sprintf(`#!/usr/bin/env node
-/**
- * Plugin: %s
- *
- * Arguments arrive via stdin (JSON) and env PLUGIN_ARGS.
- * Print your result to stdout.
- */
-let data = '';
-process.stdin.on('data', chunk => { data += chunk; });
-process.stdin.on('end', () => {
-  const args = JSON.parse(data);
-  const input = args.input || '';
-
-  // --- Your logic here ---
-  const result = 'Processed: ' + input;
-
-  console.log(result);
-});
-`, pluginName)
-
-	case "shell":
-		return "handler.sh", fmt.Sprintf(`#!/bin/sh
-# Plugin: %s
-# Arguments come via stdin (JSON) and env $PLUGIN_ARGS
-
-read INPUT
-
-# --- Your logic here ---
-echo "Processed: $INPUT"
-`, pluginName)
-
-	default:
-		return "handler.py", "# Unsupported language, using Python template\nimport sys\nprint(sys.stdin.read())\n"
-	}
-}
-
-// pythonTemplateCode generates template-specific Python boilerplate.
-func pythonTemplateCode(pluginName, template string) string {
-	switch template {
-	case "word_doc":
-		return fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s — Word Document Processing
-
-Dependencies: pip install python-docx
-"""
-import json
-import sys
-from pathlib import Path
-
-def main():
-    args = json.loads(sys.stdin.read())
-    action = args.get("action", "create")  # create, read, modify
-    filepath = args.get("filepath", "output.docx")
-    content = args.get("content", "")
-
-    try:
-        from docx import Document
-    except ImportError:
-        print(json.dumps({"error": "python-docx not installed. Run: pip install python-docx"}))
-        return
-
-    if action == "create":
-        doc = Document()
-        doc.add_heading(args.get("title", "Document"), level=1)
-        for paragraph in content.split("\n"):
-            if paragraph.strip():
-                doc.add_paragraph(paragraph.strip())
-        doc.save(filepath)
-        print(json.dumps({"status": "created", "filepath": filepath}))
-
-    elif action == "read":
-        doc = Document(filepath)
-        text = "\n".join([p.text for p in doc.paragraphs])
-        print(json.dumps({"text": text, "paragraphs": len(doc.paragraphs)}))
-
-    elif action == "modify":
-        doc = Document(filepath)
-        doc.add_paragraph(content)
-        doc.save(filepath)
-        print(json.dumps({"status": "modified", "filepath": filepath}))
-
-    else:
-        print(json.dumps({"error": f"Unknown action: {action}"}))
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-
-	case "excel":
-		return fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s — Excel Spreadsheet Processing
-
-Dependencies: pip install openpyxl
-"""
-import json
-import sys
-
-def main():
-    args = json.loads(sys.stdin.read())
-    action = args.get("action", "create")  # create, read, modify
-    filepath = args.get("filepath", "output.xlsx")
-
-    try:
-        from openpyxl import Workbook, load_workbook
-    except ImportError:
-        print(json.dumps({"error": "openpyxl not installed. Run: pip install openpyxl"}))
-        return
-
-    if action == "create":
-        wb = Workbook()
-        ws = wb.active
-        ws.title = args.get("sheet_name", "Sheet1")
-        headers = args.get("headers", [])
-        rows = args.get("rows", [])
-        if headers:
-            ws.append(headers)
-        for row in rows:
-            ws.append(row)
-        wb.save(filepath)
-        print(json.dumps({"status": "created", "filepath": filepath, "rows": len(rows)}))
-
-    elif action == "read":
-        wb = load_workbook(filepath)
-        ws = wb.active
-        data = []
-        for row in ws.iter_rows(values_only=True):
-            data.append(list(row))
-        print(json.dumps({"sheet": ws.title, "rows": len(data), "data": data[:50]}))
-
-    elif action == "modify":
-        wb = load_workbook(filepath)
-        ws = wb.active
-        row_data = args.get("row", [])
-        ws.append(row_data)
-        wb.save(filepath)
-        print(json.dumps({"status": "modified", "total_rows": ws.max_row}))
-
-    else:
-        print(json.dumps({"error": f"Unknown action: {action}"}))
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-
-	case "api_call":
-		return fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s — REST API Caller
-
-Dependencies: pip install requests
-"""
-import json
-import sys
-
-def main():
-    args = json.loads(sys.stdin.read())
-    url = args.get("url", "")
-    method = args.get("method", "GET").upper()
-    headers = args.get("headers", {})
-    body = args.get("body")
-
-    if not url:
-        print(json.dumps({"error": "url is required"}))
-        return
-
-    try:
-        import requests
-    except ImportError:
-        print(json.dumps({"error": "requests not installed. Run: pip install requests"}))
-        return
-
-    try:
-        resp = requests.request(
-            method, url,
-            headers=headers,
-            json=body if body else None,
-            timeout=30,
-        )
-        result = {
-            "status_code": resp.status_code,
-            "headers": dict(resp.headers),
-            "body": resp.text[:2000],
-        }
-        try:
-            result["json"] = resp.json()
-        except ValueError:
-            pass
-        print(json.dumps(result))
-    except requests.RequestException as e:
-        print(json.dumps({"error": str(e)}))
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-
-	case "data_analysis":
-		return fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s — Data Analysis
-
-Dependencies: pip install pandas
-"""
-import json
-import sys
-
-def main():
-    args = json.loads(sys.stdin.read())
-    action = args.get("action", "describe")  # describe, filter, aggregate
-    filepath = args.get("filepath", "")
-    data_inline = args.get("data")
-
-    try:
-        import pandas as pd
-    except ImportError:
-        print(json.dumps({"error": "pandas not installed. Run: pip install pandas"}))
-        return
-
-    # Load data
-    if filepath:
-        if filepath.endswith(".csv"):
-            df = pd.read_csv(filepath)
-        elif filepath.endswith(".xlsx"):
-            df = pd.read_excel(filepath)
-        elif filepath.endswith(".json"):
-            df = pd.read_json(filepath)
-        else:
-            print(json.dumps({"error": f"Unsupported file format: {filepath}"}))
-            return
-    elif data_inline:
-        df = pd.DataFrame(data_inline)
-    else:
-        print(json.dumps({"error": "filepath or data is required"}))
-        return
-
-    if action == "describe":
-        desc = df.describe(include="all").to_dict()
-        result = {
-            "shape": list(df.shape),
-            "columns": list(df.columns),
-            "dtypes": {k: str(v) for k, v in df.dtypes.items()},
-            "describe": desc,
-            "head": df.head(5).to_dict(orient="records"),
-        }
-    elif action == "filter":
-        column = args.get("column", "")
-        value = args.get("value")
-        op = args.get("op", "eq")
-        if op == "eq":
-            filtered = df[df[column] == value]
-        elif op == "gt":
-            filtered = df[df[column] > value]
-        elif op == "lt":
-            filtered = df[df[column] < value]
-        elif op == "contains":
-            filtered = df[df[column].astype(str).str.contains(str(value), na=False)]
-        else:
-            filtered = df
-        result = {"rows": len(filtered), "data": filtered.head(50).to_dict(orient="records")}
-    elif action == "aggregate":
-        group_by = args.get("group_by", "")
-        agg_col = args.get("agg_column", "")
-        agg_func = args.get("agg_func", "sum")
-        grouped = df.groupby(group_by)[agg_col].agg(agg_func).reset_index()
-        result = {"data": grouped.to_dict(orient="records")}
-    else:
-        result = {"error": f"Unknown action: {action}"}
-
-    print(json.dumps(result, default=str))
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-
-	default:
-		return fmt.Sprintf(`#!/usr/bin/env python3
-"""Plugin: %s"""
-import json
-import sys
-
-def main():
-    args = json.loads(sys.stdin.read())
-    user_input = args.get("input", "")
-    result = f"Processed: {user_input}"
-    print(result)
-
-if __name__ == "__main__":
-    main()
-`, pluginName)
-	}
-}
-
 func (g *Gateway) handleSandboxExec(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
@@ -719,7 +431,7 @@ func (g *Gateway) handleSystemStats(w http.ResponseWriter, r *http.Request) {
 	tid := tenantFromCtx(r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"requests_total": g.reqCount,
+		"requests_total": g.reqCount.Load(),
 		"tenants":        len(g.tenants.List()),
 		"skills":         len(g.registry.All()),
 		"plugins":        len(g.pluginReg.AllIncludeDisabled()),
@@ -766,6 +478,15 @@ func (g *Gateway) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {
 		req.Role = "user"
 	}
 
+	// Security: only allow "user" role via API Key token exchange.
+	// Admin tokens must be issued through a different mechanism.
+	allowedRoles := map[string]bool{"user": true, "viewer": true}
+	if !allowedRoles[req.Role] {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "role not allowed via API key exchange"})
+		return
+	}
+
 	if g.jwtCfg == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{"error": "jwt not configured"})
@@ -789,6 +510,7 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Max 32MB
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid multipart form")
 		return
@@ -799,6 +521,24 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	filename := filepath.Base(strings.TrimSpace(header.Filename))
+	if filename == "" || filename == "." || filename == string(filepath.Separator) {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid filename")
+		return
+	}
+
+	// Security: validate file extension to prevent dangerous uploads
+	ext := strings.ToLower(filepath.Ext(filename))
+	blockedExts := map[string]bool{
+		".exe": true, ".bat": true, ".cmd": true, ".com": true, ".msi": true,
+		".sh": true, ".bash": true, ".ps1": true, ".vbs": true, ".wsf": true,
+		".scr": true, ".pif": true, ".dll": true, ".so": true, ".dylib": true,
+	}
+	if blockedExts[ext] {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "file type not allowed: "+ext)
+		return
+	}
 
 	content, err := io.ReadAll(file)
 	if err != nil {
@@ -813,28 +553,28 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "sandbox init failed", sbErr))
 		return
 	}
-	sb.WriteFile(header.Filename, string(content))
-	savedPath := filepath.Join(sb.WorkDir(), header.Filename)
+	sb.WriteFile(filename, string(content))
+	savedPath := filepath.Join(sb.WorkDir(), filename)
 
-	slog.Info("file uploaded", "tenant", tid, "name", header.Filename, "size", len(content))
+	slog.Info("file uploaded", "tenant", tid, "name", filename, "size", len(content))
 
 	resp := map[string]any{
-		"filename": header.Filename,
+		"filename": filename,
 		"size":     len(content),
 		"path":     savedPath,
 	}
 
-	snippet := TryParseFile(header.Filename, content)
+	snippet := TryParseFile(filename, content)
 	if isMinerUSupportedExt(ext) && g.documentParser != nil && g.documentParser.Enabled() {
-		if parsed, perr := g.parseFileWithMinerU(r.Context(), header.Filename, content); perr != nil {
-			slog.Warn("upload MinerU parse failed", "name", header.Filename, "err", perr)
+		if parsed, perr := g.parseFileWithMinerU(r.Context(), filename, content); perr != nil {
+			slog.Warn("upload MinerU parse failed", "name", filename, "err", perr)
 		} else {
 			snippet = parsed.Markdown
 			resp["parse"] = parsed.Parse
 		}
 	}
 	if g.planner != nil {
-		if analysis, aerr := g.planner.AnalyzeUploadedFile(r.Context(), header.Filename, snippet); aerr != nil {
+		if analysis, aerr := g.planner.AnalyzeUploadedFile(r.Context(), filename, snippet); aerr != nil {
 			slog.Debug("upload template analysis skipped", "err", aerr)
 		} else {
 			actions := planner.AnalysisToActions(savedPath, analysis)

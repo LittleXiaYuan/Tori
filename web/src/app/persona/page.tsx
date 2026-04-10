@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type PersonaSkill, type PresetInfo } from "@/lib/api";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { AnimatedList } from "@/components/ui/animated-list";
-import { Fingerprint, Plus, Trash2, Save, FileText, Sparkles, ToggleLeft, ToggleRight, Sticker } from "lucide-react";
+import { Fingerprint, Plus, Trash2, Save, FileText, Sparkles, ToggleLeft, ToggleRight, Sticker, BrainCircuit } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 function buildPresetIdentity(preset: PresetInfo) {
@@ -40,6 +40,7 @@ function buildPresetSoul(preset: PresetInfo) {
 
 export default function PersonaPage() {
   const { t } = useI18n();
+  const [tab, setTab] = useState<"persona" | "memory">("persona");
   const featureLabels: Record<string, { label: string; desc: string }> = {
     emotion_enabled: { label: t("persona.emotionAnalysis"), desc: t("persona.emotionAnalysisDesc") },
     sticker_enabled: { label: t("persona.stickerSuggestions"), desc: t("persona.stickerSuggestionsDesc") },
@@ -55,6 +56,10 @@ export default function PersonaPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showNewPreset, setShowNewPreset] = useState(false);
   const [newPreset, setNewPreset] = useState({ id: "", name: "", description: "", tone: "", style: "", greeting: "", system_note: "" });
+
+  const [memoryBlocks, setMemoryBlocks] = useState<any[]>([]);
+  const [editingBlock, setEditingBlock] = useState<any | null>(null);
+  const [newBlock, setNewBlock] = useState({ label: "user_preference", content: "" });
 
   // Sticker management state
   type StickerEntry = { package_id: string; sticker_id: string; platform: string; emotion: string };
@@ -84,6 +89,12 @@ export default function PersonaPage() {
       setStickerData(sm || {});
     } catch {
       /* stickers not available */
+    }
+    try {
+      const mb = await api.getMemoryPersona();
+      setMemoryBlocks(mb || []);
+    } catch {
+      /* memory not available */
     }
     setLoading(false);
   };
@@ -177,6 +188,24 @@ export default function PersonaPage() {
     setStickerData(sm || {});
   };
 
+  const handleSaveBlock = async (id: string, label: string, content: string) => {
+    try {
+      await api.updateMemoryPersona({ id, label, content });
+      setEditingBlock(null);
+      setNewBlock({ label: "user_preference", content: "" });
+      const mb = await api.getMemoryPersona();
+      setMemoryBlocks(mb || []);
+    } catch { /* ignore */ }
+  };
+
+  const handleDeleteBlock = async (id: string, label: string) => {
+    try {
+      await api.updateMemoryPersona({ id, label, content: "" }); // empty content deletes
+      const mb = await api.getMemoryPersona();
+      setMemoryBlocks(mb || []);
+    } catch { /* ignore */ }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -191,21 +220,36 @@ export default function PersonaPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <Fingerprint size={20} />
-            <h1 className="text-xl font-semibold tracking-tight">{t("persona.title")}</h1>
+            <h1 className="text-xl font-semibold tracking-tight">{tab === "persona" ? t("persona.title") : "Editable Memory"}</h1>
           </div>
-          <button
-            onClick={savePersona}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
-            style={{ background: "var(--text)", color: "var(--bg)" }}
-          >
-            <Save size={14} />
-            {saving ? t("persona.saving") : t("persona.save")}
-          </button>
+          <div className="flex gap-1 p-1 rounded-full border" style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}>
+            {([["persona", t("persona.title")], ["memory", "Memory"]] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key as any)}
+                className="px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer"
+                style={{ background: tab === key ? "var(--text)" : "transparent", color: tab === key ? "var(--bg)" : "var(--text-muted)" }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab === "persona" && (
+            <button
+              onClick={savePersona}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer"
+              style={{ background: "var(--text)", color: "var(--bg)" }}
+            >
+              <Save size={14} />
+              {saving ? t("persona.saving") : t("persona.save")}
+            </button>
+          )}
         </div>
       </BlurFade>
 
-      <div className="grid gap-6">
+      {tab === "persona" && (
+        <div className="grid gap-6">
         {/* Preset selector */}
         {presets.length > 0 && (
           <BlurFade delay={0.03}>
@@ -538,6 +582,103 @@ export default function PersonaPage() {
           </div>
         </BlurFade>
       </div>
+      )}
+
+      {tab === "memory" && (
+        <BlurFade delay={0.05}>
+          <div className="grid gap-6">
+            <div className="rounded-xl border p-5" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-xs font-medium uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+                  <BrainCircuit size={14} /> 
+                  Memory Blocks ({memoryBlocks.length})
+                </div>
+              </div>
+              
+              <div className="mb-6 p-4 rounded-lg border space-y-3" style={{ borderColor: "var(--border)", background: "var(--bg-hover)" }}>
+                <div className="text-xs font-medium mb-1" style={{ color: "var(--text)" }}>Add New Memory</div>
+                <div className="flex gap-2">
+                  <select
+                    value={newBlock.label}
+                    onChange={(e) => setNewBlock({ ...newBlock, label: e.target.value })}
+                    className="bg-transparent border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    style={{ borderColor: "var(--border)", width: 140 }}
+                  >
+                    <option value="user_preference">Preference</option>
+                    <option value="fact">Fact</option>
+                    <option value="system">System</option>
+                  </select>
+                  <input
+                    value={newBlock.content}
+                    onChange={(e) => setNewBlock({ ...newBlock, content: e.target.value })}
+                    placeholder="Enter memory content..."
+                    className="flex-1 bg-transparent border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    style={{ borderColor: "var(--border)" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newBlock.content) {
+                        handleSaveBlock("", newBlock.label, newBlock.content);
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => handleSaveBlock("", newBlock.label, newBlock.content)}
+                    disabled={!newBlock.content}
+                    className="px-4 py-2 text-sm rounded-lg font-medium cursor-pointer"
+                    style={{ background: "var(--text)", color: "var(--bg)", opacity: newBlock.content ? 1 : 0.5 }}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {memoryBlocks.length === 0 ? (
+                <div className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>No memory blocks found.</div>
+              ) : (
+                <div className="space-y-3">
+                  {memoryBlocks.map((mb) => (
+                    <div key={mb.id} className="p-4 rounded-lg border transition-colors flex gap-4" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] uppercase px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}>
+                            {mb.label}
+                          </span>
+                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            ID: {mb.id}
+                          </span>
+                        </div>
+                        
+                        {editingBlock?.id === mb.id ? (
+                          <div className="flex gap-2">
+                            <input
+                              value={editingBlock.content}
+                              onChange={(e) => setEditingBlock({ ...editingBlock, content: e.target.value })}
+                              className="flex-1 bg-transparent border rounded-lg px-3 py-1.5 text-sm focus:outline-none"
+                              style={{ borderColor: "var(--accent)" }}
+                            />
+                            <button onClick={() => setEditingBlock(null)} className="px-3 py-1.5 text-xs rounded-lg border" style={{ color: "var(--text-muted)" }}>Cancel</button>
+                            <button onClick={() => handleSaveBlock(mb.id, mb.label, editingBlock.content)} className="px-3 py-1.5 text-xs rounded-lg font-medium" style={{ background: "var(--text)", color: "var(--bg)" }}>Save</button>
+                          </div>
+                        ) : (
+                          <div className="text-sm cursor-pointer hover:opacity-80" onClick={() => setEditingBlock(mb)}>{mb.content}</div>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => handleDeleteBlock(mb.id, mb.label)}
+                        className="p-1.5 rounded-lg h-fit transition-colors cursor-pointer hover:bg-red-500/10 hover:text-red-500"
+                        style={{ color: "var(--text-muted)" }}
+                        title="Delete memory"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </BlurFade>
+      )}
     </div>
   );
 }

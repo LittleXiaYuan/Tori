@@ -10,10 +10,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+
 	"path/filepath"
 	"strings"
 	"time"
 
+	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/version"
 )
 
@@ -28,23 +31,40 @@ type BackupManifest struct {
 }
 
 // backupFiles lists the data files to include in a backup.
-var backupFiles = []string{
-	"data/memory.json",
-	"data/adaptive.json",
-	"data/graph.json",
-	"data/editable.json",
-	"data/audit.jsonl",
-	"data/mcp.json",
-	"data/cron/jobs.json",
-	"data/persona/IDENTITY.md",
-	"data/persona/SOUL.md",
+// backupRelFiles lists relative file paths (under DataDir) to include in a backup.
+var backupRelFiles = []string{
+	"memory.json",
+	"adaptive.json",
+	"graph.json",
+	"editable.json",
+	"audit.jsonl",
+	"mcp.json",
+	"cron/jobs.json",
+	"persona/IDENTITY.md",
+	"persona/SOUL.md",
 }
 
-// backupDirs lists directories whose contents should be recursively included.
-var backupDirs = []string{
-	"data/sessions",
-	"data/persona/skills",
-	"data/plugins",
+// backupRelDirs lists relative directory paths (under DataDir) to recurse.
+var backupRelDirs = []string{
+	"sessions",
+	"persona/skills",
+	"plugins",
+}
+
+func backupFiles() []string {
+	out := make([]string, len(backupRelFiles))
+	for i, f := range backupRelFiles {
+		out[i] = filepath.Join(appdir.DataDir(), f)
+	}
+	return out
+}
+
+func backupDirs() []string {
+	out := make([]string, len(backupRelDirs))
+	for i, d := range backupRelDirs {
+		out[i] = filepath.Join(appdir.DataDir(), d)
+	}
+	return out
 }
 
 // handleBackupExport creates a ZIP backup and streams it to the client.
@@ -72,22 +92,25 @@ func (g *Gateway) handleBackupExport(w http.ResponseWriter, r *http.Request) {
 		FileSizes:       make(map[string]int64),
 	}
 
+	dataRoot := appdir.DataDir()
+
 	// Add individual files
-	for _, rel := range backupFiles {
-		if err := addFileToZip(zw, rel, &manifest); err != nil {
-			slog.Debug("backup: skip file", "path", rel, "err", err)
+	for _, abs := range backupFiles() {
+		rel, _ := filepath.Rel(dataRoot, abs)
+		if err := addFileToZip(zw, abs, filepath.ToSlash(rel), &manifest); err != nil {
+			slog.Debug("backup: skip file", "path", abs, "err", err)
 		}
 	}
 
 	// Add directory contents
-	for _, dir := range backupDirs {
+	for _, dir := range backupDirs() {
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 				if err != nil || info.IsDir() {
 					return nil
 				}
-				rel := filepath.ToSlash(path)
-				return addFileToZip(zw, rel, &manifest)
+				rel, _ := filepath.Rel(dataRoot, path)
+				return addFileToZip(zw, path, filepath.ToSlash(rel), &manifest)
 			})
 		}
 	}
@@ -167,61 +190,94 @@ func (g *Gateway) handleBackupImport(w http.ResponseWriter, r *http.Request) {
 		backupMajor := majorVersion(manifest.AgentVersion)
 		currentMajor := majorVersion(version.Version)
 		if backupMajor != currentMajor {
-			http.Error(w, fmt.Sprintf("major version mismatch: backup=%s current=%s", manifest.AgentVersion, version.Version), http.StatusConflict)
+			apperror.WriteCode(w, apperror.CodeBadRequest, fmt.Sprintf("major version mismatch: backup=%s current=%s", manifest.AgentVersion, version.Version))
 			return
 		}
 		versionWarning = fmt.Sprintf("minor version difference: backup=%s current=%s", manifest.AgentVersion, version.Version)
 	}
 
-	// Extract files (only to known safe paths under data/)
+	dataRoot := appdir.DataDir()
+
+	// Validate all file checksums before writing anything back to disk.
+	for _, f := range zr.File {
+		if f.Name == "manifest.json" || f.FileInfo().IsDir() {
+			continue
+		}
+
+		cleanName := filepath.Clean(filepath.FromSlash(f.Name))
+		if strings.Contains(cleanName, "..") {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "backup archive contains invalid traversal path")
+			return
+		}
+
+		expected, ok := manifest.Files[f.Name]
+		if !ok || expected == "" {
+			apperror.WriteCode(w, apperror.CodeBadRequest, fmt.Sprintf("unexpected file in backup: %s", f.Name))
+			return
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "failed to read backup entry: "+f.Name)
+			return
+		}
+		h := sha256.New()
+		if _, err := io.Copy(h, rc); err != nil {
+			rc.Close()
+			apperror.WriteCode(w, apperror.CodeBadRequest, "failed to validate backup entry: "+f.Name)
+			return
+		}
+		rc.Close()
+
+		actualHash := hex.EncodeToString(h.Sum(nil))
+		if actualHash != expected {
+			apperror.WriteCode(w, apperror.CodeBadRequest, fmt.Sprintf("checksum mismatch for %s", f.Name))
+			return
+		}
+	}
+
 	restored := 0
 	for _, f := range zr.File {
 		if f.Name == "manifest.json" {
 			continue
 		}
 
-		// Security: only allow extraction under data/
 		cleanName := filepath.Clean(filepath.FromSlash(f.Name))
-		if !strings.HasPrefix(cleanName, "data"+string(filepath.Separator)) && !strings.HasPrefix(cleanName, "data\\") && cleanName != "data" {
-			slog.Warn("backup: skip unsafe path", "path", f.Name)
-			continue
-		}
-
-		// Prevent path traversal
 		if strings.Contains(cleanName, "..") {
 			slog.Warn("backup: skip traversal path", "path", f.Name)
 			continue
 		}
-
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(cleanName, 0o755)
+		if _, ok := manifest.Files[f.Name]; !ok {
+			slog.Warn("backup: skip undeclared file", "file", f.Name)
 			continue
 		}
 
-		// Verify checksum if available
+		targetPath := filepath.Join(dataRoot, cleanName)
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(targetPath, 0o755)
+			continue
+		}
+
 		rc, err := f.Open()
 		if err != nil {
 			continue
 		}
 
-		dir := filepath.Dir(cleanName)
-		os.MkdirAll(dir, 0o755)
+		os.MkdirAll(filepath.Dir(targetPath), 0o755)
 
-		outFile, err := os.Create(cleanName)
+		outFile, err := os.Create(targetPath)
 		if err != nil {
 			rc.Close()
 			continue
 		}
 
-		h := sha256.New()
-		mw := io.MultiWriter(outFile, h)
-		io.Copy(mw, rc)
+		_, copyErr := io.Copy(outFile, rc)
 		rc.Close()
 		outFile.Close()
-
-		actualHash := hex.EncodeToString(h.Sum(nil))
-		if expected, ok := manifest.Files[f.Name]; ok && expected != actualHash {
-			slog.Warn("backup: checksum mismatch", "file", f.Name, "expected", expected, "actual", actualHash)
+		if copyErr != nil {
+			slog.Warn("backup: failed to restore file", "file", f.Name, "err", copyErr)
+			continue
 		}
 
 		restored++
@@ -251,19 +307,22 @@ func (g *Gateway) handleBackupInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files := make(map[string]int64)
+	dataRoot := appdir.DataDir()
 
-	for _, rel := range backupFiles {
-		if info, err := os.Stat(rel); err == nil {
-			files[rel] = info.Size()
+	for _, abs := range backupFiles() {
+		if info, err := os.Stat(abs); err == nil {
+			rel, _ := filepath.Rel(dataRoot, abs)
+			files[filepath.ToSlash(rel)] = info.Size()
 		}
 	}
 
-	for _, dir := range backupDirs {
+	for _, dir := range backupDirs() {
 		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return nil
 			}
-			files[filepath.ToSlash(path)] = info.Size()
+			rel, _ := filepath.Rel(dataRoot, path)
+			files[filepath.ToSlash(rel)] = info.Size()
 			return nil
 		})
 	}
@@ -283,17 +342,17 @@ func (g *Gateway) handleBackupInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 // addFileToZip adds a single file to the zip writer and updates the manifest.
-func addFileToZip(zw *zip.Writer, rel string, manifest *BackupManifest) error {
-	data, err := os.ReadFile(rel)
+func addFileToZip(zw *zip.Writer, absPath, archiveName string, manifest *BackupManifest) error {
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return err
 	}
 
 	h := sha256.Sum256(data)
-	manifest.Files[rel] = hex.EncodeToString(h[:])
-	manifest.FileSizes[rel] = int64(len(data))
+	manifest.Files[archiveName] = hex.EncodeToString(h[:])
+	manifest.FileSizes[archiveName] = int64(len(data))
 
-	w, err := zw.Create(rel)
+	w, err := zw.Create(archiveName)
 	if err != nil {
 		return err
 	}

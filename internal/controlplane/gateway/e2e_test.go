@@ -187,8 +187,8 @@ func TestE2E_MetricsEndpoints(t *testing.T) {
 		t.Fatalf("metrics: expected 200, got %d", w.Code)
 	}
 
-	// Prometheus (no auth required)
-	req = httptest.NewRequest("GET", "/v1/metrics/prometheus", nil)
+	// Prometheus (auth required since security hardening)
+	req = authedRequest("GET", "/v1/metrics/prometheus", "", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 	if w.Code != 200 {
