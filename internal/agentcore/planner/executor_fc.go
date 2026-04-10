@@ -231,9 +231,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 }
 
 // buildFunctionDefs converts skill definitions to LLM FunctionDef format.
-// Uses two optimization strategies:
-// 1. Dynamic filtering: keyword-based intent matching to select relevant skills
-// 2. Hierarchical fallback: category meta-tools when filtered set is still large
+// In delegation mode (5+ handoff agents), only exposes transfer_to_* tools.
+// Exec agents get domain-specific tools via their isolated RunFunc context.
 func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	cats := p.registry.Categories()
@@ -242,9 +241,29 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	for _, c := range cats {
 		catNames = append(catNames, fmt.Sprintf("%s(%d)", c.ID, len(c.SkillNames)))
 	}
+
+	// Delegation mode: planner only sees handoff tools, exec agents handle the rest
+	if p.handoffReg != nil && len(p.handoffReg.List()) >= 4 {
+		hdDefs := p.handoffReg.ToolDefinitions()
+		defs := make([]llm.FunctionDef, 0, len(hdDefs))
+		for _, hd := range hdDefs {
+			fn, _ := hd["function"].(map[string]any)
+			if fn == nil {
+				continue
+			}
+			name, _ := fn["name"].(string)
+			desc, _ := fn["description"].(string)
+			params, _ := fn["parameters"].(map[string]any)
+			defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
+		}
+		slog.Info("buildFunctionDefs", "mode", "delegation", "handoff_tools", len(defs), "total_skills", len(allSkills), "msg_prefix", truncate(userMessage, 50))
+		return defs
+	}
+
 	slog.Info("buildFunctionDefs", "total_skills", len(allSkills), "categories", len(cats), "cat_detail", strings.Join(catNames, ","), "msg_prefix", truncate(userMessage, 50))
 
-	// Strategy 1: Dynamic filtering by intent (keyword + Ledger success + recency)
+	// Fallback: direct mode (no delegation agents or fewer than 4)
+	// Strategy 1: Dynamic filtering by intent
 	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
 		scorer := p.skillScorer
 		if scorer != nil && len(p.recentSkills) > 0 {
@@ -280,9 +299,6 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 		}
 	}
 
-	// All tools: present every registered skill directly to the LLM.
-	// Modern models handle 80+ tools well; hierarchical meta-tools
-	// confuse weaker models and add dispatch complexity.
 	defs := make([]llm.FunctionDef, 0, len(allSkills))
 	for _, s := range allSkills {
 		defs = append(defs, llm.FunctionDef{
@@ -292,7 +308,6 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 		})
 	}
 
-	// Append handoff tool definitions (transfer_to_*)
 	if p.handoffReg != nil {
 		for _, hd := range p.handoffReg.ToolDefinitions() {
 			fn, _ := hd["function"].(map[string]any)
