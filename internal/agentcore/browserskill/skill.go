@@ -38,7 +38,7 @@ func RegisterSkills(reg *skills.Registry, ctrl BrowserController) {
 type navigateSkill struct{ ctrl BrowserController }
 
 func (s *navigateSkill) Name() string        { return "browser_navigate" }
-func (s *navigateSkill) Description() string  { return "Navigate the user's browser to a URL. Returns a screenshot of the loaded page." }
+func (s *navigateSkill) Description() string  { return "Navigate the browser to a URL. After navigation, use browser_mark_elements to find interactive elements, then browser_input/browser_click to interact." }
 func (s *navigateSkill) Parameters() map[string]any {
 	return jsonSchema([]paramDef{{Name: "url", Type: "string", Desc: "The URL to navigate to", Required: true}})
 }
@@ -47,7 +47,11 @@ func (s *navigateSkill) Execute(ctx context.Context, args map[string]any, _ *ski
 	if url == "" {
 		return "", fmt.Errorf("url is required")
 	}
-	return callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_navigate", "url": url})
+	result, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_navigate", "url": url})
+	if err != nil {
+		return result, err
+	}
+	return result + "\n[Hint: Page loaded. Use browser_mark_elements to see interactive elements, then browser_input/browser_click to interact with the page.]", nil
 }
 
 // ─── Click ───────────────────────────────────────────
@@ -313,6 +317,12 @@ func callBrowser(ctx context.Context, ctrl BrowserController, action map[string]
 	result, err := ctrl.SendAction(ctx, action)
 	if err != nil {
 		return "", err
+	}
+	resultMap, _ := result.(map[string]any)
+	if resultMap != nil {
+		if _, has := resultMap["screenshot"]; has {
+			resultMap["screenshot"] = "[captured]"
+		}
 	}
 	data, _ := json.Marshal(result)
 	return string(data), nil
