@@ -48,7 +48,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}
 
 		client := p.LLMClientFor(req.ModelOverride)
-		reply, toolCalls, err := client.ChatWithTools(ctx, messages, tools, 0.7)
+		var lastReasoning string
+		opts := &llm.ChatWithToolsOpts{LastReasoningOut: &lastReasoning}
+		reply, toolCalls, err := client.ChatWithToolsEx(ctx, messages, tools, 0.7, opts)
 		if err != nil {
 			return nil, fmt.Errorf("planner fc step %d: %w", steps, err)
 		}
@@ -69,7 +71,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						req.StepCallback(reflEvt)
 					}
 					messages = append(messages,
-						llm.Message{Role: "assistant", Content: reply},
+						llm.Message{Role: "assistant", Content: reply, ReasoningContent: lastReasoning},
 						llm.Message{Role: "user", Content: "你的回答质量不够好，请重新组织更完善的回答。"},
 					)
 					continue
@@ -78,8 +80,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		}
 
-		// Append assistant message with tool calls reference
-		messages = append(messages, llm.Message{Role: "assistant", Content: reply, ToolCalls: toolCalls})
+		// Append assistant message with tool calls + reasoning (required by Kimi K2.5 etc.)
+		messages = append(messages, llm.Message{Role: "assistant", Content: reply, ToolCalls: toolCalls, ReasoningContent: lastReasoning})
 
 		// Execute tool calls in parallel
 		type tcResult struct {
