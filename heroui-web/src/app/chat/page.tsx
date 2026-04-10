@@ -436,6 +436,7 @@ export default function ChatPage() {
   const [activePreset, setActivePreset] = useState("");
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [browserTraceEvents, setBrowserTraceEvents] = useState<AgentEvent[]>([]);
+  const [resumePromptForBrowser, setResumePromptForBrowser] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputShellRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -509,6 +510,14 @@ export default function ChatPage() {
       showToast(message, "error");
     },
   });
+
+  useEffect(() => {
+    if (!bridgeState?.connected || !resumePromptForBrowser) return;
+    setBridgeNotice({
+      tone: "success",
+      text: "Browser connector is ready. You can continue the blocked task now.",
+    });
+  }, [bridgeState?.connected, resumePromptForBrowser, setBridgeNotice]);
 
   // SSE for trace events 閳?use fetch-based SSE to avoid leaking credentials in URL
   useEffect(() => {
@@ -789,6 +798,7 @@ ${text.slice(0, 4000)}` });
       const extStatus = await api.browserExtStatus().catch(() => ({ connected: false }));
       if (!extStatus.connected) {
         setShowConnectors(true);
+        setResumePromptForBrowser(text);
         setBridgeNotice({ tone: "warning", text: "Browser extension not connected. Opened install guide for you." });
         pushBrowserTrace(makeBrowserTraceEvent(
           "Browser extension required",
@@ -861,6 +871,7 @@ ${text.slice(0, 4000)}` });
         const artifact = summarizeSlashBrowserResult(String(builtAction.action.type), result);
         const content = formatSlashBrowserResponse(slashBrowserCommand, artifact, result);
         chatD({ type: "UPDATE_LAST", updates: { content, browserSummary: artifact } });
+        setResumePromptForBrowser(null);
         setLastArtifact(artifact);
         setBridgeNotice({ tone: "success", text: browserTraceSummary(slashBrowserCommand.command, "success") });
         pushBrowserTrace(makeBrowserTraceEvent(
@@ -969,8 +980,10 @@ ${text.slice(0, 4000)}` });
                 if (doneData.reasoning_content) updates.reasoning = doneData.reasoning_content;
                 if (doneData.browser_summary) {
                   updates.browserSummary = mapBrowserSummary(doneData.browser_summary);
+                  setResumePromptForBrowser(null);
                 }
                 if (doneData.browser_requirement) {
+                  setResumePromptForBrowser(text);
                   updates.browserRequirement = doneData.browser_requirement;
                 }
                 chatD({ type: "UPDATE_LAST", updates });
@@ -1757,6 +1770,15 @@ ${text.slice(0, 4000)}` });
                               setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." });
                             });
                         }}
+                        onContinue={bridgeState?.connected ? () => {
+                          const previousUserPrompt = chat.messages[idx - 1]?.role === "user"
+                            ? chat.messages[idx - 1]?.content
+                            : resumePromptForBrowser;
+                          if (!previousUserPrompt) return;
+                          setResumePromptForBrowser(previousUserPrompt);
+                          sendMessage(previousUserPrompt);
+                        } : undefined}
+                        continueLabel="Continue blocked task"
                       />
                     )}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (

@@ -16,9 +16,11 @@ interface BrowserConnectCardProps {
   connected?: boolean;
   onOpenSetup?: () => void;
   onRefresh?: () => void;
+  onContinue?: () => void;
+  continueLabel?: string;
 }
 
-export function BrowserConnectCard({ requirement, connected, onOpenSetup, onRefresh }: BrowserConnectCardProps) {
+export function BrowserConnectCard({ requirement, connected, onOpenSetup, onRefresh, onContinue, continueLabel }: BrowserConnectCardProps) {
   if (!requirement?.required) return null;
 
   return (
@@ -71,6 +73,11 @@ export function BrowserConnectCard({ requirement, connected, onOpenSetup, onRefr
               <RefreshCw size={14} />
               Refresh status
             </Button>
+            {connected && onContinue && (
+              <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={onContinue}>
+                {continueLabel || "Continue task"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
