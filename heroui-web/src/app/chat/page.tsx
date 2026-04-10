@@ -11,12 +11,14 @@ import {
   PinOff, MoreHorizontal, Monitor, AlertTriangle, Plug,
 } from "lucide-react";
 import { api, type ConversationInfo, type EmotionResult, type StickerSuggestion, type PresetInfo } from "@/lib/api";
+import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { ConnectorPopover } from "@/components/connector-popover";
 import { BrowserSessionCard, type BrowserActionArtifactSummary, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
 import { BrowserConnectCard, type BrowserRequirement } from "@/components/browser-connect-card";
+import { SkillGrowthPanel } from "@/components/skill-growth-panel";
 import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
@@ -44,6 +46,7 @@ interface Message {
   reasoning?: string;
   browserSummary?: BrowserActionArtifactSummary;
   browserRequirement?: BrowserRequirement;
+  skillSuggestions?: SkillGrowthSuggestion[];
 }
 
 let msgId = 0;
@@ -437,6 +440,7 @@ export default function ChatPage() {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [browserTraceEvents, setBrowserTraceEvents] = useState<AgentEvent[]>([]);
   const [resumePromptForBrowser, setResumePromptForBrowser] = useState<string | null>(null);
+  const [browserResumePending, setBrowserResumePending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputShellRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -1072,13 +1076,26 @@ ${text.slice(0, 4000)}` });
                 type: "save_skill" as const,
                 label: `${s.name} · ${s.description} · ${s.confidence}/10`,
               }));
-              chatD({ type: "UPDATE_LAST", updates: { suggestions: skillSugs } });
+              chatD({ type: "UPDATE_LAST", updates: { suggestions: skillSugs, skillSuggestions: res.suggestions } });
             }
           } catch { /* ignore */ }
         }, 3000);
       }
     }
   }, [chat.input, chat.loading, chat.messages, thinkingLevel, conv.activeId, loadConversations, pushBrowserTrace, setBridgeNotice, setLastArtifact, syncBridgeState]);
+
+  const continueBlockedBrowserTask = useCallback(async (promptOverride?: string | null) => {
+    const nextPrompt = promptOverride || resumePromptForBrowser;
+    if (!nextPrompt || browserResumePending) return;
+    setBrowserResumePending(true);
+    try {
+      await sendMessage(nextPrompt);
+      setResumePromptForBrowser(null);
+      setBridgeNotice({ tone: "success", text: "Resumed the browser task." });
+    } finally {
+      setBrowserResumePending(false);
+    }
+  }, [browserResumePending, resumePromptForBrowser, sendMessage, setBridgeNotice]);
 
   const stopGeneration = () => abortRef.current?.abort();
 
@@ -1412,6 +1429,75 @@ ${text.slice(0, 4000)}` });
             </div>
           </div>
         </header>
+
+        {resumePromptForBrowser && (
+          <div className="px-4 pt-3 xl:px-5 shrink-0">
+            <div
+              className="rounded-[18px] border px-4 py-3"
+              style={{
+                background: bridgeState?.connected
+                  ? "linear-gradient(180deg, rgba(34,197,94,0.1), rgba(34,197,94,0.03))"
+                  : "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.03))",
+                borderColor: bridgeState?.connected ? "rgba(34,197,94,0.18)" : "rgba(245,158,11,0.18)",
+              }}
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                    <Plug size={15} style={{ color: bridgeState?.connected ? "#86efac" : "#fbbf24" }} />
+                    {bridgeState?.connected ? "Browser task ready to resume" : "Browser connector blocked this task"}
+                  </div>
+                  <div className="mt-1 text-xs leading-6" style={{ color: "var(--yunque-text-muted)" }}>
+                    {bridgeState?.connected
+                      ? "The browser runtime is connected again. Continue the blocked task with one click."
+                      : "This task needs the live browser connector. Connect it first, then resume from where the flow paused."}
+                  </div>
+                  <div className="mt-2 truncate rounded-xl px-2.5 py-2 text-[11px]" style={{ background: "rgba(15,23,42,0.3)", color: "var(--yunque-text-secondary)" }}>
+                    {resumePromptForBrowser}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="rounded-full px-3"
+                    variant={bridgeState?.connected ? "primary" : "ghost"}
+                    isDisabled={!bridgeState?.connected || browserResumePending || chat.loading}
+                    isPending={browserResumePending}
+                    onPress={() => continueBlockedBrowserTask()}
+                  >
+                    Continue task
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-full px-3"
+                    onPress={() => window.open("/browser", "_blank", "noopener,noreferrer")}
+                  >
+                    Open browser setup
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-full px-3"
+                    onPress={() => {
+                      syncBridgeState();
+                      api.browserExtStatus()
+                        .then((status) => {
+                          setBridgeNotice({
+                            tone: status.connected ? "success" : "info",
+                            text: status.connected ? "Browser connector is ready." : "Browser connector is still offline.",
+                          });
+                        })
+                        .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
+                    }}
+                  >
+                    Refresh status
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Chat Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar xl:px-6">
@@ -1776,9 +1862,17 @@ ${text.slice(0, 4000)}` });
                             : resumePromptForBrowser;
                           if (!previousUserPrompt) return;
                           setResumePromptForBrowser(previousUserPrompt);
-                          sendMessage(previousUserPrompt);
+                          continueBlockedBrowserTask(previousUserPrompt);
                         } : undefined}
                         continueLabel="Continue blocked task"
+                      />
+                    )}
+                    {msg.role === "assistant" && msg.skillSuggestions && msg.skillSuggestions.length > 0 && (
+                      <SkillGrowthPanel
+                        suggestions={msg.skillSuggestions}
+                        onSave={(suggestion) => {
+                          sendMessage(`Turn this into a reusable skill.\n\nName: ${suggestion.name}\nDescription: ${suggestion.description}\nTrigger: ${suggestion.trigger}`);
+                        }}
                       />
                     )}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
