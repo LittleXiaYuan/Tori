@@ -219,7 +219,7 @@ func TestTryHandleSlashCommand_NavigateWithoutBrowserExtension(t *testing.T) {
 	if !handled {
 		t.Fatal("expected slash command to be handled")
 	}
-	if resp == nil || !strings.Contains(resp.Result.Reply, "浏览器扩展未连接") {
+	if resp == nil || resp.Raw["browser_requirement"] == nil {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
 }
@@ -381,5 +381,33 @@ func TestAugmentMessagesForIntent_InsertsSystemHints(t *testing.T) {
 	}
 	if augmented[2].Role != "user" {
 		t.Fatalf("expected original user message last, got %#v", augmented[2])
+	}
+}
+
+func TestChat_BrowserIntentWithoutConnectorReturnsStructuredRequirement(t *testing.T) {
+	gw, _ := newTestGateway()
+	body := `{"messages":[{"role":"user","content":"open https://owo.today and summarize the page"}]}`
+	req := httptest.NewRequest("POST", "/v1/chat", strings.NewReader(body))
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+
+	gw.handleChat(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	requirement, ok := resp["browser_requirement"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected browser requirement payload, got %#v", resp)
+	}
+	if required, _ := requirement["required"].(bool); !required {
+		t.Fatalf("expected browser requirement to be required, got %#v", requirement)
+	}
+	if reply, _ := resp["reply"].(string); !strings.Contains(reply, "Yunque Browser Connector") {
+		t.Fatalf("unexpected reply: %#v", resp)
 	}
 }

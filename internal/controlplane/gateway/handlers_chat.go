@@ -142,6 +142,30 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msgs = g.augmentMessagesForIntent(msgs, tid)
+	intent := requestIntent{}
+	if len(req.Messages) > 0 {
+		intent = g.detectRequestIntent(req.Messages[len(req.Messages)-1].Content, tid)
+	}
+	if intent.RequiresBrowser && !intent.BrowserConnected {
+		reply := browserRequirementReply()
+		resp := map[string]any{
+			"reply":               reply,
+			"skills_used":         []string{},
+			"steps":               1,
+			"browser_requirement": browserRequirementPayload(),
+			"suggestions": []map[string]string{
+				{"type": "followup", "label": "Open browser setup"},
+			},
+		}
+		if req.SessionID != "" {
+			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Trace-ID", observe.TraceIDFromContext(r.Context()))
+		observe.EndSpan(traceSpan, nil)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
 	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
@@ -256,18 +280,18 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		if g.healer != nil && len(req.Messages) > 0 {
 			lastMsg := req.Messages[len(req.Messages)-1].Content
 			errMsg := err.Error()
-		safego.Go("selfheal", func() {
-			healCtx, healCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer healCancel()
-			if g.healer.ShouldHeal(lastMsg, errMsg) {
-				generated, healErr := g.healer.GenerateAndInstall(healCtx, lastMsg+"\nError: "+errMsg)
-				if healErr != nil {
-					slog.Warn("selfheal: generation failed", "err", healErr)
-				} else {
-					slog.Info("selfheal: plugin generated and installed", "name", generated.Name)
+			safego.Go("selfheal", func() {
+				healCtx, healCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer healCancel()
+				if g.healer.ShouldHeal(lastMsg, errMsg) {
+					generated, healErr := g.healer.GenerateAndInstall(healCtx, lastMsg+"\nError: "+errMsg)
+					if healErr != nil {
+						slog.Warn("selfheal: generation failed", "err", healErr)
+					} else {
+						slog.Info("selfheal: plugin generated and installed", "name", generated.Name)
+					}
 				}
-			}
-		})
+			})
 		}
 
 		apperror.Write(w, apperror.Wrap(apperror.CodeLLMError, "planner execution failed", err))
@@ -325,15 +349,15 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 			userMsg := req.Messages[len(req.Messages)-1].Content
 			assistReply := result.Reply
 			sessionID := req.SessionID
-		safego.Go("auto-title", func() {
-			titleCtx, titleCancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer titleCancel()
-			title := g.generateConversationTitle(titleCtx, userMsg, assistReply)
-			if title != "" {
-				g.convStore.Rename(sessionID, title)
-				slog.Debug("auto-titled conversation", "session", sessionID, "title", title)
-			}
-		})
+			safego.Go("auto-title", func() {
+				titleCtx, titleCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer titleCancel()
+				title := g.generateConversationTitle(titleCtx, userMsg, assistReply)
+				if title != "" {
+					g.convStore.Rename(sessionID, title)
+					slog.Debug("auto-titled conversation", "session", sessionID, "title", title)
+				}
+			})
 		}
 	}
 
@@ -355,23 +379,24 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		if lastUserMsg != "" {
 			pipelineReply := result.Reply
 			pipelineTID := tid
-		safego.Go("memory-pipeline", func() {
-			pipeCtx, pipeCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer pipeCancel()
-			chatMsgs := []memory.ChatMessage{
-				{Role: "user", Content: lastUserMsg},
-				{Role: "assistant", Content: pipelineReply},
-			}
-			result, err := g.pipeline.Process(pipeCtx, pipelineTID, chatMsgs)
-			if err != nil {
-				slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
-			} else if result != nil && len(result.ExtractedFacts) > 0 {
-				slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
-				if g.factHook != nil {
-					g.factHook.OnExtracted(result.ExtractedFacts)
+			safego.Go("memory-pipeline", func() {
+				pipeCtx, pipeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer pipeCancel()
+				chatMsgs := []memory.ChatMessage{
+					{Role: "user", Content: lastUserMsg},
+					{Role: "assistant", Content: pipelineReply},
 				}
-			}
-		})
+				result, err := g.pipeline.Process(pipeCtx, pipelineTID, chatMsgs)
+				if err != nil {
+					slog.Error("memory pipeline failed", "err", err, "tenant", pipelineTID)
+				} else if result != nil && len(result.ExtractedFacts) > 0 {
+					slog.Info("memory pipeline extracted", "facts", len(result.ExtractedFacts), "added", result.Added, "tenant", pipelineTID)
+					if g.factHook != nil {
+						g.factHook.OnExtracted(result.ExtractedFacts)
+					}
+					g.ingestFactsToRAG(pipeCtx, result.ExtractedFacts)
+				}
+			})
 		}
 	}
 
@@ -390,11 +415,11 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	// Adaptive loop: observe interaction for behavior adaptation
 	if g.adaptiveLoop != nil && len(req.Messages) > 0 {
 		userMsg := req.Messages[len(req.Messages)-1].Content
-	safego.Go("adaptive-loop", func() {
-		adaptCtx, adaptCancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer adaptCancel()
-		g.adaptiveLoop.ObserveInteraction(adaptCtx, userMsg, result.Reply)
-	})
+		safego.Go("adaptive-loop", func() {
+			adaptCtx, adaptCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer adaptCancel()
+			g.adaptiveLoop.ObserveInteraction(adaptCtx, userMsg, result.Reply)
+		})
 		// Feed emotion signal into adaptive emoji dimension
 		if emotionHint != nil && emotionHint.IsPositive() {
 			g.adaptiveLoop.RecordFeedback(adaptive.Feedback{
@@ -422,6 +447,34 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 				g.skillGrow.Observe(growCtx, lastUserMsg)
 			})
 		}
+	}
+
+	// Skill suggestion: analyze if this conversation could become a reusable skill
+	if g.skillSuggester != nil && len(req.Messages) > 0 && len(result.Reply) > 200 {
+		lastUserMsg := ""
+		for i := len(req.Messages) - 1; i >= 0; i-- {
+			if req.Messages[i].Role == "user" {
+				lastUserMsg = req.Messages[i].Content
+				break
+			}
+		}
+		suggestReply := result.Reply
+		suggestSkills := result.SkillsUsed
+		suggestUserMsg := lastUserMsg
+		suggestSID := req.SessionID
+		safego.Go("skill-suggest", func() {
+			suggestCtx, suggestCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer suggestCancel()
+			suggestions, err := g.skillSuggester.Analyze(suggestCtx, suggestUserMsg, suggestReply, suggestSkills)
+			if err != nil {
+				slog.Debug("skill suggest failed", "err", err)
+				return
+			}
+			if len(suggestions.Suggestions) > 0 {
+				g.storePendingSuggestions(suggestSID, suggestions.Suggestions)
+				slog.Info("skill suggestions ready", "count", len(suggestions.Suggestions), "session", suggestSID)
+			}
+		})
 	}
 
 	observe.EndSpan(traceSpan, nil)
@@ -506,4 +559,53 @@ func (g *Gateway) generateConversationTitle(ctx context.Context, userMsg, assist
 		title = string([]rune(title)[:30])
 	}
 	return title
+}
+
+// storePendingSuggestions saves skill suggestions for a session.
+func (g *Gateway) storePendingSuggestions(sessionID string, suggestions []memory.SkillSuggestion) {
+	g.pendingSuggestionsMu.Lock()
+	defer g.pendingSuggestionsMu.Unlock()
+	if g.pendingSuggestions == nil {
+		g.pendingSuggestions = make(map[string][]memory.SkillSuggestion)
+	}
+	g.pendingSuggestions[sessionID] = suggestions
+}
+
+// popPendingSuggestions returns and clears skill suggestions for a session.
+func (g *Gateway) popPendingSuggestions(sessionID string) []memory.SkillSuggestion {
+	g.pendingSuggestionsMu.Lock()
+	defer g.pendingSuggestionsMu.Unlock()
+	suggestions := g.pendingSuggestions[sessionID]
+	delete(g.pendingSuggestions, sessionID)
+	return suggestions
+}
+
+// handleSkillSuggestions returns pending skill suggestions for a session.
+// GET /v1/skill-suggestions?session_id=xxx
+func (g *Gateway) handleSkillSuggestions(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+	suggestions := g.popPendingSuggestions(sessionID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"suggestions": suggestions,
+	})
+}
+
+// ingestFactsToRAG writes extracted conversation facts into the knowledge store
+// as a persistent RAG source so they can be retrieved in future queries.
+func (g *Gateway) ingestFactsToRAG(ctx context.Context, facts []string) {
+	if g.knowledgeStore == nil || len(facts) == 0 {
+		return
+	}
+	combined := strings.Join(facts, "\n")
+	name := fmt.Sprintf("对话事实 %s", time.Now().Format("2006-01-02 15:04"))
+	_, err := g.knowledgeStore.IngestText(name, combined)
+	if err != nil {
+		slog.Warn("facts→RAG ingest failed", "err", err)
+		return
+	}
+	if err := g.knowledgeStore.BuildIndex(ctx); err != nil {
+		slog.Warn("facts→RAG index rebuild failed", "err", err)
+	}
+	slog.Info("facts→RAG ingested", "count", len(facts), "source", name)
 }

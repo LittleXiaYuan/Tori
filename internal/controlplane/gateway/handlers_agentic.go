@@ -119,6 +119,39 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msgs = g.augmentMessagesForIntent(msgs, tid)
+	intent := requestIntent{}
+	if len(req.Messages) > 0 {
+		intent = g.detectRequestIntent(req.Messages[len(req.Messages)-1].Content, tid)
+	}
+	if intent.RequiresBrowser && !intent.BrowserConnected {
+		reply := browserRequirementReply()
+		runes := []rune(reply)
+		chunkSize := 20
+		for i := 0; i < len(runes); i += chunkSize {
+			end := i + chunkSize
+			if end > len(runes) {
+				end = len(runes)
+			}
+			chunk := string(runes[i:end])
+			data, _ := json.Marshal(map[string]string{"content": chunk})
+			sseEvent(w, flusher, "delta", string(data))
+		}
+		doneBytes, _ := json.Marshal(map[string]any{
+			"reply":               reply,
+			"skills_used":         []string{},
+			"steps":               1,
+			"browser_requirement": browserRequirementPayload(),
+			"suggestions": []map[string]string{
+				{"type": "followup", "label": "Open browser setup"},
+			},
+		})
+		sseEvent(w, flusher, "done", string(doneBytes))
+		if req.SessionID != "" {
+			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
+		}
+		observe.EndSpan(traceSpan, nil)
+		return
+	}
 	// Memory: write user message(s) to short-term
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {

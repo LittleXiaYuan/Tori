@@ -16,6 +16,7 @@ import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
 import { ConnectorPopover } from "@/components/connector-popover";
 import { BrowserSessionCard, type BrowserActionArtifactSummary, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
+import { BrowserConnectCard, type BrowserRequirement } from "@/components/browser-connect-card";
 import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
@@ -42,6 +43,7 @@ interface Message {
   images?: string[];
   reasoning?: string;
   browserSummary?: BrowserActionArtifactSummary;
+  browserRequirement?: BrowserRequirement;
 }
 
 let msgId = 0;
@@ -803,6 +805,13 @@ ${text.slice(0, 4000)}` });
             "Open the workspace here: [/browser](/browser)",
           ].join("\n"),
           id: newId(),
+          browserRequirement: {
+            required: true,
+            reason: "browser_connector_required",
+            message: "This command needs the live Yunque Browser Connector before it can operate your real browser tab.",
+            install_path: "/browser",
+            settings_path: "/browser",
+          },
           traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-slash", command: slashBrowserCommand.command }, "reflect")],
         };
         chatD({ type: "SET_INPUT", value: "" });
@@ -961,9 +970,16 @@ ${text.slice(0, 4000)}` });
                 if (doneData.browser_summary) {
                   updates.browserSummary = mapBrowserSummary(doneData.browser_summary);
                 }
+                if (doneData.browser_requirement) {
+                  updates.browserRequirement = doneData.browser_requirement;
+                }
                 chatD({ type: "UPDATE_LAST", updates });
                 if (doneData.browser_summary) {
                   setLastArtifact(mapBrowserSummary(doneData.browser_summary));
+                }
+                if (doneData.browser_requirement) {
+                  setShowComputer(true);
+                  setSuggestedTab("browser");
                 }
               } catch { /* ignore */ }
               continue;
@@ -1041,7 +1057,7 @@ ${text.slice(0, 4000)}` });
             if (res.suggestions?.length > 0) {
               const skillSugs = res.suggestions.map((s) => ({
                 type: "save_skill" as const,
-                label: `${s.name}: ${s.description}`,
+                label: `${s.name} · ${s.description} · ${s.confidence}/10`,
               }));
               chatD({ type: "UPDATE_LAST", updates: { suggestions: skillSugs } });
             }
@@ -1722,6 +1738,26 @@ ${text.slice(0, 4000)}` });
                         ))}
                         </div>
                       </div>
+                    )}
+                    {msg.role === "assistant" && msg.browserRequirement?.required && (
+                      <BrowserConnectCard
+                        requirement={msg.browserRequirement}
+                        connected={Boolean(bridgeState?.connected)}
+                        onOpenSetup={() => window.open(msg.browserRequirement?.install_path || "/browser", "_blank", "noopener,noreferrer")}
+                        onRefresh={() => {
+                          syncBridgeState();
+                          api.browserExtStatus()
+                            .then((status) => {
+                              setBridgeNotice({
+                                tone: status.connected ? "success" : "info",
+                                text: status.connected ? "Browser connector is ready." : "Browser connector is still offline.",
+                              });
+                            })
+                            .catch(() => {
+                              setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." });
+                            });
+                        }}
+                      />
                     )}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
                       <details className="mt-3">

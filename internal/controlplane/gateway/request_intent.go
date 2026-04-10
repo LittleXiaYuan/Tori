@@ -20,6 +20,14 @@ type requestIntent struct {
 	SkillGrowthHint    string
 }
 
+type browserRequirement struct {
+	Required     bool   `json:"required"`
+	Reason       string `json:"reason"`
+	Message      string `json:"message"`
+	InstallPath  string `json:"install_path,omitempty"`
+	SettingsPath string `json:"settings_path,omitempty"`
+}
+
 func (g *Gateway) augmentMessagesForIntent(msgs []llm.Message, tenantID string) []llm.Message {
 	if len(msgs) == 0 {
 		return msgs
@@ -159,6 +167,20 @@ func detectSkillGrowthHint(text string) string {
 	}
 
 	return ""
+}
+
+func browserRequirementPayload() browserRequirement {
+	return browserRequirement{
+		Required:     true,
+		Reason:       "browser_connector_required",
+		Message:      "This task needs the live Yunque Browser Connector before I can operate a real page.",
+		InstallPath:  "/browser",
+		SettingsPath: "/browser",
+	}
+}
+
+func browserRequirementReply() string {
+	return "浏览器连接器还未连接。\n\n这个请求需要真实浏览器运行时，而不是普通网页搜索。\n请先连接 Yunque Browser Connector，然后我就可以继续打开页面、读取内容、标记元素并执行后续操作。"
 }
 
 func containsAny(s string, needles ...string) bool {
