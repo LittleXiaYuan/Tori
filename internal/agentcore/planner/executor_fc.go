@@ -210,10 +210,13 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}
 	}
 
+	messages = append(messages, llm.Message{Role: "user", Content: "你已执行了足够多的步骤。请根据以上所有工具结果，直接给出最终回答。"})
+
 	client := p.LLMClientFor(req.ModelOverride)
 	reply, _, err := client.ChatWithTools(ctx, messages, tools, 0.7)
 	if err != nil {
-		return nil, fmt.Errorf("planner fc final: %w", err)
+		summary := "任务已执行 " + fmt.Sprintf("%d", steps) + " 步，但生成总结时出错。"
+		return &PlanResult{Reply: summary, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 	}
 
 	// Update recency for future intent routing
