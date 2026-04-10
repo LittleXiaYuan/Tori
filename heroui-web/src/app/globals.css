@@ -59,7 +59,7 @@
   /* ── Page layout ─────────────────────────── */
   --page-px:       24px;
   --page-py:       24px;
-  --page-max:      1280px;
+  --page-max:      1080px;
   --section-gap:   24px;
   --card-pad:      20px;
   --card-pad-sm:   16px;
@@ -719,9 +719,13 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 .chat-composer-textarea {
   box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
 }
 .chat-composer-textarea:focus {
   box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
 }
 
 /* Chat empty hero icon glow */
@@ -1437,7 +1441,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* Large screens (> 1440px): wider content */
 @media (min-width: 1440px) {
   :root {
-    --page-max: 1400px;
+    --page-max: 1200px;
   }
 }
 

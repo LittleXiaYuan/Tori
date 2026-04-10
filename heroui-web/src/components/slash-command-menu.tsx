@@ -31,6 +31,8 @@ const commands: SlashCommand[] = [
   { id: "calendar_events", command: "/calendar_events", title: "Today’s schedule", description: "Read today’s calendar events.", icon: Calendar, category: "Connectors" },
   { id: "notion_search", command: "/notion_search", title: "Search Notion", description: "Find notes and pages from Notion.", icon: BookOpen, category: "Connectors", placeholder: "release checklist" },
   { id: "slack_send", command: "/slack_send", title: "Send Slack message", description: "Draft or send a message to Slack.", icon: MessageSquare, category: "Connectors", placeholder: "#general Release is ready" },
+  { id: "skill", command: "/skill", title: "Use skill", description: "Invoke a named skill directly.", icon: Sparkles, category: "Tools", placeholder: "web_search query about AI" },
+  { id: "skills", command: "/skills", title: "List skills", description: "Show all available skills and plugins.", icon: Layers, category: "Tools" },
   { id: "workflow", command: "/workflow", title: "Run workflow", description: "Start a reusable workflow from chat.", icon: Layers, category: "Automation", placeholder: "pre-release checks" },
 ];
 
