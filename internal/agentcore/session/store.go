@@ -51,7 +51,7 @@ func NewStore(maxMessages int) *Store {
 	s := &Store{
 		sessions: make(map[string]*Session),
 		maxMsgs:  maxMessages,
-		ttl:      2 * time.Hour,
+		ttl:      24 * time.Hour,
 		stopGC:   make(chan struct{}),
 	}
 	go s.gcLoop()
@@ -76,7 +76,10 @@ func (s *Store) evictExpired() {
 	defer s.mu.Unlock()
 	cutoff := time.Now().Add(-s.ttl)
 	for id, sess := range s.sessions {
-		if sess.UpdatedAt.Before(cutoff) {
+		if sess.Pinned {
+			continue
+		}
+		if sess.UpdatedAt.Before(cutoff) && len(sess.Messages) == 0 {
 			delete(s.sessions, id)
 		}
 	}
@@ -210,33 +213,63 @@ func (s *Store) Append(sessionID string, msgs ...llm.Message) {
 	}
 }
 
-// Get returns a session's messages.
+// Get returns a session's messages, rehydrating from the file repo if needed.
 func (s *Store) Get(sessionID string) []llm.Message {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	sess, ok := s.sessions[sessionID]
-	if !ok {
+	s.mu.RUnlock()
+	if ok {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		out := make([]llm.Message, len(sess.Messages))
+		copy(out, sess.Messages)
+		return out
+	}
+	if s.repo == nil {
 		return nil
 	}
-	out := make([]llm.Message, len(sess.Messages))
-	copy(out, sess.Messages)
-	return out
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	msgs, err := s.repo.GetMessages(ctx, sessionID, s.maxMsgs)
+	if err != nil || len(msgs) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	if existing, ok := s.sessions[sessionID]; ok {
+		s.mu.Unlock()
+		return existing.Messages
+	}
+	restored := &Session{
+		ID:        sessionID,
+		Messages:  msgs,
+		UpdatedAt: time.Now(),
+	}
+	s.sessions[sessionID] = restored
+	s.mu.Unlock()
+	return msgs
 }
 
-// Delete removes a session.
+// Delete removes a session from memory and the persistence backend.
 func (s *Store) Delete(sessionID string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	delete(s.sessions, sessionID)
+	s.mu.Unlock()
+	if s.repo != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = s.repo.Delete(ctx, sessionID)
+	}
 }
 
-// ListByTenant returns all sessions for a tenant.
+// ListByTenant returns all sessions for a tenant, merging in-memory and
+// persisted sessions so that evicted (but saved) sessions still appear.
 func (s *Store) ListByTenant(tenantID string) []Session {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	seen := make(map[string]bool, len(s.sessions))
 	var out []Session
 	for _, sess := range s.sessions {
 		if sess.TenantID == tenantID {
+			seen[sess.ID] = true
 			out = append(out, Session{
 				ID:         sess.ID,
 				TenantID:   sess.TenantID,
@@ -247,6 +280,21 @@ func (s *Store) ListByTenant(tenantID string) []Session {
 				CreatedAt:  sess.CreatedAt,
 				UpdatedAt:  sess.UpdatedAt,
 			})
+		}
+	}
+	s.mu.RUnlock()
+
+	if s.repo != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		repoSessions, err := s.repo.ListByTenant(ctx, tenantID)
+		if err == nil {
+			for _, rs := range repoSessions {
+				if seen[rs.ID] {
+					continue
+				}
+				out = append(out, rs)
+			}
 		}
 	}
 	return out
