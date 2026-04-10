@@ -214,6 +214,10 @@ type Gateway struct {
 	// Tori OAuth2 token store (set externally)
 	toriTokenStore *tori.TokenStore
 
+	// Exec provider override (cognitive/execution separation)
+	execProvider   string
+	execProviderMu sync.RWMutex
+
 	mux       *http.ServeMux
 	reqCount  atomic.Int64
 	startTime time.Time

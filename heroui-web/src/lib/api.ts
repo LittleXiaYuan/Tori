@@ -894,6 +894,10 @@ export const api = {
     fetcher<{ ok: boolean }>("/api/providers/delete", { method: "POST", body: JSON.stringify({ id }) }),
   breakerReset: () =>
     fetcher<{ ok: boolean; reset_count: number }>("/api/breaker/reset", { method: "POST" }),
+  execProvider: () =>
+    fetcher<{ exec_provider: string; available_providers: string[] }>("/api/providers/exec"),
+  setExecProvider: (providerId: string) =>
+    fetcher<{ ok: boolean; exec_provider: string }>("/api/providers/exec", { method: "POST", body: JSON.stringify({ provider_id: providerId }) }),
   toriDiscover: (autoRegister = false) =>
     fetcher<{ models: Array<{ id: string }>; registered?: number }>(`/api/providers/tori/discover?auto_register=${autoRegister}`),
 

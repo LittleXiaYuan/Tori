@@ -269,6 +269,7 @@ func (g *Gateway) registerProviderRoutes() {
 	g.mux.HandleFunc("/api/providers/tori/discover", g.requireAuth(g.handleToriDiscover))
 	g.mux.HandleFunc("/v1/router/stats", g.requireAuth(g.handleRouterStats))
 	g.mux.HandleFunc("/api/breaker/reset", g.requireAuth(g.handleBreakerReset))
+	g.mux.HandleFunc("/api/providers/exec", g.requireAuth(g.handleExecProvider))
 }
 
 // ──────────────────────────────────────────────

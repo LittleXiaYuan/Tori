@@ -317,6 +317,20 @@ func (g *Gateway) SetNotifier(n *notify.Notifier) { g.notifier = n }
 // Notifier returns the notification dispatcher.
 func (g *Gateway) Notifier() *notify.Notifier { return g.notifier }
 
+// SetExecProvider sets the LLM provider used by all exec agents.
+func (g *Gateway) SetExecProvider(id string) {
+	g.execProviderMu.Lock()
+	defer g.execProviderMu.Unlock()
+	g.execProvider = id
+}
+
+// ExecProvider returns the current exec provider (empty means "smart" default).
+func (g *Gateway) ExecProvider() string {
+	g.execProviderMu.RLock()
+	defer g.execProviderMu.RUnlock()
+	return g.execProvider
+}
+
 func truncateStr(s string, maxRunes int) string {
 	r := []rune(s)
 	if len(r) <= maxRunes {

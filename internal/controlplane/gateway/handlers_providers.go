@@ -452,6 +452,43 @@ func (g *Gateway) handleToriDiscover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleExecProvider gets or sets the exec-layer LLM provider.
+// GET  → returns current exec provider
+// POST { "provider_id": "moonshot-kimi-k2.5" } → sets exec provider
+func (g *Gateway) handleExecProvider(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		pid := g.ExecProvider()
+		w.Header().Set("Content-Type", "application/json")
+		var providers []string
+		if g.providerReg != nil {
+			for _, p := range g.providerReg.List() {
+				providers = append(providers, p.ID)
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"exec_provider":      pid,
+			"available_providers": providers,
+		})
+
+	case http.MethodPost:
+		var req struct {
+			ProviderID string `json:"provider_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid body")
+			return
+		}
+		g.SetExecProvider(req.ProviderID)
+		slog.Info("exec provider updated via API", "provider", req.ProviderID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "exec_provider": req.ProviderID})
+
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
+	}
+}
+
 // handleBreakerReset manually resets all LLM circuit breakers.
 func (g *Gateway) handleBreakerReset(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

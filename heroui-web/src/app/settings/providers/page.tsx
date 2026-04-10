@@ -6,6 +6,7 @@ import {
   Cpu, Cloud, Zap, Link2, Unlink, RefreshCw, Plus,
   CheckCircle2, AlertCircle, Globe, Server, Wifi, WifiOff,
   Key, ChevronRight, ExternalLink, CloudOff, ArrowDownToLine, Activity, Database, Hash,
+  Brain, Wrench,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
@@ -76,11 +77,12 @@ function CapBadges({ caps, max = 5 }: { caps?: string[]; max?: number }) {
 export default function ProvidersPage() {
   const { data, loading, refresh } = useApiData(
     async () => {
-      const [providersRes, modeRes, presetsRes, toriRes] = await Promise.all([
+      const [providersRes, modeRes, presetsRes, toriRes, execRes] = await Promise.all([
         api.providerList().catch(() => ({ providers: [] as ProviderInfo[], count: 0 })),
         api.providerMode().catch(() => ({ mode: "local" })),
         api.providerPresets().catch(() => ({ presets: [] as ProviderPreset[] })),
         api.toriStatus().catch(() => ({ bound: false } as ToriBindingStatus)),
+        api.execProvider().catch(() => ({ exec_provider: "", available_providers: [] as string[] })),
       ]);
       let toriHealth: ToriHealthStatus = { status: "unknown" };
       let toriUsage: ToriUsageSummary = {};
@@ -97,12 +99,14 @@ export default function ProvidersPage() {
         tori: toriRes,
         toriHealth,
         toriUsage,
+        execProvider: execRes.exec_provider || "",
+        availableProviders: execRes.available_providers || [],
       };
     },
-    { providers: [] as ProviderInfo[], mode: "local" as ProviderModeType, presets: [] as ProviderPreset[], tori: { bound: false } as ToriBindingStatus, toriHealth: { status: "unknown" } as ToriHealthStatus, toriUsage: {} as ToriUsageSummary },
+    { providers: [] as ProviderInfo[], mode: "local" as ProviderModeType, presets: [] as ProviderPreset[], tori: { bound: false } as ToriBindingStatus, toriHealth: { status: "unknown" } as ToriHealthStatus, toriUsage: {} as ToriUsageSummary, execProvider: "", availableProviders: [] as string[] },
   );
 
-  const { providers, mode: serverMode, presets, tori, toriHealth, toriUsage } = data;
+  const { providers, mode: serverMode, presets, tori, toriHealth, toriUsage, execProvider: serverExecProvider, availableProviders } = data;
   const [localMode, setLocalMode] = useState<ProviderModeType | null>(null);
   const mode = localMode ?? serverMode;
   const [expandedPreset, setExpandedPreset] = useState<string | null>(null);
@@ -114,6 +118,7 @@ export default function ProvidersPage() {
   const [registering, setRegistering] = useState(false);
   const [tab, setTab] = useState("mode");
   const [modeError, setModeError] = useState<string | null>(null);
+  const [savingExec, setSavingExec] = useState(false);
 
   const setMode = useCallback(async (m: ProviderModeType) => {
     setLocalMode(m);
@@ -176,6 +181,16 @@ export default function ProvidersPage() {
     setTimeout(() => setRegResult(null), 4000);
   }, [registerForm, refresh]);
 
+  const handleSetExecProvider = useCallback(async (pid: string) => {
+    setSavingExec(true);
+    try {
+      await api.setExecProvider(pid);
+      showToast("执行层模型已更新", "success");
+      refresh();
+    } catch (e) { showToast(e instanceof Error ? e.message : "设置失败", "error"); }
+    setSavingExec(false);
+  }, [refresh]);
+
   const activeProviders = providers.filter(p => p.enabled);
 
   if (loading) {
@@ -215,6 +230,7 @@ export default function ProvidersPage() {
         <Tabs.ListContainer>
           <Tabs.List aria-label="提供商设置">
             <Tabs.Tab id="mode">接入模式<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="routing"><Tabs.Separator />模型分配<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="tori"><Tabs.Separator />Tori 平台<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="providers"><Tabs.Separator />提供商列表 <Chip style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)", fontSize: "var(--text-2xs)" }}>{providers.length}</Chip><Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="presets"><Tabs.Separator />添加提供商<Tabs.Indicator /></Tabs.Tab>
@@ -278,6 +294,123 @@ export default function ProvidersPage() {
               {mode === "tori" && "所有请求经 Tori 平台中转，由 Tori 负责密钥管理与负载均衡。需先绑定 Tori 账号。"}
               {mode === "hybrid" && "优先使用本地直连提供商，当直连不可用时自动回退到 Tori 中转，确保高可用。"}
             </span>
+          </div>
+        </Tabs.Panel>
+
+        {/* ── Model Routing (Cognitive / Execution) ─── */}
+        <Tabs.Panel id="routing">
+          <div className="space-y-4">
+            <Card className="section-card p-5">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "var(--sp-3)" }}>
+                <AlertCircle size={14} style={{ color: "var(--yunque-accent)" }} />
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-secondary)" }}>
+                  认知层（Planner）负责理解意图和规划，执行层（Exec Agent）负责调用工具完成任务。为它们分配不同的模型可以优化成本与效率。
+                </span>
+              </div>
+            </Card>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-4)" }}>
+              {/* Cognitive Layer */}
+              <Card className="section-card p-5">
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", marginBottom: "var(--sp-3)" }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "var(--radius-md)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(139,92,246,0.12)",
+                  }}>
+                    <Brain size={18} style={{ color: "#8b5cf6" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)" }}>认知层 · Planner</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)" }}>理解意图 → 规划 → 委派任务</div>
+                  </div>
+                </div>
+                <div style={{
+                  padding: "var(--sp-3)", borderRadius: "var(--radius-md)",
+                  background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)",
+                }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", marginBottom: "var(--sp-1)" }}>当前模型池</div>
+                  <div style={{ fontSize: "var(--text-md)", fontWeight: 600, color: "#8b5cf6" }}>smart</div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", marginTop: "var(--sp-1)" }}>
+                    使用 smart 池中的最高优先级提供商
+                  </div>
+                </div>
+              </Card>
+
+              {/* Execution Layer */}
+              <Card className="section-card p-5">
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", marginBottom: "var(--sp-3)" }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "var(--radius-md)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(34,197,94,0.12)",
+                  }}>
+                    <Wrench size={18} style={{ color: "#22c55e" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)" }}>执行层 · Exec Agents</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)" }}>浏览器 / 文件 / 代码 / 搜索 / 通用</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)" }}>选择执行层使用的提供商</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-2)" }}>
+                    {["smart", ...availableProviders.filter(p => p !== "smart")].map(pid => {
+                      const isActive = (serverExecProvider || "smart") === pid;
+                      return (
+                        <button
+                          key={pid}
+                          disabled={savingExec}
+                          onClick={() => handleSetExecProvider(pid)}
+                          style={{
+                            padding: "6px 14px", borderRadius: "var(--radius-md)",
+                            fontSize: "var(--text-sm)", fontWeight: isActive ? 600 : 400,
+                            background: isActive ? "rgba(34,197,94,0.12)" : "var(--yunque-surface-2)",
+                            color: isActive ? "#22c55e" : "var(--yunque-text)",
+                            border: `1.5px solid ${isActive ? "#22c55e" : "var(--yunque-border)"}`,
+                            cursor: savingExec ? "wait" : "pointer",
+                            transition: "all var(--duration-fast) ease",
+                          }}
+                        >
+                          {pid}
+                          {isActive && <CheckCircle2 size={12} style={{ marginLeft: 4, verticalAlign: "middle" }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {availableProviders.length === 0 && (
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", fontStyle: "italic" }}>
+                      尚无可用提供商，请先在「添加提供商」中配置
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Agent breakdown */}
+            <Card className="section-card p-5">
+              <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--sp-3)", color: "var(--yunque-text)" }}>
+                执行代理一览
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "var(--sp-2)" }}>
+                {[
+                  { name: "browser_exec", label: "浏览器", icon: "🌐", desc: "搜索/导航/点击/输入" },
+                  { name: "file_exec", label: "文件", icon: "📄", desc: "Word/Excel/PPT/PDF" },
+                  { name: "code_exec", label: "代码", icon: "💻", desc: "Python/Shell 执行" },
+                  { name: "research_exec", label: "研究", icon: "🔍", desc: "网络搜索/信息收集" },
+                  { name: "general_exec", label: "通用", icon: "⚙️", desc: "图片/翻译/邮件等" },
+                ].map(agent => (
+                  <div key={agent.name} style={{
+                    padding: "var(--sp-3)", borderRadius: "var(--radius-md)",
+                    background: "var(--yunque-surface-2)", border: "1px solid var(--yunque-border)",
+                  }}>
+                    <div style={{ fontSize: "var(--text-md)", marginBottom: 2 }}>{agent.icon}</div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)" }}>{agent.label}</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)" }}>{agent.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
         </Tabs.Panel>
 
