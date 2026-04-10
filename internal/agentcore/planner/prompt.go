@@ -85,6 +85,10 @@ func (p *Planner) buildSystemPrompt() string {
 
 	p.cachedSysPrompt = buf.String()
 	p.sysPromptVer = currentVer
+
+	hasBrowserSection := strings.Contains(p.cachedSysPrompt, "browser_navigate")
+	slog.Info("buildSystemPrompt", "len", len(p.cachedSysPrompt), "has_browser", hasBrowserSection, "catMap", catMap, "ver", currentVer)
+
 	return p.cachedSysPrompt
 }
 
