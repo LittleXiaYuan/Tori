@@ -527,7 +527,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g.mux.ServeHTTP(sw, r.WithContext(ctx))
-	slog.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.code, "duration_ms", time.Since(start).Milliseconds(), "req_id", reqID)
+	if sw.code == 401 && strings.HasPrefix(r.URL.Path, "/api/browser/ext/") {
+		slog.Debug("http", "method", r.Method, "path", r.URL.Path, "status", sw.code, "req_id", reqID)
+	} else {
+		slog.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.code, "duration_ms", time.Since(start).Milliseconds(), "req_id", reqID)
+	}
 	if g.auditChain != nil {
 		g.auditChain.Append(audit.EventSystem, tenantFromCtx(ctx), r.Method+" "+r.URL.Path, fmt.Sprintf("status=%d dur=%dms", sw.code, time.Since(start).Milliseconds()))
 	}

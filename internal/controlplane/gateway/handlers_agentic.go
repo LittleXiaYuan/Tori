@@ -183,17 +183,27 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Emotion analysis
-	var emotionHint *emotion.Result
+	// Emotion analysis — run async so it doesn't block the planner
+	type emotionResult struct {
+		hint *emotion.Result
+	}
+	emotionCh := make(chan emotionResult, 1)
 	emotionFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureEmotion)
 	if g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() && emotionFeatureOK && len(msgs) > 0 {
 		lastMsg := msgs[len(msgs)-1]
 		if lastMsg.Role == "user" && lastMsg.Content != "" {
-			emotionHint, _ = g.emotionAnalyzer.AnalyzeText(ctx, lastMsg.Content)
-			if emotionHint != nil && g.emotionHistory != nil {
-				g.emotionHistory.Record(req.SessionID, emotionHint.Emotion, emotionHint.Confidence, emotionHint.Source)
-			}
+			go func() {
+				hint, _ := g.emotionAnalyzer.AnalyzeText(ctx, lastMsg.Content)
+				if hint != nil && g.emotionHistory != nil {
+					g.emotionHistory.Record(req.SessionID, hint.Emotion, hint.Confidence, hint.Source)
+				}
+				emotionCh <- emotionResult{hint: hint}
+			}()
+		} else {
+			emotionCh <- emotionResult{}
 		}
+	} else {
+		emotionCh <- emotionResult{}
 	}
 
 	// Session-level provider override
@@ -211,7 +221,6 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		TenantID:        tid,
 		ModelOverride:   routedTier,
 		ClientOverride:  sessionClient,
-		EmotionHint:     emotionHint,
 		TaskID:          req.TaskID,
 		TaskContext:     taskContext,
 		ThinkingEnabled: req.Thinking,
@@ -336,6 +345,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	if len(result.ContextLayers) > 0 {
 		doneData["context_layers"] = result.ContextLayers
 	}
+	emotionHint := (<-emotionCh).hint
 	if emotionHint != nil && emotionHint.Emotion != emotion.EmotionNeutral {
 		doneData["emotion"] = emotionHint
 	}
