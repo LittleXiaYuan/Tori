@@ -16,6 +16,7 @@ import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { ComputerPanel } from "@/components/computer-panel";
+import { TaskProgressPanel } from "@/components/task-progress-panel";
 import { ConnectorPopover } from "@/components/connector-popover";
 import { BrowserSessionCard, type BrowserActionArtifactSummary, type BrowserBridgeState, type BrowserSessionNotice } from "@/components/browser-session-card";
 import { BrowserConnectCard, type BrowserRequirement } from "@/components/browser-connect-card";
@@ -589,9 +590,8 @@ export default function ChatPage() {
               try {
                 const evt: AgentEvent = JSON.parse(line.slice(6));
                 chatD({ type: "ADD_LIVE_TRACE", event: evt });
-                // Auto-open computer panel on tool activity
                 const evtType = (evt.type || "").toLowerCase();
-                if (!showComputerRef.current && (evtType === "tool_start" || evtType === "tool_result" || evtType === "thinking")) {
+                if (!showComputerRef.current && (evtType === "tool_start" || evtType === "tool_result" || evtType === "thinking" || evtType === "handoff_start")) {
                   setShowComputer(true);
                 }
               } catch { /* ignore parse */ }
@@ -2289,8 +2289,11 @@ ${text.slice(0, 4000)}` });
               document.addEventListener("mouseup", onUp);
             }}
           />
-          <div className="shrink-0 flex flex-col h-full animate-slide-in-right"
+          <div className="shrink-0 flex flex-col h-full animate-slide-in-right overflow-y-auto"
             style={{ width: computerWidth, background: "var(--yunque-sidebar)" }}>
+            <div className="p-3">
+              <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
+            </div>
             <ComputerPanel traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
           </div>
         </>

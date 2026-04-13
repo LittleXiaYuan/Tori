@@ -463,6 +463,19 @@ type StepEvent struct {
 // If nil, no intermediate notifications are sent.
 type StepCallback func(event observe.AgentEvent)
 
+type ctxKeyStepCB struct{}
+
+// WithStepCallback attaches a StepCallback to the context so exec agents can emit SSE events.
+func WithStepCallback(ctx context.Context, cb StepCallback) context.Context {
+	return context.WithValue(ctx, ctxKeyStepCB{}, cb)
+}
+
+// StepCallbackFromCtx retrieves the StepCallback attached to the context.
+func StepCallbackFromCtx(ctx context.Context) StepCallback {
+	cb, _ := ctx.Value(ctxKeyStepCB{}).(StepCallback)
+	return cb
+}
+
 // StepStatus tracks the state of a plan step.
 type StepStatus string
 

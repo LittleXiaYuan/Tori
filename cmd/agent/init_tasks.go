@@ -421,6 +421,7 @@ func initTasks(app *agentrt.App) error {
 			Messages:          msgs,
 			ModelOverride:     override,
 			DisableDelegation: true,
+			StepCallback:     planner.StepCallbackFromCtx(ctx),
 		}
 		if sysNote != "" {
 			req.GroupSystemPrompt = sysNote

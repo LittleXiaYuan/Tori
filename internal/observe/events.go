@@ -61,11 +61,13 @@ const (
 // ── Planner Event Types ──
 
 const (
-	EventThinking   = "thinking"
-	EventToolStart  = "tool_start"
-	EventToolResult = "tool_result"
-	EventReflect    = "reflect"
-	EventPlan       = "plan"
+	EventThinking     = "thinking"
+	EventToolStart    = "tool_start"
+	EventToolResult   = "tool_result"
+	EventReflect      = "reflect"
+	EventPlan         = "plan"
+	EventHandoffStart = "handoff_start"
+	EventHandoffDone  = "handoff_done"
 )
 
 // ── Workflow Event Types ──
@@ -104,6 +106,15 @@ func NewEvent(traceID, domain, eventType, summary string) AgentEvent {
 		Type:      eventType,
 		Summary:   summary,
 	}
+}
+
+// HandoffDetail is the Detail payload for handoff_start / handoff_done events.
+type HandoffDetail struct {
+	Agent string `json:"agent"`
+	Input string `json:"input,omitempty"`
+	Reply string `json:"reply,omitempty"`
+	Error string `json:"error,omitempty"`
+	DurMs int64  `json:"dur_ms,omitempty"`
 }
 
 // ToolStartDetail is the Detail payload for tool_start events.

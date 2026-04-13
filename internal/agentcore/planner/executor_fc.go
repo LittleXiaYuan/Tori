@@ -109,13 +109,27 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				var args map[string]any
 				json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
-				// Check for handoff (transfer_to_*) calls first
 				if p.handoffReg != nil {
 					if agentName, ok := p.handoffReg.IsHandoffCall(tc.Function.Name); ok {
 						input, _ := args["input"].(string)
 						slog.Info("planner: handoff delegation (fc)", "agent", agentName, "step", steps)
+
+						if req.StepCallback != nil {
+							evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
+								fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
+							evt.Meta.TenantID = req.TenantID
+							evt.Meta.Skill = agentName
+							evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
+							req.StepCallback(evt)
+						}
+
+						cbCtx := toolCtx
+						if req.StepCallback != nil {
+							cbCtx = WithStepCallback(toolCtx, req.StepCallback)
+						}
+
 						t0 := time.Now()
-						hr, err := p.handoffReg.Execute(toolCtx, req.TenantID, agentName, input)
+						hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input)
 						dur := time.Since(t0)
 						if p.skillMetrics != nil {
 							p.skillMetrics(tc.Function.Name, dur, err)
@@ -123,6 +137,23 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						if p.taskFailureMon != nil {
 							p.taskFailureMon.Record(err != nil)
 						}
+
+						if req.StepCallback != nil {
+							doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
+								fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
+							doneEvt.Meta.TenantID = req.TenantID
+							doneEvt.Meta.Skill = agentName
+							detail := observe.HandoffDetail{Agent: agentName, DurMs: dur.Milliseconds()}
+							if err != nil {
+								doneEvt.Summary = fmt.Sprintf("❌ [%s] 失败: %s", agentName, err.Error())
+								detail.Error = err.Error()
+							} else {
+								detail.Reply = truncate(hr.Reply, 200)
+							}
+							doneEvt.Detail = detail
+							req.StepCallback(doneEvt)
+						}
+
 						if err != nil {
 							resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: err}
 						} else {
