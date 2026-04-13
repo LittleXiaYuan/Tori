@@ -3,7 +3,7 @@
 *.exe~
 tori
 tori_*
-agent
+/agent
 dist/
 
 # ── Logs & temp files ──
@@ -51,5 +51,7 @@ internal/agentcore/task/*/
 # ── Internal dev docs (not for public) ──
 doc/
 
-# ── External projects ──
+# ── Competitive analysis (not for public) ──
+browser-extension/manus-analysis/
+
 
