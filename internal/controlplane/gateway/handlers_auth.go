@@ -2,12 +2,15 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -336,9 +339,11 @@ func (g *Gateway) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	oauthTori := os.Getenv("TORI_URL") != ""
 	json.NewEncoder(w).Encode(map[string]any{
 		"password_set":  isSetup,
 		"authenticated": isAuthenticated,
+		"oauth_tori":    oauthTori,
 	})
 }
 
@@ -378,6 +383,223 @@ func (g *Gateway) handleAuthSetPassword(w http.ResponseWriter, r *http.Request) 
 	slog.Info("auth: password updated", "ip", extractHost(r))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// handleOAuthToriStart initiates the Tori OAuth2 PKCE login flow.
+// GET /v1/auth/oauth/tori?tori_url=https://...
+func (g *Gateway) handleOAuthToriStart(w http.ResponseWriter, r *http.Request) {
+	toriURL := r.URL.Query().Get("tori_url")
+	if toriURL == "" {
+		toriURL = os.Getenv("TORI_URL")
+	}
+	if toriURL == "" {
+		toriURL = "https://tori.owo.today"
+	}
+
+	verifier, challenge, state := generateOAuthPKCE()
+	g.oauthStateMu.Lock()
+	g.oauthPending[state] = &oauthPendingState{
+		Verifier: verifier,
+		ToriURL:  toriURL,
+		Created:  time.Now(),
+	}
+	g.oauthStateMu.Unlock()
+
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	host := r.Host
+	if host == "" {
+		host = "localhost:9090"
+	}
+	redirectURI := fmt.Sprintf("%s://%s/v1/auth/oauth/tori/callback", scheme, host)
+
+	params := fmt.Sprintf(
+		"response_type=code&client_id=yunque-agent&redirect_uri=%s&code_challenge=%s&code_challenge_method=S256&state=%s&scope=%s",
+		url.QueryEscape(redirectURI), url.QueryEscape(challenge), url.QueryEscape(state), url.QueryEscape("openid profile api"),
+	)
+	authorizeURL := strings.TrimRight(toriURL, "/") + "/oauth/authorize?" + params
+
+	http.Redirect(w, r, authorizeURL, http.StatusFound)
+}
+
+// handleOAuthToriCallback handles the OAuth2 callback from ToriAPI.
+// GET /v1/auth/oauth/tori/callback?code=...&state=...
+func (g *Gateway) handleOAuthToriCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	if code == "" || state == "" {
+		errMsg := r.URL.Query().Get("error_description")
+		if errMsg == "" {
+			errMsg = r.URL.Query().Get("error")
+		}
+		if errMsg == "" {
+			errMsg = "missing code or state"
+		}
+		renderOAuthError(w, errMsg)
+		return
+	}
+
+	g.oauthStateMu.Lock()
+	pending, ok := g.oauthPending[state]
+	if ok {
+		delete(g.oauthPending, state)
+	}
+	g.oauthStateMu.Unlock()
+
+	if !ok || time.Since(pending.Created) > 10*time.Minute {
+		renderOAuthError(w, "invalid or expired state")
+		return
+	}
+
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	host := r.Host
+	if host == "" {
+		host = "localhost:9090"
+	}
+	redirectURI := fmt.Sprintf("%s://%s/v1/auth/oauth/tori/callback", scheme, host)
+
+	tokenResp, err := exchangeOAuthCode(pending.ToriURL, code, pending.Verifier, redirectURI)
+	if err != nil {
+		slog.Error("oauth: token exchange failed", "err", err)
+		renderOAuthError(w, "token exchange failed: "+err.Error())
+		return
+	}
+
+	userInfo, err := fetchOAuthUserInfo(pending.ToriURL, tokenResp.AccessToken)
+	if err != nil {
+		slog.Warn("oauth: userinfo fetch failed", "err", err)
+	}
+
+	if g.jwtCfg == nil {
+		renderOAuthError(w, "JWT not configured")
+		return
+	}
+
+	tenants := g.tenants.List()
+	tenantID := "default"
+	if len(tenants) > 0 {
+		tenantID = tenants[0].ID
+	}
+
+	cfgCopy := *g.jwtCfg
+	cfgCopy.Expiration = 7 * 24 * time.Hour
+	jwtToken, err := GenerateJWT(cfgCopy, tenantID, "admin")
+	if err != nil {
+		renderOAuthError(w, "JWT generation failed")
+		return
+	}
+
+	username := ""
+	if userInfo != nil {
+		username = userInfo.Username
+	}
+	slog.Info("oauth: login success", "user", username, "ip", extractHost(r))
+
+	renderOAuthSuccess(w, jwtToken)
+}
+
+type oauthPendingState struct {
+	Verifier string
+	ToriURL  string
+	Created  time.Time
+}
+
+func generateOAuthPKCE() (verifier, challenge, state string) {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	verifier = base64.RawURLEncoding.EncodeToString(b)
+
+	h := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(h[:])
+
+	sb := make([]byte, 16)
+	_, _ = rand.Read(sb)
+	state = hex.EncodeToString(sb)
+	return
+}
+
+func exchangeOAuthCode(toriURL, code, verifier, redirectURI string) (*oauthTokenResp, error) {
+	data := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"client_id":     {"yunque-agent"},
+		"code_verifier": {verifier},
+	}
+
+	tokenURL := strings.TrimRight(toriURL, "/") + "/oauth/token"
+	resp, err := http.PostForm(tokenURL, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result oauthTokenResp
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode token response: %w", err)
+	}
+	if result.AccessToken == "" {
+		return nil, fmt.Errorf("empty access token in response")
+	}
+	return &result, nil
+}
+
+type oauthTokenResp struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+func fetchOAuthUserInfo(toriURL, accessToken string) (*oauthUserInfo, error) {
+	req, err := http.NewRequest("GET", strings.TrimRight(toriURL, "/")+"/oauth/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var info oauthUserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+type oauthUserInfo struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+func renderOAuthSuccess(w http.ResponseWriter, token string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Login Success</title></head><body>
+<script>
+localStorage.setItem("yunque_token", %q);
+window.location.href = "/";
+</script>
+<p>Login successful, redirecting...</p>
+</body></html>`, token)
+}
+
+func renderOAuthError(w http.ResponseWriter, msg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Login Failed</title></head><body>
+<p style="color:red">Login failed: %s</p>
+<a href="/login">Back to Login</a>
+</body></html>`, msg)
 }
 
 func extractHost(r *http.Request) string {

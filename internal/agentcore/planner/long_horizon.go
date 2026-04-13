@@ -88,7 +88,7 @@ func (p *Planner) buildDecomposeDAG(req PlanRequest) plan.DecomposeDAGFunc {
 返回 JSON 数组：[{"description":"","skill":"","args":{},"depends_on":[]}]
 规则：独立步骤不加依赖，3-8步，只返回JSON`, skillList, goal)
 
-		client := p.LLMClientFor(req.ModelOverride)
+		client := p.clientForRequest(req)
 		reply, err := client.Chat(ctx, []llm.Message{
 			{Role: "system", Content: "你是任务规划器，只输出 JSON 数组。"},
 			{Role: "user", Content: prompt},
@@ -104,7 +104,7 @@ func (p *Planner) buildReviseFunc(req PlanRequest) plan.ReviseFunc {
 	return func(ctx context.Context, goal string, current *plan.Plan, failedStep int) ([]plan.PlanStep, error) {
 		prompt := fmt.Sprintf("任务: %s\n状态:\n%s\n步骤 %d 失败，重新规划剩余部分。返回JSON数组。",
 			goal, current.StepSummary(), failedStep)
-		client := p.LLMClientFor(req.ModelOverride)
+		client := p.clientForRequest(req)
 		reply, err := client.Chat(ctx, []llm.Message{
 			{Role: "system", Content: "你是任务规划器，根据失败提出替代方案，只输出JSON数组。"},
 			{Role: "user", Content: prompt},
@@ -186,7 +186,12 @@ func (p *Planner) executeReasoningStep(ctx context.Context, req PlanRequest, pl 
 		}
 	}
 
-	client := p.LLMClientFor(selectedTier)
+	var client *llm.Client
+	if req.ClientOverride != nil {
+		client = req.ClientOverride
+	} else {
+		client = p.LLMClientFor(selectedTier)
+	}
 	reply, err := client.Chat(ctx, []llm.Message{
 		{Role: "system", Content: "基于信息完成分析，直接给出结果。"},
 		{Role: "user", Content: prompt},
@@ -211,7 +216,7 @@ func (p *Planner) synthesizePlanResult(ctx context.Context, req PlanRequest, pl 
 	if results == "" {
 		return "任务已执行完毕。"
 	}
-	client := p.LLMClientFor(req.ModelOverride)
+	client := p.clientForRequest(req)
 	reply, err := client.Chat(ctx, []llm.Message{
 		{Role: "system", Content: "根据执行结果给出完整回复。Markdown格式。"},
 		{Role: "user", Content: fmt.Sprintf("目标: %s\n结果:\n%s", pl.Task, results)},

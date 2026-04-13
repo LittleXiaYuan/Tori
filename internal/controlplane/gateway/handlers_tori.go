@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -31,15 +32,14 @@ func (g *Gateway) handleToriBind(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ToriURL string `json:"tori_url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ToriURL == "" {
-		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": "tori_url is required"})
-		return
-	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
 
 	cfg := tori.DefaultOAuthConfig()
-	cfg.ToriBaseURL = body.ToriURL
+	if body.ToriURL != "" {
+		cfg.ToriBaseURL = body.ToriURL
+	}
 
-	authorizeURL, resultCh, err := tori.StartBindFlow(r.Context(), cfg)
+	authorizeURL, resultCh, err := tori.StartBindFlow(context.Background(), cfg)
 	if err != nil {
 		slog.Error("tori: start bind flow failed", "err", err)
 		writeJSONStatus(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -55,15 +55,19 @@ func (g *Gateway) handleToriBind(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if result.Token != nil {
-				if err := g.toriTokenStore.Store(result.Token, result.UserInfo, body.ToriURL); err != nil {
-					slog.Error("tori: store token failed", "err", err)
-					return
-				}
-				apiKey := ""
-				if result.UserInfo != nil {
-					apiKey = result.UserInfo.APIKey
-				}
-				tori.ApplyLLMConfig(body.ToriURL, apiKey)
+			storeURL := body.ToriURL
+			if storeURL == "" {
+				storeURL = cfg.ToriBaseURL
+			}
+			if err := g.toriTokenStore.Store(result.Token, result.UserInfo, storeURL); err != nil {
+				slog.Error("tori: store token failed", "err", err)
+				return
+			}
+			apiKey := ""
+			if result.UserInfo != nil {
+				apiKey = result.UserInfo.APIKey
+			}
+			tori.ApplyLLMConfig(storeURL, apiKey)
 				slog.Info("tori: bind successful",
 					"user", result.UserInfo.Username,
 					"tori_url", body.ToriURL)

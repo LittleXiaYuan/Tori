@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"bufio"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -60,6 +61,12 @@ type Source struct {
 // Store — manages knowledge chunks
 // ──────────────────────────────────────────────
 
+// kvStore abstracts Ledger KV to avoid import cycles.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
+
 // Store holds ingested knowledge with search capability.
 type Store struct {
 	mu        sync.RWMutex
@@ -68,6 +75,8 @@ type Store struct {
 	chunkSize int            // default chars per chunk
 	semantic  *SemanticIndex // optional vector search index
 	reranker  Reranker       // optional reranker for second-stage ranking
+	kvs       kvStore        // optional Ledger KV persistence
+	dirty     int
 
 	// Metrics callbacks (optional, set via SetMetricsHooks)
 	onSearch func(searchType string, duration time.Duration, results int)
@@ -88,6 +97,82 @@ func NewStore(chunkSize int) *Store {
 		sources:   make(map[string]*Source),
 		chunkSize: chunkSize,
 	}
+}
+
+// SetKVStore enables Ledger KV-backed persistence for knowledge chunks.
+func (s *Store) SetKVStore(kvs kvStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	type kvData struct {
+		Sources map[string]*Source `json:"sources"`
+		Chunks  []Chunk            `json:"chunks"`
+	}
+	var data kvData
+	found, err := kvs.Get(ctx, "knowledge_data", &data)
+	if err != nil {
+		slog.Warn("knowledge: KV load failed", "err", err)
+		return
+	}
+	if found && len(data.Chunks) > 0 {
+		for id, src := range data.Sources {
+			if _, exists := s.sources[id]; !exists {
+				s.sources[id] = src
+			}
+		}
+		existing := make(map[string]bool, len(s.chunks))
+		for _, c := range s.chunks {
+			existing[c.ID] = true
+		}
+		added := 0
+		for _, c := range data.Chunks {
+			if !existing[c.ID] {
+				s.chunks = append(s.chunks, c)
+				added++
+			}
+		}
+		slog.Info("knowledge: loaded from Ledger KV", "chunks", added, "total", len(s.chunks))
+	}
+}
+
+// FlushToKV persists current state to Ledger KV. Called during shutdown.
+func (s *Store) FlushToKV() {
+	s.mu.RLock()
+	kvs := s.kvs
+	sources := make(map[string]*Source, len(s.sources))
+	for k, v := range s.sources {
+		cp := *v
+		sources[k] = &cp
+	}
+	chunks := make([]Chunk, len(s.chunks))
+	copy(chunks, s.chunks)
+	s.mu.RUnlock()
+
+	if kvs == nil {
+		return
+	}
+	type kvData struct {
+		Sources map[string]*Source `json:"sources"`
+		Chunks  []Chunk            `json:"chunks"`
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := kvs.Put(ctx, "knowledge_data", kvData{Sources: sources, Chunks: chunks}); err != nil {
+		slog.Error("knowledge: flush to KV failed", "err", err)
+	}
+}
+
+func (s *Store) persistKV() {
+	s.dirty++
+	if s.kvs == nil || s.dirty < 10 {
+		return
+	}
+	s.dirty = 0
+	go s.FlushToKV()
 }
 
 // SetMetricsHooks sets optional callbacks for recording search and rerank metrics.
@@ -487,6 +572,7 @@ func (s *Store) addPreparedChunks(src *Source, prepared []PreparedChunk) {
 	}
 	src.ChunkCount = chunkCount
 	slog.Debug("knowledge: ingested", "source", src.Name, "chunks", chunkCount)
+	s.persistKV()
 }
 
 // splitText splits text into chunks of approximately maxChars.

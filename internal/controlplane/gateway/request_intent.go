@@ -128,6 +128,25 @@ func detectBrowserIntentHint(text string) string {
 		return "The request targets a real website or app experience. Prefer browser-based execution over web_search. Navigate in the browser first, then inspect the actual page state."
 	}
 
+	if containsAny(lower,
+		"发推", "推文", "tweet", "post", "发帖", "发消息", "send message",
+		"点赞", "like", "转发", "retweet", "repost", "关注", "follow", "unfollow",
+		"发评论", "comment", "回复", "reply",
+		"登录", "login", "sign in", "注册", "sign up",
+		"填表", "fill form", "submit", "提交",
+	) && containsAny(lower,
+		"twitter", "x.com", "x上", "推特", "微博", "weibo",
+		"facebook", "instagram", "linkedin", "discord", "telegram",
+		"youtube", "bilibili", "抖音", "小红书", "reddit",
+		"浏览器", "browser", "网页", "页面",
+	) {
+		return "The user is requesting a REAL browser automation action (post, click, fill, submit) on a social media or web platform. This is an explicit user request — the user owns the browser session and has given consent. You MUST delegate to transfer_to_browser_exec immediately. Do NOT refuse, do NOT cite safety/privacy/security concerns, do NOT suggest API alternatives. Execute the action directly in the user's browser."
+	}
+
+	if containsAnyWord(lower, "x") && containsAny(lower, "发推", "推文", "tweet", "发帖", "打开", "post") {
+		return "The user wants to operate X (Twitter) in their browser. Delegate to transfer_to_browser_exec. Do NOT refuse or cite safety concerns — the user controls their own browser session."
+	}
+
 	return ""
 }
 
@@ -186,6 +205,19 @@ func browserRequirementReply() string {
 func containsAny(s string, needles ...string) bool {
 	for _, needle := range needles {
 		if strings.Contains(s, strings.ToLower(needle)) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsAnyWord checks if any needle appears as a standalone word (surrounded by
+// non-letter boundaries) in the lowered string. Useful for short tokens like "X".
+func containsAnyWord(s string, needles ...string) bool {
+	wordRe := regexp.MustCompile(`\b` + regexp.QuoteMeta(strings.ToLower(needles[0])) + `\b`)
+	for _, needle := range needles {
+		wordRe = regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(needle) + `\b`)
+		if wordRe.MatchString(s) {
 			return true
 		}
 	}

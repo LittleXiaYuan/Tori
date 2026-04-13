@@ -10,37 +10,53 @@ Production-ready AI Agent with embedded WebUI, multi-model routing, self-iterati
 
 ## 仓库结构说明
 
-- 当前前端以 `heroui-web/` 为准，Go 服务嵌入的也是 `heroui-web/out/`
-- `web/` 已归档，仅保留给历史参考，详细说明见 `web/ARCHIVED.md`
-- `docs/` 用于面向用户的正式文档与文档站内容
-- `doc/` 用于开发过程文档、连续性记录、设计蓝图等内部沉淀
-- 仓库目录说明见 `docs/repo-layout.md`
+| 目录 | 说明 |
+|------|------|
+| `heroui-web/` | **当前主前端**（HeroUI + Next.js 16），Go 嵌入 `heroui-web/out/` |
+| `web/` | 已归档旧前端，不再维护，见 `web/README.md` |
+| `docs/` | 面向用户的正式文档与文档站（VitePress） |
+| `doc/` | 内部开发文档、连续性记录、设计蓝图（`.gitignore` 排除） |
+| `browser-extension/` | 浏览器连接器扩展（Chrome/Edge） |
+| `data/plugins/` | 第三方插件热加载目录 |
+| `data/skills/` | 文件技能热加载目录 |
 
-## 一键启动
+详细结构见 `docs/repo-layout.md`。
 
-### 方式 1：双击运行 (Windows / macOS / Linux)
-
-下载对应平台的二进制，双击即可。首次运行先执行安装向导：
+## 30 秒上手
 
 ```bash
-# 安装向导（网页图形界面）
-go run ./cmd/setup
+cp .env.example .env       # ① 复制配置
+# ② 编辑 .env，填入 LLM_API_KEY
+go run ./cmd/agent         # ③ 启动
+# ④ 浏览器自动打开 → http://localhost:9090/chat
+```
 
-# 启动 Agent（自动打开浏览器）
+仅需配置一个 `LLM_API_KEY` 即可开始对话。
+
+## 更多启动方式
+
+<details>
+<summary>图形化安装向导</summary>
+
+```bash
+go run ./cmd/setup         # 网页引导配置 .env
 go run ./cmd/agent
 ```
+</details>
 
-打开 http://localhost:9090 即可看到完整管理面板 + 聊天界面。
-
-### 方式 2：编译后运行
+<details>
+<summary>编译后运行（推荐发布构建）</summary>
 
 ```bash
-cp .env.example .env       # 配置 LLM_API_KEY
-go build -o yunque-agent ./cmd/agent
-./yunque-agent             # 自动开浏览器
+make build-full            # 构建前端 + Go 二进制（强制校验前端产物）
+./dist/yunque-agent        # 自动开浏览器
 ```
 
-### 方式 3：Docker 部署
+> **开发构建**（跳过前端）：`go build -o yunque-agent ./cmd/agent`，仅用于开发调试，不含最新前端。
+</details>
+
+<details>
+<summary>Docker 部署</summary>
 
 ```bash
 cp .env.example .env       # 配置 LLM_API_KEY
@@ -49,41 +65,47 @@ docker compose --profile full up -d    # 完整版，PostgreSQL + pgvector
 ```
 
 Dashboard: http://localhost:9090
+</details>
 
-### 方式 4：跨平台构建
+<details>
+<summary>跨平台构建</summary>
 
 ```bash
 make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 ```
+</details>
 
 ## 架构
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│   Control Plane (Gateway) — 90+ API endpoints       │
-│   Embedded WebUI · JWT/APIKey · CORS · Rate Limit    │
-│   SSE Stream · WebSocket · Prometheus · Audit Chain   │
+│   Control Plane (Gateway) — 90+ API endpoints        │
+│   Embedded WebUI · JWT/APIKey · CORS · Rate Limit     │
+│   SSE Stream · WebSocket · Prometheus · Audit Chain    │
 ├─────────────────────────────────────────────────────────┤
-│   Agent Core                                         │
-│   Planner (multi-step, parallel FC, reflect)         │
-│   LLM Pool (fast/smart/expert) · Circuit Breaker     │
-│   Smart Router · Context Window · Model Override      │
+│   Agent Core  (internal/agentcore/)                   │
+│   Planner (multi-step, parallel FC)                   │
+│   LLM Pool (fast/smart/expert) · Smart Router         │
+│   Context Window · Session Provider Override           │
 ├─────────┬────────────┬───────────┬────────┬───────────┤
-│ Memory  │ Knowledge  │ Guardrail │ Trust  │ Iterate   │
-│ 5-layer │ Graph+RAG  │ PII/Inj   │ Score  │ Self-     │
-│ Orch    │ Embeddings │ Moderate  │ 0→100  │ Improve   │
+│ Memory  │ Knowledge  │ Guardrail │ Trust  │ Persona   │
+│ 5-layer │ Graph+RAG  │ PII/Inj   │ Score  │ Emotion   │
+│ Orch    │ Embeddings │ Moderate  │ 0→100  │ Identity  │
 ├─────────┴────────────┴───────────┴────────┴───────────┤
-│   Execution Layer                                    │
-│   Sandbox · Scheduler · Cron · Tools Process Manager │
-│   Channels: TG/Feishu/Discord/Slack/WA/Signal/Email  │
-│            WeCom/DingTalk/WeChatOA/LINE/Kook/Satori  │
+│   Execution Layer                                     │
+│   Sandbox · Scheduler · Cron · Tools Process Manager  │
+│   Channels: TG/Feishu/Discord/Slack/WA/Signal/Email   │
+│            WeCom/DingTalk/WeChatOA/LINE/Kook/Satori   │
 ├─────────────────────────────────────────────────────────┤
-│   Skills & Plugins                                   │
-│   SkillHub (ClawHub) · Marketplace · Hot-load        │
-│   Skill Growth Detector · Knowledge Distill          │
+│   Skills & Plugins                                    │
+│   SkillHub (ClawHub) · Marketplace · Hot-load         │
 ├─────────────────────────────────────────────────────────┤
-│   Storage (file-based default, optional PostgreSQL)   │
-│   Federation Hub · Multi-Agent Runtime Pool           │
+│   Experimental  (internal/experimental/)              │
+│   ReAct · Eval · Iterate · SkillGrow · Distill        │
+│   Curiosity · Causal · World Model · MetaCog · Trait  │
+├─────────────────────────────────────────────────────────┤
+│   Storage (Ledger KV default, optional PostgreSQL)    │
+│   Federation Hub · Multi-Agent Runtime Pool            │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -167,7 +189,7 @@ go test ./... -count=1
 ## 技术栈
 
 - **Backend**: Go 1.25, stdlib HTTP, 零外部框架依赖
-- **Frontend**: Next.js 15 嵌入式 SPA (`//go:embed`)
+- **Frontend**: Next.js 16 嵌入式 SPA (`//go:embed`)
 - **Database**: 文件存储 (默认) / PostgreSQL + pgvector (可选)
 - **LLM**: 任何 OpenAI 兼容 API
 - **Deploy**: 单二进制 / Docker / docker-compose

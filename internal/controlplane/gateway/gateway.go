@@ -21,10 +21,10 @@ import (
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/cron"
-	"yunque-agent/internal/agentcore/distill"
+	"yunque-agent/internal/experimental/distill"
 	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/agentcore/review"
-	"yunque-agent/internal/agentcore/skillgrow"
+	"yunque-agent/internal/experimental/skillgrow"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/workflow"
@@ -33,10 +33,10 @@ import (
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/guardrails"
-	"yunque-agent/internal/agentcore/heartbeat"
+	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
-	"yunque-agent/internal/agentcore/iterate"
+	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
@@ -44,7 +44,7 @@ import (
 	"yunque-agent/internal/agentcore/notify"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
-	reflectpkg "yunque-agent/internal/agentcore/reflect"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/agentcore/router"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
@@ -60,6 +60,7 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/channel"
+	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
@@ -127,6 +128,7 @@ type Gateway struct {
 	fedBridge            *federation.OPPBridge // OPP v3 bridge (model-aware federation)
 	fedTransport         *federation.Transport // federation HTTP transport
 	knowledgeStore       *knowledge.Store
+	knowledgeDir         string // data/knowledge/ path for persisting extracted facts
 	cronMgr              *cron.Manager
 	toolsMgr             *tools.ProcessManager
 	shellPolicy          *tools.ShellExecPolicy
@@ -139,6 +141,7 @@ type Gateway struct {
 	clawHub              *skillmarket.ClawHubProvider
 	toriHub              *skillmarket.ToriHubProvider
 	pluginLoader         *plugin.Loader
+	skillFileLoader      *skillmarket.SkillFileLoader
 	iterateEngine        *iterate.Engine
 	trustTracker         *trust.Tracker
 	distiller            *distill.Distiller
@@ -146,6 +149,7 @@ type Gateway struct {
 	skillGrow            *skillgrow.Detector
 	auditTrail           *audit.Trail
 	providerReg          *llm.ProviderRegistry
+	modelMgr             *modelManager
 	speechReg            *speech.Registry
 	emotionAnalyzer      *emotion.Analyzer
 	emotionHistory       *emotion.History
@@ -155,6 +159,7 @@ type Gateway struct {
 	emotionShift         *planner.EmotionShiftDetector // event-driven Reverie trigger
 	factHook             *planner.FactEventHook        // event-driven Reverie trigger on high-value facts
 	skillSuggester       *memory.SkillSuggester        // auto skill suggestion from conversations
+	suggestCounter       int64                         // rate-limit: only suggest every Nth interaction
 	pendingSuggestions   map[string][]memory.SkillSuggestion
 	pendingSuggestionsMu sync.Mutex
 	modeManager          *modes.ModeManager          // persona mode management
@@ -214,6 +219,15 @@ type Gateway struct {
 	// Tori OAuth2 token store (set externally)
 	toriTokenStore *tori.TokenStore
 
+	// Cloud sandbox runner (E2B Desktop)
+	cloudRunner    *sandbox.CloudRunner
+	desktopSandbox *sandbox.DesktopSandbox
+	desktopMu      sync.Mutex
+
+	// OAuth login state (Tori PKCE)
+	oauthPending map[string]*oauthPendingState
+	oauthStateMu sync.Mutex
+
 	// Exec provider override (cognitive/execution separation)
 	execProvider   string
 	execProviderMu sync.RWMutex
@@ -253,7 +267,7 @@ func New(p *planner.Planner, t *tenant.Manager, m *memory.Manager, r *skills.Reg
 	if met == nil {
 		met = observe.New()
 	}
-	g := &Gateway{planner: p, tenants: t, memory: m, registry: r, scheduler: s, convStore: cs, pluginReg: pr, feishuAPI: fa, learning: ll, jwtCfg: jwtCfg, limiter: NewRateLimiter(30, time.Minute), usage: NewUsageTracker(), metrics: met, pipeline: pipeline, persona: per, mux: http.NewServeMux(), startTime: time.Now(), browserSessions: NewBrowserSessionStore()}
+	g := &Gateway{planner: p, tenants: t, memory: m, registry: r, scheduler: s, convStore: cs, pluginReg: pr, feishuAPI: fa, learning: ll, jwtCfg: jwtCfg, limiter: NewRateLimiter(30, time.Minute), usage: NewUsageTracker(), metrics: met, pipeline: pipeline, persona: per, mux: http.NewServeMux(), startTime: time.Now(), browserSessions: NewBrowserSessionStore(), modelMgr: newModelManager(), oauthPending: make(map[string]*oauthPendingState)}
 	g.routes()
 	return g
 }
@@ -272,6 +286,8 @@ func (g *Gateway) SetPasswordStore(ps *PasswordStore) {
 	g.mux.HandleFunc("/v1/auth/login", g.handleAuthLogin)
 	g.mux.HandleFunc("/v1/auth/status", g.handleAuthStatus)
 	g.mux.HandleFunc("/v1/auth/set-password", g.handleAuthSetPassword)
+	g.mux.HandleFunc("/v1/auth/oauth/tori", g.handleOAuthToriStart)
+	g.mux.HandleFunc("/v1/auth/oauth/tori/callback", g.handleOAuthToriCallback)
 }
 
 func (g *Gateway) MountPluginAPIRoutes(handler *PluginAPIHandler) {

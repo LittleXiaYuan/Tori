@@ -5,6 +5,9 @@ package gateway
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -20,6 +23,46 @@ func sanitizePluginName(name string) string {
 		safe = "plugin"
 	}
 	return safe
+}
+
+// scaffoldPluginDir generates supporting files (README, deps, demo) for a new plugin.
+func scaffoldPluginDir(dir, lang, name, description string) {
+	if description == "" {
+		description = "A custom Yunque Agent plugin."
+	}
+
+	readme := fmt.Sprintf("# %s\n\n%s\n\n## Usage\n\n"+
+		"This plugin is automatically loaded by Yunque Agent on startup.\n"+
+		"Edit the handler file, then visit **Settings → Plugins** and click **Reload** to apply changes.\n\n"+
+		"## Files\n\n"+
+		"- `plugin.json` — Plugin manifest (name, skills, permissions)\n"+
+		"- `handler.*` — Entry point executed when a skill is invoked\n\n"+
+		"## Development\n\n"+
+		"1. Edit the handler file with your logic\n"+
+		"2. Add any dependencies to the requirements/package file\n"+
+		"3. Click **Reload Plugins** in the Dashboard (or restart the agent)\n"+
+		"4. Test by invoking the skill in chat\n", name, description)
+
+	write := func(filename, content string) {
+		if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0644); err != nil {
+			slog.Warn("scaffold write failed", "file", filename, "err", err)
+		}
+	}
+
+	write("README.md", readme)
+
+	switch lang {
+	case "python":
+		write("requirements.txt", "# Add Python dependencies here, one per line.\n# Example:\n# requests\n# beautifulsoup4\n")
+	case "node":
+		write("package.json", fmt.Sprintf(`{
+  "name": "%s",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {}
+}
+`, sanitizePluginName(name)))
+	}
 }
 
 // pluginBoilerplate generates a starter handler file for the given language and template.

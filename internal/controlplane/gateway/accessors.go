@@ -3,7 +3,7 @@ package gateway
 import (
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/identity"
-	reflectpkg "yunque-agent/internal/agentcore/reflect"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
 
 // GetIdentityResolver returns the identity resolver.

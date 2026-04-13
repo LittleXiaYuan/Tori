@@ -433,6 +433,30 @@
       "event_type": "enabled",
       "timestamp": "2026-04-10T20:39:59.264804+08:00",
       "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_2f67da28",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-12T03:30:04.8787472+08:00",
+      "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_7fcd010e",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-12T22:14:48.202828+08:00",
+      "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_aa2c5b25",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-13T17:27:47.6522426+08:00",
+      "message": "Trigger created: Test Trigger"
     }
   ]
 }

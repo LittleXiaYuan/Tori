@@ -11,15 +11,15 @@ import (
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/cron"
-	"yunque-agent/internal/agentcore/distill"
+	"yunque-agent/internal/experimental/distill"
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/guardrails"
-	"yunque-agent/internal/agentcore/heartbeat"
+	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
-	"yunque-agent/internal/agentcore/iterate"
+	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
@@ -27,13 +27,13 @@ import (
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/rbac"
-	reflectpkg "yunque-agent/internal/agentcore/reflect"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/agentcore/review"
 	"yunque-agent/internal/agentcore/router"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
 	"yunque-agent/internal/agentcore/session"
-	"yunque-agent/internal/agentcore/skillgrow"
+	"yunque-agent/internal/experimental/skillgrow"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/state"
@@ -130,6 +130,9 @@ func (g *Gateway) SetFederationTransport(t *federation.Transport) { g.fedTranspo
 // SetKnowledgeStore attaches the knowledge base.
 func (g *Gateway) SetKnowledgeStore(ks *knowledge.Store) { g.knowledgeStore = ks }
 
+// SetKnowledgeDir sets the directory for persisting extracted conversation facts.
+func (g *Gateway) SetKnowledgeDir(dir string) { g.knowledgeDir = dir }
+
 // SetCronManager attaches the cron job manager.
 func (g *Gateway) SetCronManager(cm *cron.Manager) { g.cronMgr = cm }
 
@@ -141,6 +144,9 @@ func (g *Gateway) SetShellPolicy(sp *tools.ShellExecPolicy) { g.shellPolicy = sp
 
 // SetPluginLoader attaches a plugin directory loader for CRUD operations.
 func (g *Gateway) SetPluginLoader(l *plugin.Loader) { g.pluginLoader = l }
+
+// SetSkillFileLoader attaches a file-based skill loader for data/skills/ auto-scanning.
+func (g *Gateway) SetSkillFileLoader(l *skillmarket.SkillFileLoader) { g.skillFileLoader = l }
 
 // SetRuntimePool attaches the multi-agent runtime pool.
 func (g *Gateway) SetRuntimePool(p *agentrt.Pool) { g.runtimePool = p }
@@ -329,6 +335,27 @@ func (g *Gateway) ExecProvider() string {
 	g.execProviderMu.RLock()
 	defer g.execProviderMu.RUnlock()
 	return g.execProvider
+}
+
+// SetModelKVStore injects a Ledger KV store into the model manager for persistence.
+func (g *Gateway) SetModelKVStore(kvs modelKVStore) {
+	if g.modelMgr != nil {
+		g.modelMgr.SetKVStore(kvs)
+	}
+}
+
+// SetUsageKVStore injects a Ledger KV store into the usage tracker for persistence.
+func (g *Gateway) SetUsageKVStore(kvs usageKVStore) {
+	if g.usage != nil {
+		g.usage.SetKVStore(kvs)
+	}
+}
+
+// FlushUsageKV persists usage data before shutdown.
+func (g *Gateway) FlushUsageKV() {
+	if g.usage != nil {
+		g.usage.FlushToKV()
+	}
 }
 
 func truncateStr(s string, maxRunes int) string {

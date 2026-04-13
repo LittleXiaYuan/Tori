@@ -209,10 +209,20 @@ func (r *ProviderRegistry) SetPersistPath(path string) {
 	r.persistPath = path
 }
 
-// LoadFromStore loads providers from the configured KV store.
+// LoadFromStore loads providers and mode from the configured KV store.
 func (r *ProviderRegistry) LoadFromStore() (int, error) {
 	if r.persistStore == nil {
 		return 0, nil
+	}
+	var modeStr string
+	if found, err := r.persistStore.Get(context.Background(), "mode", &modeStr); err == nil && found && modeStr != "" {
+		switch ProviderMode(modeStr) {
+		case ProviderModeLocal, ProviderModeTori, ProviderModeHybrid:
+			r.mu.Lock()
+			r.mode = ProviderMode(modeStr)
+			r.mu.Unlock()
+			slog.Info("provider: restored mode from store", "mode", modeStr)
+		}
 	}
 	var configs []ProviderConfig
 	found, err := r.persistStore.Get(context.Background(), "all", &configs)
@@ -266,11 +276,14 @@ func (r *ProviderRegistry) Mode() ProviderMode {
 	return r.mode
 }
 
-// SetMode changes the provider routing mode.
+// SetMode changes the provider routing mode and persists it.
 func (r *ProviderRegistry) SetMode(m ProviderMode) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.mode = m
+	if r.persistStore != nil {
+		_ = r.persistStore.Put(context.Background(), "mode", string(m))
+	}
+	r.mu.Unlock()
 	slog.Info("provider mode changed", "mode", m)
 }
 
@@ -466,22 +479,32 @@ func (r *ProviderRegistry) Delete(id string) error {
 
 // Enable activates a provider.
 func (r *ProviderRegistry) Enable(id string) error {
-	p := r.Get(id)
-	if p == nil {
+	r.mu.Lock()
+	p, ok := r.providers[id]
+	if !ok {
+		r.mu.Unlock()
 		return fmt.Errorf("provider %s not found", id)
 	}
 	p.SetEnabled(true)
+	p.Config.Enabled = true
+	r.persist()
+	r.mu.Unlock()
 	slog.Info("provider: enabled", "id", id)
 	return nil
 }
 
 // Disable deactivates a provider.
 func (r *ProviderRegistry) Disable(id string) error {
-	p := r.Get(id)
-	if p == nil {
+	r.mu.Lock()
+	p, ok := r.providers[id]
+	if !ok {
+		r.mu.Unlock()
 		return fmt.Errorf("provider %s not found", id)
 	}
 	p.SetEnabled(false)
+	p.Config.Enabled = false
+	r.persist()
+	r.mu.Unlock()
 	slog.Info("provider: disabled", "id", id)
 	return nil
 }
@@ -497,8 +520,10 @@ func (r *ProviderRegistry) TestProvider(ctx context.Context, id string) error {
 
 // SwitchModel changes the model of a provider at runtime.
 func (r *ProviderRegistry) SwitchModel(id, newModel string) error {
-	p := r.Get(id)
-	if p == nil {
+	r.mu.Lock()
+	p, ok := r.providers[id]
+	if !ok {
+		r.mu.Unlock()
 		return fmt.Errorf("provider %s not found", id)
 	}
 	p.mu.Lock()
@@ -510,11 +535,12 @@ func (r *ProviderRegistry) SwitchModel(id, newModel string) error {
 		p.Client = NewClient(p.Config.BaseURL, key, newModel)
 	}
 	p.mu.Unlock()
-	// Sync to pool
 	r.pool.Register(id, p.Client)
 	if p.Config.Tier != "" {
 		r.pool.Register(p.Config.Tier, p.Client)
 	}
+	r.persist()
+	r.mu.Unlock()
 	slog.Info("provider: model switched", "id", id, "model", newModel)
 	return nil
 }

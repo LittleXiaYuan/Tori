@@ -6,12 +6,12 @@ import (
 
 	"ledger"
 
-	"yunque-agent/internal/agentcore/circuit"
+	"yunque-agent/internal/experimental/circuit"
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/planner"
-	agreact "yunque-agent/internal/agentcore/react"
+	agreact "yunque-agent/internal/experimental/react"
 	"yunque-agent/internal/config"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/plugin"

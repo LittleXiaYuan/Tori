@@ -61,7 +61,12 @@ func (r *FileRepo) save(sf *sessionFile) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(r.path(sf.ID), data, 0644)
+	target := r.path(sf.ID)
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, target)
 }
 
 // GetOrCreate ensures a session file exists.

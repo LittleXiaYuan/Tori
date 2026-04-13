@@ -422,7 +422,7 @@ func (g *Gateway) handleToriDiscover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	autoRegister := r.URL.Query().Get("register") == "true"
+	autoRegister := r.URL.Query().Get("auto_register") == "true" || r.URL.Query().Get("register") == "true"
 	registered := 0
 
 	if autoRegister && g.providerReg != nil {

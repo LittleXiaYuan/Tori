@@ -23,7 +23,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg)
+	tools := p.buildFunctionDefs(userMsg, req.DisableDelegation)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -48,7 +48,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			req.StepCallback(thinkEvt)
 		}
 
-		client := p.LLMClientFor(req.ModelOverride)
+		client := p.clientForRequest(req)
 		var lastReasoning string
 		opts := &llm.ChatWithToolsOpts{LastReasoningOut: &lastReasoning}
 		reply, toolCalls, err := client.ChatWithToolsEx(ctx, messages, tools, 0.7, opts)
@@ -96,7 +96,16 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		resultsCh := make(chan tcResult, len(toolCalls))
 		for i, tc := range toolCalls {
 			idx, tc := i, tc // capture loop vars
-			safeToolGo(ctx, p.toolTimeout, func(toolCtx context.Context) {
+
+			// Handoff delegations need longer timeout (browser ops, code exec, etc.)
+			timeout := p.toolTimeout
+			if p.handoffReg != nil {
+				if _, isHandoff := p.handoffReg.IsHandoffCall(tc.Function.Name); isHandoff {
+					timeout = 3 * time.Minute
+				}
+			}
+
+			safeToolGo(ctx, timeout, func(toolCtx context.Context) {
 				var args map[string]any
 				json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
@@ -212,7 +221,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages = append(messages, llm.Message{Role: "user", Content: "你已执行了足够多的步骤。请根据以上所有工具结果，直接给出最终回答。"})
 
-	client := p.LLMClientFor(req.ModelOverride)
+	client := p.clientForRequest(req)
 	reply, _, err := client.ChatWithTools(ctx, messages, tools, 0.7)
 	if err != nil {
 		summary := "任务已执行 " + fmt.Sprintf("%d", steps) + " 步，但生成总结时出错。"
@@ -233,7 +242,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // buildFunctionDefs converts skill definitions to LLM FunctionDef format.
 // In delegation mode (5+ handoff agents), only exposes transfer_to_* tools.
 // Exec agents get domain-specific tools via their isolated RunFunc context.
-func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
+// When disableDelegation is true, direct mode is forced (for subagent execution).
+func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	cats := p.registry.Categories()
 
@@ -243,7 +253,7 @@ func (p *Planner) buildFunctionDefs(userMessage string) []llm.FunctionDef {
 	}
 
 	// Delegation mode: planner only sees handoff tools, exec agents handle the rest
-	if p.handoffReg != nil && len(p.handoffReg.List()) >= 4 {
+	if !disableDelegation && p.handoffReg != nil && len(p.handoffReg.List()) >= 4 {
 		hdDefs := p.handoffReg.ToolDefinitions()
 		defs := make([]llm.FunctionDef, 0, len(hdDefs))
 		for _, hd := range hdDefs {

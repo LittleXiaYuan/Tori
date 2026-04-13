@@ -57,6 +57,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 
 	return []skills.Skill{
 		ws,
+		NewComputerUseSkill(),
 		NewCodeGenSkill(),
 		NewFileSearchSkill(p.hostReadPaths),
 		NewDocParseSkill(p.hostReadPaths),
@@ -78,6 +79,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		p.pptxSkill(writeDirs),
 		NewPptxFillSkill(readDirs, writeDirs),
 		NewPptxEditSkill(readDirs, writeDirs),
+		NewPptxTemplateSearchSkill(writeDirs),
 		NewSendEmailSkill(),
 		newWorkflowGenWithStore(p.wfStore),
 	}
@@ -115,7 +117,8 @@ func (p *GeneralPlugin) SystemPrompt() string {
 - 浏览器自动化（获取网页内容、提取正文/链接/HTTP头）→ browser_*
 
 **代码与文件**
-- 安全沙盒执行代码（Python/JavaScript/Go）→ code_gen
+- 云端桌面沙箱（E2B Desktop，优先使用）→ computer_use（create/exec/status/destroy）
+- 本地安全沙盒执行代码（Python/JavaScript/Go）→ code_gen（E2B不可用时回退）
 - 浏览和搜索主机文件 → file_search
 - 解析文档（PDF/Word/Excel/CSV/TXT/Markdown）→ doc_parse
 - 创建和写入文件 → file_write

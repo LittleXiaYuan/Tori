@@ -136,9 +136,12 @@ func (g *Gateway) registerPluginRoutes() {
 	g.mux.HandleFunc("/v1/plugins/delete", g.requireAuth(g.handlePluginDelete))
 	g.mux.HandleFunc("/v1/plugins/files", g.requireAuth(g.handlePluginFiles))
 	g.mux.HandleFunc("/v1/plugins/ui", g.requireAuth(g.handlePluginUI))
+	g.mux.HandleFunc("/v1/plugins/reload", g.requireAuth(g.handlePluginReload))
+	g.mux.HandleFunc("/v1/plugins/open-folder", g.requireAuth(g.handlePluginOpenFolder))
 
 	// Skills
 	g.mux.HandleFunc("/v1/skills", g.requireAuth(g.handleSkills))
+	g.mux.HandleFunc("/v1/skills/scan", g.requireAuth(g.handleSkillsScan))
 	g.mux.HandleFunc("/v1/skills/dynamic", g.requireAuth(g.handleSkillsDynamicGet))
 	g.mux.HandleFunc("/v1/skills/approve", g.requireAuth(g.handleSkillsDynamicApprove))
 	g.mux.HandleFunc("/v1/skills/reject", g.requireAuth(g.handleSkillsDynamicReject))
@@ -199,6 +202,10 @@ func (g *Gateway) registerTriggerRoutes() {
 
 	// Sandbox
 	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.handleSandboxExec))
+	g.mux.HandleFunc("/v1/sandbox/probe", g.handleSandboxProbe)
+	g.mux.HandleFunc("/v1/sandbox/desktop", g.requireAuth(g.handleDesktopCreate))
+	g.mux.HandleFunc("/v1/sandbox/desktop/status", g.requireAuth(g.handleDesktopStatus))
+	g.mux.HandleFunc("/v1/sandbox/desktop/destroy", g.requireAuth(g.handleDesktopDestroy))
 
 	// Agent output files
 	g.mux.HandleFunc("/api/files", g.requireAuth(g.handleFileList))

@@ -196,6 +196,15 @@ func (p *Planner) LLMClientFor(modelOverride string) *llm.Client {
 	return p.llm
 }
 
+// clientForRequest returns the LLM client to use for a given request.
+// Priority: ClientOverride > ModelOverride (pool) > default client.
+func (p *Planner) clientForRequest(req PlanRequest) *llm.Client {
+	if req.ClientOverride != nil {
+		return req.ClientOverride
+	}
+	return p.LLMClientFor(req.ModelOverride)
+}
+
 // LLMBreaker returns the circuit breaker for LLM health inspection.
 func (p *Planner) LLMBreaker() *llm.CircuitBreaker { return p.llm.Breaker() }
 
@@ -423,6 +432,8 @@ type PlanRequest struct {
 	StepCallback      StepCallback    // optional: called for each intermediate step (thinking, tool call, etc.)
 	TraceID           string          // trace context ID for unified event protocol
 	ThinkingEnabled   *bool           // nil = model default; true/false = explicit override
+	DisableDelegation bool            // when true, buildFunctionDefs exposes direct skills instead of handoff tools
+	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
 }
 
 // StepEventType classifies the kind of intermediate step event.

@@ -94,6 +94,23 @@ func (t *Tracker) Get(slug string) Entry {
 	return Entry{}
 }
 
+// Seed sets a skill's trust score directly without per-promotion logging.
+// Used during startup to pre-seed built-in skills to a trusted level.
+func (t *Tracker) Seed(slug string, score int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	e := t.getOrCreate(slug)
+	if e.Score >= score {
+		return
+	}
+	e.Score = score
+	if e.Score > 100 {
+		e.Score = 100
+	}
+	e.LastPromoted = time.Now()
+	t.save()
+}
+
 // RecordSuccess increments trust after a successful, safe execution.
 func (t *Tracker) RecordSuccess(slug string) {
 	t.mu.Lock()

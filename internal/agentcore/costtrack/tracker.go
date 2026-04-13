@@ -2,6 +2,7 @@ package costtrack
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -87,6 +88,12 @@ type Budget struct {
 	PerCallLimitUSD float64 `json:"per_call_limit_usd"`
 }
 
+// kvStore abstracts Ledger KV to avoid import cycles.
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
+
 // Tracker tracks token usage and costs in real-time.
 type Tracker struct {
 	mu                 sync.RWMutex
@@ -95,6 +102,8 @@ type Tracker struct {
 	budget             Budget
 	alerts             []Alert
 	persistPath        string // path to JSONL file; empty = no persistence
+	kvs                kvStore
+	kvDirty            int
 	MaxInMemoryRecords int    // max records in memory; 0 = 100000
 }
 
@@ -124,6 +133,44 @@ func NewWithPersistence(dataDir string) *Tracker {
 	t.persistPath = filepath.Join(dataDir, "cost_telemetry.jsonl")
 	t.loadFromDisk()
 	return t
+}
+
+// SetKVStore enables Ledger KV-backed persistence for cost tracking.
+func (t *Tracker) SetKVStore(kvs kvStore) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.kvs = kvs
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var usages []Usage
+	found, err := kvs.Get(ctx, "usages", &usages)
+	if err != nil {
+		slog.Warn("costtrack: KV load failed", "err", err)
+		return
+	}
+	if found && len(usages) > 0 && len(t.usages) == 0 {
+		t.usages = usages
+		slog.Info("costtrack: loaded from Ledger KV", "records", len(usages))
+	}
+}
+
+// FlushToKV persists current usage data to Ledger KV.
+func (t *Tracker) FlushToKV() {
+	t.mu.RLock()
+	kvs := t.kvs
+	snap := make([]Usage, len(t.usages))
+	copy(snap, t.usages)
+	t.mu.RUnlock()
+
+	if kvs == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := kvs.Put(ctx, "usages", snap); err != nil {
+		slog.Error("costtrack: flush to KV failed", "err", err)
+	}
 }
 
 // SetBudget configures spending limits.
@@ -199,6 +246,11 @@ func (t *Tracker) RecordExt(opts RecordOpts) (float64, *Alert) {
 	t.usages = append(t.usages, u)
 	t.evictOldRecords()
 	t.appendToDisk(u)
+	t.kvDirty++
+	if t.kvs != nil && t.kvDirty >= 10 {
+		t.kvDirty = 0
+		go t.FlushToKV()
+	}
 
 	alert := t.checkBudget(u)
 	if alert != nil {

@@ -27,18 +27,19 @@ nul
 # ── Go ──
 vendor/
 
-# ── Node / Web ──
-web/node_modules/
-web/.next/
-web/out/
-web/build_output.txt
+# ── Legacy frontend (已归档) ──
+web/
 docs/node_modules/
-heroui-web/node_modules/
-heroui-web/.next/
-heroui-web/out/
-heroui-web/.env.local
-heroui-web/tsconfig.tsbuildinfo
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 .next/
+
+# ── Frontend source (独立仓库发布，后端仅保留 embed.go + 占位 out/) ──
+heroui-web/*
+!heroui-web/embed.go
+!heroui-web/out/
+heroui-web/out/*
+!heroui-web/out/placeholder.html
 
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
@@ -46,6 +47,9 @@ internal/agentcore/task/*/
 # ── Environment (keep .env.example, ignore actual .env) ──
 .env
 !.env.example
+
+# ── Internal dev docs (not for public) ──
+doc/
 
 # ── External projects ──
 

@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sync"
 )
@@ -17,10 +19,68 @@ type modelEntry struct {
 	Dimensions        int    `json:"dimensions,omitempty"`
 }
 
-var (
-	modelStore   = make(map[string]modelEntry)
-	modelStoreMu sync.RWMutex
-)
+type modelKVStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
+}
+
+type modelManager struct {
+	mu      sync.RWMutex
+	models  map[string]modelEntry
+	hidden  map[string]bool // provider-derived model IDs the user explicitly deleted
+	kvs     modelKVStore
+}
+
+func newModelManager() *modelManager {
+	return &modelManager{
+		models: make(map[string]modelEntry),
+		hidden: make(map[string]bool),
+	}
+}
+
+func (mm *modelManager) SetKVStore(kvs modelKVStore) {
+	mm.mu.Lock()
+	defer mm.mu.Unlock()
+	mm.kvs = kvs
+	var models []modelEntry
+	if found, err := kvs.Get(context.Background(), "models", &models); err == nil && found {
+		for _, m := range models {
+			mm.models[m.ID] = m
+		}
+		slog.Info("models: loaded from KV", "count", len(models))
+	}
+	var hidden []string
+	if found, err := kvs.Get(context.Background(), "models_hidden", &hidden); err == nil && found {
+		for _, id := range hidden {
+			mm.hidden[id] = true
+		}
+		if len(hidden) > 0 {
+			slog.Info("models: loaded hidden list from KV", "count", len(hidden))
+		}
+	}
+}
+
+func (mm *modelManager) persistModels() {
+	if mm.kvs == nil {
+		return
+	}
+	models := make([]modelEntry, 0, len(mm.models))
+	for _, m := range mm.models {
+		models = append(models, m)
+	}
+	_ = mm.kvs.Put(context.Background(), "models", models)
+}
+
+func (mm *modelManager) persistHidden() {
+	if mm.kvs == nil {
+		return
+	}
+	ids := make([]string, 0, len(mm.hidden))
+	for id := range mm.hidden {
+		ids = append(ids, id)
+	}
+	_ = mm.kvs.Put(context.Background(), "models_hidden", ids)
+}
 
 func (g *Gateway) handleModels(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -36,11 +96,12 @@ func (g *Gateway) handleModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleModelsGet(w http.ResponseWriter, _ *http.Request) {
-	modelStoreMu.RLock()
-	defer modelStoreMu.RUnlock()
+	mm := g.modelMgr
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
 
-	models := make([]modelEntry, 0, len(modelStore))
-	for _, m := range modelStore {
+	models := make([]modelEntry, 0, len(mm.models))
+	for _, m := range mm.models {
 		models = append(models, m)
 	}
 
@@ -50,9 +111,10 @@ func (g *Gateway) handleModelsGet(w http.ResponseWriter, _ *http.Request) {
 			existing[m.ModelID] = true
 		}
 		for _, p := range g.providerReg.List() {
-			if p.Model != "" && !existing[p.Model] {
+			syntheticID := p.ID + "-" + p.Model
+			if p.Model != "" && !existing[p.Model] && !mm.hidden[syntheticID] {
 				models = append(models, modelEntry{
-					ID:         p.ID + "-" + p.Model,
+					ID:         syntheticID,
 					ModelID:    p.Model,
 					Name:       p.Model,
 					Type:       string(p.Type),
@@ -78,9 +140,13 @@ func (g *Gateway) handleModelsPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	modelStoreMu.Lock()
-	modelStore[m.ID] = m
-	modelStoreMu.Unlock()
+	mm := g.modelMgr
+	mm.mu.Lock()
+	mm.models[m.ID] = m
+	delete(mm.hidden, m.ID)
+	mm.persistModels()
+	mm.persistHidden()
+	mm.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(m)
@@ -93,20 +159,30 @@ func (g *Gateway) handleModelsDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	modelStoreMu.Lock()
-	_, inStore := modelStore[id]
+	mm := g.modelMgr
+	mm.mu.Lock()
+	_, inStore := mm.models[id]
 	if inStore {
-		delete(modelStore, id)
+		delete(mm.models, id)
+		mm.persistModels()
 	}
-	modelStoreMu.Unlock()
+	mm.mu.Unlock()
 
 	if !inStore && g.providerReg != nil {
+		deleted := false
 		for _, p := range g.providerReg.List() {
 			syntheticID := p.ID + "-" + p.Model
 			if syntheticID == id || p.ID == id {
 				_ = g.providerReg.Delete(p.ID)
+				deleted = true
 				break
 			}
+		}
+		if !deleted {
+			mm.mu.Lock()
+			mm.hidden[id] = true
+			mm.persistHidden()
+			mm.mu.Unlock()
 		}
 	}
 

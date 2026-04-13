@@ -322,6 +322,7 @@ func (g *Gateway) WireReverieActions() {
 	// write_memory → orchestrator
 	if g.orchestrator != nil {
 		g.reverie.SetWriteMemory(func(ctx context.Context, fact string) error {
+			g.metrics.Cognitive().ReverieAction.Add(1)
 			return g.orchestrator.Ingest(ctx, "default", fact, "reverie_insight", "reverie")
 		})
 	}
@@ -329,6 +330,7 @@ func (g *Gateway) WireReverieActions() {
 	// create_task → task store
 	if g.taskStore != nil {
 		g.reverie.SetCreateTask(func(ctx context.Context, title, desc string) error {
+			g.metrics.Cognitive().ReverieAction.Add(1)
 			_, err := g.taskStore.Create(task.CreateRequest{
 				Title:       title,
 				Description: desc,
@@ -341,6 +343,7 @@ func (g *Gateway) WireReverieActions() {
 	// update_profile → memory as persistent profile fact
 	if g.orchestrator != nil {
 		g.reverie.SetUpdateProfile(func(ctx context.Context, key, value string) error {
+			g.metrics.Cognitive().ReverieAction.Add(1)
 			fact := fmt.Sprintf("[用户画像] %s: %s", key, value)
 			return g.orchestrator.Ingest(ctx, "default", fact, "profile_update", "reverie")
 		})
@@ -356,7 +359,11 @@ func (g *Gateway) WireReflectionLoop() {
 		return
 	}
 	g.planner.SetStrategyContext(func() string {
-		return g.experienceStore.CompileStrategies(20)
+		strategies := g.experienceStore.CompileStrategies(20)
+		if strategies != "" {
+			g.metrics.Cognitive().StrategyInject.Add(1)
+		}
+		return strategies
 	})
 }
 

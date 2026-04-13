@@ -1,9 +1,11 @@
 package identity
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -34,7 +36,8 @@ type Binding struct {
 type BindingStore struct {
 	mu       sync.RWMutex
 	bindings map[string][]Binding // userID -> bindings
-	codes    map[string]*BindCode // code -> bind code
+	codes    map[string]*BindCode // code -> bind code (transient, not persisted)
+	kvs      kvStore
 }
 
 // NewBindingStore creates an identity binding store.
@@ -45,6 +48,28 @@ func NewBindingStore() *BindingStore {
 	}
 	go s.gcLoop()
 	return s
+}
+
+// SetKVStore sets the KV store and loads persisted bindings.
+func (s *BindingStore) SetKVStore(kvs kvStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kvs = kvs
+
+	var bindings map[string][]Binding
+	if found, err := kvs.Get(context.Background(), "bindings", &bindings); err == nil && found {
+		for uid, bs := range bindings {
+			s.bindings[uid] = bs
+		}
+		slog.Info("identity: loaded bindings from KV", "users", len(bindings))
+	}
+}
+
+func (s *BindingStore) persistBindings() {
+	if s.kvs == nil {
+		return
+	}
+	_ = s.kvs.Put(context.Background(), "bindings", s.bindings)
 }
 
 // GenerateCode creates a one-time bind code for a user on a platform.
@@ -103,6 +128,7 @@ func (s *BindingStore) Bind(code, externalID, displayName string) (*Binding, err
 	}
 	s.bindings[bc.UserID] = append(s.bindings[bc.UserID], binding)
 	delete(s.codes, code) // consume code
+	s.persistBindings()
 	return &binding, nil
 }
 
@@ -137,6 +163,7 @@ func (s *BindingStore) Unbind(userID, platform, externalID string) bool {
 	for i, b := range bindings {
 		if b.Platform == platform && b.ExternalID == externalID {
 			s.bindings[userID] = append(bindings[:i], bindings[i+1:]...)
+			s.persistBindings()
 			return true
 		}
 	}

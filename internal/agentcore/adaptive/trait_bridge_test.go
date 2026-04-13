@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"yunque-agent/internal/agentcore/trait"
+	"yunque-agent/internal/experimental/trait"
 )
 
 func TestTraitBridgeSyncToProfile(t *testing.T) {

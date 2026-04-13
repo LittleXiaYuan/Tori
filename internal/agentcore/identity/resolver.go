@@ -1,19 +1,26 @@
 package identity
 
 import (
+	"context"
+	"log/slog"
 	"sync"
 	"time"
 )
 
 // Profile represents a unified user identity across channels.
 type Profile struct {
-	UnifiedID   string            `json:"unified_id"`
-	DisplayName string            `json:"display_name"`
-	Channels    map[string]string `json:"channels"`    // channel_type:channel_user_id -> unified_id
-	Metadata    map[string]string `json:"metadata"`
-	FirstSeen   time.Time         `json:"first_seen"`
-	LastSeen    time.Time         `json:"last_seen"`
-	MessageCount int64            `json:"message_count"`
+	UnifiedID    string            `json:"unified_id"`
+	DisplayName  string            `json:"display_name"`
+	Channels     map[string]string `json:"channels"`
+	Metadata     map[string]string `json:"metadata"`
+	FirstSeen    time.Time         `json:"first_seen"`
+	LastSeen     time.Time         `json:"last_seen"`
+	MessageCount int64             `json:"message_count"`
+}
+
+type kvStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
 }
 
 // Resolver maps channel-specific user IDs to unified profiles.
@@ -22,6 +29,8 @@ type Resolver struct {
 	mu       sync.RWMutex
 	profiles map[string]*Profile // unified_id -> profile
 	index    map[string]string   // "telegram:12345" -> unified_id
+	kvs      kvStore
+	dirty    int
 }
 
 // NewResolver creates an identity resolver.
@@ -29,6 +38,45 @@ func NewResolver() *Resolver {
 	return &Resolver{
 		profiles: make(map[string]*Profile),
 		index:    make(map[string]string),
+	}
+}
+
+// SetKVStore sets the KV store and loads persisted profiles.
+func (r *Resolver) SetKVStore(kvs kvStore) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.kvs = kvs
+
+	var profiles map[string]*Profile
+	if found, err := kvs.Get(context.Background(), "profiles", &profiles); err == nil && found {
+		for id, p := range profiles {
+			r.profiles[id] = p
+			for ch, uid := range p.Channels {
+				r.index[channelKey(ch, uid)] = id
+			}
+		}
+		slog.Info("identity: loaded profiles from KV", "count", len(profiles))
+	}
+}
+
+// FlushToKV persists all profiles to the KV store.
+func (r *Resolver) FlushToKV() {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.kvs == nil || r.dirty == 0 {
+		return
+	}
+	_ = r.kvs.Put(context.Background(), "profiles", r.profiles)
+	r.dirty = 0
+}
+
+func (r *Resolver) persistKV() {
+	if r.kvs == nil {
+		return
+	}
+	r.dirty++
+	if r.dirty%5 == 0 {
+		_ = r.kvs.Put(context.Background(), "profiles", r.profiles)
 	}
 }
 
@@ -69,6 +117,7 @@ func (r *Resolver) Resolve(channelType, userID, displayName string) *Profile {
 	}
 	r.profiles[uid] = p
 	r.index[key] = uid
+	r.persistKV()
 
 	return p.snapshot()
 }
@@ -93,6 +142,7 @@ func (r *Resolver) Link(unifiedID, channelType, userID string) bool {
 
 	p.Channels[channelType] = userID
 	r.index[key] = unifiedID
+	r.persistKV()
 	return true
 }
 
@@ -123,6 +173,7 @@ func (r *Resolver) Merge(keepID, mergeID string) bool {
 	}
 
 	delete(r.profiles, mergeID)
+	r.persistKV()
 	return true
 }
 
@@ -161,6 +212,7 @@ func (r *Resolver) SetMeta(unifiedID, key, value string) bool {
 		return false
 	}
 	p.Metadata[key] = value
+	r.persistKV()
 	return true
 }
 

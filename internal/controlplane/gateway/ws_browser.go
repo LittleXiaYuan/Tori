@@ -92,6 +92,11 @@ type BrowserHub struct {
 	pending   map[string]chan BrowserResult
 	listeners []func(BrowserResult)
 	seq       uint64
+
+	connectedSince time.Time
+	lastActionAt   time.Time
+	actionCount    uint64
+	errorCount     uint64
 }
 
 // NewBrowserHub creates a new BrowserHub.
@@ -141,6 +146,41 @@ func (h *BrowserHub) writeMessage(messageType int, data []byte) error {
 	return conn.WriteMessage(messageType, data)
 }
 
+// actionTimeout returns a dynamic timeout based on the action type.
+func actionTimeout(action BrowserAction) time.Duration {
+	switch action.Type {
+	case "browser_navigate":
+		return 60 * time.Second
+	case "browser_screenshot", "browser_view":
+		return 20 * time.Second
+	case "browser_get_content", "browser_get_structured_content", "browser_get_elements", "browser_mark_elements":
+		return 30 * time.Second
+	default:
+		return 45 * time.Second
+	}
+}
+
+// Health returns connection health information.
+func (h *BrowserHub) Health() map[string]any {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	info := map[string]any{
+		"connected":    h.connected,
+		"version":      h.version,
+		"tenant_id":    h.tenantID,
+		"action_count": h.actionCount,
+		"error_count":  h.errorCount,
+		"pending":      len(h.pending),
+	}
+	if h.connected && !h.connectedSince.IsZero() {
+		info["uptime_seconds"] = int(time.Since(h.connectedSince).Seconds())
+	}
+	if !h.lastActionAt.IsZero() {
+		info["last_action_age_seconds"] = int(time.Since(h.lastActionAt).Seconds())
+	}
+	return info
+}
+
 // SendAction sends a command to the browser extension and waits for the result.
 func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (BrowserResult, error) {
 	if err := validateBrowserAction(action); err != nil {
@@ -156,6 +196,8 @@ func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (Brow
 	reqID := fmt.Sprintf("browser-%d-%d", time.Now().UnixNano(), atomic.AddUint64(&h.seq, 1))
 	ch := make(chan BrowserResult, 1)
 	h.pending[reqID] = ch
+	h.lastActionAt = time.Now()
+	atomic.AddUint64(&h.actionCount, 1)
 	h.mu.Unlock()
 
 	cmd := BrowserCommand{RequestID: reqID, Action: action}
@@ -165,22 +207,30 @@ func (h *BrowserHub) SendAction(ctx context.Context, action BrowserAction) (Brow
 		h.mu.Lock()
 		delete(h.pending, reqID)
 		h.mu.Unlock()
+		atomic.AddUint64(&h.errorCount, 1)
 		return BrowserResult{OK: false, Error: err.Error()}, err
 	}
 
+	timeout := actionTimeout(action)
 	select {
 	case result := <-ch:
+		if !result.OK {
+			atomic.AddUint64(&h.errorCount, 1)
+		}
 		return result, nil
 	case <-ctx.Done():
 		h.mu.Lock()
 		delete(h.pending, reqID)
 		h.mu.Unlock()
-		return BrowserResult{OK: false, Error: "timeout"}, ctx.Err()
-	case <-time.After(30 * time.Second):
+		atomic.AddUint64(&h.errorCount, 1)
+		return BrowserResult{OK: false, Error: "context cancelled"}, ctx.Err()
+	case <-time.After(timeout):
 		h.mu.Lock()
 		delete(h.pending, reqID)
 		h.mu.Unlock()
-		return BrowserResult{OK: false, Error: "action timeout"}, nil
+		atomic.AddUint64(&h.errorCount, 1)
+		slog.Warn("browser action timeout", "type", action.Type, "timeout", timeout, "reqID", reqID)
+		return BrowserResult{OK: false, Error: fmt.Sprintf("action timeout after %s", timeout)}, nil
 	}
 }
 
@@ -309,9 +359,13 @@ func (h *BrowserHub) setConn(conn *websocket.Conn, tenantID string, connected bo
 	if conn != nil {
 		h.tenantID = tenantID
 		h.ticket = ticket
+		if connected {
+			h.connectedSince = time.Now()
+		}
 	} else {
 		h.tenantID = ""
 		h.ticket = ""
+		h.connectedSince = time.Time{}
 	}
 	if conn == nil {
 		h.failPendingLocked("browser extension disconnected")

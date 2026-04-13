@@ -1,7 +1,9 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -19,8 +21,13 @@ type UsageRecord struct {
 
 // QuotaConfig defines usage limits per tenant.
 type QuotaConfig struct {
-	MaxChatCalls   int64 `json:"max_chat_calls"`   // 0 = unlimited
+	MaxChatCalls    int64 `json:"max_chat_calls"`     // 0 = unlimited
 	MaxTokensPerDay int64 `json:"max_tokens_per_day"` // 0 = unlimited
+}
+
+type usageKVStore interface {
+	Put(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string, dest any) (bool, error)
 }
 
 // UsageTracker tracks and enforces usage quotas.
@@ -30,6 +37,8 @@ type UsageTracker struct {
 	quotas map[string]*QuotaConfig
 	daily  map[string]int64 // tenant -> tokens used today
 	dayKey string           // "2006-01-02"
+	kvs    usageKVStore
+	dirty  int
 }
 
 // NewUsageTracker creates a usage tracker.
@@ -42,11 +51,56 @@ func NewUsageTracker() *UsageTracker {
 	}
 }
 
+// SetKVStore sets the KV store and loads persisted usage/quotas.
+func (u *UsageTracker) SetKVStore(kvs usageKVStore) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.kvs = kvs
+
+	var usage map[string]*UsageRecord
+	if found, err := kvs.Get(context.Background(), "usage", &usage); err == nil && found {
+		for id, rec := range usage {
+			u.usage[id] = rec
+		}
+		slog.Info("usage: loaded records from KV", "tenants", len(usage))
+	}
+	var quotas map[string]*QuotaConfig
+	if found, err := kvs.Get(context.Background(), "quotas", &quotas); err == nil && found {
+		for id, q := range quotas {
+			u.quotas[id] = q
+		}
+	}
+}
+
+// FlushToKV persists usage and quotas.
+func (u *UsageTracker) FlushToKV() {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+	if u.kvs == nil {
+		return
+	}
+	_ = u.kvs.Put(context.Background(), "usage", u.usage)
+	_ = u.kvs.Put(context.Background(), "quotas", u.quotas)
+}
+
+func (u *UsageTracker) persistKV() {
+	if u.kvs == nil {
+		return
+	}
+	u.dirty++
+	if u.dirty%10 == 0 {
+		_ = u.kvs.Put(context.Background(), "usage", u.usage)
+	}
+}
+
 // SetQuota sets usage quota for a tenant.
 func (u *UsageTracker) SetQuota(tenantID string, q QuotaConfig) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.quotas[tenantID] = &q
+	if u.kvs != nil {
+		_ = u.kvs.Put(context.Background(), "quotas", u.quotas)
+	}
 }
 
 // RecordChat records a chat API call.
@@ -59,6 +113,7 @@ func (u *UsageTracker) RecordChat(tenantID string, tokens int64) {
 	rec.TokensUsed += tokens
 	rec.LastCall = time.Now()
 	u.daily[tenantID] += tokens
+	u.persistKV()
 }
 
 // RecordStream records a stream API call.
@@ -71,6 +126,7 @@ func (u *UsageTracker) RecordStream(tenantID string, tokens int64) {
 	rec.TokensUsed += tokens
 	rec.LastCall = time.Now()
 	u.daily[tenantID] += tokens
+	u.persistKV()
 }
 
 // CheckQuota returns true if the tenant is within quota.

@@ -56,7 +56,7 @@ function renderStatus(status) {
   els.sessionCount.textContent = status.sessions ? `${status.sessions} 个会话` : "无会话";
   els.wsUrl.value = status.wsUrl || "";
   els.apiKey.value = status.apiKey || "";
-  els.toriApiBase.value = status.toriApiBase || "http://localhost:3000";
+  els.toriApiBase.value = status.toriApiBase || "http://localhost:9090";
 
   const profile = status.tori?.profile;
   const hasTori = !!profile;

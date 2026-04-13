@@ -19,6 +19,7 @@ type SandboxConfig struct {
 	BaseDir string       `json:"base_dir"` // working directory base (default: os.TempDir)
 	Policy  Policy       `json:"policy"`   // process sandbox policy
 	Docker  DockerConfig `json:"docker"`   // Docker runtime config
+	Cloud   CloudConfig  `json:"cloud"`    // Cloud sandbox config (E2B-compatible)
 }
 
 // DockerConfig configures the Docker sandbox runtime.
@@ -176,6 +177,41 @@ func loadConfigFromEnv(cfg *SandboxConfig) {
 	// Process sandbox tier override
 	if v := os.Getenv("SANDBOX_TIER"); v != "" {
 		cfg.Policy = PolicyForTier(TierName(v))
+	}
+
+	// Cloud sandbox settings
+	if v := os.Getenv("SANDBOX_CLOUD_ENABLED"); v != "" {
+		cfg.Cloud.Enabled = parseBool(v)
+	}
+	if v := os.Getenv("SANDBOX_CLOUD_API_KEY"); v != "" {
+		cfg.Cloud.APIKey = v
+		cfg.Cloud.Enabled = true
+	}
+	if v := os.Getenv("SANDBOX_CLOUD_BASE_URL"); v != "" {
+		cfg.Cloud.BaseURL = v
+	}
+	if v := os.Getenv("SANDBOX_CLOUD_TEMPLATE"); v != "" {
+		cfg.Cloud.Template = v
+	}
+	if v := os.Getenv("SANDBOX_CLOUD_TIMEOUT"); v != "" {
+		cfg.Cloud.Timeout = parseDuration(v, cfg.Cloud.Timeout)
+	}
+
+	if cfg.Cloud.APIKey == "" {
+		if toriBase := strings.TrimSpace(os.Getenv("TORI_API_BASE_URL")); toriBase != "" {
+			if llmKey := strings.TrimSpace(os.Getenv("LLM_API_KEY")); llmKey != "" {
+				cfg.Cloud.APIKey = llmKey
+				if cfg.Cloud.BaseURL == "" {
+					trimmed := strings.TrimRight(toriBase, "/")
+					if strings.HasSuffix(trimmed, "/v1") {
+						cfg.Cloud.BaseURL = trimmed
+					} else {
+						cfg.Cloud.BaseURL = trimmed + "/v1"
+					}
+				}
+				cfg.Cloud.Enabled = true
+			}
+		}
 	}
 }
 

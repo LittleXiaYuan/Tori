@@ -34,6 +34,9 @@ type Metrics struct {
 	// Knowledge/RAG counters
 	knowledge *KnowledgeMetrics
 
+	// Cognitive subsystem counters
+	cognitive *CognitiveMetrics
+
 	// Latency tracking
 	latencies *HistogramStore
 
@@ -50,6 +53,22 @@ type Metrics struct {
 	startTime time.Time
 }
 
+// CognitiveMetrics tracks activity across memory, reflection, and soul-layer subsystems.
+type CognitiveMetrics struct {
+	MemoryIngest    atomic.Int64
+	MemoryRecall    atomic.Int64
+	MemoryPromote   atomic.Int64
+	StrategyInject  atomic.Int64
+	ReflectEval     atomic.Int64
+	LessonLearned   atomic.Int64
+	ReverieThink    atomic.Int64
+	ReverieAction   atomic.Int64
+	TraitMine       atomic.Int64
+	MetaCogAlert    atomic.Int64
+	HeartbeatRun    atomic.Int64
+	CuriosityExplore atomic.Int64
+}
+
 // New creates a new Metrics collector.
 func New() *Metrics {
 	return &Metrics{
@@ -58,9 +77,13 @@ func New() *Metrics {
 		errors:    newErrorTracker(),
 		channels:  newChannelMetrics(),
 		knowledge: newKnowledgeMetrics(),
+		cognitive: &CognitiveMetrics{},
 		startTime: time.Now(),
 	}
 }
+
+// Cognitive returns the cognitive subsystem metrics for direct counter access.
+func (m *Metrics) Cognitive() *CognitiveMetrics { return m.cognitive }
 
 // SetBreakerStatus sets the function to query circuit breaker state.
 func (m *Metrics) SetBreakerStatus(fn BreakerStatusFunc) { m.breakerStatus = fn }
@@ -138,6 +161,21 @@ func (m *Metrics) Snapshot() MetricsSnapshot {
 	}
 	if m.breakerStatus != nil {
 		snap.BreakerState, snap.BreakerFailures = m.breakerStatus()
+	}
+	c := m.cognitive
+	snap.Cognitive = CognitiveSnapshot{
+		MemoryIngest:     c.MemoryIngest.Load(),
+		MemoryRecall:     c.MemoryRecall.Load(),
+		MemoryPromote:    c.MemoryPromote.Load(),
+		StrategyInject:   c.StrategyInject.Load(),
+		ReflectEval:      c.ReflectEval.Load(),
+		LessonLearned:    c.LessonLearned.Load(),
+		ReverieThink:     c.ReverieThink.Load(),
+		ReverieAction:    c.ReverieAction.Load(),
+		TraitMine:        c.TraitMine.Load(),
+		MetaCogAlert:     c.MetaCogAlert.Load(),
+		HeartbeatRun:     c.HeartbeatRun.Load(),
+		CuriosityExplore: c.CuriosityExplore.Load(),
 	}
 	return snap
 }
@@ -232,6 +270,26 @@ func (m *Metrics) PrometheusFormat() string {
 		}
 	}
 
+	// Cognitive subsystem metrics
+	cog := snap.Cognitive
+	cogMetrics := []struct{ name, help string; val int64 }{
+		{"yunque_memory_ingest_total", "Memory ingest operations", cog.MemoryIngest},
+		{"yunque_memory_recall_total", "Memory recall/compile operations", cog.MemoryRecall},
+		{"yunque_memory_promote_total", "Memory tier promotions", cog.MemoryPromote},
+		{"yunque_strategy_inject_total", "Strategy context injections into planner", cog.StrategyInject},
+		{"yunque_reflect_eval_total", "Reflection quality evaluations", cog.ReflectEval},
+		{"yunque_lesson_learned_total", "Lessons extracted by learning loop", cog.LessonLearned},
+		{"yunque_reverie_think_total", "Reverie thought cycles", cog.ReverieThink},
+		{"yunque_reverie_action_total", "Reverie actions executed", cog.ReverieAction},
+		{"yunque_trait_mine_total", "User trait mining operations", cog.TraitMine},
+		{"yunque_metacog_alert_total", "MetaCog anomaly alerts", cog.MetaCogAlert},
+		{"yunque_heartbeat_run_total", "Heartbeat task runs", cog.HeartbeatRun},
+		{"yunque_curiosity_explore_total", "Curiosity exploration runs", cog.CuriosityExplore},
+	}
+	for _, cm := range cogMetrics {
+		w(cm.name, cm.help, "counter", cm.val)
+	}
+
 	return b.String()
 }
 
@@ -254,6 +312,23 @@ type MetricsSnapshot struct {
 	BreakerFailures int                     `json:"breaker_failures"`
 	Channels        []ChannelSnapshot       `json:"channels"`
 	Knowledge       KnowledgeSnapshot       `json:"knowledge"`
+	Cognitive       CognitiveSnapshot       `json:"cognitive"`
+}
+
+// CognitiveSnapshot is a point-in-time view of cognitive subsystem activity.
+type CognitiveSnapshot struct {
+	MemoryIngest     int64 `json:"memory_ingest"`
+	MemoryRecall     int64 `json:"memory_recall"`
+	MemoryPromote    int64 `json:"memory_promote"`
+	StrategyInject   int64 `json:"strategy_inject"`
+	ReflectEval      int64 `json:"reflect_eval"`
+	LessonLearned    int64 `json:"lesson_learned"`
+	ReverieThink     int64 `json:"reverie_think"`
+	ReverieAction    int64 `json:"reverie_action"`
+	TraitMine        int64 `json:"trait_mine"`
+	MetaCogAlert     int64 `json:"metacog_alert"`
+	HeartbeatRun     int64 `json:"heartbeat_run"`
+	CuriosityExplore int64 `json:"curiosity_explore"`
 }
 
 type LatencyStats struct {

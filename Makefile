@@ -38,11 +38,13 @@ build: web-ensure
 
 ## build-full: Build frontend + Go binary
 build-full: web-build
+	@test -d heroui-web/out/_next || (echo "ERROR: heroui-web/out/_next not found — frontend build failed" && exit 1)
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(APP_NAME) ./cmd/agent
 	@echo "Built (with frontend): $(DIST_DIR)/$(APP_NAME)"
 
 ## release: Cross-compile for all platforms (6 targets, with frontend)
 release: clean web-build
+	@test -d heroui-web/out/_next || (echo "ERROR: heroui-web/out/_next not found — frontend build failed" && exit 1)
 	@mkdir -p $(DIST_DIR)
 	@$(foreach platform,$(PLATFORMS), \
 		$(eval OS=$(word 1,$(subst /, ,$(platform)))) \

@@ -139,22 +139,38 @@ func (r *ProcessRunner) runCode(ctx context.Context, sb *Sandbox, req RunRequest
 // ──────────────────────────────────────────────
 
 // NewRunner creates a Runner from a SandboxConfig.
-// It selects the best available backend: docker > process.
+// Priority: cloud > docker > process.
+// When cloud is enabled, a FallbackRunner wraps cloud + best local runner,
+// so individual execution failures auto-degrade to local.
 func NewRunner(cfg SandboxConfig) (Runner, error) {
+	local := localRunner(cfg)
+
+	if cfg.Cloud.Enabled {
+		cr, err := NewCloudRunner(cfg.Cloud)
+		if err == nil {
+			return NewFallbackRunner(cr, local), nil
+		}
+		fmt.Printf("sandbox: cloud unavailable (%v), using local only\n", err)
+	}
+	return local, nil
+}
+
+func localRunner(cfg SandboxConfig) Runner {
 	if cfg.Docker.Enabled {
 		dr, err := NewDockerRuntime(cfg.Docker)
 		if err == nil {
-			return dr, nil
+			return dr
 		}
-		// Docker unavailable — fall back to process
 		fmt.Printf("sandbox: docker unavailable (%v), falling back to process\n", err)
 	}
-	return NewProcessRunner(cfg.BaseDir, cfg.Policy), nil
+	return NewProcessRunner(cfg.BaseDir, cfg.Policy)
 }
 
 // NewRunnerForBackend creates a specific backend Runner.
 func NewRunnerForBackend(backend string, cfg SandboxConfig) (Runner, error) {
 	switch backend {
+	case "cloud":
+		return NewCloudRunner(cfg.Cloud)
 	case "docker":
 		return NewDockerRuntime(cfg.Docker)
 	case "process":

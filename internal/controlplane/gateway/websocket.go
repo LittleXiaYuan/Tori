@@ -125,9 +125,10 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	// Memory: write user message(s) to short-term (Mem0-style Auto-Capture)
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
-			if m.Role == "user" && m.Content != "" {
-				_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
-			}
+		if m.Role == "user" && m.Content != "" {
+			_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
+			g.metrics.Cognitive().MemoryIngest.Add(1)
+		}
 		}
 	}
 
@@ -211,16 +212,26 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Session-level provider override
+	var streamSessionClient *llm.Client
+	if req.SessionID != "" && g.providerReg != nil {
+		if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
+			streamSessionClient = sp.Client
+			slog.Info("stream: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
+		}
+	}
+
 	result, err := g.planner.Run(ctx, planner.PlanRequest{
-		Messages:      msgs,
-		ClassID:       req.ClassID,
-		TeacherID:     req.TeacherID,
-		StudentID:     req.StudentID,
-		TenantID:      tid,
-		ModelOverride: routedTier,
-		EmotionHint:   emotionHintForPlanner,
-		StepCallback:  stepCB,
-		TraceID:       traceID,
+		Messages:       msgs,
+		ClassID:        req.ClassID,
+		TeacherID:      req.TeacherID,
+		StudentID:      req.StudentID,
+		TenantID:       tid,
+		ModelOverride:  routedTier,
+		ClientOverride: streamSessionClient,
+		EmotionHint:    emotionHintForPlanner,
+		StepCallback:   stepCB,
+		TraceID:        traceID,
 	})
 	if err != nil {
 		slog.Error("planner error (stream)", "err", err, "tenant", tid)
@@ -263,8 +274,13 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	if rich != nil && len(rich.Components) > 0 {
 		doneData["rich"] = json.RawMessage(rich.ToJSON())
 	}
+	var sandboxInfo map[string]any
 	if result.Plan != nil {
 		doneData["plan"] = result.Plan
+		sandboxInfo = extractSandboxFromPlan(result.Plan)
+		if sandboxInfo != nil {
+			doneData["sandbox"] = sandboxInfo
+		}
 	}
 	if streamEmotionHint != nil && streamEmotionHint.Emotion != "neutral" && streamEmotionHint.Emotion != "unknown" {
 		doneData["emotion"] = streamEmotionHint
@@ -288,12 +304,14 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		if summary := result.ExecutionSummary(); summary != "" {
 			assistantContent = summary + "\n\n" + assistantContent
 		}
+		assistantContent = embedSandboxMarker(assistantContent, sandboxInfo)
 		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
 	}
 
 	// Memory: write assistant reply to short-term
 	if g.orchestrator != nil && reply != "" {
 		_ = g.orchestrator.Ingest(ctx, tid, reply, "conversation", "assistant_reply")
+		g.metrics.Cognitive().MemoryIngest.Add(1)
 	}
 
 	// Memory pipeline: extract facts from the LATEST exchange only
@@ -393,6 +411,35 @@ func sseEvent(w http.ResponseWriter, f http.Flusher, event, data string) {
 	}
 	w.Write([]byte("\n"))
 	f.Flush()
+}
+
+// extractSandboxFromPlan scans plan steps for computer_use results and returns
+// the sandbox info map (sandbox_id, stream_url, etc.) if found.
+func extractSandboxFromPlan(plan []planner.PlanStep) map[string]any {
+	for _, step := range plan {
+		if step.Skill == "computer_use" && step.Result != "" {
+			var sbInfo map[string]any
+			if json.Unmarshal([]byte(step.Result), &sbInfo) == nil {
+				if _, ok := sbInfo["sandbox_id"]; ok {
+					return sbInfo
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// embedSandboxMarker appends a hidden HTML comment containing sandbox metadata
+// so that the sandbox card can be reconstructed when loading conversation history.
+func embedSandboxMarker(content string, sbInfo map[string]any) string {
+	if sbInfo == nil {
+		return content
+	}
+	data, err := json.Marshal(sbInfo)
+	if err != nil {
+		return content
+	}
+	return content + "\n<!-- yunque:sandbox:" + string(data) + " -->"
 }
 
 func chunkText(text string, runesPerChunk int) []string {

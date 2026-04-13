@@ -54,7 +54,19 @@ type Router struct {
 	mu         sync.RWMutex
 	stats      Stats
 	localBrain *localbrain.LocalBrain // 本地小模型分类器（nil = 退回启发式）
+	bandit     *ModelBandit           // optional: online learning for model selection
 }
+
+// SetBandit attaches a multi-armed bandit for adaptive model selection.
+// When set, Route() uses bandit recommendations instead of fixed slots.
+func (r *Router) SetBandit(b *ModelBandit) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.bandit = b
+}
+
+// Bandit returns the attached bandit (nil if not set).
+func (r *Router) Bandit() *ModelBandit { return r.bandit }
 
 // SetLocalBrain attaches a local small model for intelligent classification.
 // When set, classify() uses the small model instead of keyword heuristics.
@@ -102,11 +114,22 @@ func (r *Router) Route(ctx context.Context, query string, hasImages bool) (*mode
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// Try the assigned model for this tier
+	// Try bandit recommendation first (online learning)
+	if r.bandit != nil {
+		if banditModel, ok := r.bandit.Select(tier); ok {
+			if m, ok := r.registry.Get(banditModel); ok {
+				r.recordRoute(tier)
+				slog.Debug("router", "tier", tier.String(), "model", m.ModelID, "source", "bandit", "query_len", len(query))
+				return m, tier
+			}
+		}
+	}
+
+	// Fall back to fixed slot assignment
 	if modelID, ok := r.slots[tier]; ok {
 		if m, ok := r.registry.Get(modelID); ok {
 			r.recordRoute(tier)
-			slog.Debug("router", "tier", tier.String(), "model", m.ModelID, "query_len", len(query))
+			slog.Debug("router", "tier", tier.String(), "model", m.ModelID, "source", "slot", "query_len", len(query))
 			return m, tier
 		}
 	}

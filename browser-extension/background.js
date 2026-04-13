@@ -2,11 +2,14 @@
 // Architecture: Local WebSocket ↔ CDP (Chrome DevTools Protocol)
 
 const CDP_VERSION = "1.3";
-const RECONNECT_DELAY = 3000;
+const RECONNECT_DELAY_MIN = 2000;
+const RECONNECT_DELAY_MAX = 60000;
 const NO_CREDENTIAL_RECONNECT_DELAY = 30000;
-const SESSION_TIMEOUT = 60000;
+const SESSION_TIMEOUT = 120000;
+const CDP_RETRY_COUNT = 2;
+const CDP_RETRY_DELAY = 500;
 const DEFAULT_WS_URL = "ws://localhost:9090/ws/browser";
-const DEFAULT_TORI_API_BASE = "http://localhost:3000";
+const DEFAULT_TORI_API_BASE = "http://localhost:9090";
 const RUNTIME_STATE_KEY = "yunque_runtime_state";
 const MAX_OUTBOUND_QUEUE = 100;
 
@@ -14,6 +17,7 @@ const MAX_OUTBOUND_QUEUE = 100;
 let ws = null;
 let wsUrl = DEFAULT_WS_URL;
 let reconnectTimer = null;
+let reconnectAttempts = 0;
 let outboundQueue = [];
 let lastBroadcastSignature = "";
 let sessions = new Map();   // tabId → { target, lastUsed }
@@ -21,6 +25,12 @@ let connected = false;
 let lastConnectionError = "";
 let agentTabGroupId = null;
 const AGENT_GROUP_COLOR = "blue";
+let tabGroupsSupported = null;
+let taskAnimationTimer = null;
+const TASK_EMOJIS = ["👆","🖐️","👋","👍","🖖","🫰","✌","🤚","🤟","👉","🤞","👇","☝","🤙","👈","✊","🤘"];
+const TASK_EMOJI_DONE = "✅";
+const TASK_EMOJI_WAIT = "⌛️";
+const TASK_EMOJI_INTERVAL = 1000;
 let runtimeSession = {
   id: null,
   status: "idle",
@@ -330,6 +340,7 @@ function connect() {
       if (ws !== socket) return;
       connected = true;
       lastConnectionError = "";
+      reconnectAttempts = 0;
       log("info", "WebSocket connected");
       clearTimeout(reconnectTimer);
       if (challengeDone) {
@@ -385,7 +396,14 @@ function connect() {
 
 function scheduleReconnect(delayMs) {
   clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(connect, delayMs ?? RECONNECT_DELAY);
+  if (delayMs == null) {
+    const backoff = Math.min(RECONNECT_DELAY_MIN * Math.pow(1.5, reconnectAttempts), RECONNECT_DELAY_MAX);
+    const jitter = backoff * (0.5 + Math.random() * 0.5);
+    delayMs = Math.round(jitter);
+    reconnectAttempts++;
+  }
+  log("info", `Reconnecting in ${Math.round(delayMs / 1000)}s (attempt ${reconnectAttempts})`);
+  reconnectTimer = setTimeout(connect, delayMs);
 }
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -698,7 +716,7 @@ async function getOrCreateSession(tabId) {
   return { tabId, session };
 }
 
-async function cdpSend(target, method, params) {
+async function cdpSendOnce(target, method, params) {
   return new Promise((resolve, reject) => {
     chrome.debugger.sendCommand(target, method, params || {}, (result) => {
       if (chrome.runtime.lastError) {
@@ -708,6 +726,38 @@ async function cdpSend(target, method, params) {
       resolve(result);
     });
   });
+}
+
+async function cdpSend(target, method, params) {
+  for (let attempt = 0; attempt <= CDP_RETRY_COUNT; attempt++) {
+    try {
+      return await cdpSendOnce(target, method, params);
+    } catch (e) {
+      const isRetryable = e.message.includes("not attached") || e.message.includes("Target closed") || e.message.includes("Cannot find context");
+      if (attempt < CDP_RETRY_COUNT && isRetryable) {
+        log("warn", `CDP retry ${attempt + 1}/${CDP_RETRY_COUNT}: ${method} — ${e.message}`);
+        await sleep(CDP_RETRY_DELAY * (attempt + 1));
+        try {
+          const tabId = target.tabId;
+          if (tabId) {
+            sessions.delete(tabId);
+            await new Promise((resolve, reject) => {
+              chrome.debugger.attach(target, CDP_VERSION, () => {
+                if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                else resolve();
+              });
+            });
+            await cdpSendOnce(target, "Page.enable");
+            sessions.set(tabId, { target, lastUsed: Date.now() });
+          }
+        } catch (reattachErr) {
+          log("warn", `CDP reattach failed: ${reattachErr.message}`);
+        }
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 async function detachSession(tabId) {
@@ -747,7 +797,17 @@ chrome.debugger.onDetach.addListener((source, reason) => {
 
 let _agentGroupSeedTabId = null;
 
+function isTabGroupsSupported() {
+  if (tabGroupsSupported !== null) return tabGroupsSupported;
+  tabGroupsSupported = typeof chrome.tabs !== "undefined"
+    && typeof chrome.tabs.group === "function"
+    && typeof chrome.tabGroups !== "undefined";
+  return tabGroupsSupported;
+}
+
 async function ensureAgentTabGroup(title) {
+  if (!isTabGroupsSupported()) return null;
+
   if (agentTabGroupId != null) {
     try {
       const group = await chrome.tabGroups.get(agentTabGroupId);
@@ -759,16 +819,60 @@ async function ensureAgentTabGroup(title) {
       agentTabGroupId = null;
     }
   }
-  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
-  _agentGroupSeedTabId = tab.id;
-  const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
-  await chrome.tabGroups.update(groupId, {
-    title: title || "Yunque AI",
-    color: AGENT_GROUP_COLOR,
-    collapsed: false,
-  });
-  agentTabGroupId = groupId;
-  return groupId;
+
+  try {
+    const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+    _agentGroupSeedTabId = tab.id;
+    const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
+    await chrome.tabGroups.update(groupId, {
+      title: title || "Yunque AI",
+      color: AGENT_GROUP_COLOR,
+      collapsed: false,
+    });
+    const pinnedTabs = await chrome.tabs.query({ pinned: true });
+    await chrome.tabGroups.move(groupId, { index: pinnedTabs.length });
+    agentTabGroupId = groupId;
+    return groupId;
+  } catch (e) {
+    log("warn", `TabGroups not supported, switching to simple tab mode: ${e.message}`);
+    tabGroupsSupported = false;
+    return null;
+  }
+}
+
+// ─── Task Status Animation ───────────────────────────
+
+function startTaskAnimation(title) {
+  stopTaskAnimation();
+  if (!isTabGroupsSupported() || agentTabGroupId == null) return;
+  let idx = 0;
+  const tick = async () => {
+    if (agentTabGroupId == null) { stopTaskAnimation(); return; }
+    const emoji = TASK_EMOJIS[idx % TASK_EMOJIS.length];
+    try { await chrome.tabGroups.update(agentTabGroupId, { title: `${emoji} ${title}` }); } catch (_) {}
+    idx++;
+  };
+  tick();
+  taskAnimationTimer = setInterval(tick, TASK_EMOJI_INTERVAL);
+}
+
+function stopTaskAnimation() {
+  if (taskAnimationTimer) {
+    clearInterval(taskAnimationTimer);
+    taskAnimationTimer = null;
+  }
+}
+
+async function setTaskDone(title) {
+  stopTaskAnimation();
+  if (!isTabGroupsSupported() || agentTabGroupId == null) return;
+  try { await chrome.tabGroups.update(agentTabGroupId, { title: `${TASK_EMOJI_DONE} ${title}` }); } catch (_) {}
+}
+
+async function setTaskWaiting(title) {
+  stopTaskAnimation();
+  if (!isTabGroupsSupported() || agentTabGroupId == null) return;
+  try { await chrome.tabGroups.update(agentTabGroupId, { title: `${TASK_EMOJI_WAIT} ${title}` }); } catch (_) {}
 }
 
 async function cleanupSeedTab() {
@@ -780,6 +884,14 @@ async function cleanupSeedTab() {
 
 async function addTabToAgentGroup(tabId, title) {
   const groupId = await ensureAgentTabGroup(title);
+  if (groupId == null) {
+    // TabGroups not supported — move tab to leftmost position instead
+    try {
+      const pinnedTabs = await chrome.tabs.query({ pinned: true });
+      await chrome.tabs.move(tabId, { index: pinnedTabs.length });
+    } catch (_) {}
+    return;
+  }
   try {
     await chrome.tabs.group({ tabIds: [tabId], groupId });
     await cleanupSeedTab();
@@ -833,14 +945,13 @@ async function doClick(action) {
   const { tabId, session } = await getOrCreateSession(action.tabId);
   const { target } = action;
 
-  // Highlight before clicking
   try {
     if (target.strategy === "byIndex") {
-      await chrome.tabs.sendMessage(tabId, { type: "yunque_highlight", index: target.index });
+      await sendTabMessage(tabId, { type: "yunque_highlight", index: target.index });
     } else if (target.strategy === "bySelector") {
-      await chrome.tabs.sendMessage(tabId, { type: "yunque_highlight", selector: target.selector });
+      await sendTabMessage(tabId, { type: "yunque_highlight", selector: target.selector });
     } else if (target.strategy === "byCoordinates") {
-      await chrome.tabs.sendMessage(tabId, { type: "yunque_highlight", x: target.coordinateX, y: target.coordinateY });
+      await sendTabMessage(tabId, { type: "yunque_highlight", x: target.coordinateX, y: target.coordinateY });
     }
     await sleep(200);
   } catch (_) {}
@@ -855,7 +966,7 @@ async function doClick(action) {
       awaitPromise: true,
     });
   } else if (target.strategy === "byIndex") {
-    await chrome.tabs.sendMessage(tabId, {
+    await sendTabMessage(tabId, {
       type: "yunque_click_index",
       index: target.index,
     });
@@ -870,12 +981,11 @@ async function doInput(action) {
   const { tabId, session } = await getOrCreateSession(action.tabId);
   const { target, text, pressEnter } = action;
 
-  // Highlight before input
   try {
     if (target?.strategy === "bySelector") {
-      await chrome.tabs.sendMessage(tabId, { type: "yunque_highlight", selector: target.selector });
+      await sendTabMessage(tabId, { type: "yunque_highlight", selector: target.selector });
     } else if (target?.strategy === "byCoordinates") {
-      await chrome.tabs.sendMessage(tabId, { type: "yunque_highlight", x: target.coordinateX, y: target.coordinateY });
+      await sendTabMessage(tabId, { type: "yunque_highlight", x: target.coordinateX, y: target.coordinateY });
     }
     await sleep(150);
   } catch (_) {}
@@ -981,7 +1091,7 @@ async function doScreenshot(action) {
 
 async function doGetContent(action) {
   const { tabId } = await getOrCreateSession(action.tabId);
-  const result = await chrome.tabs.sendMessage(tabId, { type: "yunque_get_content" });
+  const result = await sendTabMessage(tabId, { type: "yunque_get_content" });
   return { ok: true, content: result?.content || "", title: result?.title || "" };
 }
 
@@ -995,7 +1105,7 @@ async function doMoveMouse(action) {
 
 async function doGetStructuredContent(action) {
   const { tabId } = await getOrCreateSession(action.tabId);
-  const result = await chrome.tabs.sendMessage(tabId, { type: "yunque_get_structured_content" });
+  const result = await sendTabMessage(tabId, { type: "yunque_get_structured_content" });
   return { ok: true, ...result };
 }
 
@@ -1003,21 +1113,21 @@ async function doGetStructuredContent(action) {
 
 async function doMarkElements(action) {
   const { tabId } = await getOrCreateSession(action.tabId);
-  await chrome.tabs.sendMessage(tabId, { type: "yunque_show_markers" });
+  await sendTabMessage(tabId, { type: "yunque_show_markers" });
   const screenshot = await captureScreenshot(tabId);
-  const { elements, total } = await chrome.tabs.sendMessage(tabId, { type: "yunque_get_elements" });
+  const { elements, total } = await sendTabMessage(tabId, { type: "yunque_get_elements" });
   return { ok: true, screenshot, elements, total };
 }
 
 async function doUnmarkElements(action) {
   const { tabId } = await getOrCreateSession(action.tabId);
-  await chrome.tabs.sendMessage(tabId, { type: "yunque_hide_markers" });
+  await sendTabMessage(tabId, { type: "yunque_hide_markers" });
   return { ok: true };
 }
 
 async function doGetElements(action) {
   const { tabId } = await getOrCreateSession(action.tabId);
-  const { elements, total } = await chrome.tabs.sendMessage(tabId, { type: "yunque_get_elements" });
+  const { elements, total } = await sendTabMessage(tabId, { type: "yunque_get_elements" });
   return { ok: true, elements, total };
 }
 
@@ -1059,7 +1169,7 @@ async function doCloseTab(action) {
   if (!tabId) return { ok: false, error: "tabId is required" };
   await detachSession(tabId);
   await chrome.tabs.remove(tabId);
-  if (agentTabGroupId != null) {
+  if (isTabGroupsSupported() && agentTabGroupId != null) {
     try {
       const tabs = await chrome.tabs.query({ groupId: agentTabGroupId });
       if (!tabs || tabs.length === 0) agentTabGroupId = null;
@@ -1072,37 +1182,43 @@ async function doCloseTab(action) {
 
 async function doSessionStatus(action) {
   const { status, sessionTitle, tabId } = action;
-
-  if (sessionTitle && agentTabGroupId != null) {
-    try { await chrome.tabGroups.update(agentTabGroupId, { title: sessionTitle }); } catch (_) {}
-  }
+  const label = sessionTitle || runtimeSession.title || "Yunque AI";
 
   if (status === "paused" || status === "take_over") {
-    if (agentTabGroupId != null) {
+    setTaskWaiting(label);
+    if (isTabGroupsSupported() && agentTabGroupId != null) {
       try { await chrome.tabGroups.update(agentTabGroupId, { color: "yellow" }); } catch (_) {}
     }
-    log("info", `User takeover activated: ${sessionTitle || "User takeover"}`);
-    return syncTakeoverState(status, sessionTitle || "User takeover", tabId, true);
+    log("info", `User takeover activated: ${label}`);
+    return syncTakeoverState(status, label, tabId, true);
   }
   if (status === "resumed" || status === "running") {
-    if (agentTabGroupId != null) {
+    startTaskAnimation(label);
+    if (isTabGroupsSupported() && agentTabGroupId != null) {
       try { await chrome.tabGroups.update(agentTabGroupId, { color: AGENT_GROUP_COLOR }); } catch (_) {}
     }
     log("info", "User takeover ended, AI resumed");
-    return syncTakeoverState(status, sessionTitle || "", tabId, true);
+    return syncTakeoverState(status, label, tabId, true);
   }
   if (status === "stopped") {
+    await setTaskDone(label);
     if (tabId) await detachSession(tabId);
-    if (agentTabGroupId != null) {
+    if (isTabGroupsSupported() && agentTabGroupId != null) {
       try { await chrome.tabGroups.update(agentTabGroupId, { color: "grey" }); } catch (_) {}
     }
     agentTabGroupId = null;
+  }
+  if (status === "error") {
+    stopTaskAnimation();
+    if (isTabGroupsSupported() && agentTabGroupId != null) {
+      try { await chrome.tabGroups.update(agentTabGroupId, { color: "red", title: `❌ ${label}` }); } catch (_) {}
+    }
   }
 
   applyTakeoverState(false, "");
   await updateRuntimeSession({
     status: status === "stopped" ? "idle" : "running",
-    title: sessionTitle || runtimeSession.title,
+    title: label,
     currentTabId: tabId || runtimeSession.currentTabId,
   });
   sendToBackend({ type: "session_status", status, sessionTitle, takeover: takeover.active });
@@ -1132,7 +1248,7 @@ async function dispatchMouseEvent(target, type, x, y, button = "left", clickCoun
   });
 }
 
-async function waitForLoad(tabId, timeout = 10000) {
+async function waitForLoad(tabId, timeout = 30000) {
   return new Promise((resolve) => {
     const timer = setTimeout(() => { cleanup(); resolve(); }, timeout);
     function onUpdated(id, info) {
@@ -1149,6 +1265,24 @@ async function waitForLoad(tabId, timeout = 10000) {
 // ─── Utility ─────────────────────────────────────────
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function sendTabMessage(tabId, msg, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, msg);
+    } catch (e) {
+      if (i < retries && (e.message.includes("Receiving end does not exist") || e.message.includes("Could not establish connection"))) {
+        log("warn", `Content script not ready (attempt ${i + 1}), injecting and retrying...`);
+        try {
+          await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+        } catch (_) {}
+        await sleep(300);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 
 function log(level, msg) {
   const prefix = "[YunqueBrowser]";
@@ -1200,9 +1334,7 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  // Only track tab activation for agent-owned tabs to prevent
-  // hijacking the session when the user switches to Yunque WebUI or other tabs
-  if (agentTabGroupId != null) {
+  if (isTabGroupsSupported() && agentTabGroupId != null) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (!tab || tab.groupId !== agentTabGroupId) return;
   }
@@ -1291,10 +1423,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === "bridge_stop_session") {
     (async () => {
+      stopTaskAnimation();
       sendToBackend({ type: "session_status", status: "stopped" });
       applyTakeoverState(false, "");
       await updateRuntimeSession({ status: "idle" }, { forceBroadcast: true });
-      if (agentTabGroupId != null) {
+      if (isTabGroupsSupported() && agentTabGroupId != null) {
         try { await chrome.tabGroups.update(agentTabGroupId, { color: "grey" }); } catch (_) {}
         agentTabGroupId = null;
       }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"yunque-agent/internal/agentcore/trait"
+	"yunque-agent/internal/experimental/trait"
 )
 
 // TraitBridge connects the trait mining system with the adaptive loop.

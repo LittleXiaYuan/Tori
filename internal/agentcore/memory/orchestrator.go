@@ -86,7 +86,11 @@ type Orchestrator struct {
 	conflictLog      []Conflict // recent conflicts detected
 	lastPromote      time.Time  // throttle auto-promotion
 	ingestCount      int        // count ingests since last promotion
+	onPromote        func()     // optional callback when promotion runs
 }
+
+// SetOnPromote sets a callback invoked each time memory promotion runs.
+func (o *Orchestrator) SetOnPromote(fn func()) { o.onPromote = fn }
 
 type promotionEntry struct {
 	From      string    `json:"from"`
@@ -281,6 +285,9 @@ func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, 
 	}
 	o.mu.Unlock()
 	if shouldPromote {
+		if o.onPromote != nil {
+			o.onPromote()
+		}
 		go o.Promote(ctx, tenantID)
 	}
 

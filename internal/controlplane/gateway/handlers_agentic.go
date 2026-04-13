@@ -155,9 +155,10 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	// Memory: write user message(s) to short-term
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
-			if m.Role == "user" && m.Content != "" {
-				_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
-			}
+		if m.Role == "user" && m.Content != "" {
+			_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
+			g.metrics.Cognitive().MemoryIngest.Add(1)
+		}
 		}
 	}
 
@@ -195,11 +196,21 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Session-level provider override
+	var sessionClient *llm.Client
+	if req.SessionID != "" && g.providerReg != nil {
+		if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
+			sessionClient = sp.Client
+			slog.Info("agentic: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
+		}
+	}
+
 	// ── Run planner with StepCallback → SSE ──
 	planReq := planner.PlanRequest{
 		Messages:        msgs,
 		TenantID:        tid,
 		ModelOverride:   routedTier,
+		ClientOverride:  sessionClient,
 		EmotionHint:     emotionHint,
 		TaskID:          req.TaskID,
 		TaskContext:     taskContext,
@@ -314,8 +325,13 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	if rich != nil && len(rich.Components) > 0 {
 		doneData["rich"] = json.RawMessage(rich.ToJSON())
 	}
+	var sandboxInfo map[string]any
 	if result.Plan != nil {
 		doneData["plan"] = result.Plan
+		sandboxInfo = extractSandboxFromPlan(result.Plan)
+		if sandboxInfo != nil {
+			doneData["sandbox"] = sandboxInfo
+		}
 	}
 	if len(result.ContextLayers) > 0 {
 		doneData["context_layers"] = result.ContextLayers
@@ -334,12 +350,14 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// Save assistant reply to session
 	if req.SessionID != "" {
-		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
+		persistContent := embedSandboxMarker(reply, sandboxInfo)
+		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: persistContent})
 	}
 
 	// Memory: write assistant reply
 	if g.orchestrator != nil && reply != "" {
 		_ = g.orchestrator.Ingest(ctx, tid, reply, "conversation", "assistant_reply")
+		g.metrics.Cognitive().MemoryIngest.Add(1)
 	}
 
 	// Memory pipeline (async)

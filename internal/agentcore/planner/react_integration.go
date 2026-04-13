@@ -12,10 +12,10 @@ import (
 
 	"yunque-agent/pkg/safego"
 
-	ageval "yunque-agent/internal/agentcore/eval"
+	ageval "yunque-agent/internal/experimental/eval"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
-	agreact "yunque-agent/internal/agentcore/react"
+	agreact "yunque-agent/internal/experimental/react"
 	"yunque-agent/internal/observe"
 )
 

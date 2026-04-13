@@ -169,9 +169,10 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
-			if m.Role == "user" && m.Content != "" {
-				_ = g.orchestrator.Ingest(r.Context(), tid, m.Content, "conversation", "user_input")
-			}
+		if m.Role == "user" && m.Content != "" {
+			_ = g.orchestrator.Ingest(r.Context(), tid, m.Content, "conversation", "user_input")
+			g.metrics.Cognitive().MemoryIngest.Add(1)
+		}
 		}
 	}
 
@@ -245,17 +246,27 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Session-level provider override
+	var sessionClient *llm.Client
+	if req.SessionID != "" && g.providerReg != nil {
+		if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
+			sessionClient = sp.Client
+			slog.Info("chat: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
+		}
+	}
+
 	planReq := planner.PlanRequest{
-		Messages:      msgs,
-		ClassID:       req.ClassID,
-		TeacherID:     req.TeacherID,
-		StudentID:     req.StudentID,
-		TenantID:      tid,
-		ModelOverride: routedTier,
-		EmotionHint:   emotionHint,
-		TaskID:        req.TaskID,
-		TaskContext:   taskContext,
-		TraceID:       traceSpan.TraceID,
+		Messages:       msgs,
+		ClassID:        req.ClassID,
+		TeacherID:      req.TeacherID,
+		StudentID:      req.StudentID,
+		TenantID:       tid,
+		ModelOverride:  routedTier,
+		ClientOverride: sessionClient,
+		EmotionHint:    emotionHint,
+		TaskID:         req.TaskID,
+		TaskContext:    taskContext,
+		TraceID:        traceSpan.TraceID,
 	}
 	if slashResp, handled, slashErr := g.tryHandleSlashCommand(r.Context(), planReq); handled {
 		if slashErr != nil {
@@ -335,12 +346,19 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Extract sandbox info early so it can be used for both persistence and response
+	var sandboxInfoForPersist map[string]any
+	if result.Plan != nil {
+		sandboxInfoForPersist = extractSandboxFromPlan(result.Plan)
+	}
+
 	// Save assistant reply to session (with ExecutionSummary for multi-turn continuity)
 	if req.SessionID != "" {
 		assistantContent := result.Reply
 		if summary := result.ExecutionSummary(); summary != "" {
 			assistantContent = summary + "\n\n" + assistantContent
 		}
+		assistantContent = embedSandboxMarker(assistantContent, sandboxInfoForPersist)
 		g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: assistantContent})
 
 		// Auto-title: generate a conversation title after the first exchange (like ChatGPT).
@@ -364,6 +382,7 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	// ── Memory: write assistant reply to short-term ──
 	if g.orchestrator != nil && result.Reply != "" {
 		_ = g.orchestrator.Ingest(r.Context(), tid, result.Reply, "conversation", "assistant_reply")
+		g.metrics.Cognitive().MemoryIngest.Add(1)
 	}
 
 	// Memory pipeline: extract facts from the LATEST exchange only (not full history).
@@ -449,8 +468,9 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Skill suggestion: analyze if this conversation could become a reusable skill
-	if g.skillSuggester != nil && len(req.Messages) > 0 && len(result.Reply) > 200 {
+	// Skill suggestion: analyze if this conversation could become a reusable skill (rate-limited)
+	g.suggestCounter++
+	if g.skillSuggester != nil && len(req.Messages) > 0 && len(result.Reply) > 500 && g.suggestCounter%5 == 0 {
 		lastUserMsg := ""
 		for i := len(req.Messages) - 1; i >= 0; i-- {
 			if req.Messages[i].Role == "user" {
@@ -496,8 +516,13 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	if rich != nil && len(rich.Components) > 0 {
 		resp["rich"] = json.RawMessage(rich.ToJSON())
 	}
+	var sandboxInfo map[string]any
 	if result.Plan != nil {
 		resp["plan"] = result.Plan
+		sandboxInfo = extractSandboxFromPlan(result.Plan)
+		if sandboxInfo != nil {
+			resp["sandbox"] = sandboxInfo
+		}
 	}
 	if len(result.ContextLayers) > 0 {
 		resp["context_layers"] = result.ContextLayers
@@ -595,7 +620,7 @@ func (g *Gateway) handleSkillSuggestions(w http.ResponseWriter, r *http.Request)
 }
 
 // ingestFactsToRAG writes extracted conversation facts into the knowledge store
-// as a persistent RAG source so they can be retrieved in future queries.
+// and persists them to data/knowledge/ so they survive restarts.
 func (g *Gateway) ingestFactsToRAG(ctx context.Context, facts []string) {
 	if g.knowledgeStore == nil || len(facts) == 0 {
 		return
@@ -610,5 +635,21 @@ func (g *Gateway) ingestFactsToRAG(ctx context.Context, facts []string) {
 	if err := g.knowledgeStore.BuildIndex(ctx); err != nil {
 		slog.Warn("facts→RAG index rebuild failed", "err", err)
 	}
+
+	// Persist to disk so facts survive restarts
+	if g.knowledgeDir != "" {
+		if mkErr := os.MkdirAll(g.knowledgeDir, 0o755); mkErr == nil {
+			filename := filepath.Join(g.knowledgeDir, "conversation_facts.md")
+			if f, openErr := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); openErr == nil {
+				ts := time.Now().Format("2006-01-02 15:04:05")
+				fmt.Fprintf(f, "\n## %s\n\n", ts)
+				for _, fact := range facts {
+					fmt.Fprintf(f, "- %s\n", fact)
+				}
+				f.Close()
+			}
+		}
+	}
+
 	slog.Info("facts→RAG ingested", "count", len(facts), "source", name)
 }
