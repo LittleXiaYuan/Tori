@@ -34,12 +34,10 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 .next/
 
-# ── Frontend source (独立仓库发布，后端仅保留 embed.go + 占位 out/) ──
-heroui-web/*
-!heroui-web/embed.go
-!heroui-web/out/
-heroui-web/out/*
-!heroui-web/out/placeholder.html
+# ── Frontend (源码在 heroui-web/src，构建产物在 heroui-web/out/) ──
+heroui-web/node_modules/
+heroui-web/.next/
+heroui-web/.env.local
 
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
