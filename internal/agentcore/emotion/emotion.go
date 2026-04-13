@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Emotion represents a detected emotional state.
@@ -253,7 +254,9 @@ func (a *Analyzer) AnalyzeText(ctx context.Context, text string) (*Result, error
 		return &Result{Emotion: EmotionNeutral, Source: "default"}, nil
 	}
 
-	resp, err := a.llmCall(ctx, a.getEmotionPrompt(), text)
+	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	resp, err := a.llmCall(callCtx, a.getEmotionPrompt(), text)
 	if err != nil {
 		slog.Warn("emotion: llm call failed", "err", err)
 		return &Result{Emotion: EmotionNeutral, Source: "fallback"}, nil
