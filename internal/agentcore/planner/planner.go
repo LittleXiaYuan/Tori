@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/emotion"

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // KVMigrator migrates legacy JSON files into Ledger's KV store.

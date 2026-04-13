@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // AnalyzeFunc is the LLM-powered analysis function.

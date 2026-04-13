@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // Model tracks the agent's understanding of the external environment.

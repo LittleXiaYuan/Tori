@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 )
 
 // LoRAHook is called after training data export to trigger LoRA training.

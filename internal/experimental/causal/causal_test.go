@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"ledger"
-	lsqlite "ledger/backend/sqlite"
+	"github.com/LittleXiaYuan/ledger"
+	lsqlite "github.com/LittleXiaYuan/ledger/backend/sqlite"
 )
 
 func newTestLedger(t *testing.T) *ledger.Ledger {

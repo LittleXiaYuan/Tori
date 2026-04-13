@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 func TestToPrompt(t *testing.T) {

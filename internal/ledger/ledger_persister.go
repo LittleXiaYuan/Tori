@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/agentcore/memory"
 )

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 func newTestMonitor() *MetaCogMonitor {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // Module drives autonomous exploration when the agent is idle.

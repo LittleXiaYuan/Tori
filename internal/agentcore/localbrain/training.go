@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 )
 
 // TrainingPipeline 从 Ledger 推理轨迹中提取 LoRA 微调训练数据。

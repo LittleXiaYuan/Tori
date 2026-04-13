@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/agentcore/emotion"
 )

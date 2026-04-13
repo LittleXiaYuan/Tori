@@ -8,7 +8,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/xuri/excelize/v2 v2.10.1
 	go.uber.org/goleak v1.3.0
-	ledger v0.0.0-00010101000000-000000000000
+	github.com/LittleXiaYuan/ledger v0.0.0-00010101000000-000000000000
 	modernc.org/sqlite v1.46.1
 )
 
@@ -38,4 +38,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace ledger => ../ledger
+replace github.com/LittleXiaYuan/ledger => ../ledger

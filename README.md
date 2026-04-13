@@ -194,6 +194,14 @@ go test ./... -count=1
 - **LLM**: 任何 OpenAI 兼容 API
 - **Deploy**: 单二进制 / Docker / docker-compose
 
+## 文档
+
+完整文档请访问 [yunque.owo.today](https://yunque.owo.today)
+
 ## License
 
 MIT
+
+© 2025 云鸢科技（青岛）有限公司 × Dream Lab
+
+© 2025 CloudTori × Dream Lab

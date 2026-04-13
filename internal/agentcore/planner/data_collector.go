@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/pkg/safego"
 )

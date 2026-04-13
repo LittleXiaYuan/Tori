@@ -3,7 +3,7 @@ package eval
 import (
 	"testing"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/experimental/taskdistill"
 )

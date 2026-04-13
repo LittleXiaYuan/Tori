@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // RecallBridge wraps Ledger Recall into a function signature compatible

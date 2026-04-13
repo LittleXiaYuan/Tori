@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // MetaCogMonitor monitors the agent's reasoning quality in real-time.

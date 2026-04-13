@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // CausalEngine extends the ContextGraph with causal reasoning capabilities.

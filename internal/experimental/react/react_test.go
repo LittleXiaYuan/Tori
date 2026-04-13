@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"ledger"
-	lsqlite "ledger/backend/sqlite"
+	"github.com/LittleXiaYuan/ledger"
+	lsqlite "github.com/LittleXiaYuan/ledger/backend/sqlite"
 )
 
 func setupLedger(t *testing.T) *ledger.Ledger {

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/pkg/safego"
 )

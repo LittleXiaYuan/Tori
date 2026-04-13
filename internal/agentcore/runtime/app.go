@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/experimental/circuit"
 	ctxwindow "yunque-agent/internal/agentcore/context"

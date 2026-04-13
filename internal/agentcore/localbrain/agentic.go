@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/agentcore/llm"
 )

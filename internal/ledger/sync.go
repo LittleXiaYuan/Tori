@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 
 	agtask "yunque-agent/internal/agentcore/task"
 )

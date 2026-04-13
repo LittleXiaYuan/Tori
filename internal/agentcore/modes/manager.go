@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	ldg "ledger"
+	ldg "github.com/LittleXiaYuan/ledger"
 )
 
 // ModeManager is the central coordinator for the multi-mode system.

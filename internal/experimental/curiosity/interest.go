@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"ledger"
+	"github.com/LittleXiaYuan/ledger"
 )
 
 // InterestTracker tracks user interests and skill gaps to generate better exploration questions.
