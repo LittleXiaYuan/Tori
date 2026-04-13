@@ -202,14 +202,14 @@ export default function ProvidersPage() {
 
   const activeProviders = providers.filter(p => p.enabled);
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
-  }
-
   const [firstTime, setFirstTime] = useState(false);
   useEffect(() => {
     api.checkSetup().then((chk) => { if (chk.setup_needed) setFirstTime(true); }).catch(() => {});
   }, []);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
+  }
 
   return (
     <div className="page-root space-y-6 animate-fade-in-up">
