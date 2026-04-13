@@ -319,6 +319,7 @@ func (c *Client) chatOnceFull(ctx context.Context, messages []Message, temperatu
 	if c.dialect == DialectAnthropic {
 		return c.chatOnceAnthropicFull(ctx, messages, temperature, onDelta...)
 	}
+	messages = normalizeSystemMessages(messages)
 	temp := temperature
 	if GetConstraints(c.model).FixedTemperature {
 		temp = 0
@@ -362,6 +363,7 @@ func (c *Client) chatOnce(ctx context.Context, messages []Message, temperature f
 	if c.dialect == DialectAnthropic {
 		return c.chatOnceAnthropic(ctx, messages, temperature)
 	}
+	messages = normalizeSystemMessages(messages)
 	temp := temperature
 	if GetConstraints(c.model).FixedTemperature {
 		temp = 0
@@ -690,5 +692,51 @@ func stripImages(msgs []Message) []Message {
 			}
 		}
 	}
+	return out
+}
+
+// normalizeSystemMessages merges all system-role messages into a single
+// leading system message to avoid validation errors on models (e.g. Qwen3.5)
+// that reject mid-conversation system messages.
+func normalizeSystemMessages(msgs []Message) []Message {
+	if len(msgs) == 0 {
+		return msgs
+	}
+
+	var sysBuilder strings.Builder
+	out := make([]Message, 0, len(msgs))
+	firstSysDone := false
+
+	for _, m := range msgs {
+		if m.Role == "system" {
+			if sysBuilder.Len() > 0 {
+				sysBuilder.WriteString("\n\n")
+			}
+			sysBuilder.WriteString(m.Content)
+			continue
+		}
+		if !firstSysDone && sysBuilder.Len() > 0 {
+			out = append(out, Message{Role: "system", Content: sysBuilder.String()})
+			firstSysDone = true
+			sysBuilder.Reset()
+		}
+		out = append(out, m)
+		if m.Role == "system" {
+			// should not happen due to outer if, but guard
+			continue
+		}
+	}
+
+	if sysBuilder.Len() > 0 && !firstSysDone {
+		out = append([]Message{{Role: "system", Content: sysBuilder.String()}}, out...)
+	} else if sysBuilder.Len() > 0 {
+		// trailing system messages after the last user/assistant — merge into the first system
+		if len(out) > 0 && out[0].Role == "system" {
+			out[0].Content += "\n\n" + sysBuilder.String()
+		} else {
+			out = append([]Message{{Role: "system", Content: sysBuilder.String()}}, out...)
+		}
+	}
+
 	return out
 }
