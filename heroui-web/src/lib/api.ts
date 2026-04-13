@@ -314,8 +314,10 @@ export const api = {
   },
   kbSources: () => fetcher<{ sources: KBSource[] }>("/v1/knowledge/sources"),
   kbStats: () => fetcher<KBStats>("/v1/knowledge/stats"),
-  kbIngest: (name: string, content: string) =>
-    fetcher<{ source: KBSource; stats: KBStats }>("/v1/knowledge/ingest", { method: "POST", body: JSON.stringify({ name, content }) }),
+  kbIngest: (name: string, content: string, trigger?: string) =>
+    fetcher<{ source: KBSource; stats: KBStats }>("/v1/knowledge/ingest", { method: "POST", body: JSON.stringify({ name, content, trigger }) }),
+  kbUpdate: (id: string, name: string, trigger: string, content: string) =>
+    fetcher<{ source: KBSource; stats: KBStats }>("/v1/knowledge/source/update", { method: "POST", body: JSON.stringify({ id, name, trigger, content }) }),
   kbImportURL: (url: string, name?: string, options?: { crawlChildren?: boolean; maxPages?: number }) =>
     fetcher<{ source: KBSource; sources?: KBSource[]; imported?: number; tree?: KBImportTreeNode; stats: KBStats }>("/v1/knowledge/import-url", {
       method: "POST",

@@ -51,19 +51,20 @@ const (
 
 // ProviderConfig is the configuration for a single LLM provider instance.
 type ProviderConfig struct {
-	ID           string         `json:"id"`
-	DisplayName  string         `json:"display_name,omitempty"`
-	Type         ProviderType   `json:"type"` // "chat", "embedding", etc.
-	Source       ProviderSource `json:"source,omitempty"` // "direct", "tori", "local"
-	BaseURL      string         `json:"base_url"`
-	APIKeys      []string       `json:"api_keys"` // supports key rotation
-	Model        string         `json:"model"`
-	Enabled      bool           `json:"enabled"`
-	Priority     int            `json:"priority,omitempty"`     // lower = higher priority
-	Capabilities []Capability   `json:"capabilities,omitempty"` // chat, tools, vision, etc.
-	Tier         string         `json:"tier,omitempty"`         // "fast", "smart", "expert"
-	PresetID     string         `json:"preset_id,omitempty"`    // links to a provider preset template
-	Dialect      Dialect        `json:"dialect,omitempty"`      // API dialect: "" = OpenAI, "anthropic" = Claude
+	ID            string         `json:"id"`
+	DisplayName   string         `json:"display_name,omitempty"`
+	Type          ProviderType   `json:"type"` // "chat", "embedding", etc.
+	Source        ProviderSource `json:"source,omitempty"` // "direct", "tori", "local"
+	BaseURL       string         `json:"base_url"`
+	APIKeys       []string       `json:"api_keys"` // supports key rotation
+	Model         string         `json:"model"`
+	Enabled       bool           `json:"enabled"`
+	Priority      int            `json:"priority,omitempty"`     // lower = higher priority
+	Capabilities  []Capability   `json:"capabilities,omitempty"` // chat, tools, vision, etc.
+	Tier          string         `json:"tier,omitempty"`         // "fast", "smart", "expert"
+	PresetID      string         `json:"preset_id,omitempty"`    // links to a provider preset template
+	Dialect       Dialect        `json:"dialect,omitempty"`      // API dialect: "" = OpenAI, "anthropic" = Claude
+	ContextWindow int            `json:"context_window,omitempty"` // in K tokens (e.g. 128 = 128K), 0 = 128K default
 }
 
 // ──────────────────────────────────────────────
@@ -91,6 +92,9 @@ func newProviderInstance(cfg ProviderConfig) *ProviderInstance {
 		cfg.Dialect = DialectAnthropic
 	} else {
 		client = NewClient(cfg.BaseURL, key, cfg.Model)
+	}
+	if cfg.ContextWindow > 0 {
+		client.SetContextWindow(cfg.ContextWindow)
 	}
 	p := &ProviderInstance{
 		Config:  cfg,

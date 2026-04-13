@@ -51,7 +51,8 @@ type Source struct {
 	ID         string     `json:"id"`
 	Name       string     `json:"name"`
 	Type       SourceType `json:"type"`
-	Path       string     `json:"path,omitempty"` // file path or URL
+	Path       string     `json:"path,omitempty"`
+	Trigger    string     `json:"trigger,omitempty"` // when to retrieve this knowledge
 	ChunkSize  int        `json:"chunk_size"`
 	ChunkCount int        `json:"chunk_count"`
 	AddedAt    time.Time  `json:"added_at"`
@@ -199,6 +200,75 @@ func (s *Store) IngestText(name, content string) (*Source, error) {
 	chunks := splitText(content, s.chunkSize)
 	s.addChunks(src, chunks, nil)
 	return src, nil
+}
+
+// IngestStructured ingests a knowledge entry with a trigger condition.
+func (s *Store) IngestStructured(name, trigger, content string) (*Source, error) {
+	if content == "" {
+		return nil, fmt.Errorf("knowledge: empty content")
+	}
+	src := s.newSource(name, SourceText)
+	src.Trigger = trigger
+	enriched := content
+	if trigger != "" {
+		enriched = "[使用时机: " + trigger + "]\n" + content
+	}
+	chunks := splitText(enriched, s.chunkSize)
+	s.addChunks(src, chunks, map[string]string{"trigger": trigger})
+	return src, nil
+}
+
+// UpdateSource updates a knowledge source's metadata.
+func (s *Store) UpdateSource(id, name, trigger, content string) (*Source, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var found *Source
+	for _, src := range s.sources {
+		if src.ID == id {
+			found = src
+			break
+		}
+	}
+	if found == nil {
+		return nil, fmt.Errorf("knowledge: source %q not found", id)
+	}
+
+	if name != "" {
+		found.Name = name
+	}
+	found.Trigger = trigger
+
+	if content != "" {
+		// Remove old chunks
+		newChunks := s.chunks[:0]
+		for _, c := range s.chunks {
+			if c.SourceID != id {
+				newChunks = append(newChunks, c)
+			}
+		}
+		s.chunks = newChunks
+
+		enriched := content
+		if trigger != "" {
+			enriched = "[使用时机: " + trigger + "]\n" + content
+		}
+		chunks := splitText(enriched, s.chunkSize)
+		for i, txt := range chunks {
+			s.chunks = append(s.chunks, Chunk{
+				ID:       fmt.Sprintf("%s-chunk-%d", id, i),
+				SourceID: id,
+				Content:  txt,
+				Metadata: map[string]string{"trigger": trigger},
+				Index:    i,
+			})
+		}
+		found.ChunkCount = len(chunks)
+		found.ChunkSize = s.chunkSize
+	}
+
+	s.persistKV()
+	return found, nil
 }
 
 // IngestURL ingests text content fetched from a URL.

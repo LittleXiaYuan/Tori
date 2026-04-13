@@ -129,7 +129,7 @@ func TestHandoffRegistry_Execute(t *testing.T) {
 		return "北京今天晴，25°C", nil
 	})
 
-	result, err := hr.Execute(context.Background(), "parent-1", "weather", "北京今天天气怎么样")
+	result, err := hr.Execute(context.Background(), "parent-1", "weather", "北京今天天气怎么样", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestHandoffRegistry_ExecuteNotRegistered(t *testing.T) {
 		return "ok", nil
 	})
 
-	_, err := hr.Execute(context.Background(), "parent", "nonexistent", "test")
+	_, err := hr.Execute(context.Background(), "parent", "nonexistent", "test", "")
 	if err == nil {
 		t.Fatal("expected error for unregistered agent")
 	}
@@ -164,7 +164,7 @@ func TestHandoffRegistry_ExecuteNoRunFunc(t *testing.T) {
 	hr := NewHandoffRegistry(mgr)
 	hr.Register(HandoffConfig{Name: "test"})
 
-	_, err := hr.Execute(context.Background(), "parent", "test", "input")
+	_, err := hr.Execute(context.Background(), "parent", "test", "input", "")
 	if err == nil {
 		t.Fatal("expected error when run function not set")
 	}
@@ -178,7 +178,7 @@ func TestHandoffRegistry_ExecuteError(t *testing.T) {
 		return "", fmt.Errorf("LLM timeout")
 	})
 
-	_, err := hr.Execute(context.Background(), "parent", "failing", "input")
+	_, err := hr.Execute(context.Background(), "parent", "failing", "input", "")
 	if err == nil {
 		t.Fatal("expected error on execution failure")
 	}

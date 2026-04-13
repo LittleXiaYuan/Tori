@@ -87,28 +87,27 @@ var (
 )
 
 // Presets returns all built-in provider presets.
+// Only GA/stable models are included. Preview/beta models should NOT be added.
 func Presets() []ProviderPreset {
 	return []ProviderPreset{
-		// ── DeepSeek ──
-		{ID: "deepseek", Name: "DeepSeek", BaseURL: "https://api.deepseek.com/v1",
-			DocsURL: "https://platform.deepseek.com/docs", Description: "DeepSeek V3.2 128K、R1",
-			Models: []PresetModel{
-				{ID: "deepseek-chat", Name: "DeepSeek V3.2", Type: ProviderTypeChat, Tier: "smart", Capabilities: deepseekChat, ContextWindow: 128},
-				{ID: "deepseek-reasoner", Name: "DeepSeek R1", Type: ProviderTypeChat, Tier: "expert", Capabilities: deepseekReasoner, ContextWindow: 128},
-			}},
+		// ── Tier 1 Global ──
 
 		// ── OpenAI ──
 		{ID: "openai", Name: "OpenAI", BaseURL: "https://api.openai.com/v1",
-			DocsURL: "https://platform.openai.com/docs", Description: "GPT-4.1, o4-mini, GPT Image 等",
+			DocsURL: "https://platform.openai.com/docs", Description: "GPT-5.4 / GPT-4.1 / o4-mini / GPT Image",
 			Models: []PresetModel{
+				{ID: "gpt-5.4-nano", Name: "GPT-5.4 Nano", Type: ProviderTypeChat, Tier: "fast",
+					Capabilities: openAIAgent, ContextWindow: 400},
+				{ID: "gpt-5.4-mini", Name: "GPT-5.4 Mini", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: openAIAgent, ContextWindow: 400},
+				{ID: "gpt-5.4", Name: "GPT-5.4", Type: ProviderTypeChat, Tier: "expert",
+					Capabilities: openAIAgent, ContextWindow: 1000},
 				{ID: "gpt-4.1-nano", Name: "GPT-4.1 Nano", Type: ProviderTypeChat, Tier: "fast",
 					Capabilities: []Capability{CapVision, CapFunctionCalling, CapStructuredOutput, CapStreaming}, ContextWindow: 128},
 				{ID: "gpt-4.1-mini", Name: "GPT-4.1 Mini", Type: ProviderTypeChat, Tier: "fast",
 					Capabilities: openAIAgent, ContextWindow: 128},
 				{ID: "gpt-4.1", Name: "GPT-4.1", Type: ProviderTypeChat, Tier: "smart",
 					Capabilities: openAIAgent, ContextWindow: 1024},
-				{ID: "gpt-4o", Name: "GPT-4o", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: openAIAgent, ContextWindow: 128},
 				{ID: "o4-mini", Name: "o4-mini", Type: ProviderTypeChat, Tier: "smart",
 					Capabilities: append([]Capability{CapReasoning}, openAIAgent...), ContextWindow: 200},
 				{ID: "o3", Name: "o3", Type: ProviderTypeChat, Tier: "expert",
@@ -119,7 +118,7 @@ func Presets() []ProviderPreset {
 
 		// ── Anthropic / Claude ──
 		{ID: "anthropic", Name: "Anthropic (Claude)", BaseURL: "https://api.anthropic.com/v1",
-			DocsURL: "https://docs.anthropic.com", Description: "Claude Opus 4.6, Sonnet 4.6, Haiku 4.5",
+			DocsURL: "https://docs.anthropic.com", Description: "Claude Opus 4.6 / Sonnet 4.6 / Haiku 4.5",
 			Dialect: DialectAnthropic,
 			Models: []PresetModel{
 				{ID: "claude-haiku-4-5-20250514", Name: "Claude Haiku 4.5", Type: ProviderTypeChat, Tier: "fast",
@@ -132,7 +131,7 @@ func Presets() []ProviderPreset {
 
 		// ── Google / Gemini ──
 		{ID: "google", Name: "Google (Gemini)", BaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-			DocsURL: "https://ai.google.dev/docs", Description: "Gemini 2.5 Flash / Pro, 多模态",
+			DocsURL: "https://ai.google.dev/docs", Description: "Gemini 2.5 (GA) / 3.1 Pro (Preview) 1M 多模态",
 			Models: []PresetModel{
 				{ID: "gemini-2.5-flash-lite", Name: "Gemini 2.5 Flash-Lite", Type: ProviderTypeChat, Tier: "fast",
 					Capabilities: geminiFast, ContextWindow: 1024},
@@ -140,32 +139,40 @@ func Presets() []ProviderPreset {
 					Capabilities: geminiAgent, ContextWindow: 1024},
 				{ID: "gemini-2.5-pro", Name: "Gemini 2.5 Pro", Type: ProviderTypeChat, Tier: "expert",
 					Capabilities: geminiAgent, ContextWindow: 1024},
+				{ID: "gemini-3.1-pro-preview", Name: "Gemini 3.1 Pro (Preview)", Type: ProviderTypeChat, Tier: "expert",
+					Capabilities: geminiAgent, ContextWindow: 1024},
 				{ID: "imagen-4.0-generate-001", Name: "Imagen 4.0", Type: ProviderTypeChat, Purpose: PurposeImage, Tier: "smart",
 					Capabilities: imageGen},
 			}},
 
-		// ── Doubao 字节豆包 ──
-		{ID: "doubao", Name: "字节豆包 (Doubao)", BaseURL: "https://ark.cn-beijing.volces.com/api/v3",
-			DocsURL: "https://www.volcengine.com/docs/82379", Description: "doubao-1.5-pro/lite/vision",
+		// ── Mistral ──
+		{ID: "mistral", Name: "Mistral AI", BaseURL: "https://api.mistral.ai/v1",
+			DocsURL: "https://docs.mistral.ai", Description: "Mistral Large 128K 欧洲替代方案",
 			Models: []PresetModel{
-				{ID: "doubao-1.5-lite-32k", Name: "Doubao 1.5 Lite", Type: ProviderTypeChat, Tier: "fast",
-					Capabilities: basicFC, ContextWindow: 32},
-				{ID: "doubao-1.5-pro-32k", Name: "Doubao 1.5 Pro", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: basicFC, ContextWindow: 32},
-				{ID: "doubao-1.5-vision-pro-32k", Name: "Doubao 1.5 Vision Pro", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: visionFC, ContextWindow: 32},
+				{ID: "mistral-large-latest", Name: "Mistral Large", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: basicFC, ContextWindow: 128},
+			}},
+
+		// ── Tier 2 China ──
+
+		// ── DeepSeek ──
+		{ID: "deepseek", Name: "DeepSeek", BaseURL: "https://api.deepseek.com/v1",
+			DocsURL: "https://platform.deepseek.com/docs", Description: "DeepSeek V3 128K / R1 推理",
+			Models: []PresetModel{
+				{ID: "deepseek-chat", Name: "DeepSeek V3", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: deepseekChat, ContextWindow: 128},
+				{ID: "deepseek-reasoner", Name: "DeepSeek R1", Type: ProviderTypeChat, Tier: "expert",
+					Capabilities: deepseekReasoner, ContextWindow: 128},
 			}},
 
 		// ── Qwen 通义千问 ──
 		{ID: "qwen", Name: "通义千问 (Qwen)", BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-			DocsURL: "https://help.aliyun.com/zh/model-studio", Description: "Qwen3.6-Plus, Qwen3-Max, VL 系列",
+			DocsURL: "https://help.aliyun.com/zh/model-studio", Description: "Qwen Max / Plus / Turbo / VL 128K",
 			Models: []PresetModel{
 				{ID: "qwen-turbo-latest", Name: "Qwen Turbo", Type: ProviderTypeChat, Tier: "fast",
 					Capabilities: basicFC, ContextWindow: 128},
 				{ID: "qwen-plus-latest", Name: "Qwen Plus", Type: ProviderTypeChat, Tier: "smart",
 					Capabilities: basicFC, ContextWindow: 128},
-				{ID: "qwen3.6-plus", Name: "Qwen3.6 Plus", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: qwenAgent, ContextWindow: 128},
 				{ID: "qwen-max-latest", Name: "Qwen Max", Type: ProviderTypeChat, Tier: "expert",
 					Capabilities: append([]Capability{CapReasoning}, basicFC...), ContextWindow: 128},
 				{ID: "qwen-vl-max-latest", Name: "Qwen VL Max", Type: ProviderTypeChat, Tier: "expert",
@@ -178,23 +185,33 @@ func Presets() []ProviderPreset {
 
 		// ── 智谱 GLM ──
 		{ID: "zhipu", Name: "智谱 (GLM)", BaseURL: "https://open.bigmodel.cn/api/paas/v4",
-			DocsURL: "https://docs.bigmodel.cn", Description: "GLM-5-Turbo Agent 原生 / GLM-4V",
+			DocsURL: "https://docs.bigmodel.cn", Description: "GLM-5 200K Agent / GLM-4V 视觉",
 			Models: []PresetModel{
 				{ID: "glm-4-flash", Name: "GLM-4 Flash", Type: ProviderTypeChat, Tier: "fast",
-					Capabilities: basicFC},
-				{ID: "glm-5-turbo", Name: "GLM-5 Turbo", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: basicFC, ContextWindow: 128},
+				{ID: "glm-5", Name: "GLM-5", Type: ProviderTypeChat, Tier: "smart",
 					Capabilities: glmAgent, ContextWindow: 200},
 				{ID: "glm-4v-flash", Name: "GLM-4V Flash", Type: ProviderTypeChat, Tier: "fast",
-					Capabilities: visionFC},
+					Capabilities: visionFC, ContextWindow: 128},
 				{ID: "glm-4v-plus", Name: "GLM-4V Plus", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: visionFC},
+					Capabilities: visionFC, ContextWindow: 128},
 				{ID: "cogview-4-plus", Name: "CogView-4 Plus", Type: ProviderTypeChat, Purpose: PurposeImage, Tier: "smart",
 					Capabilities: imageGen},
 			}},
 
+		// ── MiniMax ──
+		{ID: "minimax", Name: "MiniMax", BaseURL: "https://api.minimax.chat/v1",
+			DocsURL: "https://platform.minimaxi.com/document", Description: "M2.7 Agent 200K / 编程",
+			Models: []PresetModel{
+				{ID: "MiniMax-M2.7-highspeed", Name: "MiniMax M2.7 高速", Type: ProviderTypeChat, Tier: "fast",
+					Capabilities: basicFC, ContextWindow: 200},
+				{ID: "MiniMax-M2.7", Name: "MiniMax M2.7", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: append([]Capability{CapReasoning}, basicFC...), ContextWindow: 200},
+			}},
+
 		// ── 月之暗面 Kimi ──
 		{ID: "moonshot", Name: "月之暗面 (Kimi)", BaseURL: "https://api.moonshot.cn/v1",
-			DocsURL: "https://platform.kimi.com/docs", Description: "Kimi K2.5 多模态 Agent",
+			DocsURL: "https://platform.kimi.com/docs", Description: "Kimi K2.5 256K 多模态 Agent",
 			Models: []PresetModel{
 				{ID: "kimi-k2.5", Name: "Kimi K2.5", Type: ProviderTypeChat, Tier: "smart",
 					Capabilities: kimiAgent, ContextWindow: 256},
@@ -202,35 +219,35 @@ func Presets() []ProviderPreset {
 					Capabilities: append([]Capability{CapLongContext}, basicFC...), ContextWindow: 128},
 			}},
 
-		// ── MiniMax ──
-		{ID: "minimax", Name: "MiniMax", BaseURL: "https://api.minimax.chat/v1",
-			DocsURL: "https://platform.minimaxi.com/document", Description: "M2.7 Agent / 编程 / Office",
+		// ── 字节豆包 ──
+		{ID: "doubao", Name: "字节豆包 (Doubao)", BaseURL: "https://ark.cn-beijing.volces.com/api/v3",
+			DocsURL: "https://www.volcengine.com/docs/82379", Description: "doubao-1.5-pro/lite/vision 32K",
 			Models: []PresetModel{
-				{ID: "MiniMax-M2.7-highspeed", Name: "MiniMax M2.7 高速", Type: ProviderTypeChat, Tier: "fast",
-					Capabilities: basicFC},
-				{ID: "MiniMax-M2.7", Name: "MiniMax M2.7", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: append([]Capability{CapReasoning}, basicFC...)},
+				{ID: "doubao-1.5-lite-32k", Name: "Doubao 1.5 Lite", Type: ProviderTypeChat, Tier: "fast",
+					Capabilities: basicFC, ContextWindow: 32},
+				{ID: "doubao-1.5-pro-32k", Name: "Doubao 1.5 Pro", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: basicFC, ContextWindow: 32},
+				{ID: "doubao-1.5-vision-pro-32k", Name: "Doubao 1.5 Vision Pro", Type: ProviderTypeChat, Tier: "smart",
+					Capabilities: visionFC, ContextWindow: 32},
 			}},
+
+		// ── Tier 3 Aggregators ──
 
 		// ── SiliconFlow 硅基流动 (聚合) ──
 		{ID: "siliconflow", Name: "硅基流动 (SiliconFlow)", BaseURL: "https://api.siliconflow.cn/v1",
-			DocsURL: "https://docs.siliconflow.cn", Description: "聚合平台 200+ 模型",
+			DocsURL: "https://docs.siliconflow.cn", Description: "国内聚合平台 — 200+ 模型",
 			IsAggregator: true,
 			Models: []PresetModel{
 				{ID: "deepseek-ai/DeepSeek-V3", Name: "DeepSeek V3", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: deepseekChat},
+					Capabilities: deepseekChat, ContextWindow: 128},
 				{ID: "deepseek-ai/DeepSeek-R1", Name: "DeepSeek R1", Type: ProviderTypeChat, Tier: "expert",
-					Capabilities: deepseekReasoner},
-				{ID: "Qwen/Qwen3-VL-32B-Instruct", Name: "Qwen3 VL 32B", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: []Capability{CapVision, CapFunctionCalling, CapStreaming}},
-				{ID: "Qwen/Qwen3-VL-8B-Instruct", Name: "Qwen3 VL 8B", Type: ProviderTypeChat, Tier: "fast",
-					Capabilities: []Capability{CapVision, CapFunctionCalling, CapStreaming}},
+					Capabilities: deepseekReasoner, ContextWindow: 128},
 				{ID: "Qwen/Qwen3-VL-235B-A22B-Instruct", Name: "Qwen3 VL 235B", Type: ProviderTypeChat, Tier: "expert",
-					Capabilities: []Capability{CapVision, CapFunctionCalling, CapStreaming}},
+					Capabilities: []Capability{CapVision, CapFunctionCalling, CapStreaming}, ContextWindow: 128},
 				{ID: "THUDM/GLM-4.6V", Name: "GLM-4.6V", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: visionFC},
+					Capabilities: visionFC, ContextWindow: 128},
 				{ID: "Moonshot/Kimi-K2.5", Name: "Kimi K2.5", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: kimiAgent},
+					Capabilities: kimiAgent, ContextWindow: 256},
 				{ID: "black-forest-labs/FLUX.1-schnell", Name: "FLUX.1 Schnell", Type: ProviderTypeChat, Purpose: PurposeImage, Tier: "fast",
 					Capabilities: imageGen},
 			}},
@@ -241,16 +258,16 @@ func Presets() []ProviderPreset {
 			IsAggregator: true,
 			Models: []PresetModel{
 				{ID: "zai-org/GLM-5", Name: "GLM-5", Type: ProviderTypeChat, Tier: "smart",
-					Capabilities: basicFC},
+					Capabilities: glmAgent, ContextWindow: 200},
 				{ID: "zai-org/DeepSeek-R1", Name: "DeepSeek R1", Type: ProviderTypeChat, Tier: "expert",
-					Capabilities: deepseekReasoner},
+					Capabilities: deepseekReasoner, ContextWindow: 128},
 				{ID: "zai-org/Qwen3-235B-A22B", Name: "Qwen3 235B", Type: ProviderTypeChat, Tier: "expert",
-					Capabilities: basicFC},
+					Capabilities: basicFC, ContextWindow: 128},
 			}},
 
 		// ── OpenRouter (聚合) ──
 		{ID: "openrouter", Name: "OpenRouter", BaseURL: "https://openrouter.ai/api/v1",
-			DocsURL: "https://openrouter.ai/docs", Description: "LLM 聚合路由 — 一个 Key 访问所有模型",
+			DocsURL: "https://openrouter.ai/docs", Description: "国际聚合路由 — 一个 Key 访问所有模型",
 			IsAggregator: true},
 
 		// ── Ollama (本地) ──

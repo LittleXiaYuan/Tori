@@ -122,6 +122,7 @@ func (g *Gateway) registerKnowledgeRoutes() {
 	g.mux.HandleFunc("/v1/knowledge/import-url", g.requireAuth(g.handleKBImportURL))
 	g.mux.HandleFunc("/v1/knowledge/import-repo", g.requireAuth(g.handleKBImportRepo))
 	g.mux.HandleFunc("/v1/knowledge/source", g.requireAuth(g.handleKBDelete))
+	g.mux.HandleFunc("/v1/knowledge/source/update", g.requireAuth(g.handleKBUpdate))
 }
 
 // ──────────────────────────────────────────────
@@ -269,9 +270,9 @@ func (g *Gateway) registerProviderRoutes() {
 	g.mux.HandleFunc("/api/providers/session", g.requireAuth(g.handleProviderSessionOverride))
 	g.mux.HandleFunc("/api/providers/local/discover", g.requireAuth(g.handleLocalDiscover))
 	g.mux.HandleFunc("/api/providers/local/register", g.requireAuth(g.handleLocalRegister))
-	g.mux.HandleFunc("/api/providers/mode", g.requireAuth(g.handleProviderMode))
-	g.mux.HandleFunc("/api/providers/presets", g.requireAuth(g.handleProviderPresets))
-	g.mux.HandleFunc("/api/providers/register", g.requireAuth(g.handleProviderRegister))
+	g.mux.HandleFunc("/api/providers/mode", g.requireSetupOrAuth(g.handleProviderMode))
+	g.mux.HandleFunc("/api/providers/presets", g.requireSetupOrAuth(g.handleProviderPresets))
+	g.mux.HandleFunc("/api/providers/register", g.requireSetupOrAuth(g.handleProviderRegister))
 	g.mux.HandleFunc("/api/providers/delete", g.requireAuth(g.handleProviderDelete))
 	g.mux.HandleFunc("/api/providers/tori/discover", g.requireAuth(g.handleToriDiscover))
 	g.mux.HandleFunc("/v1/router/stats", g.requireAuth(g.handleRouterStats))

@@ -37,6 +37,7 @@ docs/.vitepress/dist/
 # ── Frontend (源码在 heroui-web/src，构建产物在 heroui-web/out/) ──
 heroui-web/node_modules/
 heroui-web/.next/
+heroui-web/out/
 heroui-web/.env.local
 
 # ── Runtime-generated task snapshots ──

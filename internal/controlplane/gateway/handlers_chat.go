@@ -460,10 +460,14 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if lastUserMsg != "" {
+			usedActions := result.SkillsUsed
 			safego.Go("skill-grow", func() {
 				growCtx, growCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer growCancel()
 				g.skillGrow.Observe(growCtx, lastUserMsg)
+				if len(usedActions) > 0 {
+					g.skillGrow.ObserveActions(growCtx, usedActions)
+				}
 			})
 		}
 	}

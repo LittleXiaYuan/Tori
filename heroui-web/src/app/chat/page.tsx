@@ -58,6 +58,8 @@ interface Message {
   skillSuggestions?: SkillGrowthSuggestion[];
   contextLayers?: string[];
   sandbox?: SandboxInfo;
+  airiSynced?: boolean;
+  airiEmotion?: string;
 }
 
 let msgId = 0;
@@ -92,6 +94,7 @@ function friendlyError(msg: string): string {
   if (m.includes("rate limit") || m.includes("429")) return "Too many requests right now. Please retry in a moment.";
   if (m.includes("401") || m.includes("unauthorized") || m.includes("invalid api key")) return "The API key looks invalid or expired. Check provider settings.";
   if (m.includes("502") || m.includes("503") || m.includes("bad gateway")) return "The upstream model service is temporarily unavailable.";
+  if (m.includes("failed to fetch") || m.includes("network") || m.includes("err_connection") || m.includes("load failed")) return "Network connection lost. Please check your connection and try again.";
   if (m.includes("request failed")) return "The request failed. Check network or service status and try again.";
   return msg;
 }
@@ -445,6 +448,9 @@ export default function ChatPage() {
   const [slashQuery, setSlashQuery] = useState("");
   const [activeSlashCommand, setActiveSlashCommand] = useState<string | null>(null);
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
+  const [chatMode, setChatMode] = useState<"agent" | "fast" | "chat">("agent");
+  const [airiMode, setAiriMode] = useState(false);
+  const [airiAvailable, setAiriAvailable] = useState(false);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [computerWidth, setComputerWidth] = useState(420);
   const resizingRef = useRef(false);
@@ -468,6 +474,20 @@ export default function ChatPage() {
 
   useEffect(() => {
     api.skills().then((list) => setHeroSkills(list.slice(0, 4))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const t = typeof window !== "undefined" ? localStorage.getItem("yunque_token") || "" : "";
+    const k = typeof window !== "undefined" ? localStorage.getItem("yunque_api_key") || "" : "";
+    const ah: Record<string, string> = t ? { Authorization: `Bearer ${t}` } : k ? { "X-API-Key": k } : {};
+    fetch("/v1/plugins/ui", { headers: ah }).then(r => r.json()).then((data: any) => {
+      const tabs = data?.tabs || data || [];
+      if (Array.isArray(tabs) && tabs.some((t: any) => t.key === "airi")) {
+        fetch("/v1/ext/airi/status", { headers: ah }).then(r => r.json()).then(() => {
+          setAiriAvailable(true);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   // Load providers for model selector
@@ -728,7 +748,7 @@ export default function ChatPage() {
     try {
       await api.deleteConversation(convId);
       convD({ type: "REMOVE", id: convId });
-      if (conv.activeId === convId) { convD({ type: "SET_ACTIVE", id: "default" }); chatD({ type: "SET_MESSAGES", messages: [] }); }
+      if (conv.activeId === convId) { convD({ type: "SET_ACTIVE", id: "default" }); chatD({ type: "SET_MESSAGES", messages: [] }); chatD({ type: "CLEAR_LIVE_TRACE" }); }
       showToast("对话已删除。", "success");
     } catch (e) { showToast(e instanceof Error ? e.message : "删除对话失败。", "error"); }
   }, [conv.activeId]);
@@ -1004,7 +1024,7 @@ ${text.slice(0, 4000)}` });
       const resp = await fetch("/v1/chat/agentic", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ messages: historyMsgs, session_id: conv.activeId, ...(thinkingEnabled !== null ? { thinking: thinkingEnabled } : {}) }),
+        body: JSON.stringify({ messages: historyMsgs, session_id: conv.activeId, ...(thinkingEnabled !== null ? { thinking: thinkingEnabled } : {}), ...(chatMode !== "agent" ? { mode: chatMode } : {}), ...(airiMode ? { airi_mode: true } : {}) }),
         signal: abort.signal,
       });
       if (!resp.ok || !resp.body) throw new Error("request failed");
@@ -1013,9 +1033,14 @@ ${text.slice(0, 4000)}` });
       const decoder = new TextDecoder();
       let buf = "";
       let currentEvent = "";
+      let streamFinished = false;
+      const IDLE_TIMEOUT = 180_000;
 
-      while (true) {
-        const { done, value } = await reader.read();
+      while (!streamFinished) {
+        const timeout = new Promise<{ done: true; value: undefined }>((resolve) =>
+          setTimeout(() => resolve({ done: true, value: undefined }), IDLE_TIMEOUT),
+        );
+        const { done, value } = await Promise.race([reader.read(), timeout]);
         if (done || abort.signal.aborted) break;
         buf += decoder.decode(value, { stream: true });
         const lines = buf.split("\n");
@@ -1026,7 +1051,7 @@ ${text.slice(0, 4000)}` });
             currentEvent = line.slice(7).trim();
           } else if (line.startsWith("data: ")) {
             const raw = line.slice(6);
-            if (raw === "[DONE]") break;
+            if (raw === "[DONE]") { streamFinished = true; break; }
 
             if (currentEvent === "error") {
               try {
@@ -1059,6 +1084,18 @@ ${text.slice(0, 4000)}` });
                 if (doneData.sandbox && doneData.sandbox.sandbox_id) {
                   updates.sandbox = doneData.sandbox as SandboxInfo;
                 }
+                if (doneData.airi_synced) {
+                  updates.airiSynced = true;
+                  const actMatch = (doneData.reply || "").match(/<\|ACT\s+(\{[^|]*\})\s*\|>/);
+                  if (actMatch) {
+                    try {
+                      const act = JSON.parse(actMatch[1]);
+                      updates.airiEmotion = act?.emotion?.name || "neutral";
+                    } catch { updates.airiEmotion = "neutral"; }
+                  }
+                  const cleaned = (doneData.reply || "").replace(/<\|ACT\s+\{[^|]*\}\s*\|>\n?/g, "").trim();
+                  if (cleaned) updates.content = cleaned;
+                }
                 chatD({ type: "UPDATE_LAST", updates });
                 if (doneData.browser_summary) {
                   setLastArtifact(mapBrowserSummary(doneData.browser_summary));
@@ -1067,8 +1104,9 @@ ${text.slice(0, 4000)}` });
                   setShowComputer(true);
                   setSuggestedTab("browser");
                 }
-              } catch { /* ignore */ }
-              continue;
+              }               catch { /* ignore */ }
+              streamFinished = true;
+              break;
             }
 
             if (currentEvent === "actions") {
@@ -1254,7 +1292,7 @@ ${text.slice(0, 4000)}` });
             <Button
               className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
               size="sm"
-              onPress={() => { convD({ type: "SET_ACTIVE", id: "new-" + Date.now() }); chatD({ type: "SET_MESSAGES", messages: [] }); }}
+              onPress={() => { convD({ type: "SET_ACTIVE", id: "new-" + Date.now() }); chatD({ type: "SET_MESSAGES", messages: [] }); chatD({ type: "CLEAR_LIVE_TRACE" }); }}
             >
               <Plus size={14} /> 新对话
             </Button>
@@ -1488,6 +1526,33 @@ ${text.slice(0, 4000)}` });
                   style={{
                     background: thinkingLevel === key ? "var(--yunque-accent)" : "transparent",
                     color: thinkingLevel === key ? "#fff" : "var(--yunque-text-muted)",
+                  }}
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              {([
+                { key: "agent" as const, label: "Agent", icon: <Sparkles size={11} /> },
+                { key: "fast" as const, label: "Fast", icon: <Zap size={11} /> },
+                ...(airiAvailable
+                  ? [{ key: "chat" as const, label: "Airi", icon: <Heart size={11} fill={chatMode === "chat" ? "#fff" : "none"} /> }]
+                  : [{ key: "chat" as const, label: "Chat", icon: <MessageCircle size={11} /> }]),
+              ]).map(({ key, label, icon }) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setChatMode(key);
+                    if (key === "chat" && airiAvailable) setAiriMode(true);
+                    else setAiriMode(false);
+                  }}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
+                  style={{
+                    background: chatMode === key
+                      ? (key === "chat" && airiAvailable ? "linear-gradient(135deg, #ec4899, #8b5cf6)" : key === "chat" ? "#22c55e" : key === "fast" ? "#f59e0b" : "var(--yunque-accent)")
+                      : "transparent",
+                    color: chatMode === key ? "#fff" : "var(--yunque-text-muted)",
                   }}
                 >
                   {icon} {label}
@@ -1765,12 +1830,17 @@ ${text.slice(0, 4000)}` });
                         )
                       )}
                     </div>
-                    {/* Emotion badge + Sticker */}
-                    {msg.role === "assistant" && (msg.emotion || msg.sticker || msg.stickers) && (
+                    {/* Emotion badge + Sticker + Airi */}
+                    {msg.role === "assistant" && (msg.emotion || msg.sticker || msg.stickers || msg.airiSynced) && (
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         {msg.emotion && <EmotionBadge emotion={msg.emotion} />}
                         {msg.sticker && <StickerView sticker={msg.sticker} />}
                         {msg.stickers && Object.values(msg.stickers).map((s, i) => <StickerView key={i} sticker={s} />)}
+                        {msg.airiSynced && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15))", color: "#d946ef", border: "1px solid rgba(217,70,239,0.2)" }}>
+                            <Heart size={10} fill="#d946ef" /> Airi {msg.airiEmotion && msg.airiEmotion !== "neutral" ? `· ${msg.airiEmotion}` : ""}
+                          </span>
+                        )}
                       </div>
                     )}
                     {/* Skill tags */}
@@ -2289,12 +2359,12 @@ ${text.slice(0, 4000)}` });
               document.addEventListener("mouseup", onUp);
             }}
           />
-          <div className="shrink-0 flex flex-col h-full animate-slide-in-right overflow-y-auto"
+          <div className="shrink-0 flex flex-col h-full animate-slide-in-right overflow-hidden"
             style={{ width: computerWidth, background: "var(--yunque-sidebar)" }}>
-            <div className="p-3">
+            <div className="shrink-0 p-3">
               <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
             </div>
-            <ComputerPanel traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
+            <ComputerPanel className="min-h-0 flex-1" traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
           </div>
         </>
       )}

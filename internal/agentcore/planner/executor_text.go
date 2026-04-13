@@ -289,7 +289,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 						}
 						slog.Info("planner: handoff delegation (text)", "agent", agentName, "step", steps)
 						t0 := time.Now()
-						hr, err := p.handoffReg.Execute(toolCtx, req.TenantID, agentName, input)
+						hr, err := p.handoffReg.Execute(toolCtx, req.TenantID, agentName, input, req.ModelOverride)
 						dur := time.Since(t0)
 						if p.skillMetrics != nil {
 							p.skillMetrics(c.Name, dur, err)

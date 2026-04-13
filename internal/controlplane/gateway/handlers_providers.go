@@ -332,13 +332,15 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 			cfg.Tier = preset.Models[0].Tier
 			cfg.Capabilities = preset.Models[0].Capabilities
 		}
-		// Inherit capabilities from matching preset model
 		for _, pm := range preset.Models {
 			if pm.ID == req.Model {
 				if cfg.Tier == "" {
 					cfg.Tier = pm.Tier
 				}
 				cfg.Capabilities = pm.Capabilities
+				if pm.ContextWindow > 0 {
+					cfg.ContextWindow = pm.ContextWindow
+				}
 				break
 			}
 		}

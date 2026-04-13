@@ -92,6 +92,41 @@ func (p *Planner) buildSystemPrompt() string {
 	return p.cachedSysPrompt
 }
 
+func (p *Planner) buildSubagentSystemPrompt() string {
+	loc := p.locale
+	if loc == "" {
+		loc = "zh-CN"
+	}
+	content, err := promptFiles.ReadFile(fmt.Sprintf("prompts/%s/system.tmpl", loc))
+	if err != nil {
+		content, _ = promptFiles.ReadFile("prompts/en/system.tmpl")
+	}
+	if len(content) == 0 {
+		return "You are an AI execution agent. Use the provided tools to complete the task."
+	}
+
+	tmpl, err := template.New("subagent").Parse(string(content))
+	if err != nil {
+		return string(content)
+	}
+
+	defs := p.registry.Definitions()
+	defsJSON, _ := json.MarshalIndent(defs, "", "  ")
+
+	data := map[string]any{
+		"SkillDefinitions": string(defsJSON),
+		"SkillIndex":       []SkillIndexEntry{},
+		"NativeFC":         false,
+		"Categories":       map[string]bool{},
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return string(content)
+	}
+	return buf.String()
+}
+
 // cleanReply removes internal artifacts from LLM output before presenting to users.
 func (p *Planner) cleanReply(text string) string {
 	// Remove JSON skill call blocks (may appear multiple times)
@@ -159,10 +194,59 @@ func (p *Planner) cleanReply(text string) string {
 		text = text[:s] + text[endPos:]
 	}
 	text = strings.TrimSpace(text)
-	// Remove trailing "descriptive tool call" patterns where LLM describes calling a tool
-	// e.g., "让我先调用xxx来..." followed by nothing useful (already stripped JSON above)
+	text = stripInlineReasoning(text)
 	text = cleanTrailingCallDescription(text)
 	return strings.TrimSpace(text)
+}
+
+// stripInlineReasoning removes leading "thinking out loud" paragraphs that some models
+// emit before the actual reply (e.g., "用户发送了xxx...我应该...").
+// Detects consecutive analysis paragraphs and strips them, keeping the user-facing content.
+func stripInlineReasoning(text string) string {
+	reasoningPrefixes := []string{
+		"用户",
+		"这是一个", "这是关于", "这个问题",
+		"我需要", "我应该", "我来", "让我", "我将",
+		"根据规范", "根据要求", "根据上下文",
+		"好的，", "好的,", "好的。",
+		"分析：", "分析:",
+		"看起来", "首先",
+	}
+
+	paragraphs := strings.Split(text, "\n\n")
+	if len(paragraphs) <= 1 {
+		return text
+	}
+
+	firstRealIdx := 0
+	for i, para := range paragraphs {
+		trimmed := strings.TrimSpace(para)
+		if trimmed == "" {
+			continue
+		}
+		isReasoning := false
+		for _, prefix := range reasoningPrefixes {
+			if strings.HasPrefix(trimmed, prefix) {
+				isReasoning = true
+				break
+			}
+		}
+		if !isReasoning {
+			firstRealIdx = i
+			break
+		}
+		firstRealIdx = i + 1
+	}
+
+	if firstRealIdx == 0 || firstRealIdx >= len(paragraphs) {
+		return text
+	}
+
+	result := strings.Join(paragraphs[firstRealIdx:], "\n\n")
+	if strings.TrimSpace(result) == "" {
+		return text
+	}
+	return strings.TrimSpace(result)
 }
 
 // cleanTrailingCallDescription removes trailing sentences where the LLM describes
@@ -214,4 +298,44 @@ func findClosingBrace(s string, start int) int {
 		}
 	}
 	return -1
+}
+
+// extractNextMoves splits reply text at the ---NEXT--- marker.
+// Returns the cleaned reply and a list of suggestion strings.
+func extractNextMoves(text string) (string, []string) {
+	markers := []string{"---NEXT---", "--- NEXT ---", "---NEXT MOVES---"}
+	idx := -1
+	for _, m := range markers {
+		if i := strings.Index(text, m); i >= 0 {
+			if idx < 0 || i < idx {
+				idx = i
+			}
+		}
+	}
+	if idx < 0 {
+		return text, nil
+	}
+
+	reply := strings.TrimSpace(text[:idx])
+	tail := text[idx:]
+
+	// Skip past the marker line
+	lines := strings.Split(tail, "\n")
+	var suggestions []string
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "```" {
+			continue
+		}
+		line = strings.TrimPrefix(line, "- ")
+		line = strings.TrimPrefix(line, "* ")
+		// Strip numbered prefixes like "1. " "2. "
+		if len(line) > 2 && line[1] == '.' && line[0] >= '1' && line[0] <= '9' {
+			line = strings.TrimSpace(line[2:])
+		}
+		if line != "" {
+			suggestions = append(suggestions, line)
+		}
+	}
+	return reply, suggestions
 }

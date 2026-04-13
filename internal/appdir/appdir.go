@@ -3,7 +3,6 @@ package appdir
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 )
 
@@ -16,11 +15,7 @@ var (
 //
 // Resolution order:
 //  1. YUNQUE_DATA_DIR environment variable (explicit override)
-//  2. Platform-specific user data directory:
-//     - Windows: %AppData%\YunqueAgent
-//     - macOS:   ~/Library/Application Support/YunqueAgent
-//     - Linux:   ~/.local/share/yunque-agent
-//  3. Fallback: ./data (relative to working directory)
+//  2. ./data next to the executable
 //
 // The directory is created if it doesn't exist.
 func DataDir() string {
@@ -52,25 +47,11 @@ func resolve() string {
 		return filepath.Clean(env)
 	}
 
-	switch runtime.GOOS {
-	case "windows":
-		if appData := os.Getenv("APPDATA"); appData != "" {
-			return filepath.Join(appData, "YunqueAgent")
-		}
-	case "darwin":
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, "Library", "Application Support", "YunqueAgent")
-		}
-	default: // linux, freebsd, etc.
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, "yunque-agent")
-		}
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, ".local", "share", "yunque-agent")
-		}
+	exe, err := os.Executable()
+	if err != nil {
+		return filepath.Join(".", "data")
 	}
-
-	return filepath.Join(".", "data")
+	return filepath.Join(filepath.Dir(exe), "data")
 }
 
 // LegacyDataDir returns the old data directory path (./data relative to exe).

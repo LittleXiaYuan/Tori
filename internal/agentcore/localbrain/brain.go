@@ -416,6 +416,13 @@ func (b *LocalBrain) FilterContext(ctx context.Context, query string, items []Co
 		maxItems = 8
 	}
 
+	if len(items) <= maxItems {
+		return &FilterResult{
+			Items:   items,
+			Elapsed: time.Since(start),
+		}, nil
+	}
+
 	// 旁路：高重要性条目直接保留，不经过小模型判断
 	var bypass []ContextItem
 	var candidates []ContextItem
@@ -468,7 +475,6 @@ func (b *LocalBrain) scoreRelevance(ctx context.Context, query string, items []C
 		return nil, nil
 	}
 
-	// 构建批量打分 prompt（一次调用处理所有条目）
 	var sb strings.Builder
 	for i, item := range items {
 		content := truncate(item.Content, 200)
@@ -490,7 +496,9 @@ Rules:
 		{Role: "user", Content: userPrompt},
 	}
 
-	reply, err := b.client.Chat(ctx, msgs, 0.1)
+	scoreCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	reply, err := b.client.Chat(scoreCtx, msgs, 0.1)
 	if err != nil {
 		return nil, err
 	}

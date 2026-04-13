@@ -101,7 +101,9 @@ func (hr *HandoffRegistry) List() []HandoffConfig {
 
 // Execute delegates a task to a named subagent.
 // It spawns (or reuses) a subagent instance, runs the task, and returns the result.
-func (hr *HandoffRegistry) Execute(ctx context.Context, parentID, agentName, input string) (*HandoffResult, error) {
+// parentProvider is the model/provider the parent planner is using; exec agents
+// inherit it when no per-agent ProviderID is configured.
+func (hr *HandoffRegistry) Execute(ctx context.Context, parentID, agentName, input, parentProvider string) (*HandoffResult, error) {
 	hr.mu.RLock()
 	cfg, ok := hr.configs[agentName]
 	runFn := hr.runFn
@@ -123,8 +125,13 @@ func (hr *HandoffRegistry) Execute(ctx context.Context, parentID, agentName, inp
 
 	slog.Info("handoff: delegating task", "agent", agentName, "subagent_id", sa.ID, "parent", parentID)
 
+	provider := cfg.ProviderID
+	if provider == "" {
+		provider = parentProvider
+	}
+
 	t0 := time.Now()
-	reply, err := runFn(ctx, agentName, input, cfg.ProviderID)
+	reply, err := runFn(ctx, agentName, input, provider)
 	dur := time.Since(t0)
 
 	if err != nil {

@@ -27,13 +27,14 @@ const (
 
 // Client is an LLM caller supporting OpenAI-compatible and Anthropic APIs.
 type Client struct {
-	baseURL string
-	apiKey  string
-	model   string
-	dialect Dialect
-	http    *http.Client
-	breaker *CircuitBreaker
-	cache   *ResponseCache
+	baseURL       string
+	apiKey        string
+	model         string
+	dialect       Dialect
+	http          *http.Client
+	breaker       *CircuitBreaker
+	cache         *ResponseCache
+	contextWindow int // in K tokens (e.g. 128 = 128K), 0 = use default
 }
 
 // newOptimizedTransport creates an HTTP transport tuned for LLM API calls:
@@ -90,6 +91,18 @@ func (c *Client) Breaker() *CircuitBreaker { return c.breaker }
 
 // Model returns the current default model ID.
 func (c *Client) Model() string { return c.model }
+
+// SetContextWindow sets the model's context window in K tokens (e.g. 128 = 128K).
+func (c *Client) SetContextWindow(k int) { c.contextWindow = k }
+
+// ContextWindowTokens returns the model's context window in tokens.
+// Falls back to 128K if not explicitly set.
+func (c *Client) ContextWindowTokens() int {
+	if c.contextWindow > 0 {
+		return c.contextWindow * 1024
+	}
+	return 128 * 1024
+}
 
 // ContentPart represents one segment of a multimodal message.
 // Supports text, image_url (vision), and video_url (Kimi K2.5 / Qwen VL).

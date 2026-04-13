@@ -28,12 +28,16 @@ type Pattern struct {
 	Proposed  bool      `json:"proposed"`
 }
 
+// GenerateSkillFunc creates and registers a Skill from a detected pattern.
+type GenerateSkillFunc func(ctx context.Context, capabilityDesc string, failureContext string) (registeredName string, err error)
+
 // Detector monitors user interactions for repeated patterns
 // and proposes automatic skill creation.
 type Detector struct {
 	mu           sync.Mutex
 	memSearch    MemSearchFunc
 	onProposal   ProposalCallback
+	generateSkill GenerateSkillFunc
 	threshold    int              // minimum similar queries to trigger (default 3)
 	patterns     map[string]*Pattern
 	cooldown     time.Duration
@@ -57,6 +61,9 @@ func (d *Detector) SetMemSearch(fn MemSearchFunc) { d.memSearch = fn }
 
 // SetOnProposal attaches the callback for when a skill creation is proposed.
 func (d *Detector) SetOnProposal(fn ProposalCallback) { d.onProposal = fn }
+
+// SetGenerateSkill attaches a function to auto-generate and register Skills from patterns.
+func (d *Detector) SetGenerateSkill(fn GenerateSkillFunc) { d.generateSkill = fn }
 
 // SetKVStore enables Ledger KV-backed persistence for detected patterns.
 func (d *Detector) SetKVStore(kvs kvStore) {
@@ -129,14 +136,90 @@ func (d *Detector) Observe(ctx context.Context, query string) {
 		d.patterns[key] = p
 	}
 
-	// Trigger proposal
-	if d.onProposal != nil && !p.Proposed {
+	// Trigger proposal + auto-generate
+	if !p.Proposed {
 		p.Proposed = true
 		p.DetectedAt = time.Now()
 		suggestion := "我注意到你经常进行类似的操作（\"" + truncate(query, 60) + "\"），" +
-			"已检测到 " + itoa(count) + " 次相似请求。要不要我把它变成一个自动化技能？"
+			"已检测到 " + itoa(count) + " 次相似请求。已自动创建为技能。"
 		slog.Info("skillgrow: pattern detected", "query", key, "count", count)
-		d.onProposal(ctx, key, suggestion)
+		if d.onProposal != nil {
+			d.onProposal(ctx, key, suggestion)
+		}
+		if d.generateSkill != nil {
+			go func() {
+				genCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				name, err := d.generateSkill(genCtx, query, sample)
+				if err != nil {
+					slog.Warn("skillgrow: auto-generate failed", "pattern", key, "err", err)
+				} else {
+					slog.Info("skillgrow: auto-generated skill", "pattern", key, "skill", name)
+				}
+			}()
+		}
+	}
+	d.persistKV()
+}
+
+// ObserveActions checks tool/action call frequency within a session.
+// When the same action appears >= threshold times, propose creating a skill.
+func (d *Detector) ObserveActions(ctx context.Context, actions []string) {
+	if len(actions) == 0 {
+		return
+	}
+
+	freq := make(map[string]int, len(actions))
+	for _, a := range actions {
+		freq[a]++
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	for action, count := range freq {
+		if count < d.threshold {
+			continue
+		}
+		key := "action:" + action
+		p, exists := d.patterns[key]
+		if exists {
+			p.Count = count
+			if p.Proposed && time.Since(p.DetectedAt) < d.cooldown {
+				continue
+			}
+		} else {
+			p = &Pattern{
+				Query:      action,
+				Count:      count,
+				DetectedAt: time.Now(),
+			}
+			d.patterns[key] = p
+		}
+
+		if !p.Proposed {
+			p.Proposed = true
+			p.DetectedAt = time.Now()
+			suggestion := "你频繁使用了 \"" + action + "\" 操作（本次已调用 " + itoa(count) +
+				" 次），已自动创建为技能。"
+			slog.Info("skillgrow: action pattern detected", "action", action, "count", count)
+			if d.onProposal != nil {
+				d.onProposal(ctx, key, suggestion)
+			}
+			if d.generateSkill != nil {
+				actionCopy := action
+				go func() {
+					genCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					name, err := d.generateSkill(genCtx, "自动化操作: "+actionCopy, "用户频繁使用 "+actionCopy)
+					if err != nil {
+						slog.Warn("skillgrow: action auto-generate failed", "action", actionCopy, "err", err)
+					} else {
+						slog.Info("skillgrow: action auto-generated skill", "action", actionCopy, "skill", name)
+					}
+				}()
+			}
+		}
 	}
 	d.persistKV()
 }

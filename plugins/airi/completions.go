@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
-	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 )
+
+var actTagRe = regexp.MustCompile(`<\|ACT\s*\{[^}]*"name"\s*:\s*"(\w+)"[^}]*\}\|>`)
 
 // OpenAIRequest represents the structure of an incoming OpenAI API call from Airi.
 type OpenAIRequest struct {
@@ -59,34 +61,29 @@ func (p *Plugin) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	msgs = append([]llm.Message{airiSystemPrompt}, msgs...)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	planReq := planner.PlanRequest{
-		Messages: msgs,
-		TenantID: "default",
+		Messages:          msgs,
+		TenantID:          "default",
+		DisableTools:      true,
+		DisableDelegation: true,
 	}
 
-	// 1. Run Yunque Planner
 	result, err := p.app.Planner.Run(ctx, planReq)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "planner error: " + err.Error()})
 		return
 	}
 
-	// 2. Perform Emotion Analysis on the assistant's reply
-	var vrmEmo string = "neutral"
-	if rawAnalyzer, ok := p.app.Get("emotion_analyzer"); ok {
-		analyzer := rawAnalyzer.(*emotion.Analyzer)
-		if analyzer.Enabled() {
-			if emRes, err := analyzer.AnalyzeText(ctx, result.Reply); err == nil && emRes != nil {
-				if emRes.Confidence >= 0.5 {
-					vrmEmo = mapEmotionToVRM(string(emRes.Emotion))
-				}
-			}
-		}
+	reply := result.Reply
+	var finalText string
+	if m := actTagRe.FindString(reply); m != "" {
+		finalText = reply
+	} else {
+		finalText = fmt.Sprintf("<|ACT {\"emotion\":{\"name\":\"neutral\",\"intensity\":1}}|>\n%s", reply)
 	}
-
-	// 3. Output format text with Action tag for Airi:
-	finalText := fmt.Sprintf("<|ACT {\"emotion\":{\"name\":\"%s\",\"intensity\":1}}|>\n%s", vrmEmo, result.Reply)
 
 	if req.Stream {
 		p.streamResponse(w, finalText, req.Model)

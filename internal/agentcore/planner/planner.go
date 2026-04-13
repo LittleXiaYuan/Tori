@@ -242,12 +242,19 @@ func (p *Planner) buildEnv(req PlanRequest) *skills.Environment {
 //   - Goal recitation inserted before last user message in multi-turn �?keeps model focused
 //   - Errors preserved (append-only context) �?model learns from failures
 func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Message, []string) {
-	// ── 1. Stable prefix: base + persona + domain (rarely changes, KV-cache friendly) ──
-	stablePrefix := p.buildSystemPrompt()
+	// ── 1. Stable prefix: persona (highest priority) + base + domain ──
+	var stablePrefix string
+
 	if p.personaPrompt != nil {
 		if pp := p.personaPrompt(); pp != "" {
-			stablePrefix += "\n\n" + pp
+			stablePrefix = pp + "\n\n"
 		}
+	}
+
+	if req.DisableDelegation {
+		stablePrefix += p.buildSubagentSystemPrompt()
+	} else {
+		stablePrefix += p.buildSystemPrompt()
 	}
 	if p.domainPrompt != "" {
 		stablePrefix += "\n\n" + p.domainPrompt
@@ -368,14 +375,23 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 	}
 
 	// Window trimming (hard token/message cap)
-	if p.windowCfg != nil {
+	// Use model's actual context window if available, otherwise fall back to default config
+	windowCfg := p.windowCfg
+	if client := p.clientForRequest(req); client != nil {
+		modelTokens := client.ContextWindowTokens()
+		if windowCfg == nil || modelTokens != windowCfg.MaxTokens {
+			cfg := ctxwindow.ConfigForWindow(modelTokens / 1024)
+			windowCfg = &cfg
+		}
+	}
+	if windowCfg != nil {
 		winMsgs := make([]ctxwindow.Message, len(msgs))
 		for i, m := range msgs {
 			winMsgs[i] = ctxwindow.Message{Role: m.Role, Content: m.Content}
 		}
-		result := ctxwindow.TrimToFit(winMsgs, *p.windowCfg)
+		result := ctxwindow.TrimToFit(winMsgs, *windowCfg)
 		if result.DroppedCount > 0 {
-			slog.Info("context window trimmed", "dropped", result.DroppedCount, "remaining", len(result.Messages))
+			slog.Info("context window trimmed", "dropped", result.DroppedCount, "remaining", len(result.Messages), "model_window_k", windowCfg.MaxTokens/1024)
 			trimmed := make([]llm.Message, len(result.Messages))
 			for i, m := range result.Messages {
 				trimmed[i] = llm.Message{Role: m.Role, Content: m.Content}
@@ -433,6 +449,7 @@ type PlanRequest struct {
 	TraceID           string          // trace context ID for unified event protocol
 	ThinkingEnabled   *bool           // nil = model default; true/false = explicit override
 	DisableDelegation bool            // when true, buildFunctionDefs exposes direct skills instead of handoff tools
+	DisableTools      bool            // when true, skip all tools — pure chat mode
 	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
 }
 
@@ -508,6 +525,7 @@ type PlanResult struct {
 	Steps            int           `json:"steps"`
 	Plan             []PlanStep    `json:"plan,omitempty"`
 	ContextLayers    []string      `json:"context_layers,omitempty"`
+	Suggestions      []string      `json:"suggestions,omitempty"`
 }
 
 // ExecutionSummary builds a concise summary of skill executions for session persistence.
@@ -569,9 +587,21 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 		slog.Debug("planner: model override", "override", req.ModelOverride)
 	}
 
+	if req.DisableTools {
+		slog.Info("planner: chat-only mode, skipping all tools")
+		messages, layers := p.BuildMessages(ctx, req)
+		reply, err := p.chatFallback(ctx, req, messages)
+		if err != nil {
+			return nil, fmt.Errorf("planner chat-only: %w", err)
+		}
+		cleaned := p.cleanReply(reply)
+		cleaned, nextMoves := extractNextMoves(cleaned)
+		return &PlanResult{Reply: cleaned, Steps: 0, ContextLayers: layers, Suggestions: nextMoves}, nil
+	}
+
 	// LocalBrain 预分类：用本地小模型决定路由（省 API token）
 	var lbNoTools bool
-	if p.localBrain != nil && req.ModelOverride == "" {
+	if p.localBrain != nil && req.ModelOverride == "" && !req.DisableDelegation {
 		query := extractGoal(req)
 		if decision, err := p.localBrain.Classify(ctx, query, req.TenantID); err == nil {
 			slog.Info("planner: localbrain decision", "handler", decision.Handler, "intent", decision.Intent.Category, "need_tools", decision.Intent.NeedTools, "reason", decision.Reason)

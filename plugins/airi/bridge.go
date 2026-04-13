@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
@@ -55,7 +54,7 @@ type Bridge struct {
 func NewBridge(app *agentrt.App) *Bridge {
 	url := os.Getenv("AIRI_URL")
 	if url == "" {
-		url = "ws://127.0.0.1:6121/ws"
+		url = "ws://localhost:6121/ws"
 	}
 	token := os.Getenv("AIRI_TOKEN")
 	moduleName := os.Getenv("AIRI_MODULE_NAME")
@@ -336,16 +335,29 @@ func (b *Bridge) handleInboundText(event *AiriEvent) {
 
 // processInboundMessage sends a user message through the Planner and pushes the reply to Airi.
 func (b *Bridge) processInboundMessage(text string) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	airiSys := ""
+	if p, ok := b.app.Get("airi_plugin"); ok {
+		if ap, ok := p.(*Plugin); ok {
+			airiSys = ap.airiSystemPrompt()
+		}
+	}
+	if airiSys == "" {
+		airiSys = "你正在通过 Airi 桌宠界面与用户面对面交流。回复要简短自然，像一个活泼的桌面伙伴。"
+	}
 
 	msgs := []llm.Message{
-		{Role: "system", Content: "你正在通过 Airi 桌宠界面与用户面对面交流。回复要简短自然，像一个活泼的桌面伙伴。"},
+		{Role: "system", Content: airiSys},
 		{Role: "user", Content: text},
 	}
 
 	planReq := planner.PlanRequest{
-		Messages: msgs,
-		TenantID: "default",
+		Messages:          msgs,
+		TenantID:          "default",
+		DisableTools:      true,
+		DisableDelegation: true,
 	}
 
 	result, err := b.app.Planner.Run(ctx, planReq)
@@ -354,50 +366,47 @@ func (b *Bridge) processInboundMessage(text string) {
 		return
 	}
 
-	// Push the reply to Airi
 	b.pushReplyToAiri(ctx, result.Reply)
 }
 
-// pushReplyToAiri performs emotion analysis and sends an input:text event.
-func (b *Bridge) pushReplyToAiri(ctx context.Context, replyText string) {
+func (b *Bridge) pushReplyToAiri(_ context.Context, replyText string) {
+	slog.Info("[airi-bridge] pushReplyToAiri called", "connected", b.connected.Load(), "len", len(replyText))
 	if !b.connected.Load() || replyText == "" {
+		slog.Info("[airi-bridge] pushReplyToAiri skipped", "connected", b.connected.Load(), "empty", replyText == "")
 		return
 	}
 
-	// Strip tool_calls JSON from the reply
 	cleaned := trimToolCalls(replyText)
 	if cleaned == "" {
+		slog.Info("[airi-bridge] pushReplyToAiri: cleaned text is empty, skipping")
 		return
 	}
 
-	// Emotion analysis
-	vrmEmo := "neutral"
-	if rawAnalyzer, ok := b.app.Get("emotion_analyzer"); ok {
-		analyzer := rawAnalyzer.(*emotion.Analyzer)
-		if analyzer.Enabled() {
-			if emRes, err := analyzer.AnalyzeText(ctx, cleaned); err == nil && emRes != nil {
-				if emRes.Confidence >= 0.5 {
-					vrmEmo = mapEmotionToVRM(string(emRes.Emotion))
-				}
-			}
-		}
-	}
-
-	// Build the text with ACT tag
-	textWithEmotion := cleaned
-	if vrmEmo != "neutral" {
-		textWithEmotion = fmt.Sprintf("<|ACT {\"emotion\":{\"name\":\"%s\",\"intensity\":1}}|>\n%s", vrmEmo, cleaned)
-	}
-
-	// Send input:text event to Airi
-	event := NewInputTextEvent(textWithEmotion, b.identity)
+	event := NewGenAIChatMessageEvent(cleaned, b.identity)
 	if err := b.sendEvent(event); err != nil {
 		slog.Warn("[airi-bridge] send reply failed", "err", err)
 		return
 	}
 
 	b.msgSent.Add(1)
-	slog.Debug("[airi-bridge] pushed reply to Airi", "emotion", vrmEmo, "length", len(cleaned))
+	slog.Info("[airi-bridge] pushed reply to Airi OK", "length", len(cleaned))
+}
+
+func (b *Bridge) PushTextToAiri(text string) {
+	slog.Info("[airi-bridge] PushTextToAiri called", "connected", b.connected.Load(), "len", len(text))
+	if !b.connected.Load() || text == "" {
+		slog.Info("[airi-bridge] PushTextToAiri skipped", "connected", b.connected.Load(), "empty", text == "")
+		return
+	}
+	event := NewGenAIChatMessageEvent(text, b.identity)
+	raw, _ := json.Marshal(event)
+	slog.Info("[airi-bridge] sending event to Airi", "type", event.Type, "data_preview", string(raw)[:min(200, len(raw))])
+	if err := b.sendEvent(event); err != nil {
+		slog.Warn("[airi-bridge] push text failed", "err", err)
+		return
+	}
+	b.msgSent.Add(1)
+	slog.Info("[airi-bridge] PushTextToAiri OK", "length", len(text))
 }
 
 // registerReplyHook adds a ReplyHook to the Gateway to intercept all outgoing replies.

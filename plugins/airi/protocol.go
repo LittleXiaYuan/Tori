@@ -153,6 +153,7 @@ func NewAnnounceEvent(moduleName string, identity ModuleIdentity) AiriEvent {
 		Identity: identity,
 		PossibleEvents: []string{
 			"input:text",
+			"output:gen-ai:chat:message",
 			"transport:connection:heartbeat",
 		},
 	})
@@ -184,6 +185,33 @@ func NewInputTextEvent(text string, identity ModuleIdentity) AiriEvent {
 	})
 	return AiriEvent{
 		Type:     "input:text",
+		Data:     data,
+		Metadata: NewMetadata(identity, ""),
+	}
+}
+
+// GenAIChatMessageData matches OutputGenAiChatMessageEvent from Airi protocol.
+type GenAIChatMessageData struct {
+	Message AiriChatMessage `json:"message"`
+}
+
+// AiriChatMessage matches the @xsai/shared-chat AssistantMessage format.
+type AiriChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// NewGenAIChatMessageEvent creates an "output:gen-ai:chat:message" event.
+// Airi displays this as a speech bubble + triggers TTS.
+func NewGenAIChatMessageEvent(text string, identity ModuleIdentity) AiriEvent {
+	data, _ := json.Marshal(GenAIChatMessageData{
+		Message: AiriChatMessage{
+			Role:    "assistant",
+			Content: text,
+		},
+	})
+	return AiriEvent{
+		Type:     "output:gen-ai:chat:message",
 		Data:     data,
 		Metadata: NewMetadata(identity, ""),
 	}

@@ -13,6 +13,7 @@ import (
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/controlplane/gateway"
+	"yunque-agent/internal/experimental/skillgrow"
 )
 
 // initMarketplace initializes the SkillHub marketplace: ClawHub + ToriHub + GitHub providers,
@@ -151,6 +152,15 @@ func initMarketplace(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) 
 				return name, nil
 			})
 			sg.SetGenerate(gen.Generate)
+
+			// Wire auto-generation to the skill growth detector
+			if detRaw, ok := app.Get("skillgrow_detector"); ok {
+				if det, ok := detRaw.(*skillgrow.Detector); ok {
+					det.SetGenerateSkill(gen.Generate)
+					slog.Info("skillgrow: auto-generate wired to detector")
+				}
+			}
+
 			slog.Info("skill generator enabled (web search → LLM → register)")
 		}
 	}

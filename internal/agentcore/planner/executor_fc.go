@@ -85,7 +85,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					continue
 				}
 			}
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			cleaned, nextMoves := extractNextMoves(cleaned)
+			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers, Suggestions: nextMoves}, nil
 		}
 
 		// Append assistant message with tool calls + reasoning (required by Kimi K2.5 etc.)
@@ -108,7 +109,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			timeout := p.toolTimeout
 			if p.handoffReg != nil {
 				if _, isHandoff := p.handoffReg.IsHandoffCall(tc.Function.Name); isHandoff {
-					timeout = 3 * time.Minute
+					timeout = 90 * time.Second
 				}
 			}
 
@@ -116,7 +117,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				var args map[string]any
 				json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
-				if p.handoffReg != nil {
+				if p.handoffReg != nil && !req.DisableDelegation {
 					if agentName, ok := p.handoffReg.IsHandoffCall(tc.Function.Name); ok {
 						input, _ := args["input"].(string)
 						slog.Info("planner: handoff delegation (fc)", "agent", agentName, "step", steps)
@@ -136,7 +137,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 						}
 
 						t0 := time.Now()
-						hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input)
+						hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
 						dur := time.Since(t0)
 						if p.skillMetrics != nil {
 							p.skillMetrics(tc.Function.Name, dur, err)

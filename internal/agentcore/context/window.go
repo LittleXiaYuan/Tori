@@ -33,6 +33,17 @@ func DefaultConfig() WindowConfig {
 	}
 }
 
+// ConfigForWindow returns a WindowConfig scaled to the model's context window (in K tokens).
+// Falls back to DefaultConfig for unknown or zero values.
+func ConfigForWindow(contextWindowK int) WindowConfig {
+	cfg := DefaultConfig()
+	if contextWindowK > 0 {
+		cfg.MaxTokens = contextWindowK * 1024
+		cfg.ReplyReserve = min(8192, contextWindowK*1024/16)
+	}
+	return cfg
+}
+
 // TrimResult holds the outcome of context trimming.
 type TrimResult struct {
 	Messages       []Message

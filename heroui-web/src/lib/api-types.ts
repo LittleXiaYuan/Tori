@@ -226,6 +226,7 @@ export interface KBSource {
   name: string;
   type: string;
   path?: string;
+  trigger?: string;
   chunk_count: number;
   added_at: string;
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"yunque-agent/internal/agentcore/adaptive"
+	"yunque-agent/pkg/safego"
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
@@ -185,18 +187,46 @@ func (g *Gateway) SetDistiller(d *distill.Distiller) { g.distiller = d }
 func (g *Gateway) SetReviewGate(rg *review.Gate) { g.reviewGate = rg }
 
 // SetSkillGrow attaches the skill growth detector and wires its proposal
-// callback to surface suggestions in the frontend via /v1/skill-suggestions.
+// callback to auto-save skills into RAG and surface notifications in the frontend.
 func (g *Gateway) SetSkillGrow(sg *skillgrow.Detector) {
 	g.skillGrow = sg
 	if sg != nil {
 		sg.SetOnProposal(func(_ context.Context, pattern, suggestion string) {
-			slog.Info("skillgrow: proposal", "pattern", pattern, "suggestion", suggestion)
+			slog.Info("skillgrow: auto-saving skill", "pattern", pattern)
+
 			g.storePendingSuggestions("default", []memory.SkillSuggestion{{
 				Name:        "自动化: " + truncateStr(pattern, 30),
 				Description: suggestion,
 				Trigger:     pattern,
-				Confidence:  7,
+				Confidence:  9,
 			}})
+
+			// Write structured knowledge entry to RAG
+			if g.knowledgeStore != nil {
+				safego.Go("skillgrow-rag-write", func() {
+					name := "自动化: " + truncateStr(pattern, 30)
+					trigger := "当用户进行类似操作时"
+					_, err := g.knowledgeStore.IngestStructured(name, trigger, suggestion)
+					if err != nil {
+						slog.Warn("skillgrow: RAG write failed", "err", err)
+						return
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					_ = g.knowledgeStore.BuildIndex(ctx)
+					slog.Info("skillgrow: RAG write completed", "pattern", pattern)
+				})
+			}
+
+			// Also write to orchestrator memory for short-term recall
+			if g.orchestrator != nil {
+				safego.Go("skillgrow-mem-write", func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					fact := "用户频繁使用的操作模式：" + pattern + "。" + suggestion
+					_ = g.orchestrator.Ingest(ctx, "default", fact, "skill_pattern", "skillgrow")
+				})
+			}
 		})
 	}
 }

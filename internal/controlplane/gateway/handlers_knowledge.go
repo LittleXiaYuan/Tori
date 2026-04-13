@@ -249,7 +249,7 @@ func isMinerUSupportedExt(ext string) bool {
 }
 
 // handleKBIngest handles direct text ingestion.
-// POST /v1/knowledge/ingest  {"name": "...", "content": "..."}
+// POST /v1/knowledge/ingest  {"name": "...", "trigger": "...", "content": "..."}
 func (g *Gateway) handleKBIngest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if g.knowledgeStore == nil {
@@ -258,6 +258,7 @@ func (g *Gateway) handleKBIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Name    string `json:"name"`
+		Trigger string `json:"trigger"`
 		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Content == "" {
@@ -268,7 +269,13 @@ func (g *Gateway) handleKBIngest(w http.ResponseWriter, r *http.Request) {
 		req.Name = "inline-text"
 	}
 
-	src, err := g.knowledgeStore.IngestText(req.Name, req.Content)
+	var src *knowledge.Source
+	var err error
+	if req.Trigger != "" {
+		src, err = g.knowledgeStore.IngestStructured(req.Name, req.Trigger, req.Content)
+	} else {
+		src, err = g.knowledgeStore.IngestText(req.Name, req.Content)
+	}
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -277,6 +284,40 @@ func (g *Gateway) handleKBIngest(w http.ResponseWriter, r *http.Request) {
 	safego.Go("knowledge-reindex", func() {
 		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
 			slog.Warn("knowledge: reindex after ingest failed", "err", err)
+		}
+	})
+
+	json.NewEncoder(w).Encode(map[string]any{"source": src, "stats": g.knowledgeStore.Stats()})
+}
+
+// handleKBUpdate handles editing a knowledge source.
+// PUT /v1/knowledge/source  {"id": "...", "name": "...", "trigger": "...", "content": "..."}
+func (g *Gateway) handleKBUpdate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if g.knowledgeStore == nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "knowledge base not configured"})
+		return
+	}
+	var req struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Trigger string `json:"trigger"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		json.NewEncoder(w).Encode(map[string]string{"error": "id required"})
+		return
+	}
+
+	src, err := g.knowledgeStore.UpdateSource(req.ID, req.Name, req.Trigger, req.Content)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	safego.Go("knowledge-reindex", func() {
+		if err := g.knowledgeStore.BuildIndex(context.Background()); err != nil {
+			slog.Warn("knowledge: reindex after update failed", "err", err)
 		}
 	})
 

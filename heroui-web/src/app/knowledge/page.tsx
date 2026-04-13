@@ -7,7 +7,7 @@ import {
   BookOpen, Upload, File, RefreshCw, FileText, Database,
   Globe, GitBranch, Trash2, X, Link, FolderGit, Filter,
   ChevronRight, ChevronDown, ExternalLink, HardDrive, Search,
-  FileCode, BarChart3, Type as TextFieldIcon,
+  FileCode, BarChart3, Type as TextFieldIcon, Pencil,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
@@ -64,6 +64,7 @@ export default function KnowledgePage() {
 
   // Ingest text state
   const [ingestName, setIngestName] = useState("");
+  const [ingestTrigger, setIngestTrigger] = useState("");
   const [ingestContent, setIngestContent] = useState("");
   const [ingesting, setIngesting] = useState(false);
 
@@ -74,6 +75,13 @@ export default function KnowledgePage() {
 
   // Delete state
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Edit modal state
+  const [editSource, setEditSource] = useState<KBSource | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editTrigger, setEditTrigger] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -147,8 +155,9 @@ export default function KnowledgePage() {
     if (!ingestName.trim() || !ingestContent.trim()) return;
     setIngesting(true);
     try {
-      await api.kbIngest(ingestName, ingestContent);
+      await api.kbIngest(ingestName, ingestContent, ingestTrigger || undefined);
       setIngestName("");
+      setIngestTrigger("");
       setIngestContent("");
       refresh();
     } catch (e) { showToast(e instanceof Error ? e.message : "写入失败", "error"); }
@@ -162,6 +171,25 @@ export default function KnowledgePage() {
       setSources((prev) => prev.filter((s) => s.id !== id));
     } catch (e) { showToast(e instanceof Error ? e.message : "删除失败", "error"); }
     setDeleting(null);
+  };
+
+  const openEdit = (s: KBSource) => {
+    setEditSource(s);
+    setEditName(s.name);
+    setEditTrigger(s.trigger || "");
+    setEditContent("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editSource || !editName.trim()) return;
+    setSaving(true);
+    try {
+      await api.kbUpdate(editSource.id, editName, editTrigger, editContent);
+      showToast("知识已更新", "success");
+      setEditSource(null);
+      refresh();
+    } catch (e) { showToast(e instanceof Error ? e.message : "保存失败", "error"); }
+    setSaving(false);
   };
 
   // Derived data
@@ -348,7 +376,14 @@ export default function KnowledgePage() {
             <input
               value={ingestName}
               onChange={(e) => setIngestName(e.target.value)}
-              placeholder="文档名称, 如 meeting-notes.md"
+              placeholder="知识名称"
+              className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
+              style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
+            />
+            <input
+              value={ingestTrigger}
+              onChange={(e) => setIngestTrigger(e.target.value)}
+              placeholder="使用时机（可选）, 如 当需要设计或排版时"
               className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none"
               style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
             />
@@ -471,22 +506,30 @@ export default function KnowledgePage() {
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <Chip style={{ background: "rgba(0,111,238,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{s.chunk_count} 片段</Chip>
                       <Chip style={{ background: "rgba(0,111,238,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{s.type}</Chip>
+                      {s.trigger && <Chip style={{ background: "rgba(34,197,94,0.08)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>{s.trigger}</Chip>}
                       {s.added_at && (
                         <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{new Date(s.added_at).toLocaleDateString()}</span>
                       )}
                     </div>
                   </div>
-                  <Tooltip delay={0}>
-                    <Button
-                      isIconOnly variant="ghost" size="sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      isPending={deleting === s.id}
-                      onPress={() => handleDelete(s.id)}
-                    >
-                      <Trash2 size={13} style={{ color: "#ef4444" }} />
-                    </Button>
-                    <Tooltip.Content>删除</Tooltip.Content>
-                  </Tooltip>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Tooltip delay={0}>
+                      <Button isIconOnly variant="ghost" size="sm" onPress={() => openEdit(s)}>
+                        <Pencil size={13} style={{ color: "var(--yunque-accent)" }} />
+                      </Button>
+                      <Tooltip.Content>编辑</Tooltip.Content>
+                    </Tooltip>
+                    <Tooltip delay={0}>
+                      <Button
+                        isIconOnly variant="ghost" size="sm"
+                        isPending={deleting === s.id}
+                        onPress={() => handleDelete(s.id)}
+                      >
+                        <Trash2 size={13} style={{ color: "#ef4444" }} />
+                      </Button>
+                      <Tooltip.Content>删除</Tooltip.Content>
+                    </Tooltip>
+                  </div>
                 </Card.Content>
               </Card>
             );
@@ -498,6 +541,42 @@ export default function KnowledgePage() {
           )}
         </div>
       </div>
+
+      {/* Edit Knowledge Modal */}
+      {editSource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }} onClick={() => setEditSource(null)}>
+          <div className="w-[480px] max-h-[80vh] rounded-2xl p-6 space-y-4 animate-scale-in" style={{ background: "var(--yunque-bg-card)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold">编辑知识</h3>
+              <Button isIconOnly variant="ghost" size="sm" onPress={() => setEditSource(null)}><X size={16} /></Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: "var(--yunque-text-secondary)" }}>名称</label>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: "var(--yunque-text-secondary)" }}>使用时机</label>
+                <input value={editTrigger} onChange={(e) => setEditTrigger(e.target.value)} placeholder="何时调取这条知识" className="w-full px-3 py-2 rounded-lg text-sm bg-transparent outline-none" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: "var(--yunque-text-secondary)" }}>内容</label>
+                <div className="relative">
+                  <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="留空则只更新名称和使用时机" rows={6} maxLength={2000} className="w-full resize-none px-3 py-2 text-sm rounded-lg outline-none bg-transparent" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }} />
+                  <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{editContent.length} / 2000</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <Button size="sm" variant="ghost" onPress={() => handleDelete(editSource.id).then(() => setEditSource(null))} style={{ color: "#ef4444" }}>删除</Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onPress={() => setEditSource(null)}>取消</Button>
+                <Button size="sm" isPending={saving} onPress={handleSaveEdit} className="btn-accent">保存</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

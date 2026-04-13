@@ -1,12 +1,15 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -67,6 +70,8 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 		return "", nil, err
 	}
 
+	messages = normalizeSystemMessages(messages)
+
 	if c.dialect == DialectAnthropic {
 		reply, calls, err := c.chatWithToolsAnthropic(ctx, messages, tools, temperature)
 		if err == nil {
@@ -95,7 +100,7 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 		"messages":    messages,
 		"temperature": temperature,
 		"tools":       toolDefs,
-		"stream":      false,
+		"stream":      true,
 	}
 	if len(toolChoice) > 0 && toolChoice[0] != "" && toolChoice[0] != ToolChoiceAuto {
 		reqBody["tool_choice"] = toolChoice[0]
@@ -148,6 +153,26 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 			slog.Warn("llm: ChatWithTools non-200", "status", resp.StatusCode, "model", c.model, "body", errDetail)
 
 			if resp.StatusCode == 400 {
+				if strings.Contains(errDetail, "max_prompt_tokens") || strings.Contains(errDetail, "input tokens") || strings.Contains(errDetail, "context_length") || strings.Contains(errDetail, "max_tokens") {
+					if len(messages) > 3 {
+						slog.Warn("llm: token limit exceeded, trimming messages", "model", c.model, "msgs_before", len(messages))
+						keep := len(messages) / 2
+						if keep < 3 {
+							keep = 3
+						}
+						trimmed := make([]Message, 0, keep+1)
+						if messages[0].Role == "system" {
+							trimmed = append(trimmed, messages[0])
+							trimmed = append(trimmed, messages[len(messages)-keep:]...)
+						} else {
+							trimmed = append(trimmed, messages[len(messages)-keep:]...)
+						}
+						messages = trimmed
+						reqBody["messages"] = messages
+						body, _ = json.Marshal(reqBody)
+						continue
+					}
+				}
 				if messagesHaveImages(messages) {
 					slog.Warn("llm: ChatWithTools 400 with images, falling back to text-only", "model", c.model)
 					messages = stripImages(messages)
@@ -155,7 +180,6 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 					body, _ = json.Marshal(reqBody)
 					continue
 				}
-				// Auto-fix: try stripping temperature/response_format and retry once
 				if attempt == 0 {
 					slog.Info("llm: ChatWithTools 400, auto-sanitizing request params", "model", c.model)
 					delete(reqBody, "temperature")
@@ -172,6 +196,35 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 				return "", nil, lastErr
 			}
 			continue
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		if strings.Contains(ct, "text/event-stream") {
+			content, reasoning, calls, err := c.readSSEToolCalls(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			c.breaker.RecordSuccess()
+			if reasoning != "" && opts != nil {
+				if opts.OnReasoning != nil {
+					opts.OnReasoning(reasoning)
+				}
+				if opts.LastReasoningOut != nil {
+					*opts.LastReasoningOut = reasoning
+				}
+			}
+			if len(calls) > 0 {
+				names := make([]string, len(calls))
+				for i, tc := range calls {
+					names[i] = tc.Function.Name
+				}
+				slog.Info("llm: tool_calls returned", "count", len(calls), "tools", names)
+			} else {
+				slog.Info("llm: no tool_calls, text reply", "content_len", len(content), "content_head", truncateStr(content, 120))
+			}
+			return content, calls, nil
 		}
 
 		var result ChatResponseFC
@@ -231,4 +284,87 @@ func truncateStr(s string, maxRunes int) string {
 		return s
 	}
 	return string(r[:maxRunes]) + "..."
+}
+
+type streamToolCallChunk struct {
+	Choices []struct {
+		Delta struct {
+			Role             string `json:"role"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id,omitempty"`
+				Type     string `json:"type,omitempty"`
+				Function struct {
+					Name      string `json:"name,omitempty"`
+					Arguments string `json:"arguments,omitempty"`
+				} `json:"function"`
+			} `json:"tool_calls,omitempty"`
+		} `json:"delta"`
+		FinishReason *string `json:"finish_reason"`
+	} `json:"choices"`
+}
+
+func (c *Client) readSSEToolCalls(body io.Reader) (content string, reasoning string, calls []ToolCall, err error) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var contentBuf, reasonBuf strings.Builder
+	toolMap := make(map[int]*ToolCall)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+		var chunk streamToolCallChunk
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue
+		}
+		for _, choice := range chunk.Choices {
+			contentBuf.WriteString(choice.Delta.Content)
+			reasonBuf.WriteString(choice.Delta.ReasoningContent)
+
+			for _, tc := range choice.Delta.ToolCalls {
+				existing, ok := toolMap[tc.Index]
+				if !ok {
+					existing = &ToolCall{ID: tc.ID, Type: tc.Type}
+					toolMap[tc.Index] = existing
+				}
+				if tc.ID != "" {
+					existing.ID = tc.ID
+				}
+				if tc.Type != "" {
+					existing.Type = tc.Type
+				}
+				if tc.Function.Name != "" {
+					existing.Function.Name = tc.Function.Name
+				}
+				existing.Function.Arguments += tc.Function.Arguments
+			}
+		}
+	}
+
+	if scanErr := scanner.Err(); scanErr != nil {
+		return contentBuf.String(), reasonBuf.String(), nil, fmt.Errorf("sse read: %w", scanErr)
+	}
+
+	if len(toolMap) > 0 {
+		calls = make([]ToolCall, 0, len(toolMap))
+		for i := 0; i < len(toolMap); i++ {
+			if tc, ok := toolMap[i]; ok {
+				if tc.Type == "" {
+					tc.Type = "function"
+				}
+				calls = append(calls, *tc)
+			}
+		}
+	}
+
+	return contentBuf.String(), reasonBuf.String(), calls, nil
 }

@@ -73,7 +73,18 @@ func (p *Plugin) HTTPHandlers() map[string]http.HandlerFunc {
 // Call this after the plugin is registered and the gateway is available.
 func (p *Plugin) StartBridge() {
 	p.bridge = NewBridge(p.app)
+	p.app.Set("airi_plugin", p)
 	go p.bridge.Run()
+}
+
+// Bridge returns the underlying Airi bridge (may be nil if not started).
+func (p *Plugin) Bridge() *Bridge { return p.bridge }
+
+// PushToAiri sends text to the Airi desktop client via the bridge.
+func (p *Plugin) PushToAiri(text string) {
+	if p.bridge != nil {
+		p.bridge.PushTextToAiri(text)
+	}
 }
 
 // StopBridge disconnects the Airi bridge.

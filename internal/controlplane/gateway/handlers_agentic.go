@@ -74,6 +74,8 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		TaskID    string        `json:"task_id"`
 		Platform  string        `json:"platform,omitempty"`
 		Thinking  *bool         `json:"thinking,omitempty"`
+		Mode      string        `json:"mode,omitempty"`
+		AiriMode  bool          `json:"airi_mode,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -183,13 +185,16 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	chatMode := req.Mode == "chat"
+	fastMode := req.Mode == "fast"
+
 	// Emotion analysis — run async so it doesn't block the planner
 	type emotionResult struct {
 		hint *emotion.Result
 	}
 	emotionCh := make(chan emotionResult, 1)
 	emotionFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureEmotion)
-	if g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() && emotionFeatureOK && len(msgs) > 0 {
+	if g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() && emotionFeatureOK && !fastMode && !chatMode && len(msgs) > 0 {
 		lastMsg := msgs[len(msgs)-1]
 		if lastMsg.Role == "user" && lastMsg.Content != "" {
 			go func() {
@@ -217,13 +222,15 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// ── Run planner with StepCallback → SSE ──
 	planReq := planner.PlanRequest{
-		Messages:        msgs,
-		TenantID:        tid,
-		ModelOverride:   routedTier,
-		ClientOverride:  sessionClient,
-		TaskID:          req.TaskID,
-		TaskContext:     taskContext,
-		ThinkingEnabled: req.Thinking,
+		Messages:          msgs,
+		TenantID:          tid,
+		ModelOverride:     routedTier,
+		ClientOverride:    sessionClient,
+		TaskID:            req.TaskID,
+		TaskContext:       taskContext,
+		ThinkingEnabled:   req.Thinking,
+		DisableTools:      chatMode,
+		DisableDelegation: chatMode,
 		StepCallback: func(event observe.AgentEvent) {
 			data, _ := json.Marshal(event)
 			sseEvent(w, flusher, event.QualifiedType(), string(data))
@@ -355,6 +362,17 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		doneData["suggestions"] = suggestions
 	}
 
+	// Airi mode: push reply to desktop pet
+	if req.AiriMode && reply != "" {
+		type airiPusher interface{ PushToAiri(string) }
+		if rawPlugin, ok := g.pluginReg.Get("airi"); ok {
+			if ap, ok := rawPlugin.(airiPusher); ok {
+				ap.PushToAiri(reply)
+				doneData["airi_synced"] = true
+			}
+		}
+	}
+
 	doneBytes, _ := json.Marshal(doneData)
 	sseEvent(w, flusher, "done", string(doneBytes))
 
@@ -370,8 +388,8 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		g.metrics.Cognitive().MemoryIngest.Add(1)
 	}
 
-	// Memory pipeline (async)
-	if g.pipeline != nil && len(req.Messages) > 0 {
+	// Memory pipeline (async) — skipped in fast/chat mode
+	if g.pipeline != nil && !fastMode && !chatMode && len(req.Messages) > 0 {
 		lastUserMsg := ""
 		for i := len(req.Messages) - 1; i >= 0; i-- {
 			if req.Messages[i].Role == "user" {
@@ -408,12 +426,16 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if g.skillGrow != nil && lastUserMsgForHook != "" {
+	if g.skillGrow != nil && !fastMode && !chatMode && lastUserMsgForHook != "" {
 		growMsg := lastUserMsgForHook
+		usedActions := result.SkillsUsed
 		safego.Go("agentic-skill-grow", func() {
 			growCtx, growCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer growCancel()
 			g.skillGrow.Observe(growCtx, growMsg)
+			if len(usedActions) > 0 {
+				g.skillGrow.ObserveActions(growCtx, usedActions)
+			}
 		})
 	}
 	g.InvokeReplyHooks(ctx, channelpkg.Message{ChannelType: "webui", Content: lastUserMsgForHook}, channelpkg.Reply{Content: reply})
@@ -426,7 +448,9 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	observe.EndSpan(traceSpan, nil)
 }
 
-// buildSuggestions generates follow-up suggestions and optional skill-save hint.
+// buildSuggestions generates follow-up suggestions.
+// Prefers LLM-generated suggestions from PlanResult.Suggestions;
+// falls back to rule-based hints if the model didn't provide any.
 func buildSuggestions(result *planner.PlanResult, msgs []llm.Message) []map[string]string {
 	if result == nil {
 		return nil
@@ -440,6 +464,16 @@ func buildSuggestions(result *planner.PlanResult, msgs []llm.Message) []map[stri
 			"label": "将此流程保存为可复用技能",
 			"icon":  "save",
 		})
+	}
+
+	// Use LLM-generated suggestions if available
+	if len(result.Suggestions) > 0 {
+		for _, s := range result.Suggestions {
+			out = append(out, map[string]string{
+				"type": "followup", "label": s,
+			})
+		}
+		return out
 	}
 
 	userMsg := ""

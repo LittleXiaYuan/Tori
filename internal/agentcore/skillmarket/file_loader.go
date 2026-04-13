@@ -80,6 +80,7 @@ func (l *SkillFileLoader) LoadAll() int {
 		return 0
 	}
 
+	current := make(map[string]bool)
 	loaded := 0
 	for _, e := range entries {
 		if !e.IsDir() {
@@ -92,6 +93,7 @@ func (l *SkillFileLoader) LoadAll() int {
 			continue
 		}
 
+		current[e.Name()] = true
 		sk, err := l.loadSkillFromDir(skillDir, e.Name())
 		if err != nil {
 			slog.Error("load skill", "dir", skillDir, "err", err)
@@ -102,6 +104,14 @@ func (l *SkillFileLoader) LoadAll() int {
 		info, _ := os.Stat(skillMDPath)
 		l.loaded[e.Name()] = info.ModTime()
 		loaded++
+	}
+
+	for slug := range l.loaded {
+		if !current[slug] {
+			l.registry.Remove(slug)
+			delete(l.loaded, slug)
+			slog.Info("file-based skill removed (directory deleted)", "slug", slug)
+		}
 	}
 
 	slog.Info("file-based skills loaded", "count", loaded, "dir", l.dir)
