@@ -49,6 +49,13 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		}
 
 		client := p.clientForRequest(req)
+		if steps == 1 {
+			totalChars := 0
+			for _, m := range messages {
+				totalChars += len(m.Content)
+			}
+			slog.Info("planner: prompt stats", "msgs", len(messages), "total_chars", totalChars, "tools", len(tools), "step", steps)
+		}
 		var lastReasoning string
 		opts := &llm.ChatWithToolsOpts{LastReasoningOut: &lastReasoning}
 		reply, toolCalls, err := client.ChatWithToolsEx(ctx, messages, tools, 0.7, opts)
