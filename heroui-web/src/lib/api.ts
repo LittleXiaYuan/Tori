@@ -84,7 +84,7 @@ export const api = {
   version: () => fetcher<VersionInfo>("/v1/version"),
   metrics: () => fetcher<MetricsSnapshot>("/v1/metrics"),
 
-  skills: () => fetcher<{ skills: SkillInfo[]; count: number }>("/v1/skills").then((r) => Array.isArray(r.skills) ? r.skills : []),
+  skills: () => fetcher<{ skills: SkillInfo[]; count: number; categories?: Array<{ id: string; name: string; description: string }> }>("/v1/skills"),
   getDynamicSkills: () => fetcher<{ skills: DynamicSkillDef[] }>("/v1/skills/dynamic").then((r) => Array.isArray(r.skills) ? r.skills : []),
   approveDynamicSkill: (name: string, instruction?: string) =>
     fetcher<{ status: string }>("/v1/skills/approve", { method: "POST", body: JSON.stringify({ name, instruction }) }),

@@ -163,7 +163,7 @@ export default function DashboardPage() {
         api.costSummary().catch(() => null),
         api.systemInfo().catch(() => null),
       ]);
-      setMetrics(m); setVersion(v); setSkills(s); setCostSummary(cost); setSysInfo(sys);
+      setMetrics(m); setVersion(v); setSkills(s.skills || []); setCostSummary(cost); setSysInfo(sys);
     } catch { /* offline */ }
     try {
       const chk = await api.checkSetup();

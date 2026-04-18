@@ -226,6 +226,50 @@ body {
 .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
 .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
 
+@keyframes modelPopFadeIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Simple mode: floating conversation sidebar overlay (Mini Sidebar companion) */
+.conv-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 45;
+  animation: fadeIn 0.18s ease;
+}
+.conv-sidebar-float {
+  position: fixed;
+  left: var(--sidebar-mini-w, 52px);
+  top: 0;
+  bottom: 0;
+  z-index: 46;
+  box-shadow: 8px 0 24px rgba(0,0,0,0.3);
+}
+
+/* Narrow viewport (≤1280px): ComputerPanel becomes a fixed right-side overlay
+   so a three-column layout (main sidebar + conversation list + computer panel)
+   never has to fit onto a laptop screen. */
+.computer-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 45;
+  animation: fadeIn 0.18s ease;
+}
+.computer-panel-overlay {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 46;
+  border-left: 1px solid var(--yunque-border);
+  box-shadow: -12px 0 28px rgba(0,0,0,0.32);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

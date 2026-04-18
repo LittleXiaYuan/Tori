@@ -45,6 +45,15 @@ export interface SkillInfo {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  category?: string;
+  usage_total?: number;
+  success_rate?: number;
+}
+
+export interface SkillCategory {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface DynamicSkillDef {
