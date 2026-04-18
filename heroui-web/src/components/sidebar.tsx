@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Switch, Avatar, Button } from "@heroui/react";
+import { Switch, Avatar, Button, Tooltip } from "@heroui/react";
 import {
   MessageCircle,
   Zap,
@@ -155,7 +155,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale } = useI18n();
-  const [devMode, setDevMode] = useState(false);
+  const [simpleMode, setSimpleMode] = useState(false);
   const [drillId, setDrillId] = useState<string | null>(null);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -165,7 +165,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setDevMode(localStorage.getItem("yunque_lab_mode") === "1");
+      setSimpleMode(localStorage.getItem("yunque_simple_mode") === "1");
     }
   }, []);
 
@@ -204,14 +204,17 @@ export default function Sidebar() {
     }).catch(() => {});
   }, []);
 
-  const toggleDevMode = useCallback((val: boolean) => {
-    setDevMode(val);
+  const toggleSimpleMode = useCallback((val: boolean) => {
+    setSimpleMode(val);
     setDrillId(null);
-    localStorage.setItem("yunque_lab_mode", val ? "1" : "0");
+    localStorage.setItem("yunque_simple_mode", val ? "1" : "0");
+    // StorageEvent doesn't fire in the same tab — broadcast via CustomEvent so
+    // other panels (chat/page.tsx) can react instantly without a page reload.
+    window.dispatchEvent(new CustomEvent("yunque:simple-mode-change", { detail: val }));
   }, []);
 
   const categories = useMemo(() => {
-    const base = devMode ? devCategories : normalCategories;
+    const base = simpleMode ? normalCategories : devCategories;
     if (extItems.length === 0) return base;
     const extCategory: NavCategory = {
       id: "extensions",
@@ -224,7 +227,7 @@ export default function Sidebar() {
     const result = [...base];
     result.splice(settingsIdx >= 0 ? settingsIdx : result.length, 0, extCategory);
     return result;
-  }, [devMode, extItems]);
+  }, [simpleMode, extItems]);
 
   useEffect(() => {
     if (pathname) {
@@ -254,7 +257,7 @@ export default function Sidebar() {
       mobileOpen: zh ? "打开侧边栏" : "Open sidebar",
       mobileClose: zh ? "关闭侧边栏" : "Close sidebar",
       navAria: zh ? "主导航" : "Main navigation",
-      devMode: zh ? "高级功能" : "Advanced features",
+      simpleMode: zh ? "简洁模式" : "Simple mode",
       help: zh ? "帮助" : "Help",
       logout: zh ? "退出" : "Logout",
       language: zh ? "语言" : "Language",
@@ -275,7 +278,46 @@ export default function Sidebar() {
 
       <div className="sidebar-overlay" data-open={mobileOpen || undefined} onClick={() => setMobileOpen(false)} />
 
-      <aside className="sidebar animate-slide-in-left" data-open={mobileOpen || undefined} data-sidebar role="navigation" aria-label={ui.navAria}>
+      <aside className="sidebar animate-slide-in-left" data-open={mobileOpen || undefined} data-simple={simpleMode || undefined} data-sidebar role="navigation" aria-label={ui.navAria}>
+        {/* Mini logo for simple mode */}
+        <div className="sidebar-mini-logo">
+          <Tooltip delay={0}>
+            <Link href="/chat" className="sidebar-mini-icon" data-active={pathname === "/chat" || pathname?.startsWith("/chat/") || undefined}>
+              <Avatar size="sm" style={{ background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))", width: 28, height: 28 }}>
+                <Avatar.Fallback className="text-white text-[8px] font-bold">YQ</Avatar.Fallback>
+              </Avatar>
+            </Link>
+            <Tooltip.Content>云雀 Agent</Tooltip.Content>
+          </Tooltip>
+        </div>
+        {/* Mini nav icons for simple mode */}
+        <div className="sidebar-mini-nav">
+          <Tooltip delay={0}>
+            <Link href="/chat" className="sidebar-mini-icon" data-active={pathname === "/chat" || pathname?.startsWith("/chat/") || undefined}>
+              <MessageCircle size={18} />
+            </Link>
+            <Tooltip.Content>{locale === "zh" ? "对话" : "Chat"}</Tooltip.Content>
+          </Tooltip>
+          <Tooltip delay={0}>
+            <Link href="/missions" className="sidebar-mini-icon" data-active={pathname?.startsWith("/missions") || pathname?.startsWith("/task") || undefined}>
+              <Zap size={18} />
+            </Link>
+            <Tooltip.Content>{locale === "zh" ? "任务" : "Tasks"}</Tooltip.Content>
+          </Tooltip>
+          <Tooltip delay={0}>
+            <Link href="/knowledge" className="sidebar-mini-icon" data-active={pathname?.startsWith("/knowledge") || pathname?.startsWith("/memory") || undefined}>
+              <BookOpen size={18} />
+            </Link>
+            <Tooltip.Content>{locale === "zh" ? "知识" : "Knowledge"}</Tooltip.Content>
+          </Tooltip>
+          <div className="flex-1" />
+          <Tooltip delay={0}>
+            <Link href="/settings" className="sidebar-mini-icon" data-active={pathname?.startsWith("/settings") || undefined}>
+              <Settings size={18} />
+            </Link>
+            <Tooltip.Content>{locale === "zh" ? "设置" : "Settings"}</Tooltip.Content>
+          </Tooltip>
+        </div>
         <div className="sidebar-brand">
           <div className="flex items-center gap-2.5">
             <div className="relative">
@@ -317,7 +359,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div style={{ padding: "0 12px 12px" }}>
+        <div style={{ padding: "0 12px 8px" }}>
           <button
             className="sidebar-search"
             onClick={() => {
@@ -428,37 +470,45 @@ export default function Sidebar() {
         </div>
 
         <div className="sidebar-footer">
-          <div className="flex items-center justify-between gap-2" style={{ padding: "6px 4px" }}>
-            <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--yunque-text-muted)" }}>{ui.devMode}</span>
-            <Switch isSelected={devMode} onChange={() => toggleDevMode(!devMode)}>
-              <Switch.Control><Switch.Thumb /></Switch.Control>
-            </Switch>
-          </div>
-
-          <div className="flex items-center justify-between gap-2" style={{ padding: "6px 4px" }}>
-            <div className="inline-flex items-center gap-2" style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)" }}>
-              <Languages size={14} style={{ opacity: 0.7 }} />
-              <span>{ui.language}</span>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="min-w-0 rounded-lg px-2"
-              onPress={() => setLocale(locale === "zh" ? "en" : "zh")}
-            >
-              {ui.localeLabel}
-            </Button>
-          </div>
-
-          <a href="https://yunque.owo.today/" target="_blank" rel="noopener noreferrer" className="sidebar-footer-btn">
-            <HelpCircle size={14} style={{ opacity: 0.5 }} />
-            <span>{ui.help}</span>
-          </a>
-
-          <button onClick={handleLogout} className="sidebar-footer-btn" type="button">
-            <LogOut size={14} style={{ opacity: 0.5 }} />
-            <span>{ui.logout}</span>
-          </button>
+          {simpleMode ? (
+            <>
+              <Tooltip delay={0}>
+                <button className="sidebar-mini-icon" onClick={() => toggleSimpleMode(false)}>
+                  <LayoutDashboard size={16} />
+                </button>
+                <Tooltip.Content>{locale === "zh" ? "切换完整模式" : "Full mode"}</Tooltip.Content>
+              </Tooltip>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2" style={{ padding: "6px 4px" }}>
+                <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--yunque-text-muted)" }}>{ui.simpleMode}</span>
+                <Switch isSelected={simpleMode} onChange={() => toggleSimpleMode(!simpleMode)}>
+                  <Switch.Control><Switch.Thumb /></Switch.Control>
+                </Switch>
+              </div>
+              <div className="flex items-center gap-1 pt-1" style={{ padding: "4px 2px 0" }}>
+                <Tooltip delay={0}>
+                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => setLocale(locale === "zh" ? "en" : "zh")}>
+                    <Languages size={14} style={{ opacity: 0.6 }} />
+                  </Button>
+                  <Tooltip.Content>{ui.localeLabel}</Tooltip.Content>
+                </Tooltip>
+                <Tooltip delay={0}>
+                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.open("https://yunque.owo.today/", "_blank", "noopener,noreferrer")}>
+                    <HelpCircle size={14} style={{ opacity: 0.6 }} />
+                  </Button>
+                  <Tooltip.Content>{ui.help}</Tooltip.Content>
+                </Tooltip>
+                <Tooltip delay={0}>
+                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={handleLogout}>
+                    <LogOut size={14} style={{ opacity: 0.6 }} />
+                  </Button>
+                  <Tooltip.Content>{ui.logout}</Tooltip.Content>
+                </Tooltip>
+              </div>
+            </>
+          )}
         </div>
       </aside>
     </>

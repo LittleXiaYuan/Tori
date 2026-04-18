@@ -203,7 +203,7 @@ func (g *Gateway) registerTriggerRoutes() {
 
 	// Sandbox
 	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.handleSandboxExec))
-	g.mux.HandleFunc("/v1/sandbox/probe", g.handleSandboxProbe)
+	g.mux.HandleFunc("/v1/sandbox/probe", g.requireAuth(g.handleSandboxProbe))
 	g.mux.HandleFunc("/v1/sandbox/desktop", g.requireAuth(g.handleDesktopCreate))
 	g.mux.HandleFunc("/v1/sandbox/desktop/status", g.requireAuth(g.handleDesktopStatus))
 	g.mux.HandleFunc("/v1/sandbox/desktop/destroy", g.requireAuth(g.handleDesktopDestroy))

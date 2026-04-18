@@ -8,6 +8,7 @@ import {
   PenLine, Sparkles, FileDown, Trash2,
 } from "lucide-react";
 import { getAuthHeaders, getApiKey } from "@/lib/api";
+import { isSafeApiBase } from "@/lib/safe-url";
 
 interface TemplateResult {
   path: string; sections: number; fields: number;
@@ -33,7 +34,19 @@ const PHASES = [
   { key: "build", label: "生成文档", icon: FileDown },
 ];
 
-const BASE = typeof window !== "undefined" ? (localStorage.getItem("yunque_api_base") || window.location.origin) : "";
+// Resolve the API base at module load. We deliberately read localStorage only
+// if the stored value parses as a plain http(s) origin — otherwise we fall
+// back to same-origin. This prevents a user who was tricked into pasting a
+// malicious string into browser devtools from redirecting every future fetch
+// (with the current Bearer token) to an attacker-controlled host.
+function resolveApiBase(): string {
+  if (typeof window === "undefined") return "";
+  const stored = localStorage.getItem("yunque_api_base");
+  if (stored && isSafeApiBase(stored)) return stored;
+  return window.location.origin;
+}
+
+const BASE = resolveApiBase();
 
 export default function PaperPage() {
   const [step, setStep] = useState(0);

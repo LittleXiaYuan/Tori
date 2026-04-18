@@ -3,6 +3,7 @@ package tenant
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"log/slog"
 	"sync"
@@ -126,15 +127,30 @@ func (m *Manager) RegisterWithID(id, name, apiKey string) *Tenant {
 	return t
 }
 
-// ByAPIKey returns the tenant for the given API key, or nil.
+// ByAPIKey returns the tenant for the given API key, or nil. The comparison
+// scans every registered key so that response timing does not leak which keys
+// are currently registered; an attacker who knows the length distribution of
+// our keys would otherwise be able to probe existence by wall-clock timing
+// against the map lookup below.
 func (m *Manager) ByAPIKey(key string) *Tenant {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	tid, ok := m.keys[key]
-	if !ok {
+	if key == "" {
 		return nil
 	}
-	return m.tenants[tid]
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var match string
+	for k, tid := range m.keys {
+		// subtle.ConstantTimeCompare returns 0/1 even for length mismatches
+		// (it enforces equal length first). We pull the tid into a local var
+		// so that the branch-free pattern below does not early-return.
+		if subtle.ConstantTimeCompare([]byte(k), []byte(key)) == 1 {
+			match = tid
+		}
+	}
+	if match == "" {
+		return nil
+	}
+	return m.tenants[match]
 }
 
 // ByID returns the tenant by ID.

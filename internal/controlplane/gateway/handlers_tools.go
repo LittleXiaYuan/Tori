@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,6 +10,13 @@ import (
 
 	"yunque-agent/internal/agentcore/tools"
 )
+
+func truncateCmd(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
 
 var envDenyList = map[string]bool{
 	"PATH": true, "HOME": true, "USER": true, "SHELL": true,
@@ -27,6 +35,19 @@ func (g *Gateway) handleToolExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ENABLE_TOOLS_EXEC on its own is not enough: without a shellPolicy the
+	// request would reach ProcessManager.Exec and be handed to `cmd /c` /
+	// `sh -c`, i.e. an authenticated user would have shell-level RCE against
+	// the agent's host. Require the policy unless the operator explicitly
+	// opts out (typically a single-user desktop build) via
+	// TOOLS_EXEC_ALLOW_UNRESTRICTED=true, which is logged on every call.
+	if g.shellPolicy == nil && !strings.EqualFold(os.Getenv("TOOLS_EXEC_ALLOW_UNRESTRICTED"), "true") {
+		writeJSONStatus(w, http.StatusForbidden, map[string]string{
+			"error": "Shell execution policy is not configured. Configure shellPolicy, or set TOOLS_EXEC_ALLOW_UNRESTRICTED=true to accept the RCE risk.",
+		})
+		return
+	}
+
 	if g.toolsMgr == nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "tools not configured"})
 		return
@@ -36,6 +57,11 @@ func (g *Gateway) handleToolExec(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&opts); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "invalid request"})
 		return
+	}
+	if g.shellPolicy == nil {
+		slog.Warn("tools/exec: unrestricted mode — command forwarded without shell policy",
+			"tenant", tenantFromCtx(r.Context()),
+			"cmd_prefix", truncateCmd(opts.Command, 40))
 	}
 
 	if opts.Cwd != "" {

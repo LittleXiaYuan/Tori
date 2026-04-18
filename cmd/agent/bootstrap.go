@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 
@@ -23,22 +24,44 @@ func loadConfig() *config.Config {
 	}
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
-		slog.Error("invalid configuration", "err", err)
-		os.Exit(1)
+		slog.Warn("configuration issue", "err", err)
+	}
+	if cfg.NeedsSetup() {
+		slog.Warn("LLM configuration incomplete — user must complete setup via web UI")
 	}
 	warnWeakSecrets(&cfg)
 	return &cfg
 }
 
-// warnWeakSecrets emits loud warnings when security-sensitive config values
-// are still set to their example/default placeholders.
+// Known placeholder secrets that must never reach production.
+var weakJWTSecrets = map[string]bool{
+	"":                                     true,
+	"your-jwt-secret-change-in-production": true,
+	"change-me-in-production":              true,
+	"changeme":                             true,
+	"default":                              true,
+	"secret":                               true,
+}
+
+// warnWeakSecrets emits warnings for development and refuses to start under
+// production-like deployments when security-sensitive config values are still
+// set to their example/default placeholders.
+//
+// Production is inferred from YUNQUE_ENV=production or when the agent binds to
+// a non-loopback address without YUNQUE_ALLOW_WEAK_SECRETS=true. Boot-time
+// fail-closed prevents accidental deployment with the default JWT secret from
+// the example compose file, which would allow trivial JWT forgery across all
+// tenants.
 func warnWeakSecrets(cfg *config.Config) {
-	weakJWT := map[string]bool{
-		"":                                    true,
-		"your-jwt-secret-change-in-production": true,
-		"change-me-in-production":              true,
-	}
-	if weakJWT[cfg.JWTSecret] {
+	production := isProductionLike(cfg)
+
+	if weakJWTSecrets[cfg.JWTSecret] {
+		if production {
+			slog.Error("JWT_SECRET is weak or set to a known placeholder — refusing to start. " +
+				"Set JWT_SECRET to a strong random value (e.g. `openssl rand -hex 32`) " +
+				"or set YUNQUE_ALLOW_WEAK_SECRETS=true for explicit development override.")
+			os.Exit(1)
+		}
 		slog.Warn("⚠️  JWT_SECRET is weak or unset — generate a strong random value for production (e.g. openssl rand -hex 32)")
 	}
 
@@ -55,12 +78,43 @@ func warnWeakSecrets(cfg *config.Config) {
 	}
 }
 
-// isListeningLocalhost returns true if the agent is bound to a localhost address.
+// isProductionLike returns true when the process is likely running in
+// production, so fail-closed checks should engage.
+func isProductionLike(cfg *config.Config) bool {
+	if strings.EqualFold(os.Getenv("YUNQUE_ALLOW_WEAK_SECRETS"), "true") {
+		return false
+	}
+	if strings.EqualFold(os.Getenv("YUNQUE_ENV"), "production") {
+		return true
+	}
+	// Binding to a non-loopback interface implies the instance is reachable
+	// off-host, which is a reasonable stand-in for "production-like".
+	return !isListeningLocalhost(cfg)
+}
+
+// isListeningLocalhost returns true only when the agent is bound exclusively
+// to a loopback address. Go's `net.Listen("tcp", ":9090")` listens on all
+// interfaces, so a bare ":port" must be treated as non-loopback.
 func isListeningLocalhost(cfg *config.Config) bool {
-	addr := cfg.Addr
-	return addr == "" || addr == ":8080" || addr == ":9090" ||
-		strings.HasPrefix(addr, "127.0.0.1:") || strings.HasPrefix(addr, "localhost:") ||
-		strings.HasPrefix(addr, "[::1]:")
+	addr := strings.TrimSpace(cfg.Addr)
+	if addr == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // newApp creates and initializes the App container, running all init phases

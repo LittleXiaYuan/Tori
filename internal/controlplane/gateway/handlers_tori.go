@@ -3,13 +3,58 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"yunque-agent/internal/tori"
 )
+
+// validateToriURL rejects operator-supplied Tori URLs that point at local or
+// metadata addresses, which would turn the OAuth binding into an SSRF oracle
+// against the host running the agent.
+//
+// Operators may further tighten the check with TORI_URL_ALLOWLIST (comma or
+// semicolon separated host list, case-insensitive, suffix match). An empty
+// allow-list means "any public host is fine", which mirrors the previous
+// behaviour minus the SSRF cases.
+func validateToriURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid tori_url: %w", err)
+	}
+	if err := validateSSRFTarget(u); err != nil {
+		return "", fmt.Errorf("tori_url rejected: %w", err)
+	}
+	allow := strings.TrimSpace(os.Getenv("TORI_URL_ALLOWLIST"))
+	if allow != "" {
+		host := strings.ToLower(u.Hostname())
+		ok := false
+		for _, entry := range strings.FieldsFunc(allow, func(r rune) bool { return r == ',' || r == ';' }) {
+			entry = strings.ToLower(strings.TrimSpace(entry))
+			if entry == "" {
+				continue
+			}
+			if host == entry || strings.HasSuffix(host, "."+entry) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return "", fmt.Errorf("tori_url host %q is not in TORI_URL_ALLOWLIST", host)
+		}
+	}
+	return raw, nil
+}
 
 // handleToriBind starts the OAuth2 PKCE flow to bind a Tori account.
 // POST /v1/tori/bind { "tori_url": "https://..." }
@@ -33,6 +78,13 @@ func (g *Gateway) handleToriBind(w http.ResponseWriter, r *http.Request) {
 		ToriURL string `json:"tori_url"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	sanitizedURL, err := validateToriURL(body.ToriURL)
+	if err != nil {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	body.ToriURL = sanitizedURL
 
 	cfg := tori.DefaultOAuthConfig()
 	if body.ToriURL != "" {

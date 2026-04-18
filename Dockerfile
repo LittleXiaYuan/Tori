@@ -6,7 +6,11 @@
 # NOTE: Build context must be the PARENT directory containing both yunque-agent/
 # and ledger/. Run: docker build -f yunque-agent/Dockerfile -t yunque-agent .
 # from the parent directory, or use docker compose which handles this.
-FROM golang:1.25-alpine AS builder
+#
+# SECURITY: for reproducible/audited builds, pin by digest instead of tag, e.g.
+#   FROM golang:1.26.2-alpine@sha256:<digest>
+# Refresh digests with `docker buildx imagetools inspect golang:1.26.2-alpine`.
+FROM golang:1.26.2-alpine AS builder
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 
@@ -27,6 +31,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /agent ./cmd/agent
 
 # ── Stage 2: Runtime (WebUI is embedded in binary, no Node.js needed) ──
+# SECURITY: pin to a digest for production builds (see note above).
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata curl python3
 RUN adduser -D -u 1000 agent

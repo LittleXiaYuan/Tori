@@ -1,0 +1,60 @@
+name: security
+
+# Continuously sweep the repo for new CVEs and regressions on the dependency
+# trees. Runs on every push/PR to main and once a day on schedule so fresh
+# advisories flip the build red without waiting for the next code change.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Go vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: yunque-agent/go.mod
+          check-latest: true
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        working-directory: yunque-agent
+        run: govulncheck ./...
+
+  npm-audit:
+    name: Frontend npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: yunque-agent/heroui-web/package-lock.json
+      - name: Install deps
+        working-directory: yunque-agent/heroui-web
+        run: npm ci --prefer-offline --no-audit
+      - name: npm audit (production)
+        working-directory: yunque-agent/heroui-web
+        run: npm audit --omit=dev --audit-level=high
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

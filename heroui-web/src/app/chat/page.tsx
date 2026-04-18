@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useReducer, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useReducer, useRef, useCallback, useEffect, useMemo, type Dispatch } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Avatar, Spinner, Tooltip, Chip, Dropdown, Label, Popover } from "@heroui/react";
 import {
   Send, Plus, MessageCircle, Zap, BookOpen, ScanFace, Package,
@@ -24,8 +25,34 @@ import { SkillGrowthPanel } from "@/components/skill-growth-panel";
 import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
+import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
+import { SimpleChatView } from "@/components/simple-chat-view";
+import "../simple-chat.css";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
+import { openExternal } from "@/lib/safe-url";
 import { browserActionLabel, browserActionPhase } from "@/lib/browser-action-labels";
+
+function ThinkingTimer({ startMs, endMs, isStreaming }: { startMs?: number; endMs?: number; isStreaming: boolean }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!startMs) return;
+    if (endMs) {
+      setElapsed((endMs - startMs) / 1000);
+      return;
+    }
+    if (!isStreaming) return;
+    const tick = () => setElapsed((Date.now() - startMs) / 1000);
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [startMs, endMs, isStreaming]);
+  if (!startMs || elapsed <= 0) return null;
+  return (
+    <span style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>
+      （用时 {elapsed.toFixed(1)} 秒）
+    </span>
+  );
+}
 
 interface Suggestion {
   type: "followup" | "save_skill";
@@ -53,6 +80,8 @@ interface Message {
   suggestions?: Suggestion[];
   images?: string[];
   reasoning?: string;
+  reasoningStartMs?: number;
+  reasoningEndMs?: number;
   browserSummary?: BrowserActionArtifactSummary;
   browserRequirement?: BrowserRequirement;
   skillSuggestions?: SkillGrowthSuggestion[];
@@ -355,6 +384,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const msgs = [...state.messages];
       if (msgs.length === 0) return state;
       const last = { ...msgs[msgs.length - 1] };
+      if (!last.reasoning) last.reasoningStartMs = Date.now();
       last.reasoning = (last.reasoning || "") + action.delta;
       msgs[msgs.length - 1] = last;
       return { ...state, messages: msgs };
@@ -370,8 +400,17 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { ...state, messages: state.messages.filter((m) => m.id !== action.id) };
     case "START_SEND":
       return { ...state, input: "", loading: true, streaming: true, liveTraceEvents: [] };
-    case "FINISH_SEND":
-      return { ...state, loading: false, streaming: false };
+    case "FINISH_SEND": {
+      const finMsgs = [...state.messages];
+      if (finMsgs.length > 0) {
+        const last = { ...finMsgs[finMsgs.length - 1] };
+        if (last.reasoning && last.reasoningStartMs && !last.reasoningEndMs) {
+          last.reasoningEndMs = Date.now();
+          finMsgs[finMsgs.length - 1] = last;
+        }
+      }
+      return { ...state, messages: finMsgs, loading: false, streaming: false };
+    }
     case "ADD_LIVE_TRACE":
       return { ...state, liveTraceEvents: [...state.liveTraceEvents.slice(-50), action.event] };
     case "CLEAR_LIVE_TRACE":
@@ -437,11 +476,16 @@ function convReducer(state: ConvState, action: ConvAction): ConvState {
 }
 
 export default function ChatPage() {
+  const router = useRouter();
   const [chat, chatD] = useReducer(chatReducer, chatInit);
   const [conv, convD] = useReducer(convReducer, convInit);
   const [thinkingLevel, setThinkingLevel] = useState<"none" | "auto" | "deep">("auto");
   const [copiedIdx, setCopiedIdx] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(() => {
+    if (typeof window === "undefined") return true;
+    if (localStorage.getItem("yunque_simple_mode") === "1") return false;
+    return window.innerWidth >= 1024;
+  });
   const [showComputer, setShowComputer] = useState(false);
   const [showConnectors, setShowConnectors] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -454,8 +498,43 @@ export default function ChatPage() {
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [computerWidth, setComputerWidth] = useState(420);
   const resizingRef = useRef(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const [isSimpleMode, setIsSimpleMode] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1280px)");
+    setIsNarrowViewport(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsNarrowViewport(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Narrow viewports can't comfortably fit sidebar + chat + computer panel at
+  // once. When the computer panel opens on a ≤1280px screen, auto-collapse the
+  // conversation sidebar so the chat area keeps breathing room.
+  useEffect(() => {
+    if (isNarrowViewport && showComputer) setShowSidebar(false);
+  }, [isNarrowViewport, showComputer]);
+
+  useEffect(() => {
+    setIsSimpleMode(localStorage.getItem("yunque_simple_mode") === "1");
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "yunque_simple_mode") setIsSimpleMode(e.newValue === "1");
+    };
+    const onLocalChange = (e: Event) => {
+      const detail = (e as CustomEvent<boolean>).detail;
+      setIsSimpleMode(typeof detail === "boolean" ? detail : localStorage.getItem("yunque_simple_mode") === "1");
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("yunque:simple-mode-change", onLocalChange);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("yunque:simple-mode-change", onLocalChange);
+    };
+  }, []);
   const [currentModel, setCurrentModel] = useState("");
-  const [availableModels, setAvailableModels] = useState<Array<{ id: string; model: string; display_name?: string; enabled: boolean }>>([]);
+  const [currentModelId, setCurrentModelId] = useState("");
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [ttsPlaying, setTtsPlaying] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [presets, setPresets] = useState<PresetInfo[]>([]);
@@ -473,7 +552,7 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   useEffect(() => {
-    api.skills().then((list) => setHeroSkills(list.slice(0, 4))).catch(() => {});
+    api.skills().then((res) => setHeroSkills((res.skills || []).slice(0, 4))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -494,10 +573,15 @@ export default function ChatPage() {
   useEffect(() => {
     api.providerList().then((data) => {
       const providers = data.providers || [];
-      setAvailableModels(providers.filter(p => p.type === "chat").map(p => ({ id: p.id, model: p.model, display_name: p.display_name, enabled: p.enabled })));
+      setAvailableModels(providers.filter(p => p.type === "chat").map(p => ({
+        id: p.id, model: p.model, display_name: p.display_name, enabled: p.enabled,
+        type: p.id.split("-")[0] || p.id,
+        tier: p.tier, capabilities: p.capabilities,
+      })));
       const primary = providers.find(p => p.enabled);
       if (primary) {
         setCurrentModel(primary.model || primary.display_name || primary.id);
+        setCurrentModelId(primary.id);
       }
     }).catch(() => {});
   }, []);
@@ -524,13 +608,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     api.checkSetup().then((chk) => {
-      if (chk.setup_needed) {
-        const skipped = sessionStorage.getItem("yunque_setup_skipped");
-        if (!skipped) {
-          window.location.href = "/settings/providers";
-          return;
-        }
-      }
       setSetupNeeded(chk.setup_needed);
     }).catch(() => {});
   }, []);
@@ -743,6 +820,12 @@ export default function ChatPage() {
     } catch (e) { showToast(e instanceof Error ? e.message : "Failed to switch preset.", "error"); }
   }, []);
 
+  const newConversation = useCallback(() => {
+    convD({ type: "SET_ACTIVE", id: "new-" + Date.now() });
+    chatD({ type: "SET_MESSAGES", messages: [] });
+    chatD({ type: "CLEAR_LIVE_TRACE" });
+  }, []);
+
   // Delete conversation
   const deleteConversation = useCallback(async (convId: string) => {
     try {
@@ -880,6 +963,11 @@ ${text.slice(0, 4000)}` });
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText || chat.input).trim();
     if (!text || chat.loading) return;
+    if (setupNeeded) {
+      showToast("请先在设置中配置模型提供商 API Key", "warning");
+      router.push("/settings/providers");
+      return;
+    }
     const slashBrowserCommand = parseSlashBrowserCommand(text);
     if (slashBrowserCommand) {
       setSuggestedTab("browser");
@@ -1037,11 +1125,18 @@ ${text.slice(0, 4000)}` });
       const IDLE_TIMEOUT = 180_000;
 
       while (!streamFinished) {
-        const timeout = new Promise<{ done: true; value: undefined }>((resolve) =>
-          setTimeout(() => resolve({ done: true, value: undefined }), IDLE_TIMEOUT),
-        );
+        let timerId: ReturnType<typeof setTimeout> | null = null;
+        const timeout = new Promise<{ done: true; value: undefined }>((resolve) => {
+          timerId = setTimeout(() => resolve({ done: true, value: undefined }), IDLE_TIMEOUT);
+        });
         const { done, value } = await Promise.race([reader.read(), timeout]);
-        if (done || abort.signal.aborted) break;
+        if (timerId) clearTimeout(timerId);
+        if (done || abort.signal.aborted) {
+          if (!abort.signal.aborted) {
+            try { await reader.cancel(); } catch { /* stream already closed */ }
+          }
+          break;
+        }
         buf += decoder.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() || "";
@@ -1277,11 +1372,59 @@ ${text.slice(0, 4000)}` });
     { key: "deep" as const, label: "深度", icon: <Brain size={12} /> },
   ] as const;
 
+  // ═══════════════════════════════════════════════════════
+  // Simple Mode — Completely different Cherry Studio-like UI
+  // ═══════════════════════════════════════════════════════
+  if (isSimpleMode) {
+    return (
+      <SimpleChatView
+        chat={chat}
+        chatDispatch={chatD as Dispatch<{ type: string; value?: string }>}
+        conversations={filteredConversations.map(c => ({
+          id: c.id,
+          title: c.name || c.id,
+          updatedAt: c.updated_at,
+          pinned: c.pinned,
+          archived: !!c.archived_at,
+        }))}
+        activeConvId={conv.activeId}
+        onSelectConv={switchConversation}
+        onNewConversation={newConversation}
+        onDeleteConversation={deleteConversation}
+        onSend={sendMessage}
+        scrollRef={scrollRef}
+        inputRef={inputRef}
+        availableModels={availableModels}
+        currentModel={currentModel}
+        currentModelId={currentModelId}
+        onSelectModel={(m) => {
+          setCurrentModel(m.model || m.display_name || m.id);
+          setCurrentModelId(m.id);
+          api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
+        }}
+        chatMode={chatMode}
+        onModeChange={(mode) => {
+          setChatMode(mode);
+          if (mode === "chat" && airiAvailable) setAiriMode(true);
+          else setAiriMode(false);
+        }}
+        airiAvailable={airiAvailable}
+        setupNeeded={setupNeeded}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
-      {/* Conversation Sidebar */}
+      {/* Conversation Sidebar — overlay in simple mode */}
+      {isSimpleMode && showSidebar && (
+        <div className="conv-sidebar-overlay" onClick={() => setShowSidebar(false)} />
+      )}
       {showSidebar && (
-        <div className="w-[228px] xl:w-[244px] flex flex-col h-full shrink-0 animate-slide-in-left" style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)" }}>
+        <div
+          className={`flex flex-col h-full animate-slide-in-left ${isSimpleMode ? "conv-sidebar-float w-[280px]" : "w-[228px] xl:w-[244px] shrink-0"}`}
+          style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)", transition: "width 0.2s ease" }}
+        >
           {/* Sidebar Header */}
           <div className="p-2.5 space-y-2">
             <div className="flex items-center justify-between px-1 pt-0.5">
@@ -1292,7 +1435,7 @@ ${text.slice(0, 4000)}` });
             <Button
               className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
               size="sm"
-              onPress={() => { convD({ type: "SET_ACTIVE", id: "new-" + Date.now() }); chatD({ type: "SET_MESSAGES", messages: [] }); chatD({ type: "CLEAR_LIVE_TRACE" }); }}
+              onPress={newConversation}
             >
               <Plus size={14} /> 新对话
             </Button>
@@ -1336,7 +1479,7 @@ ${text.slice(0, 4000)}` });
           </div>
 
           {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-2 pb-2" style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
             <div className="px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: "var(--yunque-text-muted)" }}>
               {conv.showArchived ? "归档对话" : "最近对话"} ({filteredConversations.length})
             </div>
@@ -1418,7 +1561,10 @@ ${text.slice(0, 4000)}` });
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="flex items-center justify-between px-4 py-3 shrink-0 xl:px-5" style={{ borderBottom: "1px solid var(--yunque-border)", background: "var(--yunque-sidebar)" }}>
+        <header
+          className={`flex items-center justify-between shrink-0 ${isSimpleMode ? "px-4 py-2" : "px-4 py-3 xl:px-5"}`}
+          style={{ borderBottom: "1px solid var(--yunque-border)", background: "var(--yunque-sidebar)" }}
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
@@ -1428,50 +1574,29 @@ ${text.slice(0, 4000)}` });
               <MessageCircle size={16} />
             </button>
 
-            <div className="hidden lg:flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.035)", color: "var(--yunque-text-secondary)" }}>
-                <Sparkles size={11} />
-                <span>工作台模式</span>
-              </div>
-            </div>
-
-            {/* Model Selector */}
-            {currentModel && (
-              availableModels.length > 1 ? (
-                <Dropdown>
-                  <Button variant="ghost" size="sm" className="h-8 gap-1 rounded-full px-2.5 text-[11px] font-mono"
-                    style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
-                    <Cpu size={12} />
-                    {currentModel.length > 25 ? `${currentModel.slice(0, 25)}…` : currentModel}
-                    <ChevronDown size={10} style={{ color: "var(--yunque-text-muted)" }} />
-                  </Button>
-                  <Dropdown.Popover className="min-w-[200px]">
-                    <Dropdown.Menu onAction={(key) => {
-                      const target = availableModels.find(m => m.id === key);
-                      if (target) {
-                        setCurrentModel(target.model || target.display_name || target.id);
-                        api.providerSessionOverride(target.id, conv.activeId || "default").catch(() => {});
-                      }
-                    }}>
-                      {availableModels.filter(m => m.enabled).map(m => (
-                        <Dropdown.Item key={m.id} id={m.id} textValue={m.model || m.id}>
-                          <Label>{m.display_name || m.model || m.id}</Label>
-                        </Dropdown.Item>
-                      ))}
-                    </Dropdown.Menu>
-                  </Dropdown.Popover>
-                </Dropdown>
-              ) : (
-                <Chip size="sm" variant="soft" className="text-xs font-mono">
-                  {currentModel}
-                </Chip>
-              )
-            )}
+            {/* Model Selector + Mode Switcher */}
+            <ModelSelectorPopup
+              models={availableModels}
+              currentModelId={currentModelId}
+              currentModelLabel={currentModel || "选择模型"}
+              onSelect={(m) => {
+                setCurrentModel(m.model || m.display_name || m.id);
+                setCurrentModelId(m.id);
+                api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
+              }}
+              chatMode={chatMode}
+              onModeChange={(mode) => {
+                setChatMode(mode);
+                if (mode === "chat" && airiAvailable) setAiriMode(true);
+                else setAiriMode(false);
+              }}
+              airiAvailable={airiAvailable}
+            />
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Preset selector */}
-            {presets.length > 0 && (
+            {/* Preset selector — hidden in simple mode */}
+            {!isSimpleMode && presets.length > 0 && (
               <Dropdown>
                 <Button
                   variant="ghost"
@@ -1495,10 +1620,14 @@ ${text.slice(0, 4000)}` });
               </Dropdown>
             )}
 
-            {chat.streaming && (
+            {/* Streaming indicator — compact in simple mode */}
+            {chat.streaming && !isSimpleMode && (
               <Chip className="animate-pulse-dot hidden lg:inline-flex" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
                 <Sparkles size={11} className="mr-1" /> 流式生成中
               </Chip>
+            )}
+            {chat.streaming && isSimpleMode && (
+              <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yunque-accent)" }} />
             )}
 
             {/* Computer panel toggle */}
@@ -1513,52 +1642,41 @@ ${text.slice(0, 4000)}` });
               <Tooltip.Content>{showComputer ? "隐藏计算机面板" : "显示计算机面板"}</Tooltip.Content>
             </Tooltip>
 
-            {/* Thinking level pills */}
-            <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
-              {thinkingOptions.map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setThinkingLevel(key);
-                    setThinkingEnabled(key === "deep" ? true : key === "none" ? false : null);
-                  }}
-                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-                  style={{
-                    background: thinkingLevel === key ? "var(--yunque-accent)" : "transparent",
-                    color: thinkingLevel === key ? "#fff" : "var(--yunque-text-muted)",
-                  }}
+            {/* Thinking level pills — hidden in simple mode (accessible via model selector) */}
+            {!isSimpleMode && (
+              <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                {thinkingOptions.map(({ key, label, icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setThinkingLevel(key);
+                      setThinkingEnabled(key === "deep" ? true : key === "none" ? false : null);
+                    }}
+                    className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
+                    style={{
+                      background: thinkingLevel === key ? "var(--yunque-accent)" : "transparent",
+                      color: thinkingLevel === key ? "#fff" : "var(--yunque-text-muted)",
+                    }}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* New conversation button — simple mode only */}
+            {isSimpleMode && (
+              <Tooltip delay={0}>
+                <Button
+                  isIconOnly variant="ghost" size="sm" className="h-8 w-8 rounded-full"
+                  onPress={newConversation}
+                  style={{ color: "var(--yunque-text-muted)" }}
                 >
-                  {icon} {label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
-              {([
-                { key: "agent" as const, label: "Agent", icon: <Sparkles size={11} /> },
-                { key: "fast" as const, label: "Fast", icon: <Zap size={11} /> },
-                ...(airiAvailable
-                  ? [{ key: "chat" as const, label: "Airi", icon: <Heart size={11} fill={chatMode === "chat" ? "#fff" : "none"} /> }]
-                  : [{ key: "chat" as const, label: "Chat", icon: <MessageCircle size={11} /> }]),
-              ]).map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setChatMode(key);
-                    if (key === "chat" && airiAvailable) setAiriMode(true);
-                    else setAiriMode(false);
-                  }}
-                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-                  style={{
-                    background: chatMode === key
-                      ? (key === "chat" && airiAvailable ? "linear-gradient(135deg, #ec4899, #8b5cf6)" : key === "chat" ? "#22c55e" : key === "fast" ? "#f59e0b" : "var(--yunque-accent)")
-                      : "transparent",
-                    color: chatMode === key ? "#fff" : "var(--yunque-text-muted)",
-                  }}
-                >
-                  {icon} {label}
-                </button>
-              ))}
-            </div>
+                  <Plus size={15} />
+                </Button>
+                <Tooltip.Content>新建对话</Tooltip.Content>
+              </Tooltip>
+            )}
           </div>
         </header>
 
@@ -1632,7 +1750,7 @@ ${text.slice(0, 4000)}` });
         )}
 
         {/* Chat Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar xl:px-6">
+        <div ref={scrollRef} className={`flex-1 overflow-y-auto chat-scroll-area ${isSimpleMode ? "px-6 py-5 xl:px-10" : "px-5 py-4 xl:px-6"}`}>
           {chat.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up">
               {setupNeeded && (
@@ -1699,7 +1817,7 @@ ${text.slice(0, 4000)}` });
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto space-y-5">
+            <div className={`mx-auto ${isSimpleMode ? "max-w-4xl space-y-6" : "max-w-3xl space-y-5"}`}>
               {chat.messages.map((msg, idx) => (
                 <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
@@ -1799,7 +1917,7 @@ ${text.slice(0, 4000)}` });
                         <div className="flex gap-2 flex-wrap mb-2">
                           {msg.images.map((src, i) => (
                             <img key={i} src={src} alt="" className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => window.open(src, "_blank")} />
+                              onClick={() => openExternal(src)} />
                           ))}
                         </div>
                       )}
@@ -1807,9 +1925,13 @@ ${text.slice(0, 4000)}` });
                         <details className="mb-2" open={false} style={{ fontSize: "var(--text-sm)" }}>
                           <summary style={{ cursor: "pointer", color: "var(--yunque-text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
                             <span style={{ fontSize: "var(--text-xs)", background: "rgba(245,158,11,0.12)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4 }}>
-                              {chat.streaming && idx === chat.messages.length - 1 ? "推理中…" : "推理过程"}
+                              {chat.streaming && idx === chat.messages.length - 1 ? "推理中…" : "已深度思考"}
                             </span>
-                            <span style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>（{msg.reasoning.length} 字符）</span>
+                            <ThinkingTimer
+                              startMs={msg.reasoningStartMs}
+                              endMs={msg.reasoningEndMs}
+                              isStreaming={chat.streaming && idx === chat.messages.length - 1}
+                            />
                           </summary>
                           <div style={{ marginTop: 6, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.12)", whiteSpace: "pre-wrap", color: "var(--yunque-text-secondary)", fontSize: "var(--text-xs)", maxHeight: 300, overflow: "auto" }}>
                             {msg.reasoning}
@@ -1947,7 +2069,7 @@ ${text.slice(0, 4000)}` });
                                 size="sm"
                                 variant="ghost"
                                 className="rounded-full px-3"
-                                onPress={() => window.open(msg.browserSummary?.url, "_blank", "noopener,noreferrer")}
+                                onPress={() => openExternal(msg.browserSummary?.url)}
                               >
                                 Open page
                               </Button>
@@ -1977,7 +2099,7 @@ ${text.slice(0, 4000)}` });
                           <Button
                             size="sm"
                             className="w-full mt-1"
-                            onPress={() => window.open(msg.sandbox?.stream_url, "_blank")}
+                            onPress={() => openExternal(msg.sandbox?.stream_url)}
                             style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}
                           >
                             <Monitor size={14} className="mr-2" /> Open Desktop
@@ -2338,29 +2460,46 @@ ${text.slice(0, 4000)}` });
         </div>
       </div>
 
-      {/* Computer Panel (right side) */}
+      {/* Computer Panel — side-by-side on wide screens, fixed overlay on ≤1280px */}
       {showComputer && (
         <>
+          {isNarrowViewport && (
+            <div
+              className="computer-panel-backdrop"
+              onClick={() => setShowComputer(false)}
+              aria-hidden="true"
+            />
+          )}
+          {!isNarrowViewport && (
+            <div
+              className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
+              style={{ background: "var(--yunque-border)" }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                resizingRef.current = true;
+                const startX = e.clientX;
+                const startW = computerWidth;
+                const onMove = (ev: MouseEvent) => {
+                  if (!resizingRef.current) return;
+                  const delta = startX - ev.clientX;
+                  const maxW = Math.min(800, Math.floor(window.innerWidth * 0.4));
+                  setComputerWidth(Math.max(280, Math.min(maxW, startW + delta)));
+                };
+                const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+              }}
+            />
+          )}
           <div
-            className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
-            style={{ background: "var(--yunque-border)" }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              resizingRef.current = true;
-              const startX = e.clientX;
-              const startW = computerWidth;
-              const onMove = (ev: MouseEvent) => {
-                if (!resizingRef.current) return;
-                const delta = startX - ev.clientX;
-                setComputerWidth(Math.max(300, Math.min(800, startW + delta)));
-              };
-              const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-              document.addEventListener("mousemove", onMove);
-              document.addEventListener("mouseup", onUp);
+            className={`flex flex-col h-full animate-slide-in-right overflow-hidden ${isNarrowViewport ? "computer-panel-overlay" : "shrink-0"}`}
+            style={{
+              width: isNarrowViewport
+                ? Math.min(480, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.85 : 360))
+                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.4 : 420)),
+              background: "var(--yunque-sidebar)",
             }}
-          />
-          <div className="shrink-0 flex flex-col h-full animate-slide-in-right overflow-hidden"
-            style={{ width: computerWidth, background: "var(--yunque-sidebar)" }}>
+          >
             <div className="shrink-0 p-3">
               <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
             </div>

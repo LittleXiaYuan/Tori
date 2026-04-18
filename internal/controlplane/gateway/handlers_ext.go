@@ -1,11 +1,20 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/pkg/safego"
@@ -184,13 +193,42 @@ func (g *Gateway) handleConversationManage(w http.ResponseWriter, r *http.Reques
 
 // --- Feishu Webhook ---
 
+// feishuWebhookMaxBody caps the request body at 1 MiB. Feishu events are well
+// below this threshold; anything larger is almost certainly abuse.
+const feishuWebhookMaxBody = 1 << 20
+
+// handleFeishuWebhook is the public callback endpoint invoked by Feishu for
+// URL verification and incoming events. It is deliberately *not* wrapped in
+// requireAuth because Feishu itself authenticates via signature/token, but we
+// enforce that here before any downstream state (planner.Run, LLM calls) is
+// touched. Without this, any network-reachable host could forge events and
+// burn through the agent's LLM quota.
 func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
 		return
 	}
+	// Buffer the body once so we can verify the signature (computed over the
+	// raw bytes) and then decode the JSON.
+	raw, err := io.ReadAll(io.LimitReader(r.Body, feishuWebhookMaxBody+1))
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "read body failed")
+		return
+	}
+	if len(raw) > feishuWebhookMaxBody {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "request body too large")
+		return
+	}
+
+	if err := verifyFeishuRequest(r.Header, raw); err != nil {
+		slog.Warn("feishu webhook rejected", "err", err, "remote", r.RemoteAddr)
+		writeJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})
+		return
+	}
+
 	var body struct {
 		Challenge string `json:"challenge"` // URL verification
+		Token     string `json:"token"`     // Legacy URL-verification token
 		Type      string `json:"type"`
 		Event     struct {
 			Message struct {
@@ -199,11 +237,13 @@ func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"message"`
 		} `json:"event"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&body); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request body")
 		return
 	}
-	// Feishu URL verification
+	// Feishu URL verification (happens once during app setup). The token in
+	// the body must match the configured verification token; we already
+	// compare it in constant time inside verifyFeishuRequest.
 	if body.Challenge != "" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"challenge": body.Challenge})
@@ -232,6 +272,70 @@ func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// verifyFeishuRequest authenticates an incoming Feishu webhook using whichever
+// credentials the operator has configured:
+//   - X-Lark-Signature (HMAC over timestamp + nonce + encrypt_key + body) when
+//     FEISHU_ENCRYPT_KEY is set — this is the documented signed-event scheme.
+//   - A constant-time comparison of the body's `token` field against
+//     FEISHU_VERIFICATION_TOKEN when that env is set.
+//
+// We fail-closed: if neither env is configured the webhook is disabled so a
+// pre-production agent does not silently accept unauthenticated events.
+func verifyFeishuRequest(h http.Header, body []byte) error {
+	encryptKey := strings.TrimSpace(os.Getenv("FEISHU_ENCRYPT_KEY"))
+	verifyToken := strings.TrimSpace(os.Getenv("FEISHU_VERIFICATION_TOKEN"))
+
+	if encryptKey == "" && verifyToken == "" {
+		return fmt.Errorf("feishu webhook not configured (set FEISHU_ENCRYPT_KEY or FEISHU_VERIFICATION_TOKEN)")
+	}
+
+	if encryptKey != "" {
+		sig := h.Get("X-Lark-Signature")
+		ts := h.Get("X-Lark-Request-Timestamp")
+		nonce := h.Get("X-Lark-Request-Nonce")
+		if sig == "" || ts == "" {
+			// If the signature headers are missing we fall through to token
+			// auth below; that mirrors Feishu's own optional signing.
+		} else {
+			tsInt, err := strconv.ParseInt(ts, 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid timestamp header")
+			}
+			if delta := time.Since(time.Unix(tsInt, 0)); delta < -5*time.Minute || delta > 5*time.Minute {
+				return fmt.Errorf("timestamp outside allowed window")
+			}
+			// Feishu signs sha256(timestamp + nonce + encrypt_key + body) and
+			// then base16-encodes the digest. Sorting the three string inputs
+			// is not required; we preserve the documented order.
+			h := sha256.New()
+			_, _ = io.WriteString(h, ts)
+			_, _ = io.WriteString(h, nonce)
+			_, _ = io.WriteString(h, encryptKey)
+			_, _ = h.Write(body)
+			expected := hex.EncodeToString(h.Sum(nil))
+			if subtle.ConstantTimeCompare([]byte(expected), []byte(sig)) != 1 {
+				return fmt.Errorf("signature mismatch")
+			}
+			return nil
+		}
+	}
+
+	if verifyToken == "" {
+		return fmt.Errorf("missing signature headers and no verification token configured")
+	}
+	// Fall back to comparing the body's `token` claim in constant time.
+	var peek struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(body, &peek); err != nil {
+		return fmt.Errorf("invalid json body")
+	}
+	if subtle.ConstantTimeCompare([]byte(peek.Token), []byte(verifyToken)) != 1 {
+		return fmt.Errorf("token mismatch")
+	}
+	return nil
 }
 
 // --- Smart Router API ---

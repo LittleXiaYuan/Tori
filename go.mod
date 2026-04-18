@@ -2,6 +2,8 @@ module yunque-agent
 
 go 1.25.0
 
+toolchain go1.26.2
+
 require (
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/google/uuid v1.6.0

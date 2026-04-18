@@ -30,7 +30,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api-ai.gitcode.com/v1}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-zai-org/GLM-5}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set to a strong random value (e.g. openssl rand -hex 32)}
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-default}
       DEFAULT_API_KEY: ${DEFAULT_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -38,6 +38,7 @@ services:
       FEISHU_APP_ID: ${FEISHU_APP_ID:-}
       FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
       FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      FEISHU_VERIFICATION_TOKEN: ${FEISHU_VERIFICATION_TOKEN:-}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
@@ -55,7 +56,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       OPEN_BROWSER: "false"
       # Multi-model pool (Phase F)
       LLM_FAST_URL: ${LLM_FAST_URL:-}
@@ -101,12 +102,14 @@ services:
     environment:
       POSTGRES_DB: tori
       POSTGRES_USER: tori
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tori_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set to a strong random value}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
+    # Only expose on loopback; containers on the same network reach it via service name.
+    # Override by setting POSTGRES_EXPOSE_HOST=0.0.0.0 for explicit external access.
     ports:
-      - "5432:5432"
+      - "${POSTGRES_EXPOSE_HOST:-127.0.0.1}:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tori"]
       interval: 5s
@@ -135,8 +138,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api-ai.gitcode.com/v1}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-zai-org/GLM-5}
-      DATABASE_URL: postgres://tori:${POSTGRES_PASSWORD:-tori_secret}@postgres:5432/tori?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_URL: postgres://tori:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/tori?sslmode=${POSTGRES_SSLMODE:-require}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set to a strong random value (e.g. openssl rand -hex 32)}
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-default}
       DEFAULT_API_KEY: ${DEFAULT_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -144,6 +147,7 @@ services:
       FEISHU_APP_ID: ${FEISHU_APP_ID:-}
       FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
       FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      FEISHU_VERIFICATION_TOKEN: ${FEISHU_VERIFICATION_TOKEN:-}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
@@ -161,7 +165,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       OPEN_BROWSER: "false"
       # Multi-model pool (Phase F)
       LLM_FAST_URL: ${LLM_FAST_URL:-}

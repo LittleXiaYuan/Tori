@@ -5,6 +5,8 @@ tori
 tori_*
 /agent
 dist/
+yunque-agent-*
+yunque-agent.exe
 
 # ── Logs & temp files ──
 *.log
@@ -46,6 +48,20 @@ internal/agentcore/task/*/
 # ── Environment (keep .env.example, ignore actual .env) ──
 .env
 !.env.example
+
+# ── Secrets (private keys & certs must never be committed) ──
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+# allow public certificates that intentionally live in the repo
+!**/certs/*-public.pem
+!**/certs/*-public.crt
+id_rsa
+id_ed25519
+*.gpg
+*.asc
 
 # ── Internal dev docs (not for public) ──
 doc/

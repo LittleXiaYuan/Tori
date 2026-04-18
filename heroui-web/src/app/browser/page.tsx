@@ -33,6 +33,7 @@ function ScenarioIcon({ icon }: { icon: string }) {
 import { showToast } from "@/components/toast-provider";
 import { BrowserSessionCard } from "@/components/browser-session-card";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
+import { openExternal } from "@/lib/safe-url";
 import { useI18n } from "@/lib/i18n";
 
 export default function BrowserPage() {
@@ -499,7 +500,7 @@ export default function BrowserPage() {
                   <Monitor size={48} className="mb-4" style={{ color: "var(--yunque-accent)" }} />
                   <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>XFCE 桌面已就绪</div>
                   <div className="mb-6 text-xs" style={{ color: "var(--yunque-text-muted)" }}>点击下方按钮在新标签页中打开远程桌面</div>
-                  <Button size="lg" onPress={() => window.open(desktopSandbox.stream_url, "_blank")} className="btn-accent">
+                  <Button size="lg" onPress={() => openExternal(desktopSandbox.stream_url)} className="btn-accent">
                     <ExternalLink size={16} className="mr-2" /> 打开桌面
                   </Button>
                 </div>

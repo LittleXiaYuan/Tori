@@ -38,14 +38,49 @@ func (g *Gateway) handleSkills(w http.ResponseWriter, r *http.Request) {
 		Name        string         `json:"name"`
 		Description string         `json:"description"`
 		Parameters  map[string]any `json:"parameters"`
+		Category    string         `json:"category,omitempty"`
+		UsageTotal  int64          `json:"usage_total"`
+		SuccessRate float64        `json:"success_rate"`
 	}
-	out := make([]skillInfo, 0)
-	if g.registry != nil {
-		for _, s := range g.registry.All() {
-			out = append(out, skillInfo{Name: s.Name(), Description: s.Description(), Parameters: s.Parameters()})
+	type catInfo struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	usageMap := make(map[string]struct {
+		total       int64
+		successRate float64
+	})
+	if g.metrics != nil {
+		snap := g.metrics.Snapshot()
+		for _, ss := range snap.Skills {
+			usageMap[ss.Name] = struct {
+				total       int64
+				successRate float64
+			}{total: ss.Total, successRate: ss.SuccessRate}
 		}
 	}
-	json.NewEncoder(w).Encode(map[string]any{"skills": out, "count": len(out)})
+
+	out := make([]skillInfo, 0)
+	cats := make([]catInfo, 0)
+	if g.registry != nil {
+		for _, s := range g.registry.All() {
+			u := usageMap[s.Name()]
+			out = append(out, skillInfo{
+				Name:        s.Name(),
+				Description: s.Description(),
+				Parameters:  s.Parameters(),
+				Category:    g.registry.CategoryOf(s.Name()),
+				UsageTotal:  u.total,
+				SuccessRate: u.successRate,
+			})
+		}
+		for _, c := range g.registry.Categories() {
+			cats = append(cats, catInfo{ID: c.ID, Name: c.Name, Description: c.Description})
+		}
+	}
+	json.NewEncoder(w).Encode(map[string]any{"skills": out, "count": len(out), "categories": cats})
 }
 
 func (g *Gateway) handleSkillsDynamicGet(w http.ResponseWriter, r *http.Request) {
@@ -178,11 +213,9 @@ func (g *Gateway) handlePluginToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rebuild skill registry and planner domain prompt from enabled plugins
-	g.registry.Clear()
-	for _, s := range g.pluginReg.AllSkills() {
-		g.registry.Register(s)
-	}
+	// Atomically swap the skill set so in-flight requests never see an empty
+	// registry during the rebuild window.
+	g.registry.ReplaceAll(g.pluginReg.AllSkills())
 	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
 	slog.Info("plugin toggled, skills rebuilt", "plugin", req.Name, "enabled", req.Enabled, "skills", len(g.registry.All()))
 
@@ -434,11 +467,12 @@ func (g *Gateway) handlePluginReload(w http.ResponseWriter, r *http.Request) {
 }
 
 // rebuildSkillsFromPlugins rebuilds the skill registry and planner domain prompt.
+// Uses ReplaceAll for atomicity — the registry is never observably empty, which
+// matters because request handlers iterate All()/Get() concurrently. The
+// skillFileLoader is run after the replace so that file-sourced skills layer
+// on top of plugin-sourced ones via Register().
 func (g *Gateway) rebuildSkillsFromPlugins() {
-	g.registry.Clear()
-	for _, s := range g.pluginReg.AllSkills() {
-		g.registry.Register(s)
-	}
+	g.registry.ReplaceAll(g.pluginReg.AllSkills())
 	if g.skillFileLoader != nil {
 		g.skillFileLoader.LoadAll()
 	}
@@ -515,7 +549,8 @@ func (g *Gateway) handleSandboxProbe(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 		if err == nil {
-			resp, err := http.DefaultClient.Do(req)
+			client := &http.Client{Timeout: 8 * time.Second}
+			resp, err := client.Do(req)
 			if err != nil {
 				result["probe_error"] = err.Error()
 			} else {
@@ -801,14 +836,21 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sb.WriteFile(filename, string(content))
+	// savedPath is kept for server-side consumers (e.g. AnalysisToActions
+	// below) that need the real on-disk location. We deliberately surface
+	// only `relPath` over the wire so authenticated callers do not learn the
+	// agent's host filesystem layout, which would simplify chained attacks
+	// (path traversal crafted against a known sandbox root, social
+	// engineering with a real username in the path, etc.).
 	savedPath := filepath.Join(sb.WorkDir(), filename)
+	relPath := filename
 
 	slog.Info("file uploaded", "tenant", tid, "name", filename, "size", len(content))
 
 	resp := map[string]any{
 		"filename": filename,
 		"size":     len(content),
-		"path":     savedPath,
+		"path":     relPath,
 	}
 
 	snippet := TryParseFile(filename, content)

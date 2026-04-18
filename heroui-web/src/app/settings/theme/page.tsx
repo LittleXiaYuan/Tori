@@ -6,6 +6,7 @@ import {
   Palette, Sun, Moon, Monitor, Upload, Image as ImageIcon,
   Layout, LogIn, Check, X, LayoutDashboard,
 } from "lucide-react";
+import { isSafeAssetURL } from "@/lib/safe-url";
 
 type ColorTheme = "time_monologue" | "deep_sea" | "purple_jade" | "mint_ice" | "sakura_fall" | "gold_sand" | "custom";
 
@@ -162,8 +163,14 @@ export default function ThemeSettingsPage() {
     s.setProperty("--shadow-lg", `0 8px 24px rgba(${sr},${sg},${sb},${shadowAlpha})`);
     s.setProperty("--shadow-card", `0 1px 3px rgba(${sr},${sg},${sb},${shadowAlpha})`);
 
-    if (cfg.interfaceBgImage) {
-      document.body.style.backgroundImage = `url(${cfg.interfaceBgImage})`;
+    // Background image and favicon come from user-controlled localStorage and
+    // end up in `url(...)` / `<link href>`. Limiting to https:// and
+    // data:image/* prevents abuse of plain-http resources (leaks referrer on
+    // mixed-content pages) and data:text/html (HTML injection via favicon is
+    // a known browser quirk).
+    const safeBg = cfg.interfaceBgImage && isSafeAssetURL(cfg.interfaceBgImage) ? cfg.interfaceBgImage : null;
+    if (safeBg) {
+      document.body.style.backgroundImage = `url(${CSS.escape(safeBg)})`;
       document.body.style.backgroundSize = "cover";
       document.body.style.backgroundPosition = "center";
       document.body.style.backgroundAttachment = "fixed";
@@ -183,7 +190,7 @@ export default function ThemeSettingsPage() {
       s.removeProperty("--yunque-bg");
     }
 
-    if (cfg.faviconImage) {
+    if (cfg.faviconImage && isSafeAssetURL(cfg.faviconImage)) {
       let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
       if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
       link.href = cfg.faviconImage;

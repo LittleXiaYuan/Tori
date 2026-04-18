@@ -391,6 +391,15 @@ func (g *Gateway) handleKBImportURL(w http.ResponseWriter, r *http.Request) {
 
 // handleKBImportRepo handles importing a local repository or code directory.
 // POST /v1/knowledge/import-repo {"path": "...", "max_files": 200}
+//
+// SECURITY: to prevent arbitrary local-file exfiltration via an authenticated
+// user trivially setting `path` to `/etc` or `C:\Users`, the resolved path
+// must be rooted under one of:
+//   - the configured output dir (`g.outputDir`)
+//   - any directory listed in the `KB_IMPORT_ROOTS` env (`;` or `:` separated)
+//
+// Operators who need wider access can opt in with `KB_IMPORT_ALLOW_ANY=true`,
+// which restores the legacy behaviour and is logged loudly on every request.
 func (g *Gateway) handleKBImportRepo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if g.knowledgeStore == nil {
@@ -405,7 +414,17 @@ func (g *Gateway) handleKBImportRepo(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "path required"})
 		return
 	}
-	src, err := g.knowledgeStore.IngestDirectory(strings.TrimSpace(req.Path), req.MaxFiles)
+	userPath := strings.TrimSpace(req.Path)
+	resolvedPath, err := resolveKBRepoPath(g.outputDir, userPath)
+	if err != nil {
+		slog.Warn("knowledge: import-repo rejected",
+			"tenant", tenantFromCtx(r.Context()),
+			"path", userPath,
+			"err", err)
+		writeJSONStatus(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	src, err := g.knowledgeStore.IngestDirectory(resolvedPath, req.MaxFiles)
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -416,6 +435,79 @@ func (g *Gateway) handleKBImportRepo(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 	json.NewEncoder(w).Encode(map[string]any{"source": src, "stats": g.knowledgeStore.Stats()})
+}
+
+// resolveKBRepoPath validates a user-supplied directory path for KB import.
+// Returns the cleaned absolute path if it falls under an allowed root, or an
+// error otherwise. Symlink escape is prevented by checking the real path of
+// both the candidate and each allowed root.
+func resolveKBRepoPath(outputDir, userPath string) (string, error) {
+	if strings.EqualFold(os.Getenv("KB_IMPORT_ALLOW_ANY"), "true") {
+		slog.Warn("knowledge: KB_IMPORT_ALLOW_ANY=true — arbitrary directory import enabled", "path", userPath)
+		abs, err := filepath.Abs(userPath)
+		if err != nil {
+			return "", fmt.Errorf("invalid path: %w", err)
+		}
+		return abs, nil
+	}
+
+	abs, err := filepath.Abs(userPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+	realCandidate, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		// Surface a generic error rather than a filesystem stat — the caller
+		// only needs to know the path is unusable.
+		return "", fmt.Errorf("path not accessible")
+	}
+
+	roots := collectKBImportRoots(outputDir)
+	if len(roots) == 0 {
+		return "", fmt.Errorf("no KB import roots configured; set KB_IMPORT_ROOTS or configure outputDir")
+	}
+	for _, root := range roots {
+		realRoot, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(realRoot, realCandidate)
+		if err != nil {
+			continue
+		}
+		if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
+			return realCandidate, nil
+		}
+	}
+	return "", fmt.Errorf("path must be inside the configured KB import roots")
+}
+
+// collectKBImportRoots returns the allow-list of root directories for KB
+// repository imports. Empty entries and non-existent directories are silently
+// skipped; the caller is responsible for logging an empty list.
+func collectKBImportRoots(outputDir string) []string {
+	var out []string
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		info, err := os.Stat(p)
+		if err != nil || !info.IsDir() {
+			return
+		}
+		out = append(out, p)
+	}
+	add(outputDir)
+	raw := os.Getenv("KB_IMPORT_ROOTS")
+	if raw != "" {
+		// Split on both `;` (Windows) and `:` (POSIX) so one env works
+		// cross-platform without forcing the operator to escape.
+		for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == ';' || r == ':' }) {
+			add(part)
+		}
+	}
+	return out
 }
 
 // handleKBDelete removes a knowledge source by ID.
@@ -468,23 +560,11 @@ func fetchKnowledgeURLPage(rawURL, fallbackName string) (*knowledgeImportPage, e
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, fmt.Errorf("unsupported url scheme: %s", parsed.Scheme)
 	}
-
-	// SSRF protection: resolve hostname and reject private/loopback IPs
-	hostname := parsed.Hostname()
-	if isPrivateOrLoopback(hostname) {
-		return nil, fmt.Errorf("access to private/loopback addresses is not allowed")
-	}
-	ips, err := net.LookupHost(hostname)
-	if err != nil {
-		return nil, fmt.Errorf("dns resolve failed: %w", err)
-	}
-	for _, ipStr := range ips {
-		if isPrivateOrLoopback(ipStr) {
-			return nil, fmt.Errorf("access to private/loopback addresses is not allowed")
-		}
+	if err := validateSSRFTarget(parsed); err != nil {
+		return nil, err
 	}
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	client := newSSRFSafeClient(20 * time.Second)
 	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err

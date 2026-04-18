@@ -15,14 +15,17 @@ import (
 )
 
 func setupLogging() {
-	// Try primary log in AppData
+	// Logs regularly contain request IDs, tenant IDs, and occasional LLM
+	// prompts/responses that should never be world-readable on shared hosts.
+	// 0o600 aligns with .env permissions; operators mounting the log dir into
+	// an external log aggregator can run that aggregator as the same user.
 	logPath := filepath.Join(appdir.DataDir(), "agent.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		// Fallback: log next to exe
 		if exe, exeErr := os.Executable(); exeErr == nil {
 			fallback := filepath.Join(filepath.Dir(exe), "agent.log")
-			logFile, err = os.OpenFile(fallback, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+			logFile, err = os.OpenFile(fallback, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		}
 	}
 	if err != nil || logFile == nil {
@@ -47,7 +50,7 @@ func main() {
 			slog.Error("FATAL PANIC — process crashing",
 				"panic", r, "stack", stack)
 			// Write to panic.log for post-mortem
-			if f, err := os.OpenFile(appdir.File("panic.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			if f, err := os.OpenFile(appdir.File("panic.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 				entry := fmt.Sprintf(
 					"=== FATAL PANIC at %s ===\npanic: %v\n%s\n\n",
 					time.Now().Format(time.RFC3339), r, stack,

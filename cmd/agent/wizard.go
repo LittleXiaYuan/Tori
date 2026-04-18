@@ -268,5 +268,5 @@ func wizardSaveEnv(values map[string]string) error {
 	lines = append(lines, "# PERSONA_DIR=data/personas")
 	lines = append(lines, "# SEARXNG_URL=http://localhost:8888")
 
-	return os.WriteFile(".env", []byte(strings.Join(lines, "\n")+"\n"), 0644)
+	return os.WriteFile(".env", []byte(strings.Join(lines, "\n")+"\n"), 0o600)
 }

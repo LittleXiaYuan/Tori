@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label, Switch, Tabs } from "@heroui/react";
 import {
   Cpu, Cloud, Zap, Link2, Unlink, RefreshCw, Plus,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
+import { openExternal } from "@/lib/safe-url";
 import { api, type ProviderInfo, type ProviderPreset, type ToriBindingStatus, type ToriHealthStatus, type ToriUsageSummary } from "@/lib/api";
 import { showToast } from "@/components/toast-provider";
 
@@ -75,6 +77,7 @@ function CapBadges({ caps, max = 5 }: { caps?: string[]; max?: number }) {
 }
 
 export default function ProvidersPage() {
+  const router = useRouter();
   const { data, loading, refresh } = useApiData(
     async () => {
       const [providersRes, modeRes, presetsRes, toriRes, execRes] = await Promise.all([
@@ -138,7 +141,7 @@ export default function ProvidersPage() {
     setBinding(true);
     try {
       const res = await api.toriBind(bindUrl.trim());
-      if (res.auth_url) window.open(res.auth_url, "_blank");
+      if (res.auth_url) openExternal(res.auth_url);
       setTimeout(refresh, 3000);
     } catch (e) { showToast(e instanceof Error ? e.message : "绑定失败", "error"); }
     setBinding(false);
@@ -234,7 +237,7 @@ export default function ProvidersPage() {
             <Button
               size="sm"
               variant="outline"
-              onPress={() => { sessionStorage.setItem("yunque_setup_skipped", "1"); window.location.href = "/chat"; }}
+              onPress={() => { sessionStorage.setItem("yunque_setup_skipped", "1"); router.push("/chat"); }}
             >
               跳过，直接聊天
             </Button>

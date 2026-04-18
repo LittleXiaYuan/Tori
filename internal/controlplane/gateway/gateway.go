@@ -403,9 +403,16 @@ func (g *Gateway) checkWSOrigin(r *http.Request) bool {
 	return false
 }
 
+// corsOrigin returns the value to echo in Access-Control-Allow-Origin for the
+// supplied request. An empty allowed-origins list used to default to "*",
+// which is a footgun as soon as the operator adds Cookie-based auth. We now
+// fall back to refusing cross-origin requests (empty string → no CORS header)
+// when no origins are configured, matching "same-origin only" semantics.
+// Operators who explicitly want the old permissive behaviour can set
+// ALLOWED_ORIGINS=* to opt in.
 func (g *Gateway) corsOrigin(origin string) string {
 	if len(g.allowedOrigins) == 0 {
-		return "*"
+		return ""
 	}
 	for _, o := range g.allowedOrigins {
 		if o == "*" {
@@ -414,9 +421,6 @@ func (g *Gateway) corsOrigin(origin string) string {
 		if o == origin {
 			return origin
 		}
-	}
-	if origin == "" {
-		return g.allowedOrigins[0]
 	}
 	return ""
 }
