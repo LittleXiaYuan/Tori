@@ -423,6 +423,10 @@ func safeToolGo(ctx context.Context, timeout time.Duration, fn func(ctx context.
 				slog.Error("planner: tool goroutine panic", "panic", r)
 			}
 		}()
+		if timeout <= 0 {
+			fn(ctx)
+			return
+		}
 		toolCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		fn(toolCtx)

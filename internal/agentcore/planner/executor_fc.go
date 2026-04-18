@@ -105,15 +105,23 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		for i, tc := range toolCalls {
 			idx, tc := i, tc // capture loop vars
 
-			// Handoff delegations need longer timeout (browser ops, code exec, etc.)
+			// Handoff delegations and skill generation need longer timeout
 			timeout := p.toolTimeout
 			if p.handoffReg != nil {
 				if _, isHandoff := p.handoffReg.IsHandoffCall(tc.Function.Name); isHandoff {
 					timeout = 90 * time.Second
 				}
 			}
+			if tc.Function.Name == "generate_skill" {
+				timeout = 10 * time.Minute
+			}
 
-			safeToolGo(ctx, timeout, func(toolCtx context.Context) {
+			toolParentCtx := ctx
+			if tc.Function.Name == "generate_skill" {
+				toolParentCtx = context.Background()
+			}
+
+			safeToolGo(toolParentCtx, timeout, func(toolCtx context.Context) {
 				var args map[string]any
 				json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
@@ -256,6 +264,22 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				req.StepCallback(trEvt)
 			}
 		}
+
+		// If the request context was cancelled (e.g. SSE disconnect) but tool
+		// results are available, return them directly instead of calling the
+		// LLM again (which would fail with "context canceled").
+		if ctx.Err() != nil {
+			var reply string
+			for _, r := range tcResults {
+				if r.err == nil && r.output != "" {
+					reply += r.output + "\n"
+				}
+			}
+			if reply == "" {
+				reply = "任务已执行但连接中断。"
+			}
+			return &PlanResult{Reply: reply, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+		}
 	}
 
 	messages = append(messages, llm.Message{Role: "user", Content: "你已执行了足够多的步骤。请根据以上所有工具结果，直接给出最终回答。"})
@@ -291,10 +315,10 @@ func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool) 
 		catNames = append(catNames, fmt.Sprintf("%s(%d)", c.ID, len(c.SkillNames)))
 	}
 
-	// Delegation mode: planner only sees handoff tools, exec agents handle the rest
+	// Delegation mode: planner only sees handoff tools + direct tools, exec agents handle the rest
 	if !disableDelegation && p.handoffReg != nil && len(p.handoffReg.List()) >= 4 {
 		hdDefs := p.handoffReg.ToolDefinitions()
-		defs := make([]llm.FunctionDef, 0, len(hdDefs))
+		defs := make([]llm.FunctionDef, 0, len(hdDefs)+2)
 		for _, hd := range hdDefs {
 			fn, _ := hd["function"].(map[string]any)
 			if fn == nil {
@@ -305,6 +329,20 @@ func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool) 
 			params, _ := fn["parameters"].(map[string]any)
 			defs = append(defs, llm.FunctionDef{Name: name, Description: desc, Parameters: params})
 		}
+
+		// Expose generate_skill directly in delegation mode so the planner
+		// can create new skills on-demand without sub-agent delegation.
+		directTools := []string{"generate_skill"}
+		for _, toolName := range directTools {
+			if sk, ok := p.registry.Get(toolName); ok {
+				defs = append(defs, llm.FunctionDef{
+					Name:        sk.Name(),
+					Description: sk.Description(),
+					Parameters:  sk.Parameters(),
+				})
+			}
+		}
+
 		slog.Info("buildFunctionDefs", "mode", "delegation", "handoff_tools", len(defs), "total_skills", len(allSkills), "msg_prefix", truncate(userMessage, 50))
 		return defs
 	}
