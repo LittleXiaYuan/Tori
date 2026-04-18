@@ -2,7 +2,9 @@ package skills
 
 import (
 	"context"
+	"sort"
 	"strings"
+	"sync"
 )
 
 // Skill is an atomic capability unit that the planner can invoke.
@@ -42,11 +44,19 @@ type SkillCategory struct {
 }
 
 // Registry holds all registered skills.
+//
+// All public methods are safe for concurrent use. Read paths acquire an
+// RWMutex in read mode; mutations (Register/Remove/Clear/ReplaceAll/
+// DefineCategory/AssignCategory) take the write lock. This prevents the
+// fatal "concurrent map read/write" panic that would otherwise happen when
+// plugin hot-reload (Clear+Register) races with request handlers iterating
+// All()/Get()/HierarchicalDefs().
 type Registry struct {
+	mu         sync.RWMutex
 	skills     map[string]Skill
 	categories map[string]*SkillCategory
 	skillToCat map[string]string
-	version    int // monotonically increasing counter, incremented on Register/Clear
+	version    int // monotonically increasing counter, incremented on any mutation
 }
 
 // NewRegistry creates an empty skill registry.
@@ -58,8 +68,10 @@ func NewRegistry() *Registry {
 	}
 }
 
-// Clear removes all skills from the registry.
+// Clear removes all skills and categories from the registry.
 func (r *Registry) Clear() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.skills = make(map[string]Skill)
 	r.categories = make(map[string]*SkillCategory)
 	r.skillToCat = make(map[string]string)
@@ -68,39 +80,91 @@ func (r *Registry) Clear() {
 
 // Register adds a skill to the registry.
 func (r *Registry) Register(s Skill) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.skills[s.Name()] = s
 	r.version++
 }
 
 // Remove deletes a skill from the registry.
 func (r *Registry) Remove(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	delete(r.skills, name)
+	r.version++
+}
+
+// ReplaceAll atomically swaps the entire skill set. It preserves existing
+// category definitions so that intent-based filtering keeps working across
+// a plugin hot-reload. Used by gateway rebuild paths to avoid the brief
+// empty window between Clear() and a series of Register() calls.
+func (r *Registry) ReplaceAll(skills []Skill) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.skills = make(map[string]Skill, len(skills))
+	for _, s := range skills {
+		if s == nil {
+			continue
+		}
+		r.skills[s.Name()] = s
+	}
+	// Drop stale skill→category mappings that no longer point to a live skill.
+	for name := range r.skillToCat {
+		if _, ok := r.skills[name]; !ok {
+			delete(r.skillToCat, name)
+		}
+	}
+	for _, cat := range r.categories {
+		filtered := cat.SkillNames[:0]
+		for _, n := range cat.SkillNames {
+			if _, ok := r.skills[n]; ok {
+				filtered = append(filtered, n)
+			}
+		}
+		cat.SkillNames = filtered
+	}
 	r.version++
 }
 
 // Version returns a monotonically increasing counter that changes whenever skills are added or removed.
 func (r *Registry) Version() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.version
 }
 
 // Get returns a skill by name.
 func (r *Registry) Get(name string) (Skill, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	s, ok := r.skills[name]
 	return s, ok
 }
 
-// All returns all registered skills.
+// All returns all registered skills sorted alphabetically by name.
 func (r *Registry) All() []Skill {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	out := make([]Skill, 0, len(r.skills))
 	for _, s := range r.skills {
 		out = append(out, s)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
 	return out
+}
+
+// CategoryOf returns the category ID for a skill, or empty if uncategorized.
+func (r *Registry) CategoryOf(skillName string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.skillToCat[skillName]
 }
 
 // Definitions returns tool definitions for the planner prompt.
 func (r *Registry) Definitions() []map[string]any {
-	var defs []map[string]any
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	defs := make([]map[string]any, 0, len(r.skills))
 	for _, s := range r.skills {
 		defs = append(defs, map[string]any{
 			"name":        s.Name(),
@@ -113,14 +177,20 @@ func (r *Registry) Definitions() []map[string]any {
 
 // DefineCategory registers a skill category for hierarchical calling.
 func (r *Registry) DefineCategory(cat SkillCategory) {
-	r.categories[cat.ID] = &cat
-	for _, sn := range cat.SkillNames {
-		r.skillToCat[sn] = cat.ID
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	c := cat
+	r.categories[c.ID] = &c
+	for _, sn := range c.SkillNames {
+		r.skillToCat[sn] = c.ID
 	}
+	r.version++
 }
 
 // AssignCategory puts an existing skill into a category.
 func (r *Registry) AssignCategory(skillName, catID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	cat, ok := r.categories[catID]
 	if !ok {
 		return
@@ -132,24 +202,30 @@ func (r *Registry) AssignCategory(skillName, catID string) {
 	}
 	cat.SkillNames = append(cat.SkillNames, skillName)
 	r.skillToCat[skillName] = catID
+	r.version++
 }
 
-// Categories returns all defined categories.
+// Categories returns all defined categories sorted by ID.
 func (r *Registry) Categories() []*SkillCategory {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	out := make([]*SkillCategory, 0, len(r.categories))
 	for _, c := range r.categories {
 		out = append(out, c)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 
 // CategorySkills returns all skills belonging to a category.
 func (r *Registry) CategorySkills(catID string) []Skill {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	cat, ok := r.categories[catID]
 	if !ok {
 		return nil
 	}
-	var out []Skill
+	out := make([]Skill, 0, len(cat.SkillNames))
 	for _, name := range cat.SkillNames {
 		if s, ok := r.skills[name]; ok {
 			out = append(out, s)
@@ -160,6 +236,8 @@ func (r *Registry) CategorySkills(catID string) []Skill {
 
 // UncategorizedSkills returns skills not assigned to any category.
 func (r *Registry) UncategorizedSkills() []Skill {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	var out []Skill
 	for name, s := range r.skills {
 		if _, ok := r.skillToCat[name]; !ok {
@@ -174,6 +252,8 @@ func (r *Registry) UncategorizedSkills() []Skill {
 // - All uncategorized skills directly
 // This reduces the total tools sent to the LLM.
 func (r *Registry) HierarchicalDefs() []map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	var defs []map[string]any
 
 	for _, cat := range r.categories {
@@ -250,6 +330,8 @@ type SkillScorer struct {
 // ScoreCategories returns a score for each registered category based on the
 // user message. Score = keyword_hits + success_rate_bonus + recency_bonus.
 func (r *Registry) ScoreCategories(message string, scorer *SkillScorer) map[string]float64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	msg := strings.ToLower(message)
 	scores := make(map[string]float64)
 
@@ -304,6 +386,8 @@ func (r *Registry) FilterByIntent(message string) []Skill {
 // FilterByIntentScored is like FilterByIntent but accepts a scorer
 // for Ledger-driven success rate and recency data.
 func (r *Registry) FilterByIntentScored(message string, scorer *SkillScorer) []Skill {
+	// ScoreCategories takes its own RLock; call it before we take ours below to
+	// avoid nested lock acquisition patterns.
 	scores := r.ScoreCategories(message, scorer)
 
 	matchedCats := make(map[string]bool)
@@ -313,18 +397,18 @@ func (r *Registry) FilterByIntentScored(message string, scorer *SkillScorer) []S
 		}
 	}
 
+	if len(matchedCats) == 0 {
+		return r.All()
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	var out []Skill
 	for name, s := range r.skills {
 		catID, inCat := r.skillToCat[name]
-		if !inCat {
-			out = append(out, s)
-		} else if matchedCats[catID] {
+		if !inCat || matchedCats[catID] {
 			out = append(out, s)
 		}
-	}
-
-	if len(matchedCats) == 0 {
-		return r.All()
 	}
 	return out
 }

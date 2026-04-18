@@ -4,21 +4,28 @@ import { useState, useEffect, useCallback } from "react";
 import { api, type SkillInfo, type SkillHubItem, type SkillHubInstalledItem, type DynamicSkillDef } from "@/lib/api";
 import { Card, Button, Spinner, Tabs, Chip, SearchField, Tooltip, Badge } from "@heroui/react";
 import {
-  Package, Download, Trash2, Star, Wrench, Check, RefreshCw, Globe, HardDrive, TrendingUp, GitFork, FolderSearch,
+  Package, Download, Trash2, Star, Wrench, Check, RefreshCw, Globe, HardDrive, TrendingUp, GitFork, FolderSearch, ArrowUpDown,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
 
 type TabKey = "installed" | "market" | "dynamic";
 type HubSource = "" | "clawhub" | "torihub";
+type SortKey = "usage" | "name" | "success";
+
+interface SkillCatInfo { id: string; name: string; description: string }
 
 export default function SkillsPage() {
   const [tab, setTab] = useState<TabKey>("installed");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [skillCategories, setSkillCategories] = useState<SkillCatInfo[]>([]);
   const [hubInstalled, setHubInstalled] = useState<SkillHubInstalledItem[]>([]);
   const [dynamicSkills, setDynamicSkills] = useState<DynamicSkillDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [installedFilter, setInstalledFilter] = useState("");
+  const [installedCatFilter, setInstalledCatFilter] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [results, setResults] = useState<SkillHubItem[]>([]);
   const [allItems, setAllItems] = useState<SkillHubItem[]>([]);
   const [installing, setInstalling] = useState<string | null>(null);
@@ -29,7 +36,10 @@ export default function SkillsPage() {
 
   const refreshInstalled = useCallback(() => {
     return Promise.all([
-      api.skills().then(setSkills).catch(() => {}),
+      api.skills().then((r) => {
+        setSkills(Array.isArray(r.skills) ? r.skills : []);
+        setSkillCategories(Array.isArray(r.categories) ? r.categories : []);
+      }).catch(() => {}),
       api.skillHubInstalled().then((r) => setHubInstalled(Array.isArray(r.skills) ? r.skills : [])).catch(() => {}),
       api.getDynamicSkills().then(setDynamicSkills).catch(() => {}),
     ]);
@@ -149,36 +159,136 @@ export default function SkillsPage() {
         </Tabs.ListContainer>
       </Tabs>
 
-      {tab === "installed" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-children">
-          {skills.map((s) => (
-            <Card key={s.name} className="section-card hover-lift transition-all duration-200">
-              <Card.Header className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wrench size={15} style={{ color: "var(--yunque-accent)" }} />
-                  <span className="font-medium" style={{ fontSize: "var(--text-base)" }}>{s.name}</span>
+      {tab === "installed" && (() => {
+        const lowerFilter = installedFilter.toLowerCase();
+        const filtered = skills
+          .filter((s) => {
+            if (installedCatFilter && (s.category || "") !== installedCatFilter) return false;
+            if (!lowerFilter) return true;
+            return s.name.toLowerCase().includes(lowerFilter) || (s.description || "").toLowerCase().includes(lowerFilter);
+          })
+          .sort((a, b) => {
+            if (sortKey === "usage") {
+              const diff = (b.usage_total || 0) - (a.usage_total || 0);
+              return diff !== 0 ? diff : a.name.localeCompare(b.name);
+            }
+            if (sortKey === "success") {
+              const diff = (b.success_rate || 0) - (a.success_rate || 0);
+              return diff !== 0 ? diff : a.name.localeCompare(b.name);
+            }
+            return a.name.localeCompare(b.name);
+          });
+        const sortOptions: { key: SortKey; label: string }[] = [
+          { key: "usage", label: "使用量" },
+          { key: "success", label: "成功率" },
+          { key: "name", label: "名称" },
+        ];
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <SearchField className="flex-1 min-w-[200px]" name="installed-search" value={installedFilter} onChange={setInstalledFilter}>
+                <SearchField.Group>
+                  <SearchField.SearchIcon />
+                  <SearchField.Input placeholder="搜索已安装技能..." />
+                  <SearchField.ClearButton />
+                </SearchField.Group>
+              </SearchField>
+              <div
+                className="flex gap-1 p-1 rounded-full border shrink-0"
+                style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
+              >
+                <ArrowUpDown size={11} style={{ color: "var(--yunque-text-muted)", margin: "auto 4px" }} />
+                {sortOptions.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSortKey(key)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                    style={{
+                      background: sortKey === key ? "rgba(255,255,255,0.08)" : "transparent",
+                      color: sortKey === key ? "var(--yunque-text)" : "var(--yunque-text-muted)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {skillCategories.length > 0 && (
+                <div
+                  className="flex gap-1 p-1 rounded-full border shrink-0"
+                  style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-card)" }}
+                >
+                  <button
+                    onClick={() => setInstalledCatFilter("")}
+                    className="px-3 py-1 rounded-full text-[11px] font-medium transition-all"
+                    style={{
+                      background: !installedCatFilter ? "rgba(255,255,255,0.08)" : "transparent",
+                      color: !installedCatFilter ? "var(--yunque-text)" : "var(--yunque-text-muted)",
+                    }}
+                  >
+                    全部
+                  </button>
+                  {skillCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setInstalledCatFilter(installedCatFilter === cat.id ? "" : cat.id)}
+                      className="px-3 py-1 rounded-full text-[11px] font-medium transition-all"
+                      style={{
+                        background: installedCatFilter === cat.id ? "rgba(255,255,255,0.08)" : "transparent",
+                        color: installedCatFilter === cat.id ? "var(--yunque-text)" : "var(--yunque-text-muted)",
+                      }}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
-                {hubInstalled.find((h) => h.slug === s.name) && (
-                  <Tooltip delay={0}>
-                    <Button isIconOnly variant="ghost" size="sm" onPress={() => handleUninstall(s.name)}>
-                      <Trash2 size={13} />
-                    </Button>
-                    <Tooltip.Content>卸载</Tooltip.Content>
-                  </Tooltip>
-                )}
-              </Card.Header>
-              <Card.Content className="pt-0 text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-                {s.description || "无描述"}
-              </Card.Content>
-            </Card>
-          ))}
-          {skills.length === 0 && (
-            <div className="col-span-full">
-              <EmptyState icon={<Package size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无已安装技能" description="开始对话后，Agent 会自动创建和积累技能；你也可以在「市场」标签中安装社区技能。" />
+              )}
             </div>
-          )}
-        </div>
-      )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-children">
+              {filtered.map((s) => (
+                <Card key={s.name} className="section-card hover-lift transition-all duration-200">
+                  <Card.Header className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Wrench size={15} style={{ color: "var(--yunque-accent)", flexShrink: 0 }} />
+                      <span className="font-medium truncate" style={{ fontSize: "var(--text-base)" }}>{s.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {s.category && (
+                        <Chip size="sm" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>
+                          {skillCategories.find((c) => c.id === s.category)?.name || s.category}
+                        </Chip>
+                      )}
+                      {hubInstalled.find((h) => h.slug === s.name) && (
+                        <Tooltip delay={0}>
+                          <Button isIconOnly variant="ghost" size="sm" onPress={() => handleUninstall(s.name)}>
+                            <Trash2 size={13} />
+                          </Button>
+                          <Tooltip.Content>卸载</Tooltip.Content>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </Card.Header>
+                  <Card.Content className="pt-0">
+                    <div className="text-sm" style={{ color: "var(--yunque-text-secondary)" }}>{s.description || "无描述"}</div>
+                    {(s.usage_total || 0) > 0 && (
+                      <div className="flex items-center gap-3 mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                        <span>{s.usage_total} 次调用</span>
+                        <span style={{ color: (s.success_rate || 0) >= 0.8 ? "var(--yunque-success)" : (s.success_rate || 0) >= 0.5 ? "var(--yunque-warning)" : "var(--yunque-danger)" }}>
+                          {Math.round((s.success_rate || 0) * 100)}% 成功
+                        </span>
+                      </div>
+                    )}
+                  </Card.Content>
+                </Card>
+              ))}
+              {filtered.length === 0 && (
+                <div className="col-span-full">
+                  <EmptyState icon={<Package size={24} style={{ color: "var(--yunque-accent)" }} />} title={installedFilter || installedCatFilter ? "无匹配技能" : "暂无已安装技能"} description={installedFilter || installedCatFilter ? "尝试调整搜索词或分类筛选" : "开始对话后，Agent 会自动创建和积累技能；你也可以在「市场」标签中安装社区技能。"} />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {tab === "market" && (
         <div className="space-y-4">

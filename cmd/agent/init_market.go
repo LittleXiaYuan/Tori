@@ -69,6 +69,25 @@ func initMarketplace(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) 
 	app.SkillRegistry.Register(&useSkillTool{installer: installer})
 	app.SkillRegistry.Register(&searchSkillsTool{provider: clawHub})
 	app.SkillRegistry.Register(&installSkillTool{installer: installer})
+
+	// Register generate_skill tool for on-demand skill creation.
+	// Skills are saved to data/skills/<slug>/ as SKILL.md + meta.json + scripts.
+	skillsDir := appdir.Sub("skills")
+	var skillFileLoader *skillmarket.SkillFileLoader
+	if sfl, ok := app.Get("skill_file_loader"); ok {
+		skillFileLoader, _ = sfl.(*skillmarket.SkillFileLoader)
+	}
+	genTool := &generateSkillTool{
+		llmCall:  app.LLMBreaker.Call,
+		skillDir: skillsDir,
+		onReload: func() {
+			if skillFileLoader != nil {
+				skillFileLoader.LoadAll()
+			}
+			p.InvalidatePromptCache()
+		},
+	}
+	app.SkillRegistry.Register(genTool)
 	p.InvalidatePromptCache()
 
 	// Autonomous skill growth: search → install → retry on missing skill

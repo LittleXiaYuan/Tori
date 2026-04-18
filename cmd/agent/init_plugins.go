@@ -115,15 +115,19 @@ func initPlugins(app *agentrt.App) error {
 	// Skill registry → populated from all plugin skills; rebuilt on hot-reload
 	app.SkillRegistry = skills.NewRegistry()
 	rebuildSkillRegistry := func() {
-		app.SkillRegistry.Clear()
-		for _, s := range app.PluginReg.AllSkills() {
-			app.SkillRegistry.Register(s)
-		}
-		// Built-in document processing skills
-		app.SkillRegistry.Register(&document.MedicalExcelSplitSkill{})
-		app.SkillRegistry.Register(&document.PythonInterpreterSkill{})
+		// Collect the full baseline skill set first, then swap in one shot so
+		// concurrent request handlers never observe an empty registry during
+		// the rebuild window (plugin hot-reload + ReAct request interleaving
+		// would otherwise panic on concurrent map read/write).
+		baseline := append([]skills.Skill{}, app.PluginReg.AllSkills()...)
+		baseline = append(baseline,
+			&document.MedicalExcelSplitSkill{},
+			&document.PythonInterpreterSkill{},
+		)
+		app.SkillRegistry.ReplaceAll(baseline)
 
-		// Load dynamic skills from disk
+		// Dynamic skills live in a JSON file; loader calls Register() internally,
+		// so it needs to run after ReplaceAll to survive the swap.
 		if err := task.LoadDynamicSkills(app.SkillRegistry, cfg.DataPath("dynamic_skills.json")); err != nil {
 			slog.Warn("failed to load dynamic skills", "err", err)
 		}
