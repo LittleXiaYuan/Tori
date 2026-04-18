@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -115,18 +114,15 @@ func Load() Config {
 	}
 }
 
-// Validate checks required configuration fields.
+// Validate checks configuration fields. Missing LLM settings are no longer
+// fatal — the web UI will prompt users to complete setup.
 func (c Config) Validate() error {
-	if c.LLMBaseURL == "" {
-		return fmt.Errorf("LLM_BASE_URL is required")
-	}
-	if c.LLMAPIKey == "" {
-		return fmt.Errorf("LLM_API_KEY is required")
-	}
-	if c.LLMModel == "" {
-		return fmt.Errorf("LLM_MODEL is required")
-	}
 	return nil
+}
+
+// NeedsSetup returns true when essential LLM configuration is missing.
+func (c Config) NeedsSetup() bool {
+	return c.LLMBaseURL == "" || c.LLMAPIKey == "" || c.LLMModel == ""
 }
 
 // DataPath joins sub-paths to the configured data directory root.
