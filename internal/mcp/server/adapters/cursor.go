@@ -112,7 +112,7 @@ type WindsurfConfig struct {
 func (c *WindsurfConfig) GenerateMCPJSON() (string, error) {
 	serverEntry := map[string]any{
 		"command": "npx",
-		"args":    []string{"yunque-mcp", "-s", c.ServerURL},
+		"args":    []string{"@cloudtori/yunque-bridge", "-s", c.ServerURL},
 	}
 	if c.Token != "" {
 		serverEntry["env"] = map[string]string{

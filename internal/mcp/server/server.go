@@ -113,6 +113,17 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 	}
 }
 
+var supportedVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
+
+func negotiateVersion(clientVersion string) string {
+	for _, v := range supportedVersions {
+		if v <= clientVersion {
+			return v
+		}
+	}
+	return supportedVersions[len(supportedVersions)-1]
+}
+
 func (s *Server) handleInitialize(req jsonRPCRequest) ([]byte, error) {
 	clientVersion := "2024-11-05"
 	if req.Params != nil {
@@ -125,7 +136,7 @@ func (s *Server) handleInitialize(req jsonRPCRequest) ([]byte, error) {
 	}
 
 	result := map[string]any{
-		"protocolVersion": clientVersion,
+		"protocolVersion": negotiateVersion(clientVersion),
 		"capabilities": map[string]any{
 			"tools":     map[string]any{"listChanged": false},
 			"resources": map[string]any{"subscribe": false, "listChanged": false},
