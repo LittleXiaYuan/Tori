@@ -1,0 +1,11 @@
+{
+  "name": "yunque-mcp",
+  "version": "0.1.0",
+  "description": "Yunque MCP Bridge - Connect any MCP-compatible tool to Yunque orchestration",
+  "bin": {
+    "yunque-mcp": "./index.js"
+  },
+  "keywords": ["mcp", "yunque", "ai", "orchestration", "cursor", "claude-code"],
+  "license": "MIT",
+  "type": "module"
+}
