@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * yunque-mcp — stdio MCP bridge to Yunque dispatch server.
+ * @cloudtori/yunque-bridge — stdio MCP bridge to Yunque dispatch server.
  *
  * Usage:
- *   npx yunque-mcp --server http://localhost:8765
+ *   npx @cloudtori/yunque-bridge --server http://localhost:9090
  *
  * This tool acts as a stdio-based MCP proxy: it reads JSON-RPC requests
  * from stdin, forwards them to the Yunque HTTP MCP endpoint, and writes
@@ -25,15 +25,23 @@ for (let i = 0; i < args.length; i++) {
   } else if ((args[i] === "--token" || args[i] === "-t") && args[i + 1]) {
     authToken = args[i + 1];
     i++;
+  } else if (args[i] === "--version" || args[i] === "-v" || args[i] === "-V") {
+    const { readFileSync } = await import("fs");
+    const { fileURLToPath } = await import("url");
+    const { dirname, join } = await import("path");
+    const pkg = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "package.json"), "utf8"));
+    process.stdout.write(`${pkg.version}\n`);
+    process.exit(0);
   } else if (args[i] === "--help" || args[i] === "-h") {
-    process.stderr.write(`yunque-mcp — Yunque MCP Bridge
+    process.stderr.write(`yunque-bridge — Yunque MCP Bridge
 
 Usage:
-  npx yunque-mcp [options]
+  npx @cloudtori/yunque-bridge [options]
 
 Options:
   --server, -s <url>    Yunque server URL
   --token, -t <token>   Auth token for remote servers
+  --version, -v         Show version
   --help, -h            Show this help
 
 Environment Variables:
@@ -46,14 +54,14 @@ The server URL is resolved in this order:
   1. --server flag
   2. YUNQUE_SERVER env var
   3. YUNQUE_MCP_URL env var
-  4. Auto-discover local instance (http://localhost:8765)
+  4. Auto-discover local instance (http://localhost:9090)
 
 MCP Config Examples:
 
   Local:
   {
     "mcpServers": {
-      "yunque": { "command": "npx", "args": ["yunque-mcp"] }
+      "yunque": { "command": "npx", "args": ["@cloudtori/yunque-bridge"] }
     }
   }
 
@@ -62,7 +70,7 @@ MCP Config Examples:
     "mcpServers": {
       "yunque": {
         "command": "npx",
-        "args": ["yunque-mcp", "-s", "http://my-server:8765", "-t", "my-token"]
+        "args": ["@cloudtori/yunque-bridge", "-s", "http://my-server:8765", "-t", "my-token"]
       }
     }
   }
@@ -72,7 +80,7 @@ MCP Config Examples:
     "mcpServers": {
       "yunque": {
         "command": "npx",
-        "args": ["yunque-mcp"],
+        "args": ["@cloudtori/yunque-bridge"],
         "env": { "YUNQUE_SERVER": "http://my-server:8765", "YUNQUE_TOKEN": "xxx" }
       }
     }
@@ -91,26 +99,26 @@ if (serverUrl) {
   serverUrl = await autoDiscover();
 }
 
-process.stderr.write(`[yunque-mcp] server: ${serverUrl}\n`);
-if (authToken) process.stderr.write(`[yunque-mcp] auth: token configured\n`);
+process.stderr.write(`[yunque-bridge] server: ${serverUrl}\n`);
+if (authToken) process.stderr.write(`[yunque-bridge] auth: token configured\n`);
 
 async function autoDiscover() {
   const candidates = [
+    "http://localhost:9090/mcp/v1",
+    "http://127.0.0.1:9090/mcp/v1",
     "http://localhost:8765/mcp/v1",
-    "http://127.0.0.1:8765/mcp/v1",
-    "http://localhost:3000/mcp/v1",
   ];
   for (const url of candidates) {
     try {
       const res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(2000) });
       if (res.ok) {
-        process.stderr.write(`[yunque-mcp] auto-discovered: ${url}\n`);
+        process.stderr.write(`[yunque-bridge] auto-discovered: ${url}\n`);
         return url;
       }
     } catch { /* try next */ }
   }
-  process.stderr.write(`[yunque-mcp] no local instance found, using default\n`);
-  return "http://localhost:8765/mcp/v1";
+  process.stderr.write(`[yunque-bridge] no local instance found, using default\n`);
+  return "http://localhost:9090/mcp/v1";
 }
 
 const rl = createInterface({ input: process.stdin, terminal: false });
@@ -137,7 +145,7 @@ rl.on("line", async (line) => {
 });
 
 rl.on("close", () => {
-  process.stderr.write("[yunque-mcp] stdin closed, exiting\n");
+  process.stderr.write("[yunque-bridge] stdin closed, exiting\n");
   process.exit(0);
 });
 
