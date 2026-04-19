@@ -25,7 +25,7 @@ import type {
   GraphEntity, GraphRelation, GraphStats, MemorySearchResult,
   SystemInfo, CacheStats, RouterStats, PersonaMode, SearchResult,
   FederationPeer, FederationStats, ProviderPreset, ToriBindingStatus, ToriHealthStatus, ToriUsageSummary, SkillSuggestion, SyncManifestItem,
-  ConnectorView, ConnectorDef, NotifyChannel, WorkerInfo,
+  ConnectorView, ConnectorDef, NotifyChannel, WorkerInfo, ProjectInfo,
 } from "./api-types";
 
 export type * from "./api-types";
@@ -1124,6 +1124,18 @@ export const api = {
     fetcher<{ status: string }>("/v1/workers/remove", { method: "POST", body: JSON.stringify({ id }) }),
   getWorkerConfig: (type: string) =>
     fetcher<{ type: string; mcp_config: string; instructions: string; server_url: string }>(`/v1/workers/config?type=${encodeURIComponent(type)}`),
+
+  // Projects (Orchestrator)
+  listProjects: () =>
+    fetcher<{ projects: ProjectInfo[] }>("/v1/projects"),
+  createProject: (data: { name: string; repo_path: string; repo_url?: string; description?: string; default_caps?: string[] }) =>
+    fetcher<ProjectInfo>("/v1/projects", { method: "POST", body: JSON.stringify(data) }),
+  getProject: (id: string) =>
+    fetcher<ProjectInfo>(`/v1/projects/detail?id=${encodeURIComponent(id)}`),
+  updateProject: (id: string, data: Record<string, unknown>) =>
+    fetcher<ProjectInfo>(`/v1/projects/detail?id=${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) }),
+  removeProject: (id: string) =>
+    fetcher<{ status: string }>("/v1/projects/remove", { method: "POST", body: JSON.stringify({ id }) }),
 };
 
 // Sticker URL utilities

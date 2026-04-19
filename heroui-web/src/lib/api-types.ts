@@ -1472,3 +1472,15 @@ export interface WorkerInfo {
   last_heartbeat: string;
   metadata?: Record<string, string>;
 }
+
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  repo_path: string;
+  repo_url?: string;
+  description?: string;
+  default_caps?: string[];
+  meta?: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}

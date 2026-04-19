@@ -46,6 +46,7 @@ import {
   FlaskConical,
   PanelLeftClose,
   PanelLeftOpen,
+  FolderGit2,
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
@@ -75,6 +76,7 @@ const categories: NavCategory[] = [
     { href: "/task-run", label: "执行视图", labelEn: "Execution", icon: <Terminal size={16} /> },
     { href: "/workflows", label: "工作流", labelEn: "Workflows", icon: <Blocks size={16} /> },
     { href: "/workers", label: "Worker 管理", labelEn: "Workers", icon: <Cpu size={16} /> },
+    { href: "/projects", label: "项目管理", labelEn: "Projects", icon: <FolderGit2 size={16} /> },
   ]},
   { id: "knowledge", label: "知识", labelEn: "Knowledge", icon: <BookOpen size={16} />, children: [
     { href: "/knowledge", label: "知识库", labelEn: "Knowledge Base", icon: <BookOpen size={16} /> },
