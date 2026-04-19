@@ -71,52 +71,13 @@ export default function ChatPage() {
   const [airiMode, setAiriMode] = useState(false);
   const [airiAvailable, setAiriAvailable] = useState(false);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
-  const [computerWidth, setComputerWidth] = useState(380);
+  const [computerWidth, setComputerWidth] = useState(340);
   const resizingRef = useRef(false);
-  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
-  const isTauri = typeof window !== "undefined" && !!(window as any).__TAURI__;
-  const prevWindowWidthRef = useRef<number | null>(null);
 
+  // Auto-collapse conversation sidebar when computer panel opens to free space
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1024px)");
-    setIsNarrowViewport(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsNarrowViewport(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  useEffect(() => {
-    if (isNarrowViewport && showComputer) setShowSidebar(false);
-  }, [isNarrowViewport, showComputer]);
-
-  useEffect(() => {
-    if (!isTauri) return;
-    const tauri = (window as any).__TAURI__;
-    if (!tauri?.window?.getCurrentWindow) return;
-    const appWindow = tauri.window.getCurrentWindow();
-
-    (async () => {
-      try {
-        if (showComputer) {
-          const factor = await appWindow.scaleFactor();
-          const phys = await appWindow.outerSize();
-          const logicalW = Math.round(phys.width / factor);
-          prevWindowWidthRef.current = logicalW;
-          const panelW = computerWidth;
-          const screen = window.screen;
-          const maxW = screen.availWidth;
-          const newW = Math.min(logicalW + panelW, maxW);
-          await appWindow.setSize({ type: "Logical", width: newW, height: Math.round(phys.height / factor) });
-        } else if (prevWindowWidthRef.current !== null) {
-          const factor = await appWindow.scaleFactor();
-          const phys = await appWindow.outerSize();
-          const h = Math.round(phys.height / factor);
-          await appWindow.setSize({ type: "Logical", width: prevWindowWidthRef.current, height: h });
-          prevWindowWidthRef.current = null;
-        }
-      } catch (_) { /* non-Tauri or API unavailable */ }
-    })();
-  }, [showComputer, isTauri, computerWidth]);
+    if (showComputer) setShowSidebar(false);
+  }, [showComputer]);
 
   const [currentModel, setCurrentModel] = useState("");
   const [currentModelId, setCurrentModelId] = useState("");
@@ -2026,18 +1987,11 @@ ${text.slice(0, 4000)}` });
         </div>
       </div>
 
-      {/* Computer Panel — Tauri: side-by-side (window auto-expands); Browser: overlay drawer */}
+      {/* Computer Panel — Telegram-style side panel within the window */}
       {showComputer && (
         <>
-          {!isTauri && (
-            <div
-              className="computer-panel-backdrop"
-              onClick={() => setShowComputer(false)}
-              aria-hidden="true"
-            />
-          )}
           <div
-            className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
+            className="w-[3px] shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
             style={{ background: "var(--yunque-border)" }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -2046,8 +2000,8 @@ ${text.slice(0, 4000)}` });
               const startW = computerWidth;
               const onMove = (ev: MouseEvent) => {
                 if (!resizingRef.current) return;
-                const maxW = Math.min(800, Math.floor(window.innerWidth * 0.45));
-                setComputerWidth(Math.max(280, Math.min(maxW, startW + (startX - ev.clientX))));
+                const maxW = Math.min(600, Math.floor(window.innerWidth * 0.4));
+                setComputerWidth(Math.max(260, Math.min(maxW, startW + (startX - ev.clientX))));
               };
               const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
               document.addEventListener("mousemove", onMove);
@@ -2055,13 +2009,11 @@ ${text.slice(0, 4000)}` });
             }}
           />
           <div
-            className={`flex flex-col h-full animate-slide-in-right overflow-hidden shrink-0 ${!isTauri ? "computer-panel-overlay" : ""}`}
+            className="flex flex-col h-full shrink-0 overflow-hidden animate-slide-in-right"
             style={{
-              width: isTauri
-                ? computerWidth
-                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
+              width: computerWidth,
               background: "var(--yunque-sidebar)",
-              ...(!isTauri ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.3)" } : {}),
+              borderLeft: "1px solid var(--yunque-border)",
             }}
           >
             <div className="shrink-0 p-3">
