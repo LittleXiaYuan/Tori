@@ -74,6 +74,8 @@ export default function ChatPage() {
   const [computerWidth, setComputerWidth] = useState(380);
   const resizingRef = useRef(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const isTauri = typeof window !== "undefined" && !!(window as any).__TAURI__;
+  const prevWindowWidthRef = useRef<number | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -83,12 +85,38 @@ export default function ChatPage() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Narrow viewports can't comfortably fit sidebar + chat + computer panel at
-  // once. When the computer panel opens on a ≤1024px screen, auto-collapse the
-  // conversation sidebar so the chat area keeps breathing room.
   useEffect(() => {
     if (isNarrowViewport && showComputer) setShowSidebar(false);
   }, [isNarrowViewport, showComputer]);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    const tauri = (window as any).__TAURI__;
+    if (!tauri?.window?.getCurrentWindow) return;
+    const appWindow = tauri.window.getCurrentWindow();
+
+    (async () => {
+      try {
+        if (showComputer) {
+          const factor = await appWindow.scaleFactor();
+          const phys = await appWindow.outerSize();
+          const logicalW = Math.round(phys.width / factor);
+          prevWindowWidthRef.current = logicalW;
+          const panelW = computerWidth;
+          const screen = window.screen;
+          const maxW = screen.availWidth;
+          const newW = Math.min(logicalW + panelW, maxW);
+          await appWindow.setSize({ type: "Logical", width: newW, height: Math.round(phys.height / factor) });
+        } else if (prevWindowWidthRef.current !== null) {
+          const factor = await appWindow.scaleFactor();
+          const phys = await appWindow.outerSize();
+          const h = Math.round(phys.height / factor);
+          await appWindow.setSize({ type: "Logical", width: prevWindowWidthRef.current, height: h });
+          prevWindowWidthRef.current = null;
+        }
+      } catch (_) { /* non-Tauri or API unavailable */ }
+    })();
+  }, [showComputer, isTauri, computerWidth]);
 
   const [currentModel, setCurrentModel] = useState("");
   const [currentModelId, setCurrentModelId] = useState("");
@@ -1998,44 +2026,47 @@ ${text.slice(0, 4000)}` });
         </div>
       </div>
 
-      {/* Computer Panel — always rendered as a right-side overlay drawer */}
+      {/* Computer Panel — Tauri: side-by-side (window auto-expands); Browser: overlay drawer */}
       {showComputer && (
         <>
+          {!isTauri && (
+            <div
+              className="computer-panel-backdrop"
+              onClick={() => setShowComputer(false)}
+              aria-hidden="true"
+            />
+          )}
           <div
-            className="computer-panel-backdrop"
-            onClick={() => setShowComputer(false)}
-            aria-hidden="true"
+            className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
+            style={{ background: "var(--yunque-border)" }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              resizingRef.current = true;
+              const startX = e.clientX;
+              const startW = computerWidth;
+              const onMove = (ev: MouseEvent) => {
+                if (!resizingRef.current) return;
+                const maxW = Math.min(800, Math.floor(window.innerWidth * 0.45));
+                setComputerWidth(Math.max(280, Math.min(maxW, startW + (startX - ev.clientX))));
+              };
+              const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+              document.addEventListener("mousemove", onMove);
+              document.addEventListener("mouseup", onUp);
+            }}
           />
           <div
-            className="computer-panel-overlay flex flex-col h-full animate-slide-in-right overflow-hidden"
+            className={`flex flex-col h-full animate-slide-in-right overflow-hidden shrink-0 ${!isTauri ? "computer-panel-overlay" : ""}`}
             style={{
-              width: Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
+              width: isTauri
+                ? computerWidth
+                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
               background: "var(--yunque-sidebar)",
-              boxShadow: "-4px 0 24px rgba(0,0,0,0.3)",
+              ...(!isTauri ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.3)" } : {}),
             }}
           >
-            <div className="flex items-center justify-between shrink-0 px-3 pt-3 pb-1">
+            <div className="shrink-0 p-3">
               <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
             </div>
-            <div
-              className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
-              style={{ background: "transparent" }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                resizingRef.current = true;
-                const startX = e.clientX;
-                const startW = computerWidth;
-                const onMove = (ev: MouseEvent) => {
-                  if (!resizingRef.current) return;
-                  const delta = startX - ev.clientX;
-                  const maxW = Math.min(800, Math.floor(window.innerWidth * 0.45));
-                  setComputerWidth(Math.max(280, Math.min(maxW, startW + delta)));
-                };
-                const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-                document.addEventListener("mousemove", onMove);
-                document.addEventListener("mouseup", onUp);
-              }}
-            />
             <ComputerPanel className="min-h-0 flex-1" traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
           </div>
         </>
