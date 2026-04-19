@@ -63,6 +63,15 @@ func DetectIDEs() []IDEInfo {
 			HasAdapter:    c.hasAdapter,
 		}
 		for _, bin := range c.binaries {
+			if filepath.IsAbs(bin) {
+				if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
+					info.Available = true
+					info.Binary = bin
+					info.Path = bin
+					break
+				}
+				continue
+			}
 			path, err := exec.LookPath(bin)
 			if err == nil {
 				info.Available = true
@@ -97,6 +106,23 @@ func AutoRegisterAdapters(launcher *Launcher) int {
 		count++
 	}
 	return count
+}
+
+// FindBinary searches for a binary in PATH and well-known install locations.
+// Returns the resolved path or empty string if not found.
+func FindBinary(base string) string {
+	for _, bin := range binaryVariants(base) {
+		if filepath.IsAbs(bin) {
+			if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
+				return bin
+			}
+			continue
+		}
+		if path, err := exec.LookPath(bin); err == nil {
+			return path
+		}
+	}
+	return ""
 }
 
 func binaryVariants(base string) []string {
