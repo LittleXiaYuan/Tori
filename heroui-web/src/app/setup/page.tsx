@@ -11,11 +11,14 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Cloud,
   Code2,
   Cpu,
   Eye,
   EyeOff,
+  ExternalLink,
   Globe,
+  Key,
   Layers,
   Monitor,
   RefreshCw,
@@ -39,10 +42,28 @@ const templateIcons: Record<string, React.ElementType> = {
   "public-api-service": Globe,
 };
 
+// Step indices — kept as named constants to make the flow diagram obvious.
+// Tori branch short-circuits from STEP_CHOOSE → STEP_DONE via polling.
+const STEP_CHOOSE = 0;
+const STEP_DETECT = 1;
+const STEP_MODEL = 2;
+const STEP_TEMPLATE = 3;
+const STEP_DONE = 4;
+
+// Default Tori endpoint — kept here (rather than hard-coded inline) so that
+// future self-hosted Tori instances can be surfaced from a config prop without
+// touching the render path.
+const DEFAULT_TORI_URL = "https://tori.owo.today";
+
+// Poll cadence for /v1/tori/status during OAuth. 1.5s strikes a balance between
+// feeling responsive on bind-success and not hammering the server while the
+// user is still interacting with the OAuth page.
+const TORI_POLL_INTERVAL_MS = 1500;
+
 export default function SetupPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(STEP_CHOOSE);
   const [checking, setChecking] = useState(true);
   const [env, setEnv] = useState<SetupEnvironment | null>(null);
   const [templates, setTemplates] = useState<SetupTemplate[]>([]);
@@ -59,13 +80,17 @@ export default function SetupPage() {
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [installProgress, setInstallProgress] = useState<{ percent: number; detail: string } | null>(null);
   const [installMessage, setInstallMessage] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [toriBinding, setToriBinding] = useState(false);
+  const [toriAuthURL, setToriAuthURL] = useState<string | null>(null);
+  const [toriError, setToriError] = useState<string | null>(null);
 
   const steps = useMemo(
     () => [
+      { title: t("setup.step.choose"), icon: Rocket },
       { title: t("setup.step.detect"), icon: Monitor },
       { title: t("setup.step.model"), icon: Zap },
       { title: t("setup.step.template"), icon: Layers },
-      { title: t("setup.step.done"), icon: Rocket },
+      { title: t("setup.step.done"), icon: CheckCircle2 },
     ],
     [t]
   );
@@ -112,13 +137,13 @@ export default function SetupPage() {
   };
 
   useEffect(() => {
-    if (!checking) {
+    if (!checking && step === STEP_DETECT && !env) {
       void runDetect();
     }
-  }, [checking]);
+  }, [checking, step, env]);
 
   useEffect(() => {
-    if (step !== 2 || templates.length > 0) return;
+    if (step !== STEP_TEMPLATE || templates.length > 0) return;
     api.setupTemplates()
       .then((data) => {
         const list = data.templates || [];
@@ -129,13 +154,75 @@ export default function SetupPage() {
   }, [step, templates.length, selectedTpl]);
 
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== STEP_DONE) return;
+    // Tori branch already persists config server-side via ApplyLLMConfig;
+    // skip re-running setupApply so we don't overwrite Tori's LLM settings
+    // with empty locals.
+    if (!selectedTpl) {
+      setApplyMessage(t("setup.done.subtitle"));
+      return;
+    }
     setApplying(true);
     api.setupApply(selectedTpl, { api_key: apiKey, base_url: baseURL, model })
       .then((data) => setApplyMessage(data.message || t("setup.done.subtitle")))
       .catch((error) => setApplyMessage(error instanceof Error ? error.message : "Setup failed"))
       .finally(() => setApplying(false));
   }, [step, selectedTpl, apiKey, baseURL, model, t]);
+
+  // Poll /v1/tori/status while a bind flow is pending. We stop the polling
+  // loop on either (a) success — advance to done, or (b) user stepping away
+  // from the choose screen (the unmount cleanup clears the interval).
+  useEffect(() => {
+    if (!toriBinding) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const status = await api.toriStatus();
+        if (cancelled) return;
+        if (status.bound) {
+          setToriBinding(false);
+          setToriAuthURL(null);
+          setToriError(null);
+          setApplyMessage(t("setup.tori.bound"));
+          setStep(STEP_DONE);
+        }
+      } catch {
+        // Transient errors during OAuth are expected; keep polling until the
+        // user explicitly cancels.
+      }
+    };
+    const handle = window.setInterval(tick, TORI_POLL_INTERVAL_MS);
+    void tick();
+    return () => {
+      cancelled = true;
+      window.clearInterval(handle);
+    };
+  }, [toriBinding, t]);
+
+  const startToriBind = async () => {
+    setToriError(null);
+    setToriAuthURL(null);
+    setToriBinding(true);
+    try {
+      const res = await api.toriBind(DEFAULT_TORI_URL);
+      // Backend returns either auth_url (new field) or authorize_url (legacy);
+      // accept both so a mismatched backend build doesn't strand the user.
+      const authURL =
+        (res as { auth_url?: string; authorize_url?: string }).auth_url ||
+        (res as { auth_url?: string; authorize_url?: string }).authorize_url ||
+        null;
+      setToriAuthURL(authURL);
+    } catch (error) {
+      setToriBinding(false);
+      setToriError(error instanceof Error ? error.message : t("setup.tori.error"));
+    }
+  };
+
+  const cancelToriBind = () => {
+    setToriBinding(false);
+    setToriAuthURL(null);
+    setToriError(null);
+  };
 
   const testLLM = async () => {
     setTesting(true);
@@ -244,7 +331,76 @@ export default function SetupPage() {
         })}
       </div>
 
-      {step === 0 && (
+      {step === STEP_CHOOSE && (
+        <Card className="p-6">
+          <div className="mb-5 text-center">
+            <h2 className="text-lg font-semibold">{t("setup.choose.title")}</h2>
+            <p className="mt-1 text-sm text-default-500">{t("setup.choose.subtitle")}</p>
+          </div>
+
+          {!toriBinding && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChoiceCard
+                icon={Cloud}
+                accent="#8b5cf6"
+                title={t("setup.choose.tori.title")}
+                tag={t("setup.choose.tori.tag")}
+                desc={t("setup.choose.tori.desc")}
+                cta={t("setup.choose.tori.cta")}
+                onPress={startToriBind}
+              />
+              <ChoiceCard
+                icon={Key}
+                accent="#3b82f6"
+                title={t("setup.choose.apikey.title")}
+                tag={t("setup.choose.apikey.tag")}
+                desc={t("setup.choose.apikey.desc")}
+                cta={t("setup.choose.apikey.cta")}
+                onPress={() => setStep(STEP_DETECT)}
+              />
+            </div>
+          )}
+
+          {toriBinding && (
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/3 px-4 py-10 text-center">
+              <Spinner size="lg" />
+              <div className="text-sm font-medium">{t("setup.tori.binding")}</div>
+              <div className="text-xs text-default-500">{t("setup.tori.bindingHint")}</div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {toriAuthURL && (
+                  <Button size="sm" variant="ghost" onPress={() => window.open(toriAuthURL, "_blank", "noopener,noreferrer")}>
+                    <ExternalLink size={14} /> {t("setup.tori.openAuth")}
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onPress={cancelToriBind}>
+                  {t("setup.tori.cancel")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {toriError && (
+            <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+              {toriError}
+              <Button size="sm" variant="ghost" className="ml-3" onPress={startToriBind}>
+                <RefreshCw size={14} /> {t("setup.tori.retry")}
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              className="text-xs text-default-500 underline-offset-4 transition hover:text-default-700 hover:underline"
+              onClick={() => router.push("/chat")}
+            >
+              {t("setup.choose.later")}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {step === STEP_DETECT && (
         <Card className="p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -353,15 +509,18 @@ export default function SetupPage() {
             </div>
           )}
 
-          <div className="mt-6 flex justify-end">
-            <Button className="btn-accent" onPress={() => setStep(1)}>
+          <div className="mt-6 flex items-center justify-between">
+            <Button variant="ghost" onPress={() => setStep(STEP_CHOOSE)}>
+              <ChevronLeft size={16} /> {t("setup.back")}
+            </Button>
+            <Button className="btn-accent" onPress={() => setStep(STEP_MODEL)}>
               {t("setup.next")} <ChevronRight size={16} />
             </Button>
           </div>
         </Card>
       )}
 
-      {step === 1 && (
+      {step === STEP_MODEL && (
         <Card className="p-6">
           <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold">
             <Zap size={18} /> {t("setup.model.title")}
@@ -402,17 +561,17 @@ export default function SetupPage() {
           </div>
 
           <div className="mt-6 flex justify-between">
-            <Button variant="ghost" onPress={() => setStep(0)}>
+            <Button variant="ghost" onPress={() => setStep(STEP_DETECT)}>
               <ChevronLeft size={16} /> {t("setup.back")}
             </Button>
-            <Button className="btn-accent" isDisabled={!baseURL || !model} onPress={() => setStep(2)}>
+            <Button className="btn-accent" isDisabled={!baseURL || !model} onPress={() => setStep(STEP_TEMPLATE)}>
               {t("setup.next")} <ChevronRight size={16} />
             </Button>
           </div>
         </Card>
       )}
 
-      {step === 2 && (
+      {step === STEP_TEMPLATE && (
         <Card className="p-6">
           <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold">
             <Layers size={18} /> {t("setup.template.title")}
@@ -433,7 +592,11 @@ export default function SetupPage() {
                     key={template.id}
                     type="button"
                     onClick={() => setSelectedTpl(template.id)}
-                    className={`rounded-2xl border-2 p-4 text-left transition ${selected ? "border-primary bg-primary/10" : "border-default-200 hover:border-default-400"}`}
+                    className="rounded-2xl border-2 p-4 text-left transition cursor-pointer"
+                    style={{
+                      borderColor: selected ? "var(--yunque-accent)" : "var(--yunque-border)",
+                      background: selected ? "rgba(0,111,238,0.08)" : "transparent",
+                    }}
                   >
                     <div className="mb-2 flex items-center gap-2">
                       <Icon size={18} className={selected ? "text-primary" : "text-default-500"} />
@@ -458,17 +621,17 @@ export default function SetupPage() {
           )}
 
           <div className="mt-6 flex justify-between">
-            <Button variant="ghost" onPress={() => setStep(1)}>
+            <Button variant="ghost" onPress={() => setStep(STEP_MODEL)}>
               <ChevronLeft size={16} /> {t("setup.back")}
             </Button>
-            <Button className="btn-accent" isDisabled={!selectedTpl} onPress={() => setStep(3)}>
+            <Button className="btn-accent" isDisabled={!selectedTpl} onPress={() => setStep(STEP_DONE)}>
               {t("setup.step.done")} <Rocket size={16} />
             </Button>
           </div>
         </Card>
       )}
 
-      {step === 3 && (
+      {step === STEP_DONE && (
         <Card className="p-8 text-center">
           {applying ? (
             <div className="flex flex-col items-center gap-4 py-12">
@@ -484,7 +647,7 @@ export default function SetupPage() {
                 <Button variant="ghost" onPress={() => router.push("/settings")}>
                   <Settings size={16} /> {t("setup.done.settings")}
                 </Button>
-                <Button className="btn-accent" onPress={() => router.push("/login")}>
+                <Button className="btn-accent" onPress={() => router.push("/chat")}>
                   <Rocket size={16} /> {t("setup.done.login")}
                 </Button>
               </div>
@@ -502,5 +665,54 @@ function StatusRow({ ok, label }: { ok: boolean; label: string }) {
       {ok ? <CheckCircle2 size={16} className="shrink-0 text-success" /> : <XCircle size={16} className="shrink-0 text-default-400" />}
       <span>{label}</span>
     </div>
+  );
+}
+
+function ChoiceCard({
+  icon: Icon,
+  accent,
+  title,
+  tag,
+  desc,
+  cta,
+  onPress,
+}: {
+  icon: React.ElementType;
+  accent: string;
+  title: string;
+  tag: string;
+  desc: string;
+  cta: string;
+  onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      className="group flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/3 p-5 text-left transition hover:border-white/25 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className="flex size-10 items-center justify-center rounded-xl"
+          style={{ background: `${accent}1f`, color: accent }}
+        >
+          <Icon size={20} />
+        </div>
+        <span
+          className="rounded-full px-2 py-1 text-[11px] font-medium"
+          style={{ background: `${accent}1a`, color: accent }}
+        >
+          {tag}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        <div className="text-base font-semibold">{title}</div>
+        <p className="text-sm text-default-500">{desc}</p>
+      </div>
+      <div className="mt-auto flex items-center gap-1.5 text-sm font-medium" style={{ color: accent }}>
+        {cta}
+        <ChevronRight size={14} className="transition group-hover:translate-x-0.5" />
+      </div>
+    </button>
   );
 }
