@@ -66,6 +66,7 @@
   --card-pad:      20px;
   --card-pad-sm:   16px;
   --sidebar-w:     216px;
+  --sidebar-mini-w: 52px;
 
   /* ── Typography scale ────────────────────── */
   --text-2xs: 0.6875rem;  /* 11px */
@@ -583,6 +584,64 @@ button, [role="button"] { border-radius: var(--radius-md); }
   border: 1px solid var(--yunque-border);
   color: var(--yunque-text);
   cursor: pointer;
+}
+
+/* ── Mini sidebar (Simple / Cherry mode) ────── */
+.sidebar-mini-logo,
+.sidebar-mini-nav {
+  display: none;
+}
+
+.sidebar-mini-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--yunque-text-muted);
+  text-decoration: none;
+  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+.sidebar-mini-icon:hover {
+  color: var(--yunque-text);
+  background: rgba(255,255,255,0.06);
+}
+.sidebar-mini-icon[data-active="true"] {
+  color: var(--yunque-accent);
+  background: var(--yunque-accent-muted);
+}
+
+/* Simple mode: narrow icon rail */
+.sidebar[data-simple] {
+  width: var(--sidebar-mini-w);
+  align-items: center;
+}
+.sidebar[data-simple] .sidebar-mini-logo {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+.sidebar[data-simple] .sidebar-mini-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+}
+.sidebar[data-simple] .sidebar-brand,
+.sidebar[data-simple] .sidebar-search,
+.sidebar[data-simple] .sidebar-nav-container {
+  display: none;
+}
+.sidebar[data-simple] .sidebar-footer {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--yunque-border);
 }
 
 /* ═══════════════════════════════════════════════

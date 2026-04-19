@@ -164,9 +164,11 @@ export default function Sidebar() {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setSimpleMode(localStorage.getItem("yunque_simple_mode") === "1");
-    }
+    if (typeof window === "undefined") return;
+    // Missing key = first-run → default to Simple (Cherry) mode. Once the user
+    // explicitly toggles, the key will be "0"/"1" and we honor that forever.
+    const stored = localStorage.getItem("yunque_simple_mode");
+    setSimpleMode(stored === null ? true : stored === "1");
   }, []);
 
   useEffect(() => {
@@ -483,7 +485,7 @@ export default function Sidebar() {
             <>
               <div className="flex items-center justify-between gap-2" style={{ padding: "6px 4px" }}>
                 <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--yunque-text-muted)" }}>{ui.simpleMode}</span>
-                <Switch isSelected={simpleMode} onChange={() => toggleSimpleMode(!simpleMode)}>
+                <Switch isSelected={simpleMode} onChange={(v) => toggleSimpleMode(v)}>
                   <Switch.Control><Switch.Thumb /></Switch.Control>
                 </Switch>
               </div>
