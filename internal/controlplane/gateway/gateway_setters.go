@@ -51,6 +51,7 @@ import (
 	"yunque-agent/internal/execution/scheduler"
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
+	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/plugin"
 )
@@ -107,6 +108,12 @@ func (g *Gateway) SetHandoffRegistry(hr *subagent.HandoffRegistry) { g.handoffRe
 
 // SetOrchestrator attaches the five-layer memory orchestrator.
 func (g *Gateway) SetOrchestrator(o *memory.Orchestrator) { g.orchestrator = o }
+
+// SetOrchDaemon attaches the orchestration daemon for IDE work dispatch.
+func (g *Gateway) SetOrchDaemon(d *orchestrator.Daemon) { g.orchDaemon = d }
+
+// SetOrchLauncher attaches the worker launcher for adapter management.
+func (g *Gateway) SetOrchLauncher(l *orchestrator.Launcher) { g.orchLauncher = l }
 
 // SetZhGuard attaches the Chinese guardrail pipeline.
 func (g *Gateway) SetZhGuard(p *guardrails.Pipeline) { g.zhGuard = p }

@@ -106,6 +106,9 @@ func initGateway(app *agentrt.App) error {
 	gw.SetBrowserHub(browserHub)
 	slog.Info("browser extension hub initialized")
 
+	// ── Work Orchestration (IDE dispatch daemon) ──
+	initWorkOrchestrator(app, gw)
+
 	// ── Start Channels ──
 	channelCtx, channelCancel := context.WithCancel(context.Background())
 
