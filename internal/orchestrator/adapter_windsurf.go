@@ -98,7 +98,8 @@ func (a *WindsurfAdapter) injectConfig(workDir, mcpEndpoint, taskDesc, rules str
 	mcpConfig := map[string]any{
 		"mcpServers": map[string]any{
 			"yunque-dispatch": map[string]any{
-				"serverUrl": mcpEndpoint,
+				"command": "npx",
+				"args":    []string{"yunque-mcp", "-s", mcpEndpoint},
 			},
 		},
 	}
