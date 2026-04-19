@@ -1764,7 +1764,8 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 
 /* ── Cherry Settings Modal ─────────────────── */
-.cherry-settings-layout {
+.cherry-settings-layout,
+.cherry-settings {
   display: flex;
   gap: 0;
   height: 60vh;
