@@ -31,6 +31,8 @@ func NewCursorAdapter() *CursorAdapter {
 
 func (a *CursorAdapter) Name() string { return "cursor" }
 
+func (a *CursorAdapter) Lifecycle() WorkerLifecycle { return LifecyclePersistent }
+
 func (a *CursorAdapter) Available() bool {
 	_, err := exec.LookPath(cursorBinary())
 	return err == nil

@@ -13,11 +13,12 @@ import (
 )
 
 type GenericAdapterConfig struct {
-	AdapterName    string `json:"adapter_name"`
-	Binary         string `json:"binary"`
-	LaunchArgs     string `json:"launch_args,omitempty"`
-	MCPConfigPath  string `json:"mcp_config_path"`
-	RulesFilePath  string `json:"rules_file_path,omitempty"`
+	AdapterName    string          `json:"adapter_name"`
+	Binary         string          `json:"binary"`
+	LaunchArgs     string          `json:"launch_args,omitempty"`
+	MCPConfigPath  string          `json:"mcp_config_path"`
+	RulesFilePath  string          `json:"rules_file_path,omitempty"`
+	Lifecycle      WorkerLifecycle `json:"lifecycle,omitempty"`
 }
 
 type GenericAdapter struct {
@@ -38,6 +39,13 @@ func NewGenericAdapter(cfg GenericAdapterConfig) *GenericAdapter {
 }
 
 func (a *GenericAdapter) Name() string { return a.cfg.AdapterName }
+
+func (a *GenericAdapter) Lifecycle() WorkerLifecycle {
+	if a.cfg.Lifecycle != "" {
+		return a.cfg.Lifecycle
+	}
+	return LifecycleEphemeral
+}
 
 func (a *GenericAdapter) Available() bool {
 	_, err := exec.LookPath(a.cfg.Binary)

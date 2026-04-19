@@ -3,6 +3,8 @@ package task
 import (
 	"container/heap"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -39,6 +41,10 @@ type DispatchEntry struct {
 	RetryCount     int            `json:"retry_count"`
 	MaxRetries     int            `json:"max_retries"`
 	QueuedAt       time.Time      `json:"queued_at"`
+
+	// Idempotency: unique per execution attempt, prevents duplicate work
+	ExecutionID    string `json:"execution_id"`
+	AttemptVersion int    `json:"attempt_version"`
 
 	index int // heap index, managed by the priority queue
 }
@@ -82,6 +88,8 @@ func (d *Dispatcher) Enqueue(taskID string, requiredCaps []string, priority int,
 		TimeoutSec:     timeoutSec,
 		MaxRetries:     DefaultMaxRetries,
 		QueuedAt:       time.Now(),
+		ExecutionID:    genExecutionID(),
+		AttemptVersion: 1,
 	}
 	d.byID[taskID] = entry
 	heap.Push(&d.queue, entry)
@@ -139,8 +147,10 @@ func (d *Dispatcher) Assign(taskID, workerID string) error {
 	entry.AssignedWorker = workerID
 	now := time.Now()
 	entry.AssignedAt = &now
+	entry.ExecutionID = genExecutionID()
 
-	slog.Info("task assigned to worker", "task_id", taskID, "worker_id", workerID)
+	slog.Info("task assigned to worker", "task_id", taskID, "worker_id", workerID,
+		"execution_id", entry.ExecutionID, "attempt", entry.AttemptVersion)
 	return nil
 }
 
@@ -178,9 +188,12 @@ func (d *Dispatcher) Requeue(taskID string) error {
 	entry.DispatchStatus = DispatchQueued
 	entry.AssignedWorker = ""
 	entry.AssignedAt = nil
+	entry.AttemptVersion++
+	entry.ExecutionID = genExecutionID()
 	heap.Fix(&d.queue, entry.index)
 
-	slog.Info("task re-queued", "task_id", taskID, "retry", entry.RetryCount)
+	slog.Info("task re-queued", "task_id", taskID, "retry", entry.RetryCount,
+		"attempt", entry.AttemptVersion, "execution_id", entry.ExecutionID)
 	return nil
 }
 
@@ -329,4 +342,10 @@ func (pq *priorityQueue) Pop() any {
 	entry.index = -1
 	*pq = old[:n-1]
 	return entry
+}
+
+func genExecutionID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }

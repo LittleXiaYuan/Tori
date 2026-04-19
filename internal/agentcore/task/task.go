@@ -60,6 +60,15 @@ type Task struct {
 	Constraints *TaskConstraints `json:"constraints,omitempty"`
 }
 
+// RiskLevel controls review behavior for a task.
+type RiskLevel string
+
+const (
+	RiskLow    RiskLevel = "low"    // async/sidecar review, don't block completion
+	RiskMedium RiskLevel = "medium" // standard blocking review (default)
+	RiskHigh   RiskLevel = "high"   // blocking review + require human approval
+)
+
 // TaskConstraints defines execution guardrails for a task.
 type TaskConstraints struct {
 	MaxSteps        int            `json:"max_steps,omitempty"`        // 0 = use default (8)
@@ -68,6 +77,7 @@ type TaskConstraints struct {
 	SuccessCriteria string         `json:"success_criteria,omitempty"` // natural-language acceptance condition
 	TestCommand     string         `json:"test_command,omitempty"`     // shell command to verify result (exit 0 = pass)
 	Priority        string         `json:"priority,omitempty"`         // low / medium / high
+	RiskLevel       RiskLevel      `json:"risk_level,omitempty"`       // low/medium/high — controls review mode
 	AutoApprove     bool           `json:"auto_approve,omitempty"`     // skip human approval for medium-risk ops
 	Tags            []string       `json:"tags,omitempty"`
 	Extra           map[string]any `json:"extra,omitempty"` // extensible metadata

@@ -31,6 +31,8 @@ func NewWindsurfAdapter() *WindsurfAdapter {
 
 func (a *WindsurfAdapter) Name() string { return "windsurf" }
 
+func (a *WindsurfAdapter) Lifecycle() WorkerLifecycle { return LifecyclePersistent }
+
 func (a *WindsurfAdapter) Available() bool {
 	_, err := exec.LookPath(windsurfBinary())
 	return err == nil
