@@ -153,7 +153,14 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setCollapsed(localStorage.getItem(COLLAPSED_KEY) === "1");
+    // Clean up legacy dual-mode key
+    localStorage.removeItem("yunque_simple_mode");
+    const stored = localStorage.getItem(COLLAPSED_KEY);
+    if (stored !== null) {
+      setCollapsed(stored === "1");
+    } else {
+      setCollapsed(window.innerWidth < 1440);
+    }
   }, []);
 
   const toggleCollapsed = useCallback(() => {
@@ -449,39 +456,56 @@ export default function Sidebar() {
         </div>
 
         <div className="sidebar-footer">
-          <div className="flex items-center gap-1" style={{ padding: "4px 2px 0" }}>
-            <Tooltip delay={0}>
-              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))}>
-                <Settings size={14} style={{ opacity: 0.6 }} />
-              </Button>
-              <Tooltip.Content>{ui.settings}</Tooltip.Content>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => setLocale(locale === "zh" ? "en" : "zh")}>
-                <Languages size={14} style={{ opacity: 0.6 }} />
-              </Button>
-              <Tooltip.Content>{ui.localeLabel}</Tooltip.Content>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.open("https://yunque.owo.today/", "_blank", "noopener,noreferrer")}>
-                <HelpCircle size={14} style={{ opacity: 0.6 }} />
-              </Button>
-              <Tooltip.Content>{ui.help}</Tooltip.Content>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={handleLogout}>
-                <LogOut size={14} style={{ opacity: 0.6 }} />
-              </Button>
-              <Tooltip.Content>{ui.logout}</Tooltip.Content>
-            </Tooltip>
-            <div className="flex-1" />
-            <Tooltip delay={0}>
-              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={toggleCollapsed}>
-                {collapsed ? <PanelLeftOpen size={14} style={{ opacity: 0.6 }} /> : <PanelLeftClose size={14} style={{ opacity: 0.6 }} />}
-              </Button>
-              <Tooltip.Content>{collapsed ? ui.expand : ui.collapse}</Tooltip.Content>
-            </Tooltip>
-          </div>
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-1 py-2">
+              <Tooltip delay={0} placement="right">
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))}>
+                  <Settings size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.settings}</Tooltip.Content>
+              </Tooltip>
+              <Tooltip delay={0} placement="right">
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={toggleCollapsed}>
+                  <PanelLeftOpen size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.expand}</Tooltip.Content>
+              </Tooltip>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1" style={{ padding: "4px 2px 0" }}>
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))}>
+                  <Settings size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.settings}</Tooltip.Content>
+              </Tooltip>
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => setLocale(locale === "zh" ? "en" : "zh")}>
+                  <Languages size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.localeLabel}</Tooltip.Content>
+              </Tooltip>
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.open("https://yunque.owo.today/", "_blank", "noopener,noreferrer")}>
+                  <HelpCircle size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.help}</Tooltip.Content>
+              </Tooltip>
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={handleLogout}>
+                  <LogOut size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.logout}</Tooltip.Content>
+              </Tooltip>
+              <div className="flex-1" />
+              <Tooltip delay={0}>
+                <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={toggleCollapsed}>
+                  <PanelLeftClose size={14} style={{ opacity: 0.6 }} />
+                </Button>
+                <Tooltip.Content>{ui.collapse}</Tooltip.Content>
+              </Tooltip>
+            </div>
+          )}
         </div>
       </aside>
     </>

@@ -589,6 +589,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* ── Collapsed sidebar (icon rail) ────────── */
 .sidebar[data-collapsed] {
   width: var(--sidebar-mini-w);
+  overflow: hidden;
 }
 .sidebar[data-collapsed] .sidebar-brand {
   padding: 14px 0 10px;
@@ -617,11 +618,8 @@ button, [role="button"] { border-radius: var(--radius-md); }
   display: none;
 }
 .sidebar[data-collapsed] .sidebar-footer {
-  justify-content: center;
-  padding: 8px 4px 10px;
-}
-.sidebar[data-collapsed] .sidebar-footer .flex-1 {
-  display: none;
+  padding: 4px 0 8px;
+  border-top: 1px solid var(--yunque-border);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1530,22 +1528,6 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* ═══════════════════════════════════════════════
    Responsive Breakpoints
    ═══════════════════════════════════════════════ */
-
-/* Medium screens (1024–1439px): auto-collapse sidebar */
-@media (min-width: 1024px) and (max-width: 1439px) {
-  .sidebar:not([data-collapsed]) {
-    width: var(--sidebar-mini-w);
-  }
-  .sidebar:not([data-collapsed]) .sidebar-brand-text { display: none; }
-  .sidebar:not([data-collapsed]) .sidebar-brand { padding: 14px 0 10px; justify-content: center; display: flex; }
-  .sidebar:not([data-collapsed]) .sidebar-search-wrap { padding: 0 6px 8px; }
-  .sidebar:not([data-collapsed]) .sidebar-search { justify-content: center; padding: 7px; }
-  .sidebar:not([data-collapsed]) .sidebar-search-text { display: none; }
-  .sidebar:not([data-collapsed]) .sidebar-link { justify-content: center; padding: 8px; border-left: none; }
-  .sidebar:not([data-collapsed]) .sidebar-link-label { display: none; }
-  .sidebar:not([data-collapsed]) .sidebar-footer { justify-content: center; padding: 8px 4px 10px; }
-  .sidebar:not([data-collapsed]) .sidebar-footer .flex-1 { display: none; }
-}
 
 /* Tablet (< 1024px): collapsible sidebar, 2-col KPI */
 @media (max-width: 1023px) {
