@@ -101,6 +101,13 @@ func getPendingTasksTool(dc *DispatchContext) ToolDef {
 
 			dc.Workers.Heartbeat(workerID)
 
+			if dc.TaskStore == nil {
+				return map[string]any{
+					"tasks": []any{},
+					"count": 0,
+				}, nil
+			}
+
 			allTasks := dc.TaskStore.List("", 100)
 			var pending []map[string]any
 			for _, t := range allTasks {
@@ -150,6 +157,10 @@ func claimTaskTool(dc *DispatchContext) ToolDef {
 
 			if w.ActiveTasks >= w.MaxConcur {
 				return nil, fmt.Errorf("worker at max concurrency (%d); finish a task first", w.MaxConcur)
+			}
+
+			if dc.TaskStore == nil {
+				return nil, fmt.Errorf("task store not available")
 			}
 
 			t, ok := dc.TaskStore.Get(taskID)
@@ -217,6 +228,10 @@ func reportProgressTool(dc *DispatchContext) ToolDef {
 
 			if !dc.Workers.Heartbeat(workerID) {
 				return nil, fmt.Errorf("worker '%s' not found", workerID)
+			}
+
+			if dc.TaskStore == nil {
+				return nil, fmt.Errorf("task store not available")
 			}
 
 			t, ok := dc.TaskStore.Get(taskID)
@@ -290,6 +305,10 @@ func submitResultTool(dc *DispatchContext) ToolDef {
 				return nil, fmt.Errorf("worker '%s' not found", workerID)
 			}
 
+			if dc.TaskStore == nil {
+				return nil, fmt.Errorf("task store not available")
+			}
+
 			t, ok := dc.TaskStore.Get(taskID)
 			if !ok {
 				return nil, fmt.Errorf("task '%s' not found", taskID)
@@ -355,6 +374,10 @@ func getTaskContextTool(dc *DispatchContext) ToolDef {
 
 			if !dc.Workers.Heartbeat(workerID) {
 				return nil, fmt.Errorf("worker '%s' not found", workerID)
+			}
+
+			if dc.TaskStore == nil {
+				return nil, fmt.Errorf("task store not available")
 			}
 
 			t, ok := dc.TaskStore.Get(taskID)
