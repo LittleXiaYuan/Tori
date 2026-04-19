@@ -12,6 +12,7 @@ func (g *Gateway) registerOrchestratorRoutes() {
 	g.mux.HandleFunc("/v1/orchestrator/toggle", g.requireAuth(g.handleOrchestratorToggle))
 	g.mux.HandleFunc("/v1/orchestrator/sessions", g.requireAuth(g.handleOrchestratorSessions))
 	g.mux.HandleFunc("/v1/orchestrator/detect", g.requireAuth(g.handleDetectIDEs))
+	g.mux.HandleFunc("/v1/orchestrator/adapters/add", g.requireAuth(g.handleAddCustomAdapter))
 }
 
 func (g *Gateway) handleOrchestratorStatus(w http.ResponseWriter, r *http.Request) {
@@ -102,4 +103,33 @@ func (g *Gateway) handleDetectIDEs(w http.ResponseWriter, r *http.Request) {
 	}
 	ides := orchestrator.DetectIDEs()
 	writeJSON(w, map[string]any{"ides": ides})
+}
+
+func (g *Gateway) handleAddCustomAdapter(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if g.orchLauncher == nil {
+		writeJSONStatus(w, 503, map[string]string{"error": "orchestrator not configured"})
+		return
+	}
+
+	var cfg orchestrator.GenericAdapterConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		writeJSONStatus(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	if cfg.AdapterName == "" || cfg.Binary == "" || cfg.MCPConfigPath == "" {
+		writeJSONStatus(w, 400, map[string]string{"error": "adapter_name, binary, and mcp_config_path are required"})
+		return
+	}
+
+	adapter := orchestrator.NewGenericAdapter(cfg)
+	g.orchLauncher.RegisterAdapter(adapter)
+	writeJSONStatus(w, 201, map[string]any{
+		"status":    "registered",
+		"name":      cfg.AdapterName,
+		"available": adapter.Available(),
+	})
 }
