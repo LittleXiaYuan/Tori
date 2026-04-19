@@ -1,7 +1,9 @@
 package orchestrator
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 )
 
@@ -99,7 +101,26 @@ func AutoRegisterAdapters(launcher *Launcher) int {
 
 func binaryVariants(base string) []string {
 	if runtime.GOOS == "windows" {
-		return []string{base + ".exe", base + ".cmd", base}
+		variants := []string{base + ".exe", base + ".cmd", base}
+		// Check well-known Windows install locations
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			wellKnown := []string{
+				filepath.Join(home, "AppData", "Local", "Programs", base, base+".exe"),
+				filepath.Join(home, "AppData", "Local", base, base+".exe"),
+				filepath.Join("C:\\", "Program Files", base, base+".exe"),
+				filepath.Join("C:\\", "Program Files (x86)", base, base+".exe"),
+			}
+			variants = append(variants, wellKnown...)
+		}
+		return variants
+	}
+	if runtime.GOOS == "darwin" {
+		return []string{
+			base,
+			"/usr/local/bin/" + base,
+			"/opt/homebrew/bin/" + base,
+		}
 	}
 	return []string{base}
 }
