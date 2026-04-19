@@ -71,12 +71,12 @@ export default function ChatPage() {
   const [airiMode, setAiriMode] = useState(false);
   const [airiAvailable, setAiriAvailable] = useState(false);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
-  const [computerWidth, setComputerWidth] = useState(420);
+  const [computerWidth, setComputerWidth] = useState(380);
   const resizingRef = useRef(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1280px)");
+    const mq = window.matchMedia("(max-width: 1024px)");
     setIsNarrowViewport(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsNarrowViewport(e.matches);
     mq.addEventListener("change", handler);
@@ -84,7 +84,7 @@ export default function ChatPage() {
   }, []);
 
   // Narrow viewports can't comfortably fit sidebar + chat + computer panel at
-  // once. When the computer panel opens on a ≤1280px screen, auto-collapse the
+  // once. When the computer panel opens on a ≤1024px screen, auto-collapse the
   // conversation sidebar so the chat area keeps breathing room.
   useEffect(() => {
     if (isNarrowViewport && showComputer) setShowSidebar(false);
@@ -1353,7 +1353,7 @@ ${text.slice(0, 4000)}` });
               </div>
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl space-y-5">
+            <div className="mx-auto space-y-5" style={{ maxWidth: "min(900px, 70%)" }}>
               {chat.messages.map((msg, idx) => (
                 <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (
@@ -1804,9 +1804,9 @@ ${text.slice(0, 4000)}` });
         </div>
 
         {/* Input Area */}
-        <div className="px-5 py-3 shrink-0 xl:px-6" style={{ borderTop: chat.messages.length > 0 ? "1px solid var(--yunque-border)" : "none" }}
+        <div className="px-5 py-2 shrink-0 xl:px-6" style={{ borderTop: chat.messages.length > 0 ? "1px solid var(--yunque-border)" : "none" }}
           onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}>
-          <div className="max-w-3xl mx-auto">
+          <div className="mx-auto" style={{ maxWidth: "min(900px, 70%)" }}>
             <div
               ref={inputShellRef}
               className="chat-input-wrap chat-composer rounded-[24px] overflow-visible transition-all"
@@ -1819,32 +1819,34 @@ ${text.slice(0, 4000)}` });
                   : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
               }}
             >
-              {/* Frosted glass top bar */}
-              <div
-                className="flex items-center justify-between gap-3 rounded-t-[24px] px-4 py-2"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  backdropFilter: "blur(16px) saturate(1.6)",
-                  WebkitBackdropFilter: "blur(16px) saturate(1.6)",
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
-                }}
-              >
-                <div className="text-[11px] truncate" style={{ color: "var(--yunque-text-muted)" }}>
-                  {bridgeState?.connected
-                    ? <span className="flex items-center gap-1.5"><Monitor size={11} /><span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" /> 浏览器已连接</span>
-                    : "Yunque Agent"}
+              {/* Frosted glass top bar — only visible once a conversation has started */}
+              {chat.messages.length > 0 && (
+                <div
+                  className="flex items-center justify-between gap-3 rounded-t-[24px] px-4 py-1.5"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    backdropFilter: "blur(16px) saturate(1.6)",
+                    WebkitBackdropFilter: "blur(16px) saturate(1.6)",
+                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <div className="text-[11px] truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                    {bridgeState?.connected
+                      ? <span className="flex items-center gap-1.5"><Monitor size={11} /><span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" /> 浏览器已连接</span>
+                      : "Yunque Agent"}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(true)}>
+                      <Plug size={11} /> 连接器
+                    </Button>
+                    <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]"
+                      data-active={showSlashMenu || activeSlashCommand ? "true" : undefined}
+                      onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}>
+                      <Sparkles size={11} /> 命令
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]" data-active={showConnectors ? "true" : undefined} onPress={() => setShowConnectors(true)}>
-                    <Plug size={11} /> 连接器
-                  </Button>
-                  <Button size="sm" variant="ghost" className="chat-tool-btn h-7 rounded-full px-2 text-[10px]"
-                    data-active={showSlashMenu || activeSlashCommand ? "true" : undefined}
-                    onPress={() => { chatD({ type: "SET_INPUT", value: "/" }); setShowSlashMenu(true); setSlashQuery(""); setActiveSlashCommand(null); inputRef.current?.focus(); }}>
-                    <Sparkles size={11} /> 命令
-                  </Button>
-                </div>
-              </div>
+              )}
 
               {pendingFiles.length > 0 && (
                 <div className="flex gap-2 px-5 pt-4 flex-wrap">
@@ -1914,7 +1916,7 @@ ${text.slice(0, 4000)}` });
                 placeholder="输入消息，/ 打开命令…"
                 rows={1}
                 className="chat-composer-textarea w-full resize-none bg-transparent px-4 pt-2.5 pb-1.5 text-[14px] outline-none"
-                style={{ color: "var(--yunque-text)", minHeight: 42, maxHeight: 160, lineHeight: 1.65 }}
+                style={{ color: "var(--yunque-text)", minHeight: 36, maxHeight: 160, lineHeight: 1.65 }}
                 disabled={chat.loading}
               />
 
@@ -2018,7 +2020,7 @@ ${text.slice(0, 4000)}` });
                 const onMove = (ev: MouseEvent) => {
                   if (!resizingRef.current) return;
                   const delta = startX - ev.clientX;
-                  const maxW = Math.min(800, Math.floor(window.innerWidth * 0.4));
+                  const maxW = Math.min(800, Math.floor(window.innerWidth * 0.45));
                   setComputerWidth(Math.max(280, Math.min(maxW, startW + delta)));
                 };
                 const onUp = () => { resizingRef.current = false; document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
@@ -2032,7 +2034,7 @@ ${text.slice(0, 4000)}` });
             style={{
               width: isNarrowViewport
                 ? Math.min(480, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.85 : 360))
-                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.4 : 420)),
+                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
               background: "var(--yunque-sidebar)",
             }}
           >
