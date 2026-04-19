@@ -39,6 +39,7 @@ export default function WorkersPage() {
   const [orchAdapters, setOrchAdapters] = useState<string[]>([]);
   const [orchSessions, setOrchSessions] = useState<Array<{ session_id: string; adapter: string; task_id: string; started_at: string }>>([]);
   const [orchLoading, setOrchLoading] = useState(false);
+  const [detectedIDEs, setDetectedIDEs] = useState<Array<{ name: string; binary: string; available: boolean; path?: string }>>([]);
 
   const loadWorkers = useCallback(async () => {
     setLoading(true);
@@ -54,13 +55,15 @@ export default function WorkersPage() {
 
   const loadOrchStatus = useCallback(async () => {
     try {
-      const [status, sess] = await Promise.all([
+      const [status, sess, detect] = await Promise.all([
         api.orchestratorStatus(),
         api.orchestratorSessions(),
+        api.detectIDEs(),
       ]);
       setOrchRunning(status.running);
       setOrchAdapters(status.adapters || []);
       setOrchSessions(sess.sessions || []);
+      setDetectedIDEs(detect.ides || []);
     } catch { /* ignore */ }
   }, []);
 
@@ -333,6 +336,25 @@ export default function WorkersPage() {
             </div>
           </Card>
         </div>
+
+        {detectedIDEs.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium mb-2" style={{ color: "var(--yunque-muted)" }}>IDE 环境检测</h3>
+            <div className="flex gap-2 flex-wrap">
+              {detectedIDEs.map((ide) => (
+                <span key={ide.binary} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg"
+                  style={{
+                    background: ide.available ? "rgba(34,197,94,0.1)" : "rgba(100,100,100,0.1)",
+                    color: ide.available ? "#22c55e" : "var(--yunque-muted)",
+                  }}>
+                  {ide.available ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                  {ide.name}
+                  {ide.available && ide.path && <span className="opacity-50 ml-1 hidden sm:inline">({ide.path})</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {orchSessions.length > 0 && (
           <div className="space-y-2">

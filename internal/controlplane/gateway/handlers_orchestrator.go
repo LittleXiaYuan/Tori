@@ -3,12 +3,15 @@ package gateway
 import (
 	"encoding/json"
 	"net/http"
+
+	"yunque-agent/internal/orchestrator"
 )
 
 func (g *Gateway) registerOrchestratorRoutes() {
 	g.mux.HandleFunc("/v1/orchestrator/status", g.requireAuth(g.handleOrchestratorStatus))
 	g.mux.HandleFunc("/v1/orchestrator/toggle", g.requireAuth(g.handleOrchestratorToggle))
 	g.mux.HandleFunc("/v1/orchestrator/sessions", g.requireAuth(g.handleOrchestratorSessions))
+	g.mux.HandleFunc("/v1/orchestrator/detect", g.requireAuth(g.handleDetectIDEs))
 }
 
 func (g *Gateway) handleOrchestratorStatus(w http.ResponseWriter, r *http.Request) {
@@ -90,4 +93,13 @@ func (g *Gateway) handleOrchestratorSessions(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	writeJSON(w, map[string]any{"sessions": out})
+}
+
+func (g *Gateway) handleDetectIDEs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	ides := orchestrator.DetectIDEs()
+	writeJSON(w, map[string]any{"ides": ides})
 }
