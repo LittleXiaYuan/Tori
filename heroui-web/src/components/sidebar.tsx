@@ -350,22 +350,21 @@ export default function Sidebar() {
                     (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
                   );
                   if (collapsed) {
-                    const firstHref = cat.children[0]?.href;
                     return (
                       <Tooltip key={cat.id} delay={0}>
                         <Tooltip.Trigger>
-                          <Link
-                            href={firstHref || "#"}
+                          <button
                             className="sidebar-link"
                             data-active={childActive || undefined}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              startTransition(() => { router.push(firstHref || "/"); });
+                            onClick={() => {
+                              setCollapsed(false);
+                              localStorage.setItem(COLLAPSED_KEY, "0");
+                              setDrillId(cat.id);
                             }}
                           >
                             <span className="sidebar-link-icon">{cat.icon}</span>
                             <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
-                          </Link>
+                          </button>
                         </Tooltip.Trigger>
                         <Tooltip.Content placement="right">{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
                       </Tooltip>
@@ -405,7 +404,14 @@ export default function Sidebar() {
                   return (
                     <Tooltip key={cat.id} delay={0}>
                       <Tooltip.Trigger>
-                        {linkContent}
+                        <Link
+                          href={cat.href!}
+                          className="sidebar-link"
+                          data-active={active || undefined}
+                        >
+                          <span className="sidebar-link-icon">{cat.icon}</span>
+                          <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
+                        </Link>
                       </Tooltip.Trigger>
                       <Tooltip.Content placement="right">{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
                     </Tooltip>
