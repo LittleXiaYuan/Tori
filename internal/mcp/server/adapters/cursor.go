@@ -108,15 +108,20 @@ type WindsurfConfig struct {
 }
 
 // GenerateMCPJSON returns a JSON config for Windsurf's MCP settings.
+// Windsurf requires stdio transport (command+args), not URL-based.
 func (c *WindsurfConfig) GenerateMCPJSON() (string, error) {
+	serverEntry := map[string]any{
+		"command": "npx",
+		"args":    []string{"yunque-mcp", "-s", c.ServerURL},
+	}
+	if c.Token != "" {
+		serverEntry["env"] = map[string]string{
+			"YUNQUE_TOKEN": c.Token,
+		}
+	}
 	config := map[string]any{
 		"mcpServers": map[string]any{
-			"yunque-dispatch": map[string]any{
-				"serverUrl": c.ServerURL,
-				"headers": map[string]string{
-					"Authorization": fmt.Sprintf("Bearer %s", c.Token),
-				},
-			},
+			"yunque-dispatch": serverEntry,
 		},
 	}
 	b, err := json.MarshalIndent(config, "", "  ")
