@@ -149,7 +149,7 @@ rl.on("close", () => {
   process.exit(0);
 });
 
-async function forwardToServer(request) {
+async function forwardToServer(request, retries = 2) {
   try {
     const headers = { "Content-Type": "application/json" };
     if (authToken) {
@@ -159,6 +159,7 @@ async function forwardToServer(request) {
       method: "POST",
       headers,
       body: JSON.stringify(request),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!res.ok) {
@@ -195,10 +196,17 @@ async function forwardToServer(request) {
     }
     return null;
   } catch (err) {
+    const cause = err.cause ? ` (${err.cause.code || err.cause.message || err.cause})` : "";
+    process.stderr.write(`[yunque-bridge] fetch error: ${err.message}${cause}\n`);
+    if (retries > 0 && !err.name?.includes("Abort")) {
+      process.stderr.write(`[yunque-bridge] retrying... (${retries} left)\n`);
+      await new Promise(r => setTimeout(r, 500));
+      return forwardToServer(request, retries - 1);
+    }
     return {
       jsonrpc: "2.0",
       id: request.id ?? null,
-      error: { code: -32603, message: `connection failed: ${err.message}` },
+      error: { code: -32603, message: `connection failed: ${err.message}${cause}` },
     };
   }
 }
