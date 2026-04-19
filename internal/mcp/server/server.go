@@ -114,8 +114,18 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 }
 
 func (s *Server) handleInitialize(req jsonRPCRequest) ([]byte, error) {
+	clientVersion := "2024-11-05"
+	if req.Params != nil {
+		var params struct {
+			ProtocolVersion string `json:"protocolVersion"`
+		}
+		if err := json.Unmarshal(req.Params, &params); err == nil && params.ProtocolVersion != "" {
+			clientVersion = params.ProtocolVersion
+		}
+	}
+
 	result := map[string]any{
-		"protocolVersion": "2025-11-05",
+		"protocolVersion": clientVersion,
 		"capabilities": map[string]any{
 			"tools":     map[string]any{"listChanged": false},
 			"resources": map[string]any{"subscribe": false, "listChanged": false},
