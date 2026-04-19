@@ -34,8 +34,7 @@ func (a *WindsurfAdapter) Name() string { return "windsurf" }
 func (a *WindsurfAdapter) Lifecycle() WorkerLifecycle { return LifecyclePersistent }
 
 func (a *WindsurfAdapter) Available() bool {
-	_, err := exec.LookPath(windsurfBinary())
-	return err == nil
+	return FindBinary("windsurf") != ""
 }
 
 func (a *WindsurfAdapter) Launch(ctx context.Context, task LaunchTask) (*LaunchResult, error) {

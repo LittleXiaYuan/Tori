@@ -35,8 +35,7 @@ func (a *ClaudeCodeAdapter) Name() string { return "claude_code" }
 func (a *ClaudeCodeAdapter) Lifecycle() WorkerLifecycle { return LifecycleEphemeral }
 
 func (a *ClaudeCodeAdapter) Available() bool {
-	_, err := exec.LookPath("claude")
-	return err == nil
+	return FindBinary("claude") != ""
 }
 
 func (a *ClaudeCodeAdapter) Launch(ctx context.Context, task LaunchTask) (*LaunchResult, error) {

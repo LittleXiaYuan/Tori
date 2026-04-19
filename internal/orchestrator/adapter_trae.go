@@ -34,8 +34,7 @@ func (a *TraeAdapter) Name() string { return "trae" }
 func (a *TraeAdapter) Lifecycle() WorkerLifecycle { return LifecyclePersistent }
 
 func (a *TraeAdapter) Available() bool {
-	_, err := exec.LookPath(traeBinary())
-	return err == nil
+	return FindBinary("trae") != ""
 }
 
 func (a *TraeAdapter) Launch(ctx context.Context, task LaunchTask) (*LaunchResult, error) {
