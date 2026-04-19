@@ -1144,6 +1144,8 @@ export const api = {
     fetcher<{ status: string }>("/v1/orchestrator/toggle", { method: "POST", body: JSON.stringify({ action }) }),
   orchestratorSessions: () =>
     fetcher<{ sessions: Array<{ session_id: string; adapter: string; task_id: string; started_at: string }> }>("/v1/orchestrator/sessions"),
+  detectIDEs: () =>
+    fetcher<{ ides: Array<{ name: string; binary: string; available: boolean; path?: string }> }>("/v1/orchestrator/detect"),
 };
 
 // Sticker URL utilities
