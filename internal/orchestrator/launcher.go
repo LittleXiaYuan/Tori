@@ -31,9 +31,18 @@ type ProgressEvent struct {
 	Timestamp time.Time
 }
 
+// WorkerLifecycle describes how a worker process behaves.
+type WorkerLifecycle string
+
+const (
+	LifecycleEphemeral  WorkerLifecycle = "ephemeral"  // exits after task completion
+	LifecyclePersistent WorkerLifecycle = "persistent"  // stays alive across tasks
+)
+
 type WorkerAdapter interface {
 	Name() string
 	Available() bool
+	Lifecycle() WorkerLifecycle
 	Launch(ctx context.Context, task LaunchTask) (*LaunchResult, error)
 	Monitor(ctx context.Context, sessionID string) (<-chan ProgressEvent, error)
 	Stop(sessionID string) error
@@ -49,6 +58,9 @@ type activeSession struct {
 	SessionID   string
 	AdapterName string
 	TaskID      string
+	ProjectID   string
+	WorkDir     string
+	Lifecycle   WorkerLifecycle
 	StartedAt   time.Time
 	cancel      context.CancelFunc
 }
@@ -101,6 +113,9 @@ func (l *Launcher) Launch(ctx context.Context, adapterName string, task LaunchTa
 		SessionID:   result.SessionID,
 		AdapterName: adapterName,
 		TaskID:      task.TaskID,
+		ProjectID:   task.ProjectID,
+		WorkDir:     task.WorkDir,
+		Lifecycle:   a.Lifecycle(),
 		StartedAt:   result.StartedAt,
 		cancel:      cancel,
 	}
@@ -138,4 +153,31 @@ func (l *Launcher) ActiveSessions() []activeSession {
 		out = append(out, *s)
 	}
 	return out
+}
+
+// FindSessionForProject returns an existing persistent session for the given
+// project/workdir, enabling context reuse across tasks in the same project.
+func (l *Launcher) FindSessionForProject(projectID, workDir string) *activeSession {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	for _, s := range l.sessions {
+		if s.Lifecycle != LifecyclePersistent {
+			continue
+		}
+		if (projectID != "" && s.ProjectID == projectID) || (workDir != "" && s.WorkDir == workDir) {
+			cp := *s
+			return &cp
+		}
+	}
+	return nil
+}
+
+// AdapterLifecycle returns the lifecycle type for a named adapter.
+func (l *Launcher) AdapterLifecycle(name string) WorkerLifecycle {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if a, ok := l.adapters[name]; ok {
+		return a.Lifecycle()
+	}
+	return LifecycleEphemeral
 }

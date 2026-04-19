@@ -32,6 +32,8 @@ func NewClaudeCodeAdapter() *ClaudeCodeAdapter {
 
 func (a *ClaudeCodeAdapter) Name() string { return "claude_code" }
 
+func (a *ClaudeCodeAdapter) Lifecycle() WorkerLifecycle { return LifecycleEphemeral }
+
 func (a *ClaudeCodeAdapter) Available() bool {
 	_, err := exec.LookPath("claude")
 	return err == nil
