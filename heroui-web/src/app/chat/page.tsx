@@ -1213,16 +1213,6 @@ ${text.slice(0, 4000)}` });
               </div>
             )}
 
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly variant="ghost" size="sm" className="h-8 w-8 rounded-full"
-                onPress={newConversation}
-                style={{ color: "var(--yunque-text-muted)" }}
-              >
-                <Plus size={15} />
-              </Button>
-              <Tooltip.Content>新建对话</Tooltip.Content>
-            </Tooltip>
           </div>
         </header>
 
