@@ -534,7 +534,7 @@ ${text.slice(0, 4000)}` });
           { command: slashBrowserCommand.command, args: slashBrowserCommand.args, summary: slashBrowserCommand.summary },
           "reflect",
         ));
-        const userMsg: Message = { role: "user", content: text, id: newId() };
+        const userMsg: Message = { role: "user", content: text, id: newId(), timestamp: Date.now() };
         const asstMsg: Message = {
           role: "assistant",
           content: [
@@ -566,7 +566,7 @@ ${text.slice(0, 4000)}` });
       const builtAction = buildSlashBrowserAction(slashBrowserCommand);
       if ("error" in builtAction) {
         const errorMessage = builtAction.error || "Browser command needs clarification.";
-        const userMsg: Message = { role: "user", content: text, id: newId() };
+        const userMsg: Message = { role: "user", content: text, id: newId(), timestamp: Date.now() };
         const asstMsg: Message = {
           role: "assistant",
           content: errorMessage,
@@ -580,8 +580,8 @@ ${text.slice(0, 4000)}` });
         return;
       }
 
-      const userMsg: Message = { role: "user", content: text, id: newId() };
-      const asstMsg: Message = { role: "assistant", content: "", id: newId(), traceEvents: [] };
+      const userMsg: Message = { role: "user", content: text, id: newId(), timestamp: Date.now() };
+      const asstMsg: Message = { role: "assistant", content: "", id: newId(), timestamp: Date.now(), traceEvents: [] };
       setActiveSlashCommand(null);
       setShowSlashMenu(false);
       chatD({ type: "START_SEND" });
@@ -625,8 +625,8 @@ ${text.slice(0, 4000)}` });
     }
 
     const mediaPreviews = pendingFiles.filter(f => (f.type === "image" || f.type === "video") && f.base64).map(f => f.base64!);
-    const userMsg: Message = { role: "user", content: text, id: newId(), ...(mediaPreviews.length > 0 ? { images: mediaPreviews } : {}) };
-    const asstMsg: Message = { role: "assistant", content: "", id: newId(), traceEvents: [] };
+    const userMsg: Message = { role: "user", content: text, id: newId(), timestamp: Date.now(), ...(mediaPreviews.length > 0 ? { images: mediaPreviews } : {}) };
+    const asstMsg: Message = { role: "assistant", content: "", id: newId(), timestamp: Date.now(), traceEvents: [] };
     setActiveSlashCommand(null);
     setShowSlashMenu(false);
     chatD({ type: "START_SEND" });
@@ -1343,14 +1343,28 @@ ${text.slice(0, 4000)}` });
             </div>
           ) : (
             <div className="mx-auto space-y-5" style={{ maxWidth: "min(900px, 70%)" }}>
-              {chat.messages.map((msg, idx) => (
-                <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
-                  {msg.role === "assistant" && (
-                    <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: "var(--yunque-accent)" }}>
-                      <Avatar.Fallback className="text-white text-xs font-bold">Y</Avatar.Fallback>
+              {chat.messages.map((msg, idx) => {
+                const isBubble = chatMode === "chat";
+                return (
+                <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${isBubble && msg.role === "user" ? "justify-end" : ""}`}>
+                  {(!isBubble || msg.role === "assistant") && (
+                    <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: msg.role === "assistant" ? "var(--yunque-accent)" : "#374151" }}>
+                      <Avatar.Fallback className="text-white text-xs font-bold">{msg.role === "assistant" ? "Y" : "U"}</Avatar.Fallback>
                     </Avatar>
                   )}
-                  <div className={`chat-message-stack max-w-[74%] xl:max-w-[72%] ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
+                  <div className={`chat-message-stack ${isBubble ? `max-w-[74%] xl:max-w-[72%] ${msg.role === "user" ? "flex flex-col items-end" : ""}` : "flex-1 min-w-0"}`}>
+                    {!isBubble && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[13px] font-semibold" style={{ color: msg.role === "assistant" ? "var(--yunque-accent)" : "var(--yunque-text)" }}>
+                          {msg.role === "assistant" ? (currentModel || "Yunque Agent") : "用户"}
+                        </span>
+                        {msg.timestamp && (
+                          <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                            {new Date(msg.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {/* Step summary (compact, replaces full trace in chat) */}
                     {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
                       const isLive = chat.streaming && msg.id === chat.messages[chat.messages.length - 1]?.id;
@@ -1426,8 +1440,8 @@ ${text.slice(0, 4000)}` });
                       );
                     })()}
                     <div
-                      className={`chat-message-card px-3.5 py-2.5 rounded-[18px] text-[14px] leading-7 whitespace-pre-wrap ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}`}
-                      style={{
+                      className={`chat-message-card text-[14px] leading-7 whitespace-pre-wrap ${isBubble ? `px-3.5 py-2.5 rounded-[18px] ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}` : "py-1"}`}
+                      style={isBubble ? {
                         background: msg.role === "user"
                           ? "linear-gradient(180deg, rgba(59,130,246,0.9), rgba(37,99,235,0.86))"
                           : "linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.008)), var(--yunque-card)",
@@ -1436,6 +1450,8 @@ ${text.slice(0, 4000)}` });
                         borderBottomRightRadius: msg.role === "user" ? "8px" : undefined,
                         borderBottomLeftRadius: msg.role === "assistant" ? "8px" : undefined,
                         boxShadow: msg.role === "assistant" ? "0 8px 22px rgba(0,0,0,0.14)" : "0 8px 20px rgba(37,99,235,0.14)",
+                      } : {
+                        color: "var(--yunque-text)",
                       }}
                     >
                       {msg.role === "user" && msg.images && msg.images.length > 0 && (
@@ -1756,7 +1772,7 @@ ${text.slice(0, 4000)}` });
                       </details>
                     )}
                     {msg.content && (
-                      <div className="chat-message-tools flex gap-0.5 mt-1" style={{ justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                      <div className={`chat-message-tools flex gap-0.5 mt-1 ${!isBubble ? "justify-end" : ""}`} style={isBubble ? { justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } : undefined}>
                         {msg.role === "user" && (
                           <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => editMessage(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>编辑</Tooltip.Content></Tooltip>
                         )}
@@ -1780,14 +1796,18 @@ ${text.slice(0, 4000)}` });
                         <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => retryMessage(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>重新发送</Tooltip.Content></Tooltip>
                       </div>
                     )}
+                    {!isBubble && (
+                      <div className="mt-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }} />
+                    )}
                   </div>
-                  {msg.role === "user" && (
+                  {isBubble && msg.role === "user" && (
                     <Avatar size="sm" className="shrink-0 mt-1" style={{ background: "#374151" }}>
                       <Avatar.Fallback className="text-white text-xs">U</Avatar.Fallback>
                     </Avatar>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
