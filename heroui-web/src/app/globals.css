@@ -586,62 +586,42 @@ button, [role="button"] { border-radius: var(--radius-md); }
   cursor: pointer;
 }
 
-/* ── Mini sidebar (Simple / Cherry mode) ────── */
-.sidebar-mini-logo,
-.sidebar-mini-nav {
-  display: none;
-}
-
-.sidebar-mini-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  color: var(--yunque-text-muted);
-  text-decoration: none;
-  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
-}
-.sidebar-mini-icon:hover {
-  color: var(--yunque-text);
-  background: rgba(255,255,255,0.06);
-}
-.sidebar-mini-icon[data-active="true"] {
-  color: var(--yunque-accent);
-  background: var(--yunque-accent-muted);
-}
-
-/* Simple mode: narrow icon rail */
-.sidebar[data-simple] {
+/* ── Collapsed sidebar (icon rail) ────────── */
+.sidebar[data-collapsed] {
   width: var(--sidebar-mini-w);
-  align-items: center;
 }
-.sidebar[data-simple] .sidebar-mini-logo {
+.sidebar[data-collapsed] .sidebar-brand {
+  padding: 14px 0 10px;
   display: flex;
   justify-content: center;
-  padding: 16px 0 8px;
 }
-.sidebar[data-simple] .sidebar-mini-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-height: 0;
-  padding: 4px 0;
-  overflow-y: auto;
-}
-.sidebar[data-simple] .sidebar-brand,
-.sidebar[data-simple] .sidebar-search,
-.sidebar[data-simple] .sidebar-nav-container {
+.sidebar[data-collapsed] .sidebar-brand-text {
   display: none;
 }
-.sidebar[data-simple] .sidebar-footer {
-  display: flex;
+.sidebar[data-collapsed] .sidebar-search-wrap {
+  padding: 0 6px 8px;
+}
+.sidebar[data-collapsed] .sidebar-search {
   justify-content: center;
-  padding: 8px 0 12px;
-  border-top: 1px solid var(--yunque-border);
+  padding: 7px;
+}
+.sidebar[data-collapsed] .sidebar-search-text {
+  display: none;
+}
+.sidebar[data-collapsed] .sidebar-link {
+  justify-content: center;
+  padding: 8px;
+  border-left: none;
+}
+.sidebar[data-collapsed] .sidebar-link-label {
+  display: none;
+}
+.sidebar[data-collapsed] .sidebar-footer {
+  justify-content: center;
+  padding: 8px 4px 10px;
+}
+.sidebar[data-collapsed] .sidebar-footer .flex-1 {
+  display: none;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1550,6 +1530,22 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* ═══════════════════════════════════════════════
    Responsive Breakpoints
    ═══════════════════════════════════════════════ */
+
+/* Medium screens (1024–1439px): auto-collapse sidebar */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .sidebar:not([data-collapsed]) {
+    width: var(--sidebar-mini-w);
+  }
+  .sidebar:not([data-collapsed]) .sidebar-brand-text { display: none; }
+  .sidebar:not([data-collapsed]) .sidebar-brand { padding: 14px 0 10px; justify-content: center; display: flex; }
+  .sidebar:not([data-collapsed]) .sidebar-search-wrap { padding: 0 6px 8px; }
+  .sidebar:not([data-collapsed]) .sidebar-search { justify-content: center; padding: 7px; }
+  .sidebar:not([data-collapsed]) .sidebar-search-text { display: none; }
+  .sidebar:not([data-collapsed]) .sidebar-link { justify-content: center; padding: 8px; border-left: none; }
+  .sidebar:not([data-collapsed]) .sidebar-link-label { display: none; }
+  .sidebar:not([data-collapsed]) .sidebar-footer { justify-content: center; padding: 8px 4px 10px; }
+  .sidebar:not([data-collapsed]) .sidebar-footer .flex-1 { display: none; }
+}
 
 /* Tablet (< 1024px): collapsible sidebar, 2-col KPI */
 @media (max-width: 1023px) {

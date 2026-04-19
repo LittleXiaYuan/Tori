@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useReducer, useRef, useCallback, useEffect, useMemo, type Dispatch } from "react";
+import { useState, useReducer, useRef, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Avatar, Spinner, Tooltip, Chip, Dropdown, Label, Popover } from "@heroui/react";
 import {
@@ -26,454 +26,30 @@ import { SlashCommandMenu } from "@/components/slash-command-menu";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
 import { showToast } from "@/components/toast-provider";
 import { ModelSelectorPopup, type ModelOption } from "@/components/model-selector-popup";
-import { SimpleChatView } from "@/components/simple-chat-view";
-import "../simple-chat.css";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
 import { openExternal } from "@/lib/safe-url";
 import { browserActionLabel, browserActionPhase } from "@/lib/browser-action-labels";
-
-function ThinkingTimer({ startMs, endMs, isStreaming }: { startMs?: number; endMs?: number; isStreaming: boolean }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!startMs) return;
-    if (endMs) {
-      setElapsed((endMs - startMs) / 1000);
-      return;
-    }
-    if (!isStreaming) return;
-    const tick = () => setElapsed((Date.now() - startMs) / 1000);
-    tick();
-    const id = setInterval(tick, 100);
-    return () => clearInterval(id);
-  }, [startMs, endMs, isStreaming]);
-  if (!startMs || elapsed <= 0) return null;
-  return (
-    <span style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>
-      （用时 {elapsed.toFixed(1)} 秒）
-    </span>
-  );
-}
-
-interface Suggestion {
-  type: "followup" | "save_skill";
-  label: string;
-  icon?: string;
-}
-
-interface SandboxInfo {
-  sandbox_id: string;
-  stream_url?: string;
-  created_at?: string;
-  message?: string;
-}
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  id: string;
-  emotion?: EmotionResult;
-  sticker?: StickerSuggestion;
-  stickers?: Record<string, StickerSuggestion>;
-  skills_used?: string[];
-  actions?: AgentAction[];
-  traceEvents?: AgentEvent[];
-  suggestions?: Suggestion[];
-  images?: string[];
-  reasoning?: string;
-  reasoningStartMs?: number;
-  reasoningEndMs?: number;
-  browserSummary?: BrowserActionArtifactSummary;
-  browserRequirement?: BrowserRequirement;
-  skillSuggestions?: SkillGrowthSuggestion[];
-  contextLayers?: string[];
-  sandbox?: SandboxInfo;
-  airiSynced?: boolean;
-  airiEmotion?: string;
-}
-
-let msgId = 0;
-function newId() { return `msg-${++msgId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
-
-function browserTraceSummary(action?: string | null, stage: "start" | "success" | "error" | "handoff" = "success") {
-  return browserActionPhase(action, stage);
-}
-
-function makeBrowserTraceEvent(summary: string, detail?: unknown, kind: "tool_start" | "tool_result" | "reflect" = "tool_result"): AgentEvent {
-  const now = new Date().toISOString();
-  return {
-    id: `browser-trace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    trace_id: "browser-bridge",
-    ts: now,
-    domain: "planner",
-    type: kind,
-    summary,
-    detail,
-    meta: {
-      skill: "browser_runtime",
-    },
-  };
-}
-
-/** Map technical error messages to user-friendly text */
-function friendlyError(msg: string): string {
-  const m = (msg || "").toLowerCase();
-  if (m.includes("no provider") || m.includes("provider not")) return "No model provider is configured yet. Add an API key in Settings first.";
-  if (m.includes("planner_error") || m.includes("planner error")) return "The planning step failed. Retry or switch models.";
-  if (m.includes("context deadline") || m.includes("timeout")) return "The request timed out. Please try again.";
-  if (m.includes("rate limit") || m.includes("429")) return "Too many requests right now. Please retry in a moment.";
-  if (m.includes("401") || m.includes("unauthorized") || m.includes("invalid api key")) return "The API key looks invalid or expired. Check provider settings.";
-  if (m.includes("502") || m.includes("503") || m.includes("bad gateway")) return "The upstream model service is temporarily unavailable.";
-  if (m.includes("failed to fetch") || m.includes("network") || m.includes("err_connection") || m.includes("load failed")) return "Network connection lost. Please check your connection and try again.";
-  if (m.includes("request failed")) return "The request failed. Check network or service status and try again.";
-  return msg;
-}
-
-
-function collectGeneratedFiles(traceEvents?: AgentEvent[]) {
-  const files: Array<{ path: string; name: string; size?: number }> = [];
-  for (const evt of traceEvents || []) {
-    const detail = evt.detail as Record<string, unknown> | undefined;
-    if (detail && Array.isArray(detail.files)) {
-      for (const file of detail.files as Array<{ path: string; name: string; size?: number }>) {
-        if (!files.some((entry) => entry.path === file.path)) files.push(file);
-      }
-    }
-  }
-  return files;
-}
-
-function summarizeAssistantWork(message: Message) {
-  const traceEvents = message.traceEvents || [];
-  const toolEvents = traceEvents.filter((event) => event.type === "tool_start" || event.type === "tool_result");
-  const skills = [...new Set(toolEvents.map((event) => event.meta?.skill).filter(Boolean))];
-  const files = collectGeneratedFiles(traceEvents);
-  const warnings = traceEvents.filter((event) => {
-    const summary = (event.summary || "").toLowerCase();
-    return event.type === "plan" && (
-      summary.includes("warning") ||
-      summary.includes("risk") ||
-      summary.includes("blocked") ||
-      summary.includes("needs review")
-    );
-  });
-
-  return {
-    toolCount: toolEvents.length,
-    skillCount: skills.length,
-    primarySkill: skills[skills.length - 1] || "",
-    fileCount: files.length,
-    warningCount: warnings.length,
-  };
-}
-
-function getSlashState(input: string) {
-  const trimmed = input.trimStart();
-  if (!trimmed.startsWith("/")) return { visible: false, query: "" };
-  const firstLine = trimmed.split("\n")[0];
-  const commandPart = firstLine.slice(1);
-  if (commandPart.includes(" ")) return { visible: false, query: "" };
-  return { visible: true, query: commandPart };
-}
-
-function getActiveSlashCommand(input: string) {
-  const trimmed = input.trimStart();
-  if (!trimmed.startsWith("/")) return null;
-  const firstLine = trimmed.split("\n")[0];
-  const match = firstLine.match(/^\/([^\s]+)/);
-  return match?.[1] || null;
-}
-
-function mapBrowserSummary(summary: any): BrowserActionArtifactSummary {
-  return {
-    action: summary?.skill,
-    url: summary?.url,
-    title: summary?.title,
-    elementCount: summary?.element_count,
-    tabId: summary?.tab_id,
-    hasScreenshot: summary?.has_screenshot,
-    textLength: summary?.text_length,
-    preview: summary?.preview,
-    suggestedCommand: summary?.next_command,
-    suggestedLabel: summary?.next_label,
-    updatedAt: Date.now(),
-  };
-}
-
-function parseSlashBrowserCommand(input: string) {
-  const trimmed = input.trim();
-  if (!trimmed.startsWith("/")) return null;
-  const [cmdRaw, ...restParts] = trimmed.split(/\s+/);
-  const cmd = cmdRaw.toLowerCase();
-  const args = restParts.join(" ").trim();
-  const browserCommands: Record<string, { summary: string }> = {
-    "/navigate": { summary: args ? `Open page: ${args}` : "Open page" },
-    "/screenshot": { summary: "Capture page" },
-    "/content": { summary: "Read page content" },
-    "/mark": { summary: "Mark page elements" },
-    "/unmark": { summary: "Clear marked elements" },
-    "/scroll": { summary: args ? `Scroll page: ${args}` : "Scroll page" },
-    "/click": { summary: args ? `Click target: ${args}` : "Click element" },
-    "/type": { summary: args ? `Type input: ${args.slice(0, 32)}` : "Type input" },
-  };
-  if (!browserCommands[cmd]) return null;
-  return { command: cmd, args, ...browserCommands[cmd] };
-}
-
-function normalizeBrowserUrl(raw: string) {
-  const value = raw.trim();
-  if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
-  return `https://${value}`;
-}
-
-function buildSlashBrowserAction(command: { command: string; args: string }) {
-  switch (command.command) {
-    case "/navigate": {
-      const url = normalizeBrowserUrl(command.args);
-      if (!url) return { error: "Usage: /navigate https://example.com" };
-      return { action: { type: "browser_navigate", url } };
-    }
-    case "/screenshot":
-      return { action: { type: "browser_screenshot" } };
-    case "/content":
-      return { action: { type: "browser_get_content" } };
-    case "/mark":
-      return { action: { type: "browser_mark_elements" } };
-    case "/unmark":
-      return { action: { type: "browser_unmark_elements" } };
-    case "/scroll": {
-      const value = command.args.trim().toLowerCase();
-      if (!value) return { action: { type: "browser_scroll", direction: "down" } };
-      if (value === "top") return { action: { type: "browser_scroll", direction: "up", to_end: true } };
-      if (value === "bottom") return { action: { type: "browser_scroll", direction: "down", to_end: true } };
-      if (["up", "down", "left", "right"].includes(value)) {
-        return { action: { type: "browser_scroll", direction: value } };
-      }
-      return { error: "Usage: /scroll up|down|left|right|top|bottom" };
-    }
-    case "/click": {
-      const value = command.args.trim();
-      if (!value) return { error: "Usage: /click 3 or /click .selector" };
-      if (/^\d+$/.test(value)) {
-        return { action: { type: "browser_click", target: { strategy: "byIndex", index: Number(value) } } };
-      }
-      if (/^[#.\[]|^[a-z]+[\w\-.:#\[\]\(\)="']*$/i.test(value)) {
-        return { action: { type: "browser_click", target: { strategy: "bySelector", selector: value } } };
-      }
-      return { error: "Use /mark first, then /click <number>. CSS selectors are also supported." };
-    }
-    case "/type": {
-      const value = command.args.trim();
-      if (!value) return { error: "Usage: /type your text or /type <selector> => <text>" };
-      const selectorMatch = value.match(/^(.*?)\s*(?:=>|::)\s*([\s\S]+)$/);
-      if (selectorMatch) {
-        const selector = selectorMatch[1].trim();
-        const text = selectorMatch[2].trim();
-        if (!selector || !text) return { error: "Usage: /type <selector> => <text>" };
-        return { action: { type: "browser_input", target: { strategy: "bySelector", selector }, text } };
-      }
-      return { action: { type: "browser_input", text: value } };
-    }
-    default:
-      return { error: "Unsupported browser command." };
-  }
-}
-
-function summarizeSlashBrowserResult(actionType: string, result: any): BrowserActionArtifactSummary {
-  const content = typeof result?.content === "string" ? result.content : "";
-  const preview = content.replace(/\s+/g, " ").trim();
-  return {
-    action: actionType,
-    url: result?.url || result?.currentUrl || result?.state?.runtimeSession?.currentUrl || "",
-    title: result?.title || result?.state?.runtimeSession?.title || "",
-    elementCount: typeof result?.total === "number" ? result.total : Array.isArray(result?.elements) ? result.elements.length : undefined,
-    tabId: result?.tabId ?? result?.state?.runtimeSession?.currentTabId ?? null,
-    hasScreenshot: Boolean(result?.screenshot),
-    textLength: content.length,
-    preview: preview ? (preview.length > 240 ? `${preview.slice(0, 240)}...` : preview) : "",
-    suggestedCommand: actionType === "browser_navigate" ? "/content" : actionType === "browser_mark_elements" ? "/click " : actionType === "browser_get_content" ? "/mark" : undefined,
-    suggestedLabel: actionType === "browser_navigate" ? "Read this page" : actionType === "browser_mark_elements" ? "Click a marked element" : actionType === "browser_get_content" ? "Mark interactive elements" : undefined,
-    updatedAt: Date.now(),
-  };
-}
-
-function formatSlashBrowserResponse(command: { command: string; args: string }, artifact: BrowserActionArtifactSummary, result: any) {
-  const lines: string[] = [];
-  lines.push(`**${browserActionLabel(artifact.action)}** completed.`);
-  if (artifact.title) lines.push(`- Title: ${artifact.title}`);
-  if (artifact.url) lines.push(`- URL: ${artifact.url}`);
-  if (typeof artifact.elementCount === "number") lines.push(`- Elements: ${artifact.elementCount}`);
-  if (artifact.textLength) lines.push(`- Content length: ${artifact.textLength} chars`);
-  if (artifact.preview) {
-    lines.push("");
-    lines.push(artifact.preview);
-  }
-  if (artifact.hasScreenshot) {
-    lines.push("");
-    lines.push("A fresh screenshot was captured in the browser panel.");
-  }
-  if (command.command === "/click" && !artifact.preview && !artifact.title && !artifact.url) {
-    lines.push("");
-    lines.push("Tip: use `/content` or `/screenshot` next to inspect the result.");
-  }
-  if (result?.error) {
-    lines.push("");
-    lines.push(`Warning: ${result.error}`);
-  }
-  return lines.join("\n");
-}
-
-// 閳光偓閳光偓 Chat state reducer 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
-
-interface ChatState {
-  messages: Message[];
-  input: string;
-  loading: boolean;
-  streaming: boolean;
-  liveTraceEvents: AgentEvent[];
-}
-
-type ChatAction =
-  | { type: "SET_INPUT"; value: string }
-  | { type: "SET_MESSAGES"; messages: Message[] }
-  | { type: "ADD_PAIR"; userMsg: Message; asstMsg: Message }
-  | { type: "APPEND_LAST"; delta: string }
-  | { type: "UPDATE_LAST"; updates: Partial<Message> }
-  | { type: "APPEND_LAST_TRACE"; event: AgentEvent }
-  | { type: "APPEND_LAST_REASONING"; delta: string }
-  | { type: "ERROR_LAST"; error: string }
-  | { type: "REMOVE_MSG"; id: string }
-  | { type: "START_SEND" }
-  | { type: "FINISH_SEND" }
-  | { type: "ADD_LIVE_TRACE"; event: AgentEvent }
-  | { type: "CLEAR_LIVE_TRACE" };
-
-const chatInit: ChatState = { messages: [], input: "", loading: false, streaming: false, liveTraceEvents: [] };
-
-function chatReducer(state: ChatState, action: ChatAction): ChatState {
-  switch (action.type) {
-    case "SET_INPUT":
-      return { ...state, input: action.value };
-    case "SET_MESSAGES":
-      return { ...state, messages: action.messages };
-    case "ADD_PAIR":
-      return { ...state, messages: [...state.messages, action.userMsg, action.asstMsg] };
-    case "APPEND_LAST": {
-      const msgs = [...state.messages];
-      if (msgs.length === 0) return state;
-      const last = msgs[msgs.length - 1];
-      msgs[msgs.length - 1] = { ...last, content: last.content + action.delta };
-      return { ...state, messages: msgs };
-    }
-    case "UPDATE_LAST": {
-      const msgs = [...state.messages];
-      if (msgs.length === 0) return state;
-      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], ...action.updates };
-      return { ...state, messages: msgs };
-    }
-    case "APPEND_LAST_TRACE": {
-      const msgs = [...state.messages];
-      if (msgs.length === 0) return state;
-      const last = { ...msgs[msgs.length - 1] };
-      last.traceEvents = [...(last.traceEvents || []), action.event];
-      msgs[msgs.length - 1] = last;
-      const liveTraceEvents = [...state.liveTraceEvents.slice(-50), action.event];
-      return { ...state, messages: msgs, liveTraceEvents };
-    }
-    case "APPEND_LAST_REASONING": {
-      const msgs = [...state.messages];
-      if (msgs.length === 0) return state;
-      const last = { ...msgs[msgs.length - 1] };
-      if (!last.reasoning) last.reasoningStartMs = Date.now();
-      last.reasoning = (last.reasoning || "") + action.delta;
-      msgs[msgs.length - 1] = last;
-      return { ...state, messages: msgs };
-    }
-    case "ERROR_LAST": {
-      const msgs = [...state.messages];
-      if (msgs.length === 0) return state;
-      const last = msgs[msgs.length - 1];
-      msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n[FAIL] ${action.error}` };
-      return { ...state, messages: msgs };
-    }
-    case "REMOVE_MSG":
-      return { ...state, messages: state.messages.filter((m) => m.id !== action.id) };
-    case "START_SEND":
-      return { ...state, input: "", loading: true, streaming: true, liveTraceEvents: [] };
-    case "FINISH_SEND": {
-      const finMsgs = [...state.messages];
-      if (finMsgs.length > 0) {
-        const last = { ...finMsgs[finMsgs.length - 1] };
-        if (last.reasoning && last.reasoningStartMs && !last.reasoningEndMs) {
-          last.reasoningEndMs = Date.now();
-          finMsgs[finMsgs.length - 1] = last;
-        }
-      }
-      return { ...state, messages: finMsgs, loading: false, streaming: false };
-    }
-    case "ADD_LIVE_TRACE":
-      return { ...state, liveTraceEvents: [...state.liveTraceEvents.slice(-50), action.event] };
-    case "CLEAR_LIVE_TRACE":
-      return { ...state, liveTraceEvents: [] };
-    default:
-      return state;
-  }
-}
-
-// 閳光偓閳光偓 Conversation state reducer 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
-
-interface ConvState {
-  list: ConversationInfo[];
-  activeId: string;
-  showArchived: boolean;
-  searchQuery: string;
-  renameId: string | null;
-  renameText: string;
-}
-
-type ConvAction =
-  | { type: "SET_LIST"; list: ConversationInfo[] }
-  | { type: "UPDATE_ONE"; id: string; data: Partial<ConversationInfo> }
-  | { type: "REMOVE"; id: string }
-  | { type: "SET_ACTIVE"; id: string }
-  | { type: "SET_ARCHIVED"; show: boolean }
-  | { type: "SET_SEARCH"; query: string }
-  | { type: "START_RENAME"; id: string; text: string }
-  | { type: "SET_RENAME_TEXT"; text: string }
-  | { type: "CANCEL_RENAME" };
-
-const ACTIVE_CONV_KEY = "yunque_active_conv";
-const convInit: ConvState = {
-  list: [],
-  activeId: (typeof window !== "undefined" ? localStorage.getItem(ACTIVE_CONV_KEY) : null) || "default",
-  showArchived: false, searchQuery: "", renameId: null, renameText: "",
-};
-
-function convReducer(state: ConvState, action: ConvAction): ConvState {
-  switch (action.type) {
-    case "SET_LIST":
-      return { ...state, list: action.list };
-    case "UPDATE_ONE":
-      return { ...state, list: state.list.map((c) => c.id === action.id ? { ...c, ...action.data } : c), renameId: null };
-    case "REMOVE":
-      return { ...state, list: state.list.filter((c) => c.id !== action.id) };
-    case "SET_ACTIVE":
-      if (typeof window !== "undefined") localStorage.setItem(ACTIVE_CONV_KEY, action.id);
-      return { ...state, activeId: action.id };
-    case "SET_ARCHIVED":
-      return { ...state, showArchived: action.show };
-    case "SET_SEARCH":
-      return { ...state, searchQuery: action.query };
-    case "START_RENAME":
-      return { ...state, renameId: action.id, renameText: action.text };
-    case "SET_RENAME_TEXT":
-      return { ...state, renameText: action.text };
-    case "CANCEL_RENAME":
-      return { ...state, renameId: null, renameText: "" };
-    default:
-      return state;
-  }
-}
+import type { Suggestion, SandboxInfo, Message } from "@/lib/chat-types";
+import {
+  newId,
+  browserTraceSummary,
+  makeBrowserTraceEvent,
+  friendlyError,
+  collectGeneratedFiles,
+  summarizeAssistantWork,
+} from "@/lib/chat-utils";
+import {
+  getSlashState,
+  getActiveSlashCommand,
+  mapBrowserSummary,
+  parseSlashBrowserCommand,
+  buildSlashBrowserAction,
+  summarizeSlashBrowserResult,
+  formatSlashBrowserResponse,
+} from "@/lib/slash-commands";
+import { ThinkingTimer } from "@/components/chat/thinking-timer";
+import { chatReducer, chatInit } from "@/lib/chat-state";
+import { convReducer, convInit } from "@/lib/conversation-state";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -483,7 +59,6 @@ export default function ChatPage() {
   const [copiedIdx, setCopiedIdx] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => {
     if (typeof window === "undefined") return true;
-    if (localStorage.getItem("yunque_simple_mode") === "1") return false;
     return window.innerWidth >= 1024;
   });
   const [showComputer, setShowComputer] = useState(false);
@@ -499,7 +74,6 @@ export default function ChatPage() {
   const [computerWidth, setComputerWidth] = useState(420);
   const resizingRef = useRef(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
-  const [isSimpleMode, setIsSimpleMode] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1280px)");
@@ -516,22 +90,6 @@ export default function ChatPage() {
     if (isNarrowViewport && showComputer) setShowSidebar(false);
   }, [isNarrowViewport, showComputer]);
 
-  useEffect(() => {
-    setIsSimpleMode(localStorage.getItem("yunque_simple_mode") === "1");
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "yunque_simple_mode") setIsSimpleMode(e.newValue === "1");
-    };
-    const onLocalChange = (e: Event) => {
-      const detail = (e as CustomEvent<boolean>).detail;
-      setIsSimpleMode(typeof detail === "boolean" ? detail : localStorage.getItem("yunque_simple_mode") === "1");
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("yunque:simple-mode-change", onLocalChange);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("yunque:simple-mode-change", onLocalChange);
-    };
-  }, []);
   const [currentModel, setCurrentModel] = useState("");
   const [currentModelId, setCurrentModelId] = useState("");
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
@@ -960,7 +518,12 @@ ${text.slice(0, 4000)}` });
     }
   }, [chat.messages]);
 
-  const sendMessage = useCallback(async (overrideText?: string) => {
+  const sendMessage = useCallback(async (
+    overrideText?: string,
+    cherryOpts?: {
+      attachments?: Array<{ name: string; mime: string; dataB64: string }>;
+    },
+  ) => {
     const text = (overrideText || chat.input).trim();
     if (!text || chat.loading) return;
     if (setupNeeded) {
@@ -1109,10 +672,48 @@ ${text.slice(0, 4000)}` });
       const authHeaders: Record<string, string> = token
         ? { Authorization: `Bearer ${token}` }
         : apiKey ? { "X-API-Key": apiKey } : {};
+      // Cherry overlays persist their toggles in localStorage; in simple
+      // mode we honour those here so the user's drawer picks flow into the
+      // same /v1/chat/agentic request without extra plumbing. Attachments
+      // come via `cherryOpts` because they are strictly in-memory.
+      const cherryWebSearch = (() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("yunque_web_search_enabled") === "1";
+      })();
+      const cherryToolIds = (() => {
+        if (typeof window === "undefined") return undefined;
+        try {
+          const raw = localStorage.getItem("yunque_tools_selected");
+          if (!raw) return undefined;
+          const parsed = JSON.parse(raw) as unknown;
+          if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
+            return parsed.length > 0 ? (parsed as string[]) : undefined;
+          }
+        } catch { /* corrupted storage; ignore */ }
+        return undefined;
+      })();
+
+      const bodyObj: Record<string, unknown> = {
+        messages: historyMsgs,
+        session_id: conv.activeId,
+        ...(thinkingEnabled !== null ? { thinking: thinkingEnabled } : {}),
+        ...(chatMode !== "agent" ? { mode: chatMode } : {}),
+        ...(airiMode ? { airi_mode: true } : {}),
+      };
+      if (cherryWebSearch) bodyObj.web_search = true;
+      if (cherryToolIds) bodyObj.tool_ids = cherryToolIds;
+      if (cherryOpts?.attachments && cherryOpts.attachments.length > 0) {
+        bodyObj.attachments = cherryOpts.attachments.map((a) => ({
+          name: a.name,
+          mime: a.mime,
+          data_b64: a.dataB64,
+        }));
+      }
+
       const resp = await fetch("/v1/chat/agentic", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ messages: historyMsgs, session_id: conv.activeId, ...(thinkingEnabled !== null ? { thinking: thinkingEnabled } : {}), ...(chatMode !== "agent" ? { mode: chatMode } : {}), ...(airiMode ? { airi_mode: true } : {}) }),
+        body: JSON.stringify(bodyObj),
         signal: abort.signal,
       });
       if (!resp.ok || !resp.body) throw new Error("request failed");
@@ -1372,57 +973,11 @@ ${text.slice(0, 4000)}` });
     { key: "deep" as const, label: "深度", icon: <Brain size={12} /> },
   ] as const;
 
-  // ═══════════════════════════════════════════════════════
-  // Simple Mode — Completely different Cherry Studio-like UI
-  // ═══════════════════════════════════════════════════════
-  if (isSimpleMode) {
-    return (
-      <SimpleChatView
-        chat={chat}
-        chatDispatch={chatD as Dispatch<{ type: string; value?: string }>}
-        conversations={filteredConversations.map(c => ({
-          id: c.id,
-          title: c.name || c.id,
-          updatedAt: c.updated_at,
-          pinned: c.pinned,
-          archived: !!c.archived_at,
-        }))}
-        activeConvId={conv.activeId}
-        onSelectConv={switchConversation}
-        onNewConversation={newConversation}
-        onDeleteConversation={deleteConversation}
-        onSend={sendMessage}
-        scrollRef={scrollRef}
-        inputRef={inputRef}
-        availableModels={availableModels}
-        currentModel={currentModel}
-        currentModelId={currentModelId}
-        onSelectModel={(m) => {
-          setCurrentModel(m.model || m.display_name || m.id);
-          setCurrentModelId(m.id);
-          api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
-        }}
-        chatMode={chatMode}
-        onModeChange={(mode) => {
-          setChatMode(mode);
-          if (mode === "chat" && airiAvailable) setAiriMode(true);
-          else setAiriMode(false);
-        }}
-        airiAvailable={airiAvailable}
-        setupNeeded={setupNeeded}
-      />
-    );
-  }
-
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
-      {/* Conversation Sidebar — overlay in simple mode */}
-      {isSimpleMode && showSidebar && (
-        <div className="conv-sidebar-overlay" onClick={() => setShowSidebar(false)} />
-      )}
       {showSidebar && (
         <div
-          className={`flex flex-col h-full animate-slide-in-left ${isSimpleMode ? "conv-sidebar-float w-[280px]" : "w-[228px] xl:w-[244px] shrink-0"}`}
+          className="flex flex-col h-full animate-slide-in-left w-[228px] xl:w-[244px] shrink-0"
           style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)", transition: "width 0.2s ease" }}
         >
           {/* Sidebar Header */}
@@ -1562,7 +1117,7 @@ ${text.slice(0, 4000)}` });
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
         <header
-          className={`flex items-center justify-between shrink-0 ${isSimpleMode ? "px-4 py-2" : "px-4 py-3 xl:px-5"}`}
+          className="flex items-center justify-between shrink-0 px-4 py-3 xl:px-5"
           style={{ borderBottom: "1px solid var(--yunque-border)", background: "var(--yunque-sidebar)" }}
         >
           <div className="flex items-center gap-3">
@@ -1595,8 +1150,7 @@ ${text.slice(0, 4000)}` });
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Preset selector — hidden in simple mode */}
-            {!isSimpleMode && presets.length > 0 && (
+            {presets.length > 0 && (
               <Dropdown>
                 <Button
                   variant="ghost"
@@ -1620,14 +1174,10 @@ ${text.slice(0, 4000)}` });
               </Dropdown>
             )}
 
-            {/* Streaming indicator — compact in simple mode */}
-            {chat.streaming && !isSimpleMode && (
+            {chat.streaming && (
               <Chip className="animate-pulse-dot hidden lg:inline-flex" size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>
                 <Sparkles size={11} className="mr-1" /> 流式生成中
               </Chip>
-            )}
-            {chat.streaming && isSimpleMode && (
-              <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--yunque-accent)" }} />
             )}
 
             {/* Computer panel toggle */}
@@ -1642,8 +1192,7 @@ ${text.slice(0, 4000)}` });
               <Tooltip.Content>{showComputer ? "隐藏计算机面板" : "显示计算机面板"}</Tooltip.Content>
             </Tooltip>
 
-            {/* Thinking level pills — hidden in simple mode (accessible via model selector) */}
-            {!isSimpleMode && (
+            {(
               <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
                 {thinkingOptions.map(({ key, label, icon }) => (
                   <button
@@ -1664,19 +1213,16 @@ ${text.slice(0, 4000)}` });
               </div>
             )}
 
-            {/* New conversation button — simple mode only */}
-            {isSimpleMode && (
-              <Tooltip delay={0}>
-                <Button
-                  isIconOnly variant="ghost" size="sm" className="h-8 w-8 rounded-full"
-                  onPress={newConversation}
-                  style={{ color: "var(--yunque-text-muted)" }}
-                >
-                  <Plus size={15} />
-                </Button>
-                <Tooltip.Content>新建对话</Tooltip.Content>
-              </Tooltip>
-            )}
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly variant="ghost" size="sm" className="h-8 w-8 rounded-full"
+                onPress={newConversation}
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                <Plus size={15} />
+              </Button>
+              <Tooltip.Content>新建对话</Tooltip.Content>
+            </Tooltip>
           </div>
         </header>
 
@@ -1750,7 +1296,7 @@ ${text.slice(0, 4000)}` });
         )}
 
         {/* Chat Messages */}
-        <div ref={scrollRef} className={`flex-1 overflow-y-auto chat-scroll-area ${isSimpleMode ? "px-6 py-5 xl:px-10" : "px-5 py-4 xl:px-6"}`}>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
           {chat.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up">
               {setupNeeded && (
@@ -1817,7 +1363,7 @@ ${text.slice(0, 4000)}` });
               </div>
             </div>
           ) : (
-            <div className={`mx-auto ${isSimpleMode ? "max-w-4xl space-y-6" : "max-w-3xl space-y-5"}`}>
+            <div className="mx-auto max-w-3xl space-y-5">
               {chat.messages.map((msg, idx) => (
                 <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
                   {msg.role === "assistant" && (

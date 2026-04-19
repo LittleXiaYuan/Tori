@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Switch, Avatar, Button, Tooltip } from "@heroui/react";
+import { Avatar, Button, Tooltip } from "@heroui/react";
 import {
   MessageCircle,
   Zap,
@@ -44,6 +44,8 @@ import {
   Bell,
   Languages,
   FlaskConical,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
@@ -65,23 +67,7 @@ interface NavCategory {
   children?: NavItem[];
 }
 
-const normalCategories: NavCategory[] = [
-  { id: "dashboard", label: "概览", labelEn: "Overview", icon: <LayoutDashboard size={16} />, href: "/dashboard" },
-  { id: "chat", label: "对话", labelEn: "Chat", icon: <MessageCircle size={16} />, href: "/chat" },
-  { id: "tasks", label: "任务", labelEn: "Tasks", icon: <Zap size={16} />, href: "/missions" },
-  { id: "knowledge", label: "知识", labelEn: "Knowledge", icon: <BookOpen size={16} />, children: [
-    { href: "/knowledge", label: "知识库", labelEn: "Knowledge Base", icon: <BookOpen size={16} /> },
-    { href: "/memory", label: "记忆", labelEn: "Memory", icon: <Brain size={16} /> },
-    { href: "/persona", label: "角色", labelEn: "Persona", icon: <ScanFace size={16} /> },
-  ]},
-  { id: "tools", label: "工具", labelEn: "Tools", icon: <Package size={16} />, children: [
-    { href: "/skills", label: "技能", labelEn: "Skills", icon: <Package size={16} /> },
-    { href: "/workflows", label: "工作流", labelEn: "Workflows", icon: <Blocks size={16} /> },
-  ]},
-  { id: "settings", label: "设置", labelEn: "Settings", icon: <Settings size={16} />, href: "/settings" },
-];
-
-const devCategories: NavCategory[] = [
+const categories: NavCategory[] = [
   { id: "dashboard", label: "概览", labelEn: "Overview", icon: <LayoutDashboard size={16} />, href: "/dashboard" },
   { id: "chat", label: "对话", labelEn: "Chat", icon: <MessageCircle size={16} />, href: "/chat" },
   { id: "tasks", label: "任务", labelEn: "Tasks", icon: <Zap size={16} />, children: [
@@ -140,8 +126,8 @@ function resolveIcon(name: string): React.ReactNode {
   return iconMap[name.toLowerCase()] || <Puzzle size={16} />;
 }
 
-function findCategoryForPath(categories: NavCategory[], path: string): string | null {
-  for (const cat of categories) {
+function findCategoryForPath(cats: NavCategory[], path: string): string | null {
+  for (const cat of cats) {
     if (cat.children) {
       for (const child of cat.children) {
         if (path === child.href || path.startsWith(child.href + "/")) return cat.id;
@@ -151,11 +137,13 @@ function findCategoryForPath(categories: NavCategory[], path: string): string | 
   return null;
 }
 
+const COLLAPSED_KEY = "yunque_sidebar_collapsed";
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale } = useI18n();
-  const [simpleMode, setSimpleMode] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [drillId, setDrillId] = useState<string | null>(null);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -165,10 +153,16 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Missing key = first-run → default to Simple (Cherry) mode. Once the user
-    // explicitly toggles, the key will be "0"/"1" and we honor that forever.
-    const stored = localStorage.getItem("yunque_simple_mode");
-    setSimpleMode(stored === null ? true : stored === "1");
+    setCollapsed(localStorage.getItem(COLLAPSED_KEY) === "1");
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
+      if (next) setDrillId(null);
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -206,18 +200,8 @@ export default function Sidebar() {
     }).catch(() => {});
   }, []);
 
-  const toggleSimpleMode = useCallback((val: boolean) => {
-    setSimpleMode(val);
-    setDrillId(null);
-    localStorage.setItem("yunque_simple_mode", val ? "1" : "0");
-    // StorageEvent doesn't fire in the same tab — broadcast via CustomEvent so
-    // other panels (chat/page.tsx) can react instantly without a page reload.
-    window.dispatchEvent(new CustomEvent("yunque:simple-mode-change", { detail: val }));
-  }, []);
-
-  const categories = useMemo(() => {
-    const base = simpleMode ? normalCategories : devCategories;
-    if (extItems.length === 0) return base;
+  const allCategories = useMemo(() => {
+    if (extItems.length === 0) return categories;
     const extCategory: NavCategory = {
       id: "extensions",
       label: "扩展",
@@ -225,18 +209,18 @@ export default function Sidebar() {
       icon: <Blocks size={16} />,
       children: extItems,
     };
-    const settingsIdx = base.findIndex((c) => c.id === "settings");
-    const result = [...base];
+    const settingsIdx = categories.findIndex((c) => c.id === "settings");
+    const result = [...categories];
     result.splice(settingsIdx >= 0 ? settingsIdx : result.length, 0, extCategory);
     return result;
-  }, [simpleMode, extItems]);
+  }, [extItems]);
 
   useEffect(() => {
     if (pathname) {
-      const found = findCategoryForPath(categories, pathname);
+      const found = findCategoryForPath(allCategories, pathname);
       setDrillId(found);
     }
-  }, []); // only on mount — don't override user clicks
+  }, []); // only on mount
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("yunque_token");
@@ -246,7 +230,7 @@ export default function Sidebar() {
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  const activeCategory = useMemo(() => categories.find((c) => c.id === drillId), [categories, drillId]);
+  const activeCategory = useMemo(() => allCategories.find((c) => c.id === drillId), [allCategories, drillId]);
 
   const ui = useMemo(() => {
     const zh = locale === "zh";
@@ -259,12 +243,13 @@ export default function Sidebar() {
       mobileOpen: zh ? "打开侧边栏" : "Open sidebar",
       mobileClose: zh ? "关闭侧边栏" : "Close sidebar",
       navAria: zh ? "主导航" : "Main navigation",
-      simpleMode: zh ? "简洁模式" : "Simple mode",
       help: zh ? "帮助" : "Help",
       logout: zh ? "退出" : "Logout",
-      language: zh ? "语言" : "Language",
       localeLabel: zh ? "EN" : "中文",
       back: zh ? "返回" : "Back",
+      collapse: zh ? "折叠侧边栏" : "Collapse",
+      expand: zh ? "展开侧边栏" : "Expand",
+      settings: zh ? "设置" : "Settings",
     };
   }, [locale]);
 
@@ -280,49 +265,10 @@ export default function Sidebar() {
 
       <div className="sidebar-overlay" data-open={mobileOpen || undefined} onClick={() => setMobileOpen(false)} />
 
-      <aside className="sidebar animate-slide-in-left" data-open={mobileOpen || undefined} data-simple={simpleMode || undefined} data-sidebar role="navigation" aria-label={ui.navAria}>
-        {/* Mini logo for simple mode */}
-        <div className="sidebar-mini-logo">
-          <Tooltip delay={0}>
-            <Link href="/chat" className="sidebar-mini-icon" data-active={pathname === "/chat" || pathname?.startsWith("/chat/") || undefined}>
-              <Avatar size="sm" style={{ background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))", width: 28, height: 28 }}>
-                <Avatar.Fallback className="text-white text-[8px] font-bold">YQ</Avatar.Fallback>
-              </Avatar>
-            </Link>
-            <Tooltip.Content>云雀 Agent</Tooltip.Content>
-          </Tooltip>
-        </div>
-        {/* Mini nav icons for simple mode */}
-        <div className="sidebar-mini-nav">
-          <Tooltip delay={0}>
-            <Link href="/chat" className="sidebar-mini-icon" data-active={pathname === "/chat" || pathname?.startsWith("/chat/") || undefined}>
-              <MessageCircle size={18} />
-            </Link>
-            <Tooltip.Content>{locale === "zh" ? "对话" : "Chat"}</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Link href="/missions" className="sidebar-mini-icon" data-active={pathname?.startsWith("/missions") || pathname?.startsWith("/task") || undefined}>
-              <Zap size={18} />
-            </Link>
-            <Tooltip.Content>{locale === "zh" ? "任务" : "Tasks"}</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Link href="/knowledge" className="sidebar-mini-icon" data-active={pathname?.startsWith("/knowledge") || pathname?.startsWith("/memory") || undefined}>
-              <BookOpen size={18} />
-            </Link>
-            <Tooltip.Content>{locale === "zh" ? "知识" : "Knowledge"}</Tooltip.Content>
-          </Tooltip>
-          <div className="flex-1" />
-          <Tooltip delay={0}>
-            <Link href="/settings" className="sidebar-mini-icon" data-active={pathname?.startsWith("/settings") || undefined}>
-              <Settings size={18} />
-            </Link>
-            <Tooltip.Content>{locale === "zh" ? "设置" : "Settings"}</Tooltip.Content>
-          </Tooltip>
-        </div>
+      <aside className="sidebar animate-slide-in-left" data-open={mobileOpen || undefined} data-collapsed={collapsed || undefined} data-sidebar role="navigation" aria-label={ui.navAria}>
         <div className="sidebar-brand">
           <div className="flex items-center gap-2.5">
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <Avatar size="sm" style={{ background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))" }}>
                 <Avatar.Fallback className="text-white text-[10px] font-bold">YQ</Avatar.Fallback>
               </Avatar>
@@ -340,7 +286,7 @@ export default function Sidebar() {
                 }}
               />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 sidebar-brand-text">
               <div style={{ fontSize: "var(--text-md)", fontWeight: 600, color: "var(--yunque-text)" }}>{ui.title}</div>
               <div
                 style={{
@@ -352,7 +298,7 @@ export default function Sidebar() {
               </div>
             </div>
             <button
-              className="sidebar-inbox-btn"
+              className="sidebar-inbox-btn sidebar-brand-text"
               onClick={() => { startTransition(() => { router.push("/inbox"); }); }}
               aria-label="Inbox"
             >
@@ -361,7 +307,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div style={{ padding: "0 12px 8px" }}>
+        <div className="sidebar-search-wrap" style={{ padding: "0 12px 8px" }}>
           <button
             className="sidebar-search"
             onClick={() => {
@@ -369,9 +315,9 @@ export default function Sidebar() {
             }}
           >
             <Search size={12} />
-            <span>{ui.search}</span>
+            <span className="sidebar-search-text">{ui.search}</span>
             <span
-              className="ml-auto"
+              className="ml-auto sidebar-search-text"
               style={{
                 fontSize: "var(--text-2xs)",
                 padding: "1px 5px",
@@ -385,17 +331,37 @@ export default function Sidebar() {
         </div>
 
         <div className="sidebar-nav-container">
-          {/* ── Main panel ── */}
+          {/* Main panel */}
           <nav
             className="sidebar-panel"
             data-hidden={drillId ? true : undefined}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 8px" }}>
-              {categories.map((cat) => {
+              {allCategories.map((cat) => {
                 if (cat.children) {
                   const childActive = cat.children.some(
                     (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
                   );
+                  if (collapsed) {
+                    const firstHref = cat.children[0]?.href;
+                    return (
+                      <Tooltip key={cat.id} delay={0} placement="right">
+                        <Link
+                          href={firstHref || "#"}
+                          className="sidebar-link"
+                          data-active={childActive || undefined}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            startTransition(() => { router.push(firstHref || "/"); });
+                          }}
+                        >
+                          <span className="sidebar-link-icon">{cat.icon}</span>
+                          <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
+                        </Link>
+                        <Tooltip.Content>{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
+                      </Tooltip>
+                    );
+                  }
                   return (
                     <button
                       key={cat.id}
@@ -404,13 +370,13 @@ export default function Sidebar() {
                       onClick={() => setDrillId(cat.id)}
                     >
                       <span className="sidebar-link-icon">{cat.icon}</span>
-                      <span>{locale === "zh" ? cat.label : cat.labelEn}</span>
-                      <ChevronRight size={12} className="ml-auto" style={{ opacity: 0.3 }} />
+                      <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
+                      <ChevronRight size={12} className="ml-auto sidebar-link-label" style={{ opacity: 0.3 }} />
                     </button>
                   );
                 }
                 const active = pathname === cat.href || (cat.href !== "/settings" && pathname?.startsWith(cat.href + "/"));
-                return (
+                const linkContent = (
                   <Link
                     key={cat.id}
                     href={cat.href!}
@@ -423,94 +389,99 @@ export default function Sidebar() {
                     }}
                   >
                     <span className="sidebar-link-icon">{cat.icon}</span>
-                    <span>{locale === "zh" ? cat.label : cat.labelEn}</span>
+                    <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
                   </Link>
                 );
+                if (collapsed) {
+                  return (
+                    <Tooltip key={cat.id} delay={0} placement="right">
+                      {linkContent}
+                      <Tooltip.Content>{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
+                    </Tooltip>
+                  );
+                }
+                return linkContent;
               })}
             </div>
           </nav>
 
-          {/* ── Drill-down panel ── */}
-          <nav
-            className="sidebar-panel sidebar-panel-sub"
-            data-active={drillId ? true : undefined}
-          >
-            {activeCategory && (
-              <>
-                <button
-                  className="sidebar-back-btn"
-                  onClick={() => setDrillId(null)}
-                >
-                  <ChevronLeft size={14} />
-                  <span className="sidebar-link-icon">{activeCategory.icon}</span>
-                  <span style={{ fontWeight: 600 }}>{locale === "zh" ? activeCategory.label : activeCategory.labelEn}</span>
-                </button>
-                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2, padding: "0 8px" }}>
-                  {activeCategory.children!.map(({ href, label, labelEn, icon }) => {
-                    const active = pathname === href || pathname?.startsWith(href + "/");
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className="sidebar-link"
-                        data-active={active || undefined}
-                        onClick={(e) => {
-                          if (active) { e.preventDefault(); return; }
-                          e.preventDefault();
-                          startTransition(() => { router.push(href); });
-                        }}
-                      >
-                        <span className="sidebar-link-icon">{icon}</span>
-                        <span>{locale === "zh" ? label : labelEn}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </nav>
+          {/* Drill-down panel (hidden when collapsed) */}
+          {!collapsed && (
+            <nav
+              className="sidebar-panel sidebar-panel-sub"
+              data-active={drillId ? true : undefined}
+            >
+              {activeCategory && (
+                <>
+                  <button
+                    className="sidebar-back-btn"
+                    onClick={() => setDrillId(null)}
+                  >
+                    <ChevronLeft size={14} />
+                    <span className="sidebar-link-icon">{activeCategory.icon}</span>
+                    <span style={{ fontWeight: 600 }}>{locale === "zh" ? activeCategory.label : activeCategory.labelEn}</span>
+                  </button>
+                  <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2, padding: "0 8px" }}>
+                    {activeCategory.children!.map(({ href, label, labelEn, icon }) => {
+                      const active = pathname === href || pathname?.startsWith(href + "/");
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className="sidebar-link"
+                          data-active={active || undefined}
+                          onClick={(e) => {
+                            if (active) { e.preventDefault(); return; }
+                            e.preventDefault();
+                            startTransition(() => { router.push(href); });
+                          }}
+                        >
+                          <span className="sidebar-link-icon">{icon}</span>
+                          <span className="sidebar-link-label">{locale === "zh" ? label : labelEn}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </nav>
+          )}
         </div>
 
         <div className="sidebar-footer">
-          {simpleMode ? (
-            <>
-              <Tooltip delay={0}>
-                <button className="sidebar-mini-icon" onClick={() => toggleSimpleMode(false)}>
-                  <LayoutDashboard size={16} />
-                </button>
-                <Tooltip.Content>{locale === "zh" ? "切换完整模式" : "Full mode"}</Tooltip.Content>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-2" style={{ padding: "6px 4px" }}>
-                <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--yunque-text-muted)" }}>{ui.simpleMode}</span>
-                <Switch isSelected={simpleMode} onChange={(v) => toggleSimpleMode(v)}>
-                  <Switch.Control><Switch.Thumb /></Switch.Control>
-                </Switch>
-              </div>
-              <div className="flex items-center gap-1 pt-1" style={{ padding: "4px 2px 0" }}>
-                <Tooltip delay={0}>
-                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => setLocale(locale === "zh" ? "en" : "zh")}>
-                    <Languages size={14} style={{ opacity: 0.6 }} />
-                  </Button>
-                  <Tooltip.Content>{ui.localeLabel}</Tooltip.Content>
-                </Tooltip>
-                <Tooltip delay={0}>
-                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.open("https://yunque.owo.today/", "_blank", "noopener,noreferrer")}>
-                    <HelpCircle size={14} style={{ opacity: 0.6 }} />
-                  </Button>
-                  <Tooltip.Content>{ui.help}</Tooltip.Content>
-                </Tooltip>
-                <Tooltip delay={0}>
-                  <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={handleLogout}>
-                    <LogOut size={14} style={{ opacity: 0.6 }} />
-                  </Button>
-                  <Tooltip.Content>{ui.logout}</Tooltip.Content>
-                </Tooltip>
-              </div>
-            </>
-          )}
+          <div className="flex items-center gap-1" style={{ padding: "4px 2px 0" }}>
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))}>
+                <Settings size={14} style={{ opacity: 0.6 }} />
+              </Button>
+              <Tooltip.Content>{ui.settings}</Tooltip.Content>
+            </Tooltip>
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => setLocale(locale === "zh" ? "en" : "zh")}>
+                <Languages size={14} style={{ opacity: 0.6 }} />
+              </Button>
+              <Tooltip.Content>{ui.localeLabel}</Tooltip.Content>
+            </Tooltip>
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.open("https://yunque.owo.today/", "_blank", "noopener,noreferrer")}>
+                <HelpCircle size={14} style={{ opacity: 0.6 }} />
+              </Button>
+              <Tooltip.Content>{ui.help}</Tooltip.Content>
+            </Tooltip>
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={handleLogout}>
+                <LogOut size={14} style={{ opacity: 0.6 }} />
+              </Button>
+              <Tooltip.Content>{ui.logout}</Tooltip.Content>
+            </Tooltip>
+            <div className="flex-1" />
+            <Tooltip delay={0}>
+              <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={toggleCollapsed}>
+                {collapsed ? <PanelLeftOpen size={14} style={{ opacity: 0.6 }} /> : <PanelLeftClose size={14} style={{ opacity: 0.6 }} />}
+              </Button>
+              <Tooltip.Content>{collapsed ? ui.expand : ui.collapse}</Tooltip.Content>
+            </Tooltip>
+          </div>
         </div>
       </aside>
     </>
