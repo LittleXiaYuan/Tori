@@ -1661,7 +1661,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--yunque-card);
+  background: var(--yunque-bg);
   border: 1px solid var(--yunque-border);
   border-radius: 16px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
@@ -1776,6 +1776,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   border-right: 1px solid var(--yunque-border);
   padding: 12px 8px;
   overflow-y: auto;
+  background: var(--yunque-bg);
 }
 .cherry-settings-nav-group {
   font-size: 10px;
@@ -1812,6 +1813,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
+  background: var(--yunque-bg);
 }
 .cherry-settings-title {
   font-size: 17px;
