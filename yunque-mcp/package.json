@@ -1,6 +1,6 @@
 {
   "name": "@cloudtori/yunque-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Yunque Bridge — Connect any MCP-compatible IDE (Cursor, Claude Code, Windsurf, etc.) to Yunque Agent central orchestration",
   "bin": {
     "yunque-bridge": "index.js"
