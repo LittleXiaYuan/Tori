@@ -1998,20 +1998,28 @@ ${text.slice(0, 4000)}` });
         </div>
       </div>
 
-      {/* Computer Panel — side-by-side on wide screens, fixed overlay on ≤1280px */}
+      {/* Computer Panel — always rendered as a right-side overlay drawer */}
       {showComputer && (
         <>
-          {isNarrowViewport && (
+          <div
+            className="computer-panel-backdrop"
+            onClick={() => setShowComputer(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="computer-panel-overlay flex flex-col h-full animate-slide-in-right overflow-hidden"
+            style={{
+              width: Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
+              background: "var(--yunque-sidebar)",
+              boxShadow: "-4px 0 24px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div className="flex items-center justify-between shrink-0 px-3 pt-3 pb-1">
+              <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
+            </div>
             <div
-              className="computer-panel-backdrop"
-              onClick={() => setShowComputer(false)}
-              aria-hidden="true"
-            />
-          )}
-          {!isNarrowViewport && (
-            <div
-              className="w-1 shrink-0 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
-              style={{ background: "var(--yunque-border)" }}
+              className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors"
+              style={{ background: "transparent" }}
               onMouseDown={(e) => {
                 e.preventDefault();
                 resizingRef.current = true;
@@ -2028,19 +2036,6 @@ ${text.slice(0, 4000)}` });
                 document.addEventListener("mouseup", onUp);
               }}
             />
-          )}
-          <div
-            className={`flex flex-col h-full animate-slide-in-right overflow-hidden ${isNarrowViewport ? "computer-panel-overlay" : "shrink-0"}`}
-            style={{
-              width: isNarrowViewport
-                ? Math.min(480, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.85 : 360))
-                : Math.min(computerWidth, Math.floor(typeof window !== "undefined" ? window.innerWidth * 0.45 : 380)),
-              background: "var(--yunque-sidebar)",
-            }}
-          >
-            <div className="shrink-0 p-3">
-              <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
-            </div>
             <ComputerPanel className="min-h-0 flex-1" traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />
           </div>
         </>
