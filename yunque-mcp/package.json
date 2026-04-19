@@ -1,11 +1,24 @@
 {
-  "name": "yunque-mcp",
+  "name": "@cloudtori/yunque-bridge",
   "version": "0.1.0",
-  "description": "Yunque MCP Bridge - Connect any MCP-compatible tool to Yunque orchestration",
+  "description": "Yunque Bridge — Connect any MCP-compatible IDE (Cursor, Claude Code, Windsurf, etc.) to Yunque Agent central orchestration",
   "bin": {
-    "yunque-mcp": "./index.js"
+    "yunque-bridge": "./index.js"
   },
-  "keywords": ["mcp", "yunque", "ai", "orchestration", "cursor", "claude-code"],
+  "files": ["index.js", "README.md"],
+  "keywords": ["mcp", "yunque", "ai", "orchestration", "cursor", "claude-code", "windsurf", "agent", "bridge"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nichuanfang/yunque-agent"
+  },
+  "homepage": "https://github.com/nichuanfang/yunque-agent/tree/main/yunque-mcp",
+  "author": "cloudtori",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }
