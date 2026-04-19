@@ -87,12 +87,24 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(req)
-	case "notifications/initialized":
-		return nil, nil // no response for notifications
+	case "notifications/initialized", "notifications/cancelled":
+		return nil, nil
 	case "tools/list":
 		return s.handleToolsList(req)
 	case "tools/call":
 		return s.handleToolsCall(ctx, req)
+	case "resources/list":
+		return s.marshalResult(req.ID, map[string]any{"resources": []any{}})
+	case "resources/read":
+		return s.marshalError(req.ID, -32602, "no resources available")
+	case "resources/templates/list":
+		return s.marshalResult(req.ID, map[string]any{"resourceTemplates": []any{}})
+	case "prompts/list":
+		return s.marshalResult(req.ID, map[string]any{"prompts": []any{}})
+	case "prompts/get":
+		return s.marshalError(req.ID, -32602, "no prompts available")
+	case "completion/complete":
+		return s.marshalResult(req.ID, map[string]any{"completion": map[string]any{"values": []any{}}})
 	case "ping":
 		return s.marshalResult(req.ID, map[string]any{})
 	default:
@@ -103,9 +115,11 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 
 func (s *Server) handleInitialize(req jsonRPCRequest) ([]byte, error) {
 	result := map[string]any{
-		"protocolVersion": "2025-06-18",
+		"protocolVersion": "2025-11-05",
 		"capabilities": map[string]any{
-			"tools": map[string]any{"listChanged": false},
+			"tools":     map[string]any{"listChanged": false},
+			"resources": map[string]any{"subscribe": false, "listChanged": false},
+			"prompts":   map[string]any{"listChanged": false},
 		},
 		"serverInfo": map[string]any{
 			"name":    s.name,
