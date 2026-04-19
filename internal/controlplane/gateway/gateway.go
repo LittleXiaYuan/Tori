@@ -218,6 +218,8 @@ type Gateway struct {
 
 	// Project management (orchestrator)
 	projectStore *orchestrator.ProjectStore
+	orchDaemon   *orchestrator.Daemon
+	orchLauncher *orchestrator.Launcher
 
 	// Output directory for agent-generated files (file_write, code_exec outputs)
 	outputDir string
@@ -579,7 +581,8 @@ func (g *Gateway) routes() {
 	g.registerNotifyRoutes()     // notification channels (webhook, DingTalk, Feishu, etc.)
 	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
 	g.registerMCPDispatchRoutes() // MCP dispatch server for external workers
-	g.registerProjectRoutes()    // project management (orchestrator)
+	g.registerProjectRoutes()       // project management (orchestrator)
+	g.registerOrchestratorRoutes()  // orchestrator daemon control
 }
 
 // --- Auth middleware ---

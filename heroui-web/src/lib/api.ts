@@ -1136,6 +1136,14 @@ export const api = {
     fetcher<ProjectInfo>(`/v1/projects/detail?id=${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) }),
   removeProject: (id: string) =>
     fetcher<{ status: string }>("/v1/projects/remove", { method: "POST", body: JSON.stringify({ id }) }),
+
+  // Orchestrator
+  orchestratorStatus: () =>
+    fetcher<{ running: boolean; adapters: string[]; active_sessions: number }>("/v1/orchestrator/status"),
+  orchestratorToggle: (action: "start" | "stop") =>
+    fetcher<{ status: string }>("/v1/orchestrator/toggle", { method: "POST", body: JSON.stringify({ action }) }),
+  orchestratorSessions: () =>
+    fetcher<{ sessions: Array<{ session_id: string; adapter: string; task_id: string; started_at: string }> }>("/v1/orchestrator/sessions"),
 };
 
 // Sticker URL utilities

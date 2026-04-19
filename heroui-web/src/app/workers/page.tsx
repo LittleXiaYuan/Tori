@@ -7,6 +7,7 @@ import {
   Cpu, RefreshCw, Trash2, Copy, Plus,
   CheckCircle2, AlertTriangle, Clock,
   Monitor, Terminal, Globe,
+  Play, Square, Activity,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
@@ -34,6 +35,11 @@ export default function WorkersPage() {
   const [configData, setConfigData] = useState<{ mcp_config: string; instructions: string; server_url: string } | null>(null);
   const [configLoading, setConfigLoading] = useState(false);
 
+  const [orchRunning, setOrchRunning] = useState(false);
+  const [orchAdapters, setOrchAdapters] = useState<string[]>([]);
+  const [orchSessions, setOrchSessions] = useState<Array<{ session_id: string; adapter: string; task_id: string; started_at: string }>>([]);
+  const [orchLoading, setOrchLoading] = useState(false);
+
   const loadWorkers = useCallback(async () => {
     setLoading(true);
     try {
@@ -46,7 +52,31 @@ export default function WorkersPage() {
     }
   }, []);
 
-  useEffect(() => { loadWorkers(); }, [loadWorkers]);
+  const loadOrchStatus = useCallback(async () => {
+    try {
+      const [status, sess] = await Promise.all([
+        api.orchestratorStatus(),
+        api.orchestratorSessions(),
+      ]);
+      setOrchRunning(status.running);
+      setOrchAdapters(status.adapters || []);
+      setOrchSessions(sess.sessions || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  const toggleOrch = async () => {
+    setOrchLoading(true);
+    try {
+      await api.orchestratorToggle(orchRunning ? "stop" : "start");
+      showToast(orchRunning ? "守护进程已停止" : "守护进程已启动", "success");
+      await loadOrchStatus();
+    } catch (e) {
+      showToast(`操作失败: ${(e as Error).message}`, "error");
+    }
+    setOrchLoading(false);
+  };
+
+  useEffect(() => { loadWorkers(); loadOrchStatus(); }, [loadWorkers, loadOrchStatus]);
 
   const handleRemove = async (id: string) => {
     try {
@@ -254,6 +284,75 @@ export default function WorkersPage() {
           </div>
         </div>
       )}
+
+      {/* Orchestrator Daemon Control */}
+      <div style={{ borderTop: "1px solid var(--yunque-border)", marginTop: 24, paddingTop: 24 }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--yunque-text)" }}>
+            <Activity size={18} /> 编排守护进程
+          </h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs px-2 py-1 rounded" style={{
+              background: orchRunning ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+              color: orchRunning ? "#22c55e" : "#ef4444",
+            }}>
+              {orchRunning ? "运行中" : "已停止"}
+            </span>
+            <Button size="sm" isDisabled={orchLoading} onPress={toggleOrch}
+              style={{ background: orchRunning ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)", color: orchRunning ? "#ef4444" : "#22c55e" }}>
+              {orchRunning ? <><Square size={14} /> 停止</> : <><Play size={14} /> 启动</>}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Card style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
+            <div className="p-3 text-center">
+              <div className="text-2xl font-bold" style={{ color: "var(--yunque-accent)" }}>{orchAdapters.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>可用适配器</div>
+              {orchAdapters.length > 0 && (
+                <div className="flex gap-1 justify-center mt-1 flex-wrap">
+                  {orchAdapters.map((a) => (
+                    <span key={a} className="text-[10px] px-1.5 py-0.5 rounded"
+                      style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>{a}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+          <Card style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
+            <div className="p-3 text-center">
+              <div className="text-2xl font-bold" style={{ color: "#f59e0b" }}>{orchSessions.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>活跃会话</div>
+            </div>
+          </Card>
+          <Card style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
+            <div className="p-3 text-center">
+              <div className="text-2xl font-bold" style={{ color: "#22c55e" }}>{workers.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>已连接 Worker</div>
+            </div>
+          </Card>
+        </div>
+
+        {orchSessions.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium" style={{ color: "var(--yunque-muted)" }}>活跃会话</h3>
+            {orchSessions.map((s) => (
+              <Card key={s.session_id} style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
+                <div className="p-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{s.session_id}</div>
+                    <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>
+                      适配器: {s.adapter} | 任务: {s.task_id} | {new Date(s.started_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <Chip style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>运行中</Chip>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
