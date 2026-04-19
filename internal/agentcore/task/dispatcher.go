@@ -184,6 +184,37 @@ func (d *Dispatcher) Requeue(taskID string) error {
 	return nil
 }
 
+// Pending returns copies of all queued (unassigned) entries.
+func (d *Dispatcher) Pending() []DispatchEntry {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var out []DispatchEntry
+	for _, e := range d.byID {
+		if e.DispatchStatus == DispatchQueued {
+			out = append(out, *e)
+		}
+	}
+	return out
+}
+
+// CheckTimeouts detects timed-out assigned tasks and returns their IDs.
+func (d *Dispatcher) CheckTimeouts() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var ids []string
+	now := time.Now()
+	for _, entry := range d.byID {
+		if entry.DispatchStatus != DispatchAssigned || entry.TimeoutSec <= 0 || entry.AssignedAt == nil {
+			continue
+		}
+		if now.After(entry.AssignedAt.Add(time.Duration(entry.TimeoutSec) * time.Second)) {
+			entry.DispatchStatus = DispatchTimeout
+			ids = append(ids, entry.TaskID)
+		}
+	}
+	return ids
+}
+
 // ListQueued returns copies of all entries currently in the dispatch queue.
 func (d *Dispatcher) ListQueued() []*DispatchEntry {
 	d.mu.Lock()
