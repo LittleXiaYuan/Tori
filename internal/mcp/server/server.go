@@ -113,7 +113,7 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 	}
 }
 
-var supportedVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
+var supportedVersions = []string{"2025-11-05", "2025-06-18", "2025-03-26", "2024-11-05"}
 
 func negotiateVersion(clientVersion string) string {
 	for _, v := range supportedVersions {
