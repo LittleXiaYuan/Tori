@@ -352,20 +352,22 @@ export default function Sidebar() {
                   if (collapsed) {
                     const firstHref = cat.children[0]?.href;
                     return (
-                      <Tooltip key={cat.id} delay={0} placement="right">
-                        <Link
-                          href={firstHref || "#"}
-                          className="sidebar-link"
-                          data-active={childActive || undefined}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            startTransition(() => { router.push(firstHref || "/"); });
-                          }}
-                        >
-                          <span className="sidebar-link-icon">{cat.icon}</span>
-                          <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
-                        </Link>
-                        <Tooltip.Content>{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
+                      <Tooltip key={cat.id} delay={0}>
+                        <Tooltip.Trigger>
+                          <Link
+                            href={firstHref || "#"}
+                            className="sidebar-link"
+                            data-active={childActive || undefined}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              startTransition(() => { router.push(firstHref || "/"); });
+                            }}
+                          >
+                            <span className="sidebar-link-icon">{cat.icon}</span>
+                            <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
+                          </Link>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content placement="right">{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
                       </Tooltip>
                     );
                   }
@@ -401,9 +403,11 @@ export default function Sidebar() {
                 );
                 if (collapsed) {
                   return (
-                    <Tooltip key={cat.id} delay={0} placement="right">
-                      {linkContent}
-                      <Tooltip.Content>{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
+                    <Tooltip key={cat.id} delay={0}>
+                      <Tooltip.Trigger>
+                        {linkContent}
+                      </Tooltip.Trigger>
+                      <Tooltip.Content placement="right">{locale === "zh" ? cat.label : cat.labelEn}</Tooltip.Content>
                     </Tooltip>
                   );
                 }
@@ -458,17 +462,17 @@ export default function Sidebar() {
         <div className="sidebar-footer">
           {collapsed ? (
             <div className="flex flex-col items-center gap-1 py-2">
-              <Tooltip delay={0} placement="right">
+              <Tooltip delay={0}>
                 <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={() => window.dispatchEvent(new CustomEvent("yunque:open-settings"))}>
                   <Settings size={14} style={{ opacity: 0.6 }} />
                 </Button>
-                <Tooltip.Content>{ui.settings}</Tooltip.Content>
+                <Tooltip.Content placement="right">{ui.settings}</Tooltip.Content>
               </Tooltip>
-              <Tooltip delay={0} placement="right">
+              <Tooltip delay={0}>
                 <Button size="sm" variant="ghost" isIconOnly className="min-w-0 rounded-lg" onPress={toggleCollapsed}>
                   <PanelLeftOpen size={14} style={{ opacity: 0.6 }} />
                 </Button>
-                <Tooltip.Content>{ui.expand}</Tooltip.Content>
+                <Tooltip.Content placement="right">{ui.expand}</Tooltip.Content>
               </Tooltip>
             </div>
           ) : (

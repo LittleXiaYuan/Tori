@@ -589,7 +589,6 @@ button, [role="button"] { border-radius: var(--radius-md); }
 /* ── Collapsed sidebar (icon rail) ────────── */
 .sidebar[data-collapsed] {
   width: var(--sidebar-mini-w);
-  overflow: hidden;
 }
 .sidebar[data-collapsed] .sidebar-brand {
   padding: 14px 0 10px;
