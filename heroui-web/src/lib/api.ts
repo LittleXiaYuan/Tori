@@ -25,7 +25,7 @@ import type {
   GraphEntity, GraphRelation, GraphStats, MemorySearchResult,
   SystemInfo, CacheStats, RouterStats, PersonaMode, SearchResult,
   FederationPeer, FederationStats, ProviderPreset, ToriBindingStatus, ToriHealthStatus, ToriUsageSummary, SkillSuggestion, SyncManifestItem,
-  ConnectorView, ConnectorDef, NotifyChannel,
+  ConnectorView, ConnectorDef, NotifyChannel, WorkerInfo,
 } from "./api-types";
 
 export type * from "./api-types";
@@ -112,15 +112,34 @@ export const api = {
     messages: Array<{ role: string; content: string }>,
     sessionId?: string,
     thinkingLevel?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: {
+      /** Cherry 🌐 drawer: ask planner to prefer the web_search skill. */
+      webSearch?: boolean;
+      /** Cherry 🔨 drawer: restrict planner to these skill names. */
+      toolIds?: string[];
+      /** Cherry 📎 drawer: inline files to splice into the last user message. */
+      attachments?: Array<{ name: string; mime: string; dataB64: string }>;
+    },
   ): AsyncGenerator<string> {
+    const body: Record<string, unknown> = { messages, session_id: sessionId };
+    if (thinkingLevel) body.thinking_level = thinkingLevel;
+    if (options?.webSearch) body.web_search = true;
+    if (options?.toolIds && options.toolIds.length > 0) body.tool_ids = options.toolIds;
+    if (options?.attachments && options.attachments.length > 0) {
+      body.attachments = options.attachments.map((a) => ({
+        name: a.name,
+        mime: a.mime,
+        data_b64: a.dataB64,
+      }));
+    }
     const res = await fetch(`${BASE}/v1/chat/agentic`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({ messages, session_id: sessionId, ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}) }),
+      body: JSON.stringify(body),
       signal,
     });
     if (!res.ok) throw new Error(`${res.status}`);
@@ -1095,6 +1114,16 @@ export const api = {
     fetcher<{ ok: boolean; running: boolean; sandbox?: { id: string; stream_url: string; created_at: string; vnc_log?: string[] }; alive?: boolean }>("/v1/sandbox/desktop/status"),
   desktopDestroy: () =>
     fetcher<{ ok: boolean; message?: string }>("/v1/sandbox/desktop/destroy", { method: "POST" }),
+
+  // Workers (MCP Dispatch)
+  listWorkers: () =>
+    fetcher<{ workers: WorkerInfo[]; count: number }>("/v1/workers"),
+  getWorkerDetail: (id: string) =>
+    fetcher<WorkerInfo>(`/v1/workers/detail?id=${encodeURIComponent(id)}`),
+  removeWorker: (id: string) =>
+    fetcher<{ status: string }>("/v1/workers/remove", { method: "POST", body: JSON.stringify({ id }) }),
+  getWorkerConfig: (type: string) =>
+    fetcher<{ type: string; mcp_config: string; instructions: string; server_url: string }>(`/v1/workers/config?type=${encodeURIComponent(type)}`),
 };
 
 // Sticker URL utilities

@@ -58,6 +58,7 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/connectors"
+	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/sandbox"
@@ -209,6 +210,10 @@ type Gateway struct {
 	documentParser documentParser
 
 	notifier *notify.Notifier
+
+	// MCP Dispatch Server (work orchestration for external workers)
+	mcpDispatchServer *mcpserver.Server
+	workerRegistry    *mcpserver.WorkerRegistry
 
 	// Output directory for agent-generated files (file_write, code_exec outputs)
 	outputDir string
@@ -569,6 +574,7 @@ func (g *Gateway) routes() {
 	g.registerConnectorRoutes()  // connectors (GitHub, Gmail, Calendar, etc.)
 	g.registerNotifyRoutes()     // notification channels (webhook, DingTalk, Feishu, etc.)
 	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
+	g.registerMCPDispatchRoutes() // MCP dispatch server for external workers
 }
 
 // --- Auth middleware ---

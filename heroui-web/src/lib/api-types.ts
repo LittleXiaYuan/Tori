@@ -594,6 +594,12 @@ export interface TaskInfo {
   started_at?: string;
   finished_at?: string;
   working_memory?: TaskWorkingMemory;
+  constraints?: {
+    extra?: Record<string, unknown>;
+    tags?: string[];
+    priority?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface GapRecord {
@@ -1452,4 +1458,17 @@ export interface NotifyChannel {
   url: string;
   secret?: string;
   enabled: boolean;
+}
+
+export interface WorkerInfo {
+  id: string;
+  name: string;
+  type: string; // "cursor" | "claude_code" | "windsurf" | "custom"
+  capabilities: string[];
+  max_concurrency: number;
+  active_tasks: number;
+  status: string; // "online" | "busy" | "offline"
+  registered_at: string;
+  last_heartbeat: string;
+  metadata?: Record<string, string>;
 }

@@ -374,11 +374,16 @@ export default function MissionsPage() {
                     {t.type && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{t.type}</Chip>}
                     {t.priority && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>P{t.priority}</Chip>}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {t.steps && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{t.steps.length} 步</span>}
                     <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       {t.created_at ? new Date(t.created_at).toLocaleDateString() : ""}
                     </span>
+                    {typeof t.constraints?.extra?.claimed_by === "string" && (
+                      <Chip size="sm" style={{ fontSize: "var(--text-2xs)", background: "rgba(59,130,246,0.1)", color: "#3b82f6" }}>
+                        ⚙ Worker: {t.constraints.extra.claimed_by}
+                      </Chip>
+                    )}
                     {t.error && (
                       <Tooltip delay={0}>
                         <AlertTriangle size={11} style={{ color: "#ef4444" }} />
