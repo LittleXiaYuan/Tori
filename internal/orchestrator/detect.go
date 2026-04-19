@@ -24,55 +24,31 @@ type ideCandidate struct {
 }
 
 var knownIDEs = []ideCandidate{
-	{
-		name:          "Cursor",
-		binaries:      binaryVariants("cursor"),
-		mcpConfigPath: ".cursor/mcp.json",
-		rulesPath:     ".cursor/rules/yunque-worker.mdc",
-		hasAdapter:    true,
-	},
-	{
-		name:          "Claude Code",
-		binaries:      binaryVariants("claude"),
-		mcpConfigPath: ".mcp/mcp.json",
-		rulesPath:     "CLAUDE.md",
-		hasAdapter:    true,
-	},
-	{
-		name:          "Windsurf",
-		binaries:      binaryVariants("windsurf"),
-		mcpConfigPath: ".windsurf/mcp_config.json",
-		rulesPath:     ".windsurfrules",
-		hasAdapter:    true,
-	},
-	{
-		name:          "Trae",
-		binaries:      binaryVariants("trae"),
-		mcpConfigPath: ".trae/mcp.json",
-		rulesPath:     ".trae/rules/yunque-worker.md",
-		hasAdapter:    true,
-	},
-	{
-		name:          "VS Code",
-		binaries:      binaryVariants("code"),
-		mcpConfigPath: ".vscode/mcp.json",
-		rulesPath:     "",
-		hasAdapter:    false,
-	},
-	{
-		name:          "Zed",
-		binaries:      binaryVariants("zed"),
-		mcpConfigPath: ".zed/mcp.json",
-		rulesPath:     "",
-		hasAdapter:    false,
-	},
-	{
-		name:          "Neovim",
-		binaries:      binaryVariants("nvim"),
-		mcpConfigPath: ".nvim/mcp.json",
-		rulesPath:     "",
-		hasAdapter:    false,
-	},
+	// --- IDE with built-in adapter ---
+	{name: "Cursor", binaries: binaryVariants("cursor"), mcpConfigPath: ".cursor/mcp.json", rulesPath: ".cursor/rules/yunque-worker.mdc", hasAdapter: true},
+	{name: "Claude Code", binaries: binaryVariants("claude"), mcpConfigPath: ".mcp/mcp.json", rulesPath: "CLAUDE.md", hasAdapter: true},
+	{name: "Windsurf", binaries: binaryVariants("windsurf"), mcpConfigPath: ".windsurf/mcp_config.json", rulesPath: ".windsurfrules", hasAdapter: true},
+	{name: "Trae", binaries: binaryVariants("trae"), mcpConfigPath: ".trae/mcp.json", rulesPath: ".trae/rules/yunque-worker.md", hasAdapter: true},
+
+	// --- IDE / Editors (auto-register via GenericAdapter) ---
+	{name: "VS Code", binaries: binaryVariants("code"), mcpConfigPath: ".vscode/mcp.json", rulesPath: ".github/copilot-instructions.md"},
+	{name: "VS Code Insiders", binaries: binaryVariants("code-insiders"), mcpConfigPath: ".vscode/mcp.json", rulesPath: ".github/copilot-instructions.md"},
+	{name: "JetBrains IDEA", binaries: binaryVariants("idea"), mcpConfigPath: ".idea/mcp.json", rulesPath: ""},
+	{name: "JetBrains GoLand", binaries: binaryVariants("goland"), mcpConfigPath: ".idea/mcp.json", rulesPath: ""},
+	{name: "JetBrains PyCharm", binaries: binaryVariants("pycharm"), mcpConfigPath: ".idea/mcp.json", rulesPath: ""},
+	{name: "JetBrains WebStorm", binaries: binaryVariants("webstorm"), mcpConfigPath: ".idea/mcp.json", rulesPath: ""},
+	{name: "Zed", binaries: binaryVariants("zed"), mcpConfigPath: ".zed/mcp.json", rulesPath: ""},
+	{name: "Neovim", binaries: binaryVariants("nvim"), mcpConfigPath: ".nvim/mcp.json", rulesPath: ""},
+
+	// --- CLI Coding Agents ---
+	{name: "Codex CLI", binaries: binaryVariants("codex"), mcpConfigPath: ".mcp/mcp.json", rulesPath: "AGENTS.md"},
+	{name: "Aider", binaries: binaryVariants("aider"), mcpConfigPath: ".mcp/mcp.json", rulesPath: ".aider.conf.yml"},
+	{name: "Cline", binaries: binaryVariants("cline"), mcpConfigPath: ".mcp/mcp.json", rulesPath: ""},
+	{name: "Continue", binaries: binaryVariants("continue"), mcpConfigPath: ".continue/mcp.json", rulesPath: ""},
+	{name: "Goose", binaries: binaryVariants("goose"), mcpConfigPath: ".mcp/mcp.json", rulesPath: ""},
+	{name: "OpenHands", binaries: binaryVariants("openhands"), mcpConfigPath: ".mcp/mcp.json", rulesPath: ""},
+	{name: "OpenCode", binaries: binaryVariants("opencode"), mcpConfigPath: ".mcp/mcp.json", rulesPath: ""},
+	{name: "Gemini CLI", binaries: binaryVariants("gemini"), mcpConfigPath: ".mcp/mcp.json", rulesPath: "GEMINI.md"},
 }
 
 func DetectIDEs() []IDEInfo {
