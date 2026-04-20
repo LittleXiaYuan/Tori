@@ -13,7 +13,12 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..");
-const BIN_DIR = path.resolve(__dirname, "..", "src-tauri");
+// Tauri v2 expects externalBin entries at <src-tauri>/<path>, e.g. the
+// tauri.conf.json entry "binaries/yunque-agent" points at
+// <src-tauri>/binaries/yunque-agent-<triple><ext>. Keeping the binaries in a
+// sub-folder also keeps the src-tauri root clean and prevents the Tauri CLI
+// from confusing sidecars with the build's own executable.
+const BIN_DIR = path.resolve(__dirname, "..", "src-tauri", "binaries");
 
 const PLATFORM_MAP = {
   "windows-amd64":  { triple: "x86_64-pc-windows-msvc",     ext: ".exe" },

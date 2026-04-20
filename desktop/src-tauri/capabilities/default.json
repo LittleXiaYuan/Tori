@@ -1,29 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for Yunque Desktop",
+  "description": "Default capabilities for Yunque Desktop. The Go sidecar is spawned directly via std::process so we can control CREATE_NEW_PROCESS_GROUP / CTRL_BREAK_EVENT for graceful shutdown; we therefore do NOT need shell:allow-spawn / shell:allow-execute permissions here.",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        {
-          "name": "yunque-agent",
-          "sidecar": true,
-          "args": true
-        }
-      ]
-    },
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "yunque-agent",
-          "sidecar": true,
-          "args": true
-        }
-      ]
-    }
+    "core:default"
   ]
 }

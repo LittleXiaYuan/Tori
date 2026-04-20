@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
+    "predev": "node scripts/copy-sidecar.mjs",
     "dev": "tauri dev",
+    "prebuild": "node scripts/copy-sidecar.mjs --all",
     "build": "tauri build",
-    "copy-sidecar": "node scripts/copy-sidecar.mjs"
+    "copy-sidecar": "node scripts/copy-sidecar.mjs",
+    "copy-sidecar:all": "node scripts/copy-sidecar.mjs --all"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
