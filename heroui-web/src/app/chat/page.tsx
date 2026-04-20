@@ -49,6 +49,7 @@ import {
 } from "@/lib/slash-commands";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
+import { BrowserResumeBanner } from "@/components/chat/browser-resume-banner";
 import { chatReducer, chatInit } from "@/lib/chat-state";
 import { convReducer, convInit } from "@/lib/conversation-state";
 
@@ -1081,72 +1082,31 @@ ${text.slice(0, 4000)}` });
         </header>
 
         {resumePromptForBrowser && (
-          <div className="px-4 pt-3 xl:px-5 shrink-0">
-            <div
-              className="rounded-[18px] border px-4 py-3"
-              style={{
-                background: bridgeState?.connected
-                  ? "linear-gradient(180deg, rgba(34,197,94,0.1), rgba(34,197,94,0.03))"
-                  : "linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.03))",
-                borderColor: bridgeState?.connected ? "rgba(34,197,94,0.18)" : "rgba(245,158,11,0.18)",
-              }}
-            >
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                    <Plug size={15} style={{ color: bridgeState?.connected ? "#86efac" : "#fbbf24" }} />
-                    {bridgeState?.connected ? "Browser task ready to resume" : "Browser connector blocked this task"}
-                  </div>
-                  <div className="mt-1 text-xs leading-6" style={{ color: "var(--yunque-text-muted)" }}>
-                    {bridgeState?.connected
-                      ? "The browser runtime is connected again. Continue the blocked task with one click."
-                      : "This task needs the live browser connector. Connect it first, then resume from where the flow paused."}
-                  </div>
-                  <div className="mt-2 truncate rounded-xl px-2.5 py-2 text-[11px]" style={{ background: "rgba(15,23,42,0.3)", color: "var(--yunque-text-secondary)" }}>
-                    {resumePromptForBrowser}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    className="rounded-full px-3"
-                    variant={bridgeState?.connected ? "primary" : "ghost"}
-                    isDisabled={!bridgeState?.connected || browserResumePending || chat.loading}
-                    isPending={browserResumePending}
-                    onPress={() => continueBlockedBrowserTask()}
-                  >
-                    Continue task
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-full px-3"
-                    onPress={() => window.open("/browser", "_blank", "noopener,noreferrer")}
-                  >
-                    Open browser setup
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-full px-3"
-                    onPress={() => {
-                      syncBridgeState();
-                      api.browserExtStatus()
-                        .then((status) => {
-                          setBridgeNotice({
-                            tone: status.connected ? "success" : "info",
-                            text: status.connected ? "Browser connector is ready." : "Browser connector is still offline.",
-                          });
-                        })
-                        .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
-                    }}
-                  >
-                    Refresh status
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <BrowserResumeBanner
+            prompt={resumePromptForBrowser}
+            bridgeConnected={Boolean(bridgeState?.connected)}
+            resumePending={browserResumePending}
+            chatLoading={chat.loading}
+            onResume={() => continueBlockedBrowserTask()}
+            onRefresh={() => {
+              syncBridgeState();
+              api.browserExtStatus()
+                .then((status) => {
+                  setBridgeNotice({
+                    tone: status.connected ? "success" : "info",
+                    text: status.connected
+                      ? "Browser connector is ready."
+                      : "Browser connector is still offline.",
+                  });
+                })
+                .catch(() =>
+                  setBridgeNotice({
+                    tone: "error",
+                    text: "Unable to refresh browser connector status.",
+                  }),
+                );
+            }}
+          />
         )}
 
         {/* Chat Messages */}
