@@ -31,11 +31,17 @@ func (g *Gateway) initMCPDispatch() {
 	g.workerRegistry = mcpserver.NewWorkerRegistry(60_000_000_000) // 60s heartbeat timeout
 	g.mcpDispatchServer = mcpserver.New("yunque-dispatch", "1.0.0")
 
-	dc := &mcpserver.DispatchContext{
+	// NOTE: this runs during gateway.New → routes() before SetTaskStore is
+	// invoked in cmd/agent/init_tasks.go, so g.taskStore is typically nil
+	// here. The dispatch context is retained on Gateway so SetTaskStore can
+	// late-bind the store; dispatch tools still keep a nil-check guard for
+	// the window before SetTaskStore runs (and for deployments that never
+	// configure a task store).
+	g.mcpDispatchCtx = &mcpserver.DispatchContext{
 		Workers:   g.workerRegistry,
 		TaskStore: g.taskStore,
 	}
-	mcpserver.RegisterDispatchTools(g.mcpDispatchServer, dc)
+	mcpserver.RegisterDispatchTools(g.mcpDispatchServer, g.mcpDispatchCtx)
 }
 
 // ──────────────────────────────────────────────

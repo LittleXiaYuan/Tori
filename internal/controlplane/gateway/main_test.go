@@ -21,5 +21,9 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreTopFunction("yunque-agent/internal/agentcore/trigger.(*Runtime).conditionLoop"),
 		// RateLimiter cleanup — long-lived by design
 		goleak.IgnoreTopFunction("yunque-agent/internal/controlplane/gateway.(*RateLimiter).cleanup"),
+		// MCP WorkerRegistry reaper — long-lived by design (registered via
+		// registerMCPDispatchRoutes inside gateway.New); a Stop() method
+		// exists but is owned by the lifecycle layer in cmd/agent.
+		goleak.IgnoreTopFunction("yunque-agent/internal/mcp/server.(*WorkerRegistry).reapLoop"),
 	)
 }

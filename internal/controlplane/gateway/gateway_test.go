@@ -50,6 +50,10 @@ func TestHealthz(t *testing.T) {
 
 func TestCORSHeaders(t *testing.T) {
 	gw, _ := newTestGateway()
+	// CORS is opt-in: empty allowedOrigins means no CORS header is emitted
+	// (safer default). Tests that want the legacy wildcard behaviour must
+	// opt in explicitly.
+	gw.SetAllowedOrigins([]string{"*"})
 	req := httptest.NewRequest("OPTIONS", "/v1/chat", nil)
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
@@ -58,6 +62,19 @@ func TestCORSHeaders(t *testing.T) {
 	}
 	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
 		t.Fatal("missing CORS header")
+	}
+}
+
+func TestCORSDefaultsToSameOrigin(t *testing.T) {
+	gw, _ := newTestGateway()
+	req := httptest.NewRequest("OPTIONS", "/v1/chat", nil)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("expected no CORS header without SetAllowedOrigins, got %q", got)
 	}
 }
 
