@@ -15,6 +15,7 @@ import (
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/observe"
+	"yunque-agent/pkg/skills"
 )
 
 // runNativeFC uses native LLM function calling (tool_calls in API response).
@@ -23,7 +24,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg, req.DisableDelegation)
+	tools := p.buildFunctionDefs(userMsg, req.DisableDelegation, req.AllowedSkills)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -306,8 +307,27 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // In delegation mode (5+ handoff agents), only exposes transfer_to_* tools.
 // Exec agents get domain-specific tools via their isolated RunFunc context.
 // When disableDelegation is true, direct mode is forced (for subagent execution).
-func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool) []llm.FunctionDef {
+//
+// allowedSkills, when non-empty, hard-restricts the skill universe to exactly
+// those names before any further filtering. This is driven by the Cherry
+// "tools" drawer: when a user explicitly checks a subset of skills, the
+// planner is expected to stay inside that subset.
+func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
 	allSkills := p.registry.All()
+	if len(allowedSkills) > 0 {
+		allow := make(map[string]struct{}, len(allowedSkills))
+		for _, n := range allowedSkills {
+			allow[n] = struct{}{}
+		}
+		filtered := make([]skills.Skill, 0, len(allowedSkills))
+		for _, s := range allSkills {
+			if _, ok := allow[s.Name()]; ok {
+				filtered = append(filtered, s)
+			}
+		}
+		allSkills = filtered
+		slog.Info("buildFunctionDefs: user-restricted skill set", "allowed", len(allowedSkills), "matched", len(allSkills))
+	}
 	cats := p.registry.Categories()
 
 	var catNames []string

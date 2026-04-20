@@ -455,6 +455,7 @@ type PlanRequest struct {
 	DisableDelegation bool            // when true, buildFunctionDefs exposes direct skills instead of handoff tools
 	DisableTools      bool            // when true, skip all tools — pure chat mode
 	ClientOverride    *llm.Client     // if set, bypass pool and use this client directly (session-level provider override)
+	AllowedSkills     []string        // if non-empty, buildFunctionDefs restricts to exactly these skill names (user-picked tool whitelist)
 }
 
 // StepEventType classifies the kind of intermediate step event.
