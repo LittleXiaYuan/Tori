@@ -15,8 +15,10 @@ func (g *Gateway) registerMCPDispatchRoutes() {
 	g.initMCPDispatch()
 
 	// MCP Streamable HTTP endpoint — external workers (Cursor, Claude Code, etc.)
-	// connect here as MCP clients.
-	g.mux.HandleFunc("/mcp/v1", mcpserver.HTTPHandler(g.mcpDispatchServer))
+	// connect here as MCP clients. POST (JSON-RPC) requires a valid X-API-Key
+	// or Authorization: Bearer <jwt>; GET is left open so operators and load
+	// balancers can do lightweight reachability checks without credentials.
+	g.mux.HandleFunc("/mcp/v1", g.mcpDispatchHTTPHandler())
 
 	// REST API for frontend worker management
 	g.mux.HandleFunc("/v1/workers", g.requireAuth(g.handleWorkerList))
@@ -25,6 +27,23 @@ func (g *Gateway) registerMCPDispatchRoutes() {
 	g.mux.HandleFunc("/v1/dispatch/queue", g.requireAuth(g.handleDispatchQueue))
 	g.mux.HandleFunc("/v1/dispatch/enqueue", g.requireAuth(g.handleDispatchEnqueue))
 	g.mux.HandleFunc("/v1/workers/config", g.requireAuth(g.handleWorkerConfig))
+}
+
+// mcpDispatchHTTPHandler returns the /mcp/v1 handler with method-sensitive
+// authentication: GET is unauthenticated (status probe), POST is gated by
+// requireAuth so dispatch tools like register_worker / claim_task can only
+// be driven by a trusted tenant.
+func (g *Gateway) mcpDispatchHTTPHandler() http.HandlerFunc {
+	raw := mcpserver.HTTPHandler(g.mcpDispatchServer)
+	authed := g.requireAuth(raw)
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodOptions, http.MethodHead:
+			raw(w, r)
+		default:
+			authed(w, r)
+		}
+	}
 }
 
 func (g *Gateway) initMCPDispatch() {
