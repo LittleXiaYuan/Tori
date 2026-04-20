@@ -48,6 +48,7 @@ import {
   formatSlashBrowserResponse,
 } from "@/lib/slash-commands";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
+import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
 import { chatReducer, chatInit } from "@/lib/chat-state";
 import { convReducer, convInit } from "@/lib/conversation-state";
 
@@ -965,141 +966,15 @@ ${text.slice(0, 4000)}` });
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
       {showSidebar && (
-        <div
-          className="flex flex-col h-full animate-slide-in-left w-[228px] xl:w-[244px] shrink-0"
-          style={{ background: "var(--yunque-sidebar)", borderRight: "1px solid var(--yunque-border)", transition: "width 0.2s ease" }}
-        >
-          {/* Sidebar Header */}
-          <div className="p-2.5 space-y-2">
-            <div className="flex items-center justify-between px-1 pt-0.5">
-              <span className="text-xs font-semibold" style={{ color: "var(--yunque-text-muted)" }}>
-                {conv.showArchived ? "归档" : "对话"} · {filteredConversations.length}
-              </span>
-            </div>
-            <Button
-              className="w-full justify-start gap-2 rounded-[14px] text-[13px] btn-accent"
-              size="sm"
-              onPress={newConversation}
-            >
-              <Plus size={14} /> 新对话
-            </Button>
-            <div
-              className="flex items-center gap-2 rounded-[14px] px-2.5 py-1.5 text-[11px]"
-              style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-muted)" }}
-            >
-              <Search size={12} />
-              <input
-                placeholder="搜索对话…"
-                value={conv.searchQuery}
-                onChange={(e) => convD({ type: "SET_SEARCH", query: e.target.value })}
-                className="bg-transparent outline-none text-xs flex-1"
-                style={{ color: "var(--yunque-text)" }}
-              />
-            </div>
-          </div>
-
-          {/* Archive toggle */}
-          <div className="px-2.5 pb-2 flex gap-1">
-            <button
-              onClick={() => convD({ type: "SET_ARCHIVED", show: false })}
-              className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
-              style={{
-                color: !conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
-                background: !conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
-              }}
-            >
-              <MessageCircle size={13} /> 活跃
-            </button>
-            <button
-              onClick={() => convD({ type: "SET_ARCHIVED", show: true })}
-              className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
-              style={{
-                color: conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
-                background: conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
-              }}
-            >
-              <Archive size={13} /> 归档
-            </button>
-          </div>
-
-          {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2" style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
-            <div className="px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: "var(--yunque-text-muted)" }}>
-              {conv.showArchived ? "归档对话" : "最近对话"} ({filteredConversations.length})
-            </div>
-            <div className="chat-thread-list space-y-1">
-              {filteredConversations.map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => { if (conv.renameId !== c.id) switchConversation(c.id); }}
-                  className="conv-item chat-thread-item w-full text-left px-3 py-2.5 rounded-[16px] group relative"
-                  data-active={conv.activeId === c.id || undefined}
-                  style={{ color: conv.activeId === c.id ? "var(--yunque-accent)" : "var(--yunque-text-secondary)" }}
-                >
-                  <div className="chat-thread-indicator" aria-hidden="true" />
-                  {c.pinned && (
-                    <Pin size={10} className="absolute right-2 top-2" style={{ color: "var(--yunque-accent)", opacity: 0.6 }} />
-                  )}
-                  {conv.renameId === c.id ? (
-                    <input
-                      autoFocus
-                      value={conv.renameText}
-                      onChange={(e) => convD({ type: "SET_RENAME_TEXT", text: e.target.value })}
-                      onBlur={() => { if (conv.renameText.trim()) manageConversation(c.id, { name: conv.renameText.trim() }); convD({ type: "CANCEL_RENAME" }); }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { if (conv.renameText.trim()) manageConversation(c.id, { name: conv.renameText.trim() }); convD({ type: "CANCEL_RENAME" }); }
-                        if (e.key === "Escape") convD({ type: "CANCEL_RENAME" });
-                      }}
-                      className="text-xs font-medium bg-transparent outline-none w-full px-1 py-0.5 rounded"
-                      style={{ color: "var(--yunque-text)", background: "rgba(255,255,255,0.08)", border: "1px solid var(--yunque-accent)" }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <div className="text-[12px] font-medium truncate pr-4">{c.name || c.id}</div>
-                  )}
-                  <div className="mt-0.5 truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{c.summary || "暂无摘要"}</div>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{new Date(c.updated_at).toLocaleDateString([], { month: "numeric", day: "numeric" })}</span>
-                      {c.pinned && (
-                        <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: "rgba(59,130,246,0.1)", color: "var(--yunque-accent)" }}>
-                          置顶
-                        </span>
-                      )}
-                    </div>
-                    <div className="chat-thread-actions flex items-center gap-0.5">
-                      <Button isIconOnly aria-label="重命名对话" variant="ghost" size="sm"
-                        onPress={() => convD({ type: "START_RENAME", id: c.id, text: c.name || c.id })}
-                      >
-                        <Edit3 size={11} style={{ color: "var(--yunque-text-muted)" }} />
-                      </Button>
-                      <Button isIconOnly aria-label="置顶对话" variant="ghost" size="sm"
-                        onPress={() => manageConversation(c.id, { pinned: !c.pinned })}
-                      >
-                        {c.pinned ? <PinOff size={11} style={{ color: "var(--yunque-accent)" }} /> : <Pin size={11} style={{ color: "var(--yunque-text-muted)" }} />}
-                      </Button>
-                      <Button isIconOnly aria-label={conv.showArchived ? "恢复对话" : "归档对话"} variant="ghost" size="sm"
-                        onPress={() => manageConversation(c.id, { archive: !conv.showArchived })}
-                      >
-                        {conv.showArchived ? <ArchiveRestore size={11} style={{ color: "var(--yunque-text-muted)" }} /> : <Archive size={11} style={{ color: "var(--yunque-text-muted)" }} />}
-                      </Button>
-                      <Button isIconOnly aria-label="Delete conversation" variant="ghost" size="sm"
-                        onPress={() => deleteConversation(c.id)}
-                      >
-                        <Trash2 size={11} style={{ color: "#ef4444" }} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {filteredConversations.length === 0 && (
-                <div className="text-center py-8 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                  {conv.searchQuery ? "没有匹配的对话。" : conv.showArchived ? "暂时没有归档对话。" : "还没有对话，开始新建一个吧。"}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ConversationSidebar
+          conv={conv}
+          dispatch={convD}
+          conversations={filteredConversations}
+          onNew={newConversation}
+          onSwitch={switchConversation}
+          onManage={manageConversation}
+          onDelete={deleteConversation}
+        />
       )}
 
       {/* Main Chat Area */}
