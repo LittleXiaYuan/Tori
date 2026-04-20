@@ -126,7 +126,14 @@ func initTasks(app *agentrt.App) error {
 	// ── JWT ──
 	jwtSecret := cfg.JWTSecret
 	if jwtSecret == "" {
-		jwtSecret = config.GenerateSecureKey(32)
+		generated, err := config.GenerateSecureKey(32)
+		if err != nil {
+			// crypto/rand is unavailable; we cannot issue JWTs at all, so
+			// fail hard with a structured log line rather than panicking up
+			// the stack with no context.
+			return fmt.Errorf("initTasks: failed to auto-generate JWT secret: %w", err)
+		}
+		jwtSecret = generated
 		slog.Warn("JWT_SECRET not set, using auto-generated secure secret")
 	}
 	jwtCfg := &gateway.JWTConfig{

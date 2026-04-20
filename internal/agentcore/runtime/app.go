@@ -95,6 +95,19 @@ func (a *App) Get(key string) (any, bool) {
 }
 
 // MustGet retrieves a component by key or panics.
+//
+// Panic-on-missing is intentional and follows Go's Must* idiom: this
+// function is only called from cmd/agent/init_*.go during process boot,
+// where a missing component means an earlier init phase forgot to
+// app.Set() the matching key — i.e. a programmer error, not a runtime
+// condition. Failing loudly here surfaces the mis-wiring immediately
+// instead of letting a nil pointer propagate into the first real
+// request. Do NOT convert this to error-returning in an attempt to
+// clean up "production panics"; the contract is that callers of
+// MustGet have already proven the key must be registered.
+//
+// For business-path lookups where a missing component is a recoverable
+// condition, use Get(key) (any, bool) instead.
 func (a *App) MustGet(key string) any {
 	v, ok := a.Get(key)
 	if !ok {
