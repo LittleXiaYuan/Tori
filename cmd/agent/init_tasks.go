@@ -389,6 +389,48 @@ func initTasks(app *agentrt.App) error {
 	}
 	gw.SetEmbeddings(embedRes)
 
+	// ── Memory conflict detector ──
+	//
+	// Wires the orchestrator's five-layer recall into a real conflict arbiter
+	// instead of leaving the `o.conflictDetector == nil` branch permanently
+	// taken. Two capabilities are layered on top:
+	//
+	//  1. LLM arbitration        — low-temperature Chat(system,user) call that
+	//                              judges whether the incoming fact actually
+	//                              supersedes, merges with, or is ambiguous
+	//                              against each candidate stored memory.
+	//  2. Embedding pre-filter  — cosine similarity gate (see
+	//                              memory/conflict_embedding.go). When an
+	//                              embedder is configured via EMBED_BASE_URL
+	//                              / EMBED_MODEL, only semantically close
+	//                              stored memories reach the LLM, which
+	//                              collapses both token cost and the keyword
+	//                              path's false positives on shared Chinese
+	//                              negation words ("改为" / "搬到" etc).
+	//
+	// Without an embedder the detector falls back to the LLM + keyword
+	// heuristic path, which is still strictly better than the previous
+	// "nil detector, nothing runs" state.
+	conflictLLM := func(ctx context.Context, system, user string) (string, error) {
+		return app.LLMClient.Chat(ctx, []llm.Message{
+			{Role: "system", Content: system},
+			{Role: "user", Content: user},
+		}, 0.2)
+	}
+	conflictDetector := memory.NewConflictDetector(conflictLLM)
+	if primary, ok := embedRes.Primary(); ok {
+		gateCfg := memory.DefaultEmbeddingGateConfig()
+		conflictDetector.SetEmbeddingGate(func(ctx context.Context, text string) ([]float32, error) {
+			return primary.Embed(ctx, text)
+		}, gateCfg)
+		slog.Info("memory conflict detector: embedding gate enabled",
+			"model", primary.Model(),
+			"threshold", gateCfg.Threshold)
+	} else {
+		slog.Info("memory conflict detector: keyword + LLM only (no embedder configured)")
+	}
+	app.Orchestrator.SetConflictDetector(conflictDetector)
+
 	// ── Subagent ──
 	// Exec provider can be set via env var (initial default) or at runtime via
 	// the /api/providers/exec endpoint.  gw.ExecProvider() is the live value.
