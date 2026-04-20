@@ -2,11 +2,13 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -68,14 +70,26 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Attachment is an inline user-uploaded file. Currently used by the Cherry
+	// input-bar 📎 drawer. For now we stay in-process (no persistent storage)
+	// and handle only small files — large binary uploads deserve their own
+	// multipart endpoint, which is a separate task.
+	type Attachment struct {
+		Name    string `json:"name"`
+		Mime    string `json:"mime"`
+		DataB64 string `json:"data_b64"`
+	}
 	var req struct {
-		Messages  []llm.Message `json:"messages"`
-		SessionID string        `json:"session_id"`
-		TaskID    string        `json:"task_id"`
-		Platform  string        `json:"platform,omitempty"`
-		Thinking  *bool         `json:"thinking,omitempty"`
-		Mode      string        `json:"mode,omitempty"`
-		AiriMode  bool          `json:"airi_mode,omitempty"`
+		Messages    []llm.Message `json:"messages"`
+		SessionID   string        `json:"session_id"`
+		TaskID      string        `json:"task_id"`
+		Platform    string        `json:"platform,omitempty"`
+		Thinking    *bool         `json:"thinking,omitempty"`
+		Mode        string        `json:"mode,omitempty"`
+		AiriMode    bool          `json:"airi_mode,omitempty"`
+		WebSearch   bool          `json:"web_search,omitempty"`   // Cherry 🌐 drawer: force-enable web search
+		ToolIDs     []string      `json:"tool_ids,omitempty"`     // Cherry 🔨 drawer: restrict to explicit skill subset
+		Attachments []Attachment  `json:"attachments,omitempty"`  // Cherry 📎 drawer: inline per-turn files
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
@@ -86,6 +100,57 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		sseEvent(w, flusher, "error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
 		observe.EndSpan(traceSpan, nil)
 		return
+	}
+
+	// Inline attachments: for text-like MIMEs we decode and append the body
+	// into the last user message. Binary / image attachments are only listed
+	// by name+mime to keep the prompt from ballooning. Size-capped at 64KB
+	// per file × 4 files to avoid breaking the context window.
+	if len(req.Attachments) > 0 {
+		const maxPerFile = 64 * 1024
+		const maxFiles = 4
+		var inlined strings.Builder
+		for i, a := range req.Attachments {
+			if i >= maxFiles {
+				inlined.WriteString(fmt.Sprintf("\n[...%d more attachment(s) omitted]\n", len(req.Attachments)-maxFiles))
+				break
+			}
+			decoded, err := base64.StdEncoding.DecodeString(a.DataB64)
+			if err != nil {
+				inlined.WriteString(fmt.Sprintf("\n[Attached: %s (%s) — decode failed]\n", a.Name, a.Mime))
+				continue
+			}
+			isText := strings.HasPrefix(a.Mime, "text/") ||
+				strings.Contains(a.Mime, "json") ||
+				strings.Contains(a.Mime, "xml") ||
+				strings.Contains(a.Mime, "yaml") ||
+				strings.Contains(a.Mime, "javascript") ||
+				strings.Contains(a.Mime, "typescript")
+			if isText {
+				body := string(decoded)
+				if len(body) > maxPerFile {
+					body = body[:maxPerFile] + "\n...[truncated]"
+				}
+				inlined.WriteString(fmt.Sprintf("\n[Attached file: %s, %s, %d bytes]\n```\n%s\n```\n", a.Name, a.Mime, len(decoded), body))
+			} else {
+				inlined.WriteString(fmt.Sprintf("\n[Attached binary: %s, %s, %d bytes (content omitted from prompt)]\n", a.Name, a.Mime, len(decoded)))
+			}
+		}
+		if inlined.Len() > 0 && len(req.Messages) > 0 {
+			lastIdx := len(req.Messages) - 1
+			req.Messages[lastIdx].Content = req.Messages[lastIdx].Content + inlined.String()
+		}
+	}
+
+	// Web search toggle: prepend a soft instruction so the planner/LLM
+	// knows to pick the web_search skill. We don't forcibly invoke it —
+	// the model still decides when it's actually relevant, but the hint
+	// makes it much more likely.
+	if req.WebSearch && len(req.Messages) > 0 {
+		req.Messages = append([]llm.Message{{
+			Role:    "system",
+			Content: "用户本次消息启用了『联网搜索』。当回答涉及事实、新闻、行情或需要最新信息时，请优先调用 web_search / search / searx 技能并在回复里引用来源。",
+		}}, req.Messages...)
 	}
 
 	// Chinese guardrail pipeline
@@ -231,6 +296,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		ThinkingEnabled:   req.Thinking,
 		DisableTools:      chatMode,
 		DisableDelegation: chatMode,
+		AllowedSkills:     req.ToolIDs,
 		StepCallback: func(event observe.AgentEvent) {
 			data, _ := json.Marshal(event)
 			sseEvent(w, flusher, event.QualifiedType(), string(data))
