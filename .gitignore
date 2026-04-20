@@ -10,6 +10,10 @@ yunque-agent.exe
 
 # ── Logs & temp files ──
 *.log
+*.err
+*.out
+backend.err
+backend.out
 tmp*.txt
 reflog*.txt
 
