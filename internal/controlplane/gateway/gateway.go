@@ -212,9 +212,13 @@ type Gateway struct {
 
 	notifier *notify.Notifier
 
-	// MCP Dispatch Server (work orchestration for external workers)
+	// MCP Dispatch Server (work orchestration for external workers).
+	// mcpDispatchCtx is retained so late-bound dependencies (e.g. taskStore
+	// injected via SetTaskStore *after* gateway.New) can be pushed into the
+	// dispatch tools without recreating them — see SetTaskStore.
 	mcpDispatchServer *mcpserver.Server
 	workerRegistry    *mcpserver.WorkerRegistry
+	mcpDispatchCtx    *mcpserver.DispatchContext
 
 	// Project management (orchestrator)
 	projectStore *orchestrator.ProjectStore
