@@ -6,7 +6,7 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "lint": "next lint"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@heroui/react": "^3.0.1",

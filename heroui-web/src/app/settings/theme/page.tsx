@@ -6,46 +6,15 @@ import {
   Palette, Sun, Moon, Monitor, Upload, Image as ImageIcon,
   Layout, LogIn, Check, X, LayoutDashboard,
 } from "lucide-react";
-import { isSafeAssetURL } from "@/lib/safe-url";
-
-type ColorTheme = "time_monologue" | "deep_sea" | "purple_jade" | "mint_ice" | "sakura_fall" | "gold_sand" | "custom";
-
-interface ThemeConfig {
-  presetTheme: string; colorTheme: string; customColor: string;
-  radius: string; sidebarOpacity: number; contentOpacity: number;
-  interfaceBgImage: string | null; interfaceBgOpacity: number; interfaceBgBlur: number;
-  shadowColor: string; shadowOpacity: number;
-  logoImage: string | null; faviconImage: string | null;
-  homeMode: string; homeFontSize: number;
-  loginBgImage: string | null; loginContentOpacity: number;
-}
-
-const DEFAULT_THEME: ThemeConfig = {
-  presetTheme: "auto", colorTheme: "time_monologue", customColor: "#8b5cf6",
-  radius: "default", sidebarOpacity: 100, contentOpacity: 100,
-  interfaceBgImage: null, interfaceBgOpacity: 30, interfaceBgBlur: 8,
-  shadowColor: "#000000", shadowOpacity: 20,
-  logoImage: null, faviconImage: null,
-  homeMode: "card", homeFontSize: 28,
-  loginBgImage: null, loginContentOpacity: 100,
-};
-
-const COLOR_THEMES = [
-  { id: "time_monologue", name: "时光独白", color: "#a1a1aa" },
-  { id: "deep_sea", name: "深海微光", color: "#0ea5e9" },
-  { id: "purple_jade", name: "紫玉幻境", color: "#a855f7" },
-  { id: "mint_ice", name: "薄荷冰蓝", color: "#2dd4bf" },
-  { id: "sakura_fall", name: "落樱飞雪", color: "#f472b6" },
-  { id: "gold_sand", name: "流金岁月", color: "#d97706" },
-];
-
-const RADIUS_OPTIONS = [
-  { id: "right", name: "直角" },
-  { id: "default", name: "默认" },
-  { id: "small", name: "小" },
-  { id: "medium", name: "中" },
-  { id: "large", name: "大" },
-];
+import {
+  applyTheme as applyThemeShared,
+  COLOR_THEMES,
+  DEFAULT_THEME,
+  loadTheme,
+  RADIUS_OPTIONS,
+  saveTheme,
+  type ThemeConfig,
+} from "@/lib/theme-engine";
 
 /* ---------- Image Upload Box ---------- */
 function ImageBox({ label, hint, imageUrl, onChange, onClear }: {
@@ -87,17 +56,6 @@ function ImageBox({ label, hint, imageUrl, onChange, onClear }: {
   );
 }
 
-/* ---------- Theme load/save ---------- */
-function loadTheme(): ThemeConfig {
-  if (typeof window === "undefined") return DEFAULT_THEME;
-  try { const s = localStorage.getItem("yunque_theme"); return s ? { ...DEFAULT_THEME, ...JSON.parse(s) } : DEFAULT_THEME; }
-  catch { return DEFAULT_THEME; }
-}
-function saveTheme(config: ThemeConfig) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("yunque_theme", JSON.stringify(config));
-}
-
 /* ---------- Main ---------- */
 export default function ThemeSettingsPage() {
   const [config, setConfig] = useState<ThemeConfig>(DEFAULT_THEME);
@@ -105,99 +63,7 @@ export default function ThemeSettingsPage() {
 
   useEffect(() => { setConfig(loadTheme()); setMounted(true); }, []);
 
-  const hexToRgb = (hex: string) => {
-    const h = hex.replace("#", "");
-    return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
-  };
-
-  const darkenHex = (hex: string, amount: number) => {
-    const { r, g, b } = hexToRgb(hex);
-    const f = 1 - amount;
-    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v * f)));
-    return `#${clamp(r).toString(16).padStart(2, "0")}${clamp(g).toString(16).padStart(2, "0")}${clamp(b).toString(16).padStart(2, "0")}`;
-  };
-
-  const applyTheme = (cfg: ThemeConfig) => {
-    const html = document.documentElement;
-    const s = html.style;
-
-    let mode = cfg.presetTheme;
-    if (mode === "auto") {
-      mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    html.classList.remove("dark", "light");
-    html.classList.add(mode);
-    html.setAttribute("data-theme", mode);
-    const isLight = mode === "light";
-
-    const palette = cfg.colorTheme === "custom"
-      ? cfg.customColor
-      : COLOR_THEMES.find(c => c.id === cfg.colorTheme)?.color ?? "#3b82f6";
-    const hoverColor = darkenHex(palette, 0.15);
-    const { r: pr, g: pg, b: pb } = hexToRgb(palette);
-
-    s.setProperty("--yunque-accent", palette);
-    s.setProperty("--yunque-accent-hover", hoverColor);
-    s.setProperty("--yunque-accent-muted", `rgba(${pr},${pg},${pb},${isLight ? "0.10" : "0.12"})`);
-    s.setProperty("--yunque-accent-soft", `rgba(${pr},${pg},${pb},${isLight ? "0.05" : "0.06"})`);
-    s.setProperty("--yunque-accent-glow", `rgba(${pr},${pg},${pb},${isLight ? "0.12" : "0.15"})`);
-    s.setProperty("--yunque-border-focus", `rgba(${pr},${pg},${pb},0.5)`);
-    s.setProperty("--shadow-glow", `0 0 20px rgba(${pr},${pg},${pb},${isLight ? "0.12" : "0.15"})`);
-
-    const radiusMap: Record<string, string> = { right: "0px", default: "8px", small: "4px", medium: "12px", large: "16px" };
-    const rv = radiusMap[cfg.radius] ?? "8px";
-    const rvNum = parseInt(rv);
-    s.setProperty("--radius-sm", rvNum === 0 ? "0px" : `${Math.max(rvNum - 2, 2)}px`);
-    s.setProperty("--radius-md", rv);
-    s.setProperty("--radius-lg", rvNum === 0 ? "0px" : `${rvNum + 4}px`);
-    s.setProperty("--radius-xl", rvNum === 0 ? "0px" : `${rvNum + 8}px`);
-
-    const sidebarEl = document.querySelector<HTMLElement>("[data-sidebar]");
-    if (sidebarEl) sidebarEl.style.opacity = String(cfg.sidebarOpacity / 100);
-    s.setProperty("--yunque-content-opacity", String(cfg.contentOpacity / 100));
-
-    const shadowAlpha = (cfg.shadowOpacity / 100).toFixed(2);
-    const { r: sr, g: sg, b: sb } = hexToRgb(cfg.shadowColor);
-    s.setProperty("--shadow-sm", `0 1px 2px rgba(${sr},${sg},${sb},${shadowAlpha})`);
-    s.setProperty("--shadow-md", `0 2px 8px rgba(${sr},${sg},${sb},${shadowAlpha}), 0 0 0 1px rgba(${isLight ? "0,0,0" : "255,255,255"},0.03)`);
-    s.setProperty("--shadow-lg", `0 8px 24px rgba(${sr},${sg},${sb},${shadowAlpha})`);
-    s.setProperty("--shadow-card", `0 1px 3px rgba(${sr},${sg},${sb},${shadowAlpha})`);
-
-    // Background image and favicon come from user-controlled localStorage and
-    // end up in `url(...)` / `<link href>`. Limiting to https:// and
-    // data:image/* prevents abuse of plain-http resources (leaks referrer on
-    // mixed-content pages) and data:text/html (HTML injection via favicon is
-    // a known browser quirk).
-    const safeBg = cfg.interfaceBgImage && isSafeAssetURL(cfg.interfaceBgImage) ? cfg.interfaceBgImage : null;
-    if (safeBg) {
-      document.body.style.backgroundImage = `url(${CSS.escape(safeBg)})`;
-      document.body.style.backgroundSize = "cover";
-      document.body.style.backgroundPosition = "center";
-      document.body.style.backgroundAttachment = "fixed";
-      const bgAlpha = cfg.interfaceBgOpacity / 100;
-      const overlayAlpha = (1 - bgAlpha) * 0.85;
-      const overlayBase = isLight ? "248,249,251" : "9,9,11";
-      s.setProperty("--yunque-bg-overlay", `rgba(${overlayBase},${overlayAlpha.toFixed(2)})`);
-      const baseColor = isLight ? "248,249,251" : "9,9,11";
-      s.setProperty("--yunque-bg", `rgba(${baseColor},${(1 - bgAlpha * 0.6).toFixed(2)})`);
-      const overlayEl = document.getElementById("bg-overlay");
-      if (overlayEl) overlayEl.style.backdropFilter = cfg.interfaceBgBlur > 0 ? `blur(${cfg.interfaceBgBlur}px)` : "";
-    } else {
-      document.body.style.backgroundImage = "";
-      const overlayEl = document.getElementById("bg-overlay");
-      if (overlayEl) overlayEl.style.backdropFilter = "";
-      s.setProperty("--yunque-bg-overlay", "transparent");
-      s.removeProperty("--yunque-bg");
-    }
-
-    if (cfg.faviconImage && isSafeAssetURL(cfg.faviconImage)) {
-      let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
-      if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
-      link.href = cfg.faviconImage;
-    }
-  };
-
-  useEffect(() => { if (mounted) applyTheme(config); }, [config, mounted]);
+  useEffect(() => { if (mounted) applyThemeShared(config); }, [config, mounted]);
 
   const upd = (updates: Partial<ThemeConfig>) => {
     const next = { ...config, ...updates };
