@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -263,7 +264,14 @@ func initMemory(app *agentrt.App) error {
 		}
 	}
 	if defTKey == "" {
-		defTKey = config.GenerateSecureKey(32)
+		generated, err := config.GenerateSecureKey(32)
+		if err != nil {
+			// A missing CSPRNG at boot is a deploy-level problem, not a
+			// business logic one — bail out so operators see a proper
+			// init failure instead of a panic stack.
+			return fmt.Errorf("initMemory: failed to auto-generate default tenant API key: %w", err)
+		}
+		defTKey = generated
 		slog.Warn("DEFAULT_API_KEY not set, using auto-generated key (not persisted across restarts)")
 	}
 	if tenantMgr.ByID(defTID) == nil {
