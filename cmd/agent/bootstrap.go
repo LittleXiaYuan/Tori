@@ -12,22 +12,21 @@ import (
 )
 
 // loadConfig loads the global configuration from environment / .env file.
+//
+// Note: initial setup is done entirely via the web UI (/setup). The agent
+// starts even when .env is missing — the gateway exposes /v1/setup/* and
+// /v1/tori/* for the frontend to drive configuration. This avoids the
+// long-standing UX issue where the CLI wizard would block a GUI desktop
+// launch on stdin.
 func loadConfig() *config.Config {
 	_ = godotenv.Load()
 
-	// Run setup wizard if no .env file present and stdin is a terminal
-	if _, err := os.Stat(".env"); os.IsNotExist(err) && isTerminal() {
-		if !runSetupWizard() {
-			slog.Error("setup wizard cancelled")
-			os.Exit(1)
-		}
-	}
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		slog.Warn("configuration issue", "err", err)
 	}
 	if cfg.NeedsSetup() {
-		slog.Warn("LLM configuration incomplete — user must complete setup via web UI")
+		slog.Warn("LLM configuration incomplete — complete setup in the web UI at /setup")
 	}
 	warnWeakSecrets(&cfg)
 	return &cfg

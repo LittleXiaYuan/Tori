@@ -12,6 +12,7 @@ import (
 	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/supervisor"
 	"yunque-agent/internal/version"
+	"yunque-agent/pkg/safego"
 )
 
 func setupLogging() {
@@ -38,6 +39,7 @@ func setupLogging() {
 
 func main() {
 	setupLogging()
+	safego.SetPanicLogPath(appdir.File("panic.log"))
 
 	if supervisor.ShouldSupervise() {
 		os.Exit(supervisor.Run())
