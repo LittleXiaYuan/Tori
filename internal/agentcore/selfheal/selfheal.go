@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"yunque-agent/pkg/jsonutil"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -124,7 +125,7 @@ func (h *Healer) Generate(ctx context.Context, taskDescription string) (*Generat
 	}
 
 	// Extract JSON from response (handle markdown code blocks)
-	resp = extractJSON(resp)
+	resp = jsonutil.Extract(resp)
 
 	var plugin GeneratedPlugin
 	if err := json.Unmarshal([]byte(resp), &plugin); err != nil {
@@ -395,27 +396,6 @@ func (h *Healer) HealGap(ctx context.Context, gap CapabilityGap) (*GeneratedPlug
 	return gp, nil
 }
 
-func extractJSON(s string) string {
-	s = strings.TrimSpace(s)
-	// Remove markdown code fences
-	if idx := strings.Index(s, "```json"); idx >= 0 {
-		s = s[idx+7:]
-	} else if idx := strings.Index(s, "```"); idx >= 0 {
-		s = s[idx+3:]
-	}
-	if idx := strings.LastIndex(s, "```"); idx >= 0 {
-		s = s[:idx]
-	}
-	s = strings.TrimSpace(s)
-
-	// Find JSON object boundaries
-	start := strings.Index(s, "{")
-	end := strings.LastIndex(s, "}")
-	if start >= 0 && end > start {
-		s = s[start : end+1]
-	}
-	return s
-}
 
 func orDefault(s, def string) string {
 	if s == "" {

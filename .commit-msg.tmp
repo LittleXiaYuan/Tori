@@ -1,0 +1,52 @@
+refactor: migrate 10 extractJSON duplicates to pkg/jsonutil
+
+Follow-up to 19912dd which added pkg/jsonutil. This commit deletes every
+remaining private extractJSON / extractJSONArray helper and replaces its
+callers with the canonical jsonutil.* equivalents. The migration is done
+package-by-package with the destination chosen to preserve the exact
+fallback behaviour each caller relied on:
+
+  internal/agentcore/memory/conflict.go
+    extractJSONArray → jsonutil.ExtractArray
+  internal/agentcore/localbrain/{brain,agentic,distill}.go
+    extractJSON(raw, target) → jsonutil.Unmarshal
+    helpers.go: deleted extractJSON (kept truncate); no imports left
+  internal/agentcore/selfheal/selfheal.go
+    extractJSON → jsonutil.Extract
+  internal/controlplane/gateway/handlers_missions.go
+    extractJSON → jsonutil.Extract
+    (side note: new helper is depth-aware; the old "first { + last }"
+     approach would have returned invalid JSON on two disjoint objects
+     like `{a:1} {b:2}`; the new behaviour is strictly better)
+  internal/experimental/curiosity/interest.go   → jsonutil.Extract
+  internal/experimental/iterate/engine.go       → jsonutil.Extract (x2)
+  internal/experimental/reflect/reflect.go      → jsonutil.ExtractObject
+    (preserves the "no match → {}" fallback the engine relies on)
+  internal/experimental/skillgrow/generator.go  → jsonutil.Unmarshal
+    (also removes the companion trimToJSON helper)
+  internal/experimental/world/predictor.go      → jsonutil.Extract
+  plugins/education/lesson.go                   → jsonutil.Extract (x3)
+    (dropped the now-unused encoding/json import)
+
+Tests:
+  - reflect/reflect_test.go and selfheal/selfheal_test.go — the existing
+    TestExtractJSON cases are kept but rewired to call jsonutil.Extract /
+    ExtractObject directly. They now serve as "contract witnesses" that
+    catch any future migration that silently changes the function shape.
+    Broader coverage still lives in pkg/jsonutil/extract_test.go.
+
+Behaviour-preservation spot-checks that matter:
+  - reflect used "{}" on unmatched / missing braces → ExtractObject
+    keeps that exact contract (documented in TestExtractObject_*).
+  - memory/conflict used "[]" on unmatched / missing brackets →
+    ExtractArray keeps that.
+  - iterate used to accept both [-rooted and {-rooted input and depth-
+    track whichever appeared first → jsonutil.Extract matches.
+  - localbrain's direct→fence→first/last-braces cascade → jsonutil.
+    Unmarshal's direct→Extract→original-error cascade matches.
+
+Verified:
+  - go build ./...                                 clean
+  - go test -count=1 -short ./...                  79 ok / 0 fail
+                                                   (was 78 ok before this series;
+                                                    pkg/jsonutil adds one new suite)

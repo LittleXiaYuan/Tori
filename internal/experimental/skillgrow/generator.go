@@ -2,11 +2,12 @@ package skillgrow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
 // LLMFunc abstracts an LLM call for skill code generation.
@@ -93,7 +94,7 @@ Output ONLY valid JSON:
 	}
 
 	template := &SkillTemplate{}
-	if err := extractJSON(reply, template); err != nil {
+	if err := jsonutil.Unmarshal(reply, template); err != nil {
 		return nil, fmt.Errorf("parse template: %w (raw: %s)", err, truncate(reply, 200))
 	}
 
@@ -172,33 +173,3 @@ func (g *Generator) AcceptedSkills() []SkillTemplate {
 	return out
 }
 
-// extractJSON extracts JSON from possibly noisy LLM output.
-func extractJSON(raw string, target interface{}) error {
-	raw = trimToJSON(raw)
-	return json.Unmarshal([]byte(raw), target)
-}
-
-func trimToJSON(s string) string {
-	start := -1
-	for i, c := range s {
-		if c == '{' {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return s
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		if s[i] == '{' {
-			depth++
-		} else if s[i] == '}' {
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return s[start:]
-}

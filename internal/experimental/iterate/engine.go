@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // ProposalType classifies the kind of improvement proposed.
@@ -367,9 +368,9 @@ func (e *Engine) stepPropose(ctx context.Context, weaknesses string) ([]Proposal
 		Risk      string `json:"risk"`
 		EstTokens int    `json:"est_tokens"`
 	}
-	if err := json.Unmarshal([]byte(extractJSON(reply)), &rawProposals); err != nil {
+	if err := json.Unmarshal([]byte(jsonutil.Extract(reply)), &rawProposals); err != nil {
 		// Try wrapping in array
-		if err2 := json.Unmarshal([]byte("["+extractJSON(reply)+"]"), &rawProposals); err2 != nil {
+		if err2 := json.Unmarshal([]byte("["+jsonutil.Extract(reply)+"]"), &rawProposals); err2 != nil {
 			return nil, fmt.Errorf("parse proposals: %w (raw: %s)", err, reply)
 		}
 	}
@@ -498,37 +499,3 @@ func (e *Engine) saveCycleLog(log *CycleLog) {
 	os.WriteFile(path, data, 0644)
 }
 
-// ── Helpers ──
-
-// extractJSON tries to extract a JSON array or object from a string.
-func extractJSON(s string) string {
-	// Find first [ or {
-	start := -1
-	startChar := byte(0)
-	for i := 0; i < len(s); i++ {
-		if s[i] == '[' || s[i] == '{' {
-			start = i
-			startChar = s[i]
-			break
-		}
-	}
-	if start < 0 {
-		return s
-	}
-	endChar := byte(']')
-	if startChar == '{' {
-		endChar = '}'
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		if s[i] == startChar {
-			depth++
-		} else if s[i] == endChar {
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return s[start:]
-}

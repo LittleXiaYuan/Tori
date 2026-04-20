@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
 func TestAnalyze(t *testing.T) {
@@ -21,7 +23,10 @@ func TestAnalyze(t *testing.T) {
 	}
 }
 
-func TestExtractJSON(t *testing.T) {
+// TestExtractJSONContract locks in the specific jsonutil function this
+// package migrated to (Extract) for the shapes selfheal.GenerateAndInstall
+// feeds in. Broader coverage lives in pkg/jsonutil/extract_test.go.
+func TestExtractJSONContract(t *testing.T) {
 	cases := []struct {
 		input string
 		want  string
@@ -31,9 +36,9 @@ func TestExtractJSON(t *testing.T) {
 		{"Here is the plugin:\n```\n{\"name\":\"test\"}\n```\nDone.", `{"name":"test"}`},
 	}
 	for _, c := range cases {
-		got := extractJSON(c.input)
+		got := jsonutil.Extract(c.input)
 		if got != c.want {
-			t.Fatalf("extractJSON(%q) = %q, want %q", c.input, got, c.want)
+			t.Fatalf("jsonutil.Extract(%q) = %q, want %q", c.input, got, c.want)
 		}
 	}
 }
