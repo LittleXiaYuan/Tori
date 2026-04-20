@@ -45,6 +45,10 @@ heroui-web/node_modules/
 heroui-web/.next/
 heroui-web/out/
 heroui-web/.env.local
+heroui-web/tsconfig.tsbuildinfo
+
+# ── Local MCP smoke-test fixtures (not part of the repo) ──
+test-mcp.json
 
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
