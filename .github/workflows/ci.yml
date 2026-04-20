@@ -1,0 +1,143 @@
+name: ci
+
+# Baseline CI for every push / PR.
+#
+# Scope:
+#   * Go backend  — fmt, vet, build, test, golangci-lint
+#   * Frontend    — typecheck + production build (exported static SPA)
+#   * Desktop     — cargo check (sidecar excluded to keep the job under 5 min)
+#
+# Runs on Ubuntu unless the job explicitly needs another OS; none of the
+# backend / frontend paths depend on Windows-only APIs (the Tauri shell uses
+# cfg(windows) for CREATE_NEW_PROCESS_GROUP / CTRL_BREAK_EVENT, and cargo
+# check still resolves those on Linux).
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel superseded runs on the same ref; full runs still fire on master
+  # / main so the default-branch badge reflects the latest commit.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+  go:
+    name: Go backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: gofmt -s (list)
+        run: |
+          set -euo pipefail
+          diff=$(gofmt -s -l .)
+          if [ -n "$diff" ]; then
+            echo "::error::gofmt -s required on:"
+            echo "$diff"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        # -race is deliberately off: the shared sqlite fixture plus several
+        # memory-layer tests don't pass -race cleanly yet; tracked in
+        # TECH-DEBT-2026-04-18.md. Turning -race on is a separate PR.
+        run: go test -count=1 -timeout 4m ./...
+
+  go-lint:
+    name: Go lint (golangci-lint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64
+          args: --timeout 5m
+
+  web:
+    name: Frontend (heroui-web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: heroui-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: heroui-web/package-lock.json
+
+      - name: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Next.js build (static export)
+        run: npm run build
+
+      - name: Vitest unit tests
+        # Vitest is optional per-folder; only run when the config is present
+        # so the job stays green during the incremental rollout.
+        run: |
+          if [ -f vitest.config.ts ] || [ -f vitest.config.mts ]; then
+            npx vitest run --passWithNoTests
+          else
+            echo "vitest.config not present yet — skipping"
+          fi
+
+  desktop:
+    name: Desktop (Tauri / Rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: cargo check (Tauri shell)
+        working-directory: desktop/src-tauri
+        # Sidecar binaries live in desktop/src-tauri/binaries/ at runtime
+        # (see copy-sidecar.mjs), but cargo check doesn't need them, so we
+        # don't run the copy-sidecar step in CI.
+        run: cargo check --locked

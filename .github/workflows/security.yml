@@ -6,9 +6,9 @@ name: security
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
   schedule:
     - cron: "17 3 * * *"
 
@@ -23,12 +23,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: yunque-agent/go.mod
+          go-version-file: go.mod
           check-latest: true
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Run govulncheck
-        working-directory: yunque-agent
         run: govulncheck ./...
 
   npm-audit:
@@ -40,12 +39,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: yunque-agent/heroui-web/package-lock.json
+          cache-dependency-path: heroui-web/package-lock.json
       - name: Install deps
-        working-directory: yunque-agent/heroui-web
+        working-directory: heroui-web
         run: npm ci --prefer-offline --no-audit
       - name: npm audit (production)
-        working-directory: yunque-agent/heroui-web
+        working-directory: heroui-web
         run: npm audit --omit=dev --audit-level=high
 
   secret-scan:
