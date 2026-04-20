@@ -5,9 +5,10 @@
   "identifier": "com.yunque.agent",
   "build": {
     "frontendDist": "./frontend",
-    "devUrl": "http://localhost:9090"
+    "devUrl": "http://localhost:3001"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
@@ -33,8 +34,8 @@
       "icons/128x128.png",
       "icons/icon.ico"
     ],
-    "resources": [
-      "yunque-agent.exe"
+    "externalBin": [
+      "binaries/yunque-agent"
     ]
   }
 }
