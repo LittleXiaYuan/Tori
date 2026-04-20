@@ -242,7 +242,16 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 
 // Ingest routes content to the right layer based on importance.
 // High-importance facts get written to both mid and long.
-// TODO: consider using embeddings for smarter conflict detection
+//
+// TODO(memory.conflict): use embeddings + cosine similarity for conflict
+// detection instead of the current keyword/substring check done inside
+// o.conflictDetector (see detectAndResolveConflicts). The plan:
+//   1. Embed `content` once, cache per-tenant top-K nearest memories.
+//   2. Above a similarity threshold (~0.82) treat as potential conflict
+//      and delegate to the existing LLM arbitration path.
+//   3. Fall back to keyword matching when no embedder is configured so
+//      Ingest stays useful on minimal deployments.
+// Tracked in TECH-DEBT-2026-04-18.md item #11.
 func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, source string) error {
 	importance := o.evaluateImportance(ctx, content)
 

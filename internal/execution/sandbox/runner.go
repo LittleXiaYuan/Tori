@@ -8,8 +8,20 @@ import (
 
 // ──────────────────────────────────────────────
 // Unified Runner Interface
-// All sandbox backends (Process / Docker / K8s / WASM)
-// implement this interface for polymorphic code execution.
+//
+// Runner is the polymorphic interface used by the general-purpose
+// "run code / run command" path. Current concrete implementations:
+//
+//   - ProcessRunner  — local process sandbox (default)
+//   - DockerRuntime  — container pool
+//   - CloudRunner    — E2B-compatible remote sandbox (optional)
+//   - FallbackRunner — wraps cloud + local so cloud failures degrade
+//
+// The K8s (k8s.go) and WASM (wasm.go) backends expose their own
+// Execute(...) methods tailored to Pod specs / wasm bytes and are
+// invoked via the specialised APIs in internal/execution/sandbox
+// rather than through this interface. Do not assume a generic Runner
+// factory can produce them.
 // ──────────────────────────────────────────────
 
 // RunRequest describes what to execute in a sandbox.
@@ -32,11 +44,13 @@ type RunResult struct {
 	Duration time.Duration `json:"duration"`
 }
 
-// Runner is the unified interface for all sandbox backends.
+// Runner is the unified interface for the generic code/command sandboxing
+// path. K8s and WASM backends are NOT Runners — see package doc above.
 type Runner interface {
 	// Run executes code or a command in the sandbox.
 	Run(ctx context.Context, req RunRequest) (*RunResult, error)
-	// Type returns the backend identifier ("process", "docker", "k8s", "wasm").
+	// Type returns the backend identifier ("process", "docker", "cloud",
+	// or a composite name for wrappers such as "fallback").
 	Type() string
 	// Close releases resources (container pool, runtime, etc).
 	Close() error
@@ -166,7 +180,11 @@ func localRunner(cfg SandboxConfig) Runner {
 	return NewProcessRunner(cfg.BaseDir, cfg.Policy)
 }
 
-// NewRunnerForBackend creates a specific backend Runner.
+// NewRunnerForBackend creates a specific backend Runner. Only backends
+// that implement the Runner interface can be returned here — k8s and
+// wasm are exposed via their own Execute(...) APIs and are rejected
+// explicitly so callers fail fast with a useful error instead of
+// silently getting nothing.
 func NewRunnerForBackend(backend string, cfg SandboxConfig) (Runner, error) {
 	switch backend {
 	case "cloud":
@@ -175,6 +193,8 @@ func NewRunnerForBackend(backend string, cfg SandboxConfig) (Runner, error) {
 		return NewDockerRuntime(cfg.Docker)
 	case "process":
 		return NewProcessRunner(cfg.BaseDir, cfg.Policy), nil
+	case "k8s", "wasm":
+		return nil, fmt.Errorf("sandbox backend %q does not implement the Runner interface; use the dedicated Execute API in k8s.go / wasm.go instead", backend)
 	default:
 		return nil, fmt.Errorf("unknown sandbox backend: %s", backend)
 	}

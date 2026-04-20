@@ -584,6 +584,7 @@ func (g *Gateway) routes() {
 	g.registerConnectorRoutes()  // connectors (GitHub, Gmail, Calendar, etc.)
 	g.registerNotifyRoutes()     // notification channels (webhook, DingTalk, Feishu, etc.)
 	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
+	g.registerModesRoutes()      // persona mode management (/v1/persona/modes, mode, mode/current)
 	g.registerMCPDispatchRoutes() // MCP dispatch server for external workers
 	g.registerProjectRoutes()       // project management (orchestrator)
 	g.registerOrchestratorRoutes()  // orchestrator daemon control
