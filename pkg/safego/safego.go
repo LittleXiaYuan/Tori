@@ -7,15 +7,32 @@ import (
 	rdebug "runtime/debug"
 	"sync/atomic"
 	"time"
-
-	"yunque-agent/internal/appdir"
 )
 
-var panicCount atomic.Int64
+var (
+	panicCount   atomic.Int64
+	panicLogPath atomic.Pointer[string]
+)
+
+// SetPanicLogPath configures a file path where recovered panics are appended
+// for post-mortem analysis. Typically called once from the application's main
+// after the data directory is resolved, for example:
+//
+//	safego.SetPanicLogPath(appdir.File("panic.log"))
+//
+// If the path is empty or SetPanicLogPath is never called, panics are still
+// logged via slog but no file is written. This keeps the safego package free
+// of any dependency on the caller's directory-layout module and preserves a
+// clean `pkg -> internal` layering boundary.
+func SetPanicLogPath(path string) {
+	p := path
+	panicLogPath.Store(&p)
+}
 
 // Go launches a goroutine with panic recovery.
 // If the goroutine panics, the panic is logged with full stack trace
-// and written to data/panic.log, but the process continues running.
+// and appended to the configured panic log file (if any), but the process
+// continues running.
 func Go(name string, fn func()) {
 	go func() {
 		defer func() {
@@ -39,7 +56,11 @@ func PanicCount() int64 {
 }
 
 func writePanicLog(name string, r any, stack string) {
-	f, err := os.OpenFile(appdir.File("panic.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	p := panicLogPath.Load()
+	if p == nil || *p == "" {
+		return
+	}
+	f, err := os.OpenFile(*p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}
