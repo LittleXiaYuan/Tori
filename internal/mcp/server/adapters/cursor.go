@@ -18,16 +18,21 @@ type CursorConfig struct {
 }
 
 // GenerateMCPJSON returns a JSON config block suitable for Cursor's
-// mcpServers configuration.
+// mcpServers configuration. When Token is empty, the Authorization header
+// is omitted so Cursor does not send a bare "Bearer " (which the gateway
+// would reject now that /mcp/v1 POST requires valid credentials).
 func (c *CursorConfig) GenerateMCPJSON() (string, error) {
+	entry := map[string]any{
+		"url": c.ServerURL,
+	}
+	if c.Token != "" {
+		entry["headers"] = map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %s", c.Token),
+		}
+	}
 	config := map[string]any{
 		"mcpServers": map[string]any{
-			"yunque-dispatch": map[string]any{
-				"url": c.ServerURL,
-				"headers": map[string]string{
-					"Authorization": fmt.Sprintf("Bearer %s", c.Token),
-				},
-			},
+			"yunque-dispatch": entry,
 		},
 	}
 	b, err := json.MarshalIndent(config, "", "  ")
@@ -85,13 +90,22 @@ type ClaudeCodeConfig struct {
 }
 
 // GenerateMCPJSON returns a JSON config for Claude Code's MCP settings.
+// Authorization headers are emitted only when Token is non-empty so the
+// generated config does not silently drop the credential the user set
+// via /v1/workers/config.
 func (c *ClaudeCodeConfig) GenerateMCPJSON() (string, error) {
+	entry := map[string]any{
+		"type": "url",
+		"url":  c.ServerURL,
+	}
+	if c.Token != "" {
+		entry["headers"] = map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %s", c.Token),
+		}
+	}
 	config := map[string]any{
 		"mcpServers": map[string]any{
-			"yunque-dispatch": map[string]any{
-				"type":     "url",
-				"url":      c.ServerURL,
-			},
+			"yunque-dispatch": entry,
 		},
 	}
 	b, err := json.MarshalIndent(config, "", "  ")
