@@ -243,7 +243,18 @@ func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, de
 }
 
 // extractToGraph: pattern-match facts into entities and relations.
-// HACK: this is keyword-based; should be replaced with an LLM extraction call.
+//
+// HACK(memory.graph-extract): keyword-based entity/relation extraction.
+// Kept as a no-dependency default so the knowledge graph still gets
+// populated on deployments without a configured Extractor. Follow-up
+// plan (TECH-DEBT-2026-04-18.md item #11):
+//   1. If p.Extractor is non-nil, call it with a dedicated prompt that
+//      returns JSON of the form {"entities":[{name,type}],
+//      "relations":[{subject,predicate,object}]}.
+//   2. Merge with / fall back to the patterns below when the LLM fails
+//      or returns malformed output.
+//   3. Keep the Chinese + English keyword lists as the low-latency
+//      fast path for personal-deployment Trust tiers.
 func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
 	// Entity type detection patterns (Chinese + English)
 	personPatterns := []string{"用户", "他", "她", "我", "Alice", "Bob", "老师", "同事", "朋友", "user", "person"}
