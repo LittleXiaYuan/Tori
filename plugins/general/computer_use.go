@@ -270,6 +270,11 @@ func (s *ComputerUseSkill) Execute(ctx context.Context, args map[string]any, env
 					lang = "python"
 				}
 				ext := langExt(lang)
+				// /tmp/ is the REMOTE E2B Desktop sandbox's filesystem, not the
+				// local host's. The target is always Linux regardless of what
+				// OS the agent runs on, so do NOT swap this for os.TempDir()
+				// (that would yield the local host's temp path and break the
+				// subsequent WriteFileInDesktop call).
 				tmpFile := fmt.Sprintf("/tmp/agent_exec_%d%s", time.Now().UnixNano(), ext)
 
 				if err := s.cloudRunner.WriteFileInDesktop(ctx, sandboxID, accessToken, tmpFile, code); err != nil {
