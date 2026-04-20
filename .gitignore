@@ -50,6 +50,9 @@ heroui-web/tsconfig.tsbuildinfo
 # ── Local MCP smoke-test fixtures (not part of the repo) ──
 test-mcp.json
 
+# ── Commit-message staging files (used by HEREDOC-avoiding PowerShell shells) ──
+.commit-msg.tmp
+
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
 
