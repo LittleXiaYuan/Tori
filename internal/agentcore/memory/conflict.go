@@ -36,6 +36,7 @@ type LLMConflictFunc func(ctx context.Context, system, user string) (string, err
 
 type ConflictDetector struct {
 	llmCall LLMConflictFunc // nil = use heuristic only
+	embGate *embeddingGate  // nil = no embedding pre-filter
 }
 
 // NewConflictDetector: llmCall can be nil for heuristic-only mode.
@@ -52,7 +53,28 @@ func (d *ConflictDetector) DetectConflicts(
 		return nil
 	}
 
-	// Strategy: use LLM if available, else heuristic
+	// Stage 1: when an embedding gate is configured, pre-filter `existing`
+	// down to only items that are semantically close to the new fact. This
+	// kills false positives the keyword path generates (e.g. two unrelated
+	// sentences that happen to share "改为" / "搬到") and gives the LLM a
+	// tight candidate set instead of 10+ noisy items.
+	//
+	// On gate failure (embedder offline, partial embed error) we fall
+	// through with the full existing list — degraded mode, never crashed.
+	if d.embGate != nil {
+		if filtered, ok := d.embGate.filterByEmbedding(ctx, newContent, existing); ok {
+			if len(filtered) == 0 {
+				// Nothing semantically similar → genuinely no conflict. The
+				// keyword path would have returned [] anyway because it
+				// requires both negation words AND overlap, but we short-
+				// circuit here to save the downstream LLM token cost.
+				return nil
+			}
+			existing = filtered
+		}
+	}
+
+	// Stage 2: use LLM if available, else the keyword/negation heuristic.
 	if d.llmCall != nil {
 		return d.detectWithLLM(ctx, newContent, existing)
 	}

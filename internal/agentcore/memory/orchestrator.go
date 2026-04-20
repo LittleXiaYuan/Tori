@@ -243,15 +243,23 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 // Ingest routes content to the right layer based on importance.
 // High-importance facts get written to both mid and long.
 //
-// TODO(memory.conflict): use embeddings + cosine similarity for conflict
-// detection instead of the current keyword/substring check done inside
-// o.conflictDetector (see detectAndResolveConflicts). The plan:
-//   1. Embed `content` once, cache per-tenant top-K nearest memories.
-//   2. Above a similarity threshold (~0.82) treat as potential conflict
-//      and delegate to the existing LLM arbitration path.
-//   3. Fall back to keyword matching when no embedder is configured so
-//      Ingest stays useful on minimal deployments.
-// Tracked in TECH-DEBT-2026-04-18.md item #11.
+// Conflict detection roadmap (TECH-DEBT-2026-04-18.md item #11):
+//
+//   1. [DONE] `conflict_embedding.go` implements the embedding + cosine
+//      similarity gate. `ConflictDetector.SetEmbeddingGate(embed, cfg)`
+//      pre-filters the `existing` recall set by cosine ≥ 0.82 before the
+//      LLM / heuristic arbiter runs, killing the false positives the
+//      keyword path produces on shared Chinese negation words.
+//   2. [DONE] Graceful degradation — transient embedder failures fall
+//      through to the keyword / LLM path; per-item embed errors drop
+//      only that item, never the whole call.
+//   3. [TODO] Wire the gate from cmd/agent/init_memory.go so deployments
+//      with an embedder configured pick it up automatically; no-embedder
+//      deployments keep the keyword path.
+//   4. [TODO] Per-tenant top-K cache: cache the new-content embedding
+//      and the top-K nearest stored memories per tenant to avoid
+//      O(existing) embed calls on every Ingest. Today's gate re-embeds
+//      each existing item on each call with only a small TTL cache.
 func (o *Orchestrator) Ingest(ctx context.Context, tenantID, content, category, source string) error {
 	importance := o.evaluateImportance(ctx, content)
 
