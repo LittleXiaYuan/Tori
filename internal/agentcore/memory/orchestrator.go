@@ -253,9 +253,12 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 //   2. [DONE] Graceful degradation — transient embedder failures fall
 //      through to the keyword / LLM path; per-item embed errors drop
 //      only that item, never the whole call.
-//   3. [TODO] Wire the gate from cmd/agent/init_memory.go so deployments
-//      with an embedder configured pick it up automatically; no-embedder
-//      deployments keep the keyword path.
+//   3. [DONE] Wiring lives in cmd/agent/init_tasks.go right after
+//      `gw.SetEmbeddings(embedRes)`: when an embedder is configured the
+//      gate is enabled automatically at the default threshold; when
+//      EMBED_BASE_URL is unset we fall back to the LLM + keyword path,
+//      which is still strictly better than the pre-wiring "nil detector"
+//      state where the orchestrator never even ran arbitration.
 //   4. [TODO] Per-tenant top-K cache: cache the new-content embedding
 //      and the top-K nearest stored memories per tenant to avoid
 //      O(existing) embed calls on every Ingest. Today's gate re-embeds
