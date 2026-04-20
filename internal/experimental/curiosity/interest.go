@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LittleXiaYuan/ledger"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // InterestTracker tracks user interests and skill gaps to generate better exploration questions.
@@ -181,7 +182,7 @@ Output JSON:
 	}
 
 	result := &Result{Question: q.Question}
-	if err := json.Unmarshal([]byte(extractJSON(reply)), result); err != nil {
+	if err := json.Unmarshal([]byte(jsonutil.Extract(reply)), result); err != nil {
 		slog.Warn("curiosity: parse exploration result failed", "err", err)
 		result.Findings = []string{reply}
 		result.Confidence = 0.3
@@ -190,27 +191,3 @@ Output JSON:
 	return result, nil
 }
 
-func extractJSON(s string) string {
-	start := -1
-	for i, c := range s {
-		if c == '{' {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return s
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		if s[i] == '{' {
-			depth++
-		} else if s[i] == '}' {
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return s[start:]
-}

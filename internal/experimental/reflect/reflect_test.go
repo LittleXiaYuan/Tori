@@ -2,9 +2,16 @@ package reflect
 
 import (
 	"testing"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
-func TestExtractJSON(t *testing.T) {
+// TestExtractJSONContract locks in the specific jsonutil function this
+// package migrated to (ExtractObject), so that a future refactor that
+// accidentally drops the "{}" fallback behaviour flips this red. The
+// broader jsonutil behaviour is covered by pkg/jsonutil/extract_test.go;
+// here we only verify the exact shape Engine.Evaluate relies on.
+func TestExtractJSONContract(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -15,9 +22,9 @@ func TestExtractJSON(t *testing.T) {
 		{`{"nested": {"a": 1}}`, `{"nested": {"a": 1}}`},
 	}
 	for _, tt := range tests {
-		got := extractJSON(tt.input)
+		got := jsonutil.ExtractObject(tt.input)
 		if got != tt.want {
-			t.Errorf("extractJSON(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("jsonutil.ExtractObject(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

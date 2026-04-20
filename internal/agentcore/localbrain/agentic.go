@@ -9,6 +9,7 @@ import (
 	ldg "github.com/LittleXiaYuan/ledger"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // AgenticThinking 实现"边想边做"范式。
@@ -253,7 +254,7 @@ Reply as JSON: {"thought":"...","next_action":"...","confidence":0.0-1.0,"should
 	}
 
 	result := &ThinkResult{Level: ThinkNormal}
-	if err := extractJSON(reply, result); err != nil {
+	if err := jsonutil.Unmarshal(reply, result); err != nil {
 		result.Thought = reply
 		result.Confidence = 0.5
 	}
@@ -305,7 +306,7 @@ Reply as JSON: {"thought":"...","next_action":"...","confidence":0.0-1.0,"should
 	}
 
 	result := &ThinkResult{Level: ThinkDeep}
-	if err := extractJSON(reply, result); err != nil {
+	if err := jsonutil.Unmarshal(reply, result); err != nil {
 		result.Thought = reply
 		result.Confidence = 0.4
 	}

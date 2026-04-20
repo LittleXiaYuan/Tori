@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // MissionParseResult is the structured intent returned from NL mission parsing.
@@ -92,7 +93,7 @@ func parseMissionIntent(ctx context.Context, client *llm.Client, description str
 
 	var result MissionParseResult
 	if err := json.Unmarshal([]byte(reply), &result); err != nil {
-		cleaned := extractJSON(reply)
+		cleaned := jsonutil.Extract(reply)
 		if err2 := json.Unmarshal([]byte(cleaned), &result); err2 != nil {
 			slog.Warn("mission parse: failed to parse LLM JSON", "raw", reply, "err", err2)
 			result = MissionParseResult{
@@ -108,25 +109,3 @@ func parseMissionIntent(ctx context.Context, client *llm.Client, description str
 	return result, nil
 }
 
-// extractJSON attempts to pull a JSON object from a string that may contain markdown.
-func extractJSON(s string) string {
-	// Find first { and last }
-	start := -1
-	end := -1
-	for i, c := range s {
-		if c == '{' {
-			start = i
-			break
-		}
-	}
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '}' {
-			end = i + 1
-			break
-		}
-	}
-	if start >= 0 && end > start {
-		return s[start:end]
-	}
-	return s
-}

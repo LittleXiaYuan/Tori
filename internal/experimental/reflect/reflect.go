@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // ReflectMode controls how the reflect engine behaves.
@@ -147,7 +148,7 @@ func (e *Engine) Evaluate(ctx context.Context, userIntent, agentReply string, sk
 	}
 
 	var eval Evaluation
-	if err := json.Unmarshal([]byte(extractJSON(reply)), &eval); err != nil {
+	if err := json.Unmarshal([]byte(jsonutil.ExtractObject(reply)), &eval); err != nil {
 		// Default to satisfied if parsing fails
 		return &Evaluation{Satisfied: true, Quality: 7}, nil
 	}
@@ -159,28 +160,3 @@ func (e *Evaluation) ShouldRetry() bool {
 	return !e.Satisfied && e.Quality < 5
 }
 
-func extractJSON(s string) string {
-	start := -1
-	for i, c := range s {
-		if c == '{' {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return "{}"
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		switch s[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return "{}"
-}

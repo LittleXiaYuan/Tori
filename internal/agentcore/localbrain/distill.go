@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
 // ExperienceDistiller 将大模型的成功经验蒸馏为小模型可用的知识。
@@ -106,7 +108,7 @@ Rules: max 5 rules, focus on the most common patterns, confidence 0.0-1.0.`
 	}
 
 	var rules []Rule
-	if err := extractJSON(reply, &rules); err != nil {
+	if err := jsonutil.Unmarshal(reply, &rules); err != nil {
 		slog.Warn("distill: parse rules failed", "err", err, "category", category)
 		return fmt.Errorf("parse rules: %w", err)
 	}

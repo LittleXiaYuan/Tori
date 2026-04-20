@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/pkg/jsonutil"
 )
 
 // LocalBrain 是本地小模型决策层。
@@ -257,7 +258,7 @@ Rules:
 
 	intent := &Intent{}
 	// 提取 JSON（小模型可能输出额外文本）
-	if err := extractJSON(reply, intent); err != nil {
+	if err := jsonutil.Unmarshal(reply, intent); err != nil {
 		return nil, fmt.Errorf("parse intent: %w (raw: %s)", err, truncate(reply, 200))
 	}
 
@@ -505,7 +506,7 @@ Rules:
 
 	// 解析分数数组
 	var scores []float64
-	if err := extractJSON(reply, &scores); err != nil {
+	if err := jsonutil.Unmarshal(reply, &scores); err != nil {
 		return nil, fmt.Errorf("parse scores: %w (raw: %s)", err, truncate(reply, 200))
 	}
 

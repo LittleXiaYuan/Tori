@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
 // ConflictDetector — finds contradictions between memories.
@@ -154,7 +156,7 @@ func (d *ConflictDetector) detectWithLLM(ctx context.Context, newContent string,
 	}
 
 	// Parse response
-	jsonStr := extractJSONArray(reply)
+	jsonStr := jsonutil.ExtractArray(reply)
 	var rawConflicts []struct {
 		Subject    string  `json:"subject"`
 		OldFact    string  `json:"old_fact"`
@@ -236,21 +238,3 @@ func (d *ConflictDetector) extractSubject(a, b string) string {
 	return ""
 }
 
-func extractJSONArray(s string) string {
-	start := strings.Index(s, "[")
-	if start < 0 {
-		return "[]"
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		if s[i] == '[' {
-			depth++
-		} else if s[i] == ']' {
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return s[start:]
-}

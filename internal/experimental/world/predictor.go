@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"yunque-agent/pkg/jsonutil"
 )
 
 // LLMFunc abstracts an LLM call for impact analysis.
@@ -94,7 +96,7 @@ Output JSON:
 	}
 
 	impact := &DeepImpact{Action: action}
-	if err := json.Unmarshal([]byte(extractJSON(reply)), impact); err != nil {
+	if err := json.Unmarshal([]byte(jsonutil.Extract(reply)), impact); err != nil {
 		slog.Warn("world predictor: parse failed", "err", err)
 		return p.convertBasicPrediction(basePred), nil
 	}
@@ -211,27 +213,3 @@ func truncateStr(s string, max int) string {
 	return string(r[:max]) + "..."
 }
 
-func extractJSON(s string) string {
-	start := -1
-	for i, c := range s {
-		if c == '{' {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return s
-	}
-	depth := 0
-	for i := start; i < len(s); i++ {
-		if s[i] == '{' {
-			depth++
-		} else if s[i] == '}' {
-			depth--
-			if depth == 0 {
-				return s[start : i+1]
-			}
-		}
-	}
-	return s[start:]
-}
