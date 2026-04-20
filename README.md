@@ -60,7 +60,7 @@ make build-full            # 构建前端 + Go 二进制（强制校验前端产
 
 ```bash
 cp .env.example .env       # 配置 LLM_API_KEY
-docker compose --profile lite up -d    # 轻量版，无数据库
+docker compose --profile lite up -d    # 轻量版，内嵌纯 Go SQLite（无外部依赖）
 docker compose --profile full up -d    # 完整版，PostgreSQL + pgvector
 ```
 
@@ -95,7 +95,8 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 │   Execution Layer                                     │
 │   Sandbox · Scheduler · Cron · Tools Process Manager  │
 │   Channels: TG/Feishu/Discord/Slack/WA/Signal/Email   │
-│            WeCom/DingTalk/WeChatOA/LINE/Kook/Satori   │
+│            QQ/WeCom/DingTalk/WeChatOA/LINE/Kook/Satori│
+│            + WebChat (HTTP gateway)                    │
 ├─────────────────────────────────────────────────────────┤
 │   Skills & Plugins                                    │
 │   SkillHub (ClawHub) · Marketplace · Hot-load         │
@@ -104,7 +105,8 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 │   ReAct · Eval · Iterate · SkillGrow · Distill        │
 │   Curiosity · Causal · World Model · MetaCog · Trait  │
 ├─────────────────────────────────────────────────────────┤
-│   Storage (Ledger KV default, optional PostgreSQL)    │
+│   Storage: Embedded SQLite (modernc.org/sqlite)       │
+│           Ledger KV (~25 namespaces) / Postgres opt.  │
 │   Federation Hub · Multi-Agent Runtime Pool            │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -117,13 +119,13 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 - **5层记忆**: Short/Mid/Long + 知识图谱 + 可编辑记忆，统一召回
 - **知识库 RAG**: 文件导入 + 混合检索 (BM25稀疏 + 向量密集 + RRF融合 + 可选Rerank二阶排序)
 - **上下文压缩**: 多阶段压缩管线 (轮数限制 → LLM摘要 → 紧急减半)
-- **富消息组件**: 12种消息组件 (文本/图片/音视频/文件/@/按钮/链接等)
+- **富消息组件**: 15种消息组件 (文本/图片/音视频/文件/@/回复/卡片/按钮/链接/emoji/表情贴纸/微信表情/face 等)
 - **受控自我迭代**: Agent 分析失败→提案→多 Agent 讨论→人工批准→应用
 - **信任分系统**: 渐进式权限 (0→read, 30→write, 60→network, 80→shell)
 - **安全护栏**: PII脱敏 + 注入防护 + 内容审核 + 风险分级审查
 - **审计链**: Merkle 防篡改 + 每日 JSON Trail + 完整性验证
 - **SkillHub**: 远程技能市场搜索/安装/卸载
-- **15渠道接入**: Telegram/Feishu/Discord/Slack/WhatsApp/Signal/Email/企业微信/钉钉/微信公众号/LINE/Kook/Satori/WebChat
+- **15渠道接入**: Telegram/Feishu/Discord/Slack/WhatsApp/Signal/Email/QQ/企业微信/钉钉/微信公众号/LINE/Kook/Satori + WebChat（HTTP 网关）
 - **语音能力**: TTS语音合成 + STT语音识别 (OpenAI Whisper兼容)
 - **浏览器自动化**: Headless Chrome 网页截图/内容提取/表单填充
 - **联邦**: 多 Agent 实例互联协作
@@ -190,7 +192,7 @@ go test ./... -count=1
 
 - **Backend**: Go 1.25, stdlib HTTP, 零外部框架依赖
 - **Frontend**: Next.js 16 嵌入式 SPA (`//go:embed`)
-- **Database**: 文件存储 (默认) / PostgreSQL + pgvector (可选)
+- **Database**: 嵌入式 SQLite (`modernc.org/sqlite`，默认，数据位于 `data/yunque.db`) / PostgreSQL + pgvector (可选，设置 `DATABASE_URL` 启用)
 - **LLM**: 任何 OpenAI 兼容 API
 - **Deploy**: 单二进制 / Docker / docker-compose
 

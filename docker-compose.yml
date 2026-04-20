@@ -1,6 +1,6 @@
 # Yunque Agent - Docker Compose
 #
-# Quick start (zero external deps, WebUI embedded):
+# Quick start (embedded SQLite via modernc.org/sqlite, zero external deps, WebUI embedded):
 #   docker compose --profile lite up -d
 #
 # Full stack (PostgreSQL + pgvector):
@@ -10,7 +10,7 @@
 # API:        http://localhost:9090/v1/
 
 services:
-  # ── Lite mode: SQLite only, zero external deps ──
+  # ── Lite mode: embedded pure-Go SQLite, zero external deps ──
   agent-lite:
     profiles: ["lite"]
     build:
