@@ -15,6 +15,12 @@
 //     activated per turn", "prioritize by tenant preference") without
 //     modifying any capsule.
 //   - UIs can visualize & edit activation rules without reading source code.
+//
+// Status (2026-04): paired with pkg/capsule, this package is implemented
+// and tested but **not yet consumed by the running agent**. See the
+// status note on `package capsule` for the integration plan. New
+// experimental work that would otherwise extend pkg/plugin should
+// prefer this Cogni model.
 package cogni
 
 import (

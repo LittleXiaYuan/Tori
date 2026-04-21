@@ -21,11 +21,11 @@ import (
 
 // Config for the auto-backup scheduler.
 type Config struct {
-	Enabled       bool
-	BackupDir     string        // where to write zip files; default: DataDir/backups
-	Interval      time.Duration // how often; default: 24h
-	MaxBackups    int           // keep at most N; default: 7
-	ScheduleHour  int           // hour of day (0-23) to run; default: 4
+	Enabled      bool
+	BackupDir    string        // where to write zip files; default: DataDir/backups
+	Interval     time.Duration // upper bound between runs; honored when shorter than the next ScheduleHour. Default 24h matches the daily ScheduleHour cadence and is a no-op.
+	MaxBackups   int           // keep at most N; default: 7
+	ScheduleHour int           // preferred hour of day (0-23) to run; default: 4
 }
 
 // DefaultConfig returns sensible defaults.
@@ -65,13 +65,22 @@ func StartScheduler(ctx context.Context, cfg Config) {
 		return
 	}
 	os.MkdirAll(cfg.BackupDir, 0755)
-	slog.Info("auto-backup: scheduled", "dir", cfg.BackupDir, "hour", cfg.ScheduleHour, "max", cfg.MaxBackups)
+	slog.Info("auto-backup: scheduled",
+		"dir", cfg.BackupDir,
+		"hour", cfg.ScheduleHour,
+		"interval", cfg.Interval,
+		"max", cfg.MaxBackups)
 
 	for {
 		now := time.Now()
 		next := time.Date(now.Year(), now.Month(), now.Day(), cfg.ScheduleHour, 0, 0, 0, now.Location())
 		if !next.After(now) {
 			next = next.Add(24 * time.Hour)
+		}
+		// Honor Interval when it is set AND shorter than the wait to the next
+		// ScheduleHour. Default Interval (24h) keeps the original daily cadence.
+		if cfg.Interval > 0 && cfg.Interval < time.Until(next) {
+			next = now.Add(cfg.Interval)
 		}
 
 		select {

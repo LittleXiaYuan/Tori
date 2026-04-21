@@ -35,6 +35,11 @@ type ConvSession struct {
 }
 
 // SQLite implements persistence for memories, sessions, bots, inbox, and models.
+//
+// Deprecated (informational): the agent currently persists this data through
+// `internal/ledger` (which itself uses SQLite under the hood). This type is
+// retained as a self-contained helper for future tooling but is not part of
+// the live runtime path.
 type SQLite struct {
 	db *sql.DB
 }
