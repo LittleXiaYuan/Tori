@@ -52,6 +52,7 @@ test-mcp.json
 
 # ── Commit-message staging files (used by HEREDOC-avoiding PowerShell shells) ──
 .commit-msg.tmp
+.commit-msg-*.tmp
 
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
