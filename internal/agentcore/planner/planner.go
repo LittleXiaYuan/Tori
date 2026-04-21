@@ -209,6 +209,9 @@ func (p *Planner) clientForRequest(req PlanRequest) *llm.Client {
 func (p *Planner) LLMBreaker() *llm.CircuitBreaker { return p.llm.Breaker() }
 
 // buildEnv constructs a skill Environment with LLM call capability.
+// LLMCall honors the request's session-level provider override
+// (clientForRequest) so skills invoked during planning respect the same
+// provider/model the user selected for this conversation.
 func (p *Planner) buildEnv(req PlanRequest) *skills.Environment {
 	return &skills.Environment{
 		ClassID:   req.ClassID,
@@ -220,7 +223,11 @@ func (p *Planner) buildEnv(req PlanRequest) *skills.Environment {
 				{Role: "system", Content: system},
 				{Role: "user", Content: user},
 			}
-			return p.llm.Chat(ctx, msgs, 0.7)
+			client := p.clientForRequest(req)
+			if client == nil {
+				client = p.llm
+			}
+			return client.Chat(ctx, msgs, 0.7)
 		},
 		MemorySearch: func(ctx context.Context, tenantID, query string, topK int) (string, error) {
 			if p.memory != nil {
@@ -705,9 +712,14 @@ func (p *Planner) selectClientWithCaps(req PlanRequest, messages []llm.Message) 
 	return p.LLMClientFor(p.adaptiveRoute(req))
 }
 
-// chatFallback wraps text-based chat calls with a graceful degradation retry loop.
-func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []llm.Message) (string, error) {
-	// Capability-aware routing: if messages contain media, prepend a vision-capable client
+// buildFallbackChain returns the ordered list of LLM clients to attempt for a
+// request. A session ClientOverride pins to a single client (no tier fallback)
+// so user-selected providers are honored as-is. Otherwise the chain is built
+// from the pool's tier fallback plus an optional capability-aware prepend.
+func (p *Planner) buildFallbackChain(req PlanRequest, messages []llm.Message) []*llm.Client {
+	if req.ClientOverride != nil {
+		return []*llm.Client{req.ClientOverride}
+	}
 	capClient := p.selectClientWithCaps(req, messages)
 	targetModel := p.adaptiveRoute(req)
 	var chain []*llm.Client
@@ -719,6 +731,12 @@ func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []
 	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
 		chain = append([]*llm.Client{capClient}, chain...)
 	}
+	return chain
+}
+
+// chatFallback wraps text-based chat calls with a graceful degradation retry loop.
+func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []llm.Message) (string, error) {
+	chain := p.buildFallbackChain(req, messages)
 
 	var lastErr error
 	for i, client := range chain {
@@ -746,17 +764,7 @@ func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []
 // chatFallbackFull is like chatFallback but returns ChatResult with reasoning_content.
 // Optional onDelta streams each token in real-time.
 func (p *Planner) chatFallbackFull(ctx context.Context, req PlanRequest, messages []llm.Message, onDelta ...llm.StreamDeltaFunc) (llm.ChatResult, error) {
-	capClient := p.selectClientWithCaps(req, messages)
-	targetModel := p.adaptiveRoute(req)
-	var chain []*llm.Client
-	if p.llmPool != nil {
-		chain = p.llmPool.GetFallbackChain(targetModel)
-	} else {
-		chain = []*llm.Client{p.llm}
-	}
-	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
-		chain = append([]*llm.Client{capClient}, chain...)
-	}
+	chain := p.buildFallbackChain(req, messages)
 
 	var lastErr error
 	for i, client := range chain {
@@ -777,17 +785,7 @@ func (p *Planner) chatFallbackFull(ctx context.Context, req PlanRequest, message
 
 // chatWithToolsFallback wraps native FC chat calls with a graceful degradation retry loop.
 func (p *Planner) chatWithToolsFallback(ctx context.Context, req PlanRequest, messages []llm.Message, tools []llm.FunctionDef) (string, []llm.ToolCall, string, error) {
-	capClient := p.selectClientWithCaps(req, messages)
-	targetModel := p.adaptiveRoute(req)
-	var chain []*llm.Client
-	if p.llmPool != nil {
-		chain = p.llmPool.GetFallbackChain(targetModel)
-	} else {
-		chain = []*llm.Client{p.llm}
-	}
-	if capClient != nil && (len(chain) == 0 || capClient != chain[0]) {
-		chain = append([]*llm.Client{capClient}, chain...)
-	}
+	chain := p.buildFallbackChain(req, messages)
 
 	// Resolve thinking mode: nil = auto (detect from message complexity)
 	thinkingFlag := req.ThinkingEnabled
