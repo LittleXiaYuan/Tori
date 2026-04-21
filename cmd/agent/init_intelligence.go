@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"os"
 
@@ -9,22 +8,22 @@ import (
 
 	"yunque-agent/internal/agentcore/localbrain"
 	agentrt "yunque-agent/internal/agentcore/runtime"
-	"yunque-agent/internal/agentcore/llm"
-	"yunque-agent/internal/experimental/causal"
-	"yunque-agent/internal/experimental/curiosity"
-	"yunque-agent/internal/experimental/metacog"
 	"yunque-agent/internal/experimental/microagent"
 	"yunque-agent/internal/experimental/recommend"
 	"yunque-agent/internal/experimental/rlsched"
-	"yunque-agent/internal/experimental/taskdistill"
-	"yunque-agent/internal/experimental/world"
 	iledger "yunque-agent/internal/ledger"
 )
 
-// initIntelligence is Phase 6.8: sets up LocalBrain, AgenticThinking,
-// MetaCog monitor, World Model, and Causal Engine.
-// These are the "intelligence layer" - they enhance but don't replace
-// existing planner/router functionality.
+// initIntelligence (Phase 6.8) registers the LocalBrain decision layer,
+// AgenticThinking router, LoRA scheduler, microagent registry, RL scheduler,
+// and recommend engine.
+//
+// MetaCog, World Model, Causal Engine, Curiosity and TaskDistiller are owned
+// by initSoulLayer (Phase 7), which builds them with cost-aware LLM hooks,
+// Reverie bus bridges, and tenant "default" alignment. They were previously
+// re-created here, leading to duplicate event subscriptions and tenant
+// inconsistency; that wiring has been removed in favor of the soul layer's.
+
 func initIntelligence(app *agentrt.App) error {
 	// ?? LocalBrain: local small model decision layer ??
 	// Priority: "local" pool key ??"fast" key ??first available key.
@@ -119,88 +118,12 @@ func initIntelligence(app *agentrt.App) error {
 	app.Set("agentic_thinking", at)
 	slog.Info("agentic thinking: initialized", "default_level", agenticCfg.DefaultThinkLevel)
 
-	// ?? MetaCog Monitor: runtime anomaly detection ??
-	if ldg != nil {
-		thresholds := metacog.DefaultThresholds()
-		monitor := metacog.NewFromLedger(ldg, thresholds)
+	// MetaCog, World Model, Causal Engine, Curiosity and TaskDistiller are
+	// initialized by initSoulLayer with full wiring (cost-aware LLM, Reverie
+	// bridge, tenant "default"). Re-creating bare versions here previously
+	// caused duplicate goroutine subscriptions and tenant key drift.
 
-		// Wire alert to slog + optional LocalBrain metacog adaptation
-		monitor.SetAlertFunc(func(alert metacog.Alert) {
-			slog.Warn("metacog alert",
-				"task", alert.TaskID,
-				"kind", alert.Kind,
-				"severity", alert.Severity,
-				"message", alert.Message,
-			)
-		})
-		monitor.Start()
-		app.Set("metacog_monitor", monitor)
-		app.Lifecycle.RegisterFunc("metacog", nil, func(ctx context.Context) error {
-			monitor.Stop()
-			return nil
-		})
-		slog.Info("metacog monitor: started")
-	}
-
-	// ?? World Model: environment state tracking ??
-	if ldg != nil {
-		wm := world.NewModel(ldg, "system")
-		_ = wm.Load(context.Background())
-		app.Set("world_model", wm)
-		slog.Info("world model: loaded")
-	}
-
-	// ?? Causal Engine: root cause analysis ??
-	if ldg != nil {
-		ce := causal.New(ldg)
-		app.Set("causal_engine", ce)
-		slog.Info("causal engine: initialized")
-	}
-
-	// ?? Curiosity Module: autonomous exploration when idle ??
-	if ldg != nil {
-		cm := curiosity.New(ldg)
-		if app.LLMPool != nil {
-			fastClient := app.LLMPool.Get("fast")
-			if fastClient == nil {
-				fastClient = app.LLMPool.Get("primary")
-			}
-			if fastClient != nil {
-				cm.SetExploreFn(func(ctx context.Context, q curiosity.Question) (*curiosity.Result, error) {
-					system := "You are an AI knowledge explorer. Investigate thoroughly and provide useful findings."
-					user := "Question: " + q.Question
-					if q.Context != "" {
-						user += "\nContext: " + q.Context
-					}
-					reply, err := fastClient.Chat(ctx, []llm.Message{
-						{Role: "system", Content: system},
-						{Role: "user", Content: user},
-					}, 0.7)
-					if err != nil {
-						return nil, err
-					}
-					return &curiosity.Result{
-						Question:   q.Question,
-						Findings:   []string{reply},
-						NewFacts:   []string{reply},
-						Confidence: 0.6,
-						Useful:     len(reply) > 50,
-					}, nil
-				})
-			}
-		}
-		app.Set("curiosity_module", cm)
-		slog.Info("curiosity module: initialized")
-	}
-
-	// ?? Task Distiller: extract patterns from completed tasks ??
-	if ldg != nil {
-		td := taskdistill.New(ldg)
-		app.Set("task_distiller", td)
-		slog.Info("task distiller: initialized")
-	}
-
-	// ?? MicroAgent Registry: domain-specific prompt enhancement ??
+	// ── MicroAgent Registry: domain-specific prompt enhancement ──
 	maRegistry := microagent.NewRegistry()
 	maDir := app.Config.DataPath("microagents")
 	if _, err := os.Stat(maDir); err == nil {

@@ -81,8 +81,17 @@ func initGateway(app *agentrt.App) error {
 	gw.WireRBAC()
 
 	// ── Reflection loop ──
-	experienceStore := reflectpkg.NewExperienceStore(cfg.DataPath("experience.json"))
-	gw.SetExperienceStore(experienceStore)
+	// initTasks already created the ExperienceStore (wired to Ledger KV +
+	// planner.SetStrategyContext). Reuse it so lessons captured by the
+	// learning loop here flow into the same store the planner reads from.
+	// Falling back to a fresh store keeps the gateway functional in lean
+	// configurations that skip initSoulLayer.
+	experienceStore, ok := gw.GetExperienceStore()
+	if !ok || experienceStore == nil {
+		experienceStore = reflectpkg.NewExperienceStore(cfg.DataPath("experience.json"))
+		gw.SetExperienceStore(experienceStore)
+		slog.Info("reflection: gateway-owned ExperienceStore created (initTasks did not)")
+	}
 	gw.WireReflectionLoop()
 	// Wire LearningLoop → ExperienceStore so lessons become actionable strategies
 	learningLoop.SetOnLesson(func(category, outcome, lesson, lctx string, tags []string) {
