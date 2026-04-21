@@ -150,7 +150,7 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 
 	// Phase 5: Extract entities and relations into knowledge graph
 	if p.graph != nil {
-		result.Entities, result.Relations = p.extractToGraph(extracted.Facts)
+		result.Entities, result.Relations = p.extractToGraphLLM(ctx, extracted.Facts)
 	}
 
 	// Phase 6: Persist extracted facts to daily markdown file
@@ -242,19 +242,65 @@ func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, de
 	return output, nil
 }
 
-// extractToGraph: pattern-match facts into entities and relations.
-//
-// HACK(memory.graph-extract): keyword-based entity/relation extraction.
-// Kept as a no-dependency default so the knowledge graph still gets
-// populated on deployments without a configured Extractor. Follow-up
-// plan (TECH-DEBT-2026-04-18.md item #11):
-//   1. If p.Extractor is non-nil, call it with a dedicated prompt that
-//      returns JSON of the form {"entities":[{name,type}],
-//      "relations":[{subject,predicate,object}]}.
-//   2. Merge with / fall back to the patterns below when the LLM fails
-//      or returns malformed output.
-//   3. Keep the Chinese + English keyword lists as the low-latency
-//      fast path for personal-deployment Trust tiers.
+// extractToGraphLLM tries the structured-LLM path first
+// (Extractor.ExtractGraph) and falls back to the keyword extractor when the
+// LLM fails or returns nothing useful. This addresses the historical
+// keyword-only HACK while keeping a no-dependency fallback for offline /
+// degraded deployments.
+func (p *Pipeline) extractToGraphLLM(ctx context.Context, facts []string) (entities, relations int) {
+	if p.extractor != nil {
+		if res, err := p.extractor.ExtractGraph(ctx, facts); err == nil && res != nil && len(res.Items) > 0 {
+			return p.applyGraphItems(res.Items)
+		} else if err != nil {
+			slog.Warn("memory pipeline: LLM graph extract failed, falling back to keyword extractor", "err", err)
+		}
+	}
+	return p.extractToGraph(facts)
+}
+
+// applyGraphItems writes structured triples returned by ExtractGraph into the
+// knowledge graph. Subject and object become entities; predicate becomes the
+// relation type. Falls through silently for malformed items.
+func (p *Pipeline) applyGraphItems(items []GraphFact) (entities, relations int) {
+	for _, item := range items {
+		if item.Object == "" || item.Predicate == "" {
+			continue
+		}
+		objKind := item.ObjectKind
+		if objKind == "" {
+			objKind = "concept"
+		}
+		objEnt := p.graph.PutEntity(Entity{
+			ID:         entityID(item.Object),
+			Name:       truncateName(item.Object),
+			Type:       objKind,
+			Properties: map[string]string{"source_fact": item.Fact},
+		})
+		entities++
+		subj := item.Subject
+		if subj == "" {
+			subj = "用户"
+		}
+		subjEnt := p.graph.PutEntity(Entity{
+			ID:   entityID("__user__" + subj),
+			Name: subj,
+			Type: "person",
+		})
+		p.graph.PutRelation(Relation{
+			ID:      fmt.Sprintf("r_%s_%s_%s", subjEnt.ID, item.Predicate, objEnt.ID),
+			FromID:  subjEnt.ID,
+			ToID:    objEnt.ID,
+			Type:    item.Predicate,
+			Context: item.Fact,
+		})
+		relations++
+	}
+	return entities, relations
+}
+
+// extractToGraph: keyword-only pattern-match fallback used when no structured
+// extractor is configured or the LLM call fails. Retained as a deterministic,
+// dependency-free path for offline/personal deployments.
 func (p *Pipeline) extractToGraph(facts []string) (entities, relations int) {
 	// Entity type detection patterns (Chinese + English)
 	personPatterns := []string{"用户", "他", "她", "我", "Alice", "Bob", "老师", "同事", "朋友", "user", "person"}
