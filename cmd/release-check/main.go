@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"yunque-agent/internal/version"
@@ -98,19 +99,18 @@ func main() {
 		return true, "no issues"
 	})
 
-	// 7. No TODO/FIXME in critical paths
+	// 7. No TODO/FIXME in critical paths.
+	//
+	// Cross-platform: walk the tree in Go instead of shelling out to
+	// `grep`, which is not on PATH on a default Windows install. The
+	// previous implementation always failed on Windows agents.
 	check("TODOs", func() (bool, string) {
-		cmd := exec.Command("grep", "-r", "--include=*.go", "-c", "TODO\\|FIXME\\|HACK", ".")
-		out, _ := cmd.CombinedOutput()
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		count := 0
-		for _, l := range lines {
-			if l != "" && !strings.HasSuffix(l, ":0") {
-				count++
-			}
+		count, scanErr := countTODOFiles(".")
+		if scanErr != nil {
+			return false, fmt.Sprintf("scan error: %v", scanErr)
 		}
 		if count > 0 {
-			return false, fmt.Sprintf("⚠ %d files with TODO/FIXME markers", count)
+			return false, fmt.Sprintf("⚠ %d files with TODO/FIXME/HACK markers", count)
 		}
 		return true, "clean"
 	})
@@ -151,4 +151,44 @@ func main() {
 	} else {
 		fmt.Println("\n✓ Release ready!")
 	}
+}
+
+// countTODOFiles walks `root` and returns how many *.go files contain at
+// least one of the markers TODO / FIXME / HACK. Test files and vendored
+// directories are skipped to keep release-blocking signal focused on
+// production code.
+func countTODOFiles(root string) (int, error) {
+	count := 0
+	skipDirs := map[string]bool{
+		".git":         true,
+		"vendor":       true,
+		"node_modules": true,
+		"dist":         true,
+		"build":        true,
+		"out":          true,
+	}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if info.IsDir() {
+			if skipDirs[info.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(info.Name(), ".go") || strings.HasSuffix(info.Name(), "_test.go") {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		s := string(data)
+		if strings.Contains(s, "TODO") || strings.Contains(s, "FIXME") || strings.Contains(s, "HACK") {
+			count++
+		}
+		return nil
+	})
+	return count, err
 }
