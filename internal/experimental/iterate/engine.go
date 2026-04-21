@@ -12,6 +12,7 @@ import (
 
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/pkg/jsonutil"
+	"yunque-agent/pkg/safego"
 )
 
 // ProposalType classifies the kind of improvement proposed.
@@ -177,20 +178,59 @@ func (e *Engine) AllProposals() []Proposal {
 	return out
 }
 
-// ApproveProposal marks a proposal as approved.
+// ApproveProposal marks a proposal as approved and triggers asynchronous
+// execution if an onExecute handler is configured. Returns true when the
+// proposal transitioned from pending to approved. Execution result (executed
+// or failed) is reflected back into the stored proposal status by a
+// background goroutine; query AllProposals to observe the final state.
 func (e *Engine) ApproveProposal(id string) bool {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	var snapshot Proposal
+	approved := false
 	for i, p := range e.proposals {
 		if p.ID == id && p.Status == StatusPending {
 			now := time.Now()
 			e.proposals[i].Status = StatusApproved
 			e.proposals[i].ResolvedAt = &now
-			e.saveProposals()
-			return true
+			snapshot = e.proposals[i]
+			approved = true
+			break
 		}
 	}
-	return false
+	if approved {
+		e.saveProposals()
+	}
+	e.mu.Unlock()
+
+	if !approved || e.onExecute == nil {
+		return approved
+	}
+
+	// Execute approved proposal in background so the HTTP/UI caller is not
+	// blocked; status is reconciled into the stored proposal afterwards.
+	safego.Go("iterate.approveExecute", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		err := e.onExecute(ctx, &snapshot)
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		for j := range e.proposals {
+			if e.proposals[j].ID != snapshot.ID {
+				continue
+			}
+			if err != nil {
+				e.proposals[j].Status = StatusFailed
+				e.proposals[j].Result = err.Error()
+				slog.Warn("iterate: approved proposal execution failed", "id", snapshot.ID, "err", err)
+			} else {
+				e.proposals[j].Status = StatusExecuted
+				slog.Info("iterate: approved proposal executed", "id", snapshot.ID)
+			}
+			break
+		}
+		e.saveProposals()
+	})
+	return true
 }
 
 // RejectProposal marks a proposal as rejected.
