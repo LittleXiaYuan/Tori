@@ -19,9 +19,25 @@ type Result struct {
 }
 
 // Policy controls what the sandbox can and can't do.
+//
+// AllowCommands and BlockCommands are matched against the *base name* of the
+// resolved command (case-insensitive), not against a substring of the full
+// command line. This avoids classic substring-bypass tricks like
+//
+//	cat /tmp/notes-about-rm-rf.txt
+//
+// being blocked because the words "rm" appear, or
+//
+//	rm  -rf  /
+//
+// (extra whitespace) bypassing a "rm -rf /" string contains check.
+//
+// Dangerous argument combinations (currently `rm`-style root deletion and the
+// Windows `del /s` / `rd /s` family) are vetted separately by inspecting the
+// individual argv elements rather than the joined string.
 type Policy struct {
-	AllowCommands  []string // whitelist of allowed commands (empty = all)
-	BlockCommands  []string // blacklist of blocked commands
+	AllowCommands  []string // base-name allowlist (empty = all base names allowed)
+	BlockCommands  []string // base-name blocklist
 	AllowPaths     []string // allowed file system paths
 	HostReadPaths  []string // host paths the sandbox can READ (read-only)
 	MaxDuration    time.Duration
@@ -29,11 +45,14 @@ type Policy struct {
 	AllowNetwork   bool
 }
 
-// DefaultPolicy is conservative: allowlist-only, no network.
+// DefaultPolicy is conservative: base-name allowlist, no network. Dangerous
+// argv combinations (rm -rf /, del /s, rd /s) are caught by the
+// argv-aware check inside Exec, so they no longer need to live in the
+// substring-based BlockCommands list.
 func DefaultPolicy() Policy {
 	return Policy{
 		AllowCommands:  []string{"echo", "cat", "head", "tail", "wc", "sort", "grep", "find", "ls", "dir", "type", "python3", "python", "node"},
-		BlockCommands:  []string{"rm -rf /", "format", "shutdown", "reboot", "del /s", "rd /s", "curl", "wget", "nc", "ssh", "scp"},
+		BlockCommands:  []string{"format", "shutdown", "reboot", "curl", "wget", "nc", "ssh", "scp"},
 		MaxDuration:    30 * time.Second,
 		MaxOutputBytes: 64 * 1024, // 64KB
 		AllowNetwork:   false,
@@ -54,8 +73,8 @@ const (
 // PersonalPolicy: your own machine, mostly unrestricted.
 func PersonalPolicy() Policy {
 	return Policy{
-		AllowCommands:  nil, // no whitelist → all allowed
-		BlockCommands:  []string{"rm -rf /", "format", "shutdown", "reboot"},
+		AllowCommands:  nil, // no whitelist → all base names allowed
+		BlockCommands:  []string{"format", "shutdown", "reboot"},
 		MaxDuration:    2 * time.Minute,
 		MaxOutputBytes: 256 * 1024, // 256KB
 		AllowNetwork:   true,
@@ -66,7 +85,7 @@ func PersonalPolicy() Policy {
 func FamilyPolicy() Policy {
 	return Policy{
 		AllowCommands:  []string{"echo", "cat", "head", "tail", "wc", "sort", "grep", "find", "ls", "dir", "type", "python3", "python", "node"},
-		BlockCommands:  []string{"rm -rf /", "format", "shutdown", "reboot", "del /s", "rd /s", "curl", "wget", "nc", "ssh", "scp", "sudo"},
+		BlockCommands:  []string{"format", "shutdown", "reboot", "curl", "wget", "nc", "ssh", "scp", "sudo"},
 		MaxDuration:    30 * time.Second,
 		MaxOutputBytes: 64 * 1024,
 		AllowNetwork:   false,
@@ -134,24 +153,33 @@ func NewDocker(baseDir string, policy Policy, image string) (*Sandbox, error) {
 func (s *Sandbox) WorkDir() string { return s.workDir }
 
 func (s *Sandbox) Exec(ctx context.Context, command string, args ...string) (*Result, error) {
-	// Security check
-	fullCmd := command + " " + strings.Join(args, " ")
+	base := commandBaseName(command)
+
+	// 1. Base-name blocklist: matches the resolved binary name only, so
+	//    `cat /tmp/notes-mentioning-rm.txt` is not collateral-blocked just
+	//    because "rm" appears in the args.
 	for _, blocked := range s.policy.BlockCommands {
-		if strings.Contains(strings.ToLower(fullCmd), strings.ToLower(blocked)) {
+		if strings.EqualFold(base, blocked) {
 			return &Result{ExitCode: -1, Stderr: fmt.Sprintf("blocked command: %s", blocked)}, nil
 		}
+	}
+
+	// 2. Argv-aware combination check: catches root-deletion variants that
+	//    a string blocklist cannot reliably express.
+	if reason := dangerousArgvCombo(base, args); reason != "" {
+		return &Result{ExitCode: -1, Stderr: "blocked dangerous argv combination: " + reason}, nil
 	}
 
 	if len(s.policy.AllowCommands) > 0 {
 		allowed := false
 		for _, a := range s.policy.AllowCommands {
-			if strings.EqualFold(command, a) {
+			if strings.EqualFold(base, a) {
 				allowed = true
 				break
 			}
 		}
 		if !allowed {
-			return &Result{ExitCode: -1, Stderr: fmt.Sprintf("command not in allowlist: %s", command)}, nil
+			return &Result{ExitCode: -1, Stderr: fmt.Sprintf("command not in allowlist: %s", base)}, nil
 		}
 	}
 
@@ -410,4 +438,85 @@ func truncate(s string, maxBytes int) string {
 		return s
 	}
 	return s[:maxBytes] + "\n...[truncated]"
+}
+
+// commandBaseName returns the lowercased basename of a command path with
+// any trailing .exe (Windows) or .bat/.cmd extension stripped, so that
+// `C:\Windows\System32\cmd.exe`, `cmd.exe` and `cmd` all resolve the same.
+func commandBaseName(command string) string {
+	if command == "" {
+		return ""
+	}
+	b := filepath.Base(command)
+	b = strings.ToLower(b)
+	for _, ext := range []string{".exe", ".bat", ".cmd", ".com"} {
+		if strings.HasSuffix(b, ext) {
+			b = strings.TrimSuffix(b, ext)
+			break
+		}
+	}
+	return b
+}
+
+// dangerousArgvCombo inspects argv per-token (not as a concatenated string)
+// for command + flag + target combinations that are too risky for the
+// sandbox to ever run. Returns a non-empty reason when a match is found.
+func dangerousArgvCombo(base string, args []string) string {
+	switch base {
+	case "rm":
+		// Block recursive force-delete of root or root-relative paths.
+		recursive := false
+		force := false
+		for _, a := range args {
+			la := strings.ToLower(a)
+			if la == "-r" || la == "--recursive" {
+				recursive = true
+			}
+			if la == "-rf" || la == "-fr" {
+				recursive = true
+				force = true
+			}
+			if la == "-f" || la == "--force" {
+				force = true
+			}
+		}
+		if recursive {
+			for _, a := range args {
+				if a == "/" || a == "/*" || a == "/." || a == "C:\\" || strings.EqualFold(a, "c:\\windows") {
+					_ = force // captured for completeness; recursive on root is enough
+					return "rm recursive on root"
+				}
+			}
+		}
+	case "del", "erase":
+		// Windows `del /s /q C:\` family.
+		recursive := false
+		for _, a := range args {
+			if strings.EqualFold(a, "/s") || strings.EqualFold(a, "/q") {
+				recursive = true
+			}
+		}
+		if recursive {
+			for _, a := range args {
+				if strings.EqualFold(a, "C:\\") || strings.EqualFold(a, "C:\\*") {
+					return "del recursive on system root"
+				}
+			}
+		}
+	case "rd", "rmdir":
+		recursive := false
+		for _, a := range args {
+			if strings.EqualFold(a, "/s") || strings.EqualFold(a, "/q") {
+				recursive = true
+			}
+		}
+		if recursive {
+			for _, a := range args {
+				if strings.EqualFold(a, "C:\\") {
+					return "rd recursive on system root"
+				}
+			}
+		}
+	}
+	return ""
 }
