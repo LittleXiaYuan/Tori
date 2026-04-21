@@ -1,3 +1,14 @@
+// Package storage defines a small object-storage abstraction (local + cloud
+// backends) and a stand-alone SQLite persistence helper.
+//
+// Status: as of 2026-04, no other package in this module imports `storage`.
+// `Ledger KV` (in `internal/ledger`) is the active persistence layer for the
+// agent's runtime data. The S3/OSS/COS/OBS factories below are stubs that
+// return errors. Treat this package as a sketch / future home for a unified
+// storage layer; do not add new callers without first wiring a real backend
+// or migrating the ledger to live on top of it.
+//
+// If this package is still unused at the next tech-debt sweep, delete it.
 package storage
 
 import (
@@ -7,6 +18,9 @@ import (
 )
 
 // Backend defines the interface for log storage backends (local, S3, OSS, etc.)
+//
+// Deprecated (informational): no production code imports this interface.
+// See the package-level comment above for the migration plan.
 type Backend interface {
 	// Write writes data to the storage backend
 	Write(ctx context.Context, key string, data io.Reader) error

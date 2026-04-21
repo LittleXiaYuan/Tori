@@ -11,6 +11,15 @@
 //
 // Capsule supersedes the legacy plugin.Plugin abstraction, while remaining
 // backward-compatible via adapter helpers in pkg/plugin.
+//
+// Status (2026-04): the Capsule + Cogni model is fully implemented in this
+// package and pkg/cogni, with tests, but is **not yet wired into the
+// running agent** — `cmd/agent` and `internal/*` continue to use the
+// pkg/plugin / pkg/skills path. Use this package only for new
+// experimental capsules; production wiring is tracked as the next
+// architectural milestone after the dual plugin/capsule system is
+// reconciled. Until then, do not delete the package: it represents a
+// load-bearing design contract referenced by the architecture docs.
 package capsule
 
 import (

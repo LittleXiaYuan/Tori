@@ -66,7 +66,13 @@ func (t *Trail) Query(date time.Time, opFilter string) []TrailEntry {
 	path := t.dailyPath(date)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		// Backwards compatibility: trails written before the .jsonl rename
+		// still live under the .json extension.
+		legacy := filepath.Join(t.dir, date.Format("2006-01-02")+".json")
+		data, err = os.ReadFile(legacy)
+		if err != nil {
+			return nil
+		}
 	}
 
 	var entries []TrailEntry
@@ -101,8 +107,12 @@ func (t *Trail) Recent(n int) []TrailEntry {
 	return out
 }
 
+// dailyPath returns the path for the day's audit file. The on-disk format is
+// newline-delimited JSON, so the .jsonl extension is used to be self-describing.
+// Query falls back to the legacy .json path for files written before the
+// extension change.
 func (t *Trail) dailyPath(date time.Time) string {
-	return filepath.Join(t.dir, date.Format("2006-01-02")+".json")
+	return filepath.Join(t.dir, date.Format("2006-01-02")+".jsonl")
 }
 
 func trailSplitLines(data []byte) [][]byte {

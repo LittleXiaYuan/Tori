@@ -24,10 +24,11 @@ type Handler func(ctx context.Context, job Job)
 
 // Scheduler manages periodic tasks.
 type Scheduler struct {
-	mu      sync.RWMutex
-	jobs    map[string]*Job
-	handler Handler
-	stop    chan struct{}
+	mu       sync.RWMutex
+	jobs     map[string]*Job
+	handler  Handler
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 // New creates a scheduler.
@@ -93,9 +94,11 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 }
 
-// Stop halts the scheduler.
+// Stop halts the scheduler. Safe to call multiple times.
 func (s *Scheduler) Stop() {
-	close(s.stop)
+	s.stopOnce.Do(func() {
+		close(s.stop)
+	})
 }
 
 func (s *Scheduler) tick(ctx context.Context, now time.Time) {
