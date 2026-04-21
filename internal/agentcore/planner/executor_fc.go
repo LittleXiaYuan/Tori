@@ -49,7 +49,6 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			req.StepCallback(thinkEvt)
 		}
 
-		client := p.clientForRequest(req)
 		if steps == 1 {
 			totalChars := 0
 			for _, m := range messages {
@@ -57,9 +56,11 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			}
 			slog.Info("planner: prompt stats", "msgs", len(messages), "total_chars", totalChars, "tools", len(tools), "step", steps)
 		}
-		var lastReasoning string
-		opts := &llm.ChatWithToolsOpts{LastReasoningOut: &lastReasoning}
-		reply, toolCalls, err := client.ChatWithToolsEx(ctx, messages, tools, 0.7, opts)
+		// chatWithToolsFallback walks the pool's tier fallback chain
+		// (request tier → expert → smart → fast → local → primary) and
+		// honors session ClientOverride and capability-aware selection. A
+		// session override short-circuits the chain inside clientForRequest.
+		reply, toolCalls, lastReasoning, err := p.chatWithToolsFallback(ctx, req, messages, tools)
 		if err != nil {
 			return nil, fmt.Errorf("planner fc step %d: %w", steps, err)
 		}
