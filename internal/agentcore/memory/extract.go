@@ -27,6 +27,53 @@ type ExtractResult struct {
 	Facts []string `json:"facts"`
 }
 
+// GraphFact is a structured triple plus the originating fact text used by
+// ExtractGraph; it lets callers populate the knowledge graph without
+// re-parsing free-form sentences with keyword heuristics.
+type GraphFact struct {
+	Fact      string `json:"fact"`      // original natural-language fact
+	Subject   string `json:"subject"`   // entity acting (e.g. "用户")
+	Predicate string `json:"predicate"` // relation type (uses, prefers, works_on, etc.)
+	Object    string `json:"object"`    // entity acted upon
+	ObjectKind string `json:"object_kind,omitempty"` // person|place|project|skill|preference|concept
+}
+
+// GraphResult bundles entity-and-relation extractions for ExtractGraph.
+type GraphResult struct {
+	Items []GraphFact `json:"items"`
+}
+
+// ExtractGraph runs a structured prompt asking the LLM to return entities and
+// relations rather than raw facts. Returns nil result + nil error when the
+// model declines or output is empty so callers can fall back to keyword
+// heuristics without treating it as a hard failure.
+func (e *Extractor) ExtractGraph(ctx context.Context, facts []string) (*GraphResult, error) {
+	if len(facts) == 0 || e.chatFn == nil {
+		return nil, nil
+	}
+	sys := `你是知识图谱抽取器。给定若干已抽取的事实文本，输出结构化三元组。
+对每个事实判断：subject（多用"用户"作为默认主体）、predicate（uses/prefers/works_at/works_on/learning/located_in/knows/part_of 之一，或自定义动词）、object（被作用对象）、object_kind（person|place|project|skill|preference|concept 之一）。
+输出严格 JSON：{"items":[{"fact":"...","subject":"...","predicate":"...","object":"...","object_kind":"..."}]}
+若无法可靠抽取，返回 {"items":[]}。仅输出 JSON。`
+	user := strings.Join(facts, "\n")
+	reply, err := e.chatFn(ctx, []ChatMessage{
+		{Role: "system", Content: sys},
+		{Role: "user", Content: user},
+	})
+	if err != nil {
+		return nil, err
+	}
+	cleaned := stripCodeFences(reply)
+	if cleaned == "" {
+		return nil, nil
+	}
+	var out GraphResult
+	if err := json.Unmarshal([]byte(cleaned), &out); err != nil {
+		return nil, fmt.Errorf("parse graph result: %w", err)
+	}
+	return &out, nil
+}
+
 // NewExtractor creates a fact extractor with the given LLM chat function.
 func NewExtractor(chatFn ChatFunc) *Extractor {
 	return &Extractor{chatFn: chatFn}
