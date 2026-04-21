@@ -116,36 +116,50 @@ func initExtensions(app *agentrt.App) error {
 	slog.Info("audit trail initialized", "dir", cfg.DataPath("audit"))
 
 	// ── Iterate Engine ──
-	iterBudget := app.Config.SelfIterateTokenBudget
-	if iterBudget <= 0 {
-		iterBudget = 5000
-	}
-	iterEngine := iterate.NewEngine(iterate.Config{
-		Enabled:     os.Getenv("SELF_ITERATE_ENABLED") == "true",
-		TokenBudget: iterBudget,
-		MaxRounds:   3,
-		AutoApprove: os.Getenv("SELF_ITERATE_AUTO_APPROVE") == "true",
-		DataDir:     cfg.DataPath("iterate"),
-	})
-	iterEngine.SetLLMCall(func(ctx context.Context, system, user string) (string, int, error) {
-		msgs := []llm.Message{
-			{Role: "system", Content: system},
-			{Role: "user", Content: user},
+	// Prefer the engine constructed by initSoulLayer (it has the Discusser,
+	// OnExecute handler for proposal application, and nighttime wiring). If
+	// that one is missing (lean configurations), fall back to building a
+	// minimal engine here so the gateway HTTP routes still function.
+	var iterEngine *iterate.Engine
+	if soulRaw, ok := app.Get("iterate_engine"); ok {
+		if eng, ok := soulRaw.(*iterate.Engine); ok {
+			iterEngine = eng
+			slog.Info("iterate engine: reusing soul-layer engine for gateway")
 		}
-		reply, err := app.LLMClient.Chat(ctx, msgs, IterateLLMTemperature)
-		estTokens := (len(system) + len(user) + len(reply)) / 4
-		return reply, estTokens, err
-	})
-	if app.Orchestrator != nil {
-		iterEngine.SetOnRecord(func(ctx context.Context, summary string) {
-			_ = app.Orchestrator.Ingest(ctx, "system", summary, "iterate_insight", "iterate_engine")
+	}
+	if iterEngine == nil {
+		iterBudget := app.Config.SelfIterateTokenBudget
+		if iterBudget <= 0 {
+			iterBudget = 5000
+		}
+		iterEngine = iterate.NewEngine(iterate.Config{
+			Enabled:     os.Getenv("SELF_ITERATE_ENABLED") == "true",
+			TokenBudget: iterBudget,
+			MaxRounds:   3,
+			AutoApprove: os.Getenv("SELF_ITERATE_AUTO_APPROVE") == "true",
+			DataDir:     cfg.DataPath("iterate"),
 		})
+		iterEngine.SetLLMCall(func(ctx context.Context, system, user string) (string, int, error) {
+			msgs := []llm.Message{
+				{Role: "system", Content: system},
+				{Role: "user", Content: user},
+			}
+			reply, err := app.LLMClient.Chat(ctx, msgs, IterateLLMTemperature)
+			estTokens := (len(system) + len(user) + len(reply)) / 4
+			return reply, estTokens, err
+		})
+		if app.Orchestrator != nil {
+			iterEngine.SetOnRecord(func(ctx context.Context, summary string) {
+				_ = app.Orchestrator.Ingest(ctx, "system", summary, "iterate_insight", "iterate_engine")
+			})
+		}
+		app.Set("iterate_engine", iterEngine)
+		if iterEngine.Enabled() {
+			slog.Info("iterate engine: minimal fallback constructed", "budget", iterBudget)
+		}
 	}
 	gw.SetIterateEngine(iterEngine)
 	app.Set(agentrt.CompIterateEngine, iterEngine)
-	if iterEngine.Enabled() {
-		slog.Info("iterate engine initialized", "budget", iterBudget)
-	}
 
 	// ── Speech Registry (Edge TTS = free, no API key) ──
 	if speechRegistry == nil {
