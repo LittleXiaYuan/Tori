@@ -414,4 +414,5 @@ func (g *Gateway) registerLoRARoutes() {
 	g.mux.HandleFunc("/v1/lora/trigger", g.requireAuth(g.handleLoRATrigger))
 	g.mux.HandleFunc("/v1/lora/rollback", g.requireAuth(g.handleLoRARollback))
 	g.mux.HandleFunc("/v1/lora/evolution", g.requireAuth(g.handleLoRAEvolution))
+	g.mux.HandleFunc("/v1/lora/config", g.requireAuth(g.handleLoRAConfig))
 }

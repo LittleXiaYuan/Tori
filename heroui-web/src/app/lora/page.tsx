@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { EvolutionState, LoRAStatus, TrainingRecord, TrainingSummary } from "@/lib/api-types/lora";
-import { Button, Card, Chip, Spinner, Table, Tooltip } from "@heroui/react";
+import type { LoRAConfig } from "@/lib/api-types/lora";
+import { Button, Card, Chip, Input, Spinner, Table, Tooltip } from "@heroui/react";
 import {
   Activity,
   BrainCircuit,
@@ -12,6 +13,8 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  Save,
+  Settings,
   Target,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
@@ -26,6 +29,14 @@ function fmtNs(ns?: number): string {
   return `${(s / 3600).toFixed(1)}h`;
 }
 
+function fmtNsDuration(ns?: number): string {
+  if (!ns || ns <= 0) return "24h";
+  const hours = ns / 3.6e12;
+  if (hours >= 1) return `${hours}h`;
+  const mins = ns / 6e10;
+  return `${mins}m`;
+}
+
 function pct(n: number, d: number): string {
   if (d <= 0) return "—";
   return `${Math.round((n / d) * 100)}%`;
@@ -37,16 +48,20 @@ export default function LoRAPage() {
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
   const [evolution, setEvolution] = useState<EvolutionState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"trigger" | "rollback" | null>(null);
+  const [busy, setBusy] = useState<"trigger" | "rollback" | "save-config" | null>(null);
   const [disabledReason, setDisabledReason] = useState<string | null>(null);
+  const [config, setConfig] = useState<LoRAConfig | null>(null);
+  const [configDraft, setConfigDraft] = useState<Record<string, string>>({});
+  const [showConfig, setShowConfig] = useState(false);
 
   const load = useCallback(async () => {
     setDisabledReason(null);
-    const [stR, histR, sumR, evoR] = await Promise.allSettled([
+    const [stR, histR, sumR, evoR, cfgR] = await Promise.allSettled([
       api.getLoRAStatus(),
       api.getLoRAHistory(),
       api.getLoRASummary(),
       api.getEvolutionState(),
+      api.getLoRAConfig(),
     ]);
 
     if (stR.status === "fulfilled") {
@@ -79,6 +94,19 @@ export default function LoRAPage() {
       setEvolution(null);
     }
 
+    if (cfgR.status === "fulfilled" && cfgR.value.config) {
+      const c = cfgR.value.config;
+      setConfig(c);
+      setConfigDraft({
+        min_samples: String(c.min_samples || 200),
+        min_interval: fmtNsDuration(c.min_interval),
+        eval_min_score: String(c.eval_min_score || 0.7),
+        max_adapters: String(c.max_adapters || 3),
+        base_model: c.base_model || "",
+        ab_test_duration: fmtNsDuration(c.ab_test_duration),
+      });
+    }
+
     setLoading(false);
   }, []);
 
@@ -94,6 +122,29 @@ export default function LoRAPage() {
       await load();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "触发失败", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onSaveConfig = async () => {
+    setBusy("save-config");
+    try {
+      const patch: Record<string, unknown> = {};
+      const ms = parseInt(configDraft.min_samples);
+      if (!isNaN(ms) && ms > 0) patch.min_samples = ms;
+      if (configDraft.min_interval) patch.min_interval = configDraft.min_interval;
+      const ems = parseFloat(configDraft.eval_min_score);
+      if (!isNaN(ems) && ems > 0) patch.eval_min_score = ems;
+      const ma = parseInt(configDraft.max_adapters);
+      if (!isNaN(ma) && ma > 0) patch.max_adapters = ma;
+      if (configDraft.base_model) patch.base_model = configDraft.base_model;
+      if (configDraft.ab_test_duration) patch.ab_test_duration = configDraft.ab_test_duration;
+      await api.updateLoRAConfig(patch as any);
+      showToast("配置已保存", "success");
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "保存失败", "error");
     } finally {
       setBusy(null);
     }
@@ -313,6 +364,74 @@ export default function LoRAPage() {
           <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
             暂无进化状态数据
           </p>
+        )}
+      </Card>
+
+      {/* 配置面板 */}
+      <Card className="section-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Settings size={16} style={{ color: "var(--yunque-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              调度器配置
+            </h2>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onPress={() => setShowConfig(!showConfig)}>
+              {showConfig ? "收起" : "展开"}
+            </Button>
+            {showConfig && (
+              <Button
+                size="sm"
+                className="gap-1"
+                isPending={busy === "save-config"}
+                isDisabled={!!disabledReason}
+                onPress={onSaveConfig}
+              >
+                <Save size={12} /> 保存
+              </Button>
+            )}
+          </div>
+        </div>
+        {showConfig && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <Input
+              label="最小样本数"
+              size="sm"
+              value={configDraft.min_samples ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, min_samples: e.target.value })}
+            />
+            <Input
+              label="最小间隔 (如 24h, 12h)"
+              size="sm"
+              value={configDraft.min_interval ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, min_interval: e.target.value })}
+            />
+            <Input
+              label="评估最低分 (0-1)"
+              size="sm"
+              value={configDraft.eval_min_score ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, eval_min_score: e.target.value })}
+            />
+            <Input
+              label="最大适配器数"
+              size="sm"
+              value={configDraft.max_adapters ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, max_adapters: e.target.value })}
+            />
+            <Input
+              label="基础模型"
+              size="sm"
+              value={configDraft.base_model ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, base_model: e.target.value })}
+            />
+            <Input
+              label="A/B 测试时长 (如 1h, 30m)"
+              size="sm"
+              value={configDraft.ab_test_duration ?? ""}
+              onChange={(e) => setConfigDraft({ ...configDraft, ab_test_duration: e.target.value })}
+            />
+          </div>
         )}
       </Card>
 

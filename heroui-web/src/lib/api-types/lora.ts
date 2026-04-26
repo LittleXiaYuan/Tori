@@ -84,6 +84,19 @@ export interface TrainingSummary {
   by_tenant: Record<string, number>;
 }
 
+/** LoRA scheduler configuration */
+export interface LoRAConfig {
+  min_samples: number;
+  min_interval: number; // nanoseconds
+  eval_min_score: number;
+  max_adapters: number;
+  base_model: string;
+  training_data_dir: string;
+  adapter_dir: string;
+  ab_test_duration: number; // nanoseconds
+  filter_enabled: boolean;
+}
+
 /** Evolution coordinator snapshot (localbrain.CoordinatorState) */
 export interface EvolutionState {
   total_tasks: number;

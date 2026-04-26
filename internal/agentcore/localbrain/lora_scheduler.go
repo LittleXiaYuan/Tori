@@ -185,6 +185,43 @@ func (ls *LoRAScheduler) getOrCreateTenantState(tenantID string) *SchedulerState
 	return s
 }
 
+// Config returns the current scheduler configuration.
+func (ls *LoRAScheduler) Config() SchedulerConfig {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	return ls.config
+}
+
+// UpdateConfig applies a partial config update. Only non-zero fields are updated.
+func (ls *LoRAScheduler) UpdateConfig(patch SchedulerConfig) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if patch.MinSamples > 0 {
+		ls.config.MinSamples = patch.MinSamples
+	}
+	if patch.MinInterval > 0 {
+		ls.config.MinInterval = patch.MinInterval
+	}
+	if patch.EvalMinScore > 0 {
+		ls.config.EvalMinScore = patch.EvalMinScore
+	}
+	if patch.MaxAdapters > 0 {
+		ls.config.MaxAdapters = patch.MaxAdapters
+	}
+	if patch.BaseModel != "" {
+		ls.config.BaseModel = patch.BaseModel
+	}
+	if patch.TrainingDataDir != "" {
+		ls.config.TrainingDataDir = patch.TrainingDataDir
+	}
+	if patch.AdapterDir != "" {
+		ls.config.AdapterDir = patch.AdapterDir
+	}
+	if patch.ABTestDuration > 0 {
+		ls.config.ABTestDuration = patch.ABTestDuration
+	}
+}
+
 // SetTrainFunc sets the training backend callback.
 func (ls *LoRAScheduler) SetTrainFunc(fn TrainFunc)  { ls.trainFn = fn }
 

@@ -1211,6 +1211,24 @@ export const api = {
   rollbackLoRA: () => fetcher<{ status: string }>("/v1/lora/rollback", { method: "POST" }),
   getEvolutionState: () =>
     fetcher<{ state: import("./api-types/lora").EvolutionState }>("/v1/lora/evolution"),
+
+  getLoRAConfig: () =>
+    fetcher<{ config: import("./api-types/lora").LoRAConfig }>("/v1/lora/config"),
+
+  updateLoRAConfig: (patch: Partial<{
+    min_samples: number;
+    min_interval: string;
+    eval_min_score: number;
+    max_adapters: number;
+    base_model: string;
+    training_data_dir: string;
+    adapter_dir: string;
+    ab_test_duration: string;
+  }>) =>
+    fetcher<{ config: import("./api-types/lora").LoRAConfig; status: string }>(
+      "/v1/lora/config",
+      { method: "PUT", body: JSON.stringify(patch) },
+    ),
 };
 
 // Sticker URL utilities
