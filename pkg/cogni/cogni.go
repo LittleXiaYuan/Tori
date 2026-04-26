@@ -16,11 +16,12 @@
 //     modifying any capsule.
 //   - UIs can visualize & edit activation rules without reading source code.
 //
-// Status (2026-04): paired with pkg/capsule, this package is implemented
-// and tested but **not yet consumed by the running agent**. See the
-// status note on `package capsule` for the integration plan. New
-// experimental work that would otherwise extend pkg/plugin should
-// prefer this Cogni model.
+// Status (2026-04): this package is consumed by the running agent through
+// cmd/agent/module_cogni.go. The host uses declarations for activation,
+// context injection, tool surface filtering, traces, verification, workflows,
+// experience, evolution, federation administration, and per-cogni economics.
+// pkg/capsule remains the longer-term unification layer for install/runtime
+// isolation.
 package cogni
 
 import (
@@ -54,6 +55,18 @@ type Declaration struct {
 	// system prompt when activated.
 	Context ContextInjection `json:"context,omitempty"`
 
+	// MCP declares per-Cogni MCP server connections and tool filters.
+	MCP MCPConfig `json:"mcp,omitempty"`
+
+	// Workflows declares multi-step workflows this Cogni can execute.
+	Workflows []WorkflowDef `json:"workflows,omitempty"`
+
+	// Experience declares the experience engine configuration.
+	Experience ExperienceConfig `json:"experience,omitempty"`
+
+	// Economics declares resource constraints for this Cogni.
+	Economics EconomicsConfig `json:"economics,omitempty"`
+
 	// Memory declares how this Cogni transforms memory extraction.
 	Memory MemoryPolicy `json:"memory,omitempty"`
 
@@ -64,10 +77,49 @@ type Declaration struct {
 	// Exclusive declares that when this Cogni activates, no other Cogni
 	// with a matching Exclusive group may be active in the same turn.
 	Exclusive string `json:"exclusive,omitempty"`
+
+	// Checks are optional self-tests used by cogni.VerifyDeclaration (and
+	// by Registry reload) to confirm that activation rules behave as the
+	// author intended. Think of each check as a one-line unit test — it
+	// supplies an input Message/Tenant/Channel and asserts on the
+	// resulting Activation. This is how "CI for declarative agents"
+	// enters the codebase: bad configs can no longer silently land in
+	// production, they fail the reload path and surface as alerts.
+	Checks []ActivationCheck `json:"checks,omitempty"`
+}
+
+// ActivationCheck is one declarative self-test for an activation rule.
+// At least one of ExpectActive / ExpectScoreAtLeast / ExpectReasonContains
+// must be set; unset fields are ignored so authors can assert narrowly.
+type ActivationCheck struct {
+	// Name is a human-readable label surfaced in failure reports.
+	Name string `json:"name,omitempty"`
+
+	// Message is the user-visible text sent to the evaluator.
+	Message string `json:"message"`
+
+	// Tenant / Channel narrow the Session the check runs in.
+	Tenant  string `json:"tenant,omitempty"`
+	Channel string `json:"channel,omitempty"`
+
+	// PriorHandover simulates tags emitted by earlier turns in the same
+	// conversation.
+	PriorHandover []string `json:"prior_handover,omitempty"`
+
+	// ExpectActive asserts the post-exclusivity Activated flag.
+	// Use a pointer so the zero value is distinguishable from "unset".
+	ExpectActive *bool `json:"expect_active,omitempty"`
+
+	// ExpectScoreAtLeast asserts Activation.Score >= value.
+	ExpectScoreAtLeast float64 `json:"expect_score_at_least,omitempty"`
+
+	// ExpectReasonContains asserts that at least one reason string
+	// contains every substring in this list (case-sensitive).
+	ExpectReasonContains []string `json:"expect_reason_contains,omitempty"`
 }
 
 // ActivationRules describes the declarative activation condition.
-// The final activation score is the maximum of all matching sub-rules,
+// The final activation score is the sum of all matching sub-rules,
 // clamped to [0, 1]. Any score ≥ MinScore triggers activation.
 type ActivationRules struct {
 	// MinScore is the threshold for activation (default 0.5).
@@ -98,6 +150,9 @@ type ActivationRules struct {
 	// HandoverOn declares activation when a previous Cogni hands off control
 	// by emitting one of these tags via its Handle result.
 	HandoverOn []string `json:"handover_on,omitempty"`
+
+	// Perception declares multi-modal activation signals beyond keywords/regex.
+	Perception []PerceptionRule `json:"perception,omitempty"`
 }
 
 // ToolSurface describes which skills get exposed to the planner once this

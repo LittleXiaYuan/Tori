@@ -87,7 +87,7 @@ func initIntelligence(app *agentrt.App) error {
 
 		scheduler := localbrain.NewLoRAScheduler(app.Ledger, loraAdapter, brain, loraCfg)
 		scheduler.LoadState()
-		// Wire LoRAScheduler ??Ledger KV
+		// Wire LoRAScheduler → Ledger KV
 		if app.Ledger != nil {
 			lmigrator := iledger.NewKVMigrator(app.Ledger)
 			stateFile := loraCfg.AdapterDir
@@ -98,11 +98,60 @@ func initIntelligence(app *agentrt.App) error {
 			scheduler.SetKVStore(iledger.NewKVConfigStore(app.Ledger, "lora_scheduler"))
 			slog.Info("lora scheduler wired to Ledger KV")
 		}
+
+		// Wire LoRA Trainer (remote + local hybrid; auto mode always installs)
+		trainerCfg := localbrain.TrainerConfigFromEnv()
+		trainer := localbrain.NewLoRATrainer(trainerCfg)
+		scheduler.SetTrainFunc(trainer.TrainFunc())
+		slog.Info("lora trainer: initialized",
+			"mode", trainerCfg.Mode,
+			"remote_url", trainerCfg.RemoteURL,
+			"script", trainerCfg.ScriptPath,
+		)
+
+		// Wire LoRA Evaluator (post-training quality gate)
+		vllmURL := os.Getenv("VLLM_BASE_URL")
+		evaluator := localbrain.NewLoRAEvaluator(localbrain.EvaluatorConfig{
+			InferenceURL: vllmURL,
+			APIKey:       os.Getenv("VLLM_API_KEY"),
+			BaseModel:    loraCfg.BaseModel,
+			MinScore:     loraCfg.EvalMinScore,
+		})
+		scheduler.SetEvalFunc(evaluator.EvalFunc())
+		if vllmURL != "" {
+			slog.Info("lora evaluator: initialized", "inference_url", vllmURL)
+		} else {
+			slog.Info("lora evaluator: initialized in passthrough mode (no vLLM)")
+		}
+
+		// Wire Training Metrics (observability)
+		metricsDir := loraCfg.AdapterDir
+		if metricsDir == "" {
+			metricsDir = "./data/adapters"
+		}
+		metrics := localbrain.NewTrainingMetrics(metricsDir)
+		scheduler.SetMetrics(metrics)
+		app.Set("training_metrics", metrics)
+
 		app.Set("lora_scheduler", scheduler)
 		slog.Info("lora scheduler: initialized",
 			"base_model", loraCfg.BaseModel,
 			"min_samples", loraCfg.MinSamples,
 			"has_vllm", loraAdapter != nil,
+			"history_count", metrics.Count(),
+		)
+
+		// Wire Evolution Coordinator (multi-layer evolution orchestration)
+		coordCfg := localbrain.DefaultCoordinatorConfig()
+		coordCfg.StateDir = metricsDir
+		coordinator := localbrain.NewEvolutionCoordinator(app.Ledger, brain, scheduler, metrics, coordCfg)
+		app.Set("evolution_coordinator", coordinator)
+		coordState := coordinator.State()
+		slog.Info("evolution coordinator: initialized",
+			"total_tasks", coordState.TotalTasks,
+			"success_rate", coordState.RollingSuccessRate,
+			"strategy_interval", coordCfg.StrategyInterval,
+			"weight_threshold", coordCfg.WeightHitRateThreshold,
 		)
 	}
 

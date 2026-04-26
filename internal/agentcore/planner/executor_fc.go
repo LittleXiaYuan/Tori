@@ -24,7 +24,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg, req.DisableDelegation, req.AllowedSkills)
+	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.DisableDelegation, req.AllowedSkills)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -123,7 +123,22 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				toolParentCtx = context.Background()
 			}
 
-			safeToolGo(toolParentCtx, timeout, func(toolCtx context.Context) {
+			go func(toolParentCtx context.Context, timeout time.Duration, idx int, tc llm.ToolCall) {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("planner: tool goroutine panic", "panic", r, "skill", tc.Function.Name)
+						resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, err: fmt.Errorf("tool panic: %v", r)}
+					}
+				}()
+				var toolCtx context.Context
+				if timeout <= 0 {
+					toolCtx = toolParentCtx
+				} else {
+					var cancel context.CancelFunc
+					toolCtx, cancel = context.WithTimeout(toolParentCtx, timeout)
+					defer cancel()
+				}
+				func(toolCtx context.Context) {
 				var args map[string]any
 				json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
@@ -225,7 +240,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				} else {
 					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: r}
 				}
-			})
+				}(toolCtx)
+			}(toolParentCtx, timeout, idx, tc)
 		}
 		// Collect results in order
 		tcResults := make([]tcResult, len(toolCalls))
@@ -293,12 +309,13 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		return &PlanResult{Reply: summary, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 	}
 
-	// Update recency for future intent routing
 	if len(usedSkills) > 0 {
+		p.recentSkillsMu.Lock()
 		p.recentSkills = append(usedSkills, p.recentSkills...)
 		if len(p.recentSkills) > 20 {
 			p.recentSkills = p.recentSkills[:20]
 		}
+		p.recentSkillsMu.Unlock()
 	}
 
 	return &PlanResult{Reply: p.cleanReply(reply), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
@@ -313,7 +330,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // those names before any further filtering. This is driven by the Cherry
 // "tools" drawer: when a user explicitly checks a subset of skills, the
 // planner is expected to stay inside that subset.
-func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
+func (p *Planner) buildFunctionDefs(userMessage, tenantID string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
 		allow := make(map[string]struct{}, len(allowedSkills))
@@ -329,6 +346,19 @@ func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool, 
 		allSkills = filtered
 		slog.Info("buildFunctionDefs: user-restricted skill set", "allowed", len(allowedSkills), "matched", len(allSkills))
 	}
+
+	// Cogni surface filter — narrows the tool list to the union of every
+	// activated cogni's ToolSurface. The hook returns the input unchanged
+	// when no cogni activates, so the previous behaviour is preserved.
+	if p.cogniSkillFilter != nil {
+		before := len(allSkills)
+		allSkills = p.cogniSkillFilter(userMessage, tenantID, allSkills)
+		if after := len(allSkills); after != before {
+			slog.Info("buildFunctionDefs: cogni surface filter applied",
+				"before", before, "after", after, "msg_prefix", truncate(userMessage, 50))
+		}
+	}
+
 	cats := p.registry.Categories()
 
 	var catNames []string
@@ -374,8 +404,14 @@ func (p *Planner) buildFunctionDefs(userMessage string, disableDelegation bool, 
 	// Strategy 1: Dynamic filtering by intent
 	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
 		scorer := p.skillScorer
-		if scorer != nil && len(p.recentSkills) > 0 {
-			scorer.RecentSkills = p.recentSkills
+		if scorer != nil {
+			p.recentSkillsMu.Lock()
+			if len(p.recentSkills) > 0 {
+				recent := make([]string, len(p.recentSkills))
+				copy(recent, p.recentSkills)
+				scorer.RecentSkills = recent
+			}
+			p.recentSkillsMu.Unlock()
 		}
 		filtered := p.registry.FilterByIntentScored(userMessage, scorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {

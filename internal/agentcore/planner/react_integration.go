@@ -278,6 +278,7 @@ func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, histo
 		assembled := pb.BuildDynamicContext(ctx, DynamicContextRequest{
 			LastMessage: req.Messages[len(req.Messages)-1].Content,
 			TenantID:    req.TenantID,
+			Channel:     req.ChannelType,
 			TaskContext: req.TaskContext,
 			EmotionHint: req.EmotionHint,
 		})
