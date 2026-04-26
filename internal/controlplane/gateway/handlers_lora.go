@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/apperror"
 )
 
@@ -139,6 +140,62 @@ func (g *Gateway) handleLoRARollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
+}
+
+func (g *Gateway) handleLoRAConfig(w http.ResponseWriter, r *http.Request) {
+	if g.loraScheduler == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		cfg := g.loraScheduler.Config()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"config": cfg})
+
+	case http.MethodPut, http.MethodPatch:
+		var body struct {
+			MinSamples     int    `json:"min_samples"`
+			MinInterval    string `json:"min_interval"`
+			EvalMinScore   float64 `json:"eval_min_score"`
+			MaxAdapters    int    `json:"max_adapters"`
+			BaseModel      string `json:"base_model"`
+			TrainingDataDir string `json:"training_data_dir"`
+			AdapterDir     string `json:"adapter_dir"`
+			ABTestDuration string `json:"ab_test_duration"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+
+		var patch localbrain.SchedulerConfig
+		patch.MinSamples = body.MinSamples
+		if body.MinInterval != "" {
+			if d, err := time.ParseDuration(body.MinInterval); err == nil {
+				patch.MinInterval = d
+			}
+		}
+		patch.EvalMinScore = body.EvalMinScore
+		patch.MaxAdapters = body.MaxAdapters
+		patch.BaseModel = body.BaseModel
+		patch.TrainingDataDir = body.TrainingDataDir
+		patch.AdapterDir = body.AdapterDir
+		if body.ABTestDuration != "" {
+			if d, err := time.ParseDuration(body.ABTestDuration); err == nil {
+				patch.ABTestDuration = d
+			}
+		}
+
+		g.loraScheduler.UpdateConfig(patch)
+		cfg := g.loraScheduler.Config()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"config": cfg, "status": "updated"})
+
+	default:
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or PUT/PATCH only")
+	}
 }
 
 func (g *Gateway) handleLoRAEvolution(w http.ResponseWriter, r *http.Request) {
