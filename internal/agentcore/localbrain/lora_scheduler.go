@@ -392,10 +392,14 @@ func (ls *LoRAScheduler) runPipeline(ctx context.Context, tenantID, dataPath str
 		)
 	}
 
+	ls.mu.Lock()
+	tstate = ls.getOrCreateTenantState(tenantID)
 	if err := ls.deploy(ctx, tstate, adapterName, result.AdapterPath); err != nil {
+		ls.mu.Unlock()
 		ls.recordMetrics(record)
 		return fmt.Errorf("lora_scheduler: deploy failed: %w", err)
 	}
+	ls.mu.Unlock()
 
 	record.Deployed = true
 	ls.recordMetrics(record)
@@ -719,7 +723,7 @@ func (ls *LoRAScheduler) LoadState() {
 		return
 	}
 	var ps persistedState
-	if json.Unmarshal(data, &ps) == nil && ps.Global.TotalTrains > 0 {
+	if json.Unmarshal(data, &ps) == nil && (ps.Global.TotalTrains > 0 || ps.Global.CurrentAdapter != "" || ps.Tenants != nil) {
 		ls.state = ps.Global
 		if ps.Tenants != nil {
 			ls.tenantStates = ps.Tenants
