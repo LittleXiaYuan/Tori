@@ -74,8 +74,13 @@ export default function CommandPalette() {
       }
       if (e.key === "Escape") close();
     };
+    const openHandler = () => setOpen(true);
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener("yunque:open-command-palette", openHandler);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.removeEventListener("yunque:open-command-palette", openHandler);
+    };
   }, [close]);
 
   useEffect(() => {

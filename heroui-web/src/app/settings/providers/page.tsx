@@ -608,7 +608,7 @@ export default function ProvidersPage() {
           <div className="flex items-center justify-between mb-3">
             <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>已配置的模型提供商</span>
             <Button size="sm" variant="ghost" onPress={async () => {
-              try { const r = await api.breakerReset(); alert(`已重置 ${r.reset_count} 个熔断器`); refresh(); } catch (e: any) { alert(e.message); }
+              try { const r = await api.breakerReset(); showToast(`已重置 ${r.reset_count} 个熔断器`, "success"); refresh(); } catch (e: any) { showToast(e.message, "error"); }
             }} style={{ fontSize: "var(--text-xs)" }}>
               重置熔断器
             </Button>
@@ -644,7 +644,7 @@ export default function ProvidersPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)" }}>
                           {p.display_name || p.id}
                           <Chip size="sm" style={{ background: `${statusColor}15`, color: statusColor, fontSize: "var(--text-2xs)" }}>
-                            {healthy ? "healthy" : p.breaker_state || "unknown"}
+                            {healthy ? "正常" : p.breaker_state === "open" ? "熔断" : p.breaker_state === "half-open" ? "半开" : "未知"}
                           </Chip>
                           {p.tier && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{p.tier}</Chip>}
                         </div>

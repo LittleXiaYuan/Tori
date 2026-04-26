@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@heroui/react";
-import { BookOpen, Brain, Calendar, Camera, Code, FileText, GitBranch, Globe, Keyboard, Layers, ListOrdered, Mail, MessageSquare, MousePointer, Search, Sparkles, Terminal } from "lucide-react";
+import { BookOpen, Brain, Calendar, Camera, Code, FileDown, FileText, GitBranch, Globe, Keyboard, Layers, ListOrdered, Mail, MessageSquare, MousePointer, Search, Sparkles, Terminal, Library } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 interface SlashCommand {
@@ -34,6 +34,9 @@ const commands: SlashCommand[] = [
   { id: "skill", command: "/skill", title: "Use skill", description: "Invoke a named skill directly.", icon: Sparkles, category: "Tools", placeholder: "web_search query about AI" },
   { id: "skills", command: "/skills", title: "List skills", description: "Show all available skills and plugins.", icon: Layers, category: "Tools" },
   { id: "workflow", command: "/workflow", title: "Run workflow", description: "Start a reusable workflow from chat.", icon: Layers, category: "Automation", placeholder: "pre-release checks" },
+  { id: "research", command: "/research", title: "Deep research", description: "Research a topic: browse, extract, compare, and generate a report.", icon: Search, category: "Research", placeholder: "Compare pricing of Notion vs Coda vs Confluence" },
+  { id: "report", command: "/report", title: "Generate report", description: "Turn the last research or conversation into a structured report.", icon: FileDown, category: "Research", placeholder: "Export as comparison table with sources" },
+  { id: "save_knowledge", command: "/save_knowledge", title: "Save to knowledge", description: "Save the current findings to the knowledge base for future reference.", icon: Library, category: "Research" },
 ];
 
 interface Props {

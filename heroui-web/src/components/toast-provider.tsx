@@ -43,19 +43,24 @@ export function Toaster() {
 
   useEffect(() => { globalToast = toast; }, [toast]);
 
+  const dismiss = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
-      {toasts.map((t) => {
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
+      {toasts.slice(-5).map((t) => {
         const s = typeStyles[t.type];
         return (
           <div
             key={t.id}
-            className="px-4 py-3 rounded-lg text-sm font-medium shadow-lg animate-fade-in-up"
+            className="px-4 py-3 rounded-lg text-sm font-medium shadow-lg animate-fade-in-up flex items-start gap-2"
             style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}
           >
-            {t.message}
+            <span className="flex-1">{t.message}</span>
+            <button onClick={() => dismiss(t.id)} className="shrink-0 opacity-60 hover:opacity-100 transition-opacity" aria-label="关闭">×</button>
           </div>
         );
       })}

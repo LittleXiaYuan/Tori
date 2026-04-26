@@ -12,6 +12,7 @@ export function useApiData<T>(
 ) {
   const [data, setData] = useState<T>(initial);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
   const mountedRef = useRef(true);
@@ -28,9 +29,12 @@ export function useApiData<T>(
       const result = await fetcherRef.current();
       if (mountedRef.current && seq === seqRef.current) {
         setData(result);
+        setError(null);
       }
-    } catch {
-      /* offline / error — keep previous data */
+    } catch (e) {
+      if (mountedRef.current && seq === seqRef.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
     } finally {
       if (mountedRef.current && seq === seqRef.current) {
         setLoading(false);
@@ -48,5 +52,5 @@ export function useApiData<T>(
     load();
   }, [load]);
 
-  return { data, setData, loading, refresh } as const;
+  return { data, setData, loading, error, refresh } as const;
 }

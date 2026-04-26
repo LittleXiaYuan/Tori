@@ -12,6 +12,27 @@ export const STATUS_COLORS: Record<string, string> = {
   planning: "#a78bfa",
 };
 
+export const STATUS_LABELS: Record<string, string> = {
+  running: "运行中",
+  active: "活跃",
+  completed: "已完成",
+  done: "已完成",
+  pending: "等待中",
+  failed: "失败",
+  idle: "空闲",
+  cancelled: "已取消",
+  paused: "已暂停",
+  planning: "规划中",
+  queued: "排队中",
+  scheduled: "已调度",
+  success: "成功",
+  error: "错误",
+  enabled: "已启用",
+  disabled: "已禁用",
+  healthy: "正常",
+  unknown: "未知",
+};
+
 /** Relative time formatter */
 export function relTime(ts?: string): string {
   if (!ts) return "—";

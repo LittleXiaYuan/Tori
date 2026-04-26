@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api, type ConfigGroup, getApiKey, setApiKey } from "@/lib/api";
+import { showToast } from "@/components/toast-provider";
 import {
   Button, Spinner, TextField, Input, Label,
   Select, ListBox, Chip, Separator,
@@ -87,7 +88,7 @@ export default function SettingsPage() {
       if (res.default_paths?.length && !values["HOST_READ_PATHS"]) {
         setValues(prev => ({ ...prev, HOST_READ_PATHS: res.default_paths.join(",") }));
       }
-    } catch { /* ignore */ }
+    } catch (e) { showToast(e instanceof Error ? e.message : "目录探测失败", "error"); }
     setDetectLoading(false);
   };
 

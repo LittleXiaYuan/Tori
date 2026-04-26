@@ -11,7 +11,7 @@ import {
   ChevronRight, Calendar, Power, PowerOff, Copy, Eye,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
-import { STATUS_COLORS } from "@/lib/constants";
+import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/empty-state";
 
 type MissionTab = "tasks" | "cron" | "triggers" | "templates";
@@ -358,8 +358,8 @@ export default function MissionsPage() {
                     </div>
                     <div className="flex shrink-0">
                       <Tooltip delay={0}>
-                        <Button size="sm" variant="ghost" onPress={() => taskAction(t.id, "run")} className="!p-0.5 !min-w-0"><Eye size={11} /></Button>
-                        <Tooltip.Content>查看</Tooltip.Content>
+                        <Button size="sm" variant="ghost" onPress={() => taskAction(t.id, "run")} className="!p-0.5 !min-w-0"><Play size={11} /></Button>
+                        <Tooltip.Content>运行</Tooltip.Content>
                       </Tooltip>
                       <Tooltip delay={0}>
                         <Button size="sm" variant="ghost" isPending={deleting === t.id} onPress={() => deleteTask(t.id)} className="!p-0.5 !min-w-0"><Trash2 size={11} /></Button>
@@ -369,7 +369,7 @@ export default function MissionsPage() {
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Chip size="sm" style={{ background: `${STATUS_COLORS[t.status] || "#9ca3af"}15`, color: STATUS_COLORS[t.status] || "#9ca3af", fontSize: "var(--text-2xs)" }}>
-                      {t.status}
+                      {STATUS_LABELS[t.status] || t.status}
                     </Chip>
                     {t.type && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{t.type}</Chip>}
                     {t.priority && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>P{t.priority}</Chip>}
@@ -579,7 +579,7 @@ export default function MissionsPage() {
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <Chip size="sm" style={{ background: `${typeColor}15`, color: typeColor, fontSize: "var(--text-2xs)" }}>{trig.type}</Chip>
                           <Chip size="sm" style={{ background: trig.status === "active" ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.05)", color: trig.status === "active" ? "#22c55e" : "#9ca3af", fontSize: "var(--text-2xs)" }}>
-                            {trig.status}
+                            {STATUS_LABELS[trig.status] || trig.status}
                           </Chip>
                           <span className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>触发 {trig.run_count} 次</span>
                           {trig.last_error && (

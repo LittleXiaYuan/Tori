@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [toriUrl, setToriUrl] = useState("");
   const [showToriLogin, setShowToriLogin] = useState(false);
 
@@ -50,6 +51,7 @@ export default function LoginPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     if (needsSetup) {
       if (password.length < 8) {
@@ -76,6 +78,7 @@ export default function LoginPage() {
           return;
         }
         setNeedsSetup(false);
+        setSuccess(t("auth.passwordSet") || "密码已设置，请登录");
         setPassword("");
         setConfirmPassword("");
         return;
@@ -149,6 +152,12 @@ export default function LoginPage() {
               <div className="flex items-center gap-2 rounded-lg bg-red-400/10 px-3 py-2.5 text-xs text-red-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                 {error}
+              </div>
+            )}
+            {success && (
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#22c55e" }} />
+                {success}
               </div>
             )}
 

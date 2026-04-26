@@ -50,13 +50,27 @@ import {
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
 import { BrowserResumeBanner } from "@/components/chat/browser-resume-banner";
+import { ChatEmptyState } from "@/components/chat/chat-empty-state";
+import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { chatReducer, chatInit } from "@/lib/chat-state";
 import { convReducer, convInit } from "@/lib/conversation-state";
+import { useChatInit } from "@/lib/use-chat-init";
+import { useChatMedia, type PendingFile } from "@/lib/use-chat-media";
+import { useChatRecording } from "@/lib/use-chat-recording";
+import { useShortcuts } from "@/lib/use-shortcuts";
 
 export default function ChatPage() {
   const router = useRouter();
   const [chat, chatD] = useReducer(chatReducer, chatInit);
   const [conv, convD] = useReducer(convReducer, convInit);
+  const {
+    currentModel, currentModelId, availableModels,
+    setupNeeded, presets, activePreset,
+    airiAvailable, heroSkills,
+    setCurrentModel, setCurrentModelId,
+    handleSwitchPreset,
+  } = useChatInit();
+
   const [thinkingLevel, setThinkingLevel] = useState<"none" | "auto" | "deep">("auto");
   const [copiedIdx, setCopiedIdx] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => {
@@ -71,71 +85,31 @@ export default function ChatPage() {
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean | null>(null);
   const [chatMode, setChatMode] = useState<"agent" | "fast" | "chat">("agent");
   const [airiMode, setAiriMode] = useState(false);
-  const [airiAvailable, setAiriAvailable] = useState(false);
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [computerWidth, setComputerWidth] = useState(340);
   const resizingRef = useRef(false);
 
-  // Auto-collapse conversation sidebar when computer panel opens to free space
   useEffect(() => {
     if (showComputer) setShowSidebar(false);
   }, [showComputer]);
 
-  const [currentModel, setCurrentModel] = useState("");
-  const [currentModelId, setCurrentModelId] = useState("");
-  const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
-  const [ttsPlaying, setTtsPlaying] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [presets, setPresets] = useState<PresetInfo[]>([]);
-  const [activePreset, setActivePreset] = useState("");
-  const [setupNeeded, setSetupNeeded] = useState(false);
   const [browserTraceEvents, setBrowserTraceEvents] = useState<AgentEvent[]>([]);
   const [resumePromptForBrowser, setResumePromptForBrowser] = useState<string | null>(null);
   const [browserResumePending, setBrowserResumePending] = useState(false);
-  const [heroSkills, setHeroSkills] = useState<SkillInfo[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputShellRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
-  useEffect(() => {
-    api.skills().then((res) => setHeroSkills((res.skills || []).slice(0, 4))).catch(() => {});
-  }, []);
+  const { ttsPlaying, isRecording, playTTS, startRecording, stopRecording } =
+    useChatRecording(chatD, inputRef);
 
-  useEffect(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("yunque_token") || "" : "";
-    const k = typeof window !== "undefined" ? localStorage.getItem("yunque_api_key") || "" : "";
-    const ah: Record<string, string> = t ? { Authorization: `Bearer ${t}` } : k ? { "X-API-Key": k } : {};
-    fetch("/v1/plugins/ui", { headers: ah }).then(r => r.json()).then((data: any) => {
-      const tabs = data?.tabs || data || [];
-      if (Array.isArray(tabs) && tabs.some((t: any) => t.key === "airi")) {
-        fetch("/v1/ext/airi/status", { headers: ah }).then(r => r.json()).then(() => {
-          setAiriAvailable(true);
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
+  const getCurrentInput = useCallback(() => chat.input, [chat.input]);
+  const {
+    pendingFiles, setPendingFiles, isDragging, fileInputRef,
+    processFile, handleFileUpload, handleDrop, handleDragOver, handleDragLeave,
+  } = useChatMedia(chatD, getCurrentInput);
 
-  // Load providers for model selector
-  useEffect(() => {
-    api.providerList().then((data) => {
-      const providers = data.providers || [];
-      setAvailableModels(providers.filter(p => p.type === "chat").map(p => ({
-        id: p.id, model: p.model, display_name: p.display_name, enabled: p.enabled,
-        type: p.id.split("-")[0] || p.id,
-        tier: p.tier, capabilities: p.capabilities,
-      })));
-      const primary = providers.find(p => p.enabled);
-      if (primary) {
-        setCurrentModel(primary.model || primary.display_name || primary.id);
-        setCurrentModelId(primary.id);
-      }
-    }).catch(() => {});
-  }, []);
-
-  // Load conversations from API
   const loadConversations = useCallback(async () => {
     try {
       const data = await api.conversations(conv.showArchived);
@@ -145,7 +119,6 @@ export default function ChatPage() {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  // Restore active conversation messages on mount
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
@@ -154,20 +127,6 @@ export default function ChatPage() {
       switchConversation(conv.activeId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    api.checkSetup().then((chk) => {
-      setSetupNeeded(chk.setup_needed);
-    }).catch(() => {});
-  }, []);
-
-  // Load presets
-  useEffect(() => {
-    api.getPresets().then((data) => {
-      setPresets(data.presets || []);
-      setActivePreset(data.active || "");
-    }).catch(() => {});
-  }, []);
 
   const showComputerRef = useRef(showComputer);
   showComputerRef.current = showComputer;
@@ -288,86 +247,7 @@ export default function ChatPage() {
     } catch (e) { showToast(e instanceof Error ? e.message : "Failed to update conversation.", "error"); }
   }, []);
 
-  // TTS playback
-  const playTTS = useCallback(async (mId: string, text: string) => {
-    if (ttsPlaying === mId) {
-      audioRef.current?.pause();
-      setTtsPlaying(null);
-      return;
-    }
-    try {
-      setTtsPlaying(mId);
-      const buf = await api.tts(text);
-      const blob = new Blob([buf], { type: "audio/mp3" });
-      const url = URL.createObjectURL(blob);
-      if (audioRef.current) audioRef.current.pause();
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { setTtsPlaying(null); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setTtsPlaying(null); URL.revokeObjectURL(url); };
-      audio.play();
-    } catch (e) { setTtsPlaying(null); showToast(e instanceof Error ? e.message : "Text-to-speech playback failed.", "error"); }
-  }, [ttsPlaying]);
-
-  // STT recording
-  const speechRecRef = useRef<any>(null);
-
-  const startRecording = useCallback(async () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SR) {
-      const rec = new SR();
-      rec.lang = "zh-CN";
-      rec.interimResults = true;
-      rec.continuous = true;
-      let finalText = "";
-      rec.onresult = (e: any) => {
-        let interim = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
-          else interim += e.results[i][0].transcript;
-        }
-        chatD({ type: "SET_INPUT", value: finalText + interim });
-      };
-      rec.onerror = () => { setIsRecording(false); };
-      rec.onend = () => { setIsRecording(false); inputRef.current?.focus(); };
-      rec.start();
-      speechRecRef.current = rec;
-      setIsRecording(true);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        setIsRecording(false);
-        try {
-          const result = await api.stt(blob);
-          if (result.text) { chatD({ type: "SET_INPUT", value: chat.input + result.text }); inputRef.current?.focus(); }
-        } catch { showToast("Speech transcription failed.", "error"); }
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-    } catch { showToast("Microphone access failed.", "error"); }
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    if (speechRecRef.current) { speechRecRef.current.stop(); speechRecRef.current = null; return; }
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current = null;
-  }, []);
-
-  // Switch preset
-  const handleSwitchPreset = useCallback(async (presetId: string) => {
-    try {
-      await api.switchPreset(presetId);
-      setActivePreset(presetId);
-    } catch (e) { showToast(e instanceof Error ? e.message : "Failed to switch preset.", "error"); }
-  }, []);
+  
 
   const newConversation = useCallback(() => {
     convD({ type: "SET_ACTIVE", id: "new-" + Date.now() });
@@ -385,91 +265,7 @@ export default function ChatPage() {
     } catch (e) { showToast(e instanceof Error ? e.message : "删除对话失败。", "error"); }
   }, [conv.activeId]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  type PendingFile = {
-    id: string;
-    name: string;
-    size: number;
-    preview?: string;
-    base64?: string;
-    type: "image" | "video" | "text" | "binary";
-    status?: "ready" | "uploading" | "parsed" | "error";
-    note?: string;
-  };
-
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const TEXT_EXTS = new Set(["txt","md","csv","json","yaml","yml","toml","xml","html","css","js","ts","tsx","jsx","py","go","rs","rb","java","c","cpp","h","sh","bash","sql","ini","cfg","env","log","gitignore","dockerfile"]);
-  const isTextFile = (name: string) => {
-    const ext = name.split(".").pop()?.toLowerCase() || "";
-    return TEXT_EXTS.has(ext);
-  };
-
-  const processFile = useCallback((file: File) => {
-    const fileId = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    const isText = isTextFile(file.name) || file.type.startsWith("text/");
-
-    if (isImage || isVideo) {
-      const previewUrl = URL.createObjectURL(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        setPendingFiles(prev => [...prev, { id: fileId, name: file.name, size: file.size, preview: previewUrl, base64, type: isImage ? "image" : "video", status: "ready", note: isImage ? "Image ready" : "Video ready" }]);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setPendingFiles(prev => [...prev, { id: fileId, name: file.name, size: file.size, type: isText ? "text" : "binary", status: "uploading", note: "Uploading to workspace..." }]);
-      api.uploadFile(file).then(res => {
-        const parsePreview = typeof res.parse?.preview === "string" ? res.parse.preview.trim() : "";
-        const uploadLine = parsePreview
-          ? [`[Parsed document: ${file.name}]`, `Workspace path: ${res.path}`, "", parsePreview].join("\n")
-          : `Uploaded file: ${res.path}`;
-        chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + uploadLine });
-        setPendingFiles(prev => prev.map(item => item.id === fileId ? {
-          ...item,
-          status: res.parse?.parser === "mineru" ? "parsed" : "ready",
-          note: res.parse?.parser === "mineru" ? "Parsed by MinerU" : `Saved to ${res.path}`,
-        } : item));
-        if (res.parse?.parser === "mineru") {
-          showToast(`Parsed ${file.name} with MinerU.`, "success");
-        }
-      }).catch(() => {
-        setPendingFiles(prev => prev.map(item => item.id === fileId ? { ...item, status: "error", note: "Upload failed, using local fallback" } : item));
-        if (isText) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const text = reader.result as string;
-            chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + `[File: ${file.name}]
-${text.slice(0, 4000)}` });
-          };
-          reader.readAsText(file);
-        } else {
-          const sizeStr = file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
-          chatD({ type: "SET_INPUT", value: chat.input + (chat.input ? "\n" : "") + `[File: ${file.name} (${sizeStr})]` });
-        }
-      });
-    }
-  }, [chat.input]);
-
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-    e.target.value = "";
-  }, [processFile]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    files.forEach(processFile);
-  }, [processFile]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); }, []);
-  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); }, []);
+  
 
   const editMessage = useCallback((msgId: string) => {
     const msg = chat.messages.find((m) => m.id === msgId);
@@ -707,7 +503,7 @@ ${text.slice(0, 4000)}` });
         body: JSON.stringify(bodyObj),
         signal: abort.signal,
       });
-      if (!resp.ok || !resp.body) throw new Error("request failed");
+      if (!resp.ok || !resp.body) throw new Error(`请求失败 (${resp.status}${resp.statusText ? " " + resp.statusText : ""})`);
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -958,6 +754,22 @@ ${text.slice(0, 4000)}` });
   }, [conv.list, conv.searchQuery]);
 
 
+  const shortcutHandlers = useMemo(() => ({
+    new_chat: () => newConversation(),
+    search: () => document.dispatchEvent(new CustomEvent("yunque:open-command-palette")),
+    stop: () => abortRef.current?.abort(),
+    focus_input: () => inputRef.current?.focus(),
+    toggle_sidebar: () => setShowSidebar((v) => !v),
+    toggle_computer: () => setShowComputer((v) => !v),
+    screenshot_analyze: () => sendMessage("/screenshot Take a screenshot and analyze the current page."),
+    copy_last: () => {
+      const last = chat.messages.filter((m) => m.role === "assistant").pop();
+      if (last?.content) navigator.clipboard.writeText(last.content);
+    },
+  }), [newConversation, sendMessage, chat.messages]);
+
+  useShortcuts(shortcutHandlers);
+
   const thinkingOptions = [
     { key: "none" as const, label: "快速", icon: <Zap size={12} /> },
     { key: "auto" as const, label: "自动", icon: <Gauge size={12} /> },
@@ -990,6 +802,7 @@ ${text.slice(0, 4000)}` });
               onClick={() => setShowSidebar(!showSidebar)}
               className="p-1.5 rounded-lg transition-colors"
               style={{ color: "var(--yunque-text-muted)" }}
+              aria-label={showSidebar ? "隐藏对话列表" : "显示对话列表"}
             >
               <MessageCircle size={16} />
             </button>
@@ -1015,7 +828,7 @@ ${text.slice(0, 4000)}` });
           </div>
 
           <div className="flex items-center gap-1.5">
-            {presets.length > 0 && (
+            {chatMode !== "chat" && presets.length > 0 && (
               <Dropdown>
                 <Button
                   variant="ghost"
@@ -1045,19 +858,20 @@ ${text.slice(0, 4000)}` });
               </Chip>
             )}
 
-            {/* Computer panel toggle */}
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
-                onPress={() => setShowComputer(!showComputer)}
-                style={{ color: showComputer ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}
-              >
-                <Monitor size={15} />
-              </Button>
-              <Tooltip.Content>{showComputer ? "隐藏计算机面板" : "显示计算机面板"}</Tooltip.Content>
-            </Tooltip>
+            {chatMode !== "chat" && (
+              <Tooltip delay={0}>
+                <Button
+                  isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
+                  onPress={() => setShowComputer(!showComputer)}
+                  style={{ color: showComputer ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}
+                >
+                  <Monitor size={15} />
+                </Button>
+                <Tooltip.Content>{showComputer ? "隐藏计算机面板" : "显示计算机面板"}</Tooltip.Content>
+              </Tooltip>
+            )}
 
-            {(
+            {chatMode !== "chat" && (
               <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
                 {thinkingOptions.map(({ key, label, icon }) => (
                   <button
@@ -1112,538 +926,36 @@ ${text.slice(0, 4000)}` });
         {/* Chat Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
           {chat.messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up">
-              {setupNeeded && (
-                <div className="w-full max-w-md p-4 rounded-xl border-l-4" style={{ background: "rgba(245,158,11,0.06)", borderColor: "var(--yunque-border)", borderLeftColor: "#f59e0b" }}>
-                  <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
-                    <AlertTriangle size={16} style={{ color: "#f59e0b" }} /> 先完成模型配置
-                  </div>
-                  <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-                    请先在设置中添加模型提供商 API Key，再开始第一轮对话。
-                  </p>
-                  <a href="/settings/providers" className="inline-flex items-center gap-1 text-xs mt-2 font-medium" style={{ color: "#f59e0b" }}>前往配置提供商 →</a>
-                </div>
-              )}
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center chat-hero-icon" style={{ background: "rgba(0,111,238,0.1)" }}>
-                <Sparkles size={24} style={{ color: "var(--yunque-accent)" }} />
-              </div>
-              <div className="max-w-lg text-center space-y-1.5">
-                <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>从这里开始一轮真正可执行的工作</h1>
-                <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>发起研究、浏览网页、调用连接器、生成代码，或把需求沉淀成任务。</p>
-              </div>
-
-              <div className="mt-1 grid w-full max-w-[520px] grid-cols-2 gap-2">
-                {(() => {
-                  const fixedCards = [
-                    { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
-                    { icon: <Search size={14} />, label: "研究一个主题", desc: "发起研究流程，整理来源、结论和下一步建议。" },
-                  ];
-                  const fallbackCards = [
-                    { icon: <Brain size={14} />, label: "规划多步骤任务", desc: "先拆解步骤，再执行，减少长任务中的混乱。" },
-                    { icon: <Zap size={14} />, label: "编写或修复代码", desc: "结合代码上下文、工具与连接器完成开发任务。" },
-                  ];
-                  const dynamicCards = heroSkills.slice(0, 2).map((sk) => ({
-                    icon: <Package size={14} />,
-                    label: sk.name,
-                    desc: sk.description || "已安装技能，点击直接使用",
-                  }));
-                  const cards = [...fixedCards, ...(dynamicCards.length >= 2 ? dynamicCards : fallbackCards)];
-                  return cards.map(({ icon, label, desc }) => (
-                    <button
-                      key={label}
-                      onClick={() => { chatD({ type: "SET_INPUT", value: label }); inputRef.current?.focus(); }}
-                      className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
-                      style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
-                    >
-                      <span className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }}>{icon}</span>
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium" style={{ color: "var(--yunque-text)" }}>{label}</div>
-                        <div className="mt-0.5 text-[10px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
-                      </div>
-                    </button>
-                  ));
-                })()}
-              </div>
-
-              <div className="mt-2 flex w-full max-w-[520px] items-center justify-center gap-3">
-                <a href="/skills" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
-                  style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
-                  <Package size={12} /> 浏览技能库 <ArrowRight size={10} />
-                </a>
-                <a href="/workflows" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
-                  style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
-                  <Blocks size={12} /> 浏览工作流 <ArrowRight size={10} />
-                </a>
-              </div>
-            </div>
+            <ChatEmptyState setupNeeded={setupNeeded} heroSkills={heroSkills} chatD={chatD} inputRef={inputRef} />
           ) : (
-            <div className="mx-auto space-y-5" style={{ maxWidth: "min(900px, 70%)" }}>
-              {chat.messages.map((msg, idx) => {
-                const isBubble = chatMode === "chat";
-                return (
-                <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${isBubble && msg.role === "user" ? "justify-end" : ""}`}>
-                  {(!isBubble || msg.role === "assistant") && (
-                    <Avatar size="sm" className="chat-message-avatar shrink-0 mt-1" style={{ background: msg.role === "assistant" ? "var(--yunque-accent)" : "#374151" }}>
-                      <Avatar.Fallback className="text-white text-xs font-bold">{msg.role === "assistant" ? "Y" : "U"}</Avatar.Fallback>
-                    </Avatar>
-                  )}
-                  <div className={`chat-message-stack ${isBubble ? `max-w-[74%] xl:max-w-[72%] ${msg.role === "user" ? "flex flex-col items-end" : ""}` : "flex-1 min-w-0"}`}>
-                    {!isBubble && (
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[13px] font-semibold" style={{ color: msg.role === "assistant" ? "var(--yunque-accent)" : "var(--yunque-text)" }}>
-                          {msg.role === "assistant" ? (currentModel || "Yunque Agent") : "用户"}
-                        </span>
-                        {msg.timestamp && (
-                          <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                            {new Date(msg.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Step summary (compact, replaces full trace in chat) */}
-                    {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
-                      const isLive = chat.streaming && msg.id === chat.messages[chat.messages.length - 1]?.id;
-                      const toolEvents = msg.traceEvents.filter(e => e.type === "tool_start" || e.type === "tool_result");
-                      const warnEvents = msg.traceEvents.filter((e) => {
-                        const summary = (e.summary || "").toLowerCase();
-                        return e.type === "plan" && (
-                          summary.includes("warning") ||
-                          summary.includes("risk") ||
-                          summary.includes("blocked") ||
-                          summary.includes("needs review")
-                        );
-                      });
-                      return (
-                        <>
-                          <div className="chat-inline-panel mb-1.5 rounded-xl border px-2 py-2" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
-                                {isLive ? "运行中" : "已完成"}
-                              </span>
-                              {(() => {
-                                const summary = summarizeAssistantWork(msg);
-                                return (
-                                  <>
-                                    {summary.primarySkill && (
-                                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
-                                        {summary.primarySkill}
-                                      </span>
-                                    )}
-                                    {summary.toolCount > 0 && (
-                                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
-                                        {summary.toolCount} tool events
-                                      </span>
-                                    )}
-                                    {summary.fileCount > 0 && (
-                                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
-                                        {summary.fileCount} files
-                                      </span>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            <div className="text-xs leading-6" style={{ color: "var(--yunque-text-muted)" }}>
-                              {isLive ? "The agent is still executing this request. Watch the live trace and computer panel for progress." : "This response includes structured execution steps, generated changes, and follow-up actions."}
-                            </div>
-                          </div>
-                          {warnEvents.length > 0 && (
-                            <div className="mb-2 rounded-lg px-3 py-1.5 text-[11px]"
-                              style={{ background: "rgba(245,158,11,0.08)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.15)" }}>
-                              {warnEvents.map((w, wi) => <div key={wi}>{w.summary}</div>)}
-                            </div>
-                          )}
-                          {toolEvents.length > 0 && (() => {
-                            const uniqueSkills = [...new Set(toolEvents.map(e => e.meta?.skill).filter(Boolean))];
-                            const lastSkill = toolEvents[toolEvents.length - 1]?.meta?.skill || "";
-                            return (
-                              <div className="chat-inline-panel mb-1.5 flex items-center gap-2 rounded-xl px-2 py-1 text-[10px]"
-                                style={{ background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-muted)" }}>
-                                {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
-                                <span>
-                                  {isLive ? `Working with ${lastSkill || "tools"}…` : `Used ${uniqueSkills.length} tools`}
-                                  {uniqueSkills.length > 0 && !isLive && (
-                                    <span style={{ color: "var(--yunque-text-muted)", marginLeft: 4 }}>
-                                      ({uniqueSkills.slice(0, 3).join(", ")}{uniqueSkills.length > 3 ? "…" : ""})
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </>
-                      );
-                    })()}
-                    <div
-                      className={`chat-message-card text-[14px] leading-7 whitespace-pre-wrap ${isBubble ? `px-3.5 py-2.5 rounded-[18px] ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}` : "py-1"}`}
-                      style={isBubble ? {
-                        background: msg.role === "user"
-                          ? "linear-gradient(180deg, rgba(59,130,246,0.9), rgba(37,99,235,0.86))"
-                          : "linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.008)), var(--yunque-card)",
-                        color: msg.role === "user" ? "#fff" : "var(--yunque-text)",
-                        border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(59,130,246,0.12)",
-                        borderBottomRightRadius: msg.role === "user" ? "8px" : undefined,
-                        borderBottomLeftRadius: msg.role === "assistant" ? "8px" : undefined,
-                        boxShadow: msg.role === "assistant" ? "0 8px 22px rgba(0,0,0,0.14)" : "0 8px 20px rgba(37,99,235,0.14)",
-                      } : {
-                        color: "var(--yunque-text)",
-                      }}
-                    >
-                      {msg.role === "user" && msg.images && msg.images.length > 0 && (
-                        <div className="flex gap-2 flex-wrap mb-2">
-                          {msg.images.map((src, i) => (
-                            <img key={i} src={src} alt="" className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => openExternal(src)} />
-                          ))}
-                        </div>
-                      )}
-                      {msg.role === "assistant" && msg.reasoning && (
-                        <details className="mb-2" open={false} style={{ fontSize: "var(--text-sm)" }}>
-                          <summary style={{ cursor: "pointer", color: "var(--yunque-text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
-                            <span style={{ fontSize: "var(--text-xs)", background: "rgba(245,158,11,0.12)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4 }}>
-                              {chat.streaming && idx === chat.messages.length - 1 ? "推理中…" : "已深度思考"}
-                            </span>
-                            <ThinkingTimer
-                              startMs={msg.reasoningStartMs}
-                              endMs={msg.reasoningEndMs}
-                              isStreaming={chat.streaming && idx === chat.messages.length - 1}
-                            />
-                          </summary>
-                          <div style={{ marginTop: 6, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.12)", whiteSpace: "pre-wrap", color: "var(--yunque-text-secondary)", fontSize: "var(--text-xs)", maxHeight: 300, overflow: "auto" }}>
-                            {msg.reasoning}
-                          </div>
-                        </details>
-                      )}
-                      {msg.content ? (
-                        msg.role === "assistant" ? (
-                          <MarkdownRenderer content={msg.content} />
-                        ) : (
-                          msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim() || (msg.images?.length ? null : msg.content)
-                        )
-                      ) : (
-                        !msg.images?.length && (
-                          <div className="flex items-center gap-1.5">
-                            <Spinner size="sm" color="current" /> Thinking…
-                          </div>
-                        )
-                      )}
-                    </div>
-                    {/* Emotion badge + Sticker + Airi */}
-                    {msg.role === "assistant" && (msg.emotion || msg.sticker || msg.stickers || msg.airiSynced) && (
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {msg.emotion && <EmotionBadge emotion={msg.emotion} />}
-                        {msg.sticker && <StickerView sticker={msg.sticker} />}
-                        {msg.stickers && Object.values(msg.stickers).map((s, i) => <StickerView key={i} sticker={s} />)}
-                        {msg.airiSynced && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15))", color: "#d946ef", border: "1px solid rgba(217,70,239,0.2)" }}>
-                            <Heart size={10} fill="#d946ef" /> Airi {msg.airiEmotion && msg.airiEmotion !== "neutral" ? `· ${msg.airiEmotion}` : ""}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Skill tags */}
-                    {msg.role === "assistant" && msg.skills_used && msg.skills_used.length > 0 && (
-                      <SkillTags skills={msg.skills_used} />
-                    )}
-                    {msg.role === "assistant" && msg.contextLayers && msg.contextLayers.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {msg.contextLayers.includes("memory") && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
-                            style={{ background: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
-                            <Brain size={9} /> 参考了记忆
-                          </span>
-                        )}
-                        {(msg.contextLayers.includes("graph") || msg.contextLayers.includes("code")) && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
-                            style={{ background: "rgba(6,182,212,0.1)", color: "#22d3ee" }}>
-                            <Library size={9} /> 引用了知识
-                          </span>
-                        )}
-                        {msg.contextLayers.includes("emotion") && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
-                            style={{ background: "rgba(236,72,153,0.1)", color: "#f472b6" }}>
-                            <Heart size={9} /> 情绪感知
-                          </span>
-                        )}
-                        {msg.contextLayers.includes("strategy") && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
-                            style={{ background: "rgba(245,158,11,0.1)", color: "#fbbf24" }}>
-                            <Sparkles size={9} /> 运用了经验
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Agent action buttons */}
-                    {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
-                      <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
-                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                          Suggested actions
-                        </div>
-                        <AgentActions actions={msg.actions} onAction={handleAction} />
-                      </div>
-                    )}
-                    {msg.role === "assistant" && msg.browserSummary && (
-                      <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
-                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                          Browser artifact
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
-                          {msg.browserSummary.action && (
-                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
-                              {browserActionLabel(msg.browserSummary.action)}
-                            </span>
-                          )}
-                          {typeof msg.browserSummary.elementCount === "number" && (
-                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-                              {msg.browserSummary.elementCount} elements
-                            </span>
-                          )}
-                          {msg.browserSummary.hasScreenshot && (
-                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.1)", color: "#86efac" }}>
-                              screenshot ready
-                            </span>
-                          )}
-                          {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && (
-                            <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
-                              {msg.browserSummary.textLength} chars
-                            </span>
-                          )}
-                        </div>
-                        {(msg.browserSummary.title || msg.browserSummary.url) && (
-                          <div className="mt-2 min-w-0">
-                            {msg.browserSummary.title && (
-                              <div className="truncate text-sm" style={{ color: "var(--yunque-text-secondary)" }}>
-                                {msg.browserSummary.title}
-                              </div>
-                            )}
-                            {msg.browserSummary.url && (
-                              <div className="mt-1 truncate font-mono text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
-                                {msg.browserSummary.url}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {msg.browserSummary.preview && (
-                          <div className="mt-2 rounded-2xl px-3 py-2 text-xs leading-6" style={{ background: "rgba(15,23,42,0.35)", color: "var(--yunque-text-secondary)" }}>
-                            {msg.browserSummary.preview}
-                          </div>
-                        )}
-                        {(msg.browserSummary.suggestedCommand || msg.browserSummary.url) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            {msg.browserSummary.suggestedCommand && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="rounded-full px-3"
-                                onPress={() => handleSlashSelect(msg.browserSummary?.suggestedCommand || "/")}
-                              >
-                                {msg.browserSummary.suggestedLabel || "Use next command"}
-                              </Button>
-                            )}
-                            {msg.browserSummary.url && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="rounded-full px-3"
-                                onPress={() => openExternal(msg.browserSummary?.url)}
-                              >
-                                Open page
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* E2B Desktop Sandbox */}
-                    {msg.role === "assistant" && msg.sandbox && (
-                      <div className="chat-inline-panel mt-2 rounded-xl border p-3" style={{ background: "linear-gradient(135deg, rgba(34,197,94,0.06), rgba(59,130,246,0.06))", borderColor: "rgba(34,197,94,0.2)" }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)" }}>
-                            <Monitor size={16} style={{ color: "#22c55e" }} />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
-                              E2B Desktop
-                            </div>
-                            <div className="text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>
-                              {msg.sandbox.sandbox_id}
-                            </div>
-                          </div>
-                          <Chip size="sm" style={{ marginLeft: "auto", background: "rgba(34,197,94,0.12)", color: "#22c55e", fontSize: "10px" }}>LIVE</Chip>
-                        </div>
-                        {msg.sandbox.stream_url && (
-                          <Button
-                            size="sm"
-                            className="w-full mt-1"
-                            onPress={() => openExternal(msg.sandbox?.stream_url)}
-                            style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}
-                          >
-                            <Monitor size={14} className="mr-2" /> Open Desktop
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                    {/* Generated file downloads */}
-                    {msg.role === "assistant" && msg.traceEvents && (() => {
-                      const files = collectGeneratedFiles(msg.traceEvents);
-                      if (files.length === 0) return null;
-                      return (
-                        <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                            Generated files
-                          </div>
-                          <div className="space-y-2">
-                          {files.map((f, i) => {
-                            const ext = (f.name || f.path).split(".").pop()?.toLowerCase() || "";
-                            const isDoc = ["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"].includes(ext);
-                            return (
-                              <a key={i} href={`/api/files/download?path=${encodeURIComponent(f.path)}`} download={f.name || f.path}
-                                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01]"
-                                style={{
-                                  background: isDoc ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.06)",
-                                  border: "1px solid rgba(59,130,246,0.2)",
-                                  color: "#93c5fd",
-                                }}>
-                                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                                  style={{ background: isDoc ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.08)" }}>
-                                  <Paperclip size={18} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="truncate font-semibold">{f.name || f.path.split("/").pop() || f.path}</div>
-                                  <div className="text-[11px] mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>
-                                    {ext.toUpperCase()} {f.size != null && f.size > 0 ? `  ${f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${(f.size / 1024).toFixed(1)} KB`}` : ""}
-                                  </div>
-                                </div>
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                                  style={{ background: "rgba(59,130,246,0.15)" }}>
-                                  <span style={{ color: "#60a5fa", fontSize: 16 }}>↗</span>
-                                </div>
-                              </a>
-                            );
-                          })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {/* Follow-up suggestions (collapsed by default) */}
-                    {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !chat.streaming && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                          Next moves
-                        </summary>
-                        <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
-                          <div className="flex flex-wrap gap-2">
-                          {msg.suggestions.map((s, i) => (
-                            <button key={i} onClick={() => {
-                              if (s.type === "save_skill") {
-                                sendMessage("Turn this workflow into a reusable skill and save it for later.");
-                              } else {
-                                sendMessage(s.label);
-                              }
-                            }}
-                              className="chat-followup-chip px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer"
-                              style={{
-                                background: s.type === "save_skill" ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.08)",
-                                border: `1px solid ${s.type === "save_skill" ? "rgba(139,92,246,0.3)" : "rgba(59,130,246,0.15)"}`,
-                                color: s.type === "save_skill" ? "#a78bfa" : "#93c5fd",
-                              }}>
-                              {s.type === "save_skill" ? "Save " : "→ "}{s.label}
-                            </button>
-                          ))}
-                          </div>
-                        </div>
-                      </details>
-                    )}
-                    {msg.role === "assistant" && msg.browserRequirement?.required && (
-                      <BrowserConnectCard
-                        requirement={msg.browserRequirement}
-                        connected={Boolean(bridgeState?.connected)}
-                        onOpenSetup={() => window.open(msg.browserRequirement?.install_path || "/browser", "_blank", "noopener,noreferrer")}
-                        onRefresh={() => {
-                          syncBridgeState();
-                          api.browserExtStatus()
-                            .then((status) => {
-                              setBridgeNotice({
-                                tone: status.connected ? "success" : "info",
-                                text: status.connected ? "Browser connector is ready." : "Browser connector is still offline.",
-                              });
-                            })
-                            .catch(() => {
-                              setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." });
-                            });
-                        }}
-                        onContinue={bridgeState?.connected ? () => {
-                          const previousUserPrompt = chat.messages[idx - 1]?.role === "user"
-                            ? chat.messages[idx - 1]?.content
-                            : resumePromptForBrowser;
-                          if (!previousUserPrompt) return;
-                          setResumePromptForBrowser(previousUserPrompt);
-                          continueBlockedBrowserTask(previousUserPrompt);
-                        } : undefined}
-                        continueLabel="Continue blocked task"
-                      />
-                    )}
-                    {msg.role === "assistant" && msg.skillSuggestions && msg.skillSuggestions.length > 0 && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>
-                          Skill growth proposal
-                        </summary>
-                        <div className="mt-2">
-                          <SkillGrowthPanel
-                            suggestions={msg.skillSuggestions}
-                            onSave={(suggestion) => {
-                              sendMessage(`Turn this into a reusable skill.\n\nName: ${suggestion.name}\nDescription: ${suggestion.description}\nTrigger: ${suggestion.trigger}`);
-                            }}
-                          />
-                        </div>
-                      </details>
-                    )}
-                    {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>Execution trace</summary>
-                        <div className="mt-2">
-                          <ExecutionTrace events={msg.traceEvents} isLive={chat.streaming && idx === chat.messages.length - 1} />
-                        </div>
-                      </details>
-                    )}
-                    {msg.content && (
-                      <div className={`chat-message-tools flex gap-0.5 mt-1 ${!isBubble ? "justify-end" : ""}`} style={isBubble ? { justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } : undefined}>
-                        {msg.role === "user" && (
-                          <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => editMessage(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>编辑</Tooltip.Content></Tooltip>
-                        )}
-                        {msg.role === "assistant" && (
-                          <>
-                            <Tooltip delay={0}>
-                              <Button isIconOnly variant="ghost" size="sm" onPress={() => handleCopy(msg.id, msg.content)}>
-                                {copiedIdx === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
-                              </Button>
-                              <Tooltip.Content>{copiedIdx === msg.id ? "已复制" : "复制"}</Tooltip.Content>
-                            </Tooltip>
-                            <Tooltip delay={0}>
-                              <Button isIconOnly variant="ghost" size="sm" onPress={() => playTTS(msg.id, msg.content)}>
-                                {ttsPlaying === msg.id ? <VolumeX size={11} style={{ color: "var(--yunque-accent)" }} /> : <Volume2 size={11} />}
-                              </Button>
-                              <Tooltip.Content>{ttsPlaying === msg.id ? "停止播放" : "播放语音"}</Tooltip.Content>
-                            </Tooltip>
-                            <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => rollbackToMessage(msg.id)}><Undo2 size={11} /></Button><Tooltip.Content>回滚到此</Tooltip.Content></Tooltip>
-                          </>
-                        )}
-                        <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => retryMessage(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>重新发送</Tooltip.Content></Tooltip>
-                      </div>
-                    )}
-                    {!isBubble && (
-                      <div className="mt-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }} />
-                    )}
-                  </div>
-                  {isBubble && msg.role === "user" && (
-                    <Avatar size="sm" className="shrink-0 mt-1" style={{ background: "#374151" }}>
-                      <Avatar.Fallback className="text-white text-xs">U</Avatar.Fallback>
-                    </Avatar>
-                  )}
-                </div>
-                );
-              })}
-            </div>
+            <ChatMessageList
+              messages={chat.messages}
+              streaming={chat.streaming}
+              chatMode={chatMode}
+              currentModel={currentModel}
+              copiedIdx={copiedIdx}
+              ttsPlaying={ttsPlaying}
+              bridgeState={bridgeState}
+              resumePromptForBrowser={resumePromptForBrowser}
+              onCopy={handleCopy}
+              onPlayTTS={playTTS}
+              onEdit={editMessage}
+              onRollback={rollbackToMessage}
+              onRetry={retryMessage}
+              onAction={handleAction}
+              onSlashSelect={handleSlashSelect}
+              onSend={sendMessage}
+              onBrowserRefresh={() => {
+                syncBridgeState();
+                api.browserExtStatus()
+                  .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? "Browser connector is ready." : "Browser connector is still offline." }))
+                  .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
+              }}
+              onBrowserContinue={(prompt) => {
+                setResumePromptForBrowser(prompt);
+                continueBlockedBrowserTask(prompt);
+              }}
+            />
           )}
         </div>
 
@@ -1663,8 +975,8 @@ ${text.slice(0, 4000)}` });
                   : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
               }}
             >
-              {/* Frosted glass top bar — only visible once a conversation has started */}
-              {chat.messages.length > 0 && (
+              {/* Frosted glass top bar — hidden in chat mode for simplicity */}
+              {chat.messages.length > 0 && chatMode !== "chat" && (
                 <div
                   className="flex items-center justify-between gap-3 rounded-t-[24px] px-4 py-1.5"
                   style={{
@@ -1725,7 +1037,7 @@ ${text.slice(0, 4000)}` });
                           onClick={() => { if (f.preview) URL.revokeObjectURL(f.preview); setPendingFiles(prev => prev.filter((item) => item.id !== f.id)); }}
                           className="ml-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shrink-0"
                           style={{ background: "rgba(239,68,68,0.9)", color: "#fff" }}
-                        >?</button>
+                        >×</button>
                       </div>
                     );
                   })}

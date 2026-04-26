@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { NotifyChannel } from "@/lib/api-types";
+import { showToast } from "@/components/toast-provider";
 import { Card, Button, Switch, Spinner, TextField, Input, Label, Select, ListBox } from "@heroui/react";
 import {
   Bell, Plus, Trash2, Send, MessageSquare, AlertTriangle,
@@ -83,6 +84,7 @@ export default function NotificationsPage() {
     setBusy(`test_${id}`);
     try {
       await api.notifyTest(id);
+      showToast("测试通知已发送", "success");
     } catch (e: any) {
       setError(e.message);
     } finally {

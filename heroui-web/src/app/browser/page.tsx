@@ -38,7 +38,8 @@ import { useI18n } from "@/lib/i18n";
 
 export default function BrowserPage() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrMode, setOcrMode] = useState("dom");
   const [ocrResult, setOcrResult] = useState<string>("");
   const [tab, setTab] = useState("browser");
@@ -96,7 +97,7 @@ export default function BrowserPage() {
   }, [autoRefresh, refreshInterval]);
 
   const takeScreenshot = async () => {
-    setLoading(true);
+    setScreenshotLoading(true);
     try {
       const res = await api.browserScreenshot();
       if (res.screenshot) {
@@ -105,24 +106,24 @@ export default function BrowserPage() {
       }
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [OK] Screenshot captured`, ...prev].slice(0, 50));
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Action failed", "error");
+      showToast(e instanceof Error ? e.message : "截图失败", "error");
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] Screenshot failed`, ...prev].slice(0, 50));
     }
-    setLoading(false);
+    setScreenshotLoading(false);
   };
 
   const runOcr = async () => {
-    setLoading(true);
+    setOcrLoading(true);
     setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] OCR (${ocrMode})...`, ...prev].slice(0, 50));
     try {
       const res = await api.browserOcr(ocrMode);
       setOcrResult(res.text || res.result || "");
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [OK] OCR done (${(res.text || res.result || "").length} chars)`, ...prev].slice(0, 50));
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "OCR failed", "error");
+      showToast(e instanceof Error ? e.message : "OCR 失败", "error");
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] OCR failed`, ...prev].slice(0, 50));
     }
-    setLoading(false);
+    setOcrLoading(false);
   };
 
   const handleOPPDecide = async (id: string, decision: "allow" | "deny") => {
@@ -215,7 +216,7 @@ export default function BrowserPage() {
             )}
           </div>
           <Tooltip delay={0}>
-            <Button isIconOnly variant="ghost" size="sm" onPress={takeScreenshot} isPending={loading}>
+            <Button isIconOnly variant="ghost" size="sm" onPress={takeScreenshot} isPending={screenshotLoading}>
               <Camera size={16} />
             </Button>
             <Tooltip.Content>{t("browserPage.captureScreenshot")}</Tooltip.Content>
@@ -324,7 +325,7 @@ export default function BrowserPage() {
                   {mode.toUpperCase()}
                 </button>
               ))}
-              <Button size="sm" onPress={runOcr} isPending={loading} className="btn-accent">{t("browserPage.runOcr")}</Button>
+              <Button size="sm" onPress={runOcr} isPending={ocrLoading} className="btn-accent">{t("browserPage.runOcr")}</Button>
             </div>
             <Card className="section-card p-4">
               {ocrResult ? (

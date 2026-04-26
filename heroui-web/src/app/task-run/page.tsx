@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, Button, Spinner, Chip, Tooltip, ProgressBar } from "@heroui/react";
 import { api, type TaskInfo, type CostTaskSummary, type LLMMessage, type SessionQueueInfo } from "@/lib/api";
 import { Terminal, Clock, CheckCircle, XCircle, Pause, Play, Square, RefreshCw, FileText, DollarSign, MessageSquare, Archive, ListOrdered } from "lucide-react";
-import { STATUS_COLORS } from "@/lib/constants";
+import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
 import { usePolling } from "@/lib/use-polling";
 import PageHeader from "@/components/page-header";
 import EmptyState from "@/components/empty-state";
@@ -61,8 +61,11 @@ export default function TaskRunPage() {
   };
 
   const cancelTask = async (id: string) => {
-    await api.taskCancel(id);
-    load();
+    try {
+      await api.taskCancel(id);
+      showToast("任务已取消", "success");
+      load();
+    } catch (e) { showToast(e instanceof Error ? e.message : "取消失败", "error"); }
   };
 
   const loadQueue = useCallback(async () => {
@@ -150,7 +153,7 @@ export default function TaskRunPage() {
                             {item.title || item.id}
                           </span>
                           <Chip size="sm" style={{ background: style.bg, color: style.fg, fontSize: 10 }}>
-                            {item.status}
+                            {STATUS_LABELS[item.status] || item.status}
                           </Chip>
                           {item.priority > 0 && (
                             <Chip size="sm" style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7", fontSize: 10 }}>
@@ -215,7 +218,7 @@ export default function TaskRunPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Chip size="sm" style={{ background: `${STATUS_COLORS[task.status]}15`, color: STATUS_COLORS[task.status], fontSize: 10 }}>
-                      {task.status}
+                      {STATUS_LABELS[task.status] || task.status}
                     </Chip>
                     <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                       {task.created_at ? new Date(task.created_at).toLocaleString() : ""}
@@ -246,7 +249,7 @@ export default function TaskRunPage() {
                       </Tooltip>
                     )}
                     <Chip size="sm" style={{ background: `${STATUS_COLORS[selectedTask.status]}15`, color: STATUS_COLORS[selectedTask.status] }}>
-                      {selectedTask.status}
+                      {STATUS_LABELS[selectedTask.status] || selectedTask.status}
                     </Chip>
                   </div>
                 </div>

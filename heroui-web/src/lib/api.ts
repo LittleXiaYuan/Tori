@@ -30,54 +30,11 @@ import type {
 
 export type * from "./api-types";
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE || "";
-
-let apiKey = "";
-
-export function setApiKey(key: string) {
-  apiKey = key;
-  if (typeof window !== "undefined") localStorage.setItem("yunque_api_key", key);
-}
-
-export function getApiKey(): string {
-  if (apiKey) return apiKey;
-  if (typeof window !== "undefined") {
-    apiKey = localStorage.getItem("yunque_api_key") || "";
-  }
-  return apiKey;
-}
-
-export function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("yunque_token") : "";
-  if (token) return { Authorization: `Bearer ${token}` };
-  const key = getApiKey();
-  if (key) return { "X-API-Key": key };
-  return {};
-}
-
-async function fetcher<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-      ...opts?.headers,
-    },
-  });
-  if (res.status === 401 && typeof window !== "undefined" && !path.includes("/auth/")) {
-    const hadToken = !!localStorage.getItem("yunque_token");
-    localStorage.removeItem("yunque_token");
-    if (hadToken && !path.startsWith("/v1/") && !path.startsWith("/api/providers")) {
-      window.location.href = "/login";
-    }
-    throw new Error("unauthorized");
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
-  }
-  return res.json();
-}
+// Core utilities are defined in api-core.ts and re-exported here
+// for backward compatibility. New domain-specific API files should
+// import directly from "./api-core".
+export { setApiKey, getApiKey, getAuthHeaders, BASE } from "./api-core";
+import { fetcher, getAuthHeaders, getApiKey, BASE } from "./api-core";
 
 export const api = {
   healthz: () => fetcher<{ status: string; version: string }>("/healthz"),
@@ -1146,6 +1103,99 @@ export const api = {
     fetcher<{ sessions: Array<{ session_id: string; adapter: string; task_id: string; started_at: string }> }>("/v1/orchestrator/sessions"),
   detectIDEs: () =>
     fetcher<{ ides: Array<{ name: string; binary: string; available: boolean; path?: string }> }>("/v1/orchestrator/detect"),
+
+  // ── Cogni (declarative AI-cognition shells) ──
+  listCognis: () =>
+    fetcher<import("./api-types/cogni").CogniListResponse>("/v1/cognis"),
+  getCogni: (id: string) =>
+    fetcher<{ id: string; declaration: import("./api-types/cogni").CogniDeclaration; enabled: boolean }>(
+      `/v1/cognis/${encodeURIComponent(id)}`,
+    ),
+  addCogni: (decl: import("./api-types/cogni").CogniDeclaration) =>
+    fetcher<{ status: string; id: string }>("/v1/cognis", {
+      method: "POST",
+      body: JSON.stringify(decl),
+    }),
+  removeCogni: (id: string) =>
+    fetcher<{ status: string; id: string }>(`/v1/cognis/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  setCogniEnabled: (id: string, enabled: boolean) =>
+    fetcher<{ status: string; id: string }>(
+      `/v1/cognis/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`,
+      { method: "POST" },
+    ),
+  reloadCognis: () =>
+    fetcher<import("./api-types/cogni").CogniReloadResponse>("/v1/cognis/reload", { method: "POST" }),
+  getCogniHealth: () =>
+    fetcher<{ health: import("./api-types/cogni").CogniHealthMetrics[]; count: number }>("/v1/cognis/health"),
+  getCogniAlerts: () =>
+    fetcher<{ alerts: import("./api-types/cogni").CogniAlert[]; count: number }>("/v1/cognis/alerts"),
+  scanCogniAlerts: () =>
+    fetcher<{ alerts: import("./api-types/cogni").CogniAlert[]; count: number }>("/v1/cognis/alerts/scan", {
+      method: "POST",
+    }),
+  verifyCognis: () =>
+    fetcher<{
+      results: Record<string, Array<{ cogni_id: string; check_name?: string; check_index: number; passed: boolean; reason?: string; got_active: boolean; got_score: number }>>;
+      failures: Array<{ cogni_id: string; check_name?: string; check_index: number; reason?: string }>;
+    }>("/v1/cognis/verify", { method: "POST" }),
+  getCogniTraces: (limit = 50) =>
+    fetcher<{ traces: import("./api-types/cogni").CogniTrace[]; count: number }>(
+      `/v1/cognis/traces?limit=${limit}`,
+    ),
+  getCogniTracesByID: (id: string, limit = 50) =>
+    fetcher<{ id: string; traces: import("./api-types/cogni").CogniTrace[]; count: number }>(
+      `/v1/cognis/${encodeURIComponent(id)}/trace?limit=${limit}`,
+    ),
+
+  // ── Cogni Self-Genesis ──
+  generateCogni: (description: string, autoSave = false) =>
+    fetcher<{ status: string; declaration: import("./api-types/cogni").CogniDeclaration; saved: boolean }>(
+      "/v1/cognis/generate",
+      { method: "POST", body: JSON.stringify({ description, auto_save: autoSave }) },
+    ),
+
+  // ── Cogni Workflows ──
+  getCogniWorkflows: (id: string) =>
+    fetcher<{ id: string; workflows: import("./api-types/cogni").CogniWorkflowDef[]; count: number }>(
+      `/v1/cognis/${encodeURIComponent(id)}/workflows`,
+    ),
+  runCogniWorkflow: (id: string, workflowName: string, input?: Record<string, unknown>) =>
+    fetcher<import("./api-types/cogni").CogniWorkflowResult>(
+      `/v1/cognis/${encodeURIComponent(id)}/workflow/${encodeURIComponent(workflowName)}`,
+      { method: "POST", body: input ? JSON.stringify(input) : undefined },
+    ),
+
+  // ── Cogni Experience ──
+  getCogniExperience: (id: string) =>
+    fetcher<{
+      id: string; enabled: boolean;
+      stats?: import("./api-types/cogni").CogniExperienceStats;
+      tool_memory?: unknown[]; patterns?: unknown[]; domain_facts?: unknown[];
+    }>(`/v1/cognis/${encodeURIComponent(id)}/experience`),
+
+  // ── Cogni Evolution ──
+  triggerCogniEvolution: (id: string) =>
+    fetcher<{ status: string; id: string }>(
+      `/v1/cognis/${encodeURIComponent(id)}/evolve`,
+      { method: "POST" },
+    ),
+  getCogniEvolution: (id: string) =>
+    fetcher<{ id: string; experiments: import("./api-types/cogni").CogniExperiment[]; running: boolean }>(
+      `/v1/cognis/${encodeURIComponent(id)}/evolution`,
+    ),
+
+  // ── Cogni Federation ──
+  getCogniFederation: () =>
+    fetcher<Record<string, unknown>>("/v1/cognis/federation"),
+  getCogniFederationPeers: () =>
+    fetcher<{ peers: import("./api-types/cogni").CogniFederationPeer[]; count: number }>(
+      "/v1/cognis/federation/peers",
+    ),
+  exposeCogni: (id: string, expose: boolean) =>
+    fetcher<{ status: string; id: string }>(
+      `/v1/cognis/${encodeURIComponent(id)}/${expose ? "expose" : "unexpose"}`,
+      { method: "POST" },
+    ),
 };
 
 // Sticker URL utilities
