@@ -1,0 +1,10 @@
+# Configuration for openapi-python-client.
+# Re-run: cd sdk/python && python -m openapi_python_client generate \
+#         --path ../../docs/openapi.yaml \
+#         --config openapi-config.yaml \
+#         --meta none --overwrite
+
+project_name_override: yunque-client
+package_name_override: yunque_client
+field_prefix: field_
+use_path_prefixes_for_title_model_names: true
