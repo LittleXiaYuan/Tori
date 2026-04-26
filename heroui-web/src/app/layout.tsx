@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="flex min-h-screen text-foreground">
         <div id="bg-overlay" />
-        <a href="#main-content" className="skip-link">Skip to main content</a>
+        <a href="#main-content" className="skip-link">跳到主要内容</a>
         <AppShell>{children}</AppShell>
       </body>
     </html>

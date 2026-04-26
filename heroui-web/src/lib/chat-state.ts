@@ -12,6 +12,7 @@ export interface ChatState {
 
 export type ChatAction =
   | { type: "SET_INPUT"; value: string }
+  | { type: "APPEND_INPUT"; value: string }
   | { type: "SET_MESSAGES"; messages: Message[] }
   | { type: "ADD_PAIR"; userMsg: Message; asstMsg: Message }
   | { type: "APPEND_LAST"; delta: string }
@@ -39,6 +40,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "SET_INPUT":
       return { ...state, input: action.value };
+    case "APPEND_INPUT":
+      return { ...state, input: state.input + action.value };
     case "SET_MESSAGES":
       return { ...state, messages: action.messages };
     case "ADD_PAIR":

@@ -91,7 +91,7 @@ export default function KnowledgePage() {
       const [srcRes, statsRes] = await Promise.all([api.kbSources(), api.kbStats()]);
       setSources(Array.isArray(srcRes.sources) ? srcRes.sources : []);
       setStats(statsRes);
-    } catch { /* ignore */ }
+    } catch (e) { showToast(e instanceof Error ? e.message : "加载知识库失败", "error"); }
     setLoading(false);
   }, []);
 
@@ -106,7 +106,7 @@ export default function KnowledgePage() {
       if (langFilter) filters.lang = langFilter;
       const r = await api.kbSearch(query, 20, filters);
       setSearchResults(Array.isArray(r.chunks) ? r.chunks : []);
-    } catch { /* ignore */ }
+    } catch (e) { showToast(e instanceof Error ? e.message : "搜索失败，请重试", "error"); }
     setSearching(false);
   };
 
@@ -409,7 +409,7 @@ export default function KnowledgePage() {
             <SearchField className="flex-1" name="kb-search" value={query} onChange={setQuery} onSubmit={handleSearch}>
               <SearchField.Group>
                 <SearchField.SearchIcon />
-                <SearchField.Input placeholder="搜索知识库内容?.." />
+                <SearchField.Input placeholder="搜索知识库内容…" />
                 <SearchField.ClearButton />
               </SearchField.Group>
             </SearchField>
@@ -424,7 +424,7 @@ export default function KnowledgePage() {
             <Input
               value={fileFilter}
               onChange={(e) => setFileFilter(e.target.value)}
-              placeholder="文件名?.." className="w-[140px]"
+              placeholder="文件名…" className="w-[140px]"
             />
             <Input
               value={langFilter}

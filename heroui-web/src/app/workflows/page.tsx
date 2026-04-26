@@ -40,14 +40,17 @@ export default function WorkflowsPage() {
     try {
       await api.workflowRun(defId);
       await refresh();
+      showToast("工作流已启动", "success");
     } catch (e) { showToast(e instanceof Error ? e.message : "启动失败", "error"); }
     setRunningId(null);
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("确定要删除这个工作流吗？此操作不可恢复。")) return;
     try {
       await api.workflowDelete(id);
       refresh();
+      showToast("工作流已删除", "success");
     } catch (e) { showToast(e instanceof Error ? e.message : "删除失败", "error"); }
   };
 

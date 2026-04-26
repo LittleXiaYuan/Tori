@@ -139,8 +139,15 @@ export function ConversationSidebar({
           {conversations.map((c) => (
             <div
               key={c.id}
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 if (conv.renameId !== c.id) onSwitch(c.id);
+              }}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && conv.renameId !== c.id) {
+                  e.preventDefault(); onSwitch(c.id);
+                }
               }}
               className="conv-item chat-thread-item w-full text-left px-3 py-2.5 rounded-[16px] group relative"
               data-active={conv.activeId === c.id || undefined}
@@ -254,7 +261,7 @@ export function ConversationSidebar({
                   </Button>
                   <Button
                     isIconOnly
-                    aria-label="Delete conversation"
+                    aria-label="删除对话"
                     variant="ghost"
                     size="sm"
                     onPress={() => onDelete(c.id)}

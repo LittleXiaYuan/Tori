@@ -22,19 +22,32 @@ function ImageBox({ label, hint, imageUrl, onChange, onClear }: {
   onChange: (url: string) => void; onClear: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  const [dragOver, setDragOver] = useState(false);
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = (ev) => { if (ev.target?.result) onChange(ev.target.result as string); };
-    reader.readAsDataURL(file); e.target.value = "";
+    reader.readAsDataURL(file);
+  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    handleFile(file); e.target.value = "";
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
   };
 
   return (
     <div className="flex flex-col gap-2">
       <label className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{label}</label>
       <div className="relative flex flex-col items-center justify-center p-6 border border-dashed rounded-xl cursor-pointer overflow-hidden transition-all"
-        style={{ borderColor: "var(--yunque-border)", background: "var(--yunque-bg)", minHeight: "120px" }}
-        onClick={() => !imageUrl && fileRef.current?.click()}>
+        style={{ borderColor: dragOver ? "var(--yunque-accent)" : "var(--yunque-border)", background: dragOver ? "rgba(0,111,238,0.05)" : "var(--yunque-bg)", minHeight: "120px" }}
+        onClick={() => !imageUrl && fileRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}>
         <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={handleFileChange} />
         {imageUrl ? (
           <>

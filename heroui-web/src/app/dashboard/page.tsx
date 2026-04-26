@@ -465,7 +465,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", padding: "var(--sp-4) 0", textAlign: "center" }}>加载中…</div>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)", padding: "var(--sp-4) 0", textAlign: "center" }}>{loading ? "加载中…" : "系统信息不可用"}</div>
             )}
           </div>
         </div>

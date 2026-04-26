@@ -1,19 +1,22 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "@/components/sidebar";
 import AuthGuard from "@/components/auth-guard";
 import { Toaster } from "@/components/toast-provider";
 import CommandPalette from "@/components/command-palette";
 import { CherrySettingsModal } from "@/components/cherry/settings-modal";
+import { FloatingWidget } from "@/components/floating-widget";
+import { OnboardingGuide } from "@/components/onboarding-guide";
+import { SelectionToolbar } from "@/components/selection-toolbar";
 import { I18nProvider } from "@/lib/i18n";
 
 const NO_SIDEBAR_PATHS = ["/login", "/setup"];
 
 function PageFallback() {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
+    <div role="status" aria-label="加载中" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
       <div style={{
         width: 24, height: 24, borderRadius: "50%",
         border: "2.5px solid var(--yunque-border)",
@@ -59,6 +62,7 @@ function useSystemThemeBridge(): void {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   useSystemThemeBridge();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -68,6 +72,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("yunque:open-settings", handler);
     return () => window.removeEventListener("yunque:open-settings", handler);
   }, []);
+
+  const handleSelectionAction = useCallback((action: string, text: string) => {
+    const prompts: Record<string, string> = {
+      ai_search: `/search ${text}`,
+      translate: `Translate the following text to English (or Chinese if it's already English):\n\n${text}`,
+      explain: `Explain the following in simple terms:\n\n${text}`,
+      save: `/save_knowledge Save the following to knowledge base:\n\n${text}`,
+    };
+    const prompt = prompts[action] || text;
+    if (pathname === "/chat") {
+      document.dispatchEvent(new CustomEvent("yunque:quick-send", { detail: prompt }));
+    } else {
+      router.push(`/chat?q=${encodeURIComponent(prompt)}`);
+    }
+  }, [pathname, router]);
 
   const onAuthPath = NO_SIDEBAR_PATHS.some((path) => pathname?.startsWith(path));
 
@@ -88,6 +107,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClose={() => setSettingsOpen(false)}
           />
         )}
+        {!onAuthPath && <FloatingWidget />}
+        {!onAuthPath && <OnboardingGuide />}
+        {!onAuthPath && <SelectionToolbar onAction={handleSelectionAction} />}
       </AuthGuard>
     </I18nProvider>
   );

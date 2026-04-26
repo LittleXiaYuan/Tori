@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label, TextArea, Avatar } from "@heroui/react";
 import { api } from "@/lib/api";
+import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
 import { formatDate } from "@/lib/constants";
 import {
@@ -72,10 +73,13 @@ export default function InboxPage() {
 
   const pushMessage = async () => {
     if (!compose.content) return;
-    await api.pushInbox(compose.source || "manual", compose.content, compose.action || "none");
-    setCompose({ source: "", content: "", action: "" });
-    setShowCompose(false);
-    load();
+    try {
+      await api.pushInbox(compose.source || "manual", compose.content, compose.action || "none");
+      setCompose({ source: "", content: "", action: "" });
+      setShowCompose(false);
+      showToast("消息已发送", "success");
+      load();
+    } catch (e) { showToast(e instanceof Error ? e.message : "发送失败", "error"); }
   };
 
   const toggleStar = (id: string) => {
@@ -287,20 +291,20 @@ export default function InboxPage() {
               </div>
               <div className="flex items-center gap-1">
                 <Tooltip delay={0}>
-                  <Button isIconOnly variant="ghost" size="sm"><Reply size={14} /></Button>
-                  <Tooltip.Content>回复</Tooltip.Content>
+                  <Button isIconOnly variant="ghost" size="sm" isDisabled><Reply size={14} /></Button>
+                  <Tooltip.Content>回复（即将推出）</Tooltip.Content>
                 </Tooltip>
                 <Tooltip delay={0}>
-                  <Button isIconOnly variant="ghost" size="sm"><Forward size={14} /></Button>
-                  <Tooltip.Content>转发</Tooltip.Content>
+                  <Button isIconOnly variant="ghost" size="sm" isDisabled><Forward size={14} /></Button>
+                  <Tooltip.Content>转发（即将推出）</Tooltip.Content>
                 </Tooltip>
                 <Tooltip delay={0}>
-                  <Button isIconOnly variant="ghost" size="sm"><Archive size={14} /></Button>
-                  <Tooltip.Content>归档</Tooltip.Content>
+                  <Button isIconOnly variant="ghost" size="sm" isDisabled><Archive size={14} /></Button>
+                  <Tooltip.Content>归档（即将推出）</Tooltip.Content>
                 </Tooltip>
                 <Tooltip delay={0}>
-                  <Button isIconOnly variant="ghost" size="sm" style={{ color: "#ef4444" }}><Trash2 size={14} /></Button>
-                  <Tooltip.Content>删除</Tooltip.Content>
+                  <Button isIconOnly variant="ghost" size="sm" isDisabled style={{ color: "#ef4444" }}><Trash2 size={14} /></Button>
+                  <Tooltip.Content>删除（即将推出）</Tooltip.Content>
                 </Tooltip>
               </div>
             </div>
