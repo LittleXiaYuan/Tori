@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -22,6 +24,7 @@ type LoRAAdapter struct {
 	httpClient *http.Client
 	apiKey     string
 
+	mu sync.RWMutex
 	// Static fallback: if the server doesn't support dynamic LoRA management,
 	// keep a local registry of known adapters.
 	knownAdapters map[string]*AdapterInfo
@@ -64,6 +67,9 @@ func NewLoRAAdapter(cfg LoRAAdapterConfig) *LoRAAdapter {
 // On vLLM, this is done via POST to the LoRA management endpoint.
 // The adapter becomes available as "base-model:lora-name" in subsequent requests.
 func (la *LoRAAdapter) Load(ctx context.Context, name, loraPath, baseModel string) error {
+	la.mu.Lock()
+	defer la.mu.Unlock()
+
 	reqBody := map[string]string{
 		"lora_name": name,
 		"lora_path": loraPath,
@@ -78,14 +84,25 @@ func (la *LoRAAdapter) Load(ctx context.Context, name, loraPath, baseModel strin
 
 	resp, err := la.httpClient.Do(req)
 	if err != nil {
+		slog.Warn("lora adapter: server unreachable, registering locally",
+			"name", name, "err", err)
 		la.knownAdapters[name] = &AdapterInfo{
-			Name: name, BaseModel: baseModel, Status: "loaded",
+			Name: name, BaseModel: baseModel, Status: "local_only",
 			BasePath: loraPath, LoadedAt: time.Now(),
 		}
 		return nil
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		slog.Warn("lora adapter: server does not support LoRA management, registering locally",
+			"name", name, "status", resp.StatusCode)
+		la.knownAdapters[name] = &AdapterInfo{
+			Name: name, BaseModel: baseModel, Status: "local_only",
+			BasePath: loraPath, LoadedAt: time.Now(),
+		}
+		return nil
+	}
 	if resp.StatusCode >= 400 {
 		errBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("lora load: server returned %d: %s", resp.StatusCode, string(errBody))
@@ -100,6 +117,9 @@ func (la *LoRAAdapter) Load(ctx context.Context, name, loraPath, baseModel strin
 
 // Unload requests the inference server to unload a LoRA adapter.
 func (la *LoRAAdapter) Unload(ctx context.Context, name string) error {
+	la.mu.Lock()
+	defer la.mu.Unlock()
+
 	reqBody := map[string]string{"lora_name": name}
 	body, _ := json.Marshal(reqBody)
 
@@ -122,6 +142,9 @@ func (la *LoRAAdapter) Unload(ctx context.Context, name string) error {
 
 // List returns all known LoRA adapters (from server or local registry).
 func (la *LoRAAdapter) List(ctx context.Context) ([]*AdapterInfo, error) {
+	la.mu.Lock()
+	defer la.mu.Unlock()
+
 	req, err := http.NewRequestWithContext(ctx, "GET", la.baseURL+"/v1/lora/list", nil)
 	if err != nil {
 		return la.localList(), nil
@@ -163,6 +186,8 @@ func (la *LoRAAdapter) ModelName(baseModel, loraName string) string {
 
 // IsLoaded checks if a specific adapter is currently loaded.
 func (la *LoRAAdapter) IsLoaded(name string) bool {
+	la.mu.RLock()
+	defer la.mu.RUnlock()
 	info, ok := la.knownAdapters[name]
 	return ok && info.Status == "loaded"
 }
