@@ -3,8 +3,10 @@ package planner
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	ldg "github.com/LittleXiaYuan/ledger"
@@ -24,6 +26,8 @@ import (
 //
 // Data is stored as MemoryExperience entries tagged with source="training_data",
 // then batch-exported by the nighttime scheduler via Ledger.ExportTrainingData().
+var dataCollectorSeq atomic.Int64
+
 type DataCollector struct {
 	ledger *ldg.Ledger
 	mu     sync.Mutex
@@ -111,7 +115,7 @@ func (dc *DataCollector) Collect(ctx context.Context, req PlanRequest, result *P
 		taskPtr = &taskID
 	}
 
-	key := "train:" + time.Now().Format("20060102T150405")
+	key := fmt.Sprintf("train:%s-%d", time.Now().Format("20060102T150405"), dataCollectorSeq.Add(1))
 
 	safego.Go("data-collector-store", func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -190,7 +194,7 @@ func (dc *DataCollector) CollectFromMessages(ctx context.Context, tenantID strin
 	}
 
 	content, _ := json.Marshal(pair)
-	key := "train:" + time.Now().Format("20060102T150405")
+	key := fmt.Sprintf("train:%s-%d", time.Now().Format("20060102T150405"), dataCollectorSeq.Add(1))
 
 	safego.Go("data-collector-night", func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
