@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	ldg "github.com/LittleXiaYuan/ledger"
@@ -59,6 +60,7 @@ type Planner struct {
 	ackEnabled       bool                                 // send typing indicators / ack
 	skillScorer      *skills.SkillScorer                  // Ledger-driven skill scoring for intent routing
 	recentSkills     []string                             // last N skills used (for routing recency bonus)
+	recentSkillsMu   sync.Mutex
 	locale           string                               // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
 	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
@@ -74,7 +76,21 @@ type Planner struct {
 	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
 	dataCollector    *DataCollector                       // training data collector (nil = disabled)
 	providerReg      *llm.ProviderRegistry               // capability-aware provider registry (nil = use pool only)
+	cogniContext     CogniContextFunc                     // declarative Cogni context injector (nil = disabled)
+	cogniSkillFilter CogniSkillFilterFunc                 // declarative Cogni surface filter (nil = identity)
 }
+
+// CogniContextFunc returns the assembled Cogni context block for the current
+// turn — empty string when no cogni activates. Implementations are expected
+// to be cheap (just rule evaluation + string concat); heavy work belongs in
+// the underlying Registry or its hook.
+type CogniContextFunc func(ctx context.Context, message, tenantID, channel string) string
+
+// CogniSkillFilterFunc narrows the candidate skill list to the union of
+// every activated cogni's ToolSurface. Implementations MUST return the
+// input unchanged when no cogni activates — the planner relies on this
+// "no-op default" so disabling cogni keeps existing behavior intact.
+type CogniSkillFilterFunc func(message, tenantID string, in []skills.Skill) []skills.Skill
 
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
@@ -175,6 +191,16 @@ func (p *Planner) SetDataCollector(dc *DataCollector) { p.dataCollector = dc }
 
 // SetProviderRegistry attaches the capability-aware provider registry for dynamic model routing.
 func (p *Planner) SetProviderRegistry(reg *llm.ProviderRegistry) { p.providerReg = reg }
+
+// SetCogniContext attaches a declarative Cogni context injector. The callback
+// is invoked once per turn from the prompt builder; nil disables the layer.
+func (p *Planner) SetCogniContext(fn CogniContextFunc) { p.cogniContext = fn }
+
+// SetCogniSkillFilter attaches a declarative Cogni surface filter. The
+// callback is invoked from buildFunctionDefs to narrow the tool list to
+// the union of every activated cogni's ToolSurface; nil keeps the full
+// skill set.
+func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) { p.cogniSkillFilter = fn }
 
 // LocalBrain returns the attached local brain (may be nil).
 func (p *Planner) LocalBrain() *localbrain.LocalBrain { return p.localBrain }
@@ -278,6 +304,7 @@ func (p *Planner) BuildMessages(ctx context.Context, req PlanRequest) ([]llm.Mes
 		assembled := pb.BuildDynamicContext(ctx, DynamicContextRequest{
 			LastMessage: req.Messages[len(req.Messages)-1].Content,
 			TenantID:    req.TenantID,
+			Channel:     req.ChannelType,
 			TaskContext: req.TaskContext,
 			EmotionHint: req.EmotionHint,
 		})
@@ -439,6 +466,7 @@ func safeToolGo(ctx context.Context, timeout time.Duration, fn func(ctx context.
 		fn(toolCtx)
 	}()
 }
+
 
 // PlanRequest is the input to the planner.
 type PlanRequest struct {

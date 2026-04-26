@@ -38,9 +38,11 @@ type LoRAScheduler struct {
 	brain    *LocalBrain
 	dataDir  string
 	kvs      *iledger.KVConfigStore
+	metrics  *TrainingMetrics
 
-	config SchedulerConfig
-	state  SchedulerState
+	config       SchedulerConfig
+	state        SchedulerState            // default tenant state (backward compat)
+	tenantStates map[string]*SchedulerState // per-tenant state for multi-tenant isolation
 }
 
 // SchedulerConfig configures LoRA training triggers and thresholds.
@@ -53,6 +55,8 @@ type SchedulerConfig struct {
 	TrainingDataDir string        // where JSONL training files live
 	AdapterDir      string        // where trained adapter weights are stored
 	ABTestDuration  time.Duration // how long to A/B test before committing (default 1h)
+	FilterEnabled   bool          // whether to run data quality filtering before training (default true)
+	FilterConfig    FilterConfig  // data quality filter settings
 }
 
 func DefaultSchedulerConfig() SchedulerConfig {
@@ -64,6 +68,8 @@ func DefaultSchedulerConfig() SchedulerConfig {
 		TrainingDataDir: "./data/training",
 		AdapterDir:      "./data/adapters",
 		ABTestDuration:  1 * time.Hour,
+		FilterEnabled:   true,
+		FilterConfig:    DefaultFilterConfig(),
 	}
 }
 
@@ -95,13 +101,18 @@ type TrainFunc func(ctx context.Context, job TrainJob) (*TrainResult, error)
 
 // TrainJob describes a LoRA training task.
 type TrainJob struct {
-	BaseModel   string `json:"base_model"`
-	DataPath    string `json:"data_path"`    // JSONL training data
-	OutputDir   string `json:"output_dir"`   // where to save adapter weights
-	AdapterName string `json:"adapter_name"` // unique name for this adapter version
-	NumEpochs   int    `json:"num_epochs"`   // default 3
-	LoRARank    int    `json:"lora_rank"`    // default 16
-	LearningRate float64 `json:"learning_rate"` // default 2e-4
+	BaseModel       string   `json:"base_model"`
+	DataPath        string   `json:"data_path"`         // JSONL training data
+	OutputDir       string   `json:"output_dir"`        // where to save adapter weights
+	AdapterName     string   `json:"adapter_name"`      // unique name for this adapter version
+	NumEpochs       int      `json:"num_epochs"`        // default 3
+	LoRARank        int      `json:"lora_rank"`         // default 16
+	LearningRate    float64  `json:"learning_rate"`     // default 2e-4
+	MaxSeqLength    int      `json:"max_seq_length"`    // default 2048
+	Seed            int      `json:"seed"`              // default 42
+	TargetModules   []string `json:"target_modules"`    // auto-inferred if empty
+	TrustRemoteCode bool     `json:"trust_remote_code"` // default false
+	ResumeFrom      string   `json:"resume_from"`       // previous adapter path for incremental training
 }
 
 // TrainResult is the output of a training job.
@@ -140,11 +151,38 @@ type EvalResult struct {
 // NewLoRAScheduler creates a LoRA training lifecycle scheduler.
 func NewLoRAScheduler(l *ldg.Ledger, adapter *LoRAAdapter, brain *LocalBrain, cfg SchedulerConfig) *LoRAScheduler {
 	return &LoRAScheduler{
-		ledger:  l,
-		adapter: adapter,
-		brain:   brain,
-		config:  cfg,
+		ledger:       l,
+		adapter:      adapter,
+		brain:        brain,
+		config:       cfg,
+		tenantStates: make(map[string]*SchedulerState),
 	}
+}
+
+// TenantState returns the scheduler state for a specific tenant.
+// Creates a new state if the tenant hasn't been seen before.
+func (ls *LoRAScheduler) TenantState(tenantID string) SchedulerState {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if tenantID == "" || tenantID == "default" {
+		return ls.state
+	}
+	if s, ok := ls.tenantStates[tenantID]; ok {
+		return *s
+	}
+	return SchedulerState{}
+}
+
+func (ls *LoRAScheduler) getOrCreateTenantState(tenantID string) *SchedulerState {
+	if tenantID == "" || tenantID == "default" {
+		return &ls.state
+	}
+	if s, ok := ls.tenantStates[tenantID]; ok {
+		return s
+	}
+	s := &SchedulerState{}
+	ls.tenantStates[tenantID] = s
+	return s
 }
 
 // SetTrainFunc sets the training backend callback.
@@ -152,6 +190,12 @@ func (ls *LoRAScheduler) SetTrainFunc(fn TrainFunc)  { ls.trainFn = fn }
 
 // SetEvalFunc sets the evaluation callback.
 func (ls *LoRAScheduler) SetEvalFunc(fn EvalFunc) { ls.evalFn = fn }
+
+// SetMetrics enables training observability.
+func (ls *LoRAScheduler) SetMetrics(m *TrainingMetrics) { ls.metrics = m }
+
+// Metrics returns the training metrics recorder (may be nil).
+func (ls *LoRAScheduler) Metrics() *TrainingMetrics { return ls.metrics }
 
 // SetKVStore enables Ledger KV-backed persistence for scheduler state.
 func (ls *LoRAScheduler) SetKVStore(kvs *iledger.KVConfigStore) {
@@ -173,22 +217,26 @@ func (ls *LoRAScheduler) State() SchedulerState {
 // called by the NightScheduler or a cron trigger.
 func (ls *LoRAScheduler) CheckAndTrigger(ctx context.Context, tenantID string) error {
 	ls.mu.Lock()
-	defer ls.mu.Unlock()
 
 	if ls.trainFn == nil {
+		ls.mu.Unlock()
 		return fmt.Errorf("lora_scheduler: no training function configured")
 	}
 
-	if time.Since(ls.state.LastTrainTime) < ls.config.MinInterval {
-		slog.Debug("lora_scheduler: too soon since last train", "last", ls.state.LastTrainTime)
+	tstate := ls.getOrCreateTenantState(tenantID)
+	if time.Since(tstate.LastTrainTime) < ls.config.MinInterval {
+		ls.mu.Unlock()
+		slog.Debug("lora_scheduler: too soon since last train", "tenant", tenantID, "last", tstate.LastTrainTime)
 		return nil
 	}
 
 	samples, dataPath, err := ls.countAvailableSamples()
 	if err != nil {
+		ls.mu.Unlock()
 		return fmt.Errorf("lora_scheduler: count samples: %w", err)
 	}
 	if samples < ls.config.MinSamples {
+		ls.mu.Unlock()
 		slog.Debug("lora_scheduler: insufficient samples", "have", samples, "need", ls.config.MinSamples)
 		return nil
 	}
@@ -198,37 +246,123 @@ func (ls *LoRAScheduler) CheckAndTrigger(ctx context.Context, tenantID string) e
 		"samples", samples,
 		"data_path", dataPath,
 	)
+	ls.mu.Unlock()
 
 	return ls.runPipeline(ctx, tenantID, dataPath)
 }
 
 func (ls *LoRAScheduler) runPipeline(ctx context.Context, tenantID, dataPath string) error {
+	ls.mu.Lock()
+	filterEnabled := ls.config.FilterEnabled
+	filterConfig := ls.config.FilterConfig
+	minSamples := ls.config.MinSamples
+	baseModel := ls.config.BaseModel
+	adapterDir := ls.config.AdapterDir
+	tstate := ls.getOrCreateTenantState(tenantID)
+	var resumeFrom string
+	if tstate.CurrentAdapter != "" && tstate.LastTrainResult != nil {
+		prevPath := tstate.LastTrainResult.AdapterPath
+		if prevPath != "" {
+			if _, err := os.Stat(prevPath); err == nil {
+				resumeFrom = prevPath
+			}
+		}
+	}
+	ls.mu.Unlock()
+
+	// Data quality filtering
+	if filterEnabled {
+		filter := NewTrainingFilter(filterConfig)
+		filteredPath, stats, err := filter.FilterFile(dataPath)
+		if err != nil {
+			slog.Warn("lora_scheduler: filter failed, using unfiltered data", "err", err)
+		} else if stats.Kept < minSamples {
+			slog.Warn("lora_scheduler: too few samples after filtering",
+				"before", stats.TotalRead,
+				"after", stats.Kept,
+				"need", minSamples,
+			)
+			return nil
+		} else {
+			slog.Info("lora_scheduler: data filtered",
+				"before", stats.TotalRead,
+				"after", stats.Kept,
+				"dropped_dup", stats.DroppedDup,
+				"dropped_quality", stats.DroppedTooShort+stats.DroppedTooLong+stats.DroppedGarbage,
+			)
+			dataPath = filteredPath
+		}
+	}
+
 	adapterName := fmt.Sprintf("yunque-%s-%s", tenantID, time.Now().Format("20060102"))
-	outputDir := filepath.Join(ls.config.AdapterDir, adapterName)
+	outputDir := filepath.Join(adapterDir, adapterName)
 	os.MkdirAll(outputDir, 0755)
 
+	if resumeFrom != "" {
+		slog.Info("lora_scheduler: incremental training from previous adapter",
+			"tenant", tenantID,
+			"resume_from", resumeFrom,
+		)
+	}
+
 	job := TrainJob{
-		BaseModel:    ls.config.BaseModel,
+		BaseModel:    baseModel,
 		DataPath:     dataPath,
 		OutputDir:    outputDir,
 		AdapterName:  adapterName,
 		NumEpochs:    3,
 		LoRARank:     16,
 		LearningRate: 2e-4,
+		MaxSeqLength: 2048,
+		Seed:         42,
+		ResumeFrom:   resumeFrom,
 	}
 
 	slog.Info("lora_scheduler: starting training", "job", adapterName)
+	trainStart := time.Now()
 	result, err := ls.trainFn(ctx, job)
+
+	record := TrainingRecord{
+		TenantID:     tenantID,
+		AdapterName:  adapterName,
+		BaseModel:    ls.config.BaseModel,
+		StartTime:    trainStart,
+		LoRARank:     job.LoRARank,
+		LearningRate: job.LearningRate,
+		Incremental:  resumeFrom != "",
+		ResumeFrom:   resumeFrom,
+	}
+
 	if err != nil {
+		record.EndTime = time.Now()
+		record.Duration = record.EndTime.Sub(record.StartTime)
+		record.Error = err.Error()
+		ls.recordMetrics(record)
 		return fmt.Errorf("lora_scheduler: training failed: %w", err)
 	}
+
+	record.Success = result.Success
+	record.FinalLoss = result.FinalLoss
+	record.Samples = result.Samples
+	record.Epochs = result.Epochs
+	record.Duration = result.Duration
+	record.EndTime = trainStart.Add(result.Duration)
+
 	if !result.Success {
+		record.Error = result.Error
+		ls.recordMetrics(record)
 		return fmt.Errorf("lora_scheduler: training unsuccessful: %s", result.Error)
 	}
 
-	ls.state.LastTrainTime = time.Now()
-	ls.state.LastTrainResult = result
+	ls.mu.Lock()
+	tstate = ls.getOrCreateTenantState(tenantID)
+	tstate.LastTrainTime = time.Now()
+	tstate.LastTrainResult = result
+	tstate.TotalTrains++
+	ls.state.LastTrainTime = tstate.LastTrainTime
+	ls.state.LastTrainResult = tstate.LastTrainResult
 	ls.state.TotalTrains++
+	ls.mu.Unlock()
 	slog.Info("lora_scheduler: training complete",
 		"adapter", adapterName,
 		"loss", result.FinalLoss,
@@ -239,13 +373,17 @@ func (ls *LoRAScheduler) runPipeline(ctx context.Context, tenantID, dataPath str
 		evalResult, err := ls.evaluate(ctx, adapterName)
 		if err != nil {
 			slog.Warn("lora_scheduler: evaluation failed, skipping deploy", "err", err)
+			ls.recordMetrics(record)
 			return err
 		}
+		record.EvalScore = evalResult.Score
+		record.EvalPassed = evalResult.Passed
 		if !evalResult.Passed {
 			slog.Warn("lora_scheduler: evaluation failed quality gate",
 				"score", evalResult.Score,
 				"threshold", ls.config.EvalMinScore,
 			)
+			ls.recordMetrics(record)
 			return fmt.Errorf("quality gate failed: score %.2f < %.2f", evalResult.Score, ls.config.EvalMinScore)
 		}
 		slog.Info("lora_scheduler: evaluation passed",
@@ -254,11 +392,20 @@ func (ls *LoRAScheduler) runPipeline(ctx context.Context, tenantID, dataPath str
 		)
 	}
 
-	if err := ls.deploy(ctx, adapterName, result.AdapterPath); err != nil {
+	if err := ls.deploy(ctx, tstate, adapterName, result.AdapterPath); err != nil {
+		ls.recordMetrics(record)
 		return fmt.Errorf("lora_scheduler: deploy failed: %w", err)
 	}
 
+	record.Deployed = true
+	ls.recordMetrics(record)
 	return nil
+}
+
+func (ls *LoRAScheduler) recordMetrics(r TrainingRecord) {
+	if ls.metrics != nil {
+		ls.metrics.Record(r)
+	}
 }
 
 func (ls *LoRAScheduler) evaluate(ctx context.Context, adapterName string) (*EvalResult, error) {
@@ -269,17 +416,23 @@ func (ls *LoRAScheduler) evaluate(ctx context.Context, adapterName string) (*Eva
 	return ls.evalFn(ctx, adapterName, evalSamples)
 }
 
-func (ls *LoRAScheduler) deploy(ctx context.Context, adapterName, adapterPath string) error {
+func (ls *LoRAScheduler) deploy(ctx context.Context, tstate *SchedulerState, adapterName, adapterPath string) error {
 	if ls.adapter == nil {
 		slog.Info("lora_scheduler: no adapter manager, skipping deploy", "adapter", adapterName)
 		return nil
 	}
 
+	tstate.PreviousAdapter = tstate.CurrentAdapter
 	ls.state.PreviousAdapter = ls.state.CurrentAdapter
 
 	if err := ls.adapter.Load(ctx, adapterName, adapterPath, ls.config.BaseModel); err != nil {
 		return err
 	}
+
+	tstate.CurrentAdapter = adapterName
+	tstate.ABTestActive = true
+	tstate.ABTestStart = time.Now()
+	tstate.ABTestMetrics = ABTestMetrics{}
 
 	ls.state.CurrentAdapter = adapterName
 	ls.state.ABTestActive = true
@@ -404,7 +557,7 @@ func (ls *LoRAScheduler) countAvailableSamples() (int, string, error) {
 	}
 
 	total := 0
-	var latestFile string
+	var files []string
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
 			continue
@@ -412,9 +565,43 @@ func (ls *LoRAScheduler) countAvailableSamples() (int, string, error) {
 		path := filepath.Join(dataDir, e.Name())
 		count := countJSONLLines(path)
 		total += count
-		latestFile = path
+		if count > 0 {
+			files = append(files, path)
+		}
 	}
-	return total, latestFile, nil
+	if len(files) == 0 {
+		return 0, "", nil
+	}
+	if len(files) == 1 {
+		return total, files[0], nil
+	}
+
+	merged, err := ls.mergeJSONLFiles(files, dataDir)
+	if err != nil {
+		return total, files[len(files)-1], nil
+	}
+	return total, merged, nil
+}
+
+func (ls *LoRAScheduler) mergeJSONLFiles(files []string, dataDir string) (string, error) {
+	merged := filepath.Join(dataDir, fmt.Sprintf("merged_%s.jsonl", time.Now().Format("20060102_150405")))
+	out, err := os.Create(merged)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		out.Write(data)
+		if len(data) > 0 && data[len(data)-1] != '\n' {
+			out.Write([]byte("\n"))
+		}
+	}
+	return merged, nil
 }
 
 func countJSONLLines(path string) int {
@@ -466,9 +653,18 @@ func (ls *LoRAScheduler) generateEvalSamples(ctx context.Context) []EvalSample {
 	return samples
 }
 
+type persistedState struct {
+	Global  SchedulerState               `json:"global"`
+	Tenants map[string]*SchedulerState   `json:"tenants,omitempty"`
+}
+
 func (ls *LoRAScheduler) persistState() {
+	ps := persistedState{
+		Global:  ls.state,
+		Tenants: ls.tenantStates,
+	}
 	if ls.kvs != nil {
-		if err := ls.kvs.Put(context.Background(), "state", ls.state); err != nil {
+		if err := ls.kvs.Put(context.Background(), "state", ps); err != nil {
 			slog.Warn("lora_scheduler: kv save failed, falling back to file", "err", err)
 		} else {
 			return
@@ -480,7 +676,7 @@ func (ls *LoRAScheduler) persistState() {
 	}
 	os.MkdirAll(stateDir, 0755)
 
-	data, err := json.MarshalIndent(ls.state, "", "  ")
+	data, err := json.MarshalIndent(ps, "", "  ")
 	if err != nil {
 		return
 	}
@@ -491,15 +687,24 @@ func (ls *LoRAScheduler) loadStateFromKV() {
 	if ls.kvs == nil {
 		return
 	}
-	var state SchedulerState
-	found, err := ls.kvs.Get(context.Background(), "state", &state)
+	var ps persistedState
+	found, err := ls.kvs.Get(context.Background(), "state", &ps)
 	if err != nil {
+		var state SchedulerState
+		if found2, err2 := ls.kvs.Get(context.Background(), "state", &state); err2 == nil && found2 {
+			ls.state = state
+			slog.Info("lora_scheduler: loaded legacy state from Ledger KV")
+			return
+		}
 		slog.Warn("lora_scheduler: kv load failed", "err", err)
 		return
 	}
 	if found {
-		ls.state = state
-		slog.Info("lora_scheduler: loaded state from Ledger KV")
+		ls.state = ps.Global
+		if ps.Tenants != nil {
+			ls.tenantStates = ps.Tenants
+		}
+		slog.Info("lora_scheduler: loaded state from Ledger KV", "tenants", len(ls.tenantStates))
 	}
 }
 
@@ -511,6 +716,14 @@ func (ls *LoRAScheduler) LoadState() {
 	}
 	data, err := os.ReadFile(filepath.Join(stateDir, "scheduler_state.json"))
 	if err != nil {
+		return
+	}
+	var ps persistedState
+	if json.Unmarshal(data, &ps) == nil && ps.Global.TotalTrains > 0 {
+		ls.state = ps.Global
+		if ps.Tenants != nil {
+			ls.tenantStates = ps.Tenants
+		}
 		return
 	}
 	json.Unmarshal(data, &ls.state)

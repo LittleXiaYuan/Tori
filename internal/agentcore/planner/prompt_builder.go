@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/emotion"
@@ -29,6 +30,7 @@ type PromptBuilder struct {
 	reverie          *Reverie
 	skillOptimizer   *SkillOptimizer
 	cognitiveContext CognitiveContextFunc // CognitivePlugin dynamic context
+	cogniContext     CogniContextFunc     // declarative Cogni context (pkg/cogni hook)
 	dynBudget        int
 	contextFilter    *localbrain.LocalBrain // System 1 context filter (nil = disabled)
 }
@@ -44,6 +46,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		reverie:          p.reverie,
 		skillOptimizer:   p.skillOptimizer,
 		cognitiveContext: p.cognitiveContext,
+		cogniContext:     p.cogniContext,
 		dynBudget:        p.dynContextBudget,
 		contextFilter:    p.localBrain,
 	}
@@ -53,6 +56,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 type DynamicContextRequest struct {
 	LastMessage string
 	TenantID    string
+	Channel     string
 	TaskContext string
 	EmotionHint *emotion.Result
 }
@@ -61,6 +65,10 @@ type DynamicContextRequest struct {
 // returns the assembled text ready to be injected as a system message.
 // Returns "" if no layers have content.
 func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicContextRequest) string {
+	t0 := time.Now()
+	defer func() {
+		slog.Debug("prompt_builder: dynamic context built", "elapsed_ms", time.Since(t0).Milliseconds(), "layers", len(pb.LastIncludedLayers))
+	}()
 	var layers []ctxwindow.Layer
 
 	// P1: Task working memory (highest dynamic priority)
@@ -85,7 +93,7 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	}
 	results := make(chan layerResult, 3)
 	pending := 0
-	skipRetrieval := len([]rune(req.LastMessage)) < 12
+	skipRetrieval := len([]rune(req.LastMessage)) < 6
 
 	if pb.memory != nil && !skipRetrieval {
 		pending++
@@ -196,6 +204,19 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		}
 	}
 
+	// P3.6: Declarative Cogni context — assembled from cogni.Registry.Active()
+	// declarations whose ActivationRules match the current message/tenant/channel.
+	// The hook (pkg/cogni.Hook) handles evaluation, exclusivity, and rendering.
+	if pb.cogniContext != nil {
+		if cgCtx := pb.cogniContext(ctx, req.LastMessage, req.TenantID, req.Channel); cgCtx != "" {
+			layers = append(layers, ctxwindow.Layer{
+				Name:     "cogni",
+				Priority: ctxwindow.LayerPriorityRetrieval,
+				Content:  cgCtx,
+			})
+		}
+	}
+
 	// P4: Cognition — only inject what's genuinely relevant to the current query.
 	// Emotion and strategy have higher priority than reverie (which is speculative).
 	if req.EmotionHint != nil {
@@ -253,10 +274,18 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		}
 	}
 
-	// P4.5: Reflection visibility — if there's a recent learning from reflect loop,
-	// inject it as a hint for the LLM to surface in its response.
-	if pb.strategyContext != nil {
-		if strCtx := pb.strategyContext(); strCtx != "" && len(strCtx) > 20 {
+	// P4.5: Reflection visibility — appended only when the strategy layer was
+	// actually included above, so we check LastIncludedLayers lazily. We avoid
+	// calling strategyContext() a second time (it was already called above).
+	{
+		hasStrategy := false
+		for _, l := range layers {
+			if l.Name == "strategy" && l.Content != "" {
+				hasStrategy = true
+				break
+			}
+		}
+		if hasStrategy {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "reflect_visibility",
 				Priority: ctxwindow.LayerPriorityHints,
