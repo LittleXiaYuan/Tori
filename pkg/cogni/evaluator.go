@@ -25,6 +25,9 @@ type Session struct {
 
 	// Tags are free-form hints the host can attach (e.g. "admin", "guest").
 	Tags []string
+
+	// Perception carries runtime multi-modal signals for advanced activation.
+	Perception *PerceptionSignal
 }
 
 // Activation is the result of evaluating a single Cogni against a Session.
@@ -142,6 +145,13 @@ func (e *Evaluator) evaluateOne(d *Declaration, s Session) Activation {
 				break
 			}
 		}
+	}
+
+	// Multi-modal perception
+	if len(d.Activation.Perception) > 0 {
+		pScore, pReasons := evaluatePerception(d.Activation.Perception, s, s.Perception)
+		score += pScore
+		act.Reasons = append(act.Reasons, pReasons...)
 	}
 
 	if score > 1.0 {

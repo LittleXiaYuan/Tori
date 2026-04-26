@@ -64,6 +64,9 @@ type App struct {
 	// ── Observability ──
 	Metrics *observe.Metrics
 
+	// ── Module registry (hot-pluggable subsystems) ──
+	Modules *ModuleRegistry
+
 	// ── Generic component registry ──
 	mu         sync.RWMutex
 	components map[string]any
@@ -75,6 +78,7 @@ func NewApp(cfg *config.Config) *App {
 		Config:     cfg,
 		Lifecycle:  NewLifecycle(),
 		Metrics:    observe.New(),
+		Modules:    NewModuleRegistry(),
 		components: make(map[string]any),
 	}
 }
@@ -175,4 +179,7 @@ const (
 	CompTemplateStore   = "template_store"
 	CompWorkMemMgr      = "work_mem_mgr"
 	CompThreadMgr       = "thread_mgr"
+	CompCogniRegistry   = "cogni_registry"
+	CompCogniTraces     = "cogni_traces"
+	CompCogniSentinel   = "cogni_sentinel"
 )

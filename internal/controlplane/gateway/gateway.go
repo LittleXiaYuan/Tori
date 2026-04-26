@@ -67,6 +67,7 @@ import (
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/tori"
+	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -89,95 +90,122 @@ func RequestID(ctx context.Context) string {
 }
 
 // Gateway is the HTTP API server for the agent.
+//
+// Field groupings mirror the route registrations in routes.go. When this
+// struct grows beyond ~15 fields per group, consider extracting the group
+// into its own sub-struct (embed it to keep handler code unchanged).
 type Gateway struct {
-	planner              *planner.Planner
-	tenants              *tenant.Manager
-	memory               *memory.Manager
+
+	// ── Chat & Conversation ────────────────────
+	planner       *planner.Planner
+	convStore     *session.Store
+	forkTree      *session.ForkTree
+	forkPersister *session.ForkPersister
+	subagentMgr   *subagent.Manager
+	handoffReg    *subagent.HandoffRegistry
+	preAckEmojis  []string
+
+	// ── Memory & Knowledge ─────────────────────
+	memory         *memory.Manager
+	orchestrator   *memory.Orchestrator
+	pipeline       *memory.Pipeline
+	knowledgeStore *knowledge.Store
+	knowledgeDir   string
+	embedResolver  *embeddings.Resolver
+	identityRes    *identity.Resolver
+
+	// ── Plugins & Skills ───────────────────────
 	registry             *skills.Registry
-	scheduler            *scheduler.Scheduler
-	convStore            *session.Store
 	pluginReg            *plugin.Registry
-	feishuAPI            *channel.FeishuAPI
-	learning             *reflectpkg.LearningLoop
-	limiter              *RateLimiter
-	jwtCfg               *JWTConfig
-	passwordStore        *PasswordStore
-	usage                *UsageTracker
-	metrics              *observe.Metrics
-	pipeline             *memory.Pipeline
-	persona              *persona.Persona
-	personaChain         *persona.PriorityChain
-	heartbeat            *heartbeat.Service
-	inbox                *inbox.Store
-	botMgr               *bots.Manager
-	searchReg            *websearch.Registry
-	smartRouter          *router.Router
-	identityRes          *identity.Resolver
-	healer               *selfheal.Healer
-	lifecycle            *selfheal.Lifecycle
-	costTracker          *costtrack.Tracker
-	forkTree             *session.ForkTree
-	forkPersister        *session.ForkPersister
-	embedResolver        *embeddings.Resolver
-	subagentMgr          *subagent.Manager
-	handoffReg           *subagent.HandoffRegistry
-	orchestrator         *memory.Orchestrator
-	zhGuard              *guardrails.Pipeline
-	adaptiveLoop         *adaptive.Loop
-	auditChain           *audit.Chain
+	pluginLoader         *plugin.Loader
 	skillMarket          *skillmarket.Market
-	fedHub               *federation.Hub
-	fedBridge            *federation.OPPBridge // OPP v3 bridge (model-aware federation)
-	fedTransport         *federation.Transport // federation HTTP transport
-	knowledgeStore       *knowledge.Store
-	knowledgeDir         string // data/knowledge/ path for persisting extracted facts
-	cronMgr              *cron.Manager
-	toolsMgr             *tools.ProcessManager
-	shellPolicy          *tools.ShellExecPolicy
-	runtimePool          *agentrt.Pool
-	bindingRouter        *agentrt.Router
-	toolGuard            *guardrails.ToolGuard
-	egressGuard          *guardrails.EgressGuard
 	skillInstaller       *skillmarket.Installer
 	skillPolicy          *skillmarket.SecurityPolicy
 	clawHub              *skillmarket.ClawHubProvider
 	toriHub              *skillmarket.ToriHubProvider
-	pluginLoader         *plugin.Loader
 	skillFileLoader      *skillmarket.SkillFileLoader
-	iterateEngine        *iterate.Engine
-	trustTracker         *trust.Tracker
-	distiller            *distill.Distiller
-	reviewGate           *review.Gate
 	skillGrow            *skillgrow.Detector
-	auditTrail           *audit.Trail
-	providerReg          *llm.ProviderRegistry
-	modelMgr             *modelManager
-	speechReg            *speech.Registry
-	emotionAnalyzer      *emotion.Analyzer
-	emotionHistory       *emotion.History
-	stickerMap           *emotion.StickerMap
-	stickerCollector     *emotion.StickerCollector
-	channelReg           *channel.Registry
-	emotionShift         *planner.EmotionShiftDetector // event-driven Reverie trigger
-	factHook             *planner.FactEventHook        // event-driven Reverie trigger on high-value facts
-	skillSuggester       *memory.SkillSuggester        // auto skill suggestion from conversations
-	suggestCounter       int64                         // rate-limit: only suggest every Nth interaction
+	skillSuggester       *memory.SkillSuggester
+	suggestCounter       int64
 	pendingSuggestions   map[string][]memory.SkillSuggestion
 	pendingSuggestionsMu sync.Mutex
-	modeManager          *modes.ModeManager          // persona mode management
-	reverie              *planner.Reverie            // Reverie inner monologue system (for API access)
-	taskStore            task.Store                  // task runtime persistence
-	taskRunner           *task.Runner                // task execution engine
-	gapAnalyzer          *task.GapAnalyzer           // capability gap detection
-	stateKernel          *state.Kernel               // structured state kernel
-	experienceStore      *reflectpkg.ExperienceStore // reflection experience store
-	templateStore        *task.TemplateStore         // task template store
-	workMemMgr           *task.WorkingMemoryManager  // task working memory
-	threadMgr            *task.ThreadManager         // task thread manager
-	triggerRT            *trigger.Runtime            // trigger runtime (legacy)
-	triggerMgr           *trigger.Manager            // unified trigger manager
-	preAckEmojis         []string                    // emoji list for pre-ack reactions (e.g., ["👍","🤔","💡"])
-	allowedOrigins       []string
+
+	// ── Persona & Emotion ──────────────────────
+	persona          *persona.Persona
+	personaChain     *persona.PriorityChain
+	emotionAnalyzer  *emotion.Analyzer
+	emotionHistory   *emotion.History
+	stickerMap       *emotion.StickerMap
+	stickerCollector *emotion.StickerCollector
+	emotionShift     *planner.EmotionShiftDetector
+	factHook         *planner.FactEventHook
+	modeManager      *modes.ModeManager
+	reverie          *planner.Reverie
+
+	// ── Security & Auth ────────────────────────
+	tenants       *tenant.Manager
+	jwtCfg        *JWTConfig
+	passwordStore *PasswordStore
+	limiter       *RateLimiter
+	zhGuard       *guardrails.Pipeline
+	toolGuard     *guardrails.ToolGuard
+	egressGuard   *guardrails.EgressGuard
+	trustTracker  *trust.Tracker
+	reviewGate    *review.Gate
+	auditChain    *audit.Chain
+	auditTrail    *audit.Trail
+
+	// ── LLM Providers & Routing ────────────────
+	providerReg *llm.ProviderRegistry
+	modelMgr    *modelManager
+	smartRouter *router.Router
+	costTracker *costtrack.Tracker
+
+	// ── Tasks & Scheduling ─────────────────────
+	scheduler   *scheduler.Scheduler
+	cronMgr     *cron.Manager
+	taskStore   task.Store
+	taskRunner  *task.Runner
+	gapAnalyzer *task.GapAnalyzer
+	stateKernel *state.Kernel
+	templateStore *task.TemplateStore
+	workMemMgr  *task.WorkingMemoryManager
+	threadMgr   *task.ThreadManager
+	triggerRT   *trigger.Runtime
+	triggerMgr  *trigger.Manager
+
+	// ── Tools & Execution ──────────────────────
+	toolsMgr    *tools.ProcessManager
+	shellPolicy *tools.ShellExecPolicy
+
+	// ── Channels & Integrations ────────────────
+	feishuAPI  *channel.FeishuAPI
+	channelReg *channel.Registry
+	botMgr     *bots.Manager
+	searchReg  *websearch.Registry
+	inbox      *inbox.Store
+	speechReg  *speech.Registry
+
+	// ── Federation ─────────────────────────────
+	fedHub       *federation.Hub
+	fedBridge    *federation.OPPBridge
+	fedTransport *federation.Transport
+
+	// ── Observability & Self-Heal ──────────────
+	metrics      *observe.Metrics
+	usage        *UsageTracker
+	heartbeat    *heartbeat.Service
+	healer       *selfheal.Healer
+	lifecycle    *selfheal.Lifecycle
+	adaptiveLoop *adaptive.Loop
+	learning     *reflectpkg.LearningLoop
+	iterateEngine *iterate.Engine
+	distiller    *distill.Distiller
+	experienceStore *reflectpkg.ExperienceStore
+	runtimePool  *agentrt.Pool
+	bindingRouter *agentrt.Router
+
+	allowedOrigins []string
 
 	// Workflow Engine
 	workflowStore  workflow.Store
@@ -253,6 +281,22 @@ type Gateway struct {
 
 	replyHooks   []ReplyHook
 	replyHooksMu sync.RWMutex
+
+	modules *agentrt.ModuleRegistry
+	profile string
+
+	// Cogni hot-pluggable registry (declarative AI-cognition shells).
+	// Populated by the cogni runtime module after Gateway construction.
+	cogniRegistry       *cogni.Registry
+	cogniDir            string
+	cogniTraces         cogni.TraceStore
+	cogniSentinel       *cogni.Sentinel
+	cogniWorkflowEngine *cogni.WorkflowEngine
+	cogniExperiences    map[string]*cogni.ExperienceStore
+	cogniGenesis        *cogni.Genesis
+	cogniEvolution      *cogni.EvolutionEngine
+	cogniFederation     *cogni.CogniFederation
+	cogniCostTracker    *cogni.CostTracker
 }
 
 // ReplyHook interceptor for outgoing messages.
@@ -277,12 +321,63 @@ func (g *Gateway) InvokeReplyHooks(ctx context.Context, msg channel.Message, rep
 	}
 }
 
+// GatewayConfig holds the required dependencies for creating a Gateway.
+type GatewayConfig struct {
+	Planner     *planner.Planner
+	Tenants     *tenant.Manager
+	Memory      *memory.Manager
+	Skills      *skills.Registry
+	Scheduler   *scheduler.Scheduler
+	ConvStore   *session.Store
+	Plugins     *plugin.Registry
+	FeishuAPI   *channel.FeishuAPI
+	Learning    *reflectpkg.LearningLoop
+	JWTConfig   *JWTConfig
+	Metrics     *observe.Metrics
+	Pipeline    *memory.Pipeline
+	Persona     *persona.Persona
+}
+
 // New creates a new Gateway.
+//
+// Deprecated: Use NewFromConfig for new code. This function is kept for
+// backward compatibility and delegates to NewFromConfig internally.
 func New(p *planner.Planner, t *tenant.Manager, m *memory.Manager, r *skills.Registry, s *scheduler.Scheduler, cs *session.Store, pr *plugin.Registry, fa *channel.FeishuAPI, ll *reflectpkg.LearningLoop, jwtCfg *JWTConfig, met *observe.Metrics, pipeline *memory.Pipeline, per *persona.Persona) *Gateway {
+	return NewFromConfig(GatewayConfig{
+		Planner: p, Tenants: t, Memory: m, Skills: r, Scheduler: s,
+		ConvStore: cs, Plugins: pr, FeishuAPI: fa, Learning: ll,
+		JWTConfig: jwtCfg, Metrics: met, Pipeline: pipeline, Persona: per,
+	})
+}
+
+// NewFromConfig creates a new Gateway from a config struct.
+func NewFromConfig(cfg GatewayConfig) *Gateway {
+	met := cfg.Metrics
 	if met == nil {
 		met = observe.New()
 	}
-	g := &Gateway{planner: p, tenants: t, memory: m, registry: r, scheduler: s, convStore: cs, pluginReg: pr, feishuAPI: fa, learning: ll, jwtCfg: jwtCfg, limiter: NewRateLimiter(30, time.Minute), usage: NewUsageTracker(), metrics: met, pipeline: pipeline, persona: per, mux: http.NewServeMux(), startTime: time.Now(), browserSessions: NewBrowserSessionStore(), modelMgr: newModelManager(), oauthPending: make(map[string]*oauthPendingState)}
+	g := &Gateway{
+		planner:         cfg.Planner,
+		tenants:         cfg.Tenants,
+		memory:          cfg.Memory,
+		registry:        cfg.Skills,
+		scheduler:       cfg.Scheduler,
+		convStore:       cfg.ConvStore,
+		pluginReg:       cfg.Plugins,
+		feishuAPI:       cfg.FeishuAPI,
+		learning:        cfg.Learning,
+		jwtCfg:          cfg.JWTConfig,
+		metrics:         met,
+		pipeline:        cfg.Pipeline,
+		persona:         cfg.Persona,
+		limiter:         NewRateLimiter(30, time.Minute),
+		usage:           NewUsageTracker(),
+		mux:             http.NewServeMux(),
+		startTime:       time.Now(),
+		browserSessions: NewBrowserSessionStore(),
+		modelMgr:        newModelManager(),
+		oauthPending:    make(map[string]*oauthPendingState),
+	}
 	g.routes()
 	return g
 }

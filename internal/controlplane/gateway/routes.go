@@ -201,10 +201,10 @@ func (g *Gateway) registerTriggerRoutes() {
 	g.mux.HandleFunc("/v1/tools/poll", g.requireAuth(g.handleToolPoll))
 	g.mux.HandleFunc("/v1/tools/kill", g.requireAuth(g.handleToolKill))
 
-	// Sandbox
-	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.handleSandboxExec))
+	// Sandbox (admin-only — arbitrary command execution)
+	g.mux.HandleFunc("/v1/sandbox/exec", g.requireAuth(g.requireAdmin(g.handleSandboxExec)))
 	g.mux.HandleFunc("/v1/sandbox/probe", g.requireAuth(g.handleSandboxProbe))
-	g.mux.HandleFunc("/v1/sandbox/desktop", g.requireAuth(g.handleDesktopCreate))
+	g.mux.HandleFunc("/v1/sandbox/desktop", g.requireAuth(g.requireAdmin(g.handleDesktopCreate)))
 	g.mux.HandleFunc("/v1/sandbox/desktop/status", g.requireAuth(g.handleDesktopStatus))
 	g.mux.HandleFunc("/v1/sandbox/desktop/destroy", g.requireAuth(g.handleDesktopDestroy))
 

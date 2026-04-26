@@ -18,6 +18,18 @@ type TaskStoreRef interface {
 	Update(t *task.Task) error
 }
 
+type ctxKeyType string
+
+const ctxTenantKey ctxKeyType = "tenant_id"
+
+// TenantFromContext extracts the tenant ID set by gateway auth middleware.
+func TenantFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(ctxTenantKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // DispatchContext bundles the dependencies needed by dispatch tools.
 type DispatchContext struct {
 	Workers   *WorkerRegistry
@@ -108,7 +120,8 @@ func getPendingTasksTool(dc *DispatchContext) ToolDef {
 				}, nil
 			}
 
-			allTasks := dc.TaskStore.List("", 100)
+			tenantID := TenantFromContext(ctx)
+			allTasks := dc.TaskStore.List(tenantID, 100)
 			var pending []map[string]any
 			for _, t := range allTasks {
 				if !isDispatchable(t) {
@@ -165,6 +178,9 @@ func claimTaskTool(dc *DispatchContext) ToolDef {
 
 			t, ok := dc.TaskStore.Get(taskID)
 			if !ok {
+				return nil, fmt.Errorf("task '%s' not found", taskID)
+			}
+			if tenantID := TenantFromContext(ctx); tenantID != "" && t.TenantID != tenantID {
 				return nil, fmt.Errorf("task '%s' not found", taskID)
 			}
 			if !isDispatchable(t) {

@@ -49,6 +49,8 @@ type Config struct {
 	LongHorizonEnabled     bool   // enable DAG-based long-horizon planner for complex tasks
 	ReflectMode            string // "strict", "learning", "off" (default: "learning")
 	ReflectModel           string // LLM pool key for reflect evaluator (empty = primary)
+	Profile                string // "lite", "standard", "full" (default: "standard")
+	DisabledModules        string // comma-separated module names to disable
 }
 
 // Load reads config from environment variables.
@@ -111,6 +113,8 @@ func Load() Config {
 		LongHorizonEnabled:     getenv("LONG_HORIZON_ENABLED", "") == "true",
 		ReflectMode:            getenv("REFLECT_MODE", "learning"),
 		ReflectModel:           getenv("REFLECT_MODEL", ""),
+		Profile:                getenv("AGENT_PROFILE", "standard"),
+		DisabledModules:        getenv("DISABLED_MODULES", ""),
 	}
 }
 
@@ -130,6 +134,40 @@ func (c Config) NeedsSetup() bool {
 func (c Config) DataPath(elem ...string) string {
 	parts := append([]string{c.DataDir}, elem...)
 	return strings.Join(parts, "/")
+}
+
+// Profile constants — controls which subsystems are initialized.
+const (
+	ProfileLite     = "lite"     // chat-only: no workflow/triggers/federation/heartbeat
+	ProfileStandard = "standard" // full features minus experimental
+	ProfileFull     = "full"     // everything including experimental modules
+)
+
+// ProfileAtLeast returns true when the configured profile is at or above the given level.
+func (c Config) ProfileAtLeast(level string) bool {
+	order := map[string]int{ProfileLite: 0, ProfileStandard: 1, ProfileFull: 2}
+	cur, ok := order[c.Profile]
+	if !ok {
+		cur = 1 // default to standard
+	}
+	req, ok := order[level]
+	if !ok {
+		return true
+	}
+	return cur >= req
+}
+
+// IsModuleDisabled returns true when the given module name appears in DISABLED_MODULES.
+func (c Config) IsModuleDisabled(name string) bool {
+	if c.DisabledModules == "" {
+		return false
+	}
+	for _, m := range strings.Split(c.DisabledModules, ",") {
+		if strings.TrimSpace(m) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func getenv(key, fallback string) string {

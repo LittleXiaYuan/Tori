@@ -113,9 +113,14 @@ func (s *Server) HandleRequest(ctx context.Context, raw []byte) ([]byte, error) 
 	}
 }
 
+// supportedVersions must be sorted descending. MCP uses YYYY-MM-DD format,
+// so lexicographic order matches chronological order.
 var supportedVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}
 
 func negotiateVersion(clientVersion string) string {
+	if clientVersion == "" {
+		return supportedVersions[len(supportedVersions)-1]
+	}
 	for _, v := range supportedVersions {
 		if v <= clientVersion {
 			return v

@@ -149,6 +149,7 @@ func (o *Orchestrator) Recall(ctx context.Context, tenantID, query string, limit
 		defer wg.Done()
 		items, err := o.manager.SearchAll(ctx, tenantID, query, perLayer)
 		if err != nil {
+			slog.Warn("memory recall: layer search failed", "err", err)
 			return
 		}
 		mu.Lock()

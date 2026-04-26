@@ -18,7 +18,7 @@ DIST_DIR    := dist
 # Cross-compilation targets
 PLATFORMS   := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: build release clean test setup web-ensure web-build
+.PHONY: build release clean test setup web-ensure web-build openapi docs-api
 
 ## web-ensure: Ensure heroui-web/out/ exists (placeholder if no build)
 web-ensure:
@@ -77,6 +77,17 @@ vet:
 ## setup: Build and run setup wizard
 setup:
 	go run ./cmd/setup
+
+## openapi: Regenerate docs/openapi.yaml from gateway routes
+openapi:
+	go run ./cmd/openapi-gen
+	go test ./cmd/openapi-gen
+
+## docs-api: Serve the API reference (Scalar, reads docs/openapi.yaml)
+##           Open http://localhost:8000/api-reference.html in your browser.
+docs-api:
+	@echo "Serving API reference at http://localhost:8000/api-reference.html"
+	cd docs && python -m http.server 8000
 
 ## clean: Remove build artifacts
 clean:

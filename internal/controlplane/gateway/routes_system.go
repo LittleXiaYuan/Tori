@@ -142,4 +142,11 @@ func (g *Gateway) registerSystemRoutes() {
 	if g.fedTransport != nil {
 		g.mux.HandleFunc("/v1/federation/receive", g.fedTransport.HTTPHandler())
 	}
+
+	// Modules (hot-pluggable subsystems)
+	g.mux.HandleFunc("/v1/modules", g.requireAuth(g.handleModules))
+
+	// Cogni declarative AI-cognition shells (hot-pluggable)
+	g.mux.HandleFunc("/v1/cognis", g.requireAuth(g.handleCognis))
+	g.mux.HandleFunc("/v1/cognis/", g.requireAuth(g.handleCognis))
 }
