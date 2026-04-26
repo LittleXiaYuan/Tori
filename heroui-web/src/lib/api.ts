@@ -1196,6 +1196,21 @@ export const api = {
       `/v1/cognis/${encodeURIComponent(id)}/${expose ? "expose" : "unexpose"}`,
       { method: "POST" },
     ),
+
+  // ── LoRA & evolution ──
+  getLoRAStatus: () => fetcher<import("./api-types/lora").LoRAStatus>("/v1/lora/status"),
+  getLoRAHistory: () =>
+    fetcher<{ records: import("./api-types/lora").TrainingRecord[]; count: number }>("/v1/lora/history"),
+  getLoRASummary: () =>
+    fetcher<{ summary: import("./api-types/lora").TrainingSummary }>("/v1/lora/summary"),
+  triggerLoRATraining: (tenantId?: string) =>
+    fetcher<{ status: string; tenant_id: string }>("/v1/lora/trigger", {
+      method: "POST",
+      body: JSON.stringify(tenantId ? { tenant_id: tenantId } : {}),
+    }),
+  rollbackLoRA: () => fetcher<{ status: string }>("/v1/lora/rollback", { method: "POST" }),
+  getEvolutionState: () =>
+    fetcher<{ state: import("./api-types/lora").EvolutionState }>("/v1/lora/evolution"),
 };
 
 // Sticker URL utilities
