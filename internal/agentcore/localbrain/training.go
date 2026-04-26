@@ -160,10 +160,15 @@ func (tp *TrainingPipeline) ExportBatch(ctx context.Context, taskIDs []string, t
 			if step.StepType != "decide" {
 				continue
 			}
+			decisionJSON, _ := json.Marshal(map[string]interface{}{
+				"decision":   step.Decision,
+				"reason":     step.Reason,
+				"confidence": step.Confidence,
+			})
 			sample := map[string]interface{}{
 				"instruction": "You are an agentic decision maker. Given the context, decide whether to use a tool, think deeper, or answer directly.",
 				"input":       step.Content,
-				"output":      fmt.Sprintf(`{"decision":"%s","reason":"%s","confidence":%.2f}`, step.Decision, step.Reason, step.Confidence),
+				"output":      string(decisionJSON),
 				"reward":      record.Reward,
 				"task_success": record.TaskSuccess,
 			}
