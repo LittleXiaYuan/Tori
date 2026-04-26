@@ -333,9 +333,9 @@ func (h *Hook) BuildContext(req ContextRequest) string {
 	}
 
 	st.mu.Lock()
+	defer st.mu.Unlock()
 
 	if len(st.activations) == 0 {
-		st.mu.Unlock()
 		return ""
 	}
 	var blocks []string
@@ -360,8 +360,6 @@ func (h *Hook) BuildContext(req ContextRequest) string {
 		Sources:           sources,
 		TemplateFallbacks: fallbacks,
 	}
-	st.mu.Unlock()
-	h.flushTrace(st)
 	return out
 }
 
