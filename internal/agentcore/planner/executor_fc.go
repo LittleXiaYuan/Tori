@@ -24,7 +24,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
-	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.DisableDelegation, req.AllowedSkills)
+	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills)
 
 	var usedSkills []string
 	var planSteps []PlanStep
@@ -330,7 +330,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 // those names before any further filtering. This is driven by the Cherry
 // "tools" drawer: when a user explicitly checks a subset of skills, the
 // planner is expected to stay inside that subset.
-func (p *Planner) buildFunctionDefs(userMessage, tenantID string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
+func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
 		allow := make(map[string]struct{}, len(allowedSkills))
@@ -352,7 +352,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID string, disableDelegat
 	// when no cogni activates, so the previous behaviour is preserved.
 	if p.cogniSkillFilter != nil {
 		before := len(allSkills)
-		allSkills = p.cogniSkillFilter(userMessage, tenantID, allSkills)
+		allSkills = p.cogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 		if after := len(allSkills); after != before {
 			slog.Info("buildFunctionDefs: cogni surface filter applied",
 				"before", before, "after", after, "msg_prefix", truncate(userMessage, 50))
