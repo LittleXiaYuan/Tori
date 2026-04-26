@@ -1,4 +1,4 @@
-﻿package gateway
+package gateway
 
 import (
 	"encoding/json"
@@ -320,3 +320,16 @@ func (g *Gateway) handleReviewStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleModules returns the list of registered modules and their status.
+func (g *Gateway) handleModules(w http.ResponseWriter, r *http.Request) {
+	if g.modules == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"modules": []any{}, "profile": ""})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"modules": g.modules.List(),
+		"profile": g.profile,
+	})
+}

@@ -176,5 +176,8 @@ func newApp(cfg *config.Config) (*agentrt.App, error) {
 	// Phase 9: Training data pipeline (DataCollector + NightScheduler)
 	initTrainingPipeline(app)
 
+	// Phase 10: Hot-pluggable modules (gated by AGENT_PROFILE)
+	registerModules(app)
+
 	return app, nil
 }

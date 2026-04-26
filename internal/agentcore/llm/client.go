@@ -253,6 +253,7 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Chat(ctx context.Context, messages []Message, temperature float64) (string, error) {
+	t0 := time.Now()
 	// Streaming responses need generous timeout (LLM generation can take time)
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
@@ -261,6 +262,9 @@ func (c *Client) Chat(ctx context.Context, messages []Message, temperature float
 	}
 	ctx, span := observe.StartSpan(ctx, "llm.Chat")
 	span.Attrs["model"] = c.model
+	defer func() {
+		slog.Debug("llm.Chat", "model", c.model, "msgs", len(messages), "elapsed_ms", time.Since(t0).Milliseconds())
+	}()
 	if err := c.breaker.Allow(); err != nil {
 		observe.EndSpan(span, err)
 		return "", err

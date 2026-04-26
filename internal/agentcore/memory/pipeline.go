@@ -62,8 +62,8 @@ func (p *Pipeline) Process(ctx context.Context, tenantID string, messages []Chat
 	// Phase 1: Extract facts from conversation
 	extracted, err := p.extractor.Extract(ctx, messages)
 	if err != nil {
-		slog.Warn("memory pipeline: extraction failed, skipping", "err", err)
-		return result, nil
+		slog.Warn("memory pipeline: extraction failed", "err", err)
+		return result, fmt.Errorf("memory extraction: %w", err)
 	}
 	if len(extracted.Facts) == 0 {
 		return result, nil

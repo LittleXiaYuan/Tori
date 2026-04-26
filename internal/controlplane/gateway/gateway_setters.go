@@ -53,6 +53,7 @@ import (
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
+	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/plugin"
 )
 
@@ -403,6 +404,45 @@ func (g *Gateway) FlushUsageKV() {
 		g.usage.FlushToKV()
 	}
 }
+
+// SetModuleRegistry attaches the hot-pluggable module registry.
+func (g *Gateway) SetModuleRegistry(r *agentrt.ModuleRegistry, profile string) {
+	g.modules = r
+	g.profile = profile
+}
+
+// SetCogniRegistry attaches the hot-pluggable Cogni registry plus the directory
+// it watches for declarative *.json files. Called by cmd/agent/module_cogni.go
+// after the runtime module starts.
+func (g *Gateway) SetCogniRegistry(r *cogni.Registry, dir string) {
+	g.cogniRegistry = r
+	g.cogniDir = dir
+}
+
+// SetCogniTraceStore attaches the trace store for /v1/cognis/traces and
+// /v1/cognis/{id}/trace endpoints.
+func (g *Gateway) SetCogniTraceStore(s cogni.TraceStore) { g.cogniTraces = s }
+
+// SetCogniSentinel attaches the sentinel (alert + auto-disable engine).
+func (g *Gateway) SetCogniSentinel(s *cogni.Sentinel) { g.cogniSentinel = s }
+
+// SetCogniWorkflowEngine attaches the workflow engine for /v1/cognis/{id}/workflows/*.
+func (g *Gateway) SetCogniWorkflowEngine(we *cogni.WorkflowEngine) { g.cogniWorkflowEngine = we }
+
+// SetCogniExperiences attaches the per-cogni experience stores.
+func (g *Gateway) SetCogniExperiences(m map[string]*cogni.ExperienceStore) { g.cogniExperiences = m }
+
+// SetCogniGenesis attaches the self-genesis engine for /v1/cognis/generate.
+func (g *Gateway) SetCogniGenesis(gen *cogni.Genesis) { g.cogniGenesis = gen }
+
+// SetCogniEvolution attaches the evolution engine for /v1/cognis/{id}/evolve.
+func (g *Gateway) SetCogniEvolution(ee *cogni.EvolutionEngine) { g.cogniEvolution = ee }
+
+// SetCogniFederation attaches the federation manager.
+func (g *Gateway) SetCogniFederation(cf *cogni.CogniFederation) { g.cogniFederation = cf }
+
+// SetCogniCostTracker attaches the economics cost tracker.
+func (g *Gateway) SetCogniCostTracker(ct *cogni.CostTracker) { g.cogniCostTracker = ct }
 
 func truncateStr(s string, maxRunes int) string {
 	r := []rune(s)
