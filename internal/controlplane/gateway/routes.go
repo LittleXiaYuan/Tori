@@ -20,6 +20,7 @@ package gateway
 //   registerModesRoutes      — Persona mode management
 //   registerWorkflowRoutes   — Workflow DAG engine
 //   registerIDERoutes        — IDE supervisor plugin
+//   registerLoRARoutes       — LoRA scheduler, training metrics, evolution
 
 // ──────────────────────────────────────────────
 // Chat & Conversation
@@ -400,4 +401,17 @@ func (g *Gateway) registerWorkflowRoutes() {
 	g.mux.HandleFunc("/v1/workflows/run", g.requireAuth(g.handleWorkflowRun))
 	g.mux.HandleFunc("/v1/workflows/instances", g.requireAuth(g.handleWorkflowInstances))
 	g.mux.HandleFunc("/v1/workflows/cancel", g.requireAuth(g.handleWorkflowCancel))
+}
+
+// ──────────────────────────────────────────────
+// LoRA training & evolution
+// ──────────────────────────────────────────────
+
+func (g *Gateway) registerLoRARoutes() {
+	g.mux.HandleFunc("/v1/lora/status", g.requireAuth(g.handleLoRAStatus))
+	g.mux.HandleFunc("/v1/lora/history", g.requireAuth(g.handleLoRAHistory))
+	g.mux.HandleFunc("/v1/lora/summary", g.requireAuth(g.handleLoRASummary))
+	g.mux.HandleFunc("/v1/lora/trigger", g.requireAuth(g.handleLoRATrigger))
+	g.mux.HandleFunc("/v1/lora/rollback", g.requireAuth(g.handleLoRARollback))
+	g.mux.HandleFunc("/v1/lora/evolution", g.requireAuth(g.handleLoRAEvolution))
 }

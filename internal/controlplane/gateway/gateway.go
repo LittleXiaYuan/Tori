@@ -38,6 +38,7 @@ import (
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/modes"
@@ -297,6 +298,11 @@ type Gateway struct {
 	cogniEvolution      *cogni.EvolutionEngine
 	cogniFederation     *cogni.CogniFederation
 	cogniCostTracker    *cogni.CostTracker
+
+	// LoRA training & evolution (optional — wired from app in init_tasks)
+	loraScheduler         *localbrain.LoRAScheduler
+	trainingMetrics       *localbrain.TrainingMetrics
+	evolutionCoordinator  *localbrain.EvolutionCoordinator
 }
 
 // ReplyHook interceptor for outgoing messages.
@@ -683,6 +689,7 @@ func (g *Gateway) routes() {
 	g.registerMCPDispatchRoutes() // MCP dispatch server for external workers
 	g.registerProjectRoutes()       // project management (orchestrator)
 	g.registerOrchestratorRoutes()  // orchestrator daemon control
+	g.registerLoRARoutes()          // LoRA / training / evolution
 }
 
 // --- Auth middleware ---

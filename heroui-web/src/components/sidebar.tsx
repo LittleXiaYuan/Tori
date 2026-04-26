@@ -48,6 +48,7 @@ import {
   PanelLeftOpen,
   FolderGit2,
   Boxes,
+  CircuitBoard,
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
@@ -93,6 +94,7 @@ const categories: NavCategory[] = [
     { href: "/emotions", label: "情绪", labelEn: "Emotions", icon: <SmilePlus size={16} /> },
     { href: "/reflect", label: "反思", labelEn: "Reflection", icon: <Lightbulb size={16} /> },
     { href: "/reverie", label: "内心独白", labelEn: "Reverie", icon: <BrainCircuit size={16} /> },
+    { href: "/lora", label: "LoRA 训练", labelEn: "LoRA", icon: <CircuitBoard size={16} /> },
     { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} /> },
   ]},
   { id: "system", label: "系统", labelEn: "System", icon: <ShieldCheck size={16} />, secondary: true, children: [
