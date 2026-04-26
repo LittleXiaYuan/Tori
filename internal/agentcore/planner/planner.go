@@ -90,7 +90,7 @@ type CogniContextFunc func(ctx context.Context, message, tenantID, channel strin
 // every activated cogni's ToolSurface. Implementations MUST return the
 // input unchanged when no cogni activates — the planner relies on this
 // "no-op default" so disabling cogni keeps existing behavior intact.
-type CogniSkillFilterFunc func(message, tenantID string, in []skills.Skill) []skills.Skill
+type CogniSkillFilterFunc func(message, tenantID, channel string, in []skills.Skill) []skills.Skill
 
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
