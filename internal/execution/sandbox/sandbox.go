@@ -375,10 +375,24 @@ func (s *Sandbox) isHostPathAllowed(abs string) bool {
 	if len(s.policy.HostReadPaths) == 0 {
 		return false
 	}
-	abs = filepath.Clean(abs)
+	// Resolve symlinks to prevent link-based escapes
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		resolved = filepath.Clean(abs)
+	} else {
+		resolved = filepath.Clean(resolved)
+	}
 	for _, allowed := range s.policy.HostReadPaths {
-		allowed = filepath.Clean(allowed)
-		if strings.HasPrefix(strings.ToLower(abs), strings.ToLower(allowed)) {
+		allowedClean := filepath.Clean(allowed)
+		allowedResolved, resolveErr := filepath.EvalSymlinks(allowedClean)
+		if resolveErr != nil {
+			allowedResolved = allowedClean
+		}
+		rel, relErr := filepath.Rel(allowedResolved, resolved)
+		if relErr != nil {
+			continue
+		}
+		if rel == "." || (!strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)) {
 			return true
 		}
 	}
