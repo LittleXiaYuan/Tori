@@ -85,8 +85,8 @@ func (s *FileSearchSkill) Execute(ctx context.Context, args map[string]any, env 
 			return "", err
 		}
 		// Limit output for LLM context
-		if len(content) > 4000 {
-			content = content[:4000] + "\n...[truncated]"
+		if len(content) > 16000 {
+			content = content[:16000] + "\n...[truncated]"
 		}
 		return content, nil
 
