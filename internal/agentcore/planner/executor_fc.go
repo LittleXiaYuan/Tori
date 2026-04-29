@@ -349,6 +349,22 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		slog.Info("buildFunctionDefs: user-restricted skill set", "allowed", len(allowedSkills), "matched", len(allSkills))
 	}
 
+	// Filter out skills that aren't ready (missing config/dependencies)
+	{
+		ready := make([]skills.Skill, 0, len(allSkills))
+		for _, s := range allSkills {
+			if ok, reason := skills.IsReady(s); !ok {
+				slog.Debug("buildFunctionDefs: skill not ready, excluding", "skill", s.Name(), "reason", reason)
+				continue
+			}
+			ready = append(ready, s)
+		}
+		if excluded := len(allSkills) - len(ready); excluded > 0 {
+			slog.Info("buildFunctionDefs: excluded unready skills", "count", excluded)
+		}
+		allSkills = ready
+	}
+
 	// Cogni surface filter — narrows the tool list to the union of every
 	// activated cogni's ToolSurface. The hook returns the input unchanged
 	// when no cogni activates, so the previous behaviour is preserved.
