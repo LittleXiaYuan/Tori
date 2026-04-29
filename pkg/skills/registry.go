@@ -19,6 +19,21 @@ type Skill interface {
 	Execute(ctx context.Context, args map[string]any, env *Environment) (string, error)
 }
 
+// ReadyChecker is an optional interface skills can implement to report
+// whether they have the required configuration/dependencies to function.
+type ReadyChecker interface {
+	Ready() (bool, string) // (is_ready, reason_if_not)
+}
+
+// IsReady checks if a skill is ready. Skills that don't implement ReadyChecker
+// are assumed to be always ready.
+func IsReady(s Skill) (bool, string) {
+	if rc, ok := s.(ReadyChecker); ok {
+		return rc.Ready()
+	}
+	return true, ""
+}
+
 // LLMCallFunc calls the LLM with a system prompt and user prompt, returning the response.
 type LLMCallFunc func(ctx context.Context, system, user string) (string, error)
 

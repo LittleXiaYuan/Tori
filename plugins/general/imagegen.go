@@ -23,6 +23,13 @@ type ImageGenSkill struct{}
 
 func NewImageGenSkill() *ImageGenSkill { return &ImageGenSkill{} }
 
+func (s *ImageGenSkill) Ready() (bool, string) {
+	if os.Getenv("IMAGEGEN_API_KEY") != "" || os.Getenv("OPENAI_API_KEY") != "" || os.Getenv("LLM_API_KEY") != "" {
+		return true, ""
+	}
+	return false, "需要配置 IMAGEGEN_API_KEY 或 OPENAI_API_KEY"
+}
+
 func (s *ImageGenSkill) Name() string        { return "image_gen" }
 func (s *ImageGenSkill) Description() string { return "AI图片生成：根据文字描述生成图片（DALL-E兼容）" }
 func (s *ImageGenSkill) Parameters() map[string]any {
@@ -119,14 +126,21 @@ func (s *ImageGenSkill) Execute(ctx context.Context, args map[string]any, env *s
 	// Resolve API config
 	apiURL := os.Getenv("IMAGEGEN_API_URL")
 	if apiURL == "" {
-		apiURL = "https://api.openai.com/v1/images/generations"
+		if baseURL := os.Getenv("LLM_BASE_URL"); baseURL != "" {
+			apiURL = strings.TrimRight(baseURL, "/") + "/images/generations"
+		} else {
+			apiURL = "https://api.openai.com/v1/images/generations"
+		}
 	}
 	apiKey := os.Getenv("IMAGEGEN_API_KEY")
 	if apiKey == "" {
 		apiKey = os.Getenv("OPENAI_API_KEY")
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("IMAGEGEN_API_KEY or OPENAI_API_KEY environment variable is required")
+		apiKey = os.Getenv("LLM_API_KEY")
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("需要配置 IMAGEGEN_API_KEY、OPENAI_API_KEY 或 LLM_API_KEY")
 	}
 	model := os.Getenv("IMAGEGEN_MODEL")
 	if model == "" {
