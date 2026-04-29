@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -332,10 +333,14 @@ func (dr *DockerRuntime) buildCodeCommand(req RunRequest) string {
 	escapedCode := strings.ReplaceAll(req.Code, "'", "'\\''")
 
 	var cmd string
-	// Write additional files
+	// Write additional files (sanitize names to prevent shell injection)
 	for name, content := range req.Files {
+		safeName := filepath.Base(filepath.Clean(name))
+		if safeName == "." || safeName == "/" || safeName == "" || strings.ContainsAny(safeName, "'\"$`\\;|&(){}") {
+			continue
+		}
 		escapedContent := strings.ReplaceAll(content, "'", "'\\''")
-		cmd += fmt.Sprintf("printf '%%s' '%s' > /workspace/%s && ", escapedContent, name)
+		cmd += fmt.Sprintf("printf '%%s' '%s' > '/workspace/%s' && ", escapedContent, safeName)
 	}
 	cmd += fmt.Sprintf("printf '%%s' '%s' > /workspace/%s && ", escapedCode, filename)
 
