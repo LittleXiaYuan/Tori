@@ -136,6 +136,7 @@ func (l *Lifecycle) runWithReconnect(ctx context.Context, typ string, ch Channel
 		l.notifyConnect(typ)
 
 		wrappedHandler := func(msg Message) Reply {
+			l.updateState(typ, StateConnected, nil)
 			l.recordMessage(typ, msg)
 			l.notifyMessage(typ, msg)
 			return l.handler(msg)

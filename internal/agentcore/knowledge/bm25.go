@@ -69,7 +69,7 @@ func NewBM25Index(chunks []Chunk) *BM25Index {
 
 // Search returns top-K results for the given query using BM25 scoring.
 func (idx *BM25Index) Search(query string, topK int) []BM25Result {
-	if idx.docCount == 0 || topK <= 0 {
+	if idx.docCount == 0 || topK <= 0 || idx.avgDL == 0 {
 		return nil
 	}
 

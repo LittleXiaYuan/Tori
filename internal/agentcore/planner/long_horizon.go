@@ -76,7 +76,8 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 			Result: s.Output, Error: s.Error,
 		})
 	}
-	return &PlanResult{Reply: reply, SkillsUsed: usedSkills, Steps: pl.Budget.StepsUsed, Plan: planSteps}, nil
+	_, ctxLayers := p.BuildMessages(ctx, req)
+	return &PlanResult{Reply: reply, SkillsUsed: usedSkills, Steps: pl.Budget.StepsUsed, Plan: planSteps, ContextLayers: ctxLayers}, nil
 }
 
 func (p *Planner) buildDecomposeDAG(req PlanRequest) plan.DecomposeDAGFunc {
@@ -117,6 +118,7 @@ func (p *Planner) buildReviseFunc(req PlanRequest) plan.ReviseFunc {
 }
 
 func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
+	env := p.buildEnv(req)
 	return func(ctx context.Context, pl *plan.Plan, stepIndex int) (string, []string, error) {
 		step := pl.Steps[stepIndex]
 		if step.Skill == "" {
@@ -135,7 +137,6 @@ func (p *Planner) buildStepExecutor(req PlanRequest) plan.ExecuteStepFunc {
 		for k, v := range step.Args {
 			args[k] = v
 		}
-		env := p.buildEnv(req)
 		t0 := time.Now()
 		result, err := skill.Execute(ctx, args, env)
 		dur := time.Since(t0)

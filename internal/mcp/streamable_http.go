@@ -147,8 +147,11 @@ func (p *StreamableHTTPProvider) post(ctx context.Context, method string, params
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
-	if p.sessionID != "" {
-		httpReq.Header.Set("Mcp-Session", p.sessionID)
+	p.mu.Lock()
+	sid := p.sessionID
+	p.mu.Unlock()
+	if sid != "" {
+		httpReq.Header.Set("Mcp-Session", sid)
 	}
 	for k, v := range p.headers {
 		httpReq.Header.Set(k, v)
@@ -198,8 +201,11 @@ func (p *StreamableHTTPProvider) notify(ctx context.Context, method string, para
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if p.sessionID != "" {
-		req.Header.Set("Mcp-Session", p.sessionID)
+	p.mu.Lock()
+	notifySID := p.sessionID
+	p.mu.Unlock()
+	if notifySID != "" {
+		req.Header.Set("Mcp-Session", notifySID)
 	}
 	for k, v := range p.headers {
 		req.Header.Set(k, v)

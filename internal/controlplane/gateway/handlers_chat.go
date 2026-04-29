@@ -169,10 +169,10 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 	// ── Memory: write user message(s) to short-term (Mem0-style Auto-Capture) ──
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
-		if m.Role == "user" && m.Content != "" {
-			_ = g.orchestrator.Ingest(r.Context(), tid, m.Content, "conversation", "user_input")
-			g.metrics.Cognitive().MemoryIngest.Add(1)
-		}
+			if m.Role == "user" && m.Content != "" {
+				_ = g.orchestrator.Ingest(r.Context(), tid, m.Content, "conversation", "user_input")
+				g.metrics.Cognitive().MemoryIngest.Add(1)
+			}
 		}
 	}
 
@@ -209,7 +209,14 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Budget pre-check
 	if g.costTracker != nil {
-		estIn := len(fmt.Sprint(msgs))/4 + 50
+		totalChars := 0
+		for _, m := range msgs {
+			totalChars += len([]rune(m.Content))
+			for _, p := range m.ContentParts {
+				totalChars += len([]rune(p.Text))
+			}
+		}
+		estIn := totalChars/3 + 50
 		estOut := 500 // conservative estimate
 		model := g.planner.LLMClientFor(routedTier).Model()
 		if g.costTracker.WouldExceedBudget(model, estIn, estOut) {
@@ -218,24 +225,33 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Emotion analysis: detect user emotion from last message (non-blocking, best-effort)
-	// Respects per-persona feature toggle: business/tech_expert presets disable emotion by default.
+	// Emotion analysis: async with timeout to avoid blocking the main request path.
 	var emotionHint *emotion.Result
 	emotionFeatureOK := g.personaChain == nil || g.personaChain.FeatureEnabled(persona.FeatureEmotion)
 	if g.emotionAnalyzer != nil && g.emotionAnalyzer.Enabled() && emotionFeatureOK && len(msgs) > 0 {
 		lastMsg := msgs[len(msgs)-1].Content
 		if msgs[len(msgs)-1].Role == "user" && lastMsg != "" {
-			emotionHint, _ = g.emotionAnalyzer.AnalyzeText(r.Context(), lastMsg)
+			emotionCh := make(chan *emotion.Result, 1)
+			emotionCtx, emotionCancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+			safego.Go("chat-emotion-analyze", func() {
+				hint, _ := g.emotionAnalyzer.AnalyzeText(emotionCtx, lastMsg)
+				emotionCh <- hint
+			})
+			select {
+			case emotionHint = <-emotionCh:
+			case <-emotionCtx.Done():
+				slog.Debug("chat: emotion analysis timed out, skipping")
+			}
+			emotionCancel()
+
 			if emotionHint != nil && g.emotionHistory != nil {
 				g.emotionHistory.Record(req.SessionID, emotionHint.Emotion, emotionHint.Confidence, emotionHint.Source)
 			}
-			// Event-driven Reverie trigger: detect significant emotion shifts.
 			if emotionHint != nil && g.emotionShift != nil {
 				g.emotionShift.Observe(req.SessionID, string(emotionHint.Emotion), emotionHint.Confidence)
 			}
-			// Filter by per-persona minimum confidence threshold.
 			if emotionHint != nil {
-				minConf := 0.5 // default
+				minConf := 0.5
 				if g.personaChain != nil {
 					minConf = g.personaChain.FloatFeature(persona.FeatureEmotionMinConfidence, 0.5)
 				}

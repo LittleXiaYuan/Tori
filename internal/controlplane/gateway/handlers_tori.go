@@ -120,8 +120,12 @@ func (g *Gateway) handleToriBind(w http.ResponseWriter, r *http.Request) {
 				apiKey = result.UserInfo.APIKey
 			}
 			tori.ApplyLLMConfig(storeURL, apiKey)
+				username := ""
+				if result.UserInfo != nil {
+					username = result.UserInfo.Username
+				}
 				slog.Info("tori: bind successful",
-					"user", result.UserInfo.Username,
+					"user", username,
 					"tori_url", body.ToriURL)
 			}
 		}
