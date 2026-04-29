@@ -176,7 +176,10 @@ func (g *Gateway) WrapAsSkill(toolName string) func(ctx context.Context, args ma
 			return "", err
 		}
 		if result.IsError {
-			return "", fmt.Errorf("%s", result.Content[0].Text)
+			if len(result.Content) > 0 {
+				return "", fmt.Errorf("%s", result.Content[0].Text)
+			}
+			return "", fmt.Errorf("MCP tool %s returned error with no details", toolName)
 		}
 		var parts []string
 		for _, c := range result.Content {

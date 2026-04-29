@@ -68,7 +68,9 @@ func (mm *modelManager) persistModels() {
 	for _, m := range mm.models {
 		models = append(models, m)
 	}
-	_ = mm.kvs.Put(context.Background(), "models", models)
+	if err := mm.kvs.Put(context.Background(), "models", models); err != nil {
+		slog.Error("models: persist models failed", "err", err)
+	}
 }
 
 func (mm *modelManager) persistHidden() {
@@ -79,7 +81,9 @@ func (mm *modelManager) persistHidden() {
 	for id := range mm.hidden {
 		ids = append(ids, id)
 	}
-	_ = mm.kvs.Put(context.Background(), "models_hidden", ids)
+	if err := mm.kvs.Put(context.Background(), "models_hidden", ids); err != nil {
+		slog.Error("models: persist hidden failed", "err", err)
+	}
 }
 
 func (g *Gateway) handleModels(w http.ResponseWriter, r *http.Request) {

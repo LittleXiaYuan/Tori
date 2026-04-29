@@ -393,12 +393,14 @@ func (s *Store) IngestCSV(path string) (*Source, error) {
 	src.Path = path
 
 	var chunks []string
+	var skippedRows int
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
+			skippedRows++
 			continue
 		}
 		// Format as key: value pairs
@@ -411,6 +413,9 @@ func (s *Store) IngestCSV(path string) (*Source, error) {
 		chunks = append(chunks, strings.Join(parts, " | "))
 	}
 
+	if skippedRows > 0 {
+		slog.Warn("knowledge: csv rows skipped due to parse errors", "file", path, "skipped", skippedRows)
+	}
 	s.addChunks(src, chunks, map[string]string{"file": path, "format": "csv"})
 	return src, nil
 }
@@ -641,6 +646,12 @@ func (s *Store) addPreparedChunks(src *Source, prepared []PreparedChunk) {
 		chunkCount++
 	}
 	src.ChunkCount = chunkCount
+	if s.semantic != nil && s.semantic.ready {
+		s.semantic.mu.Lock()
+		s.semantic.ready = false
+		s.semantic.mu.Unlock()
+		slog.Debug("knowledge: semantic index invalidated after new chunks added")
+	}
 	slog.Debug("knowledge: ingested", "source", src.Name, "chunks", chunkCount)
 	s.persistKV()
 }
@@ -754,8 +765,12 @@ func splitRepoContent(relPath, language, content string, maxChars int) []string 
 	if trimmed == "" {
 		return nil
 	}
+	chunkBudget := maxChars - len(header)
+	if chunkBudget < 100 {
+		chunkBudget = 100
+	}
 	if language == "markdown" || language == "text" || language == "json" || language == "yaml" {
-		parts := splitText(trimmed, maxChars-len(header))
+		parts := splitText(trimmed, chunkBudget)
 		out := make([]string, 0, len(parts))
 		for _, part := range parts {
 			out = append(out, header+part)

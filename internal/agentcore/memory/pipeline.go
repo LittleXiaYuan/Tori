@@ -221,17 +221,23 @@ func (p *Pipeline) Compact(ctx context.Context, tenantID string, targetCount, de
 		return nil, err
 	}
 
-	// Replace all mid-term memories with compacted set
-	for _, item := range existing {
-		_ = p.manager.Mid.Delete(ctx, tenantID, item.Key)
-	}
+	// Build new items first, only delete old ones if all additions succeed
+	newItems := make([]Item, 0, len(output.Facts))
 	for _, fact := range output.Facts {
-		_ = p.manager.AddMid(ctx, tenantID, Item{
+		newItems = append(newItems, Item{
 			Key:      uuid.New().String(),
 			Value:    fact,
 			Source:   "compacted",
 			Category: "fact",
 		})
+	}
+	for _, item := range newItems {
+		if err := p.manager.AddMid(ctx, tenantID, item); err != nil {
+			return nil, fmt.Errorf("compact: add new item failed, aborting to preserve data: %w", err)
+		}
+	}
+	for _, item := range existing {
+		_ = p.manager.Mid.Delete(ctx, tenantID, item.Key)
 	}
 
 	slog.Info("memory compact complete",

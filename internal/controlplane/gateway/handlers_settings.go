@@ -58,26 +58,12 @@ var configSchema = []configGroup{
 	{
 		Key: "advanced", Label: "Advanced Features", LabelZh: "高级功能",
 		Fields: []configField{
-			{Key: "HEARTBEAT_ENABLED", Label: "Heartbeat", LabelZh: "心跳自检", Type: "select", Options: []string{"true", "false"},
-				Hint: "定期自动检查状态、回顾近期对话，结果推送到收件箱。关闭后 Agent 不会主动生成状态报告。"},
-			{Key: "HEARTBEAT_INTERVAL", Label: "Heartbeat Interval (min)", LabelZh: "心跳间隔（分钟）", Type: "number", Placeholder: "30",
-				Hint: "两次心跳之间的间隔（分钟）。越短越活跃，但会消耗更多 Token。"},
-			{Key: "LONG_HORIZON_ENABLED", Label: "Deep Planning (DAG)", LabelZh: "深度长线规划", Type: "select", Options: []string{"false", "true"},
-				Hint: "复杂任务先拆解为多步骤 DAG 再执行，失败时自动重新规划。适合写报告、开发功能等长任务。简单问答不受影响。Token 消耗较高。"},
-			{Key: "SELF_ITERATE_ENABLED", Label: "Self-Iterate", LabelZh: "自我迭代", Type: "select", Options: []string{"true", "false"},
-				Hint: "允许 Agent 评估自己的回复质量并自动改进。关闭后直接输出首次结果。"},
-			{Key: "SELF_ITERATE_TOKEN_BUDGET", Label: "Iterate Token Budget", LabelZh: "迭代 Token 预算", Type: "number", Placeholder: "5000",
-				Hint: "自我迭代最多消耗多少 Token，防止无限循环改进。"},
-			{Key: "SELF_ITERATE_AUTO_APPROVE", Label: "Auto-Approve Proposals", LabelZh: "自动审批提案", Type: "select", Options: []string{"false", "true"},
-				Hint: "迭代产生的改进提案是否自动执行。关闭则需要人工审批后才执行。"},
 			{Key: "THINKING_LEVEL", Label: "Thinking Level", LabelZh: "思考深度", Type: "select", Options: []string{"auto", "none", "deep"},
 				Hint: "全局默认思考深度。auto=按复杂度自动选择，none=最快响应，deep=始终完整推理链。聊天页面可临时覆盖。"},
-			{Key: "REACT_ENABLED", Label: "ReAct Mode", LabelZh: "ReAct 推理模式", Type: "select", Options: []string{"false", "true"},
-				Hint: "交替「推理→行动→观察」，每步根据结果决定下一步。适合探索性任务，但更慢且消耗更多 Token。"},
-			{Key: "REFLECT_MODE", Label: "Reflect Mode", LabelZh: "反思评估模式", Type: "select", Options: []string{"learning", "strict", "off"},
-				Hint: "任务完成后的反思策略。learning=温和记录经验，strict=严格分析失败并产生改进策略，off=关闭反思。"},
-			{Key: "REFLECT_MODEL", Label: "Reflect Eval Model", LabelZh: "反思评估器模型", Type: "text", Placeholder: "fast (留空=主模型)",
-				Hint: "执行反思评估的模型。留空则使用系统自动选择的快速模型。"},
+			{Key: "HEARTBEAT_ENABLED", Label: "Heartbeat", LabelZh: "心跳自检", Type: "select", Options: []string{"true", "false"},
+				Hint: "定期自动检查状态、回顾近期对话，结果推送到收件箱。"},
+			{Key: "HEARTBEAT_INTERVAL", Label: "Heartbeat Interval (min)", LabelZh: "心跳间隔（分钟）", Type: "number", Placeholder: "30",
+				Hint: "两次心跳之间的间隔（分钟）。"},
 		},
 	},
 	{
@@ -126,15 +112,6 @@ var configSchema = []configGroup{
 		},
 	},
 	{
-		Key: "emotion", Label: "Emotion & Sticker", LabelZh: "情绪与贴图",
-		Fields: []configField{
-			{Key: "EMOTION_ENABLED", Label: "Emotion Analysis", LabelZh: "情绪分析", Type: "select", Options: []string{"true", "false"},
-				Hint: "启用后 Agent 会分析对话中的情绪，影响回复语气和表达方式。"},
-			{Key: "EMOTION_STICKER_FILE", Label: "Custom Sticker Map", LabelZh: "自定义贴图映射文件", Type: "text", Placeholder: "data/stickers.json",
-				Hint: "JSON 文件，定义情绪到贴图的映射关系。在支持的渠道中自动发送表情贴图。"},
-		},
-	},
-	{
 		Key: "storage", Label: "Storage & Persistence", LabelZh: "存储与持久化",
 		Fields: []configField{
 			{Key: "LEDGER_DB_PATH", Label: "Ledger DB Path", LabelZh: "Ledger 数据库路径", Type: "text", Placeholder: "data/ledger/ledger.db",
@@ -163,8 +140,6 @@ var configSchema = []configGroup{
 		Fields: []configField{
 			{Key: "SEARXNG_URL", Label: "SearXNG URL", LabelZh: "SearXNG 搜索地址", Type: "text",
 				Hint: "自建搜索引擎 SearXNG 的地址。配置后 Agent 可使用网页搜索。"},
-			{Key: "PERSONA_DIR", Label: "Persona Directory", LabelZh: "人格目录", Type: "text", Placeholder: "data/personas",
-				Hint: "存放人设文件的目录。每个 .txt 文件是一个人设。"},
 			{Key: "OPEN_BROWSER", Label: "Auto-Open Browser", LabelZh: "自动打开浏览器", Type: "select", Options: []string{"true", "false"},
 				Hint: "启动后自动在默认浏览器中打开 WebUI。"},
 		},
@@ -279,6 +254,20 @@ func (g *Gateway) handleSettingsCheck(w http.ResponseWriter, r *http.Request) {
 		apiOK = testLLMAPI(values["LLM_BASE_URL"], values["LLM_API_KEY"])
 	}
 
+	// 设计演化兼容：早期版本通过 .env 写 LLM_* 字段，现在通过 UI/Ledger KV
+	// 注册 Provider。只要任何一条路径配出可用模型，就视为已完成 setup，避免
+	// 用户在 UI 加了 Provider 后仍被首次配置 toast/卡片骚扰。
+	hasEnabledProvider := false
+	if g.providerReg != nil {
+		for _, p := range g.providerReg.List() {
+			if p.Enabled {
+				hasEnabledProvider = true
+				break
+			}
+		}
+	}
+	setupNeeded := (!envExists || !hasLLMURL || !hasLLMModel) && !hasEnabledProvider
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"env_exists":    envExists,
@@ -286,7 +275,7 @@ func (g *Gateway) handleSettingsCheck(w http.ResponseWriter, r *http.Request) {
 		"has_llm_url":   hasLLMURL,
 		"has_llm_model": hasLLMModel,
 		"api_ok":        apiOK,
-		"setup_needed":  !envExists || !hasLLMURL || !hasLLMModel,
+		"setup_needed":  setupNeeded,
 	})
 }
 

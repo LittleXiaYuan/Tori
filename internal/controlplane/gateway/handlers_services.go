@@ -26,7 +26,10 @@ func (g *Gateway) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 			Enabled  *bool `json:"enabled"`
 			Interval *int  `json:"interval_minutes"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON body")
+			return
+		}
 		if req.Enabled != nil {
 			g.heartbeat.SetEnabled(r.Context(), *req.Enabled)
 		}

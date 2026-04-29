@@ -118,10 +118,12 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				timeout = 10 * time.Minute
 			}
 
-			toolParentCtx := ctx
-			if tc.Function.Name == "generate_skill" {
-				toolParentCtx = context.Background()
-			}
+		toolParentCtx := ctx
+		if tc.Function.Name == "generate_skill" {
+			var gsCancel context.CancelFunc
+			toolParentCtx, gsCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+			defer gsCancel()
+		}
 
 			go func(toolParentCtx context.Context, timeout time.Duration, idx int, tc llm.ToolCall) {
 				defer func() {
@@ -482,13 +484,17 @@ func extractUserMessage(req PlanRequest) string {
 }
 
 // pruneToolResult applies progressive compression to tool outputs.
-// Earlier steps get compressed more aggressively to save context for later steps.
+// Later steps get more budget since they're closer to the final answer.
 func pruneToolResult(output string, stepNum int) string {
-	maxBytes := 8000
-	if stepNum > 3 {
-		maxBytes = 4000
-	}
-	if stepNum > 6 {
+	maxBytes := 12000
+	switch {
+	case stepNum <= 2:
+		maxBytes = 8000
+	case stepNum <= 5:
+		maxBytes = 5000
+	case stepNum <= 8:
+		maxBytes = 3000
+	default:
 		maxBytes = 2000
 	}
 	if len(output) <= maxBytes {

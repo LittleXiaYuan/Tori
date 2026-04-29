@@ -29,7 +29,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	}
 
 	env := p.buildEnv(req)
-	_ = env
+	_, ctxLayers := p.BuildMessages(ctx, req)
 
 	taskID := req.TaskID
 	if taskID == "" {
@@ -139,7 +139,7 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			}
 		}
 
-		result, err := skill.Execute(ctx, call.Args, p.buildEnv(req))
+		result, err := skill.Execute(ctx, call.Args, env)
 		dur := time.Since(t0)
 
 		if p.skillMetrics != nil {
@@ -212,10 +212,11 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	}
 
 	return &PlanResult{
-		Reply:      result.Answer,
-		SkillsUsed: usedSkills,
-		Steps:      result.TotalSteps,
-		Plan:       planSteps,
+		Reply:         result.Answer,
+		SkillsUsed:    usedSkills,
+		Steps:         result.TotalSteps,
+		Plan:          planSteps,
+		ContextLayers: ctxLayers,
 	}, nil
 }
 

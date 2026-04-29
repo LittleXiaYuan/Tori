@@ -260,7 +260,8 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 				}
 			}
 
-			return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			cleaned, nextMoves := extractNextMoves(cleaned)
+		return &PlanResult{Reply: cleaned, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers, Suggestions: nextMoves}, nil
 		}
 
 		// Execute tool calls in parallel

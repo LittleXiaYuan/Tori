@@ -161,15 +161,15 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			for _, item := range filtered.Items {
 				var prefix string
 				switch item.Source {
-			case "memory":
-				prefix = "## 记忆上下文\n" +
-					"以下是与当前对话相关的记忆片段。使用规则：\n" +
-					"- 如果记忆与用户问题直接相关，自然地融入回答中\n" +
-					"- 如果记忆是用户偏好，默默遵循即可，不要特意提及\n" +
-					"- 如果记忆与当前话题无关，完全忽略\n\n"
-			case "graph":
-				prefix = "## 知识图谱\n" +
-					"以下是相关的实体关系。仅在有助于回答时引用。\n\n"
+				case "memory":
+					prefix = "## 记忆上下文\n" +
+						"以下是与当前对话相关的记忆片段。使用规则：\n" +
+						"- 如果记忆与用户问题直接相关，自然地融入回答中\n" +
+						"- 如果记忆是用户偏好，默默遵循即可，不要特意提及\n" +
+						"- 如果记忆与当前话题无关，完全忽略\n\n"
+				case "graph":
+					prefix = "## 知识图谱\n" +
+						"以下是相关的实体关系。仅在有助于回答时引用。\n\n"
 				default:
 					prefix = ""
 				}

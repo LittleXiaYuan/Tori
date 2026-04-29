@@ -605,11 +605,14 @@ type OrchestratorStats struct {
 }
 
 func (o *Orchestrator) Stats(tenantID string) OrchestratorStats {
+	o.mu.RLock()
+	promoCount := len(o.promotionLog)
+	o.mu.RUnlock()
 	s := OrchestratorStats{
 		ShortCount: o.manager.Short.Count(tenantID),
 		MidCount:   o.manager.Mid.Count(tenantID),
 		LongCount:  o.manager.Long.Count(tenantID),
-		Promotions: len(o.promotionLog),
+		Promotions: promoCount,
 	}
 	if o.graph != nil {
 		gs := o.graph.Stats()

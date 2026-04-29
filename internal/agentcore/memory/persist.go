@@ -112,7 +112,6 @@ func (p *Persister) flush() {
 		p.mu.Unlock()
 		return
 	}
-	p.dirty = false
 	p.mu.Unlock()
 
 	snap := snapshot{
@@ -131,6 +130,10 @@ func (p *Persister) flush() {
 		slog.Error("memory persist write", "err", err)
 		return
 	}
+
+	p.mu.Lock()
+	p.dirty = false
+	p.mu.Unlock()
 	// Keep one backup of the previous version for crash safety
 	if _, statErr := os.Stat(p.path); statErr == nil {
 		bakPath := p.path + ".bak"

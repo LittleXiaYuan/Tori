@@ -124,6 +124,9 @@ func (s *StdioProvider) Stop() {
 
 // ListTools queries the MCP server for available tools.
 func (s *StdioProvider) ListTools(ctx context.Context) ([]Tool, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -147,6 +150,9 @@ func (s *StdioProvider) ListTools(ctx context.Context) ([]Tool, error) {
 
 // CallTool invokes a tool on the MCP server.
 func (s *StdioProvider) CallTool(ctx context.Context, name string, args map[string]any) (*CallResult, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
