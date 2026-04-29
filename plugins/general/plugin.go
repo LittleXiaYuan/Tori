@@ -65,6 +65,7 @@ func (p *GeneralPlugin) Skills() []skills.Skill {
 		NewImageGenSkill(),
 		NewBrowserSkill(),
 		NewFileWriteSkill(writeDirs),
+		NewFileOpenSkill(readDirs),
 		NewZipPackSkill(readDirs, writeDirs),
 		NewZipUnpackSkill(readDirs, writeDirs),
 		p.docxSkill(writeDirs),
