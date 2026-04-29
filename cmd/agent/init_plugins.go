@@ -9,6 +9,7 @@ import (
 
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/task"
+	"yunque-agent/internal/config"
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/execution/sandbox"
@@ -49,11 +50,17 @@ func initPlugins(app *agentrt.App) error {
 	}
 	app.Set(agentrt.CompSearchReg, searchReg)
 
-	// Host paths for plugin file access
+	// Host paths for plugin file access — auto-discover user directories
+	// when not explicitly configured.
 	hostPaths := strings.Split(cfg.HostReadPaths, ",")
 	if len(hostPaths) == 1 && hostPaths[0] == "" {
-		cwd, _ := os.Getwd()
-		hostPaths = []string{cwd}
+		hostPaths = config.DefaultReadPaths()
+		if len(hostPaths) == 0 {
+			cwd, _ := os.Getwd()
+			hostPaths = []string{cwd}
+		} else {
+			slog.Info("file access: auto-discovered user directories", "paths", hostPaths)
+		}
 	}
 
 	// Python environment for Office skills (detect system Python or use Go fallback)
