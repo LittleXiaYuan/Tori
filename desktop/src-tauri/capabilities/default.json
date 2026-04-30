@@ -2,8 +2,20 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for Yunque Desktop. The Go sidecar is spawned directly via std::process so we can control CREATE_NEW_PROCESS_GROUP / CTRL_BREAK_EVENT for graceful shutdown; we therefore do NOT need shell:allow-spawn / shell:allow-execute permissions here.",
-  "windows": ["main"],
+  "windows": ["main", "floating-ball", "floating-panel", "selection-popup"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-outer-position",
+    "core:window:allow-is-visible",
+    "core:window:allow-set-position",
+    "core:window:allow-primary-monitor",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized"
   ]
 }

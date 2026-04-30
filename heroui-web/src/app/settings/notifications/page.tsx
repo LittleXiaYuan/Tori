@@ -103,10 +103,10 @@ export default function NotificationsPage() {
   const typeInfo = channelTypes.find(t => t.id === newType);
 
   return (
-    <div className="max-w-xl mx-auto py-8 px-4" style={{ background: "var(--yunque-bg)", minHeight: "100vh" }}>
+    <div className="max-w-xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold mb-1">通知渠道</h1>
+          <h2 className="text-lg font-semibold mb-1">通知渠道</h2>
           <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
             任务完成、研究报告生成等事件自动推送到你的消息平台
           </p>

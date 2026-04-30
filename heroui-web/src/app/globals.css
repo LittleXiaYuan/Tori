@@ -3,32 +3,43 @@
 @import "highlight.js/styles/github-dark-dimmed.css";
 
 /* ═══════════════════════════════════════════════
-   云雀 Agent Design Token System v3
-   8pt grid · 3-layer surface · strict typography
-   Responsive: 375 / 768 / 1024 / 1440
+   云雀 Agent Design Token System v5 (Liquid Glass)
+   macOS Vibrancy / Win11 Acrylic 平台原生模糊 + CSS 玻璃层
+   暗色与浅色都呈现真正的"液态玻璃"质感（Tauri 端配套）
    ═══════════════════════════════════════════════ */
 
 :root {
   /* ── Font ─────────────────────────────────── */
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* ── Surface layers (frosted glass depth) ── */
-  --yunque-bg:          #09090b;
-  --yunque-sidebar:     rgba(14,14,18,0.82);
-  --yunque-card:        rgba(20,20,24,0.65);
-  --yunque-card-hover:  rgba(28,28,34,0.72);
-  --yunque-surface-2:   rgba(32,32,40,0.6);
-  --yunque-surface-3:   rgba(40,40,50,0.55);
-  --yunque-elevated:    rgba(44,44,54,0.7);
-  --yunque-bg-surface:  rgba(20,20,24,0.65);
+  /* ── Surfaces (默认暗色：实底为主，仅顶层弹层用毛玻璃) ── */
+  --yunque-bg:          #0a0a0c;
+  --yunque-sidebar:     #0f0f12;
+  --yunque-card:        #14141a;
+  --yunque-card-hover:  #1a1a22;
+  --yunque-surface-2:   #1c1c24;
+  --yunque-surface-3:   #24242e;
+  --yunque-elevated:    #2a2a35;
+  --yunque-bg-surface:  #14141a;
   --yunque-bg-muted:    rgba(255,255,255,0.04);
 
-  /* ── Borders (subtle glass edges) ────────── */
-  --yunque-border:        rgba(255,255,255,0.08);
-  --yunque-border-strong: rgba(255,255,255,0.15);
+  /* ── Borders ────────────────────────────── */
+  --yunque-border:        rgba(255,255,255,0.07);
+  --yunque-border-strong: rgba(255,255,255,0.14);
   --yunque-border-focus:  rgba(59,130,246,0.5);
-  --yunque-glass-blur:    12px;
-  --yunque-glass-saturate: 1.3;
+
+  /* ── Liquid glass（暗色：系统级模糊已经提供，CSS 只补色 + 微模糊 + 边缘高光）
+     系统层负责强模糊；CSS 层只做 ~18px 二次模糊避免双倍渲染开销。
+     alpha 比 v4 略低，让 vibrancy 透色更明显，玻璃感更强。 ── */
+  --yunque-glass-blur:     18px;
+  --yunque-glass-saturate: 1.4;
+  --glass-card:    rgba(20, 20, 26, 0.55);
+  --glass-sidebar: rgba(15, 15, 20, 0.50);
+  --glass-flyout:  rgba(20, 20, 26, 0.72);
+  --glass-overlay: rgba(0, 0, 0, 0.45);
+  --glass-edge:    rgba(255, 255, 255, 0.10);
+  --glass-edge-strong: rgba(255, 255, 255, 0.18);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   /* ── Text hierarchy ──────────────────────── */
   --yunque-text:           #f4f4f5;
@@ -36,12 +47,17 @@
   --yunque-text-muted:     #63636e;
   --yunque-text-disabled:  #3f3f46;
 
-  /* ── Brand ────────────────────────────────── */
+  /* ── Brand (颜色由 theme-engine 动态覆盖) ── */
   --yunque-accent:       #3b82f6;
   --yunque-accent-hover: #2563eb;
   --yunque-accent-muted: rgba(59,130,246,0.12);
   --yunque-accent-soft:  rgba(59,130,246,0.06);
   --yunque-accent-glow:  rgba(59,130,246,0.15);
+
+  /* ── Neutral Strong (黑/白 中性强调，竞品风的 Active 徽章/用户消息) ── */
+  --neutral-strong-bg:   #f4f4f5;   /* 暗色：浅色按钮 */
+  --neutral-strong-fg:   #0a0a0c;
+  --neutral-strong-hover: #e4e4e7;
 
   /* ── Semantic ─────────────────────────────── */
   --yunque-success:       #22c55e;
@@ -53,7 +69,7 @@
   --yunque-info:          #06b6d4;
   --yunque-info-muted:    rgba(6,182,212,0.12);
 
-  /* ── Spacing (4px base, 8pt rhythm) ──────── */
+  /* ── Spacing ──────────────────────────────── */
   --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
   --sp-5: 20px;  --sp-6: 24px;  --sp-8: 32px;  --sp-10: 40px;
   --sp-12: 48px; --sp-16: 64px;
@@ -67,29 +83,31 @@
   --card-pad-sm:   16px;
   --sidebar-w:     216px;
   --sidebar-mini-w: 52px;
+  --rail-w:        64px;       /* 新：账号栏（最左）宽度 */
+  --conv-rail-w:   272px;      /* 新：会话中栏建议宽度 */
 
-  /* ── Typography scale ────────────────────── */
-  --text-2xs: 0.6875rem;  /* 11px */
-  --text-xs:  0.75rem;    /* 12px */
-  --text-sm:  0.8125rem;  /* 13px */
-  --text-base: 0.875rem;  /* 14px */
-  --text-md:  0.9375rem;  /* 15px */
-  --text-lg:  1.0625rem;  /* 17px */
-  --text-xl:  1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-kpi: 2rem;       /* 32px */
-  --text-kpi-lg: 2.5rem;  /* 40px */
+  /* ── Typography ─────────────────────────── */
+  --text-2xs: 0.6875rem;
+  --text-xs:  0.75rem;
+  --text-sm:  0.8125rem;
+  --text-base: 0.875rem;
+  --text-md:  0.9375rem;
+  --text-lg:  1.0625rem;
+  --text-xl:  1.25rem;
+  --text-2xl: 1.5rem;
+  --text-kpi: 2rem;
+  --text-kpi-lg: 2.5rem;
 
-  /* ── Border radius ─────────────────────── */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* ── Border radius (略放大，向 macOS 靠拢) ── */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
 
-  /* ── Shadows (minimal — cards use borders, not shadows) ── */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.15);
-  --shadow-md: 0 2px 6px rgba(0,0,0,0.1);
-  --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+  /* ── Shadows (柔和宽散) ── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.20);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.30);
   --shadow-card: none;
   --shadow-glow: 0 0 20px var(--yunque-accent-glow);
 
@@ -102,38 +120,73 @@
   --duration-base: 200ms;
 }
 
+/* ── 亮色：纯白底，无毛玻璃，宽柔和阴影（竞品风） ── */
 [data-theme="light"], .light {
-  --yunque-bg:          #f8f9fb;
-  --yunque-sidebar:     rgba(240,241,244,0.85);
-  --yunque-card:        rgba(255,255,255,0.72);
-  --yunque-card-hover:  rgba(245,246,248,0.78);
-  --yunque-surface-2:   rgba(238,240,243,0.65);
-  --yunque-surface-3:   rgba(228,230,234,0.6);
-  --yunque-elevated:    rgba(217,220,225,0.7);
-  --yunque-bg-surface:  rgba(255,255,255,0.72);
-  --yunque-bg-muted:    rgba(24,24,27,0.04);
-  --yunque-border:        rgba(0,0,0,0.07);
-  --yunque-border-strong: rgba(0,0,0,0.13);
+  --yunque-bg:          #ffffff;
+  --yunque-sidebar:     #fafafa;
+  --yunque-card:        #ffffff;
+  --yunque-card-hover:  #f4f4f5;
+  --yunque-surface-2:   #f4f4f5;
+  --yunque-surface-3:   #e4e4e7;
+  --yunque-elevated:    #ffffff;
+  --yunque-bg-surface:  #ffffff;
+  --yunque-bg-muted:    rgba(0,0,0,0.04);
+  --yunque-border:        rgba(0,0,0,0.08);
+  --yunque-border-strong: rgba(0,0,0,0.16);
   --yunque-text:           #18181b;
   --yunque-text-secondary: #52525b;
-  --yunque-text-muted:     #a1a1aa;
-  --yunque-text-disabled:  #d4d4d8;
-  --shadow-sm:          0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:          0 2px 6px rgba(0,0,0,0.06);
-  --shadow-lg:          0 4px 12px rgba(0,0,0,0.08);
-  --shadow-card:        none;
-  --yunque-glass-blur:    10px;
-  --yunque-glass-saturate: 1.2;
+  --yunque-text-muted:     #71717a;
+  --yunque-text-disabled:  #a1a1aa;
+
+  /* 中性强调：亮色下=纯黑（竞品的黑徽章） */
+  --neutral-strong-bg:   #18181b;
+  --neutral-strong-fg:   #ffffff;
+  --neutral-strong-hover: #27272a;
+
+  --shadow-sm:          0 1px 2px rgba(15,15,20,0.04);
+  --shadow-md:          0 4px 14px rgba(15,15,20,0.06);
+  --shadow-lg:          0 16px 40px rgba(15,15,20,0.10);
+  --shadow-card:        0 1px 2px rgba(15,15,20,0.04);
+
+  /* ── Liquid glass（浅色：白色玻璃 + 高饱和 + 强边缘高光，iOS 风） ── */
+  --yunque-glass-blur:     16px;
+  --yunque-glass-saturate: 1.8;
+  --glass-card:    rgba(255, 255, 255, 0.55);
+  --glass-sidebar: rgba(250, 250, 251, 0.55);
+  --glass-flyout:  rgba(255, 255, 255, 0.72);
+  --glass-overlay: rgba(255, 255, 255, 0.30);
+  --glass-edge:    rgba(255, 255, 255, 0.65);
+  --glass-edge-strong: rgba(255, 255, 255, 0.85);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: 1.6;
-  background: var(--yunque-bg);
+  /* 透明：必要！Tauri 平台原生窗口效果（macOS NSVisualEffectView vibrancy /
+     Win11 Mica）通过 DWM/AppKit 渲染在 webview 之下，要求客户区是透明的，
+     否则系统层染色/模糊会被 webview 的不透明背景挡住。
+     - macOS：vibrancy 透出真液态玻璃。
+     - Win11：Mica 透出壁纸色温（不模糊不斑驳）。
+     - Win10/Linux：没有系统级材质，会暴露桌面壁纸；这是当前已知的兜底缺口，
+       后续可在 lib.rs 里按 OS 版本动态调用 webview.set_background_color 兜底。
+     `#bg-overlay` 提供品牌色微光渐变避免纯透明导致的"裸壁纸"突兀感。 */
+  background: transparent;
   color: var(--yunque-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#bg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 600px at 12% 10%, var(--yunque-accent-glow, rgba(59, 130, 246, 0.10)), transparent 60%),
+    radial-gradient(800px 500px at 88% 80%, rgba(168, 85, 247, 0.08), transparent 60%),
+    radial-gradient(700px 600px at 50% 50%, rgba(45, 212, 191, 0.05), transparent 65%);
 }
 
 /* Enforce minimum readable sizes for Tailwind arbitrary classes */
@@ -168,6 +221,10 @@ body {
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(16px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes widget-open {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes online-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
@@ -311,10 +368,10 @@ body {
 }
 
 [data-slot="base"][class*="card"], .card {
-  background: var(--yunque-card) !important;
-  border: 1px solid var(--yunque-border) !important;
+  background: var(--glass-card, var(--yunque-card)) !important;
+  border: 1px solid var(--glass-edge, var(--yunque-border)) !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: none !important;
+  box-shadow: var(--glass-inner-highlight, none), var(--shadow-sm) !important;
   backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate)) !important;
   -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate)) !important;
 }
@@ -335,15 +392,15 @@ button, [role="button"] { border-radius: var(--radius-md); }
   max-width: var(--page-max);
   margin: 0 auto;
   width: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
   height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--section-gap);
-  background: var(--yunque-bg);
+  background: transparent;
 }
 .page-root-full {
   padding: 0;
@@ -351,7 +408,7 @@ button, [role="button"] { border-radius: var(--radius-md); }
   overflow: hidden;
   height: 100vh;
   box-sizing: border-box;
-  background: var(--yunque-bg);
+  background: transparent;
 }
 
 .page-header {
@@ -374,7 +431,221 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 
 /* ═══════════════════════════════════════════════
-   Sidebar
+   AccountRail —— v4 极窄左侧栏（替代旧 Sidebar）
+   ═══════════════════════════════════════════════ */
+
+.account-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  width: var(--rail-w);
+  height: 100vh;
+  height: 100dvh;
+  padding: 8px 0 12px;
+  -webkit-app-region: drag;
+  background: var(--glass-sidebar, var(--yunque-sidebar));
+  border-right: 1px solid var(--glass-edge, var(--yunque-border));
+  box-shadow: var(--glass-inner-highlight, none);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  z-index: 40;
+}
+
+.account-rail-top,
+.account-rail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-rail-avatar-wrap {
+  -webkit-app-region: no-drag;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.account-rail-avatar-wrap:hover {
+  transform: translateY(-1px);
+}
+
+.account-rail-btn {
+  -webkit-app-region: no-drag;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--yunque-text-muted) !important;
+  background: transparent !important;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+.account-rail-btn:hover {
+  background: var(--yunque-bg-muted) !important;
+  color: var(--yunque-text) !important;
+}
+.account-rail-btn[data-active="true"] {
+  background: var(--neutral-strong-bg) !important;
+  color: var(--neutral-strong-fg) !important;
+}
+.account-rail-btn[data-active="true"]:hover {
+  background: var(--neutral-strong-hover) !important;
+  color: var(--neutral-strong-fg) !important;
+}
+.account-rail-btn--danger:hover {
+  color: var(--yunque-danger) !important;
+}
+
+/* 原生 <button> 版本（用于 More 触发器）：HeroUI Button 自带居中，原生 button
+   需要显式 flex 才能让内部 svg 图标垂直/水平居中，否则会偏左上。 */
+.account-rail-btn--more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.account-rail-btn--more:focus-visible {
+  outline: 2px solid var(--yunque-accent);
+  outline-offset: 2px;
+}
+
+.account-rail-divider {
+  width: 28px;
+  height: 1px;
+  background: var(--yunque-border);
+  margin: 4px 0;
+}
+
+/* ── AccountRail Flyout（点击/hover 弹出浮卡，方案 A）─────────────── */
+
+.account-rail-flyout {
+  position: fixed;
+  top: 0; /* 由内联 style 根据触发器位置动态覆盖 */
+  left: calc(var(--rail-w) + 8px);
+  max-height: min(560px, 80vh);
+  width: 288px;
+  background: var(--glass-flyout, var(--yunque-sidebar));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
+  border-radius: var(--radius-lg, 12px);
+  box-shadow:
+    var(--glass-inner-highlight, none),
+    0 12px 32px -6px rgba(0, 0, 0, 0.32),
+    0 4px 12px -4px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  z-index: 39;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-8px) scale(0.96);
+  transform-origin: left center;
+  transition:
+    opacity 0.16s ease-out,
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.account-rail-flyout[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scale(1);
+}
+
+.account-rail-flyout-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--yunque-border);
+  flex-shrink: 0;
+}
+.account-rail-flyout-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--yunque-text);
+}
+.account-rail-flyout-hint {
+  margin-top: 4px;
+  font-size: var(--text-2xs);
+  color: var(--yunque-text-muted);
+}
+
+.account-rail-flyout-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 8px 16px;
+}
+.account-rail-flyout-group {
+  margin-top: 12px;
+}
+.account-rail-flyout-group:first-child {
+  margin-top: 4px;
+}
+.account-rail-flyout-group-title {
+  padding: 4px 8px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--yunque-text-muted);
+  text-transform: uppercase;
+}
+.account-rail-flyout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+.account-rail-flyout-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--yunque-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+.account-rail-flyout-item:hover {
+  background: var(--yunque-bg-muted);
+}
+.account-rail-flyout-item[data-active="true"] {
+  background: var(--neutral-strong-bg);
+  color: var(--neutral-strong-fg);
+}
+.account-rail-flyout-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--yunque-text-muted);
+}
+.account-rail-flyout-item[data-active="true"] .account-rail-flyout-item-icon {
+  color: inherit;
+}
+.account-rail-flyout-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════
+   Sidebar (legacy — kept for any page that still imports it)
    ═══════════════════════════════════════════════ */
 
 .sidebar {
@@ -383,10 +654,11 @@ button, [role="button"] { border-radius: var(--radius-md); }
   height: 100vh;
   flex-shrink: 0;
   width: var(--sidebar-w);
-  background: var(--yunque-sidebar);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border-right: 1px solid var(--yunque-border);
+  background: var(--glass-sidebar, var(--yunque-sidebar));
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  border-right: 1px solid var(--glass-edge, var(--yunque-border));
+  box-shadow: var(--glass-inner-highlight, none);
   transition: transform var(--duration-base) var(--ease-out), width var(--duration-base) var(--ease-out);
   z-index: 40;
 }
@@ -414,58 +686,46 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 
 /* Drill-down container */
-.sidebar-nav-container {
+.sidebar-nav-scroll {
   flex: 1;
   min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.sidebar-panel {
-  position: absolute;
-  inset: 0;
   overflow-y: auto;
   padding-bottom: 8px;
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
-  will-change: transform, opacity;
 }
-.sidebar-panel:not(.sidebar-panel-sub) {
-  transform: translateX(0);
-  opacity: 1;
+.sidebar-group {
+  margin-bottom: 2px;
 }
-.sidebar-panel:not(.sidebar-panel-sub)[data-hidden="true"] {
-  transform: translateX(-30%);
-  opacity: 0;
-  pointer-events: none;
-}
-.sidebar-panel-sub {
-  transform: translateX(100%);
-  opacity: 0;
-  pointer-events: none;
-}
-.sidebar-panel-sub[data-active="true"] {
-  transform: translateX(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sidebar-back-btn {
+.sidebar-group-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 12px;
-  font-size: var(--text-base);
-  color: var(--yunque-text-secondary);
+  padding: 7px 10px;
+  font-size: var(--text-sm);
+  color: var(--yunque-text-muted);
   background: none;
   border: none;
-  border-bottom: 1px solid var(--yunque-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: color var(--duration-fast) ease, background var(--duration-fast) ease;
+  transition: color 0.15s ease, background 0.15s ease;
+  text-align: left;
 }
-.sidebar-back-btn:hover {
-  color: var(--yunque-text);
+.sidebar-group-header:hover {
+  color: var(--yunque-text-secondary);
   background: rgba(255,255,255,0.03);
+}
+.sidebar-group-header[data-active] {
+  color: var(--yunque-text);
+}
+.sidebar-group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px 0;
+}
+.sidebar-link-child {
+  padding-left: 32px !important;
+  font-size: var(--text-xs) !important;
 }
 
 .sidebar-inbox-btn {
@@ -609,11 +869,11 @@ button, [role="button"] { border-radius: var(--radius-md); }
    ═══════════════════════════════════════════════ */
 
 .section-card {
-  background: var(--yunque-card);
-  border: 1px solid var(--yunque-border);
+  background: var(--glass-card, var(--yunque-card));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
   border-radius: var(--radius-lg);
   padding: var(--card-pad);
-  box-shadow: none;
+  box-shadow: var(--glass-inner-highlight, none), var(--shadow-sm);
   backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   transition: border-color var(--duration-base) ease, background-color var(--duration-base) ease;
@@ -1135,6 +1395,66 @@ button, [role="button"] { border-radius: var(--radius-md); }
 }
 .config-grid [data-rac] { font-size: var(--text-sm); }
 
+/* Settings page: unified tabs layout（药丸滑动指示器） */
+.settings-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--glass-card, var(--yunque-card));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  margin-bottom: var(--sp-5);
+  overflow-x: auto;
+  isolation: isolate;
+}
+.settings-tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: var(--radius-md);
+  background: var(--yunque-accent-muted);
+  transition:
+    transform 0.36s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+.settings-tab-indicator[data-ready] {
+  opacity: 1;
+}
+.settings-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: var(--text-sm);
+  color: var(--yunque-text-muted);
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.18s ease, font-weight 0.18s ease;
+}
+.settings-tab:hover {
+  color: var(--yunque-text-secondary);
+}
+.settings-tab[data-active] {
+  color: var(--yunque-text);
+  font-weight: 500;
+}
+.settings-tab-content {
+  min-height: 400px;
+}
+
 /* Settings page: sidebar + content layout */
 .settings-layout {
   display: grid;
@@ -1151,8 +1471,10 @@ button, [role="button"] { border-radius: var(--radius-md); }
   align-self: start;
   padding: var(--sp-2);
   border-radius: var(--radius-lg);
-  background: var(--yunque-card);
-  border: 1px solid var(--yunque-border);
+  background: var(--glass-card, var(--yunque-card));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
 }
 .settings-nav-item {
   display: flex;
@@ -1201,10 +1523,10 @@ button, [role="button"] { border-radius: var(--radius-md); }
 .settings-content {
   padding: var(--card-pad);
   border-radius: var(--radius-lg);
-  background: var(--yunque-card);
+  background: var(--glass-card, var(--yunque-card));
   backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
-  border: 1px solid var(--yunque-border);
+  border: 1px solid var(--glass-edge, var(--yunque-border));
   min-height: 300px;
   overflow-y: auto;
 }
@@ -1364,16 +1686,20 @@ button, [role="button"] { border-radius: var(--radius-md); }
   width: 560px;
   max-width: calc(100vw - 32px);
   max-height: min(480px, 60vh);
-  background: var(--yunque-card);
-  border: 1px solid var(--yunque-border-strong);
+  background: var(--glass-flyout, var(--yunque-elevated));
+  border: 1px solid var(--glass-edge, var(--yunque-border-strong));
   border-radius: var(--radius-xl);
-  box-shadow: 0 24px 48px rgba(0,0,0,0.3);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: var(--glass-inner-highlight, none), var(--shadow-lg);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: scale-up var(--duration-normal) ease;
+}
+.cmd-palette[data-mode="browse"] {
+  width: 720px;
+  max-height: min(560px, 70vh);
 }
 @keyframes scale-up {
   from { transform: scale(0.96); opacity: 0; }
@@ -1452,6 +1778,60 @@ button, [role="button"] { border-radius: var(--radius-md); }
   padding: 24px;
   font-size: var(--text-sm);
   color: var(--yunque-text-muted);
+}
+
+/* ── Command palette: browse mode (no query) ── */
+.cmd-browse {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px 8px;
+}
+.cmd-browse-group {
+  margin-bottom: 18px;
+}
+.cmd-browse-group-title {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--yunque-text-muted);
+  margin: 0 0 8px 4px;
+}
+.cmd-browse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.cmd-browse-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--yunque-bg-muted);
+  border: 1px solid transparent;
+  color: var(--yunque-text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out);
+}
+.cmd-browse-tile:hover {
+  background: var(--neutral-strong-bg);
+  color: var(--neutral-strong-fg);
+  transform: translateY(-1px);
+}
+.cmd-browse-tile-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.cmd-browse-tile-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cmd-footer {
   display: flex;
@@ -1706,10 +2086,12 @@ button, [role="button"] { border-radius: var(--radius-md); }
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--yunque-bg);
-  border: 1px solid var(--yunque-border);
+  background: var(--glass-card, var(--yunque-bg));
+  border: 1px solid var(--glass-edge, var(--yunque-border));
   border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--glass-inner-highlight, none), 0 24px 48px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   max-height: 85vh;
   overflow: hidden;
   animation: cherryCardIn 0.25s ease forwards;
@@ -1773,9 +2155,11 @@ button, [role="button"] { border-radius: var(--radius-md); }
   bottom: 0;
   display: flex;
   flex-direction: column;
-  background: var(--yunque-card);
-  border-left: 1px solid var(--yunque-border);
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
+  background: var(--glass-card, var(--yunque-card));
+  border-left: 1px solid var(--glass-edge, var(--yunque-border));
+  box-shadow: var(--glass-inner-highlight, none), -8px 0 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
   animation: cherryDrawerIn 0.25s ease forwards;
 }
 .cherry-drawer-right { right: 0; }
@@ -1808,38 +2192,41 @@ button, [role="button"] { border-radius: var(--radius-md); }
   padding: 16px 20px;
 }
 
-/* ── Cherry Settings Modal ─────────────────── */
+/* ── Cherry Settings Modal (v4 分屏式) ───────── */
 .cherry-settings-layout,
 .cherry-settings {
   display: flex;
   gap: 0;
-  height: 60vh;
-  min-height: 380px;
+  height: 70vh;
+  min-height: 480px;
 }
 .cherry-settings-nav {
-  width: 180px;
+  width: 200px;
   flex-shrink: 0;
-  border-right: 1px solid var(--yunque-border);
-  padding: 12px 8px;
+  border-right: 1px solid var(--glass-edge, var(--yunque-border));
+  padding: 16px 10px;
   overflow-y: auto;
-  background: var(--yunque-bg);
+  background: var(--glass-sidebar, var(--yunque-sidebar));
 }
 .cherry-settings-nav-group {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   color: var(--yunque-text-muted);
-  padding: 12px 12px 4px;
+  padding: 14px 12px 6px;
+}
+.cherry-settings-nav-group:first-child {
+  padding-top: 4px;
 }
 .cherry-settings-nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--yunque-text-secondary, var(--yunque-text-muted));
   font-size: 13px;
@@ -1848,18 +2235,20 @@ button, [role="button"] { border-radius: var(--radius-md); }
   text-align: left;
 }
 .cherry-settings-nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--yunque-bg-muted);
   color: var(--yunque-text);
 }
+.cherry-settings-nav-item.active,
 .cherry-settings-nav-item[data-active="true"] {
-  background: rgba(0, 111, 238, 0.1);
-  color: var(--yunque-accent);
+  background: var(--neutral-strong-bg);
+  color: var(--neutral-strong-fg);
+  font-weight: 500;
 }
 .cherry-settings-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
-  background: var(--yunque-bg);
+  padding: 28px 32px;
+  background: transparent;
 }
 .cherry-settings-title {
   font-size: 17px;
@@ -1920,4 +2309,72 @@ button, [role="button"] { border-radius: var(--radius-md); }
   background: rgba(255, 255, 255, 0.05);
   color: var(--yunque-text);
   border-color: rgba(255, 255, 255, 0.15);
+}
+
+.model-selector-listbox [role="option"] {
+  padding: 6px 10px !important;
+  min-height: 0 !important;
+  border-radius: 8px;
+}
+
+/* ── Custom Title Bar (traffic-light) ──────────────────────────── */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: var(--rail-w, 64px);
+  right: 0;
+  height: 32px;
+  z-index: 9999;
+  -webkit-app-region: drag;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 非全屏页面（如知识库/智体/设置等）给顶部留出拖拽区间距 */
+.page-header {
+  padding-top: 6px;
+}
+.window-controls {
+  display: flex;
+  gap: 7px;
+  padding: 2px 0;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.window-controls:hover { opacity: 1; }
+.window-controls .ctl {
+  -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: filter 0.15s;
+  color: rgba(0, 0, 0, 0.55);
+}
+.window-controls .ctl svg { width: 6px; height: 6px; }
+.window-controls .ctl-close     { background: #ff5f57; }
+.window-controls .ctl-minimize  { background: #febc2e; }
+.window-controls .ctl-maximize  { background: #28c840; }
+.window-controls .ctl:hover     { filter: brightness(0.88); }
+.window-controls .ctl:active    { filter: brightness(0.76); }
+
+[data-theme="light"] .window-controls .ctl {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* macOS: native traffic lights need top padding in sidebar */
+html[data-platform="macos"] .account-rail {
+  padding-top: 38px;
+}
+html[data-platform="macos"] .titlebar-drag {
+  left: 80px;
 }

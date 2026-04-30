@@ -111,6 +111,7 @@ type Gateway struct {
 	orchestrator   *memory.Orchestrator
 	pipeline       *memory.Pipeline
 	knowledgeStore *knowledge.Store
+	wikiStore      *knowledge.WikiStore
 	knowledgeDir   string
 	embedResolver  *embeddings.Resolver
 	identityRes    *identity.Resolver

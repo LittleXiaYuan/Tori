@@ -13,6 +13,7 @@ import (
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/i18n"
 	"yunque-agent/internal/agentcore/knowledge"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/models"
 	"yunque-agent/internal/agentcore/notify"
@@ -96,6 +97,22 @@ func initTasks(app *agentrt.App) error {
 	}
 	gw.SetPasswordStore(passwordStore)
 	app.Set(agentrt.CompGateway, gw)
+
+	if v, ok := app.Get("lora_scheduler"); ok {
+		if s, ok := v.(*localbrain.LoRAScheduler); ok {
+			gw.SetLoRAScheduler(s)
+		}
+	}
+	if v, ok := app.Get("training_metrics"); ok {
+		if m, ok := v.(*localbrain.TrainingMetrics); ok {
+			gw.SetTrainingMetrics(m)
+		}
+	}
+	if v, ok := app.Get("evolution_coordinator"); ok {
+		if ec, ok := v.(*localbrain.EvolutionCoordinator); ok {
+			gw.SetEvolutionCoordinator(ec)
+		}
+	}
 
 	// ── Phase 3: Perception (Identity/Emotion/Speech/Embeddings) ──
 	perception, err := initPerceptionWiring(app, gw)

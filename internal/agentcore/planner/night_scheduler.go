@@ -26,15 +26,24 @@ type LoRAHook interface {
 //  2. Event log compaction
 //  3. Training data export to JSONL
 //  4. LoRA training trigger (if hook is set)
+// DreamHook runs cross-conversation pattern recognition during night cycle.
+type DreamHook interface {
+	RunDreams(ctx context.Context, tenantID string) error
+}
+
 type NightScheduler struct {
 	ledger    *ldg.Ledger
 	outputDir string // directory for exported JSONL files
 	tenantIDs func() []string
-	loraHook  LoRAHook // optional: trigger LoRA training after export
+	loraHook  LoRAHook  // optional: trigger LoRA training after export
+	dreamHook DreamHook // optional: cross-conversation pattern recognition
 }
 
 // SetLoRAHook attaches a LoRA training trigger (called after JSONL export).
 func (ns *NightScheduler) SetLoRAHook(hook LoRAHook) { ns.loraHook = hook }
+
+// SetDreamHook attaches a dream consolidation hook for cross-conversation pattern recognition.
+func (ns *NightScheduler) SetDreamHook(hook DreamHook) { ns.dreamHook = hook }
 
 // NightSchedulerConfig configures the nighttime batch processor.
 type NightSchedulerConfig struct {
@@ -152,6 +161,17 @@ func (ns *NightScheduler) runForTenant(ctx context.Context, tenantID string) Nig
 				result.Error += "; "
 			}
 			result.Error += fmt.Sprintf("lora: %v", err)
+		}
+	}
+
+	// Phase 5: Dream consolidation (cross-conversation pattern recognition)
+	if ns.dreamHook != nil {
+		if err := ns.dreamHook.RunDreams(ctx, tenantID); err != nil {
+			slog.Warn("night_scheduler: dreams failed", "tenant", tenantID, "err", err)
+			if result.Error != "" {
+				result.Error += "; "
+			}
+			result.Error += fmt.Sprintf("dreams: %v", err)
 		}
 	}
 

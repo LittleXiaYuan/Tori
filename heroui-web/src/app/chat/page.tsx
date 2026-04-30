@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useReducer, useRef, useCallback, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Avatar, Spinner, Tooltip, Chip, Dropdown, Label, Popover } from "@heroui/react";
 import {
   Send, Plus, MessageCircle, Zap, BookOpen, ScanFace, Package,
@@ -10,7 +10,7 @@ import {
   Paperclip, ImageIcon, Trash2, Volume2, Pin, Archive,
   PanelRightOpen, PanelRightClose, VolumeX, ArchiveRestore, Edit3, Heart,
   PinOff, MoreHorizontal, Monitor, AlertTriangle, Plug,
-  ArrowRight, Blocks,
+  ArrowRight, Blocks, Maximize2, Minimize2,
 } from "lucide-react";
 import { api, type ConversationInfo, type EmotionResult, type StickerSuggestion, type PresetInfo, type SkillInfo } from "@/lib/api";
 import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
@@ -510,15 +510,21 @@ export default function ChatPage() {
       let buf = "";
       let currentEvent = "";
       let streamFinished = false;
-      const IDLE_TIMEOUT = 180_000;
+      const IDLE_TIMEOUT = 60_000;
 
       while (!streamFinished) {
         let timerId: ReturnType<typeof setTimeout> | null = null;
+        let timedOut = false;
         const timeout = new Promise<{ done: true; value: undefined }>((resolve) => {
-          timerId = setTimeout(() => resolve({ done: true, value: undefined }), IDLE_TIMEOUT);
+          timerId = setTimeout(() => { timedOut = true; resolve({ done: true, value: undefined }); }, IDLE_TIMEOUT);
         });
         const { done, value } = await Promise.race([reader.read(), timeout]);
         if (timerId) clearTimeout(timerId);
+        if (timedOut) {
+          chatD({ type: "ERROR_LAST", error: "响应超时（60s 无数据），模型可能暂时不可用。点击下方「重新发送」按钮重试。" });
+          try { await reader.cancel(); } catch { /* ignore */ }
+          break;
+        }
         if (done || abort.signal.aborted) {
           if (!abort.signal.aborted) {
             try { await reader.cancel(); } catch { /* stream already closed */ }
@@ -761,6 +767,10 @@ export default function ChatPage() {
     focus_input: () => inputRef.current?.focus(),
     toggle_sidebar: () => setShowSidebar((v) => !v),
     toggle_computer: () => setShowComputer((v) => !v),
+    zen_mode: () => {
+      setShowSidebar(false);
+      window.dispatchEvent(new CustomEvent("yunque:zen-toggle"));
+    },
     screenshot_analyze: () => sendMessage("/screenshot Take a screenshot and analyze the current page."),
     copy_last: () => {
       const last = chat.messages.filter((m) => m.role === "assistant").pop();
@@ -770,6 +780,28 @@ export default function ChatPage() {
 
   useShortcuts(shortcutHandlers);
 
+  const searchParams = useSearchParams();
+  const qParamHandled = useRef(false);
+  useEffect(() => {
+    if (qParamHandled.current) return;
+    const q = searchParams.get("q");
+    if (q) {
+      qParamHandled.current = true;
+      chatD({ type: "SET_INPUT", value: q });
+      setTimeout(() => sendMessage(q), 300);
+      window.history.replaceState(null, "", "/chat");
+    }
+  }, [searchParams, sendMessage]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail) sendMessage(detail);
+    };
+    document.addEventListener("yunque:quick-send", handler);
+    return () => document.removeEventListener("yunque:quick-send", handler);
+  }, [sendMessage]);
+
   const thinkingOptions = [
     { key: "none" as const, label: "快速", icon: <Zap size={12} /> },
     { key: "auto" as const, label: "自动", icon: <Gauge size={12} /> },
@@ -777,8 +809,17 @@ export default function ChatPage() {
   ] as const;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--yunque-bg)" }}>
-      {showSidebar && (
+    <div className="flex h-screen overflow-hidden" style={{ background: "transparent" }}>
+      <div
+        className="chat-sidebar-wrap"
+        style={{
+          width: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
+          minWidth: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
+          opacity: showSidebar ? 1 : 0,
+          overflow: "hidden",
+          transition: "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.2s ease",
+        }}
+      >
         <ConversationSidebar
           conv={conv}
           dispatch={convD}
@@ -788,14 +829,19 @@ export default function ChatPage() {
           onManage={manageConversation}
           onDelete={deleteConversation}
         />
-      )}
+      </div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
         <header
-          className="flex items-center justify-between shrink-0 px-4 py-3 xl:px-5"
-          style={{ borderBottom: "1px solid var(--yunque-border)", background: "var(--yunque-sidebar)" }}
+          className="flex items-center justify-between shrink-0 px-4 py-2.5 xl:px-5"
+          style={{
+            borderBottom: chat.messages.length > 0 ? "1px solid var(--glass-edge, var(--yunque-border))" : "none",
+            background: chat.messages.length > 0 ? "var(--glass-sidebar, var(--yunque-sidebar))" : "transparent",
+            backdropFilter: chat.messages.length > 0 ? "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))" : "none",
+            WebkitBackdropFilter: chat.messages.length > 0 ? "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))" : "none",
+          }}
         >
           <div className="flex items-center gap-3">
             <button
@@ -807,24 +853,7 @@ export default function ChatPage() {
               <MessageCircle size={16} />
             </button>
 
-            {/* Model Selector + Mode Switcher */}
-            <ModelSelectorPopup
-              models={availableModels}
-              currentModelId={currentModelId}
-              currentModelLabel={currentModel || "选择模型"}
-              onSelect={(m) => {
-                setCurrentModel(m.model || m.display_name || m.id);
-                setCurrentModelId(m.id);
-                api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
-              }}
-              chatMode={chatMode}
-              onModeChange={(mode) => {
-                setChatMode(mode);
-                if (mode === "chat" && airiAvailable) setAiriMode(true);
-                else setAiriMode(false);
-              }}
-              airiAvailable={airiAvailable}
-            />
+            
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -871,26 +900,16 @@ export default function ChatPage() {
               </Tooltip>
             )}
 
-            {chatMode !== "chat" && (
-              <div className="flex items-center gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                {thinkingOptions.map(({ key, label, icon }) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setThinkingLevel(key);
-                      setThinkingEnabled(key === "deep" ? true : key === "none" ? false : null);
-                    }}
-                    className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-                    style={{
-                      background: thinkingLevel === key ? "var(--yunque-accent)" : "transparent",
-                      color: thinkingLevel === key ? "#fff" : "var(--yunque-text-muted)",
-                    }}
-                  >
-                    {icon} {label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly variant="ghost" size="sm" className="chat-tool-btn h-8 w-8 rounded-full"
+                onPress={() => shortcutHandlers.zen_mode()}
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                <Maximize2 size={14} />
+              </Button>
+              <Tooltip.Content>禅模式 (Ctrl+\)</Tooltip.Content>
+            </Tooltip>
 
           </div>
         </header>
@@ -926,7 +945,7 @@ export default function ChatPage() {
         {/* Chat Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto chat-scroll-area px-5 py-4 xl:px-6">
           {chat.messages.length === 0 ? (
-            <ChatEmptyState setupNeeded={setupNeeded} heroSkills={heroSkills} chatD={chatD} inputRef={inputRef} />
+            <ChatEmptyState setupNeeded={setupNeeded} heroSkills={heroSkills} chatD={chatD} inputRef={inputRef} onSend={sendMessage} />
           ) : (
             <ChatMessageList
               messages={chat.messages}
@@ -968,11 +987,13 @@ export default function ChatPage() {
               className="chat-input-wrap chat-composer rounded-[24px] overflow-visible transition-all"
               data-busy={chat.loading ? "true" : "false"}
               style={{
-                background: "linear-gradient(180deg, rgba(255,255,255,0.024), rgba(255,255,255,0.008)), var(--yunque-card)",
-                border: isDragging ? "1px dashed var(--yunque-accent)" : "1px solid var(--yunque-border)",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)), var(--glass-card, var(--yunque-card))",
+                border: isDragging ? "1px dashed var(--yunque-accent)" : "1px solid var(--glass-edge, var(--yunque-border))",
                 boxShadow: isDragging
                   ? "0 0 0 1px rgba(59,130,246,0.22), 0 14px 36px rgba(15,23,42,0.32)"
-                  : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.03)",
+                  : "0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)",
+                backdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
+                WebkitBackdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
               }}
             >
               {/* Frosted glass top bar — hidden in chat mode for simplicity */}
@@ -1113,6 +1134,28 @@ export default function ChatPage() {
                     />
                   </div>
                 </div>
+                <ModelSelectorPopup
+                  models={availableModels}
+                  currentModelId={currentModelId}
+                  currentModelLabel={currentModel || "选择模型"}
+                  onSelect={(m) => {
+                    setCurrentModel(m.model || m.display_name || m.id);
+                    setCurrentModelId(m.id);
+                    api.providerSessionOverride(m.id, conv.activeId || "default").catch(() => {});
+                  }}
+                  chatMode={chatMode}
+                  onModeChange={(mode) => {
+                    setChatMode(mode);
+                    if (mode === "chat" && airiAvailable) setAiriMode(true);
+                    else setAiriMode(false);
+                  }}
+                  airiAvailable={airiAvailable}
+                  thinkingLevel={thinkingLevel}
+                  onThinkingChange={(lvl) => {
+                    setThinkingLevel(lvl);
+                    setThinkingEnabled(lvl === "deep" ? true : lvl === "none" ? false : null);
+                  }}
+                />
                 <div className="hidden items-center gap-2 text-[10px] md:flex" style={{ color: "var(--yunque-text-muted)" }}>
                   <span>Enter 发送</span>
                   <span>·</span>

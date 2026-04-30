@@ -65,8 +65,12 @@ export function useChatInit(): ChatInitState {
 
   useEffect(() => {
     api.checkSetup().then((chk) => {
+      // TEMP 诊断：直接打印 setup_needed 字段，避免对象折叠看不到。
+      console.log("[chat-init] setup_needed =", chk.setup_needed, "full=", JSON.stringify(chk));
       setSetupNeeded(chk.setup_needed);
-    }).catch(() => {});
+    }).catch((e) => {
+      console.warn("[chat-init] checkSetup failed", e);
+    });
   }, []);
 
   useEffect(() => {

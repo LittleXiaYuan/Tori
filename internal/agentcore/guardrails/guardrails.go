@@ -13,11 +13,12 @@ import (
 
 // CheckResult captures the outcome of a guardrail check.
 type CheckResult struct {
-	Passed  bool     `json:"passed"`
-	Blocked bool     `json:"blocked"`
-	Warnings []string `json:"warnings,omitempty"`
-	Redacted string  `json:"redacted,omitempty"` // sanitized text
-	Rule    string   `json:"rule,omitempty"`
+	Passed        bool     `json:"passed"`
+	Blocked       bool     `json:"blocked"`
+	NeedsApproval bool     `json:"needs_approval,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+	Redacted      string   `json:"redacted,omitempty"`
+	Rule          string   `json:"rule,omitempty"`
 }
 
 // Guard is a single check in the guardrail pipeline.

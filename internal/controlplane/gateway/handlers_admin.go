@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,13 +10,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/task"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/sandbox"
-	"yunque-agent/internal/execution/scheduler"
 	"yunque-agent/pkg/plugin"
 )
 
@@ -213,8 +209,6 @@ func (g *Gateway) handlePluginToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atomically swap the skill set so in-flight requests never see an empty
-	// registry during the rebuild window.
 	g.registry.ReplaceAll(g.pluginReg.AllSkills())
 	g.planner.SetDomainPrompt(g.pluginReg.CombinedPrompt())
 	slog.Info("plugin toggled, skills rebuilt", "plugin", req.Name, "enabled", req.Enabled, "skills", len(g.registry.All()))
@@ -248,7 +242,6 @@ func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 		req.Language = "python"
 	}
 
-	// Sanitize plugin name (directory-safe)
 	safeName := sanitizePluginName(req.Name)
 	pluginDir := filepath.Join(g.pluginLoader.Dir(), safeName)
 	if _, err := os.Stat(pluginDir); err == nil {
@@ -260,7 +253,6 @@ func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write manifest
 	manifest := plugin.Manifest{
 		Name:         req.Name,
 		Description:  req.Description,
@@ -275,14 +267,12 @@ func (g *Gateway) handlePluginCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate full scaffold: handler + README + deps file
 	handlerName, handlerCode := pluginBoilerplate(req.Language, req.Name, req.Template)
 	if err := os.WriteFile(filepath.Join(pluginDir, handlerName), []byte(handlerCode), 0644); err != nil {
 		slog.Warn("write handler boilerplate failed", "err", err)
 	}
 	scaffoldPluginDir(pluginDir, req.Language, req.Name, req.Description)
 
-	// Hot-load the new plugin
 	g.pluginLoader.LoadAll()
 	g.rebuildSkillsFromPlugins()
 
@@ -340,7 +330,6 @@ func (g *Gateway) handlePluginDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prevent deleting built-in plugins
 	if name == "general" || name == "education" {
 		apperror.WriteCode(w, apperror.CodeInvalidField, "cannot delete built-in plugin")
 		return
@@ -378,11 +367,9 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		// List files
 		pluginDir := filepath.Join(g.pluginLoader.Dir(), sanitizePluginName(name))
 		entries, err := os.ReadDir(pluginDir)
 		if err != nil {
-			// Might be a built-in plugin with no directory
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{"files": []any{}, "builtin": true})
 			return
@@ -413,7 +400,6 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"files": files})
 
 	case http.MethodPut:
-		// Save file
 		var req struct {
 			Plugin  string `json:"plugin"`
 			File    string `json:"file"`
@@ -432,13 +418,11 @@ func (g *Gateway) handlePluginFiles(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeNotFound, "plugin not found")
 			return
 		}
-		// Prevent path traversal
 		safeFile := filepath.Base(req.File)
 		if err := os.WriteFile(filepath.Join(pluginDir, safeFile), []byte(req.Content), 0644); err != nil {
 			apperror.Write(w, apperror.Wrap(apperror.CodeInternal, "write file", err))
 			return
 		}
-		// Reload plugin
 		g.pluginLoader.LoadAll()
 		g.rebuildSkillsFromPlugins()
 		slog.Info("plugin file saved", "plugin", pluginName, "file", safeFile)
@@ -492,211 +476,10 @@ func (g *Gateway) handleSkillsScan(w http.ResponseWriter, r *http.Request) {
 	slog.Info("skills scanned via API", "count", count)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"status":      "scanned",
+		"status":       "scanned",
 		"skills_loaded": count,
-		"total_skills": len(g.registry.All()),
+		"total_skills":  len(g.registry.All()),
 	})
-}
-
-func (g *Gateway) handleSandboxExec(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	var req struct {
-		Command string   `json:"command"`
-		Args    []string `json:"args"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Command == "" {
-		apperror.WriteCode(w, apperror.CodeMissingField, "command is required")
-		return
-	}
-	sb, err := sandbox.New("", sandbox.DefaultPolicy())
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "sandbox init failed", err))
-		return
-	}
-	defer sb.Cleanup()
-	result, err := sb.Exec(r.Context(), req.Command, req.Args...)
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "sandbox exec failed", err))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
-}
-
-func (g *Gateway) handleSandboxProbe(w http.ResponseWriter, r *http.Request) {
-	result := map[string]any{
-		"sandbox_cloud_api_key_set": os.Getenv("SANDBOX_CLOUD_API_KEY") != "",
-		"sandbox_cloud_base_url_set": os.Getenv("SANDBOX_CLOUD_BASE_URL") != "",
-		"tori_api_base_url_set":      os.Getenv("TORI_API_BASE_URL") != "",
-		"llm_api_key_set":            os.Getenv("LLM_API_KEY") != "",
-	}
-
-	toriBase := strings.TrimSpace(os.Getenv("TORI_API_BASE_URL"))
-	if toriBase == "" {
-		toriBase = strings.TrimSpace(os.Getenv("SANDBOX_CLOUD_BASE_URL"))
-	}
-
-	if toriBase != "" {
-		trimmed := strings.TrimRight(toriBase, "/")
-		probeURL := trimmed + "/sandboxes/status"
-		if !strings.HasSuffix(trimmed, "/v1") {
-			probeURL = trimmed + "/v1/sandboxes/status"
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
-		if err == nil {
-			client := &http.Client{Timeout: 8 * time.Second}
-			resp, err := client.Do(req)
-			if err != nil {
-				result["probe_error"] = err.Error()
-			} else {
-				defer resp.Body.Close()
-				body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-				var probeResp map[string]any
-				if json.Unmarshal(body, &probeResp) == nil {
-					result["tori_sandbox_status"] = probeResp
-				} else {
-					result["tori_sandbox_raw"] = string(body)
-				}
-				result["probe_status_code"] = resp.StatusCode
-			}
-		}
-	} else {
-		result["probe_error"] = "no TORI_API_BASE_URL or SANDBOX_CLOUD_BASE_URL configured"
-	}
-
-	var source string
-	if os.Getenv("SANDBOX_CLOUD_API_KEY") != "" {
-		source = "env:SANDBOX_CLOUD_API_KEY"
-	} else if g.toriTokenStore != nil && g.toriTokenStore.IsBound() {
-		source = "tori_oauth_bound"
-	} else if toriBase != "" && os.Getenv("LLM_API_KEY") != "" {
-		source = "auto:TORI_API_BASE_URL+LLM_API_KEY"
-	} else {
-		source = "none"
-	}
-	result["key_source"] = source
-
-	g.desktopMu.Lock()
-	result["cloud_runner_ready"] = g.cloudRunner != nil
-	result["desktop_running"] = g.desktopSandbox != nil
-	g.desktopMu.Unlock()
-
-	writeJSON(w, result)
-}
-
-func (g *Gateway) handleDesktopCreate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
-		return
-	}
-	g.desktopMu.Lock()
-	defer g.desktopMu.Unlock()
-
-	if g.desktopSandbox != nil {
-		writeJSON(w, map[string]any{
-			"ok": true, "sandbox": g.desktopSandbox,
-			"message": "desktop sandbox already running",
-		})
-		return
-	}
-
-	if g.cloudRunner == nil {
-		cfg := sandbox.CloudConfig{
-			Enabled: true,
-			APIKey:  os.Getenv("SANDBOX_CLOUD_API_KEY"),
-			BaseURL: os.Getenv("SANDBOX_CLOUD_BASE_URL"),
-		}
-		if cfg.APIKey == "" && g.toriTokenStore != nil && g.toriTokenStore.IsBound() {
-			t := g.toriTokenStore.Get()
-			if t != nil && t.APIKey != "" {
-				cfg.APIKey = t.APIKey
-				if cfg.BaseURL == "" && t.ToriBaseURL != "" {
-					cfg.BaseURL = strings.TrimRight(t.ToriBaseURL, "/") + "/v1"
-				}
-			}
-		}
-		if cfg.APIKey == "" {
-			if toriBase := strings.TrimSpace(os.Getenv("TORI_API_BASE_URL")); toriBase != "" {
-				if llmKey := strings.TrimSpace(os.Getenv("LLM_API_KEY")); llmKey != "" {
-					cfg.APIKey = llmKey
-					trimmed := strings.TrimRight(toriBase, "/")
-					if strings.HasSuffix(trimmed, "/v1") {
-						cfg.BaseURL = trimmed
-					} else {
-						cfg.BaseURL = trimmed + "/v1"
-					}
-				}
-			}
-		}
-		if cfg.APIKey == "" {
-			apperror.WriteCode(w, apperror.CodeMissingField, "SANDBOX_CLOUD_API_KEY not configured and Tori not bound")
-			return
-		}
-		cr, err := sandbox.NewCloudRunner(cfg)
-		if err != nil {
-			apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "cloud runner init failed", err))
-			return
-		}
-		g.cloudRunner = cr
-	}
-
-	ds, err := g.cloudRunner.CreateDesktop(r.Context())
-	if err != nil {
-		apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "create desktop failed", err))
-		return
-	}
-	g.desktopSandbox = ds
-	writeJSON(w, map[string]any{"ok": true, "sandbox": ds})
-}
-
-func (g *Gateway) handleDesktopStatus(w http.ResponseWriter, r *http.Request) {
-	g.desktopMu.Lock()
-	ds := g.desktopSandbox
-	cr := g.cloudRunner
-	g.desktopMu.Unlock()
-
-	if ds == nil {
-		writeJSON(w, map[string]any{"ok": true, "running": false})
-		return
-	}
-
-	info := map[string]any{"ok": true, "running": true, "sandbox": ds}
-	if cr != nil {
-		status, err := cr.DesktopStatus(r.Context(), ds.ID)
-		if err != nil {
-			info["alive"] = false
-			info["error"] = err.Error()
-		} else {
-			info["alive"] = true
-			info["upstream"] = status
-		}
-	}
-	writeJSON(w, info)
-}
-
-func (g *Gateway) handleDesktopDestroy(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "DELETE or POST only")
-		return
-	}
-	g.desktopMu.Lock()
-	defer g.desktopMu.Unlock()
-
-	if g.desktopSandbox == nil {
-		writeJSON(w, map[string]any{"ok": true, "message": "no desktop sandbox running"})
-		return
-	}
-
-	if g.cloudRunner != nil {
-		_ = g.cloudRunner.DestroyDesktop(r.Context(), g.desktopSandbox.ID)
-	}
-	g.desktopSandbox = nil
-	writeJSON(w, map[string]any{"ok": true, "message": "desktop sandbox destroyed"})
 }
 
 func (g *Gateway) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
@@ -737,7 +520,6 @@ func (g *Gateway) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	// Authenticate via API Key to issue JWT
 	apiKey := r.Header.Get("X-API-Key")
 	if apiKey == "" {
 		auth := r.Header.Get("Authorization")
@@ -760,8 +542,6 @@ func (g *Gateway) handleTokenGenerate(w http.ResponseWriter, r *http.Request) {
 		req.Role = "user"
 	}
 
-	// Security: only allow "user" role via API Key token exchange.
-	// Admin tokens must be issued through a different mechanism.
 	allowedRoles := map[string]bool{"user": true, "viewer": true}
 	if !allowedRoles[req.Role] {
 		w.WriteHeader(http.StatusForbidden)
@@ -791,7 +571,6 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
 		return
 	}
-	// Max 32MB
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid multipart form")
@@ -810,7 +589,6 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Security: validate file extension to prevent dangerous uploads
 	ext := strings.ToLower(filepath.Ext(filename))
 	blockedExts := map[string]bool{
 		".exe": true, ".bat": true, ".cmd": true, ".com": true, ".msi": true,
@@ -828,7 +606,6 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store in sandbox workspace
 	tid := tenantFromCtx(r.Context())
 	sb, sbErr := sandbox.New("", sandbox.DefaultPolicy())
 	if sbErr != nil {
@@ -879,52 +656,4 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
-}
-
-func (g *Gateway) handleSchedulerJobs(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	jobs := g.scheduler.List()
-	json.NewEncoder(w).Encode(map[string]any{"jobs": jobs, "count": len(jobs)})
-}
-
-func (g *Gateway) handleSchedulerAdd(w http.ResponseWriter, r *http.Request) {
-	tid := tenantFromCtx(r.Context())
-	var req struct {
-		Name     string `json:"name"`
-		Prompt   string `json:"prompt"`
-		Interval string `json:"interval"` // e.g. "1h", "30m", "24h"
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || req.Prompt == "" {
-		apperror.WriteCode(w, apperror.CodeMissingField, "name and prompt are required")
-		return
-	}
-	dur, err := time.ParseDuration(req.Interval)
-	if err != nil || dur < time.Minute {
-		apperror.WriteCode(w, apperror.CodeInvalidField, "invalid interval (min 1m)")
-		return
-	}
-	job := scheduler.Job{
-		ID:       fmt.Sprintf("job_%d", time.Now().UnixNano()),
-		Name:     req.Name,
-		TenantID: tid,
-		Interval: dur,
-		Prompt:   req.Prompt,
-	}
-	g.scheduler.Add(job)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(job)
-}
-
-func (g *Gateway) handleSchedulerRemove(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
-		apperror.WriteCode(w, apperror.CodeMissingField, "id is required")
-		return
-	}
-	g.scheduler.Remove(req.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "removed"})
 }

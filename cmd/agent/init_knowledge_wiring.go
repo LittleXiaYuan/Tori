@@ -10,6 +10,7 @@ import (
 
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/knowledge"
+	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/controlplane/gateway"
@@ -75,6 +76,30 @@ func initKnowledgeWiring(app *agentrt.App, gw *gateway.Gateway, embedRes *embedd
 	gw.SetKnowledgeStore(knowledgeStore)
 	gw.SetKnowledgeDir(kbDir)
 	app.Set(agentrt.CompKnowledgeStore, knowledgeStore)
+
+	// Wire LLM Wiki store
+	wikiDigester := knowledge.NewLLMWikiDigester(func(ctx context.Context, prompt string) (string, error) {
+		pool := app.LLMPool
+		if pool == nil {
+			return "", fmt.Errorf("no LLM pool available")
+		}
+		client := pool.Get("smart")
+		if client == nil {
+			client = pool.Primary()
+		}
+		if client == nil {
+			return "", fmt.Errorf("no LLM client available")
+		}
+		return client.Chat(ctx, []llm.Message{{Role: "user", Content: prompt}}, 0.3)
+	})
+	wikiStore := knowledge.NewWikiStore(wikiDigester)
+	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
+		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
+			wikiStore.SetKVStore(iledger.NewKVConfigStore(ldg, "wiki"))
+		}
+	}
+	gw.SetWikiStore(wikiStore)
+	app.Set("wiki_store", wikiStore)
 
 	// Wire embedder → knowledge store
 	if emb, ok := embedRes.Primary(); ok {

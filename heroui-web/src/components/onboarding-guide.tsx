@@ -29,11 +29,18 @@ const steps = [
     descEn: "Let the Agent research any topic, save results to the knowledge base with one click. The Agent will reference it next time.",
   },
   {
+    icon: <Package size={28} style={{ color: "#f472b6" }} />,
+    title: "对话即配置",
+    titleEn: "Configure through chat",
+    desc: "不想翻设置页？直接告诉 Agent「帮我切换到 GPT-4」或「启用深度思考模式」，Agent 会自动配置。",
+    descEn: "Don't want to dig through settings? Just tell the Agent to 'switch to GPT-4' or 'enable deep thinking mode' — it will configure automatically.",
+  },
+  {
     icon: <Zap size={28} style={{ color: "#fbbf24" }} />,
     title: "快捷键让你更快",
     titleEn: "Shortcuts make you faster",
-    desc: "Alt+N 新对话 · Alt+I 聚焦输入 · Alt+P 截图分析 · Ctrl+K 全局搜索",
-    descEn: "Alt+N new chat · Alt+I focus input · Alt+P screenshot · Ctrl+K global search",
+    desc: "Alt+N 新对话 · Ctrl+\\ 禅模式 · Ctrl+K 全局搜索",
+    descEn: "Alt+N new chat · Ctrl+\\ Zen mode · Ctrl+K global search",
   },
 ];
 

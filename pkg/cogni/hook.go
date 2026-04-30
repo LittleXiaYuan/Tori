@@ -62,6 +62,9 @@ type Hook struct {
 	expMu          sync.RWMutex
 	expProvider    ExperienceProvider
 
+	actMu        sync.RWMutex
+	onActivation func(cogniID string, score float64)
+
 	turnCache *turnCache
 }
 
@@ -113,6 +116,28 @@ func (h *Hook) SetExperienceProvider(fn ExperienceProvider) {
 	h.expMu.Lock()
 	h.expProvider = fn
 	h.expMu.Unlock()
+}
+
+// SetOnActivation registers a callback invoked whenever a cogni activates.
+func (h *Hook) SetOnActivation(fn func(cogniID string, score float64)) {
+	if h == nil {
+		return
+	}
+	h.actMu.Lock()
+	h.onActivation = fn
+	h.actMu.Unlock()
+}
+
+func (h *Hook) fireActivation(cogniID string, score float64) {
+	if h == nil {
+		return
+	}
+	h.actMu.RLock()
+	fn := h.onActivation
+	h.actMu.RUnlock()
+	if fn != nil {
+		fn(cogniID, score)
+	}
 }
 
 func (h *Hook) experienceProviderFn() ExperienceProvider {
@@ -342,6 +367,7 @@ func (h *Hook) BuildContext(req ContextRequest) string {
 	var sources []string
 	fallbacks := 0
 	for _, a := range st.activations {
+		h.fireActivation(a.Declaration.ID, a.Score)
 		block, fellBack := h.renderContextOnce(a.Declaration, req)
 		if block != "" {
 			blocks = append(blocks, block)

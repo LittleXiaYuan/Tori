@@ -94,26 +94,29 @@ export function SelectionToolbar({ onAction }: SelectionToolbarProps) {
       <div
         className="flex items-center gap-0.5 rounded-xl px-1.5 py-1"
         style={{
-          background: "rgba(255,255,255,0.95)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)",
-          backdropFilter: "blur(12px)",
+          background: "var(--yunque-elevated)",
+          color: "var(--yunque-text)",
+          border: "1px solid var(--yunque-border)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         {actions.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             onClick={() => handleClick(id)}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-gray-100"
-            style={{ color: "#374151" }}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors"
+            style={{ color: "var(--yunque-text-secondary)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--yunque-bg-muted)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            <Icon size={14} style={{ color: "#6b7280" }} />
+            <Icon size={14} style={{ color: "var(--yunque-text-muted)" }} />
             {label}
           </button>
         ))}
       </div>
       <div
         className="mx-auto w-2 h-2 rotate-45"
-        style={{ background: "rgba(255,255,255,0.95)", marginTop: -1 }}
+        style={{ background: "var(--yunque-elevated)", border: "1px solid var(--yunque-border)", borderTop: "none", borderLeft: "none", marginTop: -1 }}
       />
     </div>
   );

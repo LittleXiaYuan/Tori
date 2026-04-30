@@ -141,6 +141,9 @@ func (g *Gateway) SetFederationTransport(t *federation.Transport) { g.fedTranspo
 // SetKnowledgeStore attaches the knowledge base.
 func (g *Gateway) SetKnowledgeStore(ks *knowledge.Store) { g.knowledgeStore = ks }
 
+// SetWikiStore attaches the LLM Wiki structured knowledge store.
+func (g *Gateway) SetWikiStore(ws *knowledge.WikiStore) { g.wikiStore = ws }
+
 // SetKnowledgeDir sets the directory for persisting extracted conversation facts.
 func (g *Gateway) SetKnowledgeDir(dir string) { g.knowledgeDir = dir }
 

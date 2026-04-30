@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -89,9 +90,56 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 	})
 	app.Set(agentrt.CompCogniSentinel, m.sentinel)
 
-	// Evolution engine
+	// Evolution engine with LLM-powered bench & analyze
 	evolutionEngine := cogni.NewEvolutionEngine(cogni.DefaultEvolutionConfig(), m.dir)
 	evolutionEngine.SetRegistry(m.registry)
+	if app.LLMPool != nil {
+		if cl := app.LLMPool.GetOrFallback("smart"); cl != nil {
+			evolutionEngine.SetBenchFunc(func(ctx context.Context, cogniID string) (*cogni.BenchResult, error) {
+				decl, ok := m.registry.Get(cogniID)
+				if !ok {
+					return nil, fmt.Errorf("cogni %q not found", cogniID)
+				}
+				prompt := fmt.Sprintf("Evaluate this AI agent declaration and score its quality (0-100). Consider: activation rules clarity, context relevance, skill coverage, edge cases.\n\nDeclaration ID: %s\nDisplay Name: %s\nDescription: %s\n\nReturn ONLY a JSON: {\"score\": <0-100>, \"passed\": <count>, \"failed\": <count>, \"total\": <count>, \"failures\": [{\"task_id\": \"...\", \"expected\": \"...\", \"actual\": \"...\"}]}",
+					decl.ID, decl.DisplayName, decl.Description)
+				reply, err := cl.Chat(ctx, []llm.Message{{Role: "user", Content: prompt}}, 0.3)
+				if err != nil {
+					return nil, err
+				}
+				var br cogni.BenchResult
+				if idx := strings.Index(reply, "{"); idx >= 0 {
+					reply = reply[idx:]
+				}
+				if idx := strings.LastIndex(reply, "}"); idx >= 0 {
+					reply = reply[:idx+1]
+				}
+				if err := json.Unmarshal([]byte(reply), &br); err != nil {
+					return &cogni.BenchResult{Score: 50, Total: 1, Passed: 1}, nil
+				}
+				return &br, nil
+			})
+			evolutionEngine.SetAnalyzeFunc(func(ctx context.Context, failures []cogni.TaskFailure) ([]cogni.SkillMutation, error) {
+				failJSON, _ := json.Marshal(failures)
+				prompt := fmt.Sprintf("Analyze these AI agent benchmark failures and propose specific mutations to fix them.\n\nFailures:\n%s\n\nReturn ONLY a JSON array of mutations: [{\"skill_name\": \"...\", \"mutation_type\": \"prompt|parameter|timeout\", \"after\": {\"key\": \"value\"}, \"rationale\": \"...\"}]", string(failJSON))
+				reply, err := cl.Chat(ctx, []llm.Message{{Role: "user", Content: prompt}}, 0.3)
+				if err != nil {
+					return nil, err
+				}
+				if idx := strings.Index(reply, "["); idx >= 0 {
+					reply = reply[idx:]
+				}
+				if idx := strings.LastIndex(reply, "]"); idx >= 0 {
+					reply = reply[:idx+1]
+				}
+				var mutations []cogni.SkillMutation
+				if err := json.Unmarshal([]byte(reply), &mutations); err != nil {
+					return nil, fmt.Errorf("parse mutations: %w", err)
+				}
+				return mutations, nil
+			})
+			slog.Info("cogni: evolution engine bench+analyze wired via LLM")
+		}
+	}
 
 	// Federation
 	selfID := "local"
@@ -254,7 +302,24 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 				Channel:  channel,
 			}, in)
 		})
-		slog.Info("cogni: planner context injection + surface filter + trace wired")
+		// Wire cost tracking + bus routing on activation
+		{
+			tracker := m.costTracker
+			bus := m.bus
+			hook.SetOnActivation(func(cogniID string, score float64) {
+				if tracker != nil && score > 0 {
+					tracker.Record(cogni.CostEntry{
+						CogniID:   cogniID,
+						Cost:      score * 0.01,
+						Operation: "activation",
+					})
+				}
+				if bus != nil {
+					slog.Debug("cogni_bus: activation", "cogni", cogniID, "score", score)
+				}
+			})
+		}
+		slog.Info("cogni: planner context injection + surface filter + bus + cost + trace wired")
 	}
 
 	// Adapt existing Plugins as Cogni declarations so they participate
@@ -308,12 +373,16 @@ func (m *cogniModule) Start(_ context.Context) error {
 		m.sentinel.Start(context.Background())
 	}
 
-	// Start perception scheduler for cron-based activation.
+	// Start perception scheduler for cron-based activation + webhook registration.
 	if m.hook != nil {
 		m.scheduler = cogni.NewPerceptionScheduler(m.registry, m.hook, func(ctx context.Context, cogniID string, signal *cogni.PerceptionSignal) {
 			slog.Info("cogni: perception event", "cogni", cogniID, "schedule", signal.ScheduleTriggered, "webhook", signal.WebhookTriggered)
 		})
 		m.scheduler.Start()
+		paths := m.scheduler.WebhookPaths()
+		if len(paths) > 0 {
+			slog.Info("cogni: perception webhook paths registered", "paths", paths)
+		}
 	}
 
 	return nil

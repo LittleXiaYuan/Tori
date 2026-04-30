@@ -3,18 +3,39 @@ package guardrails
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"yunque-agent/internal/agentcore/audit"
+
+	"gopkg.in/yaml.v3"
 )
 
-// ToolGuard — validates tool/skill call params before execution.
-// Catches path traversal, command injection, unauthorized access.
+// ToolGuardAction defines what to do when a rule matches.
+type ToolGuardAction string
+
+const (
+	ActionAllow           ToolGuardAction = "ALLOW"
+	ActionBlock           ToolGuardAction = "BLOCK"
+	ActionRequireApproval ToolGuardAction = "REQUIRE_APPROVAL"
+)
+
+// ToolGuardRule is a declarative rule loaded from YAML.
+type ToolGuardRule struct {
+	Tool    string          `yaml:"tool" json:"tool"`
+	Pattern string          `yaml:"pattern,omitempty" json:"pattern,omitempty"`
+	Action  ToolGuardAction `yaml:"action" json:"action"`
+	Reason  string          `yaml:"reason,omitempty" json:"reason,omitempty"`
+}
+
+// ToolGuardConfig supports both legacy fields and declarative rules.
 type ToolGuardConfig struct {
-	AllowedCommands []string // e.g. ["ls", "cat", "python3"]
-	AllowedPaths    []string // e.g. ["/data", "/tmp"] (prefix match)
-	BlockedParams   []string // patterns that must never appear in any param value
+	AllowedCommands []string        `yaml:"allowed_commands,omitempty" json:"allowed_commands,omitempty"`
+	AllowedPaths    []string        `yaml:"allowed_paths,omitempty" json:"allowed_paths,omitempty"`
+	BlockedParams   []string        `yaml:"blocked_params,omitempty" json:"blocked_params,omitempty"`
+	Rules           []ToolGuardRule `yaml:"rules,omitempty" json:"rules,omitempty"`
 }
 
 func DefaultToolGuardConfig() ToolGuardConfig {
@@ -32,7 +53,34 @@ func DefaultToolGuardConfig() ToolGuardConfig {
 			"$(", "`",   // command substitution
 			"&&", "||",  // shell operators
 		},
+		Rules: []ToolGuardRule{
+			{Tool: "code_exec", Action: ActionRequireApproval, Reason: "code execution requires approval"},
+		},
 	}
+}
+
+// LoadToolGuardConfig loads config from a YAML file, falling back to defaults.
+func LoadToolGuardConfig(path string) ToolGuardConfig {
+	if path == "" {
+		path = "data/tool-guard.yaml"
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return DefaultToolGuardConfig()
+	}
+	var cfg ToolGuardConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		slog.Warn("tool_guard: failed to parse YAML config, using defaults", "err", err)
+		return DefaultToolGuardConfig()
+	}
+	if len(cfg.AllowedCommands) == 0 && len(cfg.Rules) == 0 {
+		def := DefaultToolGuardConfig()
+		cfg.AllowedCommands = def.AllowedCommands
+		cfg.AllowedPaths = def.AllowedPaths
+		cfg.BlockedParams = def.BlockedParams
+	}
+	slog.Info("tool_guard: loaded config from YAML", "path", path, "rules", len(cfg.Rules))
+	return cfg
 }
 
 type ToolGuard struct {
@@ -54,9 +102,50 @@ type ToolCallInput struct {
 	Params    map[string]string // flattened key=value of all parameters
 }
 
-// CheckToolCall validates params against the allowlist. Returns block if the call looks dangerous.
+// CheckToolCall validates params against the allowlist and declarative rules.
 func (g *ToolGuard) CheckToolCall(_ context.Context, input ToolCallInput) CheckResult {
 	result := CheckResult{Passed: true}
+
+	// 0. Declarative rules (highest priority)
+	for _, rule := range g.config.Rules {
+		if !matchToolName(rule.Tool, input.SkillName) {
+			continue
+		}
+		if rule.Pattern != "" {
+			matched := false
+			for _, val := range input.Params {
+				if matchPattern(rule.Pattern, val) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		switch rule.Action {
+		case ActionBlock:
+			result.Passed = false
+			result.Blocked = true
+			result.Rule = "declarative_block"
+			reason := rule.Reason
+			if reason == "" {
+				reason = fmt.Sprintf("tool %q blocked by rule", input.SkillName)
+			}
+			result.Warnings = append(result.Warnings, reason)
+			g.auditDeny("rule_block", input.SkillName, reason)
+			return result
+		case ActionRequireApproval:
+			result.NeedsApproval = true
+			reason := rule.Reason
+			if reason == "" {
+				reason = fmt.Sprintf("tool %q requires approval", input.SkillName)
+			}
+			result.Warnings = append(result.Warnings, reason)
+		case ActionAllow:
+			return result
+		}
+	}
 
 	// 1. Command whitelist
 	if input.Command != "" && len(g.config.AllowedCommands) > 0 {
@@ -154,4 +243,37 @@ func isPathParam(key string) bool {
 		strings.Contains(lower, "file") ||
 		strings.Contains(lower, "dir") ||
 		strings.Contains(lower, "folder")
+}
+
+// matchToolName checks if a rule's tool pattern matches a skill name.
+// Supports * prefix/suffix wildcards (e.g. "*DeleteTool" matches "FileDeleteTool").
+func matchToolName(pattern, name string) bool {
+	if pattern == "*" {
+		return true
+	}
+	patLower := strings.ToLower(pattern)
+	nameLower := strings.ToLower(name)
+	if strings.HasPrefix(patLower, "*") && strings.HasSuffix(patLower, "*") {
+		return strings.Contains(nameLower, strings.Trim(patLower, "*"))
+	}
+	if strings.HasPrefix(patLower, "*") {
+		return strings.HasSuffix(nameLower, strings.TrimPrefix(patLower, "*"))
+	}
+	if strings.HasSuffix(patLower, "*") {
+		return strings.HasPrefix(nameLower, strings.TrimSuffix(patLower, "*"))
+	}
+	return strings.EqualFold(pattern, name)
+}
+
+// matchPattern checks if a value matches a glob-like pattern (e.g. "*.env").
+func matchPattern(pattern, value string) bool {
+	patLower := strings.ToLower(pattern)
+	valLower := strings.ToLower(value)
+	if strings.HasPrefix(patLower, "*") {
+		return strings.HasSuffix(valLower, strings.TrimPrefix(patLower, "*"))
+	}
+	if strings.HasSuffix(patLower, "*") {
+		return strings.HasPrefix(valLower, strings.TrimSuffix(patLower, "*"))
+	}
+	return strings.Contains(valLower, patLower)
 }

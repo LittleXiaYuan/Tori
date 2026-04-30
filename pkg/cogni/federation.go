@@ -195,6 +195,9 @@ func (cf *CogniFederation) fetchPeerCognis(ctx context.Context, peer *Federation
 	return out, nil
 }
 
+// federatedDecl is compatible with both the remote /v1/cognis response
+// (EntryStatus: id, display_name, description) and any future explicit
+// skill_names field.
 type federatedDecl struct {
 	ID          string   `json:"id"`
 	DisplayName string   `json:"display_name"`
@@ -203,7 +206,13 @@ type federatedDecl struct {
 }
 
 func (d *federatedDecl) Skills() []string {
-	return d.SkillNames
+	if len(d.SkillNames) > 0 {
+		return d.SkillNames
+	}
+	if d.ID != "" {
+		return []string{d.ID}
+	}
+	return nil
 }
 
 // Stats returns federation statistics.

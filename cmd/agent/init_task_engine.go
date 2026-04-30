@@ -241,7 +241,7 @@ func initTaskEngine(
 	})
 
 	// ── Security Guards ──
-	toolGuard := guardrails.NewToolGuard(guardrails.DefaultToolGuardConfig())
+	toolGuard := guardrails.NewToolGuard(guardrails.LoadToolGuardConfig("data/tool-guard.yaml"))
 	egressGuard := guardrails.NewEgressGuard(guardrails.DefaultEgressGuardConfig())
 	if auditChain != nil {
 		toolGuard.SetAudit(auditChain)

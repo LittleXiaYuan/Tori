@@ -21,7 +21,9 @@ const securityHeaders = [
       // (data:), favicons, or remote knowledge sources; narrow this further
       // if you disable those features.
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' http://localhost:* ws://localhost:* https: wss:",
+      // Tauri 2 的 IPC 走 http://ipc.localhost 协议（apply_window_theme 等命令）
+      // 以及 ipc: 协议；不放行会导致前端 ti.invoke() 全部被 CSP 阻止。
+      "connect-src 'self' http://localhost:* ws://localhost:* http://ipc.localhost ipc: https: wss:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -38,6 +40,10 @@ const nextConfig = {
   ...(isProd ? { output: "export" } : {}),
   images: { unoptimized: true },
   trailingSlash: true,
+  // 关掉 dev 模式左下角的 "Rendering..."/编译状态浮标：放在桌面应用里
+  // 看起来像应用 BUG，而 Tauri 已经有自己的窗口呈现机制。
+  // 生产构建（output: export）本来就不会出现这个浮标，这里只影响 next dev。
+  devIndicators: false,
   async rewrites() {
     if (isProd) return [];
     const api = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9090";

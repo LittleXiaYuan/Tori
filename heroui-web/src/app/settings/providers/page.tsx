@@ -215,13 +215,7 @@ export default function ProvidersPage() {
   }
 
   return (
-    <div className="page-root space-y-6 animate-fade-in-up">
-      <PageHeader
-        icon={<Cpu size={20} />}
-        title="模型提供商"
-        description="管理 LLM 接入方式、API 密钥与 Tori 中转"
-        onRefresh={refresh}
-      />
+    <div className="space-y-6">
 
       {firstTime && (
         <Card className="section-card p-5 border-l-4" style={{ borderLeftColor: "var(--yunque-accent)" }}>

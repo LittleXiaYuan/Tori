@@ -66,9 +66,11 @@ export function ConversationSidebar({
     <div
       className="flex flex-col h-full animate-slide-in-left w-[228px] xl:w-[244px] shrink-0"
       style={{
-        background: "var(--yunque-sidebar)",
-        borderRight: "1px solid var(--yunque-border)",
+        background: "var(--glass-sidebar, var(--yunque-sidebar))",
+        borderRight: "1px solid var(--glass-edge, var(--yunque-border))",
         transition: "width 0.2s ease",
+        backdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
+        WebkitBackdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))",
       }}
     >
       {/* Sidebar Header */}
@@ -87,7 +89,7 @@ export function ConversationSidebar({
         </Button>
         <div
           className="flex items-center gap-2 rounded-[14px] px-2.5 py-1.5 text-[11px]"
-          style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-muted)" }}
+          style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}
         >
           <Search size={12} />
           <input
@@ -106,8 +108,8 @@ export function ConversationSidebar({
           onClick={() => dispatch({ type: "SET_ARCHIVED", show: false })}
           className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
           style={{
-            color: !conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
-            background: !conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
+            color: !conv.showArchived ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)",
+            background: !conv.showArchived ? "var(--neutral-strong-bg)" : "var(--yunque-bg-muted)",
           }}
         >
           <MessageCircle size={13} /> 活跃
@@ -116,8 +118,8 @@ export function ConversationSidebar({
           onClick={() => dispatch({ type: "SET_ARCHIVED", show: true })}
           className="flex items-center gap-1.5 rounded-[12px] px-2 py-1.5 text-[10px] transition-colors flex-1 justify-center"
           style={{
-            color: conv.showArchived ? "var(--yunque-accent)" : "var(--yunque-text-muted)",
-            background: conv.showArchived ? "rgba(0,111,238,0.1)" : "rgba(255,255,255,0.03)",
+            color: conv.showArchived ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)",
+            background: conv.showArchived ? "var(--neutral-strong-bg)" : "var(--yunque-bg-muted)",
           }}
         >
           <Archive size={13} /> 归档
@@ -187,7 +189,7 @@ export function ConversationSidebar({
                   className="text-xs font-medium bg-transparent outline-none w-full px-1 py-0.5 rounded"
                   style={{
                     color: "var(--yunque-text)",
-                    background: "rgba(255,255,255,0.08)",
+                    background: "var(--yunque-bg-muted)",
                     border: "1px solid var(--yunque-accent)",
                   }}
                   onClick={(e) => e.stopPropagation()}
