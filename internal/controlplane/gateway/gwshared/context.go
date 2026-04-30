@@ -2,6 +2,7 @@ package gwshared
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 )
 
@@ -25,3 +26,16 @@ type AuthFunc func(http.HandlerFunc) http.HandlerFunc
 
 // LimiterMiddleware wraps an http.HandlerFunc with rate limiting.
 type LimiterMiddleware func(http.HandlerFunc) http.HandlerFunc
+
+// WriteJSON writes a JSON response with 200 OK.
+func WriteJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+// WriteJSONStatus writes a JSON response with the given status code.
+func WriteJSONStatus(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(v)
+}

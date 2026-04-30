@@ -354,21 +354,8 @@ func (g *Gateway) registerBrowserRoutes() {
 	g.mux.HandleFunc("/api/browser/ext/scenarios/run", g.requireAuth(g.handleBrowserRunScenario))
 }
 
-func (g *Gateway) registerNotifyRoutes() {
-	g.mux.HandleFunc("/api/notify/channels", g.requireAuth(g.handleNotifyChannels))
-	g.mux.HandleFunc("/api/notify/add", g.requireAuth(g.handleNotifyAddChannel))
-	g.mux.HandleFunc("/api/notify/remove", g.requireAuth(g.handleNotifyRemoveChannel))
-	g.mux.HandleFunc("/api/notify/toggle", g.requireAuth(g.handleNotifyToggle))
-	g.mux.HandleFunc("/api/notify/test", g.requireAuth(g.handleNotifyTest))
-}
-
-func (g *Gateway) registerConnectorRoutes() {
-	g.mux.HandleFunc("/api/connectors", g.requireAuth(g.handleConnectorList))
-	g.mux.HandleFunc("/api/connectors/detail", g.requireAuth(g.handleConnectorDetail))
-	g.mux.HandleFunc("/api/connectors/connect", g.requireAuth(g.handleConnectorConnect))
-	g.mux.HandleFunc("/api/connectors/disconnect", g.requireAuth(g.handleConnectorDisconnect))
-	g.mux.HandleFunc("/api/connectors/execute", g.requireAuth(g.handleConnectorExecute))
-}
+// Connector and Notify routes are registered via sub-packages
+// (connectorapi, notifyapi) in gateway.go routes().
 
 func (g *Gateway) registerIDERoutes() {
 	g.mux.HandleFunc("/v1/ide/review", g.requireAuth(g.handleIDEReviewCode))
