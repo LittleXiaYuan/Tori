@@ -51,6 +51,14 @@ type Config struct {
 	ReflectModel           string // LLM pool key for reflect evaluator (empty = primary)
 	Profile                string // "lite", "standard", "full" (default: "standard")
 	DisabledModules        string // comma-separated module names to disable
+
+	// BuildFlavor selects industry-specific capabilities.
+	// "standard" (default) — general-purpose agent
+	// "legal"    — adds legal-ai engine (case retrieval, contract review)
+	// "collect"  — adds collection scripts, knowledge embedding
+	// Flavors do NOT change the core agent — they only control which
+	// industry plugins are auto-registered in init_plugins.
+	BuildFlavor string
 }
 
 // Load reads config from environment variables.
@@ -115,6 +123,7 @@ func Load() Config {
 		ReflectModel:           getenv("REFLECT_MODEL", ""),
 		Profile:                getenv("AGENT_PROFILE", "standard"),
 		DisabledModules:        getenv("DISABLED_MODULES", ""),
+		BuildFlavor:            getenv("BUILD_FLAVOR", "standard"),
 	}
 }
 
