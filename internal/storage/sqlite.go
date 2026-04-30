@@ -1,3 +1,7 @@
+// Package storage is DEPRECATED. All runtime persistence is handled through
+// internal/ledger (backed by its own SQLite database). This package is
+// retained only as a reference for the original schema; it is not imported
+// by any production code. Safe to remove in a future cleanup pass.
 package storage
 
 import (
