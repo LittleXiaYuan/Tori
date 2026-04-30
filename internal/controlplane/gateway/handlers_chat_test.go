@@ -14,7 +14,7 @@ import (
 
 // ctxWithTenant builds a context with the given tenant ID.
 func ctxWithTenant(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, ctxTenantKey, id)
+	return contextWithTenant(ctx, id)
 }
 
 // extractErrorCode extracts the error code from the apperror JSON response.

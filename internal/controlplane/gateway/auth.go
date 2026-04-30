@@ -118,7 +118,7 @@ func (g *Gateway) requireAuthJWT(jwtCfg *JWTConfig, next http.HandlerFunc) http.
 		}
 
 		if t := g.tenants.ByAPIKey(token); t != nil {
-			ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
+			ctx := contextWithTenant(r.Context(), t.ID)
 			next(w, r.WithContext(ctx))
 			return
 		}
@@ -126,7 +126,7 @@ func (g *Gateway) requireAuthJWT(jwtCfg *JWTConfig, next http.HandlerFunc) http.
 		if jwtCfg != nil {
 			claims, err := ValidateJWT(*jwtCfg, token)
 			if err == nil {
-				ctx := context.WithValue(r.Context(), ctxTenantKey, claims.TenantID)
+				ctx := contextWithTenant(r.Context(), claims.TenantID)
 				ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
 				next(w, r.WithContext(ctx))
 				return
@@ -194,7 +194,7 @@ func (g *Gateway) requireBrowserSessionAuth(next http.HandlerFunc) http.HandlerF
 		}
 
 		if t := g.tenants.ByAPIKey(token); t != nil {
-			ctx := context.WithValue(r.Context(), ctxTenantKey, t.ID)
+			ctx := contextWithTenant(r.Context(), t.ID)
 			next(w, r.WithContext(ctx))
 			return
 		}
@@ -202,7 +202,7 @@ func (g *Gateway) requireBrowserSessionAuth(next http.HandlerFunc) http.HandlerF
 		if g.jwtCfg != nil {
 			claims, err := ValidateJWT(*g.jwtCfg, token)
 			if err == nil {
-				ctx := context.WithValue(r.Context(), ctxTenantKey, claims.TenantID)
+				ctx := contextWithTenant(r.Context(), claims.TenantID)
 				ctx = context.WithValue(ctx, ctxRoleKey, claims.Role)
 				next(w, r.WithContext(ctx))
 				return
@@ -210,7 +210,7 @@ func (g *Gateway) requireBrowserSessionAuth(next http.HandlerFunc) http.HandlerF
 		}
 
 		if tenantID, info, err := g.resolveBrowserExtensionTenant(r.Context(), token); err == nil && tenantID != "" {
-			ctx := context.WithValue(r.Context(), ctxTenantKey, tenantID)
+			ctx := contextWithTenant(r.Context(), tenantID)
 			ctx = context.WithValue(ctx, ctxRoleKey, "user")
 			ctx = context.WithValue(ctx, ctxKeyType("browser_ext_subject"), info.Subject())
 			next(w, r.WithContext(ctx))

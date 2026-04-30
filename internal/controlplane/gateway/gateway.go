@@ -59,6 +59,9 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/connectors"
+	"yunque-agent/internal/controlplane/gateway/costapi"
+	"yunque-agent/internal/controlplane/gateway/gwshared"
+	"yunque-agent/internal/controlplane/gateway/loraapi"
 	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/controlplane/tenant"
@@ -687,10 +690,20 @@ func (g *Gateway) routes() {
 	g.registerNotifyRoutes()     // notification channels (webhook, DingTalk, Feishu, etc.)
 	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
 	g.registerModesRoutes()      // persona mode management (/v1/persona/modes, mode, mode/current)
-	g.registerMCPDispatchRoutes() // MCP dispatch server for external workers
-	g.registerProjectRoutes()       // project management (orchestrator)
-	g.registerOrchestratorRoutes()  // orchestrator daemon control
-	g.registerLoRARoutes()          // LoRA / training / evolution
+	g.registerMCPDispatchRoutes()  // MCP dispatch server for external workers
+	g.registerProjectRoutes()      // project management (orchestrator)
+	g.registerOrchestratorRoutes() // orchestrator daemon control
+
+	// Extracted handler groups (sub-packages)
+	(&loraapi.Handler{
+		Scheduler: g.loraScheduler,
+		Metrics:   g.trainingMetrics,
+		Evolution: g.evolutionCoordinator,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&costapi.Handler{
+		Tracker: g.costTracker,
+	}).RegisterRoutes(g.mux, g.requireAuth)
 }
 
 // --- Auth middleware ---
@@ -732,12 +745,11 @@ func (g *Gateway) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func contextWithTenant(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, ctxTenantKey, id)
+	return gwshared.ContextWithTenant(ctx, id)
 }
 
 func tenantFromCtx(ctx context.Context) string {
-	v, _ := ctx.Value(ctxTenantKey).(string)
-	return v
+	return gwshared.TenantFromCtx(ctx)
 }
 
 // requireSetupOrAuth allows unauthenticated access only during true first-run
