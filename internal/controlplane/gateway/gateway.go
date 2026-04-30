@@ -59,9 +59,11 @@ import (
 	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/connectors"
+	"yunque-agent/internal/controlplane/gateway/connectorapi"
 	"yunque-agent/internal/controlplane/gateway/costapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/controlplane/gateway/loraapi"
+	"yunque-agent/internal/controlplane/gateway/notifyapi"
 	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/controlplane/tenant"
@@ -686,8 +688,6 @@ func (g *Gateway) routes() {
 	g.registerSSERoutes()        // SSE event stream
 	g.registerTraceRoutes()      // execution trace / audit API
 	g.registerBrowserRoutes()    // browser engine management
-	g.registerConnectorRoutes()  // connectors (GitHub, Gmail, Calendar, etc.)
-	g.registerNotifyRoutes()     // notification channels (webhook, DingTalk, Feishu, etc.)
 	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
 	g.registerModesRoutes()      // persona mode management (/v1/persona/modes, mode, mode/current)
 	g.registerMCPDispatchRoutes()  // MCP dispatch server for external workers
@@ -703,6 +703,14 @@ func (g *Gateway) routes() {
 
 	(&costapi.Handler{
 		Tracker: g.costTracker,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&connectorapi.Handler{
+		Registry: g.connectorReg,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&notifyapi.Handler{
+		Notifier: g.notifier,
 	}).RegisterRoutes(g.mux, g.requireAuth)
 }
 
