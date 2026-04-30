@@ -25,8 +25,9 @@ func loadConfig() *config.Config {
 	if err := cfg.Validate(); err != nil {
 		slog.Warn("configuration issue", "err", err)
 	}
-	if cfg.NeedsSetup() {
-		slog.Warn("LLM configuration incomplete — complete setup in the web UI at /setup")
+	slog.Info("config loaded", "summary", cfg.Summary())
+	for _, w := range cfg.Warnings() {
+		slog.Warn("config", "warning", w)
 	}
 	warnWeakSecrets(&cfg)
 	return &cfg

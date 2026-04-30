@@ -124,6 +124,39 @@ func (c Config) Validate() error {
 	return nil
 }
 
+// Warnings returns non-fatal configuration issues for startup logging.
+func (c Config) Warnings() []string {
+	var w []string
+	if c.NeedsSetup() {
+		w = append(w, "LLM not configured — setup wizard will launch on first visit")
+	}
+	if c.JWTSecret == "" {
+		w = append(w, "JWT_SECRET not set — auth tokens will use an insecure default")
+	}
+	if c.JWTSecret != "" && len(c.JWTSecret) < 16 {
+		w = append(w, "JWT_SECRET is shorter than 16 chars — consider a stronger secret")
+	}
+	if c.Profile != ProfileLite && c.Profile != ProfileStandard && c.Profile != ProfileFull {
+		w = append(w, "AGENT_PROFILE unrecognized ("+c.Profile+") — falling back to standard")
+	}
+	if c.LLMExpertURL != "" && c.LLMExpertModel == "" {
+		w = append(w, "LLM_EXPERT_URL set but LLM_EXPERT_MODEL missing — expert tier will be unused")
+	}
+	if c.LLMFastURL != "" && c.LLMFastModel == "" {
+		w = append(w, "LLM_FAST_URL set but LLM_FAST_MODEL missing — fast tier will be unused")
+	}
+	return w
+}
+
+// Summary returns a human-readable one-liner of key config state for startup logs.
+func (c Config) Summary() string {
+	llm := c.LLMModel
+	if llm == "" {
+		llm = "(not set)"
+	}
+	return "profile=" + c.Profile + " addr=" + c.Addr + " model=" + llm + " data=" + c.DataDir
+}
+
 // NeedsSetup returns true when essential LLM configuration is missing.
 func (c Config) NeedsSetup() bool {
 	return c.LLMBaseURL == "" || c.LLMAPIKey == "" || c.LLMModel == ""
