@@ -64,6 +64,8 @@ import (
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/controlplane/gateway/loraapi"
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
+	"yunque-agent/internal/controlplane/gateway/schedulerapi"
+	"yunque-agent/internal/controlplane/gateway/workflowapi"
 	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/controlplane/tenant"
@@ -680,7 +682,6 @@ func (g *Gateway) routes() {
 	g.registerGovernanceRoutes() // audit, trust, iterate, review, cost, usage
 	g.registerProviderRoutes()   // LLM providers, router stats
 	g.registerReverieRoutes()    // reverie inner monologue
-	g.registerWorkflowRoutes()   // workflow engine (DAG)
 	g.registerRBACRoutes()       // role-based access control
 	g.registerApprovalRoutes()   // human-in-the-loop approval
 	g.registerSetupRoutes()      // setup, onboarding, templates
@@ -711,6 +712,15 @@ func (g *Gateway) routes() {
 
 	(&notifyapi.Handler{
 		Notifier: g.notifier,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&workflowapi.Handler{
+		Store:  g.workflowStore,
+		Engine: g.workflowEngine,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&schedulerapi.Handler{
+		Scheduler: g.scheduler,
 	}).RegisterRoutes(g.mux, g.requireAuth)
 }
 

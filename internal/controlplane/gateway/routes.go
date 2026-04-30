@@ -191,10 +191,7 @@ func (g *Gateway) registerTriggerRoutes() {
 	g.mux.HandleFunc("/v1/cron/remove", g.requireAuth(g.handleCronRemove))
 	g.mux.HandleFunc("/v1/cron/run", g.requireAuth(g.handleCronRun))
 
-	// Scheduler
-	g.mux.HandleFunc("/v1/scheduler/jobs", g.requireAuth(g.handleSchedulerJobs))
-	g.mux.HandleFunc("/v1/scheduler/add", g.requireAuth(g.handleSchedulerAdd))
-	g.mux.HandleFunc("/v1/scheduler/remove", g.requireAuth(g.handleSchedulerRemove))
+	// Scheduler routes moved to schedulerapi sub-package
 
 	// Tools (process execution)
 	g.mux.HandleFunc("/v1/tools/exec", g.requireAuth(g.handleToolExec))
@@ -372,16 +369,7 @@ func (g *Gateway) registerModesRoutes() {
 	g.mux.HandleFunc("/v1/persona/mode/current", g.requireAuth(g.handleCurrentMode))
 }
 
-// ──────────────────────────────────────────────
-// Workflow Engine
-// ──────────────────────────────────────────────
-
-func (g *Gateway) registerWorkflowRoutes() {
-	g.mux.HandleFunc("/v1/workflows", g.requireAuth(g.handleWorkflowRouteSwitch))
-	g.mux.HandleFunc("/v1/workflows/run", g.requireAuth(g.handleWorkflowRun))
-	g.mux.HandleFunc("/v1/workflows/instances", g.requireAuth(g.handleWorkflowInstances))
-	g.mux.HandleFunc("/v1/workflows/cancel", g.requireAuth(g.handleWorkflowCancel))
-}
+// Workflow routes moved to workflowapi sub-package.
 
 // LoRA and Cost routes are registered via sub-packages (loraapi, costapi)
 // in gateway.go routes() — see the "Extracted handler groups" section.
