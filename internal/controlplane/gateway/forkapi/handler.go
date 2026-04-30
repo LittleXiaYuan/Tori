@@ -1,4 +1,4 @@
-package gateway
+package forkapi
 
 import (
 	"encoding/json"
@@ -7,22 +7,36 @@ import (
 
 	"yunque-agent/internal/agentcore/session"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/pkg/safego"
 )
 
-func (g *Gateway) persistForkTree() {
-	if g.forkPersister != nil && g.forkTree != nil {
+// Handler serves conversation fork/branch HTTP endpoints.
+type Handler struct {
+	ForkTree  *session.ForkTree
+	Persister *session.ForkPersister
+}
+
+// RegisterRoutes mounts all /v1/fork/* endpoints.
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
+	mux.HandleFunc("/v1/fork", auth(h.handleFork))
+	mux.HandleFunc("/v1/fork/branch", auth(h.handleBranch))
+	mux.HandleFunc("/v1/fork/list", auth(h.handleList))
+}
+
+func (h *Handler) persist() {
+	if h.Persister != nil && h.ForkTree != nil {
 		safego.Go("fork-tree-persist", func() {
-			if err := g.forkPersister.Save(g.forkTree); err != nil {
+			if err := h.Persister.Save(h.ForkTree); err != nil {
 				slog.Error("fork tree persist failed", "err", err)
 			}
 		})
 	}
 }
 
-func (g *Gateway) handleFork(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleFork(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.forkTree == nil {
+	if h.ForkTree == nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "fork tree not configured"})
 		return
 	}
@@ -30,7 +44,7 @@ func (g *Gateway) handleFork(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		forkID := r.URL.Query().Get("id")
 		if forkID != "" {
-			f, ok := g.forkTree.Get(forkID)
+			f, ok := h.ForkTree.Get(forkID)
 			if !ok {
 				apperror.WriteCode(w, apperror.CodeBadRequest, "fork not found")
 				return
@@ -42,7 +56,7 @@ func (g *Gateway) handleFork(w http.ResponseWriter, r *http.Request) {
 				apperror.WriteCode(w, apperror.CodeBadRequest, "session_id or id required")
 				return
 			}
-			root, ok := g.forkTree.GetRoot(sessionID)
+			root, ok := h.ForkTree.GetRoot(sessionID)
 			if !ok {
 				json.NewEncoder(w).Encode(map[string]any{"fork": nil})
 				return
@@ -58,8 +72,8 @@ func (g *Gateway) handleFork(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request")
 			return
 		}
-		f := g.forkTree.Create(req.SessionID, req.Messages)
-		g.persistForkTree()
+		f := h.ForkTree.Create(req.SessionID, req.Messages)
+		h.persist()
 		json.NewEncoder(w).Encode(f)
 	case http.MethodDelete:
 		forkID := r.URL.Query().Get("id")
@@ -67,17 +81,17 @@ func (g *Gateway) handleFork(w http.ResponseWriter, r *http.Request) {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "id required")
 			return
 		}
-		ok := g.forkTree.Delete(forkID)
-		g.persistForkTree()
+		ok := h.ForkTree.Delete(forkID)
+		h.persist()
 		json.NewEncoder(w).Encode(map[string]bool{"deleted": ok})
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 	}
 }
 
-func (g *Gateway) handleForkBranch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleBranch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.forkTree == nil {
+	if h.ForkTree == nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "fork tree not configured"})
 		return
 	}
@@ -94,18 +108,18 @@ func (g *Gateway) handleForkBranch(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid request")
 		return
 	}
-	branch, err := g.forkTree.Branch(req.ForkID, req.AtIndex, req.Label)
+	branch, err := h.ForkTree.Branch(req.ForkID, req.AtIndex, req.Label)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
-	g.persistForkTree()
+	h.persist()
 	json.NewEncoder(w).Encode(branch)
 }
 
-func (g *Gateway) handleForkList(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if g.forkTree == nil {
+	if h.ForkTree == nil {
 		json.NewEncoder(w).Encode(map[string]any{"forks": []any{}})
 		return
 	}
@@ -114,6 +128,6 @@ func (g *Gateway) handleForkList(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "session_id required")
 		return
 	}
-	forks := g.forkTree.ListBranches(sessionID)
+	forks := h.ForkTree.ListBranches(sessionID)
 	json.NewEncoder(w).Encode(map[string]any{"forks": forks})
 }
