@@ -10,9 +10,10 @@ interface ChatEmptyStateProps {
   heroSkills: SkillInfo[];
   chatD: ChatDispatch;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onSend?: (text: string) => void;
 }
 
-export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef }: ChatEmptyStateProps) {
+export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSend }: ChatEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-6 animate-fade-in-up">
       {setupNeeded && (
@@ -30,19 +31,19 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef }: Cha
         <Sparkles size={24} style={{ color: "var(--yunque-accent)" }} />
       </div>
       <div className="max-w-lg text-center space-y-1.5">
-        <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>从这里开始一轮真正可执行的工作</h1>
-        <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>发起研究、浏览网页、调用连接器、生成代码，或把需求沉淀成任务。</p>
+        <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>有什么可以帮你的？</h1>
+        <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>研究、写作、编码、分析 —— 描述你的需求，我来帮你完成。</p>
       </div>
 
       <div className="mt-1 grid w-full max-w-[520px] grid-cols-2 gap-2">
         {(() => {
           const fixedCards = [
-            { icon: <BookOpen size={14} />, label: "总结文档 / 需求", desc: "贴入文档、需求或笔记，让 Agent 先帮你提炼重点。" },
-            { icon: <Search size={14} />, label: "/research ", desc: "发起深度研究：自动浏览、提取、对比、生成报告。", displayLabel: "研究一个主题" },
+            { icon: <BookOpen size={14} />, label: "帮我总结这份文档", desc: "贴入文档或笔记，提炼要点与行动项。", prompt: "" },
+            { icon: <Search size={14} />, label: "/research 最新的AI Agent技术趋势", desc: "自动浏览、提取、对比，生成结构化报告。", displayLabel: "深度研究一个主题", autoSend: true },
           ];
           const fallbackCards = [
-            { icon: <Brain size={14} />, label: "规划多步骤任务", desc: "先拆解步骤，再执行，减少长任务中的混乱。" },
-            { icon: <Zap size={14} />, label: "编写或修复代码", desc: "结合代码上下文、工具与连接器完成开发任务。" },
+            { icon: <Brain size={14} />, label: "帮我拆解这个任务", desc: "把复杂需求拆解成可执行的步骤。", prompt: "" },
+            { icon: <Zap size={14} />, label: "写一个Python脚本，监控指定文件夹的变化并发送通知", desc: "点击直接运行，查看效果。", displayLabel: "帮我写段代码", autoSend: true },
           ];
           const dynamicCards = heroSkills.slice(0, 2).map((sk) => ({
             icon: <Package size={14} />,
@@ -53,7 +54,15 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef }: Cha
           return cards.map((card) => (
             <button
               key={card.label}
-              onClick={() => { chatD({ type: "SET_INPUT", value: card.label }); inputRef.current?.focus(); }}
+              onClick={() => {
+                const text = ("prompt" in card && card.prompt) || card.label;
+                if ("autoSend" in card && card.autoSend && onSend) {
+                  onSend(text);
+                } else {
+                  chatD({ type: "SET_INPUT", value: text });
+                  inputRef.current?.focus();
+                }
+              }}
               className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
               style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
             >

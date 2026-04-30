@@ -98,7 +98,7 @@ export function CherrySettingsModal({
     <CherryModal
       open={open}
       onClose={onClose}
-      size="lg"
+      size="xl"
       bodyFlush
       ariaLabel="设置"
       header={

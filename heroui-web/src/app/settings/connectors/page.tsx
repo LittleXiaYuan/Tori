@@ -103,30 +103,14 @@ export default function ConnectorsPage() {
 
   if (loading) {
     return (
-      <div className="page-root">
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: "rgba(59,130,246,0.12)" }}>
-              <Plug size={20} style={{ color: "var(--yunque-accent)" }} />
-            </div>
-            <Spinner size="lg" />
-          </div>
-        </div>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="page-root">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">连接器</h1>
-          <p className="page-subtitle">
-            管理浏览器、代码仓库、邮件和协作工具，让 Agent 在聊天中直接调用。
-          </p>
-        </div>
-      </div>
-
+    <div>
       {error && (
         <div
           className="flex items-center gap-3 rounded-[20px] border px-4 py-3 text-sm"

@@ -1,11 +1,14 @@
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager, State, Theme, WebviewUrl, WebviewWindow};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream as TokioTcpStream;
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 // ── Tunables ────────────────────────────────────────────────────────────────
 const DEFAULT_BACKEND_PORT: u16 = 9090;
@@ -107,13 +110,519 @@ fn lock_or_recover<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     }
 }
 
+// ── Window appearance (per-platform liquid glass / Mica) ────────────────────
+//
+// 我们按平台原生材质语言走，不强求跨平台像素级一致：
+//   - macOS  : NSVisualEffectView vibrancy (`Sidebar`)。Apple 的 Metal 合成器
+//              本身就做高质量降饱和模糊，配合 set_theme 让 NSAppearance
+//              自动跟随，呈现真·液态玻璃。
+//   - Win 11 : Mica（不再使用 Acrylic）。Acrylic 的盒式模糊 + 噪点纹理在
+//              花壁纸下会出现"颗粒+斑驳"，远不及 mac 的 vibrancy。Mica
+//              不模糊，但壁纸采样后只贡献"色温"，应用主体保持稳定纯净，
+//              是微软自家 Win11 设置/资源管理器/Edge/Teams 的统一语言，
+//              在 Win 平台被视作"现代高级感"的代表。
+//   - Win 10 : 不支持 Mica，set_effects 调用会被 Tauri 静默忽略，窗口
+//              呈现 `transparent: false` 后的纯色 webview，由 CSS
+//              `--yunque-bg` 兜底，效果与 Linux 分支一致。
+//   - Linux  : 没有 compositor-level blur API，set_effects(None)
+//              + CSS 纯色底，由内部 `.glass-card` 等 backdrop-filter
+//              提供应用内的玻璃质感。
+//
+// 设计哲学：外层窗口背景稳定，liquid glass 在应用内部由 CSS backdrop-filter
+// 统一承担（Linear / Cursor / Codex 同款思路），跨平台一致且不被用户壁纸
+// 颜色冲击。Mica 无 tint 参数，所以 Windows 分支不再传 Color。
+//
+// 该 helper 是窗口级的，主窗口和悬浮面板共用同一逻辑。
+fn apply_window_appearance(window: &WebviewWindow, theme: &str) {
+    // 1. Tell the OS what colour scheme the window should advertise.
+    //    On macOS this drives NSAppearance (so vibrancy auto-adapts);
+    //    on Windows this drives the title-bar / scrollbar colour
+    //    AND tells Mica which wallpaper-tint variant to apply.
+    let theme_enum = if theme == "light" { Theme::Light } else { Theme::Dark };
+    let _ = window.set_theme(Some(theme_enum));
+
+    // 2. Apply the platform-appropriate window material.
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::window::{Effect, EffectState, EffectsBuilder};
+        let _ = window.set_effects(
+            EffectsBuilder::new()
+                .effect(Effect::Sidebar)
+                .state(EffectState::FollowsWindowActiveState)
+                .radius(10.0)
+                .build(),
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use tauri::window::{Effect, EffectsBuilder};
+        // Mica：壁纸只贡献色温，主体不模糊不透出形状，避免 Acrylic
+        // 在花壁纸下产生的颗粒/斑驳。light/dark 用不同变体让
+        // 系统采样出对应明暗倾向的色温。Win10 不支持时调用静默失败，
+        // 窗口落到 `transparent: false` 的纯色兜底。
+        let effect = if theme == "light" {
+            Effect::MicaLight
+        } else {
+            Effect::MicaDark
+        };
+        let _ = window.set_effects(
+            EffectsBuilder::new()
+                .effect(effect)
+                .build(),
+        );
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        // Linux / other：没有 compositor 级模糊 API，由 CSS 纯色底兜底，
+        // 应用内部的 `.glass-card` 等 backdrop-filter 承担玻璃质感。
+        let _ = window.set_effects(None);
+    }
+}
+
+/// Apply the in-app theme to every window we own.
+///
+/// Called from `setup` once on startup and from the `apply_window_theme`
+/// command whenever the front-end flips presetTheme. Iterating over all
+/// windows means the floating panel/ball pick up the new appearance even
+/// if they were created lazily after the user signed in.
+fn apply_appearance_all(handle: &AppHandle, theme: &str) {
+    for (_label, win) in handle.webview_windows() {
+        apply_window_appearance(&win, theme);
+    }
+}
+
+/// Tracks the most recent theme the front-end asked for. Lazily-created
+/// windows (floating ball / floating panel) read this on construction so
+/// they don't briefly render as a plain transparent rectangle before the
+/// next theme sync arrives.
+struct ThemeState {
+    current: Mutex<String>,
+}
+
+impl ThemeState {
+    fn new() -> Self {
+        Self {
+            current: Mutex::new("dark".into()),
+        }
+    }
+
+    fn current(&self) -> String {
+        lock_or_recover(&self.current).clone()
+    }
+
+    fn set(&self, v: &str) {
+        *lock_or_recover(&self.current) = v.to_string();
+    }
+}
+
+fn current_theme(handle: &AppHandle) -> String {
+    handle
+        .try_state::<ThemeState>()
+        .map(|s| s.current())
+        .unwrap_or_else(|| "dark".into())
+}
+
+#[tauri::command]
+fn apply_window_theme(handle: AppHandle, theme: String) {
+    let normalized = if theme == "light" { "light" } else { "dark" };
+    if let Some(state) = handle.try_state::<ThemeState>() {
+        state.set(normalized);
+    }
+    apply_appearance_all(&handle, normalized);
+}
+
+// ── Floating window (Feishu-style) ──────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct FloatingItem {
+    id: String,
+    text: String,
+    timestamp: u64,
+}
+
+const MAX_FLOATING_ITEMS: usize = 100;
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+struct BallPosition {
+    x: f64,
+    y: f64,
+}
+
+struct FloatingState {
+    items: Mutex<Vec<FloatingItem>>,
+    next_id: AtomicU64,
+    data_path: Mutex<Option<std::path::PathBuf>>,
+}
+
+impl FloatingState {
+    fn new() -> Self {
+        Self {
+            items: Mutex::new(Vec::new()),
+            next_id: AtomicU64::new(1),
+            data_path: Mutex::new(None),
+        }
+    }
+
+    fn gen_id(&self) -> String {
+        let n = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        format!("{ts:x}-{n:x}")
+    }
+
+    fn save_items(&self) {
+        let guard = lock_or_recover(&self.data_path);
+        let Some(dir) = guard.as_ref() else { return };
+        let path = dir.join("floating_items.json");
+        let items = lock_or_recover(&self.items);
+        if let Ok(json) = serde_json::to_string_pretty(&*items) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+
+    fn load_items(&self) {
+        let guard = lock_or_recover(&self.data_path);
+        let Some(dir) = guard.as_ref() else { return };
+        let path = dir.join("floating_items.json");
+        if let Ok(json) = std::fs::read_to_string(&path) {
+            if let Ok(items) = serde_json::from_str::<Vec<FloatingItem>>(&json) {
+                let mut store = lock_or_recover(&self.items);
+                *store = items;
+                let max_id = store.iter()
+                    .filter_map(|i| i.id.split('-').last().and_then(|s| u64::from_str_radix(s, 16).ok()))
+                    .max()
+                    .unwrap_or(0);
+                self.next_id.store(max_id + 1, Ordering::Relaxed);
+                log::info!("loaded {} floating items from disk", store.len());
+            }
+        }
+    }
+
+    fn save_ball_pos(&self, x: f64, y: f64) {
+        let guard = lock_or_recover(&self.data_path);
+        let Some(dir) = guard.as_ref() else { return };
+        let path = dir.join("floating_ball_pos.json");
+        let pos = BallPosition { x, y };
+        if let Ok(json) = serde_json::to_string(&pos) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+
+    fn load_ball_pos(&self) -> Option<BallPosition> {
+        let guard = lock_or_recover(&self.data_path);
+        let dir = guard.as_ref()?;
+        let path = dir.join("floating_ball_pos.json");
+        let json = std::fs::read_to_string(path).ok()?;
+        serde_json::from_str(&json).ok()
+    }
+}
+
+#[tauri::command]
+fn toggle_floating_panel(handle: AppHandle) {
+    let port = resolve_backend_port();
+
+    if let Some(panel) = handle.get_webview_window("floating-panel") {
+        if panel.is_visible().unwrap_or(false) {
+            let _ = panel.hide();
+        } else {
+            position_panel_near_ball(&handle, &panel);
+            let _ = panel.show();
+            let _ = panel.set_focus();
+        }
+        return;
+    }
+
+    let url = format!("http://127.0.0.1:{port}/floating-panel");
+    let (x, y) = panel_position_from_ball(&handle);
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        &handle,
+        "floating-panel",
+        WebviewUrl::External(url.parse().unwrap()),
+    )
+    .title("")
+    .inner_size(320.0, 460.0)
+    .position(x, y)
+    .decorations(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .focused(true);
+
+    match builder.build() {
+        Ok(panel) => {
+            log::info!("floating panel created");
+            apply_window_appearance(&panel, &current_theme(&handle));
+        }
+        Err(e) => log::error!("failed to create floating panel: {e}"),
+    }
+}
+
+fn position_panel_near_ball(handle: &AppHandle, panel: &tauri::WebviewWindow) {
+    if let Some(ball) = handle.get_webview_window("floating-ball") {
+        if let Ok(pos) = ball.outer_position() {
+            let _ = panel.set_position(tauri::PhysicalPosition::new(
+                pos.x - 270,
+                pos.y - 460,
+            ));
+        }
+    }
+}
+
+fn panel_position_from_ball(handle: &AppHandle) -> (f64, f64) {
+    if let Some(ball) = handle.get_webview_window("floating-ball") {
+        if let Ok(pos) = ball.outer_position() {
+            return ((pos.x - 270) as f64, (pos.y - 460) as f64);
+        }
+    }
+    (400.0, 200.0)
+}
+
+#[tauri::command]
+fn get_floating_items(state: State<FloatingState>) -> Vec<FloatingItem> {
+    lock_or_recover(&state.items).clone()
+}
+
+#[tauri::command]
+fn get_floating_count(state: State<FloatingState>) -> usize {
+    lock_or_recover(&state.items).len()
+}
+
+#[tauri::command]
+fn add_floating_item(
+    text: String,
+    state: State<FloatingState>,
+    handle: AppHandle,
+) -> FloatingItem {
+    let item = FloatingItem {
+        id: state.gen_id(),
+        text,
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    };
+    {
+        let mut items = lock_or_recover(&state.items);
+        items.insert(0, item.clone());
+        items.truncate(MAX_FLOATING_ITEMS);
+    }
+    state.save_items();
+    let _ = handle.emit("yunque:floating-update", ());
+    item
+}
+
+#[tauri::command]
+fn remove_floating_item(id: String, state: State<FloatingState>, handle: AppHandle) {
+    lock_or_recover(&state.items).retain(|i| i.id != id);
+    state.save_items();
+    let _ = handle.emit("yunque:floating-update", ());
+}
+
+#[tauri::command]
+fn clear_floating_items(state: State<FloatingState>, handle: AppHandle) {
+    lock_or_recover(&state.items).clear();
+    state.save_items();
+    let _ = handle.emit("yunque:floating-update", ());
+}
+
+#[tauri::command]
+fn floating_send_to_chat(text: String, handle: AppHandle) {
+    if let Some(main) = handle.get_webview_window("main") {
+        let js = format!(
+            "document.dispatchEvent(new CustomEvent('yunque:quick-send', {{ detail: {} }}));",
+            serde_json::to_string(&text).unwrap_or_default()
+        );
+        let _ = main.eval(&js);
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    if let Some(panel) = handle.get_webview_window("floating-panel") {
+        let _ = panel.hide();
+    }
+}
+
+fn create_floating_ball(handle: &AppHandle, port: u16) {
+    let url = format!("http://127.0.0.1:{port}/floating-ball");
+
+    let state = handle.state::<FloatingState>();
+    let (x, y) = if let Some(pos) = state.load_ball_pos() {
+        (pos.x, pos.y)
+    } else if let Ok(Some(monitor)) = handle.primary_monitor() {
+        let size = monitor.size();
+        let scale = monitor.scale_factor();
+        (
+            (size.width as f64 / scale - 80.0),
+            (size.height as f64 / scale - 120.0),
+        )
+    } else {
+        (1800.0, 900.0)
+    };
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        handle,
+        "floating-ball",
+        WebviewUrl::External(url.parse().unwrap()),
+    )
+    .title("")
+    .inner_size(56.0, 56.0)
+    .position(x, y)
+    .decorations(false)
+    .resizable(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .focused(false);
+
+    match builder.build() {
+        Ok(ball) => {
+            log::info!("floating ball created at ({x}, {y})");
+            // The 56x56 ball renders as a circle in CSS, but we still set
+            // window-level material so its drop-shadow / hover halo blend
+            // with the desktop instead of clipping against opaque pixels.
+            apply_window_appearance(&ball, &current_theme(handle));
+        }
+        Err(e) => log::error!("failed to create floating ball: {e}"),
+    }
+}
+
+// ── Keyboard simulation ─────────────────────────────────────────────────────
+
+#[cfg(windows)]
+fn simulate_ctrl_c() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL,
+    };
+    let vk_c: u16 = 0x43; // 'C'
+    let inputs: [INPUT; 4] = [
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_CONTROL,
+                    wScan: 0,
+                    dwFlags: 0,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_c,
+                    wScan: 0,
+                    dwFlags: 0,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk_c,
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VK_CONTROL,
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+    ];
+    unsafe {
+        SendInput(4, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(not(windows))]
+fn simulate_ctrl_c() {
+    log::warn!("simulate_ctrl_c not implemented on this platform");
+}
+
+fn register_selection_shortcut(handle: &AppHandle) {
+    let shortcut: Shortcut = "Alt+Y".parse().unwrap();
+    let handle2 = handle.clone();
+    if let Err(e) = handle.global_shortcut().on_shortcut(shortcut, move |_app, _sc, event| {
+        if event.state != ShortcutState::Pressed {
+            return;
+        }
+        log::info!("global shortcut Alt+Y triggered");
+        let h = handle2.clone();
+        tauri::async_runtime::spawn(async move {
+            let old_clip = h.clipboard().read_text().unwrap_or_default();
+            simulate_ctrl_c();
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            let new_clip = h.clipboard().read_text().unwrap_or_default();
+            let text = if new_clip != old_clip && !new_clip.trim().is_empty() {
+                new_clip.trim().to_string()
+            } else if !old_clip.trim().is_empty() {
+                old_clip.trim().to_string()
+            } else {
+                return;
+            };
+            if text.len() < 2 {
+                return;
+            }
+
+            let state = h.state::<FloatingState>();
+            let item = FloatingItem {
+                id: state.gen_id(),
+                text: text.clone(),
+                timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            };
+            {
+                let mut items = lock_or_recover(&state.items);
+                items.insert(0, item);
+                items.truncate(MAX_FLOATING_ITEMS);
+            }
+            state.save_items();
+            let _ = h.emit("yunque:floating-update", ());
+            log::info!("added text to floating items ({} chars)", text.len());
+
+            show_floating_panel(&h);
+        });
+    }) {
+        log::error!("failed to register global shortcut: {e}");
+    }
+}
+
+fn show_floating_panel(handle: &AppHandle) {
+    if let Some(panel) = handle.get_webview_window("floating-panel") {
+        position_panel_near_ball(handle, &panel);
+        let _ = panel.show();
+        let _ = panel.set_focus();
+    } else {
+        toggle_floating_panel(handle.clone());
+    }
+}
+
 // ── Entry point ─────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // File + stderr logging. On Windows release builds there is no
-        // console, so the file target is what you grep when users report
-        // "it won't open". Log dir resolves to the platform app-log path.
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -127,23 +636,75 @@ pub fn run() {
         )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(BackendState {
             child: Mutex::new(None),
         })
+        .manage(FloatingState::new())
+        .manage(ThemeState::new())
+        .invoke_handler(tauri::generate_handler![
+            toggle_floating_panel,
+            get_floating_items,
+            get_floating_count,
+            add_floating_item,
+            remove_floating_item,
+            clear_floating_items,
+            floating_send_to_chat,
+            apply_window_theme,
+        ])
         .setup(|app| {
             let handle = app.handle().clone();
+
+            if let Ok(app_data) = handle.path().app_data_dir() {
+                let data_dir = app_data.join("data");
+                let _ = std::fs::create_dir_all(&data_dir);
+                let state = handle.state::<FloatingState>();
+                *lock_or_recover(&state.data_path) = Some(data_dir);
+                state.load_items();
+            }
+
+            // First-paint window material. The front-end will call
+            // `apply_window_theme` again as soon as it boots, but doing it
+            // here too prevents a flash where the window briefly shows
+            // the raw webview before Mica/vibrancy kicks in. We default
+            // to dark — matching the inline bootstrap script in layout.tsx.
+            if let Some(main) = handle.get_webview_window("main") {
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = main.set_decorations(true);
+                    let _ = main.set_title_bar_style(tauri::TitleBarStyle::Overlay);
+                }
+                apply_window_appearance(&main, "dark");
+            }
+
+            register_selection_shortcut(&handle);
             tauri::async_runtime::spawn(async move {
                 launch_backend(&handle).await;
             });
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            // macOS typically fires CloseRequested but not Destroyed when a
-            // user hits the red traffic-light button — listen to both so the
-            // Go sidecar never outlives its host window.
             tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
-                if let Some(state) = window.try_state::<BackendState>() {
-                    state.graceful_kill();
+                if window.label() == "main" {
+                    if let Some(ball) = window.app_handle().get_webview_window("floating-ball") {
+                        if let Ok(pos) = ball.outer_position() {
+                            if let Some(fs) = window.try_state::<FloatingState>() {
+                                fs.save_ball_pos(pos.x as f64, pos.y as f64);
+                            }
+                        }
+                    }
+                    if let Some(state) = window.try_state::<BackendState>() {
+                        state.graceful_kill();
+                    }
+                }
+            }
+            tauri::WindowEvent::Focused(false) => {
+                if window.label() == "selection-popup" {
+                    let _ = window.hide();
+                }
+                if window.label() == "floating-panel" {
+                    let _ = window.hide();
                 }
             }
             _ => {}
@@ -262,6 +823,8 @@ async fn launch_backend(handle: &AppHandle) {
             "backend healthy on port {port} ({:.1}s) — loader page will auto-navigate",
             start.elapsed().as_secs_f64()
         );
+        // Floating ball disabled by default — users can enable via settings.
+        // create_floating_ball(handle, port);
         if let Err(e) = handle.emit(
             EVT_READY,
             ReadyPayload {

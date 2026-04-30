@@ -87,15 +87,7 @@ export default function ThemeSettingsPage() {
   if (!mounted) return <div className="flex items-center justify-center h-64"><span className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>正在加载主题引擎...</span></div>;
 
   return (
-    <div className="page-root space-y-6 animate-fade-in-up" style={{ color: "var(--yunque-text)" }}>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Palette size={20} style={{ color: "var(--yunque-accent)" }} />
-        <div>
-          <h1 className="text-xl font-semibold">主题设置</h1>
-          <p className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>自定义云雀 Agent 的视觉外观、颜色搭配与全局交互风格</p>
-        </div>
-      </div>
+    <div className="space-y-6" style={{ color: "var(--yunque-text)" }}>
 
       {/* Tabs — HeroUI v3 compound pattern */}
       <Tabs defaultSelectedKey="appearance">

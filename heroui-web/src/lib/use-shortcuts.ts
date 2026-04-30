@@ -21,6 +21,7 @@ export const defaultShortcuts: ShortcutDef[] = [
   { id: "toggle_computer", label: "切换计算机面板", labelEn: "Toggle computer", defaultKey: "Alt+C", category: "chat" },
   { id: "screenshot_analyze", label: "截图分析", labelEn: "Screenshot & analyze", defaultKey: "Alt+P", category: "chat" },
   { id: "copy_last", label: "复制上条回复", labelEn: "Copy last reply", defaultKey: "Alt+Shift+C", category: "chat" },
+  { id: "zen_mode", label: "禅模式", labelEn: "Zen Mode", defaultKey: "Ctrl+\\", category: "chat" },
   { id: "prev_conv", label: "上一个对话", labelEn: "Previous chat", defaultKey: "Alt+ArrowUp", category: "chat" },
   { id: "next_conv", label: "下一个对话", labelEn: "Next chat", defaultKey: "Alt+ArrowDown", category: "chat" },
 ];

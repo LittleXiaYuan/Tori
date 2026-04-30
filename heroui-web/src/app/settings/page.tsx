@@ -10,7 +10,7 @@ import {
 import {
   Key, Save, Check, AlertTriangle, RefreshCw, Settings, Cpu, Layers,
   Shield, Plug, Database, Eye, EyeOff, Rocket, FolderOpen, FolderCheck,
-  Smile, Heart, ExternalLink, Cloud,
+  Smile, Heart, ExternalLink, Cloud, Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [activeGroup, setActiveGroup] = useState("");
   const [detectedDirs, setDetectedDirs] = useState<Array<{ label: string; label_zh: string; path: string; exists: boolean; kind: string }>>([]);
   const [detectLoading, setDetectLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => { setClientKey(getApiKey()); loadConfig(); }, []);
 
@@ -108,35 +109,40 @@ export default function SettingsPage() {
 
   if (loading) return <div className="flex-1 flex items-center justify-center"><Spinner size="lg" /></div>;
 
-  const currentGroup = schema.find(g => g.key === activeGroup);
+  const q = searchQuery.toLowerCase().trim();
+  const currentGroup = q
+    ? (() => {
+        const allFields = schema.flatMap(g => (g.fields || []).map(f => ({ ...f, groupLabel: g.label_zh || g.label })));
+        const matched = allFields.filter(f =>
+          (f.key || "").toLowerCase().includes(q) ||
+          (f.label || "").toLowerCase().includes(q) ||
+          (f.label_zh || "").toLowerCase().includes(q) ||
+          (f.hint || "").toLowerCase().includes(q)
+        );
+        return matched.length ? { key: "_search", label: "搜索结果", label_zh: "搜索结果", fields: matched } as ConfigGroup : null;
+      })()
+    : schema.find(g => g.key === activeGroup);
 
   return (
-    <div className="page-root animate-fade-in-up">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Settings size={20} style={{ color: "var(--yunque-accent)" }} /> 设置
-          </h1>
-          <p className="page-subtitle">系统配置、模型参数与安全选项</p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-          {saveResult && (
-            <Chip size="sm" variant={saveResult.ok ? "soft" : "soft"}
-              style={{ color: saveResult.ok ? "var(--yunque-success)" : "var(--yunque-danger)" }}>
-              {saveResult.ok ? <Check size={12} /> : <AlertTriangle size={12} />} {saveResult.msg}
-            </Chip>
-          )}
-          <a href="https://yunque.owo.today/zh/guide/configuration" target="_blank" rel="noopener noreferrer"
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", textDecoration: "none", padding: "4px 8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--yunque-border)", transition: "border-color 0.15s ease" }}>
-            <ExternalLink size={11} /> 配置说明
-          </a>
-          <Button variant="ghost" size="sm" onPress={loadConfig}><RefreshCw size={13} /></Button>
-          <Button size="sm" isPending={saving} onPress={handleSaveConfig}
-            style={{ background: "var(--yunque-accent)", color: "#fff", fontWeight: 600 }}>
-            <Save size={13} /> 保存
-          </Button>
-        </div>
+    <div>
+      {/* Actions bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", marginBottom: "var(--sp-4)" }}>
+        {saveResult && (
+          <Chip size="sm" variant={saveResult.ok ? "soft" : "soft"}
+            style={{ color: saveResult.ok ? "var(--yunque-success)" : "var(--yunque-danger)" }}>
+            {saveResult.ok ? <Check size={12} /> : <AlertTriangle size={12} />} {saveResult.msg}
+          </Chip>
+        )}
+        <div className="flex-1" />
+        <a href="https://yunque.owo.today/zh/guide/configuration" target="_blank" rel="noopener noreferrer"
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", textDecoration: "none", padding: "4px 8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--yunque-border)", transition: "border-color 0.15s ease" }}>
+          <ExternalLink size={11} /> 配置说明
+        </a>
+        <Button variant="ghost" size="sm" onPress={loadConfig}><RefreshCw size={13} /></Button>
+        <Button size="sm" isPending={saving} onPress={handleSaveConfig}
+          style={{ background: "var(--yunque-accent)", color: "#fff", fontWeight: 600 }}>
+          <Save size={13} /> 保存
+        </Button>
       </div>
 
       {/* Setup Banner */}
@@ -208,6 +214,17 @@ export default function SettingsPage() {
         <div className="settings-layout">
           {/* Left navigation */}
           <nav className="settings-nav">
+            <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 mb-2 text-xs"
+              style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>
+              <Search size={12} />
+              <input
+                className="bg-transparent outline-none flex-1 text-xs"
+                placeholder="搜索配置项…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ color: "var(--yunque-text)" }}
+              />
+            </div>
             {schema.map(group => {
               const meta = groupMeta[group.key] || groupMeta.other;
               const Icon = meta.icon;

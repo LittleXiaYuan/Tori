@@ -649,6 +649,14 @@
       "event_type": "enabled",
       "timestamp": "2026-04-27T00:02:38.8591058+08:00",
       "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_3fbef7d1",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-27T00:12:14.740247+08:00",
+      "message": "Trigger created: Test Trigger"
     }
   ]
 }

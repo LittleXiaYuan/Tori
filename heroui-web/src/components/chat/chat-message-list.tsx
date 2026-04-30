@@ -77,9 +77,9 @@ export function ChatMessageList({
               });
               return (
                 <>
-                  <div className="chat-inline-panel mb-1.5 rounded-xl border px-2 py-2" style={{ background: "rgba(255,255,255,0.025)", borderColor: "rgba(255,255,255,0.06)" }}>
+                  <div className="chat-inline-panel mb-1.5 rounded-xl border px-2 py-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
+                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
                         {isLive ? "运行中" : "已完成"}
                       </span>
                       {(() => {
@@ -87,12 +87,12 @@ export function ChatMessageList({
                         return (
                           <>
                             {summary.primarySkill && (
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
+                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-secondary)" }}>
                                 {summary.primarySkill}
                               </span>
                             )}
                             {summary.toolCount > 0 && (
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
+                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-secondary)" }}>
                                 {summary.toolCount} tool events
                               </span>
                             )}
@@ -138,12 +138,12 @@ export function ChatMessageList({
             <div
               className={`chat-message-card text-[14px] leading-7 whitespace-pre-wrap ${isBubble ? `px-3.5 py-2.5 rounded-[18px] ${msg.role === "assistant" ? "assistant-message-shell chat-message-card--assistant" : "chat-message-card--user"}` : "py-1"}`}
               style={isBubble ? {
-                background: msg.role === "user" ? "linear-gradient(180deg, rgba(59,130,246,0.9), rgba(37,99,235,0.86))" : "linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.008)), var(--yunque-card)",
-                color: msg.role === "user" ? "#fff" : "var(--yunque-text)",
-                border: msg.role === "assistant" ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(59,130,246,0.12)",
+                background: msg.role === "user" ? "var(--neutral-strong-bg)" : "var(--yunque-card)",
+                color: msg.role === "user" ? "var(--neutral-strong-fg)" : "var(--yunque-text)",
+                border: msg.role === "assistant" ? "1px solid var(--yunque-border)" : "1px solid transparent",
                 borderBottomRightRadius: msg.role === "user" ? "8px" : undefined,
                 borderBottomLeftRadius: msg.role === "assistant" ? "8px" : undefined,
-                boxShadow: msg.role === "assistant" ? "0 8px 22px rgba(0,0,0,0.14)" : "0 8px 20px rgba(37,99,235,0.14)",
+                boxShadow: "var(--shadow-sm)",
               } : { color: "var(--yunque-text)" }}
             >
               {msg.role === "user" && msg.images && msg.images.length > 0 && (
@@ -224,20 +224,20 @@ export function ChatMessageList({
             )}
             {/* Actions */}
             {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
-              <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+              <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Suggested actions</div>
                 <AgentActions actions={msg.actions} onAction={onAction} />
               </div>
             )}
             {/* Browser summary */}
             {msg.role === "assistant" && msg.browserSummary && (
-              <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+              <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Browser artifact</div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
                   {msg.browserSummary.action && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(msg.browserSummary.action)}</span>}
-                  {typeof msg.browserSummary.elementCount === "number" && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.elementCount} elements</span>}
-                  {msg.browserSummary.hasScreenshot && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.1)", color: "#86efac" }}>screenshot ready</span>}
-                  {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.textLength} chars</span>}
+                  {typeof msg.browserSummary.elementCount === "number" && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.elementCount} elements</span>}
+                  {msg.browserSummary.hasScreenshot && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}>screenshot ready</span>}
+                  {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.textLength} chars</span>}
                 </div>
                 {(msg.browserSummary.title || msg.browserSummary.url) && (
                   <div className="mt-2 min-w-0">
@@ -279,7 +279,7 @@ export function ChatMessageList({
               const files = collectGeneratedFiles(msg.traceEvents);
               if (files.length === 0) return null;
               return (
-                <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Generated files</div>
                   <div className="space-y-2">
                     {files.map((f, i) => {
@@ -288,15 +288,15 @@ export function ChatMessageList({
                       return (
                         <a key={i} href={`/api/files/download?path=${encodeURIComponent(f.path)}`} download={f.name || f.path}
                           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01]"
-                          style={{ background: isDoc ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.06)", border: "1px solid rgba(59,130,246,0.2)", color: "#93c5fd" }}>
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: isDoc ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.08)" }}><Paperclip size={18} /></div>
+                          style={{ background: isDoc ? "var(--yunque-accent-muted)" : "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: isDoc ? "var(--yunque-accent-muted)" : "var(--yunque-bg-muted)" }}><Paperclip size={18} /></div>
                           <div className="flex-1 min-w-0">
                             <div className="truncate font-semibold">{f.name || f.path.split("/").pop() || f.path}</div>
                             <div className="text-[11px] mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>
                               {ext.toUpperCase()} {f.size != null && f.size > 0 ? `  ${f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${(f.size / 1024).toFixed(1)} KB`}` : ""}
                             </div>
                           </div>
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(59,130,246,0.15)" }}><span style={{ color: "#60a5fa", fontSize: 16 }}>↗</span></div>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--yunque-accent-muted)" }}><span style={{ color: "var(--yunque-accent)", fontSize: 16 }}>↗</span></div>
                         </a>
                       );
                     })}
@@ -308,7 +308,7 @@ export function ChatMessageList({
             {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !streaming && (
               <details className="mt-3">
                 <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Next moves</summary>
-                <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
+                <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                   <div className="flex flex-wrap gap-2">
                     {msg.suggestions.map((s, i) => (
                       <button key={i} onClick={() => {
@@ -403,7 +403,7 @@ export function ChatMessageList({
                 <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>重新发送</Tooltip.Content></Tooltip>
               </div>
             )}
-            {!isBubble && <div className="mt-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }} />}
+            {!isBubble && <div className="mt-3" style={{ borderBottom: "1px solid var(--yunque-border)" }} />}
           </div>
           {isBubble && msg.role === "user" && (
             <Avatar size="sm" className="shrink-0 mt-1" style={{ background: "#374151" }}>

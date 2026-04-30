@@ -87,9 +87,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const msgs = [...state.messages];
       if (msgs.length === 0) return state;
       const last = msgs[msgs.length - 1];
+      const separator = last.content.trim() ? "\n\n" : "";
       msgs[msgs.length - 1] = {
         ...last,
-        content: last.content + `\n\n[FAIL] ${action.error}`,
+        content: last.content + `${separator}> ⚠ ${action.error}`,
       };
       return { ...state, messages: msgs };
     }

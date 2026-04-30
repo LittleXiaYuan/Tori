@@ -5,7 +5,7 @@
   "identifier": "com.yunque.agent",
   "build": {
     "frontendDist": "./frontend",
-    "devUrl": "http://localhost:3001"
+    "devUrl": "http://localhost:3002"
   },
   "app": {
     "withGlobalTauri": true,
@@ -18,12 +18,14 @@
         "minWidth": 800,
         "minHeight": 600,
         "center": true,
-        "decorations": true,
-        "visible": true
+        "decorations": false,
+        "hiddenTitle": true,
+        "visible": true,
+        "transparent": true
       }
     ],
     "security": {
-      "csp": "default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* https:; img-src 'self' data: blob: http://localhost:* https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* http://ipc.localhost ipc: https:; img-src 'self' data: blob: http://localhost:* https:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
     }
   },
   "bundle": {

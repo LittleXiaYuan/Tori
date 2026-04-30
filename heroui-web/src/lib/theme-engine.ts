@@ -115,6 +115,30 @@ function darkenHex(hex: string, amount: number): string {
 
 /* ---------------- apply ---------------- */
 
+/**
+ * Ask the Tauri host to re-apply the platform-native window appearance
+ * (NSAppearance + vibrancy on macOS, set_theme + acrylic tint on Windows)
+ * for every window we own. Silently no-ops in a plain browser tab.
+ *
+ * We intentionally read `__TAURI_INTERNALS__.invoke` rather than importing
+ * `@tauri-apps/api` so this module stays usable from a non-Tauri build of
+ * the same UI (e.g. when running the dashboard in a regular browser for
+ * design QA).
+ */
+function syncTauriWindowTheme(mode: "light" | "dark"): void {
+  if (typeof window === "undefined") return;
+  const tauri = (window as unknown as {
+    __TAURI_INTERNALS__?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+  }).__TAURI_INTERNALS__;
+  if (!tauri?.invoke) return;
+  try {
+    void tauri.invoke("apply_window_theme", { theme: mode });
+  } catch {
+    // Tauri may fail to deliver the IPC during teardown; nothing useful
+    // to surface to the user.
+  }
+}
+
 export function applyTheme(cfg: ThemeConfig): void {
   if (typeof document === "undefined") return;
   const html = document.documentElement;
@@ -128,6 +152,8 @@ export function applyTheme(cfg: ThemeConfig): void {
   html.classList.add(mode);
   html.setAttribute("data-theme", mode);
   const isLight = mode === "light";
+
+  syncTauriWindowTheme(isLight ? "light" : "dark");
 
   const palette =
     cfg.colorTheme === "custom"
@@ -146,12 +172,12 @@ export function applyTheme(cfg: ThemeConfig): void {
 
   const radiusMap: Record<string, string> = {
     right: "0px",
-    default: "8px",
-    small: "4px",
-    medium: "12px",
-    large: "16px",
+    default: "10px",
+    small: "6px",
+    medium: "14px",
+    large: "18px",
   };
-  const rv = radiusMap[cfg.radius] ?? "8px";
+  const rv = radiusMap[cfg.radius] ?? "10px";
   const rvNum = parseInt(rv);
   s.setProperty("--radius-sm", rvNum === 0 ? "0px" : `${Math.max(rvNum - 2, 2)}px`);
   s.setProperty("--radius-md", rv);
@@ -182,9 +208,9 @@ export function applyTheme(cfg: ThemeConfig): void {
     document.body.style.backgroundAttachment = "fixed";
     const bgAlpha = cfg.interfaceBgOpacity / 100;
     const overlayAlpha = (1 - bgAlpha) * 0.85;
-    const overlayBase = isLight ? "248,249,251" : "9,9,11";
+    const overlayBase = isLight ? "255,255,255" : "10,10,12";
     s.setProperty("--yunque-bg-overlay", `rgba(${overlayBase},${overlayAlpha.toFixed(2)})`);
-    const baseColor = isLight ? "248,249,251" : "9,9,11";
+    const baseColor = isLight ? "255,255,255" : "10,10,12";
     s.setProperty("--yunque-bg", `rgba(${baseColor},${(1 - bgAlpha * 0.6).toFixed(2)})`);
     const overlayEl = document.getElementById("bg-overlay");
     if (overlayEl) overlayEl.style.backdropFilter = cfg.interfaceBgBlur > 0 ? `blur(${cfg.interfaceBgBlur}px)` : "";
