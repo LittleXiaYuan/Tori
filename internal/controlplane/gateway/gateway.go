@@ -61,6 +61,7 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/gateway/connectorapi"
 	"yunque-agent/internal/controlplane/gateway/costapi"
+	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
 	"yunque-agent/internal/controlplane/gateway/loraapi"
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
@@ -721,6 +722,11 @@ func (g *Gateway) routes() {
 
 	(&schedulerapi.Handler{
 		Scheduler: g.scheduler,
+	}).RegisterRoutes(g.mux, g.requireAuth)
+
+	(&forkapi.Handler{
+		ForkTree:  g.forkTree,
+		Persister: g.forkPersister,
 	}).RegisterRoutes(g.mux, g.requireAuth)
 }
 
