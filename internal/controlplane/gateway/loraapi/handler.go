@@ -1,4 +1,4 @@
-package gateway
+package loraapi
 
 import (
 	"context"
@@ -9,42 +9,65 @@ import (
 
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/controlplane/gateway/gwshared"
 )
 
-func (g *Gateway) handleLoRAStatus(w http.ResponseWriter, r *http.Request) {
+// Handler serves LoRA training and evolution HTTP endpoints.
+type Handler struct {
+	Scheduler   *localbrain.LoRAScheduler
+	Metrics     *localbrain.TrainingMetrics
+	Evolution   *localbrain.EvolutionCoordinator
+}
+
+// RegisterRoutes mounts all /v1/lora/* endpoints.
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
+	mux.HandleFunc("/v1/lora/status", auth(h.handleStatus))
+	mux.HandleFunc("/v1/lora/history", auth(h.handleHistory))
+	mux.HandleFunc("/v1/lora/summary", auth(h.handleSummary))
+	mux.HandleFunc("/v1/lora/trigger", auth(h.handleTrigger))
+	mux.HandleFunc("/v1/lora/rollback", auth(h.handleRollback))
+	mux.HandleFunc("/v1/lora/evolution", auth(h.handleEvolution))
+	mux.HandleFunc("/v1/lora/config", auth(h.handleConfig))
+}
+
+func (h *Handler) metrics() *localbrain.TrainingMetrics {
+	if h.Metrics != nil {
+		return h.Metrics
+	}
+	if h.Scheduler != nil {
+		return h.Scheduler.Metrics()
+	}
+	return nil
+}
+
+func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
 	}
-	if g.loraScheduler == nil {
+	if h.Scheduler == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
 		return
 	}
 
-	state := g.loraScheduler.State()
-	active := g.loraScheduler.ActiveModel()
-
 	out := map[string]any{
-		"scheduler":    state,
-		"active_model": active,
+		"scheduler":    h.Scheduler.State(),
+		"active_model": h.Scheduler.ActiveModel(),
 	}
-	if g.evolutionCoordinator != nil {
-		out["rolling_success_rate"] = g.evolutionCoordinator.State().RollingSuccessRate
+	if h.Evolution != nil {
+		out["rolling_success_rate"] = h.Evolution.State().RollingSuccessRate
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
 }
 
-func (g *Gateway) handleLoRAHistory(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
 	}
-	m := g.trainingMetrics
-	if m == nil && g.loraScheduler != nil {
-		m = g.loraScheduler.Metrics()
-	}
+	m := h.metrics()
 	if m == nil {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "count": 0})
@@ -59,37 +82,33 @@ func (g *Gateway) handleLoRAHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (g *Gateway) handleLoRASummary(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
 	}
-	m := g.trainingMetrics
-	if m == nil && g.loraScheduler != nil {
-		m = g.loraScheduler.Metrics()
-	}
+	m := h.metrics()
 	if m == nil {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"summary": struct{}{}})
 		return
 	}
 
-	summary := m.Summary()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"summary": summary})
+	_ = json.NewEncoder(w).Encode(map[string]any{"summary": m.Summary()})
 }
 
-func (g *Gateway) handleLoRATrigger(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleTrigger(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
 	}
-	if g.loraScheduler == nil {
+	if h.Scheduler == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
 		return
 	}
 
-	tenantID := tenantFromCtx(r.Context())
+	tenantID := gwshared.TenantFromCtx(r.Context())
 	if tenantID == "" || tenantID == "setup" {
 		tenantID = "default"
 	}
@@ -111,7 +130,7 @@ func (g *Gateway) handleLoRATrigger(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Hour)
 	defer cancel()
 
-	err := g.loraScheduler.CheckAndTrigger(ctx, tenantID)
+	err := h.Scheduler.CheckAndTrigger(ctx, tenantID)
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
@@ -120,12 +139,12 @@ func (g *Gateway) handleLoRATrigger(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "tenant_id": tenantID})
 }
 
-func (g *Gateway) handleLoRARollback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleRollback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
 	}
-	if g.loraScheduler == nil {
+	if h.Scheduler == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
 		return
 	}
@@ -133,7 +152,7 @@ func (g *Gateway) handleLoRARollback(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
 
-	err := g.loraScheduler.Rollback(ctx)
+	err := h.Scheduler.Rollback(ctx)
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
@@ -142,28 +161,41 @@ func (g *Gateway) handleLoRARollback(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
 }
 
-func (g *Gateway) handleLoRAConfig(w http.ResponseWriter, r *http.Request) {
-	if g.loraScheduler == nil {
+func (h *Handler) handleEvolution(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
+		return
+	}
+	if h.Evolution == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "evolution coordinator not configured")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"state": h.Evolution.State()})
+}
+
+func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if h.Scheduler == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
 		return
 	}
 
 	switch r.Method {
 	case http.MethodGet:
-		cfg := g.loraScheduler.Config()
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"config": cfg})
+		_ = json.NewEncoder(w).Encode(map[string]any{"config": h.Scheduler.Config()})
 
 	case http.MethodPut, http.MethodPatch:
 		var body struct {
-			MinSamples     int    `json:"min_samples"`
-			MinInterval    string `json:"min_interval"`
-			EvalMinScore   float64 `json:"eval_min_score"`
-			MaxAdapters    int    `json:"max_adapters"`
-			BaseModel      string `json:"base_model"`
-			TrainingDataDir string `json:"training_data_dir"`
-			AdapterDir     string `json:"adapter_dir"`
-			ABTestDuration string `json:"ab_test_duration"`
+			MinSamples      int     `json:"min_samples"`
+			MinInterval     string  `json:"min_interval"`
+			EvalMinScore    float64 `json:"eval_min_score"`
+			MaxAdapters     int     `json:"max_adapters"`
+			BaseModel       string  `json:"base_model"`
+			TrainingDataDir string  `json:"training_data_dir"`
+			AdapterDir      string  `json:"adapter_dir"`
+			ABTestDuration  string  `json:"ab_test_duration"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON: "+err.Error())
@@ -188,27 +220,11 @@ func (g *Gateway) handleLoRAConfig(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		g.loraScheduler.UpdateConfig(patch)
-		cfg := g.loraScheduler.Config()
+		h.Scheduler.UpdateConfig(patch)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"config": cfg, "status": "updated"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"config": h.Scheduler.Config(), "status": "updated"})
 
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or PUT/PATCH only")
 	}
-}
-
-func (g *Gateway) handleLoRAEvolution(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
-		return
-	}
-	if g.evolutionCoordinator == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "evolution coordinator not configured")
-		return
-	}
-
-	state := g.evolutionCoordinator.State()
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"state": state})
 }

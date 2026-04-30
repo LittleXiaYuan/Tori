@@ -243,14 +243,7 @@ func (g *Gateway) registerGovernanceRoutes() {
 	// Skill Grow
 	g.mux.HandleFunc("/api/skillgrow/patterns", g.requireAuth(g.handleSkillGrowPatterns))
 
-	// Cost tracking
-	g.mux.HandleFunc("/v1/cost/summary", g.requireAuth(g.handleCostSummary))
-	g.mux.HandleFunc("/v1/cost/budget", g.requireAuth(g.handleCostBudget))
-	g.mux.HandleFunc("/v1/cost/task", g.requireAuth(g.handleCostByTask))
-	g.mux.HandleFunc("/v1/cost/task/timeline", g.requireAuth(g.handleCostTaskTimeline))
-	g.mux.HandleFunc("/v1/cost/breakdown", g.requireAuth(g.handleCostBreakdown))
-	g.mux.HandleFunc("/v1/cost/history", g.requireAuth(g.handleCostHistory))
-	g.mux.HandleFunc("/v1/cost/alerts", g.requireAuth(g.handleCostAlerts))
+	// Cost routes moved to costapi sub-package
 
 	// Usage / Quota
 	g.mux.HandleFunc("/v1/usage", g.requireAuth(g.handleUsage))
@@ -403,16 +396,5 @@ func (g *Gateway) registerWorkflowRoutes() {
 	g.mux.HandleFunc("/v1/workflows/cancel", g.requireAuth(g.handleWorkflowCancel))
 }
 
-// ──────────────────────────────────────────────
-// LoRA training & evolution
-// ──────────────────────────────────────────────
-
-func (g *Gateway) registerLoRARoutes() {
-	g.mux.HandleFunc("/v1/lora/status", g.requireAuth(g.handleLoRAStatus))
-	g.mux.HandleFunc("/v1/lora/history", g.requireAuth(g.handleLoRAHistory))
-	g.mux.HandleFunc("/v1/lora/summary", g.requireAuth(g.handleLoRASummary))
-	g.mux.HandleFunc("/v1/lora/trigger", g.requireAuth(g.handleLoRATrigger))
-	g.mux.HandleFunc("/v1/lora/rollback", g.requireAuth(g.handleLoRARollback))
-	g.mux.HandleFunc("/v1/lora/evolution", g.requireAuth(g.handleLoRAEvolution))
-	g.mux.HandleFunc("/v1/lora/config", g.requireAuth(g.handleLoRAConfig))
-}
+// LoRA and Cost routes are registered via sub-packages (loraapi, costapi)
+// in gateway.go routes() — see the "Extracted handler groups" section.
