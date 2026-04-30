@@ -13,14 +13,14 @@ func TestListTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools) != 5 {
-		t.Fatalf("expected 5 tools, got %d", len(tools))
+	if len(tools) != 6 {
+		t.Fatalf("expected 6 tools, got %d", len(tools))
 	}
 	names := map[string]bool{}
 	for _, tool := range tools {
 		names[tool.Name] = true
 	}
-	for _, want := range []string{"web_fetch", "code_exec", "file_read", "file_write", "file_list"} {
+	for _, want := range []string{"web_fetch", "code_exec", "file_read", "file_write", "file_list", "configure_settings"} {
 		if !names[want] {
 			t.Fatalf("missing tool: %s", want)
 		}

@@ -55,7 +55,7 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
             <button
               key={card.label}
               onClick={() => {
-                const text = ("prompt" in card && card.prompt) || card.label;
+                const text: string = ("prompt" in card && typeof card.prompt === "string" && card.prompt) ? card.prompt : card.label;
                 if ("autoSend" in card && card.autoSend && onSend) {
                   onSend(text);
                 } else {

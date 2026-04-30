@@ -122,14 +122,26 @@ func initGateway(app *agentrt.App) error {
 	channelCtx, channelCancel := context.WithCancel(context.Background())
 
 	// Wire Reverie delivery — with Inbox fallback when no channel targets are configured
-	inboxStoreRaw, _ := app.Get(agentrt.CompInbox)
-	inboxStoreForReverie, _ := inboxStoreRaw.(*inbox.Store)
+	var inboxStoreForReverie *inbox.Store
+	if inboxStoreRaw, ok := app.Get(agentrt.CompInbox); ok {
+		if typed, castOk := inboxStoreRaw.(*inbox.Store); castOk {
+			inboxStoreForReverie = typed
+		} else {
+			slog.Warn("inbox store component present but wrong type", "type", fmt.Sprintf("%T", inboxStoreRaw))
+		}
+	}
 	wireReverieDelivery(app.Reverie, channelReg, inboxStoreForReverie, channelCtx)
 	app.Reverie.Start(channelCtx)
 
 	// Start all channels with message handler
-	hookMgrRaw, _ := app.Get("hook_manager")
-	hookMgr, _ := hookMgrRaw.(*pluginpkg.HookManager)
+	var hookMgr *pluginpkg.HookManager
+	if hookMgrRaw, ok := app.Get("hook_manager"); ok {
+		if typed, castOk := hookMgrRaw.(*pluginpkg.HookManager); castOk {
+			hookMgr = typed
+		} else {
+			slog.Warn("hook_manager component present but wrong type", "type", fmt.Sprintf("%T", hookMgrRaw))
+		}
+	}
 	channelReg.StartAll(channelCtx, buildChannelHandler(
 		p, convStore, channelReg, app.Orchestrator, app.Reverie,
 		emotionHistory, stickerCollector, emotionShiftDetector,

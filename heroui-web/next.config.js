@@ -21,9 +21,9 @@ const securityHeaders = [
       // (data:), favicons, or remote knowledge sources; narrow this further
       // if you disable those features.
       "img-src 'self' data: blob: https:",
-      // Tauri 2 的 IPC 走 http://ipc.localhost 协议（apply_window_theme 等命令）
-      // 以及 ipc: 协议；不放行会导致前端 ti.invoke() 全部被 CSP 阻止。
-      "connect-src 'self' http://localhost:* ws://localhost:* http://ipc.localhost ipc: https: wss:",
+      // Tauri 2 的 IPC 走 https://ipc.localhost 协议（Windows WebView2）
+      // 以及 ipc: 协议（macOS/Linux）；不放行会导致前端 ti.invoke() 全部被 CSP 阻止。
+      "connect-src 'self' http://localhost:* ws://localhost:* https://ipc.localhost ipc: https: wss:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

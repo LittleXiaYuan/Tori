@@ -1,0 +1,65 @@
+# ── Secrets & environment ──
+.env
+.env.*
+!.env.example
+
+# ── Version control ──
+.git/
+.gitignore
+
+# ── Build outputs & temp ──
+dist/
+*.log
+*.out
+*.err
+tmp*.txt
+
+# ── Runtime data ──
+data/
+
+# ── IDE / OS ──
+.idea/
+.vscode/
+.cursor/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ── Go ──
+vendor/
+
+# ── Frontend build artifacts & deps ──
+heroui-web/node_modules/
+heroui-web/.next/
+heroui-web/out/
+
+# ── Legacy frontend ──
+web/
+docs/node_modules/
+docs/.vitepress/
+
+# ── Documentation (not needed in image) ──
+doc/
+*.md
+!migrations/README.md
+
+# ── Test files (not needed in production image) ──
+*_test.go
+testdata/
+
+# ── CI/CD config ──
+.github/
+.golangci.yml
+
+# ── Desktop app (Tauri) ──
+desktop/
+
+# ── Misc ──
+coverage.out
+coverage.html
+.commit-msg.tmp
+.commit-msg-*.tmp
+test-mcp.json
+Makefile

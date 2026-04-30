@@ -1167,11 +1167,7 @@ export const api = {
 
   // ── Cogni Experience ──
   getCogniExperience: (id: string) =>
-    fetcher<{
-      id: string; enabled: boolean;
-      stats?: import("./api-types/cogni").CogniExperienceStats;
-      tool_memory?: unknown[]; patterns?: unknown[]; domain_facts?: unknown[];
-    }>(`/v1/cognis/${encodeURIComponent(id)}/experience`),
+    fetcher<import("./api-types/cogni").CogniExperienceResponse>(`/v1/cognis/${encodeURIComponent(id)}/experience`),
 
   // ── Cogni Evolution ──
   triggerCogniEvolution: (id: string) =>

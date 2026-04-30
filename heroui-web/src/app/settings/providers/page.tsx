@@ -602,7 +602,7 @@ export default function ProvidersPage() {
           <div className="flex items-center justify-between mb-3">
             <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>已配置的模型提供商</span>
             <Button size="sm" variant="ghost" onPress={async () => {
-              try { const r = await api.breakerReset(); showToast(`已重置 ${r.reset_count} 个熔断器`, "success"); refresh(); } catch (e: any) { showToast(e.message, "error"); }
+              try { const r = await api.breakerReset(); showToast(`已重置 ${r.reset_count} 个熔断器`, "success"); refresh(); } catch (e: unknown) { showToast(e instanceof Error ? e.message : String(e), "error"); }
             }} style={{ fontSize: "var(--text-xs)" }}>
               重置熔断器
             </Button>

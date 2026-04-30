@@ -160,6 +160,7 @@ type Gateway struct {
 	zhGuard       *guardrails.Pipeline
 	toolGuard     *guardrails.ToolGuard
 	egressGuard   *guardrails.EgressGuard
+	sanitizer     *guardrails.Sanitizer
 	trustTracker  *trust.Tracker
 	reviewGate    *review.Gate
 	auditChain    *audit.Chain

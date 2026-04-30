@@ -32,8 +32,8 @@ export default function NotificationsPage() {
     try {
       const res = await api.notifyChannels();
       setChannels(res.channels || []);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -52,8 +52,8 @@ export default function NotificationsPage() {
       setNewURL("");
       setShowAdd(false);
       await load();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -64,8 +64,8 @@ export default function NotificationsPage() {
     try {
       await api.notifyRemove(id);
       await load();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -75,8 +75,8 @@ export default function NotificationsPage() {
     try {
       await api.notifyToggle(id, enabled);
       setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, enabled } : ch));
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -85,8 +85,8 @@ export default function NotificationsPage() {
     try {
       await api.notifyTest(id);
       showToast("测试通知已发送", "success");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }

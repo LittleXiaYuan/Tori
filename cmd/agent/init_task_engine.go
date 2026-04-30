@@ -54,13 +54,22 @@ func initTaskEngine(
 ) error {
 	cfg := app.Config
 	p := app.Planner
+
+	taskEngineCtx, taskEngineCancel := context.WithCancel(context.Background())
+	app.Lifecycle.RegisterFunc("task_engine_ctx", nil, func(_ context.Context) {
+		taskEngineCancel()
+	})
 	channelReg := app.MustGet(agentrt.CompChannelReg).(*channel.Registry)
 	learningLoop := app.MustGet("learning_loop").(*reflectpkg.LearningLoop)
 	emotionShiftDetector := app.MustGet("emotion_shift_detector").(*planner.EmotionShiftDetector)
 
 	var typedLdg *ledger.Ledger
 	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
-		typedLdg, _ = ldgRaw.(*ledger.Ledger)
+		if typed, castOk := ldgRaw.(*ledger.Ledger); castOk {
+			typedLdg = typed
+		} else {
+			slog.Warn("ledger component present but wrong type", "type", fmt.Sprintf("%T", ldgRaw))
+		}
 	}
 
 	// ── Tools ──
@@ -194,7 +203,7 @@ func initTaskEngine(
 			if err != nil {
 				return "", err
 			}
-			go wfEngine.Run(context.Background(), inst.ID)
+			go wfEngine.Run(taskEngineCtx, inst.ID)
 			return inst.ID, nil
 		},
 	)
@@ -243,12 +252,15 @@ func initTaskEngine(
 	// ── Security Guards ──
 	toolGuard := guardrails.NewToolGuard(guardrails.LoadToolGuardConfig("data/tool-guard.yaml"))
 	egressGuard := guardrails.NewEgressGuard(guardrails.DefaultEgressGuardConfig())
+	sanitizer := guardrails.NewSanitizer(guardrails.DefaultSanitizerConfig())
 	if auditChain != nil {
 		toolGuard.SetAudit(auditChain)
 		egressGuard.SetAudit(auditChain)
+		sanitizer.SetAudit(auditChain)
 	}
 	gw.SetToolGuard(toolGuard)
 	gw.SetEgressGuard(egressGuard)
+	gw.SetSanitizer(sanitizer)
 
 	// ── Ledger State Engine ──
 	if typedLdg != nil {
@@ -515,9 +527,12 @@ func initTaskEngine(
 	gw.SetOrchestrator(app.Orchestrator)
 	guardPipeline := app.MustGet(agentrt.CompGuardPipeline).(*guardrails.Pipeline)
 	gw.SetZhGuard(guardPipeline)
-	adaptiveRaw, _ := app.Get(agentrt.CompAdaptiveLoop)
-	if adaptiveRaw != nil {
-		gw.SetAdaptiveLoop(adaptiveRaw.(*adaptive.Loop))
+	if adaptiveRaw, ok := app.Get(agentrt.CompAdaptiveLoop); ok {
+		if loop, castOk := adaptiveRaw.(*adaptive.Loop); castOk {
+			gw.SetAdaptiveLoop(loop)
+		} else {
+			slog.Warn("adaptive loop component present but wrong type", "type", fmt.Sprintf("%T", adaptiveRaw))
+		}
 	}
 	gw.SetProviderRegistry(app.Providers)
 
@@ -702,7 +717,7 @@ func wireWorkflowSkills(
 	}
 
 	runWFSkill := workflow.NewRunWorkflowSkill(wfStore, func(ctx context.Context, instanceID string) error {
-		go wfEngine.Run(context.Background(), instanceID)
+		go wfEngine.Run(taskEngineCtx, instanceID)
 		return nil
 	})
 	runWFSkill.SetTenantID(defaultTID)
@@ -727,7 +742,7 @@ func wireTriggerExecutor(
 		if err != nil {
 			return "", err
 		}
-		go taskRunner.Run(context.Background(), t.ID)
+		go taskRunner.Run(taskEngineCtx, t.ID)
 		return t.ID, nil
 	})
 	exec.SetContinueTask(func(ctx context.Context, taskID, message string) error {

@@ -73,6 +73,14 @@ func DefaultOrchestratorConfig() OrchestratorConfig {
 	}
 }
 
+// TFIDFImportanceScorer computes information density scores for content.
+// When attached, heuristicImportance uses it as a secondary signal to
+// reduce false negatives (important content missed by keyword matching).
+type TFIDFImportanceScorer interface {
+	Score(content string) float64
+	AddDocument(content string)
+}
+
 // Orchestrator ties the five memory layers together.
 type Orchestrator struct {
 	mu               sync.RWMutex
@@ -82,6 +90,7 @@ type Orchestrator struct {
 	editable         *EditableMemory // agent-editable blocks
 	importanceFn     ImportanceFunc
 	conflictDetector *ConflictDetector // optional: detects memory contradictions
+	tfidfScorer      TFIDFImportanceScorer // optional: TF-IDF importance signal
 	promotionLog     []promotionEntry
 	conflictLog      []Conflict // recent conflicts detected
 	lastPromote      time.Time  // throttle auto-promotion
@@ -119,6 +128,14 @@ func (o *Orchestrator) SetImportanceFunc(fn ImportanceFunc) {
 
 func (o *Orchestrator) SetConflictDetector(cd *ConflictDetector) {
 	o.conflictDetector = cd
+}
+
+// SetTFIDFScorer attaches a TF-IDF scorer for information density-aware
+// importance evaluation. When set, heuristicImportance uses TF-IDF scores
+// as a secondary signal to promote content with rare/specific terms to
+// ImportanceMedium even when no keyword match is found.
+func (o *Orchestrator) SetTFIDFScorer(scorer TFIDFImportanceScorer) {
+	o.tfidfScorer = scorer
 }
 
 func (o *Orchestrator) Conflicts() []Conflict {
@@ -532,8 +549,24 @@ func (o *Orchestrator) evaluateImportance(ctx context.Context, content string) I
 	if o.importanceFn != nil {
 		return o.importanceFn(ctx, content)
 	}
-	// Heuristic fallback
-	return heuristicImportance(content)
+
+	result := heuristicImportance(content)
+
+	// TF-IDF uplift: if keyword heuristic says Low but TF-IDF shows
+	// high information density (rare/specific terms), promote to Medium.
+	if result == ImportanceLow && o.tfidfScorer != nil {
+		tfidfScore := o.tfidfScorer.Score(content)
+		if tfidfScore >= 0.6 {
+			result = ImportanceMedium
+		}
+	}
+
+	// Feed content into TF-IDF corpus for future scoring
+	if o.tfidfScorer != nil {
+		o.tfidfScorer.AddDocument(content)
+	}
+
+	return result
 }
 
 // heuristicImportance: keyword-based fallback when no LLM evaluator is set.

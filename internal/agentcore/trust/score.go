@@ -3,13 +3,19 @@ package trust
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
 
+	"yunque-agent/internal/agentcore/audit"
 	iledger "yunque-agent/internal/ledger"
 )
+
+// ErrAdminRequired is returned when a privileged trust operation is called
+// without admin role.
+var ErrAdminRequired = fmt.Errorf("admin role required for this operation")
 
 // PermLevel defines what a skill is allowed to do at a given trust level.
 type PermLevel int
@@ -63,6 +69,14 @@ type Tracker struct {
 	scores map[string]*Entry
 	path   string // legacy JSON persistence path
 	kvs    *iledger.KVConfigStore
+	audit  *audit.Chain
+}
+
+// SetAudit attaches a Merkle audit chain for logging privileged operations.
+func (t *Tracker) SetAudit(chain *audit.Chain) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.audit = chain
 }
 
 // NewTracker creates a trust tracker, optionally loading from file.
@@ -157,19 +171,38 @@ func (t *Tracker) Reset(slug string) {
 }
 
 // GrantFull sets a skill's trust to the maximum level (100), granting full
-// permissions including shell access. This is the "one-click full trust" API.
-func (t *Tracker) GrantFull(slug string) {
+// permissions including shell access. Requires admin role; the caller identity
+// is recorded in the audit chain.
+func (t *Tracker) GrantFull(slug, callerID, callerRole string) error {
+	if callerRole != "admin" {
+		slog.Warn("trust: GrantFull denied — admin required", "caller", callerID, "role", callerRole, "slug", slug)
+		return ErrAdminRequired
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e := t.getOrCreate(slug)
 	e.Score = 100
 	e.LastPromoted = time.Now()
 	t.save()
-	slog.Info("trust: granted full trust", "slug", slug, "score", e.Score)
+
+	if t.audit != nil {
+		t.audit.Append(audit.EventAuth, callerID,
+			"trust_grant_full",
+			fmt.Sprintf("slug=%s score=100 role=%s", slug, callerRole))
+	}
+	slog.Info("trust: granted full trust", "slug", slug, "score", e.Score, "by", callerID)
+	return nil
 }
 
-// GrantFullAll sets all tracked skills' trust to the maximum level.
-func (t *Tracker) GrantFullAll() int {
+// GrantFullAll sets all tracked skills' trust to the maximum level. Requires
+// admin role; the operation is logged in the audit chain.
+func (t *Tracker) GrantFullAll(callerID, callerRole string) (int, error) {
+	if callerRole != "admin" {
+		slog.Warn("trust: GrantFullAll denied — admin required", "caller", callerID, "role", callerRole)
+		return 0, ErrAdminRequired
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	count := 0
@@ -181,8 +214,14 @@ func (t *Tracker) GrantFullAll() int {
 		}
 	}
 	t.save()
-	slog.Info("trust: granted full trust to all skills", "upgraded", count)
-	return count
+
+	if t.audit != nil {
+		t.audit.Append(audit.EventAuth, callerID,
+			"trust_grant_full_all",
+			fmt.Sprintf("upgraded=%d role=%s", count, callerRole))
+	}
+	slog.Info("trust: granted full trust to all skills", "upgraded", count, "by", callerID)
+	return count, nil
 }
 
 // CheckPermission returns true if the skill has enough trust for the requested level.

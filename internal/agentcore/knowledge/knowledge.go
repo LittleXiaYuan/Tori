@@ -79,6 +79,12 @@ type Store struct {
 	kvs       kvStore        // optional Ledger KV persistence
 	dirty     int
 
+	bm25Cache   *BM25Index // cached BM25 index, rebuilt on chunk changes
+	bm25Version int        // increments when chunks change
+	bm25Built   int        // version at which bm25Cache was built
+
+	semCache *SemanticCache // optional semantic query cache
+
 	// Metrics callbacks (optional, set via SetMetricsHooks)
 	onSearch func(searchType string, duration time.Duration, results int)
 	onRerank func(provider string, duration time.Duration, err error)
@@ -265,6 +271,10 @@ func (s *Store) UpdateSource(id, name, trigger, content string) (*Source, error)
 		}
 		found.ChunkCount = len(chunks)
 		found.ChunkSize = s.chunkSize
+		s.bm25Version++
+		if s.semCache != nil {
+			s.semCache.Invalidate()
+		}
 	}
 
 	s.persistKV()
@@ -578,6 +588,10 @@ func (s *Store) RemoveSource(sourceID string) bool {
 		}
 	}
 	s.chunks = kept
+	s.bm25Version++
+	if s.semCache != nil {
+		s.semCache.Invalidate()
+	}
 	return true
 }
 
@@ -646,11 +660,15 @@ func (s *Store) addPreparedChunks(src *Source, prepared []PreparedChunk) {
 		chunkCount++
 	}
 	src.ChunkCount = chunkCount
+	s.bm25Version++
 	if s.semantic != nil && s.semantic.ready {
 		s.semantic.mu.Lock()
 		s.semantic.ready = false
 		s.semantic.mu.Unlock()
 		slog.Debug("knowledge: semantic index invalidated after new chunks added")
+	}
+	if s.semCache != nil {
+		s.semCache.Invalidate()
 	}
 	slog.Debug("knowledge: ingested", "source", src.Name, "chunks", chunkCount)
 	s.persistKV()

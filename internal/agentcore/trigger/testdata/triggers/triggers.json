@@ -657,6 +657,22 @@
       "event_type": "enabled",
       "timestamp": "2026-04-27T00:12:14.740247+08:00",
       "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_302a0ba1",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-30T16:02:18.017794+08:00",
+      "message": "Trigger created: Test Trigger"
+    },
+    {
+      "id": "evt_8d4911d8",
+      "trigger_id": "test-trigger-1",
+      "tenant_id": "tenant-1",
+      "event_type": "enabled",
+      "timestamp": "2026-04-30T16:08:05.9737242+08:00",
+      "message": "Trigger created: Test Trigger"
     }
   ]
 }

@@ -38,8 +38,8 @@ export default function ConnectorsPage() {
       ]);
       setConnectors(connectorRes.connectors || []);
       setBrowserConnected(!!browserRes.connected);
-    } catch (e: any) {
-      setError(e.message || "加载连接器失败");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "加载连接器失败");
     } finally {
       setLoading(false);
     }
@@ -73,8 +73,8 @@ export default function ConnectorsPage() {
       await api.connectorConnect(id, tokenInput.trim());
       setTokenInput("");
       await load();
-    } catch (e: any) {
-      setError(e.message || "连接失败");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "连接失败");
     } finally {
       setBusy(null);
     }
@@ -86,8 +86,8 @@ export default function ConnectorsPage() {
     try {
       await api.connectorDisconnect(id);
       await load();
-    } catch (e: any) {
-      setError(e.message || "断开失败");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "断开失败");
     } finally {
       setBusy(null);
     }

@@ -472,10 +472,32 @@ func commandBaseName(command string) string {
 	return b
 }
 
+// interpreterInlineFlags lists flags that allow inline code execution for
+// each interpreter. These bypass file-based sandboxing because the user
+// can embed arbitrary OS commands in the inline string.
+var interpreterInlineFlags = map[string][]string{
+	"python":  {"-c", "--command"},
+	"python3": {"-c", "--command"},
+	"node":    {"-e", "--eval", "-p", "--print"},
+	"ruby":    {"-e"},
+	"perl":    {"-e"},
+}
+
 // dangerousArgvCombo inspects argv per-token (not as a concatenated string)
 // for command + flag + target combinations that are too risky for the
 // sandbox to ever run. Returns a non-empty reason when a match is found.
 func dangerousArgvCombo(base string, args []string) string {
+	if flags, ok := interpreterInlineFlags[base]; ok {
+		for _, a := range args {
+			la := strings.ToLower(a)
+			for _, f := range flags {
+				if la == f {
+					return base + " inline code execution via " + f
+				}
+			}
+		}
+	}
+
 	switch base {
 	case "rm":
 		// Block recursive force-delete of root or root-relative paths.

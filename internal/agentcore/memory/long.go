@@ -45,9 +45,6 @@ func (l *LongTerm) SetEmbedFunc(fn EmbedFunc) {
 }
 
 func (l *LongTerm) Put(ctx context.Context, tenantID string, item Item) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	if item.ID == "" {
 		item.ID = uuid.New().String()
 	}
@@ -55,26 +52,29 @@ func (l *LongTerm) Put(ctx context.Context, tenantID string, item Item) error {
 		item.CreatedAt = time.Now()
 	}
 
-	// Generate embedding if function available and item has none
-	if l.embedFn != nil && len(item.Embedding) == 0 && item.Value != "" {
-		// Unlock during API call to avoid blocking
-		l.mu.Unlock()
-		embeddings, err := l.embedFn(ctx, []string{item.Value})
-		l.mu.Lock()
-		if err == nil && len(embeddings) > 0 {
-			item.Embedding = embeddings[0]
+	// Generate embedding BEFORE acquiring the lock to avoid unlock/relock races.
+	if len(item.Embedding) == 0 && item.Value != "" {
+		l.mu.RLock()
+		fn := l.embedFn
+		l.mu.RUnlock()
+		if fn != nil {
+			embeddings, err := fn(ctx, []string{item.Value})
+			if err == nil && len(embeddings) > 0 {
+				item.Embedding = embeddings[0]
+			}
 		}
-		// Non-fatal: proceed without embedding if API fails
 	}
 
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.items[tenantID] = append(l.items[tenantID], item)
 	l.statsDirty[tenantID] = true
 	return nil
 }
 
 func (l *LongTerm) Get(_ context.Context, tenantID, key string) (*Item, error) {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for i, item := range l.items[tenantID] {
 		if item.Key == key || item.ID == key {
 			l.items[tenantID][i].AccessCnt++
@@ -87,18 +87,17 @@ func (l *LongTerm) Get(_ context.Context, tenantID, key string) (*Item, error) {
 }
 
 func (l *LongTerm) Search(ctx context.Context, tenantID, query string, limit int) ([]Item, error) {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-
 	if limit <= 0 {
 		limit = 10
 	}
+
+	// Check if embeddings are available and get embedFn reference under lock.
+	l.mu.RLock()
 	items := l.items[tenantID]
 	if len(items) == 0 {
+		l.mu.RUnlock()
 		return nil, nil
 	}
-
-	// Try vector search first if embeddings are available
 	hasEmbeddings := false
 	for _, item := range items {
 		if len(item.Embedding) > 0 {
@@ -106,20 +105,22 @@ func (l *LongTerm) Search(ctx context.Context, tenantID, query string, limit int
 			break
 		}
 	}
+	fn := l.embedFn
+	l.mu.RUnlock()
 
-	if hasEmbeddings && l.embedFn != nil {
-		// Unlock during API call
-		l.mu.RUnlock()
-		queryEmb, err := l.embedFn(ctx, []string{query})
-		l.mu.RLock()
-
+	// Call embedding API outside the lock to avoid data races.
+	if hasEmbeddings && fn != nil {
+		queryEmb, err := fn(ctx, []string{query})
 		if err == nil && len(queryEmb) > 0 && len(queryEmb[0]) > 0 {
+			l.mu.RLock()
+			defer l.mu.RUnlock()
 			return l.vectorSearch(tenantID, queryEmb[0], limit), nil
 		}
-		// Fall through to BM25 if embedding fails
 	}
 
 	// Fallback: BM25 with real IDF
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.bm25Search(tenantID, query, limit), nil
 }
 

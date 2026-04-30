@@ -212,8 +212,12 @@ func (g *ToolGuard) isPathAllowed(path string) bool {
 		return true // no restriction
 	}
 	cleaned := filepath.Clean(path)
+	cleanedLower := strings.ToLower(cleaned)
 	for _, allowed := range g.config.AllowedPaths {
-		if strings.HasPrefix(strings.ToLower(cleaned), strings.ToLower(allowed)) {
+		allowedClean := strings.ToLower(filepath.Clean(allowed))
+		if cleanedLower == allowedClean ||
+			strings.HasPrefix(cleanedLower, allowedClean+string(filepath.Separator)) ||
+			strings.HasPrefix(cleanedLower, allowedClean+"/") {
 			return true
 		}
 	}

@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function tauriInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> | null {
   if (typeof window === "undefined") return null;
   const ti = (window as any).__TAURI_INTERNALS__;
-  if (!ti?.invoke) return null;
-  return ti.invoke(cmd, args);
+  if (!ti?.invoke) {
+    console.warn("[WindowControls] __TAURI_INTERNALS__ not available, IPC call skipped:", cmd);
+    return null;
+  }
+  return ti.invoke(cmd, args).catch((err: unknown) => {
+    console.error("[WindowControls] IPC failed:", cmd, err);
+  });
 }
 
 export function WindowControls() {
@@ -22,35 +27,44 @@ export function WindowControls() {
 
   useEffect(() => {
     tauriInvoke("plugin:window|is_maximized")
-      ?.then((v: any) => setMaximized(!!v))
+      ?.then((v: unknown) => setMaximized(!!v))
       ?.catch(() => {});
 
     const handler = () => {
       tauriInvoke("plugin:window|is_maximized")
-        ?.then((v: any) => setMaximized(!!v))
+        ?.then((v: unknown) => setMaximized(!!v))
         ?.catch(() => {});
     };
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
 
+  const firedRef = useRef<string | null>(null);
+
+  const fireAction = useCallback((action: string, invoke: () => void) => {
+    if (firedRef.current === action) return;
+    firedRef.current = action;
+    invoke();
+    setTimeout(() => { firedRef.current = null; }, 300);
+  }, []);
+
   const close = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    tauriInvoke("plugin:window|close");
-  }, []);
+    fireAction("close", () => tauriInvoke("plugin:window|close"));
+  }, [fireAction]);
 
   const minimize = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    tauriInvoke("plugin:window|minimize");
-  }, []);
+    fireAction("minimize", () => tauriInvoke("plugin:window|minimize"));
+  }, [fireAction]);
 
   const toggleMax = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    tauriInvoke("plugin:window|toggle_maximize");
-  }, []);
+    fireAction("toggleMax", () => tauriInvoke("plugin:window|toggle_maximize"));
+  }, [fireAction]);
 
   if (isMac) return null;
 
@@ -60,13 +74,13 @@ export function WindowControls() {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <button className="ctl ctl-close" aria-label="关闭" onMouseDown={close}>
+      <button className="ctl ctl-close" aria-label="关闭" onMouseDown={close} onClick={close}>
         {hovered && <CloseSvg />}
       </button>
-      <button className="ctl ctl-minimize" aria-label="最小化" onMouseDown={minimize}>
+      <button className="ctl ctl-minimize" aria-label="最小化" onMouseDown={minimize} onClick={minimize}>
         {hovered && <MinimizeSvg />}
       </button>
-      <button className="ctl ctl-maximize" aria-label={maximized ? "还原" : "最大化"} onMouseDown={toggleMax}>
+      <button className="ctl ctl-maximize" aria-label={maximized ? "还原" : "最大化"} onMouseDown={toggleMax} onClick={toggleMax}>
         {hovered && (maximized ? <RestoreSvg /> : <MaximizeSvg />)}
       </button>
     </div>

@@ -51,7 +51,7 @@ export function useChatRecording(
       rec.interimResults = true;
       rec.continuous = true;
       let finalText = "";
-      rec.onresult = (e: any) => {
+      rec.onresult = (e: { resultIndex: number; results: SpeechRecognitionResultList }) => {
         let interim = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) finalText += e.results[i][0].transcript;

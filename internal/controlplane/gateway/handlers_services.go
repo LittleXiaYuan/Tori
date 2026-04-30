@@ -271,12 +271,22 @@ func (g *Gateway) handleTrustGrant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "slug is required", http.StatusBadRequest)
 		return
 	}
+	callerID := tenantFromCtx(r.Context())
+	callerRole := roleFromCtx(r.Context())
+
 	if req.Slug == "*" {
-		count := g.trustTracker.GrantFullAll()
+		count, err := g.trustTracker.GrantFullAll(callerID, callerRole)
+		if err != nil {
+			apperror.WriteCode(w, apperror.CodeForbidden, err.Error())
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"status": "granted_all", "upgraded": count})
 		return
 	}
-	g.trustTracker.GrantFull(req.Slug)
+	if err := g.trustTracker.GrantFull(req.Slug, callerID, callerRole); err != nil {
+		apperror.WriteCode(w, apperror.CodeForbidden, err.Error())
+		return
+	}
 	json.NewEncoder(w).Encode(map[string]string{"status": "granted", "slug": req.Slug, "level": "shell"})
 }
 

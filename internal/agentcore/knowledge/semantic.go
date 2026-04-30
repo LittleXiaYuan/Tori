@@ -136,22 +136,24 @@ func (s *Store) HybridSearch(ctx context.Context, query string, limit int) []Sco
 		limit = 5
 	}
 
-	// Retrieve more candidates from each retriever for better fusion
 	candidateLimit := limit * 5
 	if candidateLimit < 20 {
 		candidateLimit = 20
 	}
 
-	// Dense retrieval (vector similarity)
 	denseChunks := s.SemanticSearch(ctx, query, candidateLimit)
 
-	// Sparse retrieval (BM25)
-	s.mu.RLock()
+	// Sparse retrieval (BM25) — use cached index, rebuild only when chunks change.
+	s.mu.Lock()
+	if s.bm25Cache == nil || s.bm25Built != s.bm25Version {
+		s.bm25Cache = NewBM25Index(s.chunks)
+		s.bm25Built = s.bm25Version
+	}
+	bm25Idx := s.bm25Cache
 	chunks := make([]Chunk, len(s.chunks))
 	copy(chunks, s.chunks)
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
-	bm25Idx := NewBM25Index(chunks)
 	bm25Results := bm25Idx.Search(query, candidateLimit)
 
 	sparseChunks := make([]Chunk, len(bm25Results))
@@ -161,7 +163,6 @@ func (s *Store) HybridSearch(ctx context.Context, query string, limit int) []Sco
 		}
 	}
 
-	// RRF fusion
 	results := FuseRRF(denseChunks, sparseChunks, 60, limit)
 	if s.onSearch != nil {
 		s.onSearch("hybrid", time.Since(start), len(results))
