@@ -6,9 +6,15 @@ import type {
   CogniAlert,
   CogniCheckResult,
   CogniEntryStatus,
+  CogniEvolutionResponse,
+  CogniExperiencePattern,
+  CogniExperienceResponse,
   CogniHealthMetrics,
   CogniTrace,
   CogniVerifyResponse,
+  CogniWorkflowDef,
+  CogniWorkflowStep,
+  CogniExperiment,
 } from "@/lib/api-types/cogni";
 import { Button, Card, Chip, Switch } from "@heroui/react";
 import {
@@ -72,9 +78,9 @@ export default function CognisPage() {
   const [detailID, setDetailID] = useState<string | null>(null);
   const [detailTraces, setDetailTraces] = useState<CogniTrace[]>([]);
   const [detailTab, setDetailTab] = useState<"traces" | "workflows" | "experience" | "evolution">("traces");
-  const [detailWorkflows, setDetailWorkflows] = useState<any[]>([]);
-  const [detailExperience, setDetailExperience] = useState<any>(null);
-  const [detailEvolution, setDetailEvolution] = useState<any>(null);
+  const [detailWorkflows, setDetailWorkflows] = useState<CogniWorkflowDef[]>([]);
+  const [detailExperience, setDetailExperience] = useState<CogniExperienceResponse | null>(null);
+  const [detailEvolution, setDetailEvolution] = useState<CogniEvolutionResponse | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateDesc, setGenerateDesc] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -891,7 +897,7 @@ export default function CognisPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {detailWorkflows.map((wf: any) => (
+                    {detailWorkflows.map((wf: CogniWorkflowDef) => (
                       <div key={wf.name} className="p-3 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{wf.name}</span>
@@ -909,7 +915,7 @@ export default function CognisPage() {
                         {wf.description && <div className="text-xs mb-2" style={{ color: "var(--yunque-text-muted)" }}>{wf.description}</div>}
                         <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
                           {wf.steps?.length || 0} 个步骤
-                          {wf.steps?.map((s: any, i: number) => (
+                          {wf.steps?.map((s: CogniWorkflowStep, i: number) => (
                             <span key={i}> · {s.skill}</span>
                           ))}
                         </div>
@@ -940,10 +946,10 @@ export default function CognisPage() {
                         </div>
                       ))}
                     </div>
-                    {detailExperience.patterns?.length > 0 && (
+                    {(detailExperience.patterns?.length ?? 0) > 0 && (
                       <div>
                         <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>行为模式</div>
-                        {detailExperience.patterns.slice(0, 5).map((p: any, i: number) => (
+                        {detailExperience.patterns!.slice(0, 5).map((p: CogniExperiencePattern, i: number) => (
                           <div key={i} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(255,255,255,0.03)", color: "var(--yunque-text-muted)" }}>
                             {p.trigger} → {p.response} {p.confirmed && "✓"}
                           </div>
@@ -983,7 +989,7 @@ export default function CognisPage() {
                   </div>
                 ) : (
                   <div className="space-y-2 mt-2">
-                    {detailEvolution.experiments.map((exp: any) => (
+                    {detailEvolution.experiments.map((exp: CogniExperiment) => (
                       <div key={exp.id} className="p-3 rounded-lg text-xs" style={{ background: "rgba(255,255,255,0.03)" }}>
                         <div className="flex items-center gap-2 mb-1">
                           <Chip size="sm" style={{

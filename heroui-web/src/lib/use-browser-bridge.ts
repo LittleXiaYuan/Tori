@@ -11,7 +11,19 @@ function buildArtifactPreview(content: unknown) {
   return normalized.length > 220 ? `${normalized.slice(0, 220)}...` : normalized;
 }
 
-function suggestNextBrowserAction(action: string | undefined, result: any): Pick<BrowserActionArtifactSummary, "suggestedCommand" | "suggestedLabel"> {
+interface BrowserActionResult {
+  url?: string;
+  currentUrl?: string;
+  title?: string;
+  total?: number;
+  elements?: unknown[];
+  tabId?: number | null;
+  screenshot?: unknown;
+  content?: string;
+  state?: { runtimeSession?: { currentUrl?: string; title?: string; currentTabId?: number | null } };
+}
+
+function suggestNextBrowserAction(action: string | undefined, result: BrowserActionResult | null): Pick<BrowserActionArtifactSummary, "suggestedCommand" | "suggestedLabel"> {
   const normalized = action || "";
   if (normalized.includes("mark") || typeof result?.total === "number") {
     return { suggestedCommand: "/click ", suggestedLabel: "Click a marked element" };
@@ -34,7 +46,7 @@ interface UseBrowserBridgeOptions {
   onActionError?: (type: string | undefined, payload: unknown, message: string) => void;
 }
 
-function summarizeActionArtifact(action: string | undefined, result: any): BrowserActionArtifactSummary | null {
+function summarizeActionArtifact(action: string | undefined, result: BrowserActionResult | null): BrowserActionArtifactSummary | null {
   if (!result || typeof result !== "object") return null;
   return {
     action,

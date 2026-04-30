@@ -220,6 +220,28 @@ export interface CogniVerifyResponse {
   failures: Array<{ cogni_id: string; check_name?: string; check_index: number; reason?: string }>;
 }
 
+// ── Experience Response ──
+export interface CogniExperiencePattern {
+  trigger: string;
+  response: string;
+  confirmed?: boolean;
+}
+
+export interface CogniExperienceResponse {
+  id: string;
+  enabled: boolean;
+  stats?: CogniExperienceStats;
+  tool_memory?: unknown[];
+  patterns?: CogniExperiencePattern[];
+  domain_facts?: unknown[];
+}
+
+// ── Evolution Response ──
+export interface CogniEvolutionResponse {
+  running: boolean;
+  experiments: CogniExperiment[];
+}
+
 // ── Federation Types ──
 export interface CogniFederationPeer {
   id: string;

@@ -34,6 +34,7 @@ type jwtClaims struct {
 	Iss      string `json:"iss"`
 	Iat      int64  `json:"iat"`
 	Exp      int64  `json:"exp"`
+	Nbf      int64  `json:"nbf,omitempty"`
 	TenantID string `json:"tenant_id"`
 	Role     string `json:"role"` // "admin", "user"
 }
@@ -47,6 +48,7 @@ func GenerateJWT(cfg JWTConfig, tenantID, role string) (string, error) {
 		Iss:      cfg.Issuer,
 		Iat:      now.Unix(),
 		Exp:      now.Add(cfg.Expiration).Unix(),
+		Nbf:      now.Unix(),
 		TenantID: tenantID,
 		Role:     role,
 	}
@@ -72,6 +74,19 @@ func ValidateJWT(cfg JWTConfig, token string) (*jwtClaims, error) {
 		return nil, errInvalidToken
 	}
 
+	// Decode and validate header — reject anything other than HS256
+	headerJSON, err := base64URLDecode(parts[0])
+	if err != nil {
+		return nil, errInvalidToken
+	}
+	var header jwtHeader
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return nil, errInvalidToken
+	}
+	if header.Alg != "HS256" {
+		return nil, errUnsupportedAlg
+	}
+
 	// Verify signature
 	mac := hmac.New(sha256.New, []byte(cfg.Secret))
 	mac.Write([]byte(parts[0] + "." + parts[1]))
@@ -90,9 +105,21 @@ func ValidateJWT(cfg JWTConfig, token string) (*jwtClaims, error) {
 		return nil, errInvalidToken
 	}
 
+	now := time.Now().Unix()
+
 	// Check expiration
-	if time.Now().Unix() > claims.Exp {
+	if now > claims.Exp {
 		return nil, errTokenExpired
+	}
+
+	// Check not-before
+	if claims.Nbf > 0 && now < claims.Nbf {
+		return nil, errTokenNotYetValid
+	}
+
+	// Validate issuer
+	if cfg.Issuer != "" && claims.Iss != cfg.Issuer {
+		return nil, errInvalidIssuer
 	}
 
 	return &claims, nil
@@ -106,6 +133,9 @@ const (
 	errInvalidToken     authError = "invalid token"
 	errInvalidSignature authError = "invalid signature"
 	errTokenExpired     authError = "token expired"
+	errTokenNotYetValid authError = "token not yet valid"
+	errUnsupportedAlg   authError = "unsupported signing algorithm"
+	errInvalidIssuer    authError = "invalid issuer"
 )
 
 // requireAuthJWT is a middleware that supports both API Key and JWT.

@@ -41,12 +41,14 @@ func NewStreamableHTTPProvider(url string, headers map[string]string, timeout ti
 // Start performs the MCP initialization handshake.
 func (p *StreamableHTTPProvider) Start(ctx context.Context) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.initialized {
+		p.mu.Unlock()
 		return nil
 	}
+	p.mu.Unlock()
 
+	// post() and notify() each acquire p.mu internally to read sessionID,
+	// so we must NOT hold the lock while calling them.
 	result, sessionID, err := p.post(ctx, "initialize", map[string]any{
 		"protocolVersion": "2025-06-18",
 		"capabilities":    map[string]any{},
@@ -59,13 +61,15 @@ func (p *StreamableHTTPProvider) Start(ctx context.Context) error {
 		return fmt.Errorf("mcp streamable-http: initialize: %w", err)
 	}
 	_ = result
-	p.sessionID = sessionID
 
-	// Send initialized notification
+	p.mu.Lock()
+	p.sessionID = sessionID
+	p.initialized = true
+	p.mu.Unlock()
+
 	p.notify(ctx, "notifications/initialized", nil)
 
-	p.initialized = true
-	slog.Info("mcp streamable-http provider started", "url", p.url, "session", p.sessionID)
+	slog.Info("mcp streamable-http provider started", "url", p.url, "session", sessionID)
 	return nil
 }
 

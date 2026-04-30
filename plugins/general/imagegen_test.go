@@ -115,7 +115,7 @@ func TestImageGenSkill_NoAPIKey(t *testing.T) {
 	_, err := s.Execute(context.Background(), map[string]any{
 		"prompt": "a cat",
 	}, env)
-	if err == nil || !strings.Contains(err.Error(), "environment variable") {
+	if err == nil || !strings.Contains(err.Error(), "需要配置") {
 		t.Fatalf("expected API key error, got %v", err)
 	}
 }

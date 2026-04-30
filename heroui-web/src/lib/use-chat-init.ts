@@ -37,9 +37,9 @@ export function useChatInit(): ChatInitState {
     const t = typeof window !== "undefined" ? localStorage.getItem("yunque_token") || "" : "";
     const k = typeof window !== "undefined" ? localStorage.getItem("yunque_api_key") || "" : "";
     const ah: Record<string, string> = t ? { Authorization: `Bearer ${t}` } : k ? { "X-API-Key": k } : {};
-    fetch("/v1/plugins/ui", { headers: ah }).then(r => r.json()).then((data: any) => {
-      const tabs = data?.tabs || data || [];
-      if (Array.isArray(tabs) && tabs.some((t: any) => t.key === "airi")) {
+    fetch("/v1/plugins/ui", { headers: ah }).then(r => r.json()).then((data: unknown) => {
+      const tabs = (data as Record<string, unknown>)?.tabs || data || [];
+      if (Array.isArray(tabs) && tabs.some((t: Record<string, unknown>) => t.key === "airi")) {
         fetch("/v1/ext/airi/status", { headers: ah }).then(r => r.json()).then(() => {
           setAiriAvailable(true);
         }).catch(() => {});

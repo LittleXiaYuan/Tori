@@ -56,12 +56,24 @@ make build-full            # 构建前端 + Go 二进制（强制校验前端产
 </details>
 
 <details>
-<summary>Docker 部署</summary>
+<summary>Docker 一键部署</summary>
 
 ```bash
-cp .env.example .env       # 配置 LLM_API_KEY
-docker compose --profile lite up -d    # 轻量版，内嵌纯 Go SQLite（无外部依赖）
-docker compose --profile full up -d    # 完整版，PostgreSQL + pgvector
+cp .env.example .env       # ① 复制配置
+# ② 编辑 .env，填入 LLM_API_KEY 和 JWT_SECRET
+#    JWT_SECRET 生成: openssl rand -hex 32
+
+# 方式一：一键脚本（推荐）
+./scripts/deploy.sh              # 轻量版（默认，内嵌 SQLite）
+./scripts/deploy.sh prod         # 完整版（PostgreSQL + pgvector）
+./scripts/deploy.sh dev          # 开发模式（前台运行，实时日志）
+./scripts/deploy.sh stop         # 停止所有服务
+./scripts/deploy.sh status       # 查看服务状态
+./scripts/deploy.sh logs         # 查看日志
+
+# 方式二：直接 docker compose
+docker compose --profile lite up -d    # 轻量版
+docker compose --profile full up -d    # 完整版（需额外设 POSTGRES_PASSWORD）
 ```
 
 Dashboard: http://localhost:9090

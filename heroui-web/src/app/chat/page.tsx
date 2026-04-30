@@ -58,6 +58,7 @@ import { useChatInit } from "@/lib/use-chat-init";
 import { useChatMedia, type PendingFile } from "@/lib/use-chat-media";
 import { useChatRecording } from "@/lib/use-chat-recording";
 import { useShortcuts } from "@/lib/use-shortcuts";
+import { TaskResourceMeter, type ResourceSnapshot } from "@/components/chat/task-resource-meter";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -88,6 +89,9 @@ export default function ChatPage() {
   const [suggestedTab, setSuggestedTab] = useState<"terminal" | "browser" | "editor" | "thinking" | undefined>(undefined);
   const [computerWidth, setComputerWidth] = useState(340);
   const resizingRef = useRef(false);
+  const [resourceSnapshot, setResourceSnapshot] = useState<ResourceSnapshot | null>(null);
+  const [prevResourceSnapshot, setPrevResourceSnapshot] = useState<ResourceSnapshot | null>(null);
+  const sendStartRef = useRef<number>(0);
 
   useEffect(() => {
     if (showComputer) setShowSidebar(false);
@@ -114,7 +118,9 @@ export default function ChatPage() {
     try {
       const data = await api.conversations(conv.showArchived);
       convD({ type: "SET_LIST", list: data.sessions || [] });
-    } catch { /* offline */ }
+    } catch (e) {
+      console.warn("[chat] loadConversations failed:", e);
+    }
   }, [conv.showArchived]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
@@ -203,7 +209,9 @@ export default function ChatPage() {
             }
           }
         }
-      } catch { /* SSE connection failed */ }
+      } catch (e) {
+        console.warn("[chat] SSE connection failed, trace events unavailable:", e);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -431,7 +439,9 @@ export default function ChatPage() {
     chatD({ type: "ADD_PAIR", userMsg, asstMsg });
     pendingFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
     setPendingFiles([]);
-    // Computer panel auto-opens when tool events are received, not on every message
+    sendStartRef.current = Date.now();
+    if (resourceSnapshot) setPrevResourceSnapshot(resourceSnapshot);
+    setResourceSnapshot({ tokensIn: 0, tokensOut: 0, costUsd: 0, startMs: Date.now() });
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -593,6 +603,14 @@ export default function ChatPage() {
                   setShowComputer(true);
                   setSuggestedTab("browser");
                 }
+                const usage = doneData.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+                setResourceSnapshot((prev) => ({
+                  tokensIn: usage?.prompt_tokens ?? prev?.tokensIn ?? 0,
+                  tokensOut: usage?.completion_tokens ?? prev?.tokensOut ?? 0,
+                  costUsd: (doneData.cost_usd as number) ?? prev?.costUsd ?? 0,
+                  startMs: prev?.startMs ?? sendStartRef.current,
+                  endMs: Date.now(),
+                }));
               }               catch { /* ignore */ }
               streamFinished = true;
               break;
@@ -816,8 +834,12 @@ export default function ChatPage() {
           width: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
           minWidth: showSidebar ? "var(--conv-rail-w, 272px)" : "0px",
           opacity: showSidebar ? 1 : 0,
+          visibility: showSidebar ? "visible" : "hidden",
           overflow: "hidden",
-          transition: "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.2s ease",
+          clipPath: "inset(0)",
+          transition: showSidebar
+            ? "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.2s ease, visibility 0s"
+            : "width 0.25s cubic-bezier(.22,1,.36,1), min-width 0.25s cubic-bezier(.22,1,.36,1), opacity 0.15s ease, visibility 0s 0.25s",
         }}
       >
         <ConversationSidebar
@@ -1226,7 +1248,8 @@ export default function ChatPage() {
               borderLeft: "1px solid var(--yunque-border)",
             }}
           >
-            <div className="shrink-0 p-3">
+            <div className="shrink-0 p-3 space-y-2">
+              <TaskResourceMeter snapshot={resourceSnapshot} prevSnapshot={prevResourceSnapshot} isLive={chat.streaming} />
               <TaskProgressPanel events={chat.liveTraceEvents} isLive={chat.streaming} />
             </div>
             <ComputerPanel className="min-h-0 flex-1" traceEvents={chat.liveTraceEvents} isLive onClose={() => setShowComputer(false)} suggestedTab={suggestedTab} />

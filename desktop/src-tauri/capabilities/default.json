@@ -3,6 +3,9 @@
   "identifier": "default",
   "description": "Default capabilities for Yunque Desktop. The Go sidecar is spawned directly via std::process so we can control CREATE_NEW_PROCESS_GROUP / CTRL_BREAK_EVENT for graceful shutdown; we therefore do NOT need shell:allow-spawn / shell:allow-execute permissions here.",
   "windows": ["main", "floating-ball", "floating-panel", "selection-popup"],
+  "remote": {
+    "urls": ["http://localhost:*"]
+  },
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

@@ -43,6 +43,34 @@ var weakJWTSecrets = map[string]bool{
 	"secret":                               true,
 }
 
+// isWeakJWTSecret returns true if the secret is a known placeholder, too
+// short, or composed of a trivially repeating pattern (e.g. "C7C7C7C7...").
+func isWeakJWTSecret(s string) bool {
+	if weakJWTSecrets[s] {
+		return true
+	}
+	if len(s) < 32 {
+		return true
+	}
+	// Detect repeating patterns of length 1–4 (covers "AAAA...", "ABAB...", "ABCABC..." etc.)
+	for patLen := 1; patLen <= 4; patLen++ {
+		if len(s) >= patLen*2 {
+			pat := s[:patLen]
+			repeating := true
+			for i := patLen; i < len(s); i++ {
+				if s[i] != pat[i%patLen] {
+					repeating = false
+					break
+				}
+			}
+			if repeating {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // warnWeakSecrets emits warnings for development and refuses to start under
 // production-like deployments when security-sensitive config values are still
 // set to their example/default placeholders.
@@ -55,7 +83,7 @@ var weakJWTSecrets = map[string]bool{
 func warnWeakSecrets(cfg *config.Config) {
 	production := isProductionLike(cfg)
 
-	if weakJWTSecrets[cfg.JWTSecret] {
+	if isWeakJWTSecret(cfg.JWTSecret) {
 		if production {
 			slog.Error("JWT_SECRET is weak or set to a known placeholder — refusing to start. " +
 				"Set JWT_SECRET to a strong random value (e.g. `openssl rand -hex 32`) " +

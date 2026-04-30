@@ -121,7 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <AccountRail />
           </div>
         )}
-        <main id="main-content" className="flex min-h-screen flex-1 flex-col overflow-hidden" style={{ opacity: "var(--yunque-content-opacity, 1)", paddingTop: 6 }}>
+        <main id="main-content" className="flex min-h-screen flex-1 flex-col overflow-hidden" style={{ opacity: "var(--yunque-content-opacity, 1)" }}>
           <Suspense fallback={<PageFallback />}>
             {children}
           </Suspense>

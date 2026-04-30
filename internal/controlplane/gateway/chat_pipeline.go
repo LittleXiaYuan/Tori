@@ -11,6 +11,7 @@ import (
 
 	"yunque-agent/internal/agentcore/adaptive"
 	"yunque-agent/internal/agentcore/emotion"
+	"yunque-agent/internal/agentcore/guardrails"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
@@ -76,6 +77,22 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 		}
 		if guardResult.Redacted != "" {
 			req.Messages[len(req.Messages)-1].Content = guardResult.Redacted
+		}
+	}
+
+	// ── 2b. Unified sanitizer ──
+	if g.sanitizer != nil && len(req.Messages) > 0 {
+		lastMsg := req.Messages[len(req.Messages)-1].Content
+		sr := g.sanitizer.Sanitize(ctx, guardrails.SanitizeRequest{
+			Input:  lastMsg,
+			Source: guardrails.SourceUserPrompt,
+		})
+		if sr.Blocked {
+			observe.EndSpan(traceSpan, fmt.Errorf("sanitizer blocked"))
+			return nil, fmt.Errorf("sanitizer: %s (%s)", sr.Rule, sr.ThreatType)
+		}
+		if sr.Sanitized != "" {
+			req.Messages[len(req.Messages)-1].Content = sr.Sanitized
 		}
 	}
 

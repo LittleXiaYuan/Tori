@@ -20,7 +20,7 @@ function Bone({ className = "", style }: SkeletonProps) {
 
 export function DashboardSkeleton() {
   return (
-    <div className="page-root space-y-6 animate-fade-in-up">
+    <div className="page-root space-y-6 animate-fade-in-up" role="status" aria-busy="true" aria-label="页面加载中">
       <div className="flex items-center justify-between">
         <Bone style={{ width: 200, height: 28 }} />
         <Bone style={{ width: 32, height: 32, borderRadius: "50%" }} />
@@ -63,7 +63,7 @@ export function DashboardSkeleton() {
 
 export function ChatSkeleton() {
   return (
-    <div className="page-root animate-fade-in-up" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px)" }}>
+    <div className="page-root animate-fade-in-up" role="status" aria-busy="true" aria-label="页面加载中" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px)" }}>
       <div className="flex items-center justify-between p-4">
         <Bone style={{ width: 160, height: 24 }} />
         <div className="flex gap-2">
@@ -94,7 +94,7 @@ export function ChatSkeleton() {
 
 export function ListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="page-root space-y-4 animate-fade-in-up">
+    <div className="page-root space-y-4 animate-fade-in-up" role="status" aria-busy="true" aria-label="页面加载中">
       <div className="flex items-center justify-between">
         <Bone style={{ width: 180, height: 24 }} />
         <Bone style={{ width: 80, height: 32, borderRadius: 8 }} />

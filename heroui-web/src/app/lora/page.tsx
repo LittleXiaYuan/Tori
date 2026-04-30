@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { EvolutionState, LoRAStatus, TrainingRecord, TrainingSummary } from "@/lib/api-types/lora";
 import type { LoRAConfig } from "@/lib/api-types/lora";
-import { Button, Card, Chip, Input, Spinner, Table, Tooltip } from "@heroui/react";
+import { Button, Card, Chip, Input, Label, Spinner, Table, TextField, Tooltip } from "@heroui/react";
 import {
   Activity,
   BrainCircuit,
@@ -395,42 +395,30 @@ export default function LoRAPage() {
         </div>
         {showConfig && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <Input
-              label="最小样本数"
-              size="sm"
-              value={configDraft.min_samples ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, min_samples: e.target.value })}
-            />
-            <Input
-              label="最小间隔 (如 24h, 12h)"
-              size="sm"
-              value={configDraft.min_interval ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, min_interval: e.target.value })}
-            />
-            <Input
-              label="评估最低分 (0-1)"
-              size="sm"
-              value={configDraft.eval_min_score ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, eval_min_score: e.target.value })}
-            />
-            <Input
-              label="最大适配器数"
-              size="sm"
-              value={configDraft.max_adapters ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, max_adapters: e.target.value })}
-            />
-            <Input
-              label="基础模型"
-              size="sm"
-              value={configDraft.base_model ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, base_model: e.target.value })}
-            />
-            <Input
-              label="A/B 测试时长 (如 1h, 30m)"
-              size="sm"
-              value={configDraft.ab_test_duration ?? ""}
-              onChange={(e) => setConfigDraft({ ...configDraft, ab_test_duration: e.target.value })}
-            />
+            <TextField value={configDraft.min_samples ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, min_samples: v })}>
+              <Label>最小样本数</Label>
+              <Input />
+            </TextField>
+            <TextField value={configDraft.min_interval ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, min_interval: v })}>
+              <Label>最小间隔 (如 24h, 12h)</Label>
+              <Input />
+            </TextField>
+            <TextField value={configDraft.eval_min_score ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, eval_min_score: v })}>
+              <Label>评估最低分 (0-1)</Label>
+              <Input />
+            </TextField>
+            <TextField value={configDraft.max_adapters ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, max_adapters: v })}>
+              <Label>最大适配器数</Label>
+              <Input />
+            </TextField>
+            <TextField value={configDraft.base_model ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, base_model: v })}>
+              <Label>基础模型</Label>
+              <Input />
+            </TextField>
+            <TextField value={configDraft.ab_test_duration ?? ""} onChange={(v) => setConfigDraft({ ...configDraft, ab_test_duration: v })}>
+              <Label>A/B 测试时长 (如 1h, 30m)</Label>
+              <Input />
+            </TextField>
           </div>
         )}
       </Card>

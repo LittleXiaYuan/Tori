@@ -174,6 +174,9 @@ func (g *Gateway) SetToolGuard(tg *guardrails.ToolGuard) { g.toolGuard = tg }
 // SetEgressGuard attaches the output sanitization guard.
 func (g *Gateway) SetEgressGuard(eg *guardrails.EgressGuard) { g.egressGuard = eg }
 
+// SetSanitizer attaches the unified input sanitizer middleware.
+func (g *Gateway) SetSanitizer(s *guardrails.Sanitizer) { g.sanitizer = s }
+
 // SetSkillInstaller attaches the skill installer for SkillHub API.
 func (g *Gateway) SetSkillInstaller(si *skillmarket.Installer) { g.skillInstaller = si }
 

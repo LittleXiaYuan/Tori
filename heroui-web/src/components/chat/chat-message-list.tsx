@@ -5,6 +5,7 @@ import {
   Brain, Sparkles, FileDown, BookOpen,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { BrowserConnectCard } from "@/components/browser-connect-card";
@@ -44,6 +45,7 @@ export function ChatMessageList({
   onCopy, onPlayTTS, onEdit, onRollback, onRetry,
   onAction, onSlashSelect, onSend, onBrowserRefresh, onBrowserContinue,
 }: ChatMessageListProps) {
+  const { t } = useI18n();
   const isBubble = chatMode === "chat";
   return (
     <div className="mx-auto space-y-5" style={{ maxWidth: "min(900px, 70%)" }}>
@@ -58,7 +60,7 @@ export function ChatMessageList({
             {!isBubble && (
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[13px] font-semibold" style={{ color: msg.role === "assistant" ? "var(--yunque-accent)" : "var(--yunque-text)" }}>
-                  {msg.role === "assistant" ? (currentModel || "Yunque Agent") : "用户"}
+                  {msg.role === "assistant" ? (currentModel || "Yunque Agent") : t("chat.user")}
                 </span>
                 {msg.timestamp && (
                   <span className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
@@ -80,7 +82,7 @@ export function ChatMessageList({
                   <div className="chat-inline-panel mb-1.5 rounded-xl border px-2 py-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
-                        {isLive ? "运行中" : "已完成"}
+                        {isLive ? t("chat.running") : t("chat.completed")}
                       </span>
                       {(() => {
                         const summary = summarizeAssistantWork(msg);
@@ -93,12 +95,12 @@ export function ChatMessageList({
                             )}
                             {summary.toolCount > 0 && (
                               <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-secondary)" }}>
-                                {summary.toolCount} tool events
+                                {summary.toolCount} {t("chat.toolEvents")}
                               </span>
                             )}
                             {summary.fileCount > 0 && (
                               <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
-                                {summary.fileCount} files
+                                {summary.fileCount} {t("chat.files")}
                               </span>
                             )}
                           </>
@@ -106,7 +108,7 @@ export function ChatMessageList({
                       })()}
                     </div>
                     <div className="text-xs leading-6" style={{ color: "var(--yunque-text-muted)" }}>
-                      {isLive ? "The agent is still executing this request. Watch the live trace and computer panel for progress." : "This response includes structured execution steps, generated changes, and follow-up actions."}
+                      {isLive ? t("chat.runningDesc") : t("chat.completedDesc")}
                     </div>
                   </div>
                   {warnEvents.length > 0 && (
@@ -121,7 +123,7 @@ export function ChatMessageList({
                       <div className="chat-inline-panel mb-1.5 flex items-center gap-2 rounded-xl px-2 py-1 text-[10px]" style={{ background: "rgba(59,130,246,0.06)", color: "var(--yunque-text-muted)" }}>
                         {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
                         <span>
-                          {isLive ? `Working with ${lastSkill || "tools"}…` : `Used ${uniqueSkills.length} tools`}
+                          {isLive ? t("chat.workingWith").replace("{skill}", lastSkill || "tools") : t("chat.usedTools").replace("{count}", String(uniqueSkills.length))}
                           {uniqueSkills.length > 0 && !isLive && (
                             <span style={{ color: "var(--yunque-text-muted)", marginLeft: 4 }}>
                               ({uniqueSkills.slice(0, 3).join(", ")}{uniqueSkills.length > 3 ? "…" : ""})
@@ -149,7 +151,7 @@ export function ChatMessageList({
               {msg.role === "user" && msg.images && msg.images.length > 0 && (
                 <div className="flex gap-2 flex-wrap mb-2">
                   {msg.images.map((src, i) => (
-                    <img key={i} src={src} alt="" className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openExternal(src)} />
+                    <img key={i} src={src} alt={`${t("chat.uploadedImage")} ${i + 1}`} className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openExternal(src)} />
                   ))}
                 </div>
               )}
@@ -157,7 +159,7 @@ export function ChatMessageList({
                 <details className="mb-2" open={false} style={{ fontSize: "var(--text-sm)" }}>
                   <summary style={{ cursor: "pointer", color: "var(--yunque-text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
                     <span style={{ fontSize: "var(--text-xs)", background: "rgba(245,158,11,0.12)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4 }}>
-                      {streaming && idx === messages.length - 1 ? "推理中…" : "已深度思考"}
+                      {streaming && idx === messages.length - 1 ? t("chat.reasoning") : t("chat.reasoned")}
                     </span>
                     <ThinkingTimer startMs={msg.reasoningStartMs} endMs={msg.reasoningEndMs} isStreaming={streaming && idx === messages.length - 1} />
                   </summary>
@@ -171,7 +173,7 @@ export function ChatMessageList({
               ) : (
                 !msg.images?.length && (
                   <div className="flex items-center gap-1.5">
-                    <Spinner size="sm" color="current" /> Thinking…
+                    <Spinner size="sm" color="current" /> {t("chat.thinking")}
                   </div>
                 )
               )}
@@ -225,19 +227,19 @@ export function ChatMessageList({
             {/* Actions */}
             {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
               <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Suggested actions</div>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.suggestedActions")}</div>
                 <AgentActions actions={msg.actions} onAction={onAction} />
               </div>
             )}
             {/* Browser summary */}
             {msg.role === "assistant" && msg.browserSummary && (
               <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Browser artifact</div>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.browserArtifact")}</div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "var(--yunque-text-secondary)" }}>
                   {msg.browserSummary.action && <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>{browserActionLabel(msg.browserSummary.action)}</span>}
-                  {typeof msg.browserSummary.elementCount === "number" && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.elementCount} elements</span>}
-                  {msg.browserSummary.hasScreenshot && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}>screenshot ready</span>}
-                  {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.textLength} chars</span>}
+                  {typeof msg.browserSummary.elementCount === "number" && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.elementCount} {t("chat.elements")}</span>}
+                  {msg.browserSummary.hasScreenshot && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-success-muted)", color: "var(--yunque-success)" }}>{t("chat.screenshotReady")}</span>}
+                  {typeof msg.browserSummary.textLength === "number" && msg.browserSummary.textLength > 0 && <span className="rounded-full px-2.5 py-1" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-muted)" }}>{msg.browserSummary.textLength} {t("chat.chars")}</span>}
                 </div>
                 {(msg.browserSummary.title || msg.browserSummary.url) && (
                   <div className="mt-2 min-w-0">
@@ -250,8 +252,8 @@ export function ChatMessageList({
                 )}
                 {(msg.browserSummary.suggestedCommand || msg.browserSummary.url) && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {msg.browserSummary.suggestedCommand && <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={() => onSlashSelect(msg.browserSummary?.suggestedCommand || "/")}>{msg.browserSummary.suggestedLabel || "Use next command"}</Button>}
-                    {msg.browserSummary.url && <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={() => openExternal(msg.browserSummary?.url)}>Open page</Button>}
+                    {msg.browserSummary.suggestedCommand && <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={() => onSlashSelect(msg.browserSummary?.suggestedCommand || "/")}>{msg.browserSummary.suggestedLabel || t("chat.useNextCommand")}</Button>}
+                    {msg.browserSummary.url && <Button size="sm" variant="ghost" className="rounded-full px-3" onPress={() => openExternal(msg.browserSummary?.url)}>{t("chat.openPage")}</Button>}
                   </div>
                 )}
               </div>
@@ -269,7 +271,7 @@ export function ChatMessageList({
                 </div>
                 {msg.sandbox.stream_url && (
                   <Button size="sm" className="w-full mt-1" onPress={() => openExternal(msg.sandbox?.stream_url)} style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}>
-                    <Monitor size={14} className="mr-2" /> Open Desktop
+                    <Monitor size={14} className="mr-2" /> {t("chat.openDesktop")}
                   </Button>
                 )}
               </div>
@@ -280,7 +282,7 @@ export function ChatMessageList({
               if (files.length === 0) return null;
               return (
                 <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Generated files</div>
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.generatedFiles")}</div>
                   <div className="space-y-2">
                     {files.map((f, i) => {
                       const ext = (f.name || f.path).split(".").pop()?.toLowerCase() || "";
@@ -307,7 +309,7 @@ export function ChatMessageList({
             {/* Suggestions */}
             {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !streaming && (
               <details className="mt-3">
-                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>Next moves</summary>
+                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.nextMoves")}</summary>
                 <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
                   <div className="flex flex-wrap gap-2">
                     {msg.suggestions.map((s, i) => (
@@ -336,7 +338,7 @@ export function ChatMessageList({
                   const prevPrompt = messages[idx - 1]?.role === "user" ? messages[idx - 1]?.content : resumePromptForBrowser;
                   if (prevPrompt) onBrowserContinue(prevPrompt);
                 } : undefined}
-                continueLabel="Continue blocked task"
+                continueLabel={t("chat.continueBlocked")}
               />
             )}
             {/* Skill growth */}
@@ -344,7 +346,7 @@ export function ChatMessageList({
               <div className="mt-2 rounded-xl px-3 py-2.5" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles size={13} style={{ color: "#4ade80" }} />
-                  <span className="text-[11px] font-semibold" style={{ color: "#4ade80" }}>Agent 学到了新技能</span>
+                  <span className="text-[11px] font-semibold" style={{ color: "#4ade80" }}>{t("chat.skillLearned")}</span>
                 </div>
                 <SkillGrowthPanel suggestions={msg.skillSuggestions} onSave={(s) => onSend(`Turn this into a reusable skill.\n\nName: ${s.name}\nDescription: ${s.description}\nTrigger: ${s.trigger}`)} />
               </div>
@@ -352,7 +354,7 @@ export function ChatMessageList({
             {/* Execution trace */}
             {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
               <details className="mt-3">
-                <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>Execution trace</summary>
+                <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.executionTrace")}</summary>
                 <div className="mt-2"><ExecutionTrace events={msg.traceEvents} isLive={streaming && idx === messages.length - 1} /></div>
               </details>
             )}
@@ -364,14 +366,14 @@ export function ChatMessageList({
                   className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:scale-[1.02]"
                   style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", color: "#a78bfa" }}
                 >
-                  <BookOpen size={11} /> 存入知识库
+                  <BookOpen size={11} /> {t("chat.saveToKnowledge")}
                 </button>
                 <button
                   onClick={() => onSend("/report Generate a structured report from the above conversation.")}
                   className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:scale-[1.02]"
                   style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", color: "#93c5fd" }}
                 >
-                  <FileDown size={11} /> 导出报告
+                  <FileDown size={11} /> {t("chat.exportReport")}
                 </button>
               </div>
             )}
@@ -379,7 +381,7 @@ export function ChatMessageList({
             {msg.content && (
               <div className={`chat-message-tools flex gap-0.5 mt-1 ${!isBubble ? "justify-end" : ""}`} style={isBubble ? { justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } : undefined}>
                 {msg.role === "user" && (
-                  <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>编辑</Tooltip.Content></Tooltip>
+                  <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>{t("chat.edit")}</Tooltip.Content></Tooltip>
                 )}
                 {msg.role === "assistant" && (
                   <>
@@ -387,20 +389,20 @@ export function ChatMessageList({
                       <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, msg.content)}>
                         {copiedIdx === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
                       </Button>
-                      <Tooltip.Content>{copiedIdx === msg.id ? "已复制" : "复制"}</Tooltip.Content>
+                      <Tooltip.Content>{copiedIdx === msg.id ? t("chat.copied") : t("chat.copy")}</Tooltip.Content>
                     </Tooltip>
                     <Tooltip delay={0}>
                       <Button isIconOnly variant="ghost" size="sm" onPress={() => onPlayTTS(msg.id, msg.content)}>
                         {ttsPlaying === msg.id ? <VolumeX size={11} style={{ color: "var(--yunque-accent)" }} /> : <Volume2 size={11} />}
                       </Button>
-                      <Tooltip.Content>{ttsPlaying === msg.id ? "停止播放" : "播放语音"}</Tooltip.Content>
+                      <Tooltip.Content>{ttsPlaying === msg.id ? t("chat.stopTTS") : t("chat.playTTS")}</Tooltip.Content>
                     </Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRollback(msg.id)}><Undo2 size={11} /></Button><Tooltip.Content>回滚到此</Tooltip.Content></Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/save_knowledge Save the above response to knowledge base.`)}><BookOpen size={11} /></Button><Tooltip.Content>存入知识库</Tooltip.Content></Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/report Generate a structured report from the above conversation.`)}><FileDown size={11} /></Button><Tooltip.Content>导出报告</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRollback(msg.id)}><Undo2 size={11} /></Button><Tooltip.Content>{t("chat.rollback")}</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/save_knowledge Save the above response to knowledge base.`)}><BookOpen size={11} /></Button><Tooltip.Content>{t("chat.saveToKnowledge")}</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/report Generate a structured report from the above conversation.`)}><FileDown size={11} /></Button><Tooltip.Content>{t("chat.exportReport")}</Tooltip.Content></Tooltip>
                   </>
                 )}
-                <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>重新发送</Tooltip.Content></Tooltip>
+                <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>{t("chat.retry")}</Tooltip.Content></Tooltip>
               </div>
             )}
             {!isBubble && <div className="mt-3" style={{ borderBottom: "1px solid var(--yunque-border)" }} />}
