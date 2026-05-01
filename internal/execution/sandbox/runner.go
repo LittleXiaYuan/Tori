@@ -154,15 +154,16 @@ func (r *ProcessRunner) runCode(ctx context.Context, sb *Sandbox, req RunRequest
 
 // NewRunner creates a Runner from a SandboxConfig.
 // Priority: cloud > docker > process.
-// When cloud is enabled, a FallbackRunner wraps cloud + best local runner,
-// so individual execution failures auto-degrade to local.
+// When cloud is enabled, a CircuitRunner wraps the cloud runner so repeated
+// failures skip it immediately, then a FallbackRunner degrades to local.
 func NewRunner(cfg SandboxConfig) (Runner, error) {
 	local := localRunner(cfg)
 
 	if cfg.Cloud.Enabled {
 		cr, err := NewCloudRunner(cfg.Cloud)
 		if err == nil {
-			return NewFallbackRunner(cr, local), nil
+			wrapped := NewCircuitRunner(cr, DefaultCircuitConfig())
+			return NewFallbackRunner(wrapped, local), nil
 		}
 		fmt.Printf("sandbox: cloud unavailable (%v), using local only\n", err)
 	}
