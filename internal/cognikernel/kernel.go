@@ -26,8 +26,13 @@ type CogniKernel struct {
 	config   KernelConfig
 	metrics  KernelMetrics
 
-	running bool
-	cancel  context.CancelFunc
+	running    bool
+	subscribed bool // prevents duplicate event subscriptions on re-Start
+	cancel     context.CancelFunc
+
+	// Concurrency limiters: prevent goroutine leaks from rapid event bursts.
+	reflectSem chan struct{} // limits concurrent reflective cycles
+	dreamSem   chan struct{} // limits concurrent dreaming cycles
 }
 
 // KernelConfig controls the behavior of the cognitive kernel.
@@ -117,8 +122,10 @@ func (m *KernelMetrics) Snapshot() KernelMetrics {
 // All loop components must be set via Set* methods before Start().
 func New(cfg KernelConfig) *CogniKernel {
 	return &CogniKernel{
-		config:   cfg,
-		eventBus: NewEventBus(256),
+		config:     cfg,
+		eventBus:   NewEventBus(256),
+		reflectSem: make(chan struct{}, 2), // max 2 concurrent reflections
+		dreamSem:   make(chan struct{}, 1), // max 1 concurrent dream cycle
 	}
 }
 
@@ -135,6 +142,7 @@ func (k *CogniKernel) Metrics() KernelMetrics { return k.metrics.Snapshot() }
 
 // Start begins background loops (reflective listener, dreaming scheduler).
 // The active loop is driven externally by HandleConversation calls.
+// Safe to call multiple times; subscriptions are registered only once.
 func (k *CogniKernel) Start(ctx context.Context) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -145,28 +153,31 @@ func (k *CogniKernel) Start(ctx context.Context) {
 	k.running = true
 	ctx, k.cancel = context.WithCancel(ctx)
 
-	// Subscribe to conversation-ended events → trigger reflective loop
-	if k.reflective != nil && k.config.ReflectAfterConversation {
-		k.eventBus.Subscribe(EventConversationEnded, func(ev Event) {
-			k.triggerReflection(ctx, ev)
-		})
-		slog.Info("cognikernel: reflective loop subscribed to conversation events")
-	}
+	// Guard: register subscriptions only once to avoid duplicate handlers
+	// across Stop/Start cycles.
+	if !k.subscribed {
+		k.subscribed = true
 
-	// Subscribe to idle events → trigger dreaming loop
-	if k.dreaming != nil && k.config.DreamingEnabled {
-		k.eventBus.Subscribe(EventIdleDetected, func(ev Event) {
-			k.triggerDreaming(ctx, ev)
-		})
-		slog.Info("cognikernel: dreaming loop subscribed to idle events")
-	}
+		if k.reflective != nil && k.config.ReflectAfterConversation {
+			k.eventBus.Subscribe(EventConversationEnded, func(ev Event) {
+				k.triggerReflection(ctx, ev)
+			})
+			slog.Info("cognikernel: reflective loop subscribed to conversation events")
+		}
 
-	// Subscribe to security events → immune bridge
-	if k.immune != nil && k.config.ImmuneEnabled {
-		k.eventBus.Subscribe(EventSecurityAlert, func(ev Event) {
-			k.immune.HandleEvent(ctx, ev)
-		})
-		slog.Info("cognikernel: immune bridge subscribed to security events")
+		if k.dreaming != nil && k.config.DreamingEnabled {
+			k.eventBus.Subscribe(EventIdleDetected, func(ev Event) {
+				k.triggerDreaming(ctx, ev)
+			})
+			slog.Info("cognikernel: dreaming loop subscribed to idle events")
+		}
+
+		if k.immune != nil && k.config.ImmuneEnabled {
+			k.eventBus.Subscribe(EventSecurityAlert, func(ev Event) {
+				k.immune.HandleEvent(ctx, ev)
+			})
+			slog.Info("cognikernel: immune bridge subscribed to security events")
+		}
 	}
 
 	slog.Info("cognikernel: started",
@@ -212,6 +223,7 @@ func (k *CogniKernel) OnIdle(tenantID string) {
 }
 
 // triggerReflection runs the reflective loop asynchronously.
+// Uses a semaphore to prevent unbounded goroutine growth from event bursts.
 func (k *CogniKernel) triggerReflection(ctx context.Context, ev Event) {
 	data, ok := ev.Data.(ConversationEndData)
 	if !ok {
@@ -219,7 +231,17 @@ func (k *CogniKernel) triggerReflection(ctx context.Context, ev Event) {
 		return
 	}
 
+	// Non-blocking semaphore acquire: drop if at capacity
+	select {
+	case k.reflectSem <- struct{}{}:
+	default:
+		slog.Warn("cognikernel: reflective loop at capacity, skipping")
+		return
+	}
+
 	go func() {
+		defer func() { <-k.reflectSem }()
+
 		reflectCtx, cancel := context.WithTimeout(ctx, k.config.ReflectTimeout)
 		defer cancel()
 
@@ -246,13 +268,23 @@ func (k *CogniKernel) triggerReflection(ctx context.Context, ev Event) {
 }
 
 // triggerDreaming runs the dreaming loop asynchronously.
+// Uses a semaphore (capacity 1) to ensure only one dream cycle at a time.
 func (k *CogniKernel) triggerDreaming(ctx context.Context, ev Event) {
 	data, ok := ev.Data.(IdleData)
 	if !ok {
 		return
 	}
 
+	select {
+	case k.dreamSem <- struct{}{}:
+	default:
+		slog.Debug("cognikernel: dreaming loop already running, skipping")
+		return
+	}
+
 	go func() {
+		defer func() { <-k.dreamSem }()
+
 		dreamCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
 
