@@ -1,14 +1,27 @@
 package channel
 
+// ─── Channel: Slack ─────────────────────────────────────────
+// Type:     "slack"
+// Protocol: Webhook (Events API, 独立端口 :8444)
+// Inbound:  text (Events API 签名校验)
+// Outbound: text (chat.postMessage, 线程回复)
+// Env vars: SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, SLACK_WEBHOOK_PATH
+// Status:   Production — 签名校验完整，支持 GroupLister
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
-	"strings"
+	"strconv"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -104,7 +117,9 @@ func (s *Slack) Send(ctx context.Context, channelID string, reply Reply) error {
 	defer resp.Body.Close()
 
 	var result slackAPIResponse
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("slack: decode response: %w", err)
+	}
 	if !result.OK {
 		return fmt.Errorf("slack: send error: %s", result.Error)
 	}
@@ -113,9 +128,15 @@ func (s *Slack) Send(ctx context.Context, channelID string, reply Reply) error {
 
 // handleEvent processes incoming Slack Events API payloads.
 func (s *Slack) handleEvent(rw http.ResponseWriter, r *http.Request, handler func(Message) Reply) {
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := s.verifySlackSignature(r.Header, body); err != nil {
+		slog.Warn("slack: request rejected", "err", err, "remote", r.RemoteAddr)
+		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -141,6 +162,39 @@ func (s *Slack) handleEvent(rw http.ResponseWriter, r *http.Request, handler fun
 	if envelope.Type == "event_callback" {
 		go s.processEvent(envelope.Event, handler)
 	}
+}
+
+// verifySlackSignature validates X-Slack-Signature using HMAC-SHA256.
+// Signature = 'v0=' + HMAC-SHA256(signingSecret, 'v0:' + timestamp + ':' + body).
+// Fails closed: if signingSecret is not configured, all requests are rejected.
+func (s *Slack) verifySlackSignature(h http.Header, body []byte) error {
+	if s.signingSecret == "" {
+		return fmt.Errorf("slack signing secret not configured")
+	}
+
+	sig := h.Get("X-Slack-Signature")
+	ts := h.Get("X-Slack-Request-Timestamp")
+	if sig == "" || ts == "" {
+		return fmt.Errorf("missing signature headers")
+	}
+
+	tsInt, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid timestamp")
+	}
+	if delta := math.Abs(float64(time.Now().Unix() - tsInt)); delta > 300 {
+		return fmt.Errorf("timestamp outside allowed window (%vs)", delta)
+	}
+
+	baseString := "v0:" + ts + ":" + string(body)
+	mac := hmac.New(sha256.New, []byte(s.signingSecret))
+	mac.Write([]byte(baseString))
+	expected := "v0=" + hex.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(sig), []byte(expected)) {
+		return fmt.Errorf("signature mismatch")
+	}
+	return nil
 }
 
 func (s *Slack) processEvent(event slackEvent, handler func(Message) Reply) {
@@ -169,7 +223,7 @@ func (s *Slack) processEvent(event slackEvent, handler func(Message) Reply) {
 	}
 
 	reply := handler(msg)
-	if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+	if !IsEmptyReply(reply) {
 		// Reply in thread if the original message was in a thread
 		if event.ThreadTS != "" {
 			reply.ReplyTo = event.ThreadTS

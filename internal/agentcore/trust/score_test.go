@@ -12,11 +12,14 @@ func TestTrackerRecordSuccess(t *testing.T) {
 
 	tracker.RecordSuccess("skill_a")
 	e := tracker.Get("skill_a")
-	if e.Score != 1 {
-		t.Errorf("score = %d, want 1", e.Score)
-	}
 	if e.Executions != 1 {
 		t.Errorf("executions = %d, want 1", e.Executions)
+	}
+	if e.Alpha < 1 {
+		t.Errorf("alpha = %.1f, want >= 1", e.Alpha)
+	}
+	if e.Score < 0 || e.Score > 100 {
+		t.Errorf("score = %d, want in [0, 100]", e.Score)
 	}
 }
 
@@ -24,18 +27,21 @@ func TestTrackerRecordFailure(t *testing.T) {
 	dir := t.TempDir()
 	tracker := NewTracker(filepath.Join(dir, "trust.json"))
 
-	// Build up some trust first
 	for i := 0; i < 50; i++ {
 		tracker.RecordSuccess("skill_b")
 	}
 
 	tracker.RecordFailure("skill_b", 10)
 	e := tracker.Get("skill_b")
-	if e.Score != 40 {
-		t.Errorf("score = %d, want 40", e.Score)
-	}
 	if e.Failures != 1 {
 		t.Errorf("failures = %d, want 1", e.Failures)
+	}
+	if e.BetaParam < 10 {
+		t.Errorf("beta = %.1f, want >= 10 after severity-10 failure", e.BetaParam)
+	}
+	beforeFailure := Entry{Alpha: 51, BetaParam: 1}
+	if e.BayesianScore() >= beforeFailure.BayesianScore() {
+		t.Error("score should decrease after failure")
 	}
 }
 
@@ -127,8 +133,11 @@ func TestTrackerPersistence(t *testing.T) {
 	// Load from same file
 	t2 := NewTracker(path)
 	e := t2.Get("persisted")
-	if e.Score != 50 {
-		t.Errorf("persisted score = %d, want 50", e.Score)
+	if e.Score <= 0 {
+		t.Errorf("persisted score = %d, want > 0", e.Score)
+	}
+	if e.Alpha < 50 {
+		t.Errorf("persisted alpha = %.1f, want >= 50", e.Alpha)
 	}
 }
 
