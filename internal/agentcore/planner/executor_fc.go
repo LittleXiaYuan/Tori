@@ -13,6 +13,7 @@ import (
 	"time"
 
 	ctxwindow "yunque-agent/internal/agentcore/context"
+	"yunque-agent/internal/agentcore/i18n"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
@@ -35,7 +36,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 
 		// Check for mid-execution interrupts between steps
 		if shouldStop, extraMsgs := p.checkInterrupt(req, messages); shouldStop {
-			return &PlanResult{Reply: "已停止当前任务。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			return &PlanResult{Reply: i18n.T(p.locale, "planner.task_stopped"), SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		} else if len(extraMsgs) > 0 {
 			messages = append(messages, extraMsgs...)
 		}
@@ -82,7 +83,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					}
 					messages = append(messages,
 						llm.Message{Role: "assistant", Content: reply, ReasoningContent: lastReasoning},
-						llm.Message{Role: "user", Content: "你的回答质量不够好，请重新组织更完善的回答。"},
+						llm.Message{Role: "user", Content: i18n.T(p.locale, "planner.reflect_retry")},
 					)
 					continue
 				}
@@ -419,8 +420,9 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	slog.Info("buildFunctionDefs", "total_skills", len(allSkills), "categories", len(cats), "cat_detail", strings.Join(catNames, ","), "msg_prefix", truncate(userMessage, 50))
 
 	// Fallback: direct mode (no delegation agents or fewer than 4)
-	// Strategy 1: Dynamic filtering by intent
-	if userMessage != "" && len(allSkills) > 25 && len(cats) > 0 {
+	// Strategy 1: Dynamic filtering by intent (threshold lowered from 25 to 10
+	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs)
+	if userMessage != "" && len(allSkills) > 10 && len(cats) > 0 {
 		scorer := p.skillScorer
 		if scorer != nil {
 			p.recentSkillsMu.Lock()
