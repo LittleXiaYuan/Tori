@@ -12,6 +12,7 @@ import (
 
 	"yunque-agent/internal/agentcore/llm"
 	agentrt "yunque-agent/internal/agentcore/runtime"
+	builtinCogni "yunque-agent/internal/cognikernel/builtin"
 	"yunque-agent/internal/controlplane/gateway"
 	mcpkg "yunque-agent/internal/mcp"
 	"yunque-agent/pkg/cogni"
@@ -249,6 +250,22 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 		})
 	}
 
+	// NL Config translator: natural language → structured configuration.
+	// Reuses the same LLM client as Genesis.
+	var nlTranslator *cogni.NLConfigTranslator
+	if app.LLMPool != nil {
+		if cl := app.LLMPool.GetOrFallback("smart"); cl != nil {
+			nlTranslator = cogni.NewNLConfigTranslator(func(ctx context.Context, system, user string) (string, error) {
+				msgs := []llm.Message{
+					{Role: "system", Content: system},
+					{Role: "user", Content: user},
+				}
+				return cl.Chat(ctx, msgs, 0.3)
+			})
+			slog.Info("cogni: NL config translator wired")
+		}
+	}
+
 	// Gateway wiring — placed after all cogni subsystems are initialized
 	// so the gateway receives valid (non-nil) references.
 	if gwRaw, ok := app.Get(agentrt.CompGateway); ok {
@@ -262,6 +279,7 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			gw.SetCogniEvolution(evolutionEngine)
 			gw.SetCogniFederation(federation)
 			gw.SetCogniCostTracker(m.costTracker)
+			gw.SetNLConfigTranslator(nlTranslator)
 		}
 	}
 
@@ -328,6 +346,21 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 		cogni.RegisterPlugins(m.registry, app.PluginReg.All())
 		slog.Info("cogni: existing plugins adapted as declarations",
 			"count", len(app.PluginReg.All()))
+	}
+
+	// Register built-in Cogni declarations (office/creative/data-analyst).
+	builtinDecls, err := builtinCogni.LoadAll()
+	if err != nil {
+		slog.Warn("cogni: failed to load built-in declarations", "err", err)
+	} else {
+		for _, d := range builtinDecls {
+			if addErr := m.registry.Add(d, "builtin"); addErr != nil {
+				slog.Warn("cogni: failed to add built-in declaration", "id", d.ID, "err", addErr)
+			}
+		}
+		if len(builtinDecls) > 0 {
+			slog.Info("cogni: built-in declarations registered", "count", len(builtinDecls))
+		}
 	}
 
 	slog.Info("cogni registry initialized", "dir", m.dir)
