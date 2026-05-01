@@ -258,6 +258,82 @@ func TestKernel_EndToEnd(t *testing.T) {
 	}
 }
 
+func TestKernel_DoubleStart_NoDuplicateSubscriptions(t *testing.T) {
+	cfg := DefaultKernelConfig()
+	cfg.ReflectTimeout = 5 * time.Second
+	k := New(cfg)
+
+	rl := NewReflectiveLoop()
+	var reflectCount int32
+	rl.SetReflectEval(func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
+		atomic.AddInt32(&reflectCount, 1)
+		return &ReflectEvalResult{Satisfied: true, Quality: 9}, nil
+	})
+	rl.SetExperienceRecord(func(source, category, outcome, lesson, ctx string, tags []string) {})
+
+	k.SetReflectiveLoop(rl)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start twice — subscriptions should only register once
+	k.Start(ctx)
+	k.Stop()
+	k.Start(ctx)
+
+	k.OnConversationEnd(ConversationEndData{
+		TenantID:   "test",
+		UserIntent: "hello",
+		AgentReply: "hi there",
+		ModelTier:  "fast",
+	})
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Should only run once (no duplicate subscription)
+	if got := atomic.LoadInt32(&reflectCount); got != 1 {
+		t.Errorf("expected 1 reflection (no duplicate subscription), got %d", got)
+	}
+}
+
+func TestKernel_ReflectSemaphore(t *testing.T) {
+	cfg := DefaultKernelConfig()
+	cfg.ReflectTimeout = 5 * time.Second
+	k := New(cfg)
+
+	rl := NewReflectiveLoop()
+	var activeCount int32
+	rl.SetReflectEval(func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
+		atomic.AddInt32(&activeCount, 1)
+		time.Sleep(100 * time.Millisecond)
+		atomic.AddInt32(&activeCount, -1)
+		return &ReflectEvalResult{Satisfied: true, Quality: 7}, nil
+	})
+	rl.SetExperienceRecord(func(source, category, outcome, lesson, ctx string, tags []string) {})
+
+	k.SetReflectiveLoop(rl)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	k.Start(ctx)
+
+	// Fire 5 events rapidly — semaphore limits to 2 concurrent
+	for i := 0; i < 5; i++ {
+		k.OnConversationEnd(ConversationEndData{
+			TenantID:   "test",
+			UserIntent: "hello",
+			AgentReply: "hi",
+			ModelTier:  "fast",
+		})
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	peak := atomic.LoadInt32(&activeCount)
+	if peak > 2 {
+		t.Errorf("expected max 2 concurrent reflections, got %d", peak)
+	}
+}
+
 func longString(n int) string {
 	b := make([]byte, n)
 	for i := range b {
