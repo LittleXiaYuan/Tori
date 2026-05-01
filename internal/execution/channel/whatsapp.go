@@ -1,5 +1,21 @@
 package channel
 
+// ─── Channel: WhatsApp ──────────────────────────────────────
+// Type:     "whatsapp"
+// Protocol: Webhook (Cloud API v21, 独立端口 :8443)
+// Inbound:  text (仅文本，其他类型待实现)
+// Outbound: text (仅纯文本，无模板/交互消息)
+// Env vars: WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN,
+//           WHATSAPP_VERIFY_TOKEN, WHATSAPP_WEBHOOK_PATH
+// Status:   Stub — 基础可用，缺少签名校验和多媒体支持
+//
+// TODO: [P1] 添加 X-Hub-Signature-256 签名校验 (handleMessage)
+// TODO: [P2] 支持入站多媒体消息 (image/audio/document/video/location/sticker)
+// TODO: [P2] 支持出站交互消息 (interactive buttons/lists)
+// TODO: [P3] 支持 WhatsApp 模板消息 (template messages)
+// TODO: [P3] 实现 ProgressSender 接口 (编辑消息)
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"
@@ -8,7 +24,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -167,7 +182,7 @@ func (w *WhatsApp) handleMessage(rw http.ResponseWriter, r *http.Request, handle
 				}
 
 				reply := handler(inMsg)
-				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+				if !IsEmptyReply(reply) {
 					if err := w.Send(r.Context(), msg.From, reply); err != nil {
 						slog.Warn("whatsapp: reply failed", "to", msg.From, "err", err)
 					}
