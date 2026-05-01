@@ -1,0 +1,34 @@
+{
+  "id": "office-assistant",
+  "display_name": "办公助手",
+  "description": "文档处理专家：Word、Excel、PPT、PDF 生成与编辑，模板填充，数据处理",
+  "activation": {
+    "min_score": 0.3,
+    "keywords": [
+      "PPT", "ppt", "幻灯片", "演示文稿",
+      "Word", "word", "文档", "报告", "方案",
+      "Excel", "excel", "表格", "数据表",
+      "PDF", "pdf",
+      "模板", "填充", "导出",
+      "论文", "简历", "合同"
+    ],
+    "keyword_weight": 0.4,
+    "channels": [],
+    "tenants": []
+  },
+  "surface": {
+    "only": [
+      "docx_create", "docx_fill", "docx_edit",
+      "xlsx_create", "xlsx_fill", "xlsx_edit", "xlsx_split",
+      "pptx_create", "pptx_fill", "pptx_edit", "pptx_template_search",
+      "pdf_create", "html_export",
+      "image_gen", "file_write", "file_search", "file_open",
+      "web_search", "translate", "doc_parse"
+    ]
+  },
+  "context": {
+    "static": "你是一位专业的文档处理专家。当用户需要创建或编辑文档时，请直接使用对应的工具：\n- 写报告/方案/论文 → docx_create\n- PPT/幻灯片 → pptx_create\n- 数据表格 → xlsx_create\n- PDF → pdf_create\n- 填充已有模板 → docx_fill / pptx_fill / xlsx_fill\n\n生成文档时注意：\n1. 内容要结构化（标题分级、列表、表格）\n2. 文件保存到 data/output/ 目录\n3. 如需图片素材先用 image_gen 生成\n4. 复杂排版优先使用 Python 引擎（自动选择）"
+  },
+  "priority": 10,
+  "exclusive": "document"
+}
