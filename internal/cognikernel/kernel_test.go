@@ -258,6 +258,74 @@ func TestKernel_EndToEnd(t *testing.T) {
 	}
 }
 
+func TestEventBus_PanicRecovery(t *testing.T) {
+	bus := NewEventBus(16)
+
+	var handlerACalled, handlerBCalled int32
+
+	// Handler A panics
+	bus.Subscribe(EventConversationEnded, func(ev Event) {
+		atomic.AddInt32(&handlerACalled, 1)
+		panic("handler A exploded")
+	})
+
+	// Handler B should still run
+	bus.Subscribe(EventConversationEnded, func(ev Event) {
+		atomic.AddInt32(&handlerBCalled, 1)
+	})
+
+	// Should not panic
+	bus.Publish(Event{Type: EventConversationEnded, Timestamp: time.Now()})
+
+	if atomic.LoadInt32(&handlerACalled) != 1 {
+		t.Error("handler A should have been called")
+	}
+	if atomic.LoadInt32(&handlerBCalled) != 1 {
+		t.Error("handler B should still run despite A panicking")
+	}
+}
+
+func TestKernel_StopStartUsesNewCtx(t *testing.T) {
+	cfg := DefaultKernelConfig()
+	cfg.ReflectTimeout = 2 * time.Second
+	k := New(cfg)
+
+	rl := NewReflectiveLoop()
+	var ctxCancelled int32
+	rl.SetReflectEval(func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
+		if ctx.Err() != nil {
+			atomic.AddInt32(&ctxCancelled, 1)
+		}
+		return &ReflectEvalResult{Satisfied: true, Quality: 9}, nil
+	})
+	rl.SetExperienceRecord(func(source, category, outcome, lesson, ctx string, tags []string) {})
+
+	k.SetReflectiveLoop(rl)
+
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	k.Start(ctx1)
+	cancel1() // cancel the original ctx
+	k.Stop()
+
+	// Start with a fresh context
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	k.Start(ctx2)
+
+	k.OnConversationEnd(ConversationEndData{
+		TenantID:   "test",
+		UserIntent: "hello",
+		AgentReply: "hi",
+		ModelTier:  "fast",
+	})
+
+	time.Sleep(200 * time.Millisecond)
+
+	if atomic.LoadInt32(&ctxCancelled) != 0 {
+		t.Error("handler should use new ctx, not cancelled old one")
+	}
+}
+
 func TestKernel_DoubleStart_NoDuplicateSubscriptions(t *testing.T) {
 	cfg := DefaultKernelConfig()
 	cfg.ReflectTimeout = 5 * time.Second

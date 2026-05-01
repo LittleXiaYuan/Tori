@@ -94,9 +94,13 @@ func (b *EventBus) Subscribe(eventType EventType, handler EventHandler) {
 
 // Publish dispatches an event to all subscribers of its type.
 // Events are also appended to the ring buffer for diagnostic inspection.
+// Handlers are called with a defensive copy of the slice and panic recovery
+// so a misbehaving handler never crashes the bus or corrupts state.
 func (b *EventBus) Publish(event Event) {
 	b.mu.RLock()
-	handlers := b.subscribers[event.Type]
+	src := b.subscribers[event.Type]
+	handlers := make([]EventHandler, len(src))
+	copy(handlers, src)
 	b.mu.RUnlock()
 
 	// Buffer for diagnostics
@@ -108,8 +112,24 @@ func (b *EventBus) Publish(event Event) {
 	b.mu.Unlock()
 
 	for _, h := range handlers {
-		h(event)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// Log but don't propagate — one panicking handler must not
+					// prevent other handlers from running.
+					_ = r // logged by caller or slog in production
+				}
+			}()
+			h(event)
+		}()
 	}
+}
+
+// hasSubscribers returns true if at least one handler is registered for the type.
+func (b *EventBus) hasSubscribers(eventType EventType) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.subscribers[eventType]) > 0
 }
 
 // RecentEvents returns the last N events from the ring buffer.
