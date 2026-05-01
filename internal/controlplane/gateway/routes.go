@@ -38,6 +38,7 @@ func (g *Gateway) registerChatRoutes() {
 	g.mux.HandleFunc("/v1/conversations", g.requireAuth(g.handleConversations))
 	g.mux.HandleFunc("/v1/conversations/messages", g.requireAuth(g.handleConversationMessages))
 	g.mux.HandleFunc("/v1/conversations/manage", g.requireAuth(g.handleConversationManage))
+	g.mux.HandleFunc("/v1/conversations/replay", g.requireAuth(g.handleConversationReplay))
 
 	// Fork routes moved to forkapi sub-package
 
@@ -59,6 +60,10 @@ func (g *Gateway) registerChatRoutes() {
 	// Emotion
 	g.mux.HandleFunc("/v1/emotion/stickers", g.requireAuth(g.handleStickers))
 	g.mux.HandleFunc("/v1/emotion/history", g.requireAuth(g.handleEmotionHistory))
+
+	// User Instructions
+	g.mux.HandleFunc("/v1/instructions", g.requireAuth(g.handleInstructions))
+	g.mux.HandleFunc("/v1/instructions/reorder", g.requireAuth(g.handleInstructionsReorder))
 
 	// React & Sticker
 	g.mux.HandleFunc("/v1/react", g.requireAuth(g.handleReact))
