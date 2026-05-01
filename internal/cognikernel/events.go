@@ -1,6 +1,7 @@
 package cognikernel
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -114,11 +115,10 @@ func (b *EventBus) Publish(event Event) {
 	for _, h := range handlers {
 		func() {
 			defer func() {
-				if r := recover(); r != nil {
-					// Log but don't propagate — one panicking handler must not
-					// prevent other handlers from running.
-					_ = r // logged by caller or slog in production
-				}
+			if r := recover(); r != nil {
+				slog.Error("cognikernel: event handler panicked",
+					"event_type", event.Type, "recover", r)
+			}
 			}()
 			h(event)
 		}()
