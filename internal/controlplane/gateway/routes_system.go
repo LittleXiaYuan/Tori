@@ -7,13 +7,16 @@ import (
 
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/desktop"
+	"yunque-agent/internal/sbom"
 	"yunque-agent/internal/version"
 )
 
 // registerSystemRoutes registers system info, metrics, settings, tenants, backup, speech,
 // federation, heartbeat, and file upload routes.
 func (g *Gateway) registerSystemRoutes() {
-	// Health & version (unauthenticated)
+	// ── Multi-layer health probes (unauthenticated, K8s-compatible) ──
+
+	// /healthz — backward-compatible simple probe (returns 200 always)
 	g.mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		breaker := g.planner.LLMBreaker()
 		health := map[string]any{
@@ -28,6 +31,27 @@ func (g *Gateway) registerSystemRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(health)
 	})
+
+	// /livez — liveness probe: process alive, can serve HTTP
+	g.mux.HandleFunc("/livez", g.handleLivez)
+
+	// /readyz — readiness probe: dependencies initialized, ready to accept traffic
+	g.mux.HandleFunc("/readyz", g.handleReadyz)
+
+	// /sbom — embedded CycloneDX SBOM (unauthenticated, read-only supply chain info)
+	g.mux.HandleFunc("/sbom", func(w http.ResponseWriter, r *http.Request) {
+		data := sbom.Get()
+		if data == nil {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":"no SBOM embedded in this build"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+	})
+
+	// /healthz/cognitive — deep cognitive subsystem health (memory, knowledge, LLM, cogni)
+	g.mux.HandleFunc("/healthz/cognitive", g.handleCognitiveHealth)
 	g.mux.HandleFunc("/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		info := version.Get()
@@ -149,4 +173,8 @@ func (g *Gateway) registerSystemRoutes() {
 	// Cogni declarative AI-cognition shells (hot-pluggable)
 	g.mux.HandleFunc("/v1/cognis", g.requireAuth(g.handleCognis))
 	g.mux.HandleFunc("/v1/cognis/", g.requireAuth(g.handleCognis))
+
+	// NL Config — natural language → structured configuration
+	g.mux.HandleFunc("/v1/nl-config", g.requireAuth(g.handleNLConfig))
+	g.mux.HandleFunc("/v1/nl-config/", g.requireAuth(g.handleNLConfig))
 }
