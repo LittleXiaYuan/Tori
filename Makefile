@@ -18,7 +18,7 @@ DIST_DIR    := dist
 # Cross-compilation targets
 PLATFORMS   := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: build release clean test setup web-ensure web-build openapi docs-api
+.PHONY: build build-full release clean test coverage lint lint-go lint-web vet setup openapi docs-api check web-ensure web-build sbom vulncheck release-safe
 
 ## web-ensure: Ensure heroui-web/out/ exists (placeholder if no build)
 web-ensure:
@@ -66,13 +66,27 @@ test: web-ensure
 coverage: web-ensure
 	@bash scripts/coverage.sh
 
-## lint: Run golangci-lint (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
-lint:
+## lint: Run all linters (Go + frontend)
+lint: lint-go lint-web
+
+## lint-go: Run golangci-lint (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+lint-go:
 	golangci-lint run ./...
 
-## vet: Run go vet only
+## lint-web: Run frontend type checking and lint
+lint-web:
+	@if [ -f heroui-web/node_modules/.package-lock.json ]; then \
+		cd heroui-web && npx tsc --noEmit; \
+	else \
+		echo "SKIP: heroui-web/node_modules not installed (run 'cd heroui-web && npm ci' first)"; \
+	fi
+
+## vet: Run go vet only (lightweight alternative to full lint)
 vet:
 	go vet ./...
+
+## check: Pre-commit gate — lint + test (fails fast)
+check: lint test
 
 ## setup: Build and run setup wizard
 setup:
@@ -88,6 +102,25 @@ openapi:
 docs-api:
 	@echo "Serving API reference at http://localhost:8000/api-reference.html"
 	cd docs && python -m http.server 8000
+
+## sbom: Generate CycloneDX SBOM from Go modules
+sbom:
+	@echo "Generating SBOM..."
+	@which cyclonedx-gomod >/dev/null 2>&1 || (echo "Install: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest" && exit 1)
+	@mkdir -p $(DIST_DIR)
+	cyclonedx-gomod mod -json -output $(DIST_DIR)/sbom.cdx.json
+	cp $(DIST_DIR)/sbom.cdx.json internal/sbom/sbom.cdx.json
+	@echo "SBOM generated: $(DIST_DIR)/sbom.cdx.json (and embedded copy)"
+
+## vulncheck: Scan for known Go vulnerabilities
+vulncheck:
+	@echo "Scanning for vulnerabilities..."
+	@which govulncheck >/dev/null 2>&1 || (echo "Install: go install golang.org/x/vuln/cmd/govulncheck@latest" && exit 1)
+	govulncheck ./...
+	@echo "Vulnerability scan complete"
+
+## release-safe: Release with SBOM generation and vulnerability gate
+release-safe: vulncheck sbom release
 
 ## clean: Remove build artifacts
 clean:
