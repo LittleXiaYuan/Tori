@@ -21,6 +21,7 @@ import (
 	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/instruction"
 	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/localbrain"
@@ -261,6 +262,9 @@ func (g *Gateway) SetEmotionAnalyzer(ea *emotion.Analyzer) { g.emotionAnalyzer =
 // SetEmotionHistory attaches the emotion history store.
 func (g *Gateway) SetEmotionHistory(h *emotion.History) { g.emotionHistory = h }
 
+// SetInstructionStore attaches the user instruction store.
+func (g *Gateway) SetInstructionStore(s *instruction.Store) { g.instructionStore = s }
+
 // SetStickerMap attaches a sticker suggestion map.
 func (g *Gateway) SetStickerMap(sm *emotion.StickerMap) { g.stickerMap = sm }
 
@@ -450,6 +454,9 @@ func (g *Gateway) SetCogniFederation(cf *cogni.CogniFederation) { g.cogniFederat
 
 // SetCogniCostTracker attaches the economics cost tracker.
 func (g *Gateway) SetCogniCostTracker(ct *cogni.CostTracker) { g.cogniCostTracker = ct }
+
+// SetNLConfigTranslator attaches the natural-language config translator.
+func (g *Gateway) SetNLConfigTranslator(t *cogni.NLConfigTranslator) { g.nlConfigTranslator = t }
 
 // SetLoRAScheduler attaches the LoRA training lifecycle scheduler.
 func (g *Gateway) SetLoRAScheduler(s *localbrain.LoRAScheduler) { g.loraScheduler = s }

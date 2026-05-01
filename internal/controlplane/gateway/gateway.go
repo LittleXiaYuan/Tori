@@ -36,6 +36,7 @@ import (
 	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
+	"yunque-agent/internal/agentcore/instruction"
 	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/localbrain"
@@ -263,6 +264,9 @@ type Gateway struct {
 	projectStore *orchestrator.ProjectStore
 	orchDaemon   *orchestrator.Daemon
 	orchLauncher *orchestrator.Launcher
+
+	// User-defined instructions (per-tenant)
+	instructionStore *instruction.Store
 
 	// Output directory for agent-generated files (file_write, code_exec outputs)
 	outputDir string
