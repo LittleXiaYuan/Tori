@@ -322,16 +322,17 @@ func (g *Gateway) handleProviderRegister(w http.ResponseWriter, r *http.Request)
 			apperror.WriteCode(w, apperror.CodeBadRequest, "unknown preset: "+req.PresetID)
 			return
 		}
-		cfg.ID = req.PresetID + "-" + req.Model
 		cfg.DisplayName = preset.Name
 		cfg.BaseURL = preset.BaseURL
 		cfg.PresetID = req.PresetID
 		cfg.Dialect = preset.Dialect
+		// Fill default model BEFORE generating provider ID
 		if req.Model == "" && len(preset.Models) > 0 {
 			req.Model = preset.Models[0].ID
 			cfg.Tier = preset.Models[0].Tier
 			cfg.Capabilities = preset.Models[0].Capabilities
 		}
+		cfg.ID = req.PresetID + "-" + req.Model
 		for _, pm := range preset.Models {
 			if pm.ID == req.Model {
 				if cfg.Tier == "" {
