@@ -33,6 +33,9 @@ type CogniKernel struct {
 	ctxMu      sync.RWMutex
 	currentCtx context.Context
 
+	// stoppedCtx is a pre-cancelled context returned by ctx() after Stop().
+	stoppedCtx context.Context
+
 	// Concurrency limiters: prevent goroutine leaks from rapid event bursts.
 	reflectSem chan struct{} // limits concurrent reflective cycles
 	dreamSem   chan struct{} // limits concurrent dreaming cycles
@@ -124,9 +127,12 @@ func (m *KernelMetrics) Snapshot() KernelMetrics {
 // New creates a CogniKernel with the given configuration.
 // All loop components must be set via Set* methods before Start().
 func New(cfg KernelConfig) *CogniKernel {
+	stopped, stopFn := context.WithCancel(context.Background())
+	stopFn()
 	return &CogniKernel{
 		config:     cfg,
 		eventBus:   NewEventBus(256),
+		stoppedCtx: stopped,
 		reflectSem: make(chan struct{}, 2), // max 2 concurrent reflections
 		dreamSem:   make(chan struct{}, 1), // max 1 concurrent dream cycle
 	}
@@ -138,12 +144,13 @@ func (k *CogniKernel) SetDreamingLoop(dl *DreamingLoop)     { k.dreaming = dl }
 func (k *CogniKernel) SetImmuneBridge(ib *ImmuneBridge)     { k.immune = ib }
 
 // ctx returns the current lifecycle context, safe for use in event handlers.
-// Returns context.Background() if the kernel is stopped.
+// Returns a pre-cancelled context if the kernel is stopped, ensuring any
+// in-flight handler sees ctx.Err() != nil and exits promptly.
 func (k *CogniKernel) ctx() context.Context {
 	k.ctxMu.RLock()
 	defer k.ctxMu.RUnlock()
 	if k.currentCtx == nil {
-		return context.Background()
+		return k.stoppedCtx
 	}
 	return k.currentCtx
 }

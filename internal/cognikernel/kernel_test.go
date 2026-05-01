@@ -370,10 +370,18 @@ func TestKernel_ReflectSemaphore(t *testing.T) {
 	k := New(cfg)
 
 	rl := NewReflectiveLoop()
+	var peakCount int32
 	var activeCount int32
+	gate := make(chan struct{})
 	rl.SetReflectEval(func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
-		atomic.AddInt32(&activeCount, 1)
-		time.Sleep(100 * time.Millisecond)
+		cur := atomic.AddInt32(&activeCount, 1)
+		for {
+			old := atomic.LoadInt32(&peakCount)
+			if cur <= old || atomic.CompareAndSwapInt32(&peakCount, old, cur) {
+				break
+			}
+		}
+		<-gate
 		atomic.AddInt32(&activeCount, -1)
 		return &ReflectEvalResult{Satisfied: true, Quality: 7}, nil
 	})
@@ -385,7 +393,6 @@ func TestKernel_ReflectSemaphore(t *testing.T) {
 	defer cancel()
 	k.Start(ctx)
 
-	// Fire 5 events rapidly — semaphore limits to 2 concurrent
 	for i := 0; i < 5; i++ {
 		k.OnConversationEnd(ConversationEndData{
 			TenantID:   "test",
@@ -395,10 +402,12 @@ func TestKernel_ReflectSemaphore(t *testing.T) {
 		})
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	peak := atomic.LoadInt32(&activeCount)
-	if peak > 2 {
-		t.Errorf("expected max 2 concurrent reflections, got %d", peak)
+	time.Sleep(100 * time.Millisecond)
+	close(gate)
+	time.Sleep(100 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&peakCount); got > 2 {
+		t.Errorf("expected max 2 concurrent reflections, peak was %d", got)
 	}
 }
 
