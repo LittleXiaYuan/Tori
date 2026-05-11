@@ -82,6 +82,8 @@ const sources = [
   "src/trust.test.ts",
   "src/review.ts",
   "src/review.test.ts",
+  "src/skillgrow.ts",
+  "src/skillgrow.test.ts",
   "src/audit.ts",
   "src/audit.test.ts",
   "src/heartbeat.ts",
@@ -211,6 +213,7 @@ for (const testName of [
   "iterate.test",
   "trust.test",
   "review.test",
+  "skillgrow.test",
   "audit.test",
   "heartbeat.test",
   "reverie.test",
@@ -284,6 +287,7 @@ for (const testName of [
     .replace('from "./iterate"', 'from "./iterate.js"')
     .replace('from "./trust"', 'from "./trust.js"')
     .replace('from "./review"', 'from "./review.js"')
+    .replace('from "./skillgrow"', 'from "./skillgrow.js"')
     .replace('from "./audit"', 'from "./audit.js"')
     .replace('from "./heartbeat"', 'from "./heartbeat.js"')
     .replace('from "./reverie"', 'from "./reverie.js"')
