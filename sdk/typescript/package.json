@@ -58,6 +58,10 @@
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
+    },
+    "./modes": {
+      "types": "./src/modes.ts",
+      "import": "./src/modes.ts"
     }
   },
   "files": [
