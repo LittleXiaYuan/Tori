@@ -172,6 +172,19 @@ test("SetupClient throws SetupClientError with parsed body", async () => {
     assertDeepEqual(error.body, { error: "base_url is required" });
     assertEqual(error.message, "base_url is required");
   }
+
+  const nestedClient = createSetupClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "template_id is required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.apply({ template_id: "" });
+    throw new Error("expected nested apply to reject");
+  } catch (error) {
+    assert(error instanceof SetupClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "template_id is required");
+  }
 });
 
 let failures = 0;
