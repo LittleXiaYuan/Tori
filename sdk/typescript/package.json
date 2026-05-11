@@ -91,6 +91,10 @@
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"
     },
+    "./models": {
+      "types": "./src/models.ts",
+      "import": "./src/models.ts"
+    },
     "./setup": {
       "types": "./src/setup.ts",
       "import": "./src/setup.ts"

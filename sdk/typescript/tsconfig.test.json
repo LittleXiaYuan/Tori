@@ -37,6 +37,7 @@
     "src/task-context.ts",
     "src/knowledge.ts",
     "src/providers.ts",
+    "src/models.ts",
     "src/setup.ts",
     "src/documents.ts",
     "src/approvals.ts",
