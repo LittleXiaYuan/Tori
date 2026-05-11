@@ -135,6 +135,10 @@
       "types": "./src/task-observe.ts",
       "import": "./src/task-observe.ts"
     },
+    "./task-templates": {
+      "types": "./src/task-templates.ts",
+      "import": "./src/task-templates.ts"
+    },
     "./task-lifecycle": {
       "types": "./src/task-lifecycle.ts",
       "import": "./src/task-lifecycle.ts"
