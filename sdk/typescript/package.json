@@ -38,6 +38,10 @@
     "./setup": {
       "types": "./src/setup.ts",
       "import": "./src/setup.ts"
+    },
+    "./documents": {
+      "types": "./src/documents.ts",
+      "import": "./src/documents.ts"
     }
   },
   "files": [
