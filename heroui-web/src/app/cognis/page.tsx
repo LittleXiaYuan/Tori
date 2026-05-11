@@ -276,6 +276,12 @@ export default function CognisPage() {
 
   const demoCogni = cognis.find((c) => c.id === DEMO_COGNI_ID);
   const demoHealthData = health[DEMO_COGNI_ID];
+  const experienceSummary = detailExperience?.summary;
+  const experienceStats = experienceSummary?.stats ?? detailExperience?.stats ?? {};
+  const topTools = experienceSummary?.top_tools ?? detailExperience?.tool_memory?.slice(0, 5) ?? [];
+  const topFacts = experienceSummary?.top_facts ?? detailExperience?.domain_facts?.slice(0, 5) ?? [];
+  const pendingPatterns = experienceSummary?.pending_patterns ?? detailExperience?.patterns?.filter((p) => !p.confirmed).slice(0, 5) ?? [];
+  const confirmedPatterns = detailExperience?.patterns?.filter((p) => p.confirmed).slice(0, 5) ?? [];
 
   const filteredCognis = cognis.filter(
     (c) =>
@@ -940,19 +946,60 @@ export default function CognisPage() {
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(detailExperience.stats || {}).map(([k, v]) => (
+                      {Object.entries(experienceStats).map(([k, v]) => (
                         <div key={k} className="p-2 rounded-lg text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
                           <div className="text-lg font-medium" style={{ color: "var(--yunque-text)" }}>{String(v)}</div>
                           <div className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{k.replace(/_/g, " ")}</div>
                         </div>
                       ))}
                     </div>
-                    {(detailExperience.patterns?.length ?? 0) > 0 && (
+                    {experienceSummary?.updated_at && (
+                      <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                        Profile 最近更新：{new Date(experienceSummary.updated_at).toLocaleString()}
+                      </div>
+                    )}
+                    {topTools.length > 0 && (
                       <div>
-                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>行为模式</div>
-                        {detailExperience.patterns!.slice(0, 5).map((p: CogniExperiencePattern, i: number) => (
+                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>高频工具经验</div>
+                        {topTools.map((tool, i) => (
+                          <div key={`${tool.tool}-${i}`} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(34,211,238,0.08)", color: "var(--yunque-text-muted)" }}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium" style={{ color: "var(--yunque-text)" }}>{tool.tool || "unknown tool"}</span>
+                              <span>复用 {tool.used_count ?? 0}</span>
+                            </div>
+                            {tool.learned && <div>{tool.learned}</div>}
+                            {tool.context && <div>场景：{tool.context}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {topFacts.length > 0 && (
+                      <div>
+                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>高频领域事实</div>
+                        {topFacts.map((fact, i) => (
+                          <div key={`${fact.fact}-${i}`} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(167,139,250,0.08)", color: "var(--yunque-text-muted)" }}>
+                            <div style={{ color: "var(--yunque-text)" }}>{fact.fact}</div>
+                            <div>来源 {fact.source || "unknown"} · 复用 {fact.used_count ?? 0}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {pendingPatterns.length > 0 && (
+                      <div>
+                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>待确认模式</div>
+                        {pendingPatterns.map((p: CogniExperiencePattern, i: number) => (
+                          <div key={p.id || i} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(255,170,0,0.08)", color: "var(--yunque-text-muted)" }}>
+                            {p.trigger} → {p.response}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {confirmedPatterns.length > 0 && (
+                      <div>
+                        <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>已确认行为模式</div>
+                        {confirmedPatterns.map((p: CogniExperiencePattern, i: number) => (
                           <div key={i} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(255,255,255,0.03)", color: "var(--yunque-text-muted)" }}>
-                            {p.trigger} → {p.response} {p.confirmed && "✓"}
+                            {p.trigger} → {p.response} ✓
                           </div>
                         ))}
                       </div>
