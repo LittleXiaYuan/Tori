@@ -180,6 +180,7 @@ import { createSkillHubPolicyClient } from "yunque-client/skillhub-policy";
 import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
+import { createConnectorCatalogClient } from "yunque-client/connector-catalog";
 import { createNotifyClient } from "yunque-client/notify";
 import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
@@ -396,12 +397,18 @@ const taskDelete = createTaskDeleteClient({
 });
 await taskDelete.delete("task_123");
 
+const connectorCatalog = createConnectorCatalogClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const connectorList = await connectorCatalog.list();
+console.log(connectorList.connectors.length);
+
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
-const connectorList = await connectors.list();
-console.log(connectorList.connectors.length);
+await connectors.execute({ connector_id: "github", action_id: "list_issues" });
 
 const notifyShare = createNotifyShareClient({
   baseUrl: "http://localhost:9090",
@@ -1151,6 +1158,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/skills.ts` | Lightweight hand-written runtime skills catalog, scan, dynamic review, and suggestions slice |
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
+| `src/connector-catalog.ts` | Lightweight connector list/detail catalog facade without full SDK import |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
 | `src/notify-share.ts` | Lightweight notification share dispatch facade without full SDK import |
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |
