@@ -70,6 +70,7 @@ import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
 import { createWorkflowClient } from "yunque-client/workflow";
+import { createCostClient } from "yunque-client/cost";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -256,14 +257,21 @@ const saved = await workflows.save({
   edges: [],
 });
 await workflows.run({ definition_id: saved.id!, variables: { topic: "sdk" } });
+
+const costs = createCostClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+console.log(await costs.summary());
+await costs.setQuota({ quota: { max_chat_calls: 100, max_tokens_per_day: 200000 } });
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona`/`workflow` without importing the generated 500KB+ SDK/types
-bundle. Add future slices in the same style when those surfaces need stable,
-lightweight integration APIs.
+`/ide`/`persona`/`workflow`/`cost` without importing the generated 500KB+
+SDK/types bundle. Add future slices in the same style when those surfaces need
+stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -305,6 +313,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
 | `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
+| `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

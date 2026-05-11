@@ -74,6 +74,10 @@
     "./workflow": {
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"
+    },
+    "./cost": {
+      "types": "./src/cost.ts",
+      "import": "./src/cost.ts"
     }
   },
   "files": [
