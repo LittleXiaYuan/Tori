@@ -71,6 +71,10 @@
       "types": "./src/embeddings.ts",
       "import": "./src/embeddings.ts"
     },
+    "./search": {
+      "types": "./src/search.ts",
+      "import": "./src/search.ts"
+    },
     "./interactions": {
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
