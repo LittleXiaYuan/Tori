@@ -42,6 +42,7 @@
     "src/permissions.ts",
     "src/memory.ts",
     "src/memory-search.ts",
+    "src/memory-stats.ts",
     "src/tasks.ts",
     "src/task-context.ts",
     "src/knowledge.ts",
