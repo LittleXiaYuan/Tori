@@ -99,6 +99,10 @@
       "types": "./src/roles.ts",
       "import": "./src/roles.ts"
     },
+    "./permissions": {
+      "types": "./src/permissions.ts",
+      "import": "./src/permissions.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"
