@@ -54,6 +54,7 @@
     "src/plugin-api.ts",
     "src/state.ts",
     "src/triggers.ts",
+    "src/missions.ts",
     "src/**/*.test.ts"
   ]
 }

@@ -158,6 +158,10 @@
     "./triggers": {
       "types": "./src/triggers.ts",
       "import": "./src/triggers.ts"
+    },
+    "./missions": {
+      "types": "./src/missions.ts",
+      "import": "./src/missions.ts"
     }
   },
   "files": [
