@@ -159,6 +159,10 @@
       "types": "./src/trust.ts",
       "import": "./src/trust.ts"
     },
+    "./review": {
+      "types": "./src/review.ts",
+      "import": "./src/review.ts"
+    },
     "./audit": {
       "types": "./src/audit.ts",
       "import": "./src/audit.ts"

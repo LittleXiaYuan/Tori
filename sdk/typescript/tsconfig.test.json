@@ -54,6 +54,7 @@
     "src/lora.ts",
     "src/iterate.ts",
     "src/trust.ts",
+    "src/review.ts",
     "src/audit.ts",
     "src/heartbeat.ts",
     "src/reverie.ts",
