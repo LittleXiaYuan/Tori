@@ -111,6 +111,32 @@ test("ChatClient throws ChatClientError with parsed body", async () => {
   }
 });
 
+test("ChatClient reads nested gateway and text error messages", async () => {
+  const nestedClient = createChatClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "messages are required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.send({ messages: [] });
+    throw new Error("expected nestedClient to reject");
+  } catch (error) {
+    assert(error instanceof ChatClientError);
+    assertEqual(error.message, "messages are required");
+  }
+
+  const textClient = createChatClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => new Response("temporarily unavailable", { status: 503 }),
+  });
+  try {
+    await textClient.send({ messages: [{ role: "user", content: "hello" }] });
+    throw new Error("expected textClient to reject");
+  } catch (error) {
+    assert(error instanceof ChatClientError);
+    assertEqual(error.message, "temporarily unavailable");
+  }
+});
+
 let failures = 0;
 for (const { name, fn } of tests) {
   try {
