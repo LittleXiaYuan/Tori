@@ -19,6 +19,7 @@
     "src/tasks.ts",
     "src/knowledge.ts",
     "src/providers.ts",
+    "src/setup.ts",
     "src/**/*.test.ts"
   ]
 }

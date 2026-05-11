@@ -34,6 +34,10 @@
     "./providers": {
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"
+    },
+    "./setup": {
+      "types": "./src/setup.ts",
+      "import": "./src/setup.ts"
     }
   },
   "files": [
