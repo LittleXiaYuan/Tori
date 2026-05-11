@@ -163,6 +163,10 @@
       "types": "./src/review.ts",
       "import": "./src/review.ts"
     },
+    "./skillgrow": {
+      "types": "./src/skillgrow.ts",
+      "import": "./src/skillgrow.ts"
+    },
     "./audit": {
       "types": "./src/audit.ts",
       "import": "./src/audit.ts"
