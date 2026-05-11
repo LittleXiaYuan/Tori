@@ -28,7 +28,9 @@ describe("formatErrorMessage", () => {
 
   it("hides raw timeout and handoff implementation errors", () => {
     expect(formatErrorMessage(new Error("handoff agent execution failed: context deadline exceeded"))).toBe("响应暂时超时，已保留现场，可稍后重试或继续。");
-    expect(formatErrorMessage({ code: "planner_failed", detail: "all fallback LLM clients failed (FC): EOF" })).toBe("任务暂时没有完成，已保留现场，可切换策略或稍后继续。");
+    expect(formatErrorMessage({ code: "planner_failed", detail: "all fallback LLM clients failed (FC): EOF" })).toBe(
+      "所有可用模型通道暂时失败，已保留现场；可以稍后重试，或先切换模型/供应商继续。",
+    );
     expect(formatErrorMessage("context canceled")).toBe("连接暂时中断，已保留现场，可稍后继续或先查看阶段结果。");
     expect(formatErrorMessage("context cancelled")).toBe("连接暂时中断，已保留现场，可稍后继续或先查看阶段结果。");
   });
@@ -38,10 +40,19 @@ describe("formatErrorMessage", () => {
     expect(formatErrorMessage("调用栈降级，正在级联唤醒备用引擎")).toBe("模型暂时没有回应，已保留现场，正在换用可用模型继续。");
   });
 
+  it("explains provider EOF cascades without exposing raw vendor URLs", () => {
+    expect(
+      formatErrorMessage(
+        'planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF',
+      ),
+    ).toBe("所有可用模型通道暂时失败，已保留现场；可以稍后重试，或先切换模型/供应商继续。");
+  });
+
   it("hides raw tool execution implementation errors", () => {
     expect(formatErrorMessage("unknown skill: file_exec")).toBe("所需工具暂时不可用，已保留现场，可换用可用工具或调整步骤继续。");
     expect(formatErrorMessage({ reason: "blocked by trust gate: needs approval" })).toBe("这一步需要更高信任或确认，已保留现场，可确认后继续。");
     expect(formatErrorMessage(new Error("tool panic: nil pointer"))).toBe("工具运行时遇到异常，已保留现场，可重试或切换策略继续。");
   });
 });
+
 

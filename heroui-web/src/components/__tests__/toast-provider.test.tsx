@@ -21,7 +21,7 @@ describe("showErrorToast", () => {
       showToast("all fallback LLM clients failed (FC): EOF", "error");
     });
 
-    expect(screen.getByText("任务暂时没有完成，已保留现场，可切换策略或稍后继续。")).toBeInTheDocument();
+    expect(screen.getByText("所有可用模型通道暂时失败，已保留现场；可以稍后重试，或先切换模型/供应商继续。")).toBeInTheDocument();
     expect(screen.queryByText(/fallback|EOF/)).toBeNull();
   });
 });
