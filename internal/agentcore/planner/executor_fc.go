@@ -242,6 +242,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				step.Error = r.err.Error()
 				r.output = "暂未完成：" + plannerFriendlyFailureText(r.err.Error())
 			}
+			p.recordSkillRecommendationOutcome(r.name, r.err == nil)
 			planSteps = append(planSteps, step)
 			pruned := pruneToolResult(r.output, steps)
 			messages = append(messages, buildToolResultMsg(r.id, pruned))
@@ -408,6 +409,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		}
 		filtered := p.registry.FilterByIntentScored(userMessage, scorer)
 		if len(filtered) < len(allSkills) && len(filtered) > 0 {
+			filtered = p.rankSkillsByRecommendation(userMessage, filtered)
 			slog.Info("skill dynamic filter applied",
 				"total", len(allSkills),
 				"filtered", len(filtered),
@@ -435,6 +437,8 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 			return defs
 		}
 	}
+
+	allSkills = p.rankSkillsByRecommendation(userMessage, allSkills)
 
 	defs := make([]llm.FunctionDef, 0, len(allSkills))
 	for _, s := range allSkills {

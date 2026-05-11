@@ -11,11 +11,7 @@ import (
 // ──────────────────────────────────────────────
 
 func TestTriggerStore(t *testing.T) {
-	store := NewStore("testdata/triggers")
-	defer func() {
-		// 清理测试数据
-		store.Delete("test-trigger-1")
-	}()
+	store := NewStore(t.TempDir())
 
 	// 创建触发器
 	trigger := &TriggerDef{
@@ -29,8 +25,8 @@ func TestTriggerStore(t *testing.T) {
 		},
 		Actions: []TriggerAction{
 			{
-				Type:    ActionCreateTask,
-				TaskTitle: "Follow-up Task",
+				Type:            ActionCreateTask,
+				TaskTitle:       "Follow-up Task",
 				TaskDescription: "Created by trigger",
 			},
 		},
@@ -58,7 +54,7 @@ func TestTriggerStore(t *testing.T) {
 }
 
 func TestTriggerRun(t *testing.T) {
-	store := NewStore("testdata/triggers")
+	store := NewStore(t.TempDir())
 
 	// 创建执行记录
 	run := &TriggerRun{
@@ -93,7 +89,7 @@ func TestTriggerRun(t *testing.T) {
 }
 
 func TestExecutor(t *testing.T) {
-	store := NewStore("testdata/triggers")
+	store := NewStore(t.TempDir())
 	executor := NewExecutor(store)
 
 	// 注入回调
@@ -141,8 +137,8 @@ func TestExecutor(t *testing.T) {
 
 func TestBudgetCheck(t *testing.T) {
 	budget := &BudgetConfig{
-		MaxRunsPerDay: 10,
-		MaxTotalCost:  1.0,
+		MaxRunsPerDay:  10,
+		MaxTotalCost:   1.0,
 		CurrentDayCost: 0.5,
 	}
 
@@ -161,4 +157,3 @@ func TestBudgetCheck(t *testing.T) {
 		t.Error("Reason should not be empty")
 	}
 }
-

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/observe"
@@ -179,7 +180,16 @@ func (g *Gateway) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tid := tenantFromCtx(r.Context())
-	sb, sbErr := sandbox.New("", sandbox.DefaultPolicy())
+	uploadTenant := strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' {
+			return '_'
+		}
+		return r
+	}, tid)
+	if uploadTenant == "" {
+		uploadTenant = "default"
+	}
+	sb, sbErr := sandbox.New(appdir.Sub("uploads", uploadTenant), sandbox.DefaultPolicy())
 	if sbErr != nil {
 		apperror.Write(w, apperror.Wrap(apperror.CodeSandboxError, "sandbox init failed", sbErr))
 		return

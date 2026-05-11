@@ -195,6 +195,7 @@ func initIntelligence(app *agentrt.App) error {
 
 	// ?? Recommend Engine: personalized response/skill suggestions ??
 	recEngine := recommend.NewEngine()
+	app.Planner.SetSkillRecommendationEngine(recEngine)
 	app.Set("recommend_engine", recEngine)
 	slog.Info("recommend engine: initialized")
 

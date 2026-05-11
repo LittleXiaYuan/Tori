@@ -479,6 +479,7 @@ func (p *Planner) runTextBased(ctx context.Context, req PlanRequest) (*PlanResul
 			} else {
 				results = append(results, fmt.Sprintf("[%s] %s", r.name, r.output))
 			}
+			p.recordSkillRecommendationOutcome(r.name, r.err == nil)
 			planSteps = append(planSteps, step)
 			if req.StepCallback != nil {
 				trSummary := fmt.Sprintf("✅ [%s] 完成", r.name)
