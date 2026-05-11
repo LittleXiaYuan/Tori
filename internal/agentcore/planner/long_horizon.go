@@ -91,7 +91,7 @@ func (p *Planner) runLongHorizon(ctx context.Context, req PlanRequest) (*PlanRes
 // steps keep their output and are never re-run; selected pending/failed steps
 // are reset to pending and executed under the normal DAG dependency gate.
 func (p *Planner) ResumeLongHorizonCheckpoint(ctx context.Context, req PlanRequest, cp LongHorizonCheckpoint, action string) (*PlanResult, error) {
-	action = normalizeCheckpointResumeAction(action)
+	action = NormalizeCheckpointResumeAction(action)
 	if action == "partial" {
 		return partialCheckpointResult(cp), nil
 	}
