@@ -72,6 +72,7 @@ import { createPersonaClient } from "yunque-client/persona";
 import { createWorkflowClient } from "yunque-client/workflow";
 import { createCostClient } from "yunque-client/cost";
 import { createLoRAClient } from "yunque-client/lora";
+import { createIterateClient } from "yunque-client/iterate";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -275,14 +276,24 @@ const preview = await lora.preview({ tenant_id: "default" });
 if (preview.preview.ready) {
   await lora.trigger({ tenant_id: "default" });
 }
+
+const iterate = createIterateClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+
+const pending = await iterate.pendingProposals();
+if (pending.proposals[0]) {
+  await iterate.approve({ id: pending.proposals[0].id });
+}
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona`/`workflow`/`cost`/`lora` without importing the generated 500KB+
-SDK/types bundle. Add future slices in the same style when those surfaces need
-stable, lightweight integration APIs.
+`/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate` without importing the
+generated 500KB+ SDK/types bundle. Add future slices in the same style when
+those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -326,6 +337,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
 | `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
 | `src/lora.ts` | Lightweight hand-written LoRA training and evolution lifecycle slice |
+| `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

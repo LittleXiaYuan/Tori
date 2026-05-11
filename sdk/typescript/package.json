@@ -82,6 +82,10 @@
     "./lora": {
       "types": "./src/lora.ts",
       "import": "./src/lora.ts"
+    },
+    "./iterate": {
+      "types": "./src/iterate.ts",
+      "import": "./src/iterate.ts"
     }
   },
   "files": [
