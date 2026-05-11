@@ -32,6 +32,8 @@ test("DiscoveryClient searches and lists search providers", async () => {
 test("DiscoveryClient throws DiscoveryClientError with parsed and text bodies", async () => {
   const jsonClient = createDiscoveryClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "q is required" }, { status: 400 }) });
   try { await jsonClient.search(""); throw new Error("expected search to reject"); } catch (error) { assert(error instanceof DiscoveryClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "q is required" }); assertEqual(error.message, "q is required"); }
+  const nestedClient = createDiscoveryClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "identity channel is required" } }, { status: 400 }) });
+  try { await nestedClient.resolveIdentity({ channel: "", user_id: "42" }); throw new Error("expected resolveIdentity to reject"); } catch (error) { assert(error instanceof DiscoveryClientError); assertEqual(error.status, 400); assertEqual(error.message, "identity channel is required"); }
   const textClient = createDiscoveryClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST required", { status: 405 }) });
   try { await textClient.resolveIdentity({ channel: "feishu", user_id: "42" }); throw new Error("expected resolveIdentity to reject"); } catch (error) { assert(error instanceof DiscoveryClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST required"); assertEqual(error.message, "POST required"); }
 });

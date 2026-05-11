@@ -39,6 +39,8 @@ test("InteractionsClient sends reactions and stickers", async () => {
 test("InteractionsClient throws InteractionsClientError with parsed and text bodies", async () => {
   const jsonClient = createInteractionsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "id query parameter required" }, { status: 400 }) });
   try { await jsonClient.deleteInstruction(""); throw new Error("expected deleteInstruction to reject"); } catch (error) { assert(error instanceof InteractionsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "id query parameter required" }); assertEqual(error.message, "id query parameter required"); }
+  const nestedClient = createInteractionsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "instruction content is required" } }, { status: 400 }) });
+  try { await nestedClient.createInstruction({ category: "style", content: "" }); throw new Error("expected createInstruction to reject"); } catch (error) { assert(error instanceof InteractionsClientError); assertEqual(error.status, 400); assertEqual(error.message, "instruction content is required"); }
   const textClient = createInteractionsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.emotionHistory(); throw new Error("expected emotionHistory to reject"); } catch (error) { assert(error instanceof InteractionsClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });
