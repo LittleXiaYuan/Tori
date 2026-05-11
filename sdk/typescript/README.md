@@ -61,6 +61,7 @@ import { createTasksClient } from "yunque-client/tasks";
 import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createProvidersClient } from "yunque-client/providers";
 import { createSetupClient } from "yunque-client/setup";
+import { createDocumentsClient } from "yunque-client/documents";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -152,12 +153,22 @@ await setup.apply({
   api_key: "<provider-key>",
   model: "deepseek-chat",
 });
+
+const documents = createDocumentsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+await documents.generateDocx({
+  title: "技术蓝图摘要",
+  content: "# 云雀技术蓝图摘要\n\nPlanner、任务、记忆与知识库已经拆成增量 SDK。",
+});
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
-`providers`/`setup` without importing the generated 500KB+ SDK/types bundle.
-Add future slices in the same style when those surfaces need stable,
+`providers`/`setup`/`documents` without importing the generated 500KB+ SDK/types
+bundle. Add future slices in the same style when those surfaces need stable,
 lightweight integration APIs.
 
 ## Regenerating
@@ -191,6 +202,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
+| `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
