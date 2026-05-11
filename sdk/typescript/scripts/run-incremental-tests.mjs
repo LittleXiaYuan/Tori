@@ -58,6 +58,8 @@ const sources = [
   "src/system.test.ts",
   "src/settings.ts",
   "src/settings.test.ts",
+  "src/tori.ts",
+  "src/tori.test.ts",
 ];
 
 const compile = spawnSync(
@@ -113,6 +115,7 @@ for (const testName of [
   "federation.test",
   "system.test",
   "settings.test",
+  "tori.test",
 ]) {
   const compiledTestPath = join(outDir, `${testName}.js`);
   let compiledTest = readFileSync(compiledTestPath, "utf8");
@@ -142,7 +145,8 @@ for (const testName of [
     .replace('from "./reverie"', 'from "./reverie.js"')
     .replace('from "./federation"', 'from "./federation.js"')
     .replace('from "./system"', 'from "./system.js"')
-    .replace('from "./settings"', 'from "./settings.js"');
+    .replace('from "./settings"', 'from "./settings.js"')
+    .replace('from "./tori"', 'from "./tori.js"');
   writeFileSync(compiledTestPath, compiledTest);
 
   const run = spawnSync(process.execPath, [compiledTestPath], { stdio: "inherit" });
