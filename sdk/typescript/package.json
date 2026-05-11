@@ -355,6 +355,10 @@
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
     },
+    "./notify-channels": {
+      "types": "./src/notify-channels.ts",
+      "import": "./src/notify-channels.ts"
+    },
     "./projects": {
       "types": "./src/projects.ts",
       "import": "./src/projects.ts"
