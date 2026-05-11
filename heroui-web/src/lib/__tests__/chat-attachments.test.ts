@@ -34,6 +34,8 @@ describe("buildHiddenContextAttachments", () => {
     expect(decodeUtf8B64(attachments[0].dataB64)).toContain("[Parsed document: 申请表.docx]");
     expect(decodeUtf8B64(attachments[0].dataB64)).toContain("Parser: local");
     expect(decodeUtf8B64(attachments[0].dataB64)).toContain("Status: parsed");
+    expect(decodeUtf8B64(attachments[0].dataB64)).toContain("hidden working context");
+    expect(decodeUtf8B64(attachments[0].dataB64)).toContain("Do not echo the full body into chat");
     expect(decodeUtf8B64(attachments[1].dataB64)).toContain("[Sheet: 预算]");
     expect(decodeUtf8B64(attachments[2].dataB64)).toContain("[Slide 1]");
   });
