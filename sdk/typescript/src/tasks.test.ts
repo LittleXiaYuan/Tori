@@ -123,6 +123,19 @@ test("TasksClient throws TasksClientError with parsed body", async () => {
     assertDeepEqual(error.body, { error: "task not found" });
     assertEqual(error.message, "task not found");
   }
+
+  const nestedClient = createTasksClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "task id is required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.run("");
+    throw new Error("expected nested run to reject");
+  } catch (error) {
+    assert(error instanceof TasksClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "task id is required");
+  }
 });
 
 let failures = 0;
