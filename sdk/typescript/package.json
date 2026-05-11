@@ -154,6 +154,10 @@
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
+    },
+    "./triggers": {
+      "types": "./src/triggers.ts",
+      "import": "./src/triggers.ts"
     }
   },
   "files": [
