@@ -15,6 +15,10 @@
       "types": "./src/auth.ts",
       "import": "./src/auth.ts"
     },
+    "./airi": {
+      "types": "./src/airi.ts",
+      "import": "./src/airi.ts"
+    },
     "./planner-recovery": {
       "types": "./src/planner-recovery.ts",
       "import": "./src/planner-recovery.ts"

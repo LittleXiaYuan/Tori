@@ -55,6 +55,7 @@ can import the hand-written incremental slice instead:
 
 ```ts
 import { createAuthClient } from "yunque-client/auth";
+import { createAiriClient } from "yunque-client/airi";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createCognisClient } from "yunque-client/cognis";
@@ -311,6 +312,10 @@ const realtime = createRealtimeClient({
 });
 const ws = realtime.connect();
 ws.addEventListener("open", () => realtime.send(ws, realtime.ping()));
+
+const airi = createAiriClient({ baseUrl: "http://localhost:9090" });
+const airiModels = await airi.models();
+console.log(airiModels.data[0]?.id);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -661,7 +666,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `planner-recovery`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -693,6 +698,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
+| `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, evolution, and federation control slice |

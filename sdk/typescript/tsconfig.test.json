@@ -18,6 +18,7 @@
   },
   "include": [
     "src/auth.ts",
+    "src/airi.ts",
     "src/planner-recovery.ts",
     "src/chat.ts",
     "src/cognis.ts",
