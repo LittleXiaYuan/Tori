@@ -34,6 +34,8 @@ const sources = [
   "src/discovery.test.ts",
   "src/identity.ts",
   "src/identity.test.ts",
+  "src/embeddings.ts",
+  "src/embeddings.test.ts",
   "src/interactions.ts",
   "src/interactions.test.ts",
   "src/rbac.ts",
@@ -193,6 +195,7 @@ for (const testName of [
   "bots.test",
   "discovery.test",
   "identity.test",
+  "embeddings.test",
   "interactions.test",
   "rbac.test",
   "memory.test",
@@ -269,6 +272,7 @@ for (const testName of [
     .replace('from "./bots"', 'from "./bots.js"')
     .replace('from "./discovery"', 'from "./discovery.js"')
     .replace('from "./identity"', 'from "./identity.js"')
+    .replace('from "./embeddings"', 'from "./embeddings.js"')
     .replace('from "./interactions"', 'from "./interactions.js"')
     .replace('from "./rbac"', 'from "./rbac.js"')
     .replace('from "./memory"', 'from "./memory.js"')
