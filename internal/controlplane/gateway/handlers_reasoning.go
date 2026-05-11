@@ -372,11 +372,7 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	// lightweight SDK's combined q+filter query semantics aligned with runtime.
 	query := r.URL.Query().Get("q")
 	if query != "" {
-		searchLimit := 50
-		if limit > searchLimit {
-			searchLimit = limit
-		}
-		results := limitReflectExperiences(filterReflectExperiences(g.experienceStore.Search(query, searchLimit), source, category, outcome, tag), limit)
+		results := limitReflectExperiences(filterReflectExperiences(queryReflectExperiences(g.experienceStore.All(), query), source, category, outcome, tag), limit)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": results, "total": len(results)})
 		return

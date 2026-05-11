@@ -59,6 +59,46 @@ func TestHandleExperiencesSearchRespectsFilters(t *testing.T) {
 	}
 }
 
+func TestHandleExperiencesSearchFiltersBeforeLimit(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{
+		ID:       "older-task-match",
+		Source:   "task",
+		Category: "strategy",
+		Outcome:  "success",
+		Lesson:   "needle strategy should still be found after many newer chat matches",
+	})
+	for i := 0; i < 60; i++ {
+		store.Add(reflectpkg.Experience{
+			ID:       "newer-chat-match",
+			Source:   "interaction",
+			Category: "strategy",
+			Outcome:  "success",
+			Lesson:   "needle strategy from chat should not hide older task matches",
+		})
+	}
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?q=needle&source=task&limit=1", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Experiences []reflectpkg.Experience `json:"experiences"`
+		Total       int                     `json:"total"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 || len(body.Experiences) != 1 || body.Experiences[0].ID != "older-task-match" {
+		t.Fatalf("search should filter before limit and preserve matching task, body=%s", rec.Body.String())
+	}
+}
+
 func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
 	store.Add(reflectpkg.Experience{ID: "old-task", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "older task lesson"})
