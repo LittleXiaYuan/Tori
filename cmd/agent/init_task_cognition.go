@@ -98,6 +98,12 @@ func initCognitionWiring(
 	p.SetStrategyContext(func() string {
 		return experienceStore.CompileStrategies(10)
 	})
+	p.SetStrategyContextFor(func(query string) string {
+		if scoped := experienceStore.CompileStrategiesForQuery(query, 10); scoped != "" {
+			return scoped
+		}
+		return experienceStore.CompileStrategies(10)
+	})
 
 	if typedLdg != nil {
 		migrator := iledger.NewKVMigrator(typedLdg)

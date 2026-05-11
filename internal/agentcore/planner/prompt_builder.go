@@ -23,35 +23,37 @@ type PromptBuilder struct {
 	LastIncludedLayers []string
 
 	// Data sources (injected from Planner's callbacks)
-	memory           func(ctx context.Context, tenantID, query string) string
-	graphContext     func(query string) string
-	codeContext      func(query string) string
-	stateContext     func() string
-	strategyContext  func() string
-	reverie          *Reverie
-	skillOptimizer   *SkillOptimizer
-	cognitiveContext CognitiveContextFunc // CognitivePlugin dynamic context
-	cogniContext     CogniContextFunc     // declarative Cogni context (pkg/cogni hook)
-	beliefContext    BeliefContextFunc    // Cognition SDK belief context
-	dynBudget        int
-	contextFilter    *localbrain.LocalBrain // System 1 context filter (nil = disabled)
+	memory             func(ctx context.Context, tenantID, query string) string
+	graphContext       func(query string) string
+	codeContext        func(query string) string
+	stateContext       func() string
+	strategyContext    func() string
+	strategyContextFor func(query string) string
+	reverie            *Reverie
+	skillOptimizer     *SkillOptimizer
+	cognitiveContext   CognitiveContextFunc // CognitivePlugin dynamic context
+	cogniContext       CogniContextFunc     // declarative Cogni context (pkg/cogni hook)
+	beliefContext      BeliefContextFunc    // Cognition SDK belief context
+	dynBudget          int
+	contextFilter      *localbrain.LocalBrain // System 1 context filter (nil = disabled)
 }
 
 // NewPromptBuilder creates a PromptBuilder from Planner's callbacks.
 func NewPromptBuilder(p *Planner) *PromptBuilder {
 	return &PromptBuilder{
-		memory:           p.memory,
-		graphContext:     p.graphContext,
-		codeContext:      p.codeContext,
-		stateContext:     p.stateContext,
-		strategyContext:  p.strategyContext,
-		reverie:          p.reverie,
-		skillOptimizer:   p.skillOptimizer,
-		cognitiveContext: p.cognitiveContext,
-		cogniContext:     p.cogniContext,
-		beliefContext:    p.beliefContext,
-		dynBudget:        p.dynContextBudget,
-		contextFilter:    p.localBrain,
+		memory:             p.memory,
+		graphContext:       p.graphContext,
+		codeContext:        p.codeContext,
+		stateContext:       p.stateContext,
+		strategyContext:    p.strategyContext,
+		strategyContextFor: p.strategyContextFor,
+		reverie:            p.reverie,
+		skillOptimizer:     p.skillOptimizer,
+		cognitiveContext:   p.cognitiveContext,
+		cogniContext:       p.cogniContext,
+		beliefContext:      p.beliefContext,
+		dynBudget:          p.dynContextBudget,
+		contextFilter:      p.localBrain,
 	}
 }
 
@@ -287,8 +289,15 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 			})
 		}
 	}
-	if pb.strategyContext != nil {
-		if strCtx := pb.strategyContext(); strCtx != "" {
+	if pb.strategyContextFor != nil || pb.strategyContext != nil {
+		strCtx := ""
+		if pb.strategyContextFor != nil {
+			strCtx = pb.strategyContextFor(req.LastMessage)
+		}
+		if strCtx == "" && pb.strategyContext != nil {
+			strCtx = pb.strategyContext()
+		}
+		if strCtx != "" {
 			layers = append(layers, ctxwindow.Layer{
 				Name:     "strategy",
 				Priority: ctxwindow.LayerPriorityCognition,

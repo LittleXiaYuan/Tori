@@ -473,6 +473,59 @@ func TestBuildMessages_WithBeliefContext(t *testing.T) {
 	}
 }
 
+func TestBuildMessages_UsesQueryAwareStrategyContext(t *testing.T) {
+	p := NewPlanner(nil, skills.NewRegistry(), 8)
+	p.SetStrategyContext(func() string {
+		return "general strategy should not be used"
+	})
+	p.SetStrategyContextFor(func(query string) string {
+		if query != "请做 code review" {
+			t.Fatalf("strategy query = %q", query)
+		}
+		return "scoped code review strategy"
+	})
+
+	msgs, _ := p.BuildMessages(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "请做 code review"}},
+		TenantID: "tenant-a",
+	})
+
+	foundScoped := false
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "scoped code review strategy") {
+			foundScoped = true
+		}
+		if strings.Contains(m.Content, "general strategy should not be used") {
+			t.Fatalf("query-aware strategy should take precedence: %#v", msgs)
+		}
+	}
+	if !foundScoped {
+		t.Fatalf("query-aware strategy context not injected: %#v", msgs)
+	}
+}
+
+func TestBuildMessages_FallsBackToGeneralStrategyContext(t *testing.T) {
+	p := NewPlanner(nil, skills.NewRegistry(), 8)
+	p.SetStrategyContext(func() string {
+		return "general strategy fallback"
+	})
+	p.SetStrategyContextFor(func(query string) string {
+		return ""
+	})
+
+	msgs, _ := p.BuildMessages(context.Background(), PlanRequest{
+		Messages: []llm.Message{{Role: "user", Content: "普通问题"}},
+		TenantID: "tenant-a",
+	})
+
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "general strategy fallback") {
+			return
+		}
+	}
+	t.Fatalf("general strategy fallback not injected: %#v", msgs)
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
