@@ -154,6 +154,7 @@ import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
 import { createTriggersClient } from "yunque-client/triggers";
 import { createMissionsClient } from "yunque-client/missions";
+import { createReflectClient } from "yunque-client/reflect";
 import { createToolsClient } from "yunque-client/tools";
 import { createSandboxClient } from "yunque-client/sandbox";
 
@@ -694,7 +695,11 @@ const missions = createMissionsClient({
 const mission = await missions.parse("每天早上总结昨天的任务");
 console.log(mission.type);
 
-const reflectExperiences = await missions.experiences({
+const reflect = createReflectClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const reflectExperiences = await reflect.experiences({
   q: "code review",
   source: "task",
   outcome: "partial",
@@ -702,9 +707,9 @@ const reflectExperiences = await missions.experiences({
   limit: 10,
 });
 console.log(reflectExperiences.experiences[0]?.lesson);
-const reflectStats = await missions.experienceStats({ source: "task", tag: "quality:9" });
+const reflectStats = await reflect.experienceStats({ source: "task", tag: "quality:9" });
 console.log(reflectStats.by_outcome?.success ?? 0);
-const strategyContext = await missions.strategies({ source: "task", tag: "quality:9", limit: 5 });
+const strategyContext = await reflect.strategies({ source: "task", tag: "quality:9", limit: 5 });
 console.log(strategyContext.strategies.split("\n")[0]);
 
 const tools = createToolsClient({
@@ -726,7 +731,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -817,6 +822,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
 | `src/triggers.ts` | Lightweight hand-written legacy and v2 trigger CRUD, emit, runs, and events slice |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
+| `src/reflect.ts` | Lightweight reflect-only facade over experiences, stats, and strategy context |
 | `src/tools.ts` | Lightweight hand-written guarded process execution sessions list/poll/kill slice |
 | `src/sandbox.ts` | Lightweight hand-written sandbox exec, cloud probe, and desktop lifecycle slice |
 | `openapi-ts.config.ts` | Generator configuration |
