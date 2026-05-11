@@ -33,6 +33,8 @@ test("RBACClient checks permissions and reads current subject roles", async () =
 test("RBACClient throws RBACClientError with parsed and text bodies", async () => {
   const jsonClient = createRBACClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "subject_id and role_id are required" }, { status: 400 }) });
   try { await jsonClient.assignRole({ subject_id: "", role_id: "" }); throw new Error("expected assignRole to reject"); } catch (error) { assert(error instanceof RBACClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "subject_id and role_id are required" }); assertEqual(error.message, "subject_id and role_id are required"); }
+  const nestedClient = createRBACClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "rbac resource is required" } }, { status: 400 }) });
+  try { await nestedClient.check({ resource: "", action: "read" }); throw new Error("expected check to reject"); } catch (error) { assert(error instanceof RBACClientError); assertEqual(error.status, 400); assertEqual(error.message, "rbac resource is required"); }
   const textClient = createRBACClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET/POST/DELETE only", { status: 405 }) });
   try { await textClient.roles(); throw new Error("expected roles to reject"); } catch (error) { assert(error instanceof RBACClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET/POST/DELETE only"); assertEqual(error.message, "GET/POST/DELETE only"); }
 });
