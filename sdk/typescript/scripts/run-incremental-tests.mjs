@@ -16,6 +16,8 @@ const sources = [
   "src/cognis.test.ts",
   "src/events.ts",
   "src/events.test.ts",
+  "src/realtime.ts",
+  "src/realtime.test.ts",
   "src/webchat.ts",
   "src/webchat.test.ts",
   "src/conversations.ts",
@@ -164,6 +166,7 @@ for (const testName of [
   "chat.test",
   "cognis.test",
   "events.test",
+  "realtime.test",
   "webchat.test",
   "conversations.test",
   "subagents.test",
@@ -230,6 +233,7 @@ for (const testName of [
     .replace('from "./chat"', 'from "./chat.js"')
     .replace('from "./cognis"', 'from "./cognis.js"')
     .replace('from "./events"', 'from "./events.js"')
+    .replace('from "./realtime"', 'from "./realtime.js"')
     .replace('from "./webchat"', 'from "./webchat.js"')
     .replace('from "./conversations"', 'from "./conversations.js"')
     .replace('from "./subagents"', 'from "./subagents.js"')

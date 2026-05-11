@@ -59,6 +59,7 @@ import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createCognisClient } from "yunque-client/cognis";
 import { createEventsClient } from "yunque-client/events";
+import { createRealtimeClient } from "yunque-client/realtime";
 import { createWebChatClient } from "yunque-client/webchat";
 import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
@@ -303,6 +304,13 @@ for await (const event of events.stream()) {
   console.log(event.event, event.data);
   break;
 }
+
+const realtime = createRealtimeClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const ws = realtime.connect();
+ws.addEventListener("open", () => realtime.send(ws, realtime.ping()));
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -653,7 +661,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `planner-recovery`, `chat`, `cognis`, `events`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `planner-recovery`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -689,6 +697,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, evolution, and federation control slice |
 | `src/events.ts` | Lightweight hand-written SSE event stream slice for task/workflow/approval live updates |
+| `src/realtime.ts` | Lightweight hand-written `/v1/ws` URL, connect, ping/chat message helper slice |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
@@ -753,7 +762,7 @@ npm run typecheck   # should be silent (0 errors)
 - 343 endpoints, ~22000 LOC, 100+ schemas
 - Hand-curated `cognis` operationIds yield idiomatic names (`postV1CognisGenerate` etc.)
 - Auto-generated names follow `<method><PathPascalCase>` pattern
-- Streaming (`getV1ChatStream`, `getV1EventsStream`) is stubbed in the generated SDK; use the hand-written `yunque-client/chat` and `yunque-client/events` slices when you need parsed fetch streams without importing the full bundle.
+- Streaming (`getV1ChatStream`, `getV1EventsStream`) is stubbed in the generated SDK; use the hand-written `yunque-client/chat`, `yunque-client/events`, and `yunque-client/realtime` slices when you need parsed fetch streams or `/v1/ws` helpers without importing the full bundle.
 - Request/response bodies are mostly `unknown` placeholders since the source
   spec is path-only. Hand-edit `docs/openapi.yaml` to add real schemas, then
   regenerate.
