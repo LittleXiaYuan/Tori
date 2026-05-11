@@ -63,6 +63,10 @@
       "types": "./src/discovery.ts",
       "import": "./src/discovery.ts"
     },
+    "./identity": {
+      "types": "./src/identity.ts",
+      "import": "./src/identity.ts"
+    },
     "./interactions": {
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
