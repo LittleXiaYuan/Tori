@@ -106,6 +106,7 @@
     "src/plugins.ts",
     "src/plugin-catalog.ts",
     "src/plugin-control.ts",
+    "src/plugin-files.ts",
     "src/connectors.ts",
     "src/connector-catalog.ts",
     "src/connector-auth.ts",
@@ -136,6 +137,7 @@
     "src/**/*.test.ts"
   ]
 }
+
 
 
 
