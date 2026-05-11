@@ -113,6 +113,21 @@ test("AuditClient throws AuditClientError with parsed and text bodies", async ()
     assertEqual(error.message, "audit not configured");
   }
 
+
+  const nestedClient = createAuditClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "audit task id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.trail({ date: "" });
+    throw new Error("expected trail to reject");
+  } catch (error) {
+    assert(error instanceof AuditClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "audit task id is required");
+  }
+
   const textClient = createAuditClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("unauthorized", { status: 401 }),

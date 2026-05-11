@@ -48,6 +48,8 @@ test("SystemClient reads embedded SBOM metadata", async () => {
 test("SystemClient throws SystemClientError with parsed and text bodies", async () => {
   const jsonClient = createSystemClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "invalid api key" }, { status: 401 }) });
   try { await jsonClient.metrics(); throw new Error("expected metrics to reject"); } catch (error) { assert(error instanceof SystemClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "invalid api key" }); assertEqual(error.message, "invalid api key"); }
+  const nestedClient = createSystemClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "system metrics scope is required" } }, { status: 400 }) });
+  try { await nestedClient.metrics(); throw new Error("expected metrics to reject"); } catch (error) { assert(error instanceof SystemClientError); assertEqual(error.status, 400); assertEqual(error.message, "system metrics scope is required"); }
   const textClient = createSystemClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET only", { status: 405 }) });
   try { await textClient.modules(); throw new Error("expected modules to reject"); } catch (error) { assert(error instanceof SystemClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET only"); assertEqual(error.message, "GET only"); }
 });

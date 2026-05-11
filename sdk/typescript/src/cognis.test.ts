@@ -35,6 +35,8 @@ test("CognisClient controls bundles workflows evolution and federation", async (
 test("CognisClient throws CognisClientError with parsed and text bodies", async () => {
   const jsonClient = createCognisClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "cogni registry not configured" }, { status: 500 }) });
   try { await jsonClient.list(); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof CognisClientError); assertEqual(error.status, 500); assertDeepEqual(error.body, { error: "cogni registry not configured" }); assertEqual(error.message, "cogni registry not configured"); }
+  const nestedClient = createCognisClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "cogni id is required" } }, { status: 400 }) });
+  try { await nestedClient.get(""); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof CognisClientError); assertEqual(error.status, 400); assertEqual(error.message, "cogni id is required"); }
   const textClient = createCognisClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET only", { status: 405 }) });
   try { await textClient.health(); throw new Error("expected health to reject"); } catch (error) { assert(error instanceof CognisClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET only"); assertEqual(error.message, "GET only"); }
 });

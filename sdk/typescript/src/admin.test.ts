@@ -39,6 +39,8 @@ test("AdminClient returns partial NL config 422 bodies as results", async () => 
 test("AdminClient throws AdminClientError with parsed and text bodies", async () => {
   const jsonClient = createAdminClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "invalid api key" }, { status: 401 }) });
   try { await jsonClient.listTenants(); throw new Error("expected listTenants to reject"); } catch (error) { assert(error instanceof AdminClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "invalid api key" }); assertEqual(error.message, "invalid api key"); }
+  const nestedClient = createAdminClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "tenant name is required" } }, { status: 400 }) });
+  try { await nestedClient.createTenant(""); throw new Error("expected createTenant to reject"); } catch (error) { assert(error instanceof AdminClientError); assertEqual(error.status, 400); assertEqual(error.message, "tenant name is required"); }
   const textClient = createAdminClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.createTenant("x"); throw new Error("expected createTenant to reject"); } catch (error) { assert(error instanceof AdminClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });

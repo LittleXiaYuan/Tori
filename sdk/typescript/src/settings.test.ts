@@ -42,6 +42,8 @@ test("SettingsClient manages backup info export and import", async () => {
 test("SettingsClient throws SettingsClientError with parsed and text bodies", async () => {
   const jsonClient = createSettingsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "invalid api key" }, { status: 401 }) });
   try { await jsonClient.config(); throw new Error("expected config to reject"); } catch (error) { assert(error instanceof SettingsClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "invalid api key" }); assertEqual(error.message, "invalid api key"); }
+  const nestedClient = createSettingsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "settings key is required" } }, { status: 400 }) });
+  try { await nestedClient.updateConfig({}); throw new Error("expected updateConfig to reject"); } catch (error) { assert(error instanceof SettingsClientError); assertEqual(error.status, 400); assertEqual(error.message, "settings key is required"); }
   const textClient = createSettingsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET only", { status: 405 }) });
   try { await textClient.schema(); throw new Error("expected schema to reject"); } catch (error) { assert(error instanceof SettingsClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET only"); assertEqual(error.message, "GET only"); }
 });
