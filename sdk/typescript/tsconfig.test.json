@@ -44,6 +44,7 @@
     "src/memory-search.ts",
     "src/memory-stats.ts",
     "src/memory-add.ts",
+    "src/memory-compact.ts",
     "src/tasks.ts",
     "src/task-context.ts",
     "src/knowledge.ts",

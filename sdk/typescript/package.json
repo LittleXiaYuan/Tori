@@ -119,6 +119,10 @@
       "types": "./src/memory-add.ts",
       "import": "./src/memory-add.ts"
     },
+    "./memory-compact": {
+      "types": "./src/memory-compact.ts",
+      "import": "./src/memory-compact.ts"
+    },
     "./tasks": {
       "types": "./src/tasks.ts",
       "import": "./src/tasks.ts"
