@@ -95,6 +95,10 @@
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
     },
+    "./router": {
+      "types": "./src/router.ts",
+      "import": "./src/router.ts"
+    },
     "./modes": {
       "types": "./src/modes.ts",
       "import": "./src/modes.ts"

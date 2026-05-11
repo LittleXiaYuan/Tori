@@ -48,6 +48,8 @@ const sources = [
   "src/browser.test.ts",
   "src/runtime.ts",
   "src/runtime.test.ts",
+  "src/router.ts",
+  "src/router.test.ts",
   "src/modes.ts",
   "src/modes.test.ts",
   "src/ide.ts",
@@ -174,6 +176,7 @@ for (const testName of [
   "trace.test",
   "browser.test",
   "runtime.test",
+  "router.test",
   "modes.test",
   "ide.test",
   "persona.test",
@@ -237,6 +240,7 @@ for (const testName of [
     .replace('from "./trace"', 'from "./trace.js"')
     .replace('from "./browser"', 'from "./browser.js"')
     .replace('from "./runtime"', 'from "./runtime.js"')
+    .replace('from "./router"', 'from "./router.js"')
     .replace('from "./modes"', 'from "./modes.js"')
     .replace('from "./ide"', 'from "./ide.js"')
     .replace('from "./persona"', 'from "./persona.js"')

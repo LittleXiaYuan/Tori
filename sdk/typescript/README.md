@@ -75,6 +75,7 @@ import { createApprovalsClient } from "yunque-client/approvals";
 import { createTraceClient } from "yunque-client/trace";
 import { createBrowserClient } from "yunque-client/browser";
 import { createRuntimeClient } from "yunque-client/runtime";
+import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
@@ -269,6 +270,13 @@ const skills = createSkillsClient({
 });
 const runtimeSkills = await skills.list();
 console.log(runtimeSkills.count);
+
+const router = createRouterClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const routerStats = await router.stats();
+console.log(routerStats.status ?? routerStats.stats);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -620,7 +628,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
-`providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
+`providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
