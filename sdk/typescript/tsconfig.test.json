@@ -38,6 +38,7 @@
     "src/trace.ts",
     "src/browser.ts",
     "src/runtime.ts",
+    "src/router.ts",
     "src/modes.ts",
     "src/ide.ts",
     "src/persona.ts",
