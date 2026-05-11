@@ -157,6 +157,9 @@ jobs:
       - name: TypeScript typecheck
         run: npm run typecheck
 
+      - name: Package size guard
+        run: npm run check:pack
+
   go-lint:
     name: Go lint (golangci-lint)
     needs: changes
