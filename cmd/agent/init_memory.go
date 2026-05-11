@@ -164,15 +164,7 @@ func initMemory(app *agentrt.App) error {
 			app.Set("bm25_index", bm25Idx)
 			slog.Info("BM25 index initialized", "docs", bm25Idx.Size())
 
-			// GraphRAG community detection
-			graphRAG := ledger.NewGraphRAG(ldg.Backend())
-			if err := graphRAG.BuildCommunities(context.Background(), 10); err != nil {
-				slog.Warn("GraphRAG community detection failed", "err", err)
-			} else {
-				ldg.Recall.SetGraphRAG(graphRAG)
-				app.Set("graphrag", graphRAG)
-				slog.Info("GraphRAG initialized", "communities", len(graphRAG.Communities()))
-			}
+			initGraphRAGRuntime(app, ldg)
 
 			slog.Info("vector ANN backend will be configured after embeddings are wired",
 				"env", "VECTOR_ANN_BACKEND")
