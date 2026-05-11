@@ -143,6 +143,10 @@
       "types": "./src/task-create.ts",
       "import": "./src/task-create.ts"
     },
+    "./task-delete": {
+      "types": "./src/task-delete.ts",
+      "import": "./src/task-delete.ts"
+    },
     "./knowledge": {
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"

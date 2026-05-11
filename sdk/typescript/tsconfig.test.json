@@ -50,6 +50,7 @@
     "src/task-lifecycle.ts",
     "src/task-read.ts",
     "src/task-create.ts",
+    "src/task-delete.ts",
     "src/knowledge.ts",
     "src/knowledge-search.ts",
     "src/knowledge-ingest.ts",
