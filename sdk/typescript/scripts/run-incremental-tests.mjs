@@ -12,6 +12,8 @@ const sources = [
   "src/airi.test.ts",
   "src/planner-recovery.ts",
   "src/planner-recovery.test.ts",
+  "src/planner.ts",
+  "src/planner.test.ts",
   "src/chat.ts",
   "src/chat.test.ts",
   "src/cognis.ts",
@@ -168,6 +170,7 @@ for (const testName of [
   "auth.test",
   "airi.test",
   "planner-recovery.test",
+  "planner.test",
   "chat.test",
   "cognis.test",
   "events.test",
@@ -237,6 +240,7 @@ for (const testName of [
     .replace('from "./auth"', 'from "./auth.js"')
     .replace('from "./airi"', 'from "./airi.js"')
     .replace('from "./planner-recovery"', 'from "./planner-recovery.js"')
+    .replace('from "./planner"', 'from "./planner.js"')
     .replace('from "./chat"', 'from "./chat.js"')
     .replace('from "./cognis"', 'from "./cognis.js"')
     .replace('from "./events"', 'from "./events.js"')

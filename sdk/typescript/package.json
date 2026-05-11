@@ -23,6 +23,10 @@
       "types": "./src/planner-recovery.ts",
       "import": "./src/planner-recovery.ts"
     },
+    "./planner": {
+      "types": "./src/planner.ts",
+      "import": "./src/planner.ts"
+    },
     "./chat": {
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
