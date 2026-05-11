@@ -600,9 +600,9 @@ export default function ChatPage() {
           const parsed = item.event as unknown as AgentEvent;
           const detail = parsed.detail as { stream_type?: string; skill?: string } | undefined;
           if (parsed.domain === "planner" && parsed.type === "thinking" && detail?.stream_type === "thinking_delta") {
-            chatD({ type: "APPEND_LAST_REASONING", delta: (item.event.message as string) || "" });
+            chatD({ type: "APPEND_LAST_REASONING", delta: friendlyError((item.event.message as string) || "") });
           } else if (parsed.domain === "planner" && parsed.type === "thinking" && detail?.stream_type === "reasoning_batch") {
-            chatD({ type: "APPEND_LAST_REASONING", delta: (parsed.summary || "") + "\n" });
+            chatD({ type: "APPEND_LAST_REASONING", delta: friendlyError(parsed.summary || "") + "\n" });
           } else {
             chatD({ type: "APPEND_LAST_TRACE", event: parsed });
             if (parsed.type === "tool_start" || parsed.type === "tool_end" || parsed.type === "thinking") {
@@ -623,7 +623,7 @@ export default function ChatPage() {
           continue;
         }
         if (item.kind === "raw") {
-          chatD({ type: "APPEND_LAST", delta: item.data });
+          chatD({ type: "APPEND_LAST", delta: friendlyError(item.data) });
         }
       }
     } catch (e: unknown) {

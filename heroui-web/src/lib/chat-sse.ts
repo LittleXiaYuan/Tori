@@ -37,6 +37,27 @@ function parseJSONRecord(raw: string): Record<string, unknown> | null {
   }
 }
 
+function messageFromErrorRecord(record: Record<string, unknown>, fallback: string): string {
+  for (const key of ["message", "detail", "error", "reason"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return fallback;
+}
+
+function isErrorLikeRecord(record: Record<string, unknown>): boolean {
+  const type = typeof record.type === "string" ? record.type.toLowerCase() : "";
+  const event = typeof record.event === "string" ? record.event.toLowerCase() : "";
+  const code = typeof record.code === "string" ? record.code.toLowerCase() : "";
+  return (
+    type === "error" ||
+    event === "error" ||
+    code.includes("error") ||
+    code.includes("failed") ||
+    typeof record.error === "string"
+  );
+}
+
 function frameDataLine(line: string): string {
   let data = line.slice(5);
   if (data.startsWith(" ")) data = data.slice(1);
@@ -120,7 +141,7 @@ function parseAgenticFrame(frame: SSEFrame): AgenticChatStreamItem[] {
   if (event === "error") {
     let parsed: unknown = null;
     try { parsed = parseJSON(raw); } catch { }
-    const message = isRecord(parsed) && typeof parsed.message === "string" ? parsed.message : raw;
+    const message = isRecord(parsed) ? messageFromErrorRecord(parsed, raw) : raw;
     return [{ kind: "error", message: formatErrorMessage(message, "任务暂时没有顺利完成，已保留现场。"), data: parsed, raw }];
   }
 
@@ -148,6 +169,10 @@ function parseAgenticFrame(frame: SSEFrame): AgenticChatStreamItem[] {
   try {
     const parsed = parseJSON(raw);
     if (isRecord(parsed)) {
+      if (isErrorLikeRecord(parsed)) {
+        const message = messageFromErrorRecord(parsed, raw);
+        return [{ kind: "error", message: formatErrorMessage(message, "任务暂时没有顺利完成，已保留现场。"), data: parsed, raw }];
+      }
       if (typeof parsed.content === "string" || parsed.type === "delta") {
         return [{ kind: "delta", content: typeof parsed.content === "string" ? parsed.content : "" }];
       }
