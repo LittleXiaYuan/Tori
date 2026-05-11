@@ -68,6 +68,7 @@ import { createBrowserClient } from "yunque-client/browser";
 import { createRuntimeClient } from "yunque-client/runtime";
 import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
+import { createPersonaClient } from "yunque-client/persona";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -229,13 +230,26 @@ if (ideStatus.connected) {
     diff: "+console.log('hello')",
   });
 }
+
+const persona = createPersonaClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+
+const currentPersona = await persona.get();
+await persona.addSkill({
+  name: "review-style",
+  description: "Review tone and output preference",
+  content: "Prefer concise, evidence-first review comments.",
+});
+console.log(currentPersona.identity);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide` without importing the generated 500KB+ SDK/types bundle. Add future
-slices in the same style when those surfaces need stable, lightweight
+`/ide`/`persona` without importing the generated 500KB+ SDK/types bundle. Add
+future slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
 ## Regenerating
@@ -276,6 +290,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
+| `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
