@@ -63,6 +63,7 @@ import { createProvidersClient } from "yunque-client/providers";
 import { createSetupClient } from "yunque-client/setup";
 import { createDocumentsClient } from "yunque-client/documents";
 import { createApprovalsClient } from "yunque-client/approvals";
+import { createTraceClient } from "yunque-client/trace";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -174,13 +175,21 @@ const pending = await approvals.pending();
 if (pending.approvals[0]) {
   await approvals.decide(pending.approvals[0].id, "allow_once");
 }
+
+const trace = createTraceClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const recentEvents = await trace.recent({ limit: 20 });
+console.log(recentEvents.events);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
-`providers`/`setup`/`documents`/`approvals` without importing the generated
-500KB+ SDK/types bundle. Add future slices in the same style when those surfaces
-need stable, lightweight integration APIs.
+`providers`/`setup`/`documents`/`approvals`/`trace` without importing the
+generated 500KB+ SDK/types bundle. Add future slices in the same style when
+those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -215,6 +224,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
+| `src/trace.ts` | Lightweight hand-written execution/audit trace inspection slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
