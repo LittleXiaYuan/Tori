@@ -98,6 +98,10 @@
     "./heartbeat": {
       "types": "./src/heartbeat.ts",
       "import": "./src/heartbeat.ts"
+    },
+    "./reverie": {
+      "types": "./src/reverie.ts",
+      "import": "./src/reverie.ts"
     }
   },
   "files": [
