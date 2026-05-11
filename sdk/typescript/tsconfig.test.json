@@ -41,6 +41,7 @@
     "src/roles.ts",
     "src/permissions.ts",
     "src/memory.ts",
+    "src/memory-search.ts",
     "src/tasks.ts",
     "src/task-context.ts",
     "src/knowledge.ts",
