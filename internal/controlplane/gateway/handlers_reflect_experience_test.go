@@ -116,3 +116,33 @@ func TestHandleStrategiesRespectsLimit(t *testing.T) {
 		t.Fatalf("expected one compiled strategy, got %d in %q", count, body.Strategies)
 	}
 }
+
+func TestHandleExperienceStatsRespectsFilters(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "task-success", Source: "task", Category: "strategy", Outcome: "success", Lesson: "task success lesson"})
+	store.Add(reflectpkg.Experience{ID: "task-failure", Source: "task", Category: "strategy", Outcome: "failure", Lesson: "task failure lesson"})
+	store.Add(reflectpkg.Experience{ID: "chat-success", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat success lesson"})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&source=task&outcome=success", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body reflectpkg.ExperienceStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 {
+		t.Fatalf("expected one filtered stat entry, got total=%d body=%s", body.Total, rec.Body.String())
+	}
+	if body.BySource["task"] != 1 || body.ByOutcome["success"] != 1 {
+		t.Fatalf("unexpected filtered stats: %+v", body)
+	}
+	if body.ByOutcome["failure"] != 0 || body.BySource["interaction"] != 0 {
+		t.Fatalf("stats leaked filtered experiences: %+v", body)
+	}
+}
