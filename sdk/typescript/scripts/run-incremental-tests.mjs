@@ -16,6 +16,8 @@ const sources = [
   "src/subagents.test.ts",
   "src/bots.ts",
   "src/bots.test.ts",
+  "src/discovery.ts",
+  "src/discovery.test.ts",
   "src/memory.ts",
   "src/memory.test.ts",
   "src/tasks.ts",
@@ -128,6 +130,7 @@ for (const testName of [
   "conversations.test",
   "subagents.test",
   "bots.test",
+  "discovery.test",
   "memory.test",
   "tasks.test",
   "task-context.test",
@@ -176,6 +179,7 @@ for (const testName of [
     .replace('from "./conversations"', 'from "./conversations.js"')
     .replace('from "./subagents"', 'from "./subagents.js"')
     .replace('from "./bots"', 'from "./bots.js"')
+    .replace('from "./discovery"', 'from "./discovery.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
     .replace('from "./task-context"', 'from "./task-context.js"')
