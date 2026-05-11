@@ -97,7 +97,9 @@ export default function ChatPage() {
   const resizingRef = useRef(false);
   const [resourceSnapshot, setResourceSnapshot] = useState<ResourceSnapshot | null>(null);
   const [prevResourceSnapshot, setPrevResourceSnapshot] = useState<ResourceSnapshot | null>(null);
+  const [plannerRecoveryRefreshSignal, setPlannerRecoveryRefreshSignal] = useState<number | undefined>(undefined);
   const sendStartRef = useRef<number>(0);
+  const refreshPlannerRecovery = useCallback(() => setPlannerRecoveryRefreshSignal(Date.now()), []);
 
   useEffect(() => {
     if (showComputer) setShowSidebar(false);
@@ -530,6 +532,7 @@ export default function ChatPage() {
         if (abort.signal.aborted) break;
         if (item.kind === "error") {
           chatD({ type: "ERROR_LAST", error: friendlyError(item.message) });
+          refreshPlannerRecovery();
           continue;
         }
         if (item.kind === "done") {
@@ -633,8 +636,10 @@ export default function ChatPage() {
         chatD({ type: "APPEND_LAST", delta: "\n\n[已停止生成]" });
       } else if (e instanceof ChatStreamTimeoutError) {
         chatD({ type: "ERROR_LAST", error: friendlyError(e.message) });
+        refreshPlannerRecovery();
       } else {
         chatD({ type: "ERROR_LAST", error: friendlyError((e as Error).message) });
+        refreshPlannerRecovery();
       }
     } finally {
       chatD({ type: "FINISH_SEND" });
@@ -980,7 +985,7 @@ export default function ChatPage() {
         )}
 
         {chatMode !== "chat" && (
-          <PlannerRecoveryShelf onSend={sendMessage} disabled={chat.loading} />
+          <PlannerRecoveryShelf onSend={sendMessage} disabled={chat.loading} refreshSignal={plannerRecoveryRefreshSignal} />
         )}
 
         {/* Chat Messages */}
