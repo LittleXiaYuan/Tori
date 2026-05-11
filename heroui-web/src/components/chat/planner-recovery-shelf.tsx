@@ -147,6 +147,54 @@ function stepStatusLabel(status?: string): string {
   }
 }
 
+function isRecoveryStepComplete(status?: string): boolean {
+  return status === "done" || status === "completed" || status === "skipped";
+}
+
+function recoveryStepDependencyState(
+  step: NonNullable<PlannerCheckpointSummary["plan_snapshot"]>[number],
+  steps: NonNullable<PlannerCheckpointSummary["plan_snapshot"]>,
+): { label: string; color: string; hint?: string; blockedDeps: number[]; completedDeps: number[] } {
+  const byId = new Map(steps.map((item) => [item.id, item]));
+  const deps = Array.from(new Set(step.depends_on || []));
+  const completedDeps = deps.filter((dep) => isRecoveryStepComplete(byId.get(dep)?.status));
+  const blockedDeps = deps.filter((dep) => !isRecoveryStepComplete(byId.get(dep)?.status));
+
+  if (isRecoveryStepComplete(step.status)) {
+    return { label: "已完成", color: "#86efac", blockedDeps, completedDeps };
+  }
+  if (step.status === "failed") {
+    return { label: "需处理", color: "#fca5a5", blockedDeps, completedDeps };
+  }
+  if (step.status === "running") {
+    return { label: "执行中", color: "#93c5fd", blockedDeps, completedDeps };
+  }
+  if (blockedDeps.length > 0) {
+    return {
+      label: "被阻塞",
+      color: "#fcd34d",
+      hint: `阻塞依赖：${blockedDeps.map((dep) => `#${dep}`).join("、")}`,
+      blockedDeps,
+      completedDeps,
+    };
+  }
+  return {
+    label: "可执行",
+    color: "#7dd3fc",
+    hint: deps.length > 0 ? `前置已完成：${completedDeps.map((dep) => `#${dep}`).join("、")}` : "无前置依赖，可直接继续。",
+    blockedDeps,
+    completedDeps,
+  };
+}
+
+function recoveryStepGraphCounts(steps: NonNullable<PlannerCheckpointSummary["plan_snapshot"]>): Record<string, number> {
+  return steps.reduce<Record<string, number>>((acc, step) => {
+    const state = recoveryStepDependencyState(step, steps).label;
+    acc[state] = (acc[state] || 0) + 1;
+    return acc;
+  }, {});
+}
+
 function stepResultPreview(result?: string): string {
   const normalized = displayRecoveryText(result).replace(/\s+/g, " ").trim();
   if (!normalized) return "";
@@ -584,22 +632,41 @@ export function PlannerRecoveryShelf({
                   ) : detailError ? (
                     <div>{detailError}</div>
                   ) : ((detailCheckpoint?.plan_id === cp.plan_id ? detailCheckpoint.plan_snapshot : cp.plan_snapshot) || []).length > 0 ? (
-                    <div className="flex flex-col gap-1.5">
-                      {((detailCheckpoint?.plan_id === cp.plan_id ? detailCheckpoint.plan_snapshot : cp.plan_snapshot) || []).map((step) => (
-                        <div key={step.id} className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ color: "#cbd5e1", background: "rgba(255,255,255,0.06)" }}>#{step.id}</span>
-                          <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ color: step.status === "failed" ? "#fca5a5" : "#c4b5fd", background: "rgba(255,255,255,0.06)" }}>{stepStatusLabel(step.status)}</span>
-                          {step.skill && <span className="text-[10px]" style={{ color: "#93c5fd" }}>{step.skill}</span>}
-                          <span className="min-w-0 flex-1 truncate" style={{ color: "var(--yunque-text)" }}>{step.action}</span>
-                          {step.depends_on?.length ? <span className="text-[10px]">依赖：{step.depends_on.join(", ")}</span> : null}
-                          {stepResultPreview(step.result) && (
-                            <span className="basis-full truncate text-[10px]" style={{ color: "#86efac" }}>
-                              已保留证据：{stepResultPreview(step.result)}
-                            </span>
-                          )}
+                    (() => {
+                      const snapshot = (detailCheckpoint?.plan_id === cp.plan_id ? detailCheckpoint.plan_snapshot : cp.plan_snapshot) || [];
+                      const counts = recoveryStepGraphCounts(snapshot);
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-wrap gap-1.5 text-[10px]">
+                            <span className="rounded-full px-2 py-0.5" style={{ color: "#7dd3fc", background: "rgba(14,165,233,0.1)" }}>可执行 {counts["可执行"] || 0}</span>
+                            <span className="rounded-full px-2 py-0.5" style={{ color: "#fcd34d", background: "rgba(251,191,36,0.1)" }}>被阻塞 {counts["被阻塞"] || 0}</span>
+                            <span className="rounded-full px-2 py-0.5" style={{ color: "#86efac", background: "rgba(34,197,94,0.1)" }}>已完成 {counts["已完成"] || 0}</span>
+                            <span className="rounded-full px-2 py-0.5" style={{ color: "#fca5a5", background: "rgba(239,68,68,0.1)" }}>需处理 {counts["需处理"] || 0}</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {snapshot.map((step) => {
+                              const graph = recoveryStepDependencyState(step, snapshot);
+                              return (
+                                <div key={step.id} className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-1.5" style={{ background: "rgba(0,0,0,0.12)", border: `1px solid ${graph.color}33` }}>
+                                  <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ color: "#cbd5e1", background: "rgba(255,255,255,0.06)" }}>#{step.id}</span>
+                                  <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ color: graph.color, background: "rgba(255,255,255,0.06)" }}>{graph.label}</span>
+                                  <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ color: step.status === "failed" ? "#fca5a5" : "#c4b5fd", background: "rgba(255,255,255,0.06)" }}>{stepStatusLabel(step.status)}</span>
+                                  {step.skill && <span className="text-[10px]" style={{ color: "#93c5fd" }}>{step.skill}</span>}
+                                  <span className="min-w-0 flex-1 truncate" style={{ color: "var(--yunque-text)" }}>{step.action}</span>
+                                  {step.depends_on?.length ? <span className="text-[10px]">依赖：{step.depends_on.join(", ")}</span> : null}
+                                  {graph.hint && <span className="basis-full text-[10px]" style={{ color: graph.color }}>{graph.hint}</span>}
+                                  {stepResultPreview(step.result) && (
+                                    <span className="basis-full truncate text-[10px]" style={{ color: "#86efac" }}>
+                                      已保留证据：{stepResultPreview(step.result)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()
                   ) : (
                     <div>暂无步骤快照，可先用恢复动作继续。</div>
                   )}

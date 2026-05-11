@@ -131,6 +131,7 @@ describe("PlannerRecoveryShelf", () => {
       plan_snapshot: [
         { id: 0, action: "读取文档蓝图", skill: "read_file", status: "done", result: "[Parsed document: 申请表.docx]\n公司名称\t云鸢科技\n联系电话\t13864841667" },
         { id: 1, action: "继续实现 Planner", skill: "edit", status: "pending", depends_on: [0] },
+        { id: 2, action: "整理最终结果", status: "pending", depends_on: [1] },
       ],
     });
     render(<PlannerRecoveryShelf fetchOnMount={false} initialCheckpoints={[failedCheckpoint]} onSend={onSend} getCheckpointDetails={getCheckpointDetails} />);
@@ -141,6 +142,12 @@ describe("PlannerRecoveryShelf", () => {
       expect(getCheckpointDetails).toHaveBeenCalledWith("plan-restore-1");
       expect(screen.getByText("读取文档蓝图")).toBeInTheDocument();
       expect(screen.getByText("继续实现 Planner")).toBeInTheDocument();
+      expect(screen.getByText("整理最终结果")).toBeInTheDocument();
+      expect(screen.getByText("可执行 1")).toBeInTheDocument();
+      expect(screen.getByText("被阻塞 1")).toBeInTheDocument();
+      expect(screen.getByText("已完成 1")).toBeInTheDocument();
+      expect(screen.getByText("前置已完成：#0")).toBeInTheDocument();
+      expect(screen.getByText("阻塞依赖：#1")).toBeInTheDocument();
       expect(screen.getByText("依赖：0")).toBeInTheDocument();
       expect(screen.getByText(/已保留证据/)).toBeInTheDocument();
       expect(screen.getByText(/公司名称\s+云鸢科技/)).toBeInTheDocument();
