@@ -58,6 +58,7 @@ import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
+import { createBotsClient } from "yunque-client/bots";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
@@ -143,6 +144,14 @@ const child = await subagents.spawn({
   skills: ["review"],
 });
 await subagents.appendMessages(child.id, [{ role: "user", content: "请审阅当前计划。" }]);
+
+const bots = createBotsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const botList = await bots.list();
+await bots.pushInbox({ source: "webhook", content: "新的外部消息", action: "notify" });
+console.log(botList.total);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -493,7 +502,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `conversations`, `subagents`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -528,6 +537,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
+| `src/bots.ts` | Lightweight hand-written bots, inbox, and channel group operations slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |

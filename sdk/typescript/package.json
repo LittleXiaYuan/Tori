@@ -27,6 +27,10 @@
       "types": "./src/subagents.ts",
       "import": "./src/subagents.ts"
     },
+    "./bots": {
+      "types": "./src/bots.ts",
+      "import": "./src/bots.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"
