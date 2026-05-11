@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 	"unicode"
 
@@ -14,6 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
+	"yunque-agent/internal/agentcore/router"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/safego"
 )
@@ -156,6 +158,83 @@ func (g *Gateway) recordCost(ctx context.Context, req *ChatRequest, tier string,
 	if alert != nil {
 		slog.Warn("cost alert", "type", alert.Type, "message", alert.Message)
 	}
+}
+
+func (g *Gateway) recordRouterOutcome(tierName, modelID string, start time.Time, err error, reply string, span *observe.Span) {
+	if g.smartRouter == nil {
+		return
+	}
+	if modelID == "" && g.planner != nil {
+		modelID = g.planner.LLMClientFor(tierName).Model()
+	}
+	if modelID == "" {
+		return
+	}
+
+	latency := time.Since(start)
+	g.smartRouter.RecordLatency(modelID, latency)
+
+	tier, ok := routerTierFromString(tierName)
+	if !ok {
+		return
+	}
+	reward := routerOutcomeReward(err, reply, latency)
+	if bandit := g.smartRouter.Bandit(); bandit != nil {
+		bandit.RecordOutcome(tier, modelID, reward, float64(latency.Milliseconds()))
+	}
+	if span != nil {
+		span.Attrs["router_outcome_model"] = modelID
+		span.Attrs["router_outcome_tier"] = tier.String()
+		span.Attrs["router_outcome_reward"] = fmt.Sprintf("%.2f", reward)
+		span.Attrs["router_outcome_latency_ms"] = fmt.Sprintf("%d", latency.Milliseconds())
+	}
+}
+
+func routerTierFromString(tierName string) (router.Tier, bool) {
+	switch tierName {
+	case "fast":
+		return router.TierFast, true
+	case "smart", "":
+		return router.TierSmart, true
+	case "expert":
+		return router.TierExpert, true
+	default:
+		return router.TierSmart, false
+	}
+}
+
+func routerOutcomeReward(err error, reply string, latency time.Duration) float64 {
+	if err != nil {
+		return 0
+	}
+	reply = strings.TrimSpace(reply)
+	if reply == "" {
+		return 0.25
+	}
+
+	reward := 0.70
+	if len([]rune(reply)) >= 20 {
+		reward += 0.15
+	} else {
+		reward += 0.05
+	}
+
+	switch {
+	case latency > 60*time.Second:
+		reward -= 0.30
+	case latency > 30*time.Second:
+		reward -= 0.20
+	case latency > 10*time.Second:
+		reward -= 0.10
+	}
+
+	if reward < 0 {
+		return 0
+	}
+	if reward > 1 {
+		return 1
+	}
+	return reward
 }
 
 // persistChatResult saves the assistant reply to the session and triggers auto-titling.

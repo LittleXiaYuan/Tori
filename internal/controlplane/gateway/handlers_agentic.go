@@ -314,11 +314,13 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// Smart router
 	var routedTier string
+	var routedModelID string
 	if g.smartRouter != nil && len(msgs) > 0 {
 		lastMsg := msgs[len(msgs)-1].Content
 		routedModel, tier := g.smartRouter.Route(ctx, lastMsg, false)
 		routedTier = tier.String()
 		if routedModel != nil {
+			routedModelID = routedModel.ModelID
 			traceSpan.Attrs["router_model"] = routedModel.ModelID
 		}
 	}
@@ -442,11 +444,13 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	result, err := g.planner.Run(ctx, planReq)
 	if err != nil {
 		slog.Error("agentic planner error", "err", err, "tenant", tid)
+		g.recordRouterOutcome(routedTier, routedModelID, start, err, "", traceSpan)
 		errData, _ := json.Marshal(map[string]string{"code": "PLANNER_ERROR", "message": friendlyChatPipelineError(err)})
 		sendEvent("error", string(errData))
 		observe.EndSpan(traceSpan, err)
 		return
 	}
+	g.recordRouterOutcome(routedTier, routedModelID, start, nil, result.Reply, traceSpan)
 
 	// Cache plan result for save_as_workflow skill
 	if len(result.Plan) > 0 && g.lastPlanCache != nil {
