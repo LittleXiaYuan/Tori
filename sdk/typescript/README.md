@@ -71,6 +71,7 @@ import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
 import { createWorkflowClient } from "yunque-client/workflow";
 import { createCostClient } from "yunque-client/cost";
+import { createLoRAClient } from "yunque-client/lora";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -264,12 +265,22 @@ const costs = createCostClient({
 });
 console.log(await costs.summary());
 await costs.setQuota({ quota: { max_chat_calls: 100, max_tokens_per_day: 200000 } });
+
+const lora = createLoRAClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const preview = await lora.preview({ tenant_id: "default" });
+if (preview.preview.ready) {
+  await lora.trigger({ tenant_id: "default" });
+}
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona`/`workflow`/`cost` without importing the generated 500KB+
+`/ide`/`persona`/`workflow`/`cost`/`lora` without importing the generated 500KB+
 SDK/types bundle. Add future slices in the same style when those surfaces need
 stable, lightweight integration APIs.
 
@@ -314,6 +325,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
 | `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
 | `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
+| `src/lora.ts` | Lightweight hand-written LoRA training and evolution lifecycle slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

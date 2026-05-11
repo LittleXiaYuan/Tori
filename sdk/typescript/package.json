@@ -78,6 +78,10 @@
     "./cost": {
       "types": "./src/cost.ts",
       "import": "./src/cost.ts"
+    },
+    "./lora": {
+      "types": "./src/lora.ts",
+      "import": "./src/lora.ts"
     }
   },
   "files": [
