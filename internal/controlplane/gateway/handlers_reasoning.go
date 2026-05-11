@@ -10,9 +10,11 @@ import (
 	"yunque-agent/internal/agentcore/state"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/execution/channel"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 )
 
-//  from handlers_state.go 
+//	from handlers_state.go
+//
 // handleStateSnapshot GET /v1/state 鈥?杩斿洖瀹屾暣鐘舵€佸揩鐓?
 func (g *Gateway) handleStateSnapshot(w http.ResponseWriter, r *http.Request) {
 	if g.stateKernel == nil {
@@ -202,7 +204,8 @@ func (g *Gateway) handleStateResources(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//  from handlers_react.go 
+//	from handlers_react.go
+//
 // handleReact handles POST /v1/react to add emoji reactions to messages.
 func (g *Gateway) handleReact(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -328,7 +331,7 @@ func (g *Gateway) PreAckReact(ctx context.Context, channelType, target, messageI
 	}
 }
 
-//  from handlers_reflect.go 
+//  from handlers_reflect.go
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Reflection API 鈥?experience store and strategy compilation
 //
@@ -354,10 +357,15 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Search mode
+	source := r.URL.Query().Get("source")
+	category := r.URL.Query().Get("category")
+	outcome := r.URL.Query().Get("outcome")
+
+	// Search mode still respects source/category/outcome filters. This keeps the
+	// lightweight SDK's combined q+filter query semantics aligned with runtime.
 	query := r.URL.Query().Get("q")
 	if query != "" {
-		results := g.experienceStore.Search(query, 50)
+		results := filterReflectExperiences(g.experienceStore.Search(query, 50), source, category, outcome)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": results, "total": len(results)})
 		return
@@ -366,24 +374,8 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	// List all
 	all := g.experienceStore.All()
 	// Apply filters
-	source := r.URL.Query().Get("source")
-	category := r.URL.Query().Get("category")
-	outcome := r.URL.Query().Get("outcome")
-
 	if source != "" || category != "" || outcome != "" {
-		filtered := make([]any, 0)
-		for _, e := range all {
-			if source != "" && e.Source != source {
-				continue
-			}
-			if category != "" && e.Category != category {
-				continue
-			}
-			if outcome != "" && e.Outcome != outcome {
-				continue
-			}
-			filtered = append(filtered, e)
-		}
+		filtered := filterReflectExperiences(all, source, category, outcome)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": filtered, "total": len(filtered)})
 		return
@@ -391,6 +383,26 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"experiences": all, "total": len(all)})
+}
+
+func filterReflectExperiences(experiences []reflectpkg.Experience, source, category, outcome string) []reflectpkg.Experience {
+	if source == "" && category == "" && outcome == "" {
+		return experiences
+	}
+	filtered := make([]reflectpkg.Experience, 0, len(experiences))
+	for _, e := range experiences {
+		if source != "" && e.Source != source {
+			continue
+		}
+		if category != "" && e.Category != category {
+			continue
+		}
+		if outcome != "" && e.Outcome != outcome {
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	return filtered
 }
 
 func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {
@@ -407,4 +419,3 @@ func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"strategies": strategies})
 }
-
