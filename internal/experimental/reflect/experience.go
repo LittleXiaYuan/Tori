@@ -169,9 +169,7 @@ func (s *ExperienceStore) CompileStrategiesForQuery(query string, limit int) str
 	experiences := make([]Experience, 0, len(s.data))
 	for i := len(s.data) - 1; i >= 0; i-- {
 		e := s.data[i]
-		if strings.Contains(strings.ToLower(e.Lesson), q) ||
-			strings.Contains(strings.ToLower(e.Context), q) ||
-			containsAny(e.Tags, q) {
+		if experienceMatchesQuery(e, q) {
 			experiences = append(experiences, e)
 		}
 	}
@@ -275,6 +273,23 @@ func (s *ExperienceStore) save() {
 func containsAny(tags []string, q string) bool {
 	for _, t := range tags {
 		if strings.Contains(strings.ToLower(t), q) {
+			return true
+		}
+	}
+	return false
+}
+
+func experienceMatchesQuery(e Experience, q string) bool {
+	haystack := strings.ToLower(e.Lesson + "\n" + e.Context + "\n" + strings.Join(e.Tags, "\n"))
+	if strings.Contains(haystack, q) {
+		return true
+	}
+	for _, token := range strings.Fields(q) {
+		token = strings.Trim(token, ".,，。:：;；!?！？()（）[]【】{}<>\"'`")
+		if len([]rune(token)) < 2 {
+			continue
+		}
+		if strings.Contains(haystack, token) {
 			return true
 		}
 	}
