@@ -57,6 +57,7 @@ can import the hand-written incremental slice instead:
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createConversationsClient } from "yunque-client/conversations";
+import { createSubagentsClient } from "yunque-client/subagents";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
@@ -130,6 +131,18 @@ const conversations = createConversationsClient({
 const history = await conversations.messages("demo-session");
 const replay = await conversations.replay("demo-session", { limit: 5 });
 console.log(history.count, replay.total_turns);
+
+const subagents = createSubagentsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const child = await subagents.spawn({
+  parent_id: "demo-session",
+  name: "reviewer",
+  description: "检查 Planner 输出并补充风险提示",
+  skills: ["review"],
+});
+await subagents.appendMessages(child.id, [{ role: "user", content: "请审阅当前计划。" }]);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -480,7 +493,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `conversations`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `planner-recovery`, `chat`, `conversations`, `subagents`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -514,6 +527,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
+| `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |

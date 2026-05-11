@@ -23,6 +23,10 @@
       "types": "./src/conversations.ts",
       "import": "./src/conversations.ts"
     },
+    "./subagents": {
+      "types": "./src/subagents.ts",
+      "import": "./src/subagents.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"

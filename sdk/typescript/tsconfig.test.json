@@ -20,6 +20,7 @@
     "src/planner-recovery.ts",
     "src/chat.ts",
     "src/conversations.ts",
+    "src/subagents.ts",
     "src/memory.ts",
     "src/tasks.ts",
     "src/task-context.ts",
