@@ -50,6 +50,8 @@ const sources = [
   "src/rbac.test.ts",
   "src/roles.ts",
   "src/roles.test.ts",
+  "src/permissions.ts",
+  "src/permissions.test.ts",
   "src/memory.ts",
   "src/memory.test.ts",
   "src/tasks.ts",
@@ -213,6 +215,7 @@ for (const testName of [
   "instructions.test",
   "rbac.test",
   "roles.test",
+  "permissions.test",
   "memory.test",
   "tasks.test",
   "task-context.test",
@@ -295,6 +298,7 @@ for (const testName of [
     .replace('from "./instructions"', 'from "./instructions.js"')
     .replace('from "./rbac"', 'from "./rbac.js"')
     .replace('from "./roles"', 'from "./roles.js"')
+    .replace('from "./permissions"', 'from "./permissions.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
     .replace('from "./task-context"', 'from "./task-context.js"')
