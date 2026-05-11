@@ -110,6 +110,10 @@
     "./system": {
       "types": "./src/system.ts",
       "import": "./src/system.ts"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "import": "./src/settings.ts"
     }
   },
   "files": [
