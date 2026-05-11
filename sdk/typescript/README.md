@@ -78,6 +78,14 @@ The generated `src/sdk.gen.ts` is useful for full API coverage, but it is a
 large all-in-one surface. Product integrations that only need Planner recovery
 can import the hand-written incremental slice instead:
 
+Planner recovery keeps request actions and server recommendations separate.
+Use `CheckpointRecoveryAction` (`continue` / `retry_failed` / `partial`) when
+posting a checkpoint resume request. Treat broader `RecoveryNextAction` values
+such as `inspect_dependencies` or `create_task` as UI guidance instead of
+submitting them directly. The gateway accepts common UI aliases such as
+`retry-failed-step` or `重试失败`, but SDK callers should prefer the canonical
+request actions for portable integrations.
+
 ```ts
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
