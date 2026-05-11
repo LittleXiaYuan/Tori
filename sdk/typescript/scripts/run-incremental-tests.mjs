@@ -72,6 +72,8 @@ const sources = [
   "src/knowledge-search.test.ts",
   "src/knowledge-ingest.ts",
   "src/knowledge-ingest.test.ts",
+  "src/knowledge-sources.ts",
+  "src/knowledge-sources.test.ts",
   "src/providers.ts",
   "src/providers.test.ts",
   "src/breaker.ts",
@@ -238,6 +240,7 @@ for (const testName of [
   "knowledge.test",
   "knowledge-search.test",
   "knowledge-ingest.test",
+  "knowledge-sources.test",
   "providers.test",
   "breaker.test",
   "models.test",
@@ -327,6 +330,7 @@ for (const testName of [
     .replace('from "./knowledge"', 'from "./knowledge.js"')
     .replace('from "./knowledge-search"', 'from "./knowledge-search.js"')
     .replace('from "./knowledge-ingest"', 'from "./knowledge-ingest.js"')
+    .replace('from "./knowledge-sources"', 'from "./knowledge-sources.js"')
     .replace('from "./providers"', 'from "./providers.js"')
     .replace('from "./breaker"', 'from "./breaker.js"')
     .replace('from "./models"', 'from "./models.js"')

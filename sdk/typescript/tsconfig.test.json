@@ -50,6 +50,7 @@
     "src/knowledge.ts",
     "src/knowledge-search.ts",
     "src/knowledge-ingest.ts",
+    "src/knowledge-sources.ts",
     "src/providers.ts",
     "src/breaker.ts",
     "src/models.ts",
