@@ -131,6 +131,10 @@
       "types": "./src/task-context.ts",
       "import": "./src/task-context.ts"
     },
+    "./task-observe": {
+      "types": "./src/task-observe.ts",
+      "import": "./src/task-observe.ts"
+    },
     "./task-lifecycle": {
       "types": "./src/task-lifecycle.ts",
       "import": "./src/task-lifecycle.ts"
@@ -507,6 +511,7 @@
   },
   "sideEffects": false
 }
+
 
 
 
