@@ -207,6 +207,10 @@
       "types": "./src/fork.ts",
       "import": "./src/fork.ts"
     },
+    "./scheduler": {
+      "types": "./src/scheduler.ts",
+      "import": "./src/scheduler.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
