@@ -170,6 +170,42 @@ describe("api/plannerCheckpoints", () => {
   });
 });
 
+describe("api/reflectExperience", () => {
+  it("serializes experience filters and limit", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ experiences: [], total: 0 }), { status: 200 }),
+    );
+
+    await api.getExperiences({ q: "code review", source: "task", outcome: "partial", limit: 5 });
+
+    const [url] = spy.mock.calls[0];
+    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=partial&q=code+review&limit=5");
+  });
+
+  it("serializes experience stats filters", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ total: 1, by_outcome: { success: 1 } }), { status: 200 }),
+    );
+
+    await api.getExperiences({ stats: true, source: "task", outcome: "success" });
+
+    const [url] = spy.mock.calls[0];
+    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=success&stats=true");
+  });
+
+  it("serializes strategy limit only when requested", async () => {
+    const spy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ strategies: "" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ strategies: "" }), { status: 200 }));
+
+    await api.getStrategies({ limit: 3 });
+    await api.getStrategies();
+
+    expect(spy.mock.calls[0][0]).toBe("/v1/reflect/strategies?limit=3");
+    expect(spy.mock.calls[1][0]).toBe("/v1/reflect/strategies");
+  });
+});
+
 describe("api/chatStream", () => {
   it("uses a recoverable idle timeout for the legacy streaming wrapper", async () => {
     vi.useFakeTimers();
