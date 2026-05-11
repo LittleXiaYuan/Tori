@@ -122,6 +122,10 @@
     "./speech": {
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
+    },
+    "./admin": {
+      "types": "./src/admin.ts",
+      "import": "./src/admin.ts"
     }
   },
   "files": [
