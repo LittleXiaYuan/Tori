@@ -39,6 +39,8 @@ test("DispatchClient reads worker config with type query", async () => {
 test("DispatchClient throws DispatchClientError with parsed and text bodies", async () => {
   const jsonClient = createDispatchClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "worker not found" }, { status: 404 }) });
   try { await jsonClient.worker("missing"); throw new Error("expected worker to reject"); } catch (error) { assert(error instanceof DispatchClientError); assertEqual(error.status, 404); assertDeepEqual(error.body, { error: "worker not found" }); assertEqual(error.message, "worker not found"); }
+  const nestedClient = createDispatchClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "dispatch worker id is required" } }, { status: 400 }) });
+  try { await nestedClient.worker(""); throw new Error("expected worker to reject"); } catch (error) { assert(error instanceof DispatchClientError); assertEqual(error.status, 400); assertEqual(error.message, "dispatch worker id is required"); }
   const textClient = createDispatchClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.workers(); throw new Error("expected workers to reject"); } catch (error) { assert(error instanceof DispatchClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });
