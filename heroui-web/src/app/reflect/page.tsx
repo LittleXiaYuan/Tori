@@ -9,7 +9,11 @@ import { relTime } from "@/lib/constants";
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
 
-const outcomeColor: Record<string, string> = { success: "#17c964", failure: "#f31260", neutral: "#9ca3af" };
+const EXPERIENCE_LIST_LIMIT = 50;
+const STRATEGY_LIMIT = 8;
+
+const outcomeColor: Record<string, string> = { success: "#17c964", failure: "#f31260", partial: "#ffaa00", neutral: "#9ca3af" };
+const outcomeLabel: Record<string, string> = { success: "成功", failure: "失败", partial: "部分成功", neutral: "中性" };
 const categoryEmoji: Record<string, string> = {
   task_success: "[OK]", task_failure: "[FAIL]", gap_resolved: "[FIX]", retry_pattern: "[RETRY]", skill_gap: "[PKG]", llm_insight: "*",
 };
@@ -30,8 +34,8 @@ export default function ReflectPage() {
     async () => {
       const [statsRes, listRes, stratRes] = await Promise.all([
         api.getExperiences({ stats: true }),
-        api.getExperiences({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, q: search || undefined }),
-        api.getStrategies(),
+        api.getExperiences({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, q: search || undefined, limit: EXPERIENCE_LIST_LIMIT }),
+        api.getStrategies({ limit: STRATEGY_LIMIT }),
       ]);
       const stats = ("total" in statsRes && "by_source" in statsRes) ? statsRes as ExperienceStats : null;
       const experiences = ("experiences" in listRes) ? ((listRes as { experiences: ExperienceItem[] }).experiences || []) : [];
@@ -97,6 +101,7 @@ export default function ReflectPage() {
                 <ListBox.Item id="" textValue="全部结果">全部结果<ListBox.ItemIndicator /></ListBox.Item>
                 <ListBox.Item id="success" textValue="成功">成功<ListBox.ItemIndicator /></ListBox.Item>
                 <ListBox.Item id="failure" textValue="失败">失败<ListBox.ItemIndicator /></ListBox.Item>
+                <ListBox.Item id="partial" textValue="部分成功">部分成功<ListBox.ItemIndicator /></ListBox.Item>
                 <ListBox.Item id="neutral" textValue="中性">中性<ListBox.ItemIndicator /></ListBox.Item>
               </ListBox>
             </Select.Popover>
@@ -123,7 +128,7 @@ export default function ReflectPage() {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <Chip size="sm"
                       style={{ background: `${outcomeColor[exp.outcome] || "#9ca3af"}20`, color: outcomeColor[exp.outcome] || "#9ca3af" }}>
-                      {exp.outcome === "success" ? <CheckCircle2 size={10} /> : exp.outcome === "failure" ? <XCircle size={10} /> : null} {exp.outcome}
+                      {exp.outcome === "success" ? <CheckCircle2 size={10} /> : exp.outcome === "failure" ? <XCircle size={10} /> : null} {outcomeLabel[exp.outcome] || exp.outcome}
                     </Chip>
                     <Chip size="sm" style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)" }}>{exp.category}</Chip>
                     <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{exp.source}</span>
