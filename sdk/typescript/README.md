@@ -181,6 +181,7 @@ import { createNotifyClient } from "yunque-client/notify";
 import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
 import { createProjectsClient } from "yunque-client/projects";
+import { createProjectReadClient } from "yunque-client/project-read";
 import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
@@ -417,6 +418,13 @@ const notify = createNotifyClient({
   apiKey: "<your-api-key>",
 });
 await notify.share({ channel_id: "feishu-main", message: "任务已完成", session_id: "demo-session" });
+
+const projectRead = createProjectReadClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+
+const projectList = await projectRead.list();
 
 const projects = createProjectsClient({
   baseUrl: "http://localhost:9090",
@@ -1115,6 +1123,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/notify-share.ts` | Lightweight notification share dispatch facade without full SDK import |
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |
 | `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
+| `src/project-read.ts` | Lightweight project list/detail read facade without full SDK import |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
