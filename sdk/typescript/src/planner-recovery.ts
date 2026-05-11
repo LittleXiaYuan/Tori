@@ -8,7 +8,9 @@
  *   import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
  */
 
-export type RecoveryAction = "continue" | "retry_failed" | "partial" | "inspect_dependencies" | "create_task";
+export type CheckpointRecoveryAction = "continue" | "retry_failed" | "partial";
+export type RecoveryNextAction = CheckpointRecoveryAction | "inspect_dependencies" | "create_task";
+export type RecoveryAction = RecoveryNextAction;
 
 export type PlannerStepStatus = "pending" | "running" | "done" | "completed" | "failed" | "skipped";
 
@@ -45,7 +47,7 @@ export type PlannerRecoveryPlanStep = PlannerCheckpointStep & {
 };
 
 export type PlannerRecoveryPlan = {
-  mode?: RecoveryAction | string;
+  mode?: CheckpointRecoveryAction | string;
   executable?: boolean;
   prompt?: string;
   steps?: PlannerRecoveryPlanStep[];
@@ -62,13 +64,13 @@ export type PlannerResumePlanEvent = {
 export type PlannerResumePlanJob = {
   id: string;
   status?: "running" | "completed" | "failed" | "cancelled" | string;
-  action?: RecoveryAction | string;
+  action?: CheckpointRecoveryAction | string;
   plan_id?: string;
   task_id?: string;
   error?: string;
   friendly_error?: string;
   recoverable?: boolean;
-  next_action?: RecoveryAction | string;
+  next_action?: RecoveryNextAction | string;
   events?: PlannerResumePlanEvent[];
   started_at?: string;
   finished_at?: string;
@@ -96,7 +98,7 @@ export type ListPlannerCheckpointsResponse = {
 };
 
 export type RecoverPlannerCheckpointResponse = {
-  action: RecoveryAction | string;
+  action: CheckpointRecoveryAction | string;
   plan_id: string;
   task_id?: string;
   prompt?: string;
@@ -114,7 +116,7 @@ export type ResumePlannerCheckpointTaskResponse = {
 
 export type ResumePlannerCheckpointPlanResponse = {
   status?: string;
-  action?: RecoveryAction | string;
+  action?: CheckpointRecoveryAction | string;
   plan_id?: string;
   job_id?: string;
   result?: PlannerResumePlanJob["result"];
@@ -129,8 +131,8 @@ export type GetPlannerResumePlanJobResponse = {
 export type GetPlannerExecutionStateResponse = {
   plan_id: string;
   status?: string;
-  action?: RecoveryAction | string;
-  next_action?: RecoveryAction | string;
+  action?: CheckpointRecoveryAction | string;
+  next_action?: RecoveryNextAction | string;
   updated_at?: string;
   checkpoint?: PlannerCheckpoint;
   latest_job?: PlannerResumePlanJob;
@@ -221,15 +223,15 @@ export class PlannerRecoveryClient {
     return this.request<ListPlannerCheckpointsResponse>("GET", "/v1/planner/checkpoints", { query });
   }
 
-  recoverCheckpoint(body: { plan_id: string; action?: RecoveryAction }): Promise<RecoverPlannerCheckpointResponse> {
+  recoverCheckpoint(body: { plan_id: string; action?: CheckpointRecoveryAction }): Promise<RecoverPlannerCheckpointResponse> {
     return this.request<RecoverPlannerCheckpointResponse>("POST", "/v1/planner/checkpoints/recover", { body });
   }
 
-  resumeCheckpointTask(body: { plan_id: string; action?: RecoveryAction; run?: boolean }): Promise<ResumePlannerCheckpointTaskResponse> {
+  resumeCheckpointTask(body: { plan_id: string; action?: CheckpointRecoveryAction; run?: boolean }): Promise<ResumePlannerCheckpointTaskResponse> {
     return this.request<ResumePlannerCheckpointTaskResponse>("POST", "/v1/planner/checkpoints/resume", { body });
   }
 
-  resumeCheckpointPlan(body: { plan_id: string; action?: RecoveryAction; async?: boolean }): Promise<ResumePlannerCheckpointPlanResponse> {
+  resumeCheckpointPlan(body: { plan_id: string; action?: CheckpointRecoveryAction; async?: boolean }): Promise<ResumePlannerCheckpointPlanResponse> {
     return this.request<ResumePlannerCheckpointPlanResponse>("POST", "/v1/planner/checkpoints/resume-plan", { body });
   }
 
@@ -237,7 +239,7 @@ export class PlannerRecoveryClient {
     return this.request<GetPlannerResumePlanJobResponse>("GET", "/v1/planner/checkpoints/resume-plan/jobs", { query });
   }
 
-  getExecutionState(query: { plan_id: string; action?: RecoveryAction }): Promise<GetPlannerExecutionStateResponse> {
+  getExecutionState(query: { plan_id: string; action?: CheckpointRecoveryAction }): Promise<GetPlannerExecutionStateResponse> {
     return this.request<GetPlannerExecutionStateResponse>("GET", "/v1/planner/execution-state", { query });
   }
 

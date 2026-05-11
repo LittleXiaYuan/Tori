@@ -495,6 +495,24 @@ func TestPlannerCheckpointRecoverBuildsBackendPrompt(t *testing.T) {
 	}
 }
 
+func TestNormalizeCheckpointActionAcceptsUiAliases(t *testing.T) {
+	cases := map[string]string{
+		"":                      "continue",
+		" Resume_Plan ":         "continue",
+		"继续":                    "continue",
+		"retry-failed-step":     "retry_failed",
+		" 重试失败 ":                "retry_failed",
+		"return-partial-result": "partial",
+		"返回阶段结果":                "partial",
+		"unknown":               "",
+	}
+	for input, want := range cases {
+		if got := normalizeCheckpointAction(input); got != want {
+			t.Fatalf("normalizeCheckpointAction(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestPlannerCheckpointRecoverValidatesRequest(t *testing.T) {
 	gw, tm := newTestGateway()
 	tenant := tm.Register("planner-checkpoint-recover-validation")
