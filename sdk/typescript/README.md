@@ -701,7 +701,7 @@ const reflectExperiences = await missions.experiences({
   limit: 10,
 });
 console.log(reflectExperiences.experiences[0]?.lesson);
-const reflectStats = await missions.experienceStats();
+const reflectStats = await missions.experienceStats({ source: "task" });
 console.log(reflectStats.by_outcome?.success ?? 0);
 const strategyContext = await missions.strategies({ limit: 5 });
 console.log(strategyContext.strategies.split("\n")[0]);

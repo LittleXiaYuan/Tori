@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"time"
 
 	"yunque-agent/internal/agentcore/state"
 	"yunque-agent/internal/apperror"
@@ -350,18 +351,20 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Stats mode
-	if r.URL.Query().Get("stats") == "true" {
-		st := g.experienceStore.Stats()
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(st)
-		return
-	}
-
 	source := r.URL.Query().Get("source")
 	category := r.URL.Query().Get("category")
 	outcome := r.URL.Query().Get("outcome")
 	limit := reflectExperienceLimit(r, 0)
+
+	// Stats mode supports the same filters as list/search so dashboards can ask
+	// for scoped counters without fetching the full experience list.
+	if r.URL.Query().Get("stats") == "true" {
+		all := g.experienceStore.All()
+		st := summarizeReflectExperiences(filterReflectExperiences(all, source, category, outcome))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(st)
+		return
+	}
 
 	// Search mode still respects source/category/outcome filters. This keeps the
 	// lightweight SDK's combined q+filter query semantics aligned with runtime.
@@ -432,6 +435,25 @@ func limitReflectExperiences(experiences []reflectpkg.Experience, limit int) []r
 		return experiences
 	}
 	return experiences[:limit]
+}
+
+func summarizeReflectExperiences(experiences []reflectpkg.Experience) reflectpkg.ExperienceStats {
+	st := reflectpkg.ExperienceStats{
+		Total:      len(experiences),
+		BySource:   make(map[string]int),
+		ByCategory: make(map[string]int),
+		ByOutcome:  make(map[string]int),
+	}
+	week := time.Now().Add(-7 * 24 * time.Hour)
+	for _, e := range experiences {
+		st.BySource[e.Source]++
+		st.ByCategory[e.Category]++
+		st.ByOutcome[e.Outcome]++
+		if e.CreatedAt.After(week) {
+			st.Recent++
+		}
+	}
+	return st
 }
 
 func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {
