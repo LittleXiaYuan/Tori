@@ -989,7 +989,23 @@ export default function CognisPage() {
                         <div className="text-xs mb-1 font-medium" style={{ color: "var(--yunque-text)" }}>待确认模式</div>
                         {pendingPatterns.map((p: CogniExperiencePattern, i: number) => (
                           <div key={p.id || i} className="text-xs p-2 rounded mb-1" style={{ background: "rgba(255,170,0,0.08)", color: "var(--yunque-text-muted)" }}>
-                            {p.trigger} → {p.response}
+                            <div className="flex items-start justify-between gap-2">
+                              <span>{p.trigger} → {p.response}</span>
+                              {p.id && (
+                                <Button size="sm" variant="ghost" onPress={async () => {
+                                  try {
+                                    await api.confirmCogniExperiencePattern(detailID!, p.id!);
+                                    const refreshed = await api.getCogniExperience(detailID!);
+                                    setDetailExperience(refreshed);
+                                    showToast("经验模式已确认", "success");
+                                  } catch (e) {
+                                    showToast(e instanceof Error ? e.message : "确认失败", "error");
+                                  }
+                                }}>
+                                  确认
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

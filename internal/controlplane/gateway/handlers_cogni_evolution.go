@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"yunque-agent/internal/apperror"
 	"yunque-agent/pkg/cogni"
@@ -90,6 +91,42 @@ func (g *Gateway) cogniExperienceRecord(w http.ResponseWriter, r *http.Request, 
 	default:
 		apperror.WriteCode(w, apperror.CodeBadRequest, "type must be tool_memory, pattern, or fact")
 	}
+}
+
+func (g *Gateway) cogniExperiencePatternRoute(w http.ResponseWriter, r *http.Request, id, rest string) {
+	parts := strings.Split(rest, "/")
+	if len(parts) != 3 || parts[0] != "patterns" || parts[2] != "confirm" {
+		apperror.WriteCode(w, apperror.CodeNotFound, "unknown cogni experience pattern sub-resource")
+		return
+	}
+	g.cogniExperienceConfirmPattern(w, r, id, parts[1])
+}
+
+func (g *Gateway) cogniExperienceConfirmPattern(w http.ResponseWriter, r *http.Request, id, patternID string) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	if patternID == "" {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "pattern id is required")
+		return
+	}
+	if g.cogniExperiences == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "experience stores not configured")
+		return
+	}
+	es, ok := g.cogniExperiences[id]
+	if !ok {
+		apperror.WriteCode(w, apperror.CodeNotFound, "no experience store for cogni: "+id)
+		return
+	}
+	if !es.ConfirmPattern(patternID) {
+		apperror.WriteCode(w, apperror.CodeNotFound, "experience pattern not found: "+patternID)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"status": "ok", "type": "pattern", "id": patternID, "confirmed": true})
 }
 
 func (g *Gateway) cogniEvolve(w http.ResponseWriter, r *http.Request, id string) {
