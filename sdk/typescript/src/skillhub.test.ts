@@ -39,6 +39,8 @@ test("SkillHubClient updates rollback and policy with JSON bodies", async () => 
 test("SkillHubClient throws SkillHubClientError with parsed and text bodies", async () => {
   const auditClient = createSkillHubClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "audit failed", report: { score: 20 } }, { status: 422 }) });
   try { await auditClient.install("unsafe"); throw new Error("expected install to reject"); } catch (error) { assert(error instanceof SkillHubClientError); assertEqual(error.status, 422); assertDeepEqual(error.body, { error: "audit failed", report: { score: 20 } }); assertEqual(error.message, "audit failed"); }
+  const nestedClient = createSkillHubClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "skill id is required" } }, { status: 400 }) });
+  try { await nestedClient.detail(""); throw new Error("expected detail to reject"); } catch (error) { assert(error instanceof SkillHubClientError); assertEqual(error.status, 400); assertEqual(error.message, "skill id is required"); }
   const textClient = createSkillHubClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("not found", { status: 404 }) });
   try { await textClient.detail("missing"); throw new Error("expected detail to reject"); } catch (error) { assert(error instanceof SkillHubClientError); assertEqual(error.status, 404); assertEqual(error.body, "not found"); assertEqual(error.message, "not found"); }
 });

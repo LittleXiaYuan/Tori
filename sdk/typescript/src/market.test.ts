@@ -39,6 +39,8 @@ test("SkillMarketClient reads marketplace stats", async () => {
 test("SkillMarketClient throws SkillMarketClientError with parsed and text bodies", async () => {
   const jsonClient = createSkillMarketClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "skill market not configured" }, { status: 503 }) });
   try { await jsonClient.stats(); throw new Error("expected stats to reject"); } catch (error) { assert(error instanceof SkillMarketClientError); assertEqual(error.status, 503); assertDeepEqual(error.body, { error: "skill market not configured" }); assertEqual(error.message, "skill market not configured"); }
+  const nestedClient = createSkillMarketClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "market query is required" } }, { status: 400 }) });
+  try { await nestedClient.search(""); throw new Error("expected search to reject"); } catch (error) { assert(error instanceof SkillMarketClientError); assertEqual(error.status, 400); assertEqual(error.message, "market query is required"); }
   const textClient = createSkillMarketClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.search("x"); throw new Error("expected search to reject"); } catch (error) { assert(error instanceof SkillMarketClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

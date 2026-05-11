@@ -35,6 +35,8 @@ test("SkillsClient approves rejects and fetches session suggestions", async () =
 test("SkillsClient throws SkillsClientError with parsed and text bodies", async () => {
   const jsonClient = createSkillsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "skill registry not configured" }, { status: 500 }) });
   try { await jsonClient.dynamic(); throw new Error("expected dynamic to reject"); } catch (error) { assert(error instanceof SkillsClientError); assertEqual(error.status, 500); assertDeepEqual(error.body, { error: "skill registry not configured" }); assertEqual(error.message, "skill registry not configured"); }
+  const nestedClient = createSkillsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "skill session id is required" } }, { status: 400 }) });
+  try { await nestedClient.approve({ name: "" }); throw new Error("expected approve to reject"); } catch (error) { assert(error instanceof SkillsClientError); assertEqual(error.status, 400); assertEqual(error.message, "skill session id is required"); }
   const textClient = createSkillsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.scan(); throw new Error("expected scan to reject"); } catch (error) { assert(error instanceof SkillsClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });
