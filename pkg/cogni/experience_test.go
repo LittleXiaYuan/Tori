@@ -40,6 +40,23 @@ func TestExperienceStore_ToolMemory_AllTools(t *testing.T) {
 	}
 }
 
+func TestExperienceStore_ToolMemory_DeduplicatesRepeatedLessons(t *testing.T) {
+	es := NewExperienceStore("test", ExperienceConfig{StoreDir: t.TempDir()})
+	es.AddToolMemory(ToolExperience{Tool: "search", Context: "large query", Learned: "Paginate results", Confidence: 0.7, SuccessRate: 0.6})
+	es.AddToolMemory(ToolExperience{Tool: "search", Context: "large query", Learned: "Paginate results", Confidence: 0.9, SuccessRate: 0.8, Result: "success", VerifiedBy: "review"})
+
+	memories := es.ToolMemory("search")
+	if len(memories) != 1 {
+		t.Fatalf("memories = %d, want 1", len(memories))
+	}
+	if memories[0].UsedCount != 2 {
+		t.Fatalf("used_count = %d, want 2", memories[0].UsedCount)
+	}
+	if memories[0].Confidence != 0.9 || memories[0].SuccessRate != 0.8 || memories[0].Result != "success" || memories[0].VerifiedBy != "review" {
+		t.Fatalf("merged memory did not preserve stronger metadata: %+v", memories[0])
+	}
+}
+
 func TestExperienceStore_Patterns(t *testing.T) {
 	es := NewExperienceStore("test", ExperienceConfig{
 		StoreDir:      t.TempDir(),
@@ -94,6 +111,20 @@ func TestExperienceStore_DomainFacts(t *testing.T) {
 	facts := es.DomainFacts()
 	if len(facts) > 3 {
 		t.Errorf("facts = %d, should be capped at 3", len(facts))
+	}
+}
+
+func TestExperienceStore_DomainFacts_DeduplicatesRepeatedFacts(t *testing.T) {
+	es := NewExperienceStore("test", ExperienceConfig{StoreDir: t.TempDir()})
+	es.AddFact(DomainFact{Fact: "云雀使用 Cogni 声明智体", Source: "chat"})
+	es.AddFact(DomainFact{Fact: "云雀使用 Cogni 声明智体", Source: "chat"})
+
+	facts := es.DomainFacts()
+	if len(facts) != 1 {
+		t.Fatalf("facts = %d, want 1", len(facts))
+	}
+	if facts[0].UsedCount != 2 {
+		t.Fatalf("used_count = %d, want 2", facts[0].UsedCount)
 	}
 }
 
