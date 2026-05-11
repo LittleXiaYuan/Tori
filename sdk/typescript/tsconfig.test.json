@@ -43,6 +43,7 @@
     "src/federation.ts",
     "src/system.ts",
     "src/settings.ts",
+    "src/tori.ts",
     "src/**/*.test.ts"
   ]
 }

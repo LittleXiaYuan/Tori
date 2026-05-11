@@ -114,6 +114,10 @@
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts"
+    },
+    "./tori": {
+      "types": "./src/tori.ts",
+      "import": "./src/tori.ts"
     }
   },
   "files": [
