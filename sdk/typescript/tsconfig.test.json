@@ -61,6 +61,7 @@
     "src/plugins.ts",
     "src/connectors.ts",
     "src/notify.ts",
+    "src/projects.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",

@@ -98,6 +98,7 @@ import { createSkillHubClient } from "yunque-client/skillhub";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createNotifyClient } from "yunque-client/notify";
+import { createProjectsClient } from "yunque-client/projects";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -205,6 +206,13 @@ const notify = createNotifyClient({
   apiKey: "<your-api-key>",
 });
 await notify.share({ channel_id: "feishu-main", message: "任务已完成", session_id: "demo-session" });
+
+const projects = createProjectsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const projectList = await projects.list();
+console.log(projectList.projects.length);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -558,7 +566,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`connectors`/`notify`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`connectors`/`notify`/`projects`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -630,6 +638,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
+| `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |

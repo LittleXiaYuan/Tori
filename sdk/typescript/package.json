@@ -187,6 +187,10 @@
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
     },
+    "./projects": {
+      "types": "./src/projects.ts",
+      "import": "./src/projects.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
