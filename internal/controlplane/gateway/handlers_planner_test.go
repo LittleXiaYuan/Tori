@@ -462,7 +462,7 @@ func TestPlannerCheckpointRecoverBuildsBackendPrompt(t *testing.T) {
 		t.Fatalf("save checkpoint: %v", err)
 	}
 
-	req := authedRequest(http.MethodPost, "/v1/planner/checkpoints/recover", `{"plan_id":"plan-recover","action":"retry_failed"}`, tenant.APIKey)
+	req := authedRequest(http.MethodPost, "/v1/planner/checkpoints/recover", `{"plan_id":"plan-recover","action":" 重试失败 "}`, tenant.APIKey)
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 
