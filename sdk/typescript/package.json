@@ -166,6 +166,10 @@
     "./tools": {
       "types": "./src/tools.ts",
       "import": "./src/tools.ts"
+    },
+    "./sandbox": {
+      "types": "./src/sandbox.ts",
+      "import": "./src/sandbox.ts"
     }
   },
   "files": [
