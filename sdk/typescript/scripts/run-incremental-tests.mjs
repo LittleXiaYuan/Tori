@@ -48,6 +48,8 @@ const sources = [
   "src/trust.test.ts",
   "src/audit.ts",
   "src/audit.test.ts",
+  "src/heartbeat.ts",
+  "src/heartbeat.test.ts",
 ];
 
 const compile = spawnSync(
@@ -98,6 +100,7 @@ for (const testName of [
   "iterate.test",
   "trust.test",
   "audit.test",
+  "heartbeat.test",
 ]) {
   const compiledTestPath = join(outDir, `${testName}.js`);
   let compiledTest = readFileSync(compiledTestPath, "utf8");
@@ -122,7 +125,8 @@ for (const testName of [
     .replace('from "./lora"', 'from "./lora.js"')
     .replace('from "./iterate"', 'from "./iterate.js"')
     .replace('from "./trust"', 'from "./trust.js"')
-    .replace('from "./audit"', 'from "./audit.js"');
+    .replace('from "./audit"', 'from "./audit.js"')
+    .replace('from "./heartbeat"', 'from "./heartbeat.js"');
   writeFileSync(compiledTestPath, compiledTest);
 
   const run = spawnSync(process.execPath, [compiledTestPath], { stdio: "inherit" });
