@@ -60,6 +60,7 @@ import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createProvidersClient } from "yunque-client/providers";
+import { createSetupClient } from "yunque-client/setup";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -133,13 +134,31 @@ await providers.registerProvider({
 });
 await providers.testProvider("deepseek-deepseek-chat");
 await providers.setExecProvider("deepseek-deepseek-chat");
+
+const setup = createSetupClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const templates = await setup.templates();
+await setup.testProvider({
+  base_url: "https://api.deepseek.com/v1",
+  api_key: "<provider-key>",
+  model: "deepseek-chat",
+});
+await setup.apply({
+  template_id: templates.templates[0]?.id ?? "hybrid",
+  base_url: "https://api.deepseek.com/v1",
+  api_key: "<provider-key>",
+  model: "deepseek-chat",
+});
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
-`providers` without importing the generated 500KB+ SDK/types bundle. Add future
-slices in the same style when those surfaces need stable, lightweight
-integration APIs.
+`providers`/`setup` without importing the generated 500KB+ SDK/types bundle.
+Add future slices in the same style when those surfaces need stable,
+lightweight integration APIs.
 
 ## Regenerating
 
@@ -171,6 +190,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
+| `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
