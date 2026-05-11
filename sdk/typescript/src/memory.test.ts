@@ -100,6 +100,19 @@ test("MemoryClient throws MemoryClientError with parsed body", async () => {
     assertDeepEqual(error.body, { error: "value is required" });
     assertEqual(error.message, "value is required");
   }
+
+  const nestedClient = createMemoryClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "memory query is required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.search({ query: "" });
+    throw new Error("expected nested search to reject");
+  } catch (error) {
+    assert(error instanceof MemoryClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "memory query is required");
+  }
 });
 
 let failures = 0;
