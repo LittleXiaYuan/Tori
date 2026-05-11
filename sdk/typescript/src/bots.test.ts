@@ -39,6 +39,8 @@ test("BotsClient reads channel groups and marks all inbox read", async () => {
 test("BotsClient throws BotsClientError with parsed and text bodies", async () => {
   const jsonClient = createBotsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "bot not found" }, { status: 404 }) });
   try { await jsonClient.get("missing"); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof BotsClientError); assertEqual(error.status, 404); assertDeepEqual(error.body, { error: "bot not found" }); assertEqual(error.message, "bot not found"); }
+  const nestedClient = createBotsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "bot id is required" } }, { status: 400 }) });
+  try { await nestedClient.get(""); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof BotsClientError); assertEqual(error.status, 400); assertEqual(error.message, "bot id is required"); }
   const textClient = createBotsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET or POST", { status: 405 }) });
   try { await textClient.list(); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof BotsClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET or POST"); assertEqual(error.message, "GET or POST"); }
 });

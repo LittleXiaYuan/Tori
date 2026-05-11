@@ -32,6 +32,8 @@ test("SubagentsClient appends messages and destroys subagents", async () => {
 test("SubagentsClient throws SubagentsClientError with parsed and text bodies", async () => {
   const jsonClient = createSubagentsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "subagent not found" }, { status: 400 }) });
   try { await jsonClient.get("missing"); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof SubagentsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "subagent not found" }); assertEqual(error.message, "subagent not found"); }
+  const nestedClient = createSubagentsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "subagent id is required" } }, { status: 400 }) });
+  try { await nestedClient.get(""); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof SubagentsClientError); assertEqual(error.status, 400); assertEqual(error.message, "subagent id is required"); }
   const textClient = createSubagentsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST required", { status: 405 }) });
   try { await textClient.appendMessages("sa-1", []); throw new Error("expected appendMessages to reject"); } catch (error) { assert(error instanceof SubagentsClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST required"); assertEqual(error.message, "POST required"); }
 });
