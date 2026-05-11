@@ -49,6 +49,7 @@
     "src/task-context.ts",
     "src/knowledge.ts",
     "src/knowledge-search.ts",
+    "src/knowledge-ingest.ts",
     "src/providers.ts",
     "src/breaker.ts",
     "src/models.ts",
