@@ -94,6 +94,7 @@ type plannerCheckpointResumePlanJob struct {
 	ID            string                                `json:"id"`
 	Status        string                                `json:"status"`
 	Action        string                                `json:"action"`
+	TenantID      string                                `json:"tenant_id,omitempty"`
 	PlanID        string                                `json:"plan_id"`
 	TaskID        string                                `json:"task_id,omitempty"`
 	Error         string                                `json:"error,omitempty"`
@@ -442,8 +443,8 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 		return
 	}
 	if req.Async {
-		job, reused := g.reservePlannerResumeJob(cp.PlanID, cp.TaskID, req.Action)
 		tenantID := tenantFromCtx(r.Context())
+		job, reused := g.reservePlannerResumeJob(cp.PlanID, cp.TaskID, tenantID, req.Action)
 		if !reused {
 			safego.Go("planner-resume-plan-"+job.ID, func() {
 				defer func() {
@@ -529,13 +530,17 @@ func (g *Gateway) handlePlannerCheckpointResumePlanJob(w http.ResponseWriter, r 
 		return
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		id = strings.TrimSpace(r.URL.Query().Get("job_id"))
+	}
 	planID := strings.TrimSpace(r.URL.Query().Get("plan_id"))
+	tenantID := tenantFromCtx(r.Context())
 	var job plannerCheckpointResumePlanJob
 	var ok bool
 	if id != "" {
-		job, ok = g.getPlannerResumeJob(id)
+		job, ok = g.getPlannerResumeJob(id, tenantID)
 	} else if planID != "" {
-		job, ok = g.getLatestPlannerResumeJobForPlan(planID)
+		job, ok = g.getLatestPlannerResumeJobForPlan(planID, tenantID)
 	} else {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "id or plan_id required")
 		return
@@ -583,7 +588,7 @@ func (g *Gateway) handlePlannerExecutionState(w http.ResponseWriter, r *http.Req
 		action = normalizeCheckpointAction(rawAction)
 	}
 	var latestJob *plannerCheckpointResumePlanJob
-	if job, ok := g.getLatestPlannerResumeJobForPlan(planID); ok {
+	if job, ok := g.getLatestPlannerResumeJobForPlan(planID, tenantFromCtx(r.Context())); ok {
 		job = sanitizePlannerResumeJobForExecutionState(job)
 		latestJob = &job
 		if action == "" {
@@ -1078,6 +1083,7 @@ func plannerCheckpointFailureBucket(raw string) string {
 }
 
 func sanitizePlannerResumeJobForResponse(job plannerCheckpointResumePlanJob) plannerCheckpointResumePlanJob {
+	job.TenantID = ""
 	job.Error = plannerCheckpointDisplayError(job.Error)
 	job.FriendlyError = plannerCheckpointDisplayError(job.FriendlyError)
 	if job.Result != nil {
@@ -1130,8 +1136,9 @@ func (g *Gateway) savePlannerResumeJob(job plannerCheckpointResumePlanJob) {
 	}
 }
 
-func (g *Gateway) reservePlannerResumeJob(planID, taskID, action string) (plannerCheckpointResumePlanJob, bool) {
+func (g *Gateway) reservePlannerResumeJob(planID, taskID, tenantID, action string) (plannerCheckpointResumePlanJob, bool) {
 	planID = strings.TrimSpace(planID)
+	tenantID = strings.TrimSpace(tenantID)
 	action = normalizeCheckpointAction(action)
 	if err := g.loadPlannerResumeJobs(); err != nil {
 		slog.Warn("planner resume job store reload failed", "err", err)
@@ -1141,6 +1148,7 @@ func (g *Gateway) reservePlannerResumeJob(planID, taskID, action string) (planne
 		ID:        fmt.Sprintf("resume-plan-%d", now.UnixNano()),
 		Status:    "running",
 		Action:    action,
+		TenantID:  tenantID,
 		PlanID:    planID,
 		TaskID:    strings.TrimSpace(taskID),
 		StartedAt: now.Format(time.RFC3339),
@@ -1150,7 +1158,7 @@ func (g *Gateway) reservePlannerResumeJob(planID, taskID, action string) (planne
 		g.plannerResumeJobs = make(map[string]plannerCheckpointResumePlanJob)
 	}
 	for _, existing := range g.plannerResumeJobs {
-		if existing.PlanID == planID && normalizeCheckpointAction(existing.Action) == action && existing.Status == "running" {
+		if plannerResumeJobTenantMatches(existing, tenantID) && existing.PlanID == planID && normalizeCheckpointAction(existing.Action) == action && existing.Status == "running" {
 			g.plannerResumeJobsMu.Unlock()
 			return existing, true
 		}
@@ -1166,12 +1174,13 @@ func (g *Gateway) reservePlannerResumeJob(planID, taskID, action string) (planne
 	return job, false
 }
 
-func (g *Gateway) getPlannerResumeJob(id string) (plannerCheckpointResumePlanJob, bool) {
+func (g *Gateway) getPlannerResumeJob(id, tenantID string) (plannerCheckpointResumePlanJob, bool) {
+	tenantID = strings.TrimSpace(tenantID)
 	g.plannerResumeJobsMu.Lock()
 	if g.plannerResumeJobs != nil {
 		job, ok := g.plannerResumeJobs[id]
 		g.plannerResumeJobsMu.Unlock()
-		return job, ok
+		return job, ok && plannerResumeJobTenantMatches(job, tenantID)
 	}
 	g.plannerResumeJobsMu.Unlock()
 	if err := g.loadPlannerResumeJobs(); err != nil {
@@ -1183,11 +1192,12 @@ func (g *Gateway) getPlannerResumeJob(id string) (plannerCheckpointResumePlanJob
 		return plannerCheckpointResumePlanJob{}, false
 	}
 	job, ok := g.plannerResumeJobs[id]
-	return job, ok
+	return job, ok && plannerResumeJobTenantMatches(job, tenantID)
 }
 
-func (g *Gateway) getLatestPlannerResumeJobForPlan(planID string) (plannerCheckpointResumePlanJob, bool) {
+func (g *Gateway) getLatestPlannerResumeJobForPlan(planID, tenantID string) (plannerCheckpointResumePlanJob, bool) {
 	planID = strings.TrimSpace(planID)
+	tenantID = strings.TrimSpace(tenantID)
 	if planID == "" {
 		return plannerCheckpointResumePlanJob{}, false
 	}
@@ -1199,7 +1209,7 @@ func (g *Gateway) getLatestPlannerResumeJobForPlan(planID string) (plannerCheckp
 	var latest plannerCheckpointResumePlanJob
 	ok := false
 	for _, job := range g.plannerResumeJobs {
-		if job.PlanID != planID {
+		if job.PlanID != planID || !plannerResumeJobTenantMatches(job, tenantID) {
 			continue
 		}
 		if !ok || job.StartedAt > latest.StartedAt || (job.StartedAt == latest.StartedAt && job.ID > latest.ID) {
@@ -1208,6 +1218,10 @@ func (g *Gateway) getLatestPlannerResumeJobForPlan(planID string) (plannerCheckp
 		}
 	}
 	return latest, ok
+}
+
+func plannerResumeJobTenantMatches(job plannerCheckpointResumePlanJob, tenantID string) bool {
+	return strings.TrimSpace(job.TenantID) == strings.TrimSpace(tenantID)
 }
 
 func (g *Gateway) loadPlannerResumeJobs() error {
