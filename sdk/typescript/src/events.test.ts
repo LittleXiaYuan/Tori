@@ -98,6 +98,16 @@ async function testEventsClientThrowsParsedAndTextErrors() {
     assertEqual(err.message, "SSE not available");
   });
 
+  const nestedClient = createEventsClient({
+    baseUrl: "https://agent.test",
+    fetch: async () => new Response(JSON.stringify({ error: { code: "BAD_REQUEST", message: "event stream tenant is required" } }), { status: 400 }),
+  });
+  await assertRejects(() => collect(nestedClient.stream()), (err: unknown) => {
+    assert(err instanceof EventsClientError);
+    assertEqual(err.status, 400);
+    assertEqual(err.message, "event stream tenant is required");
+  });
+
   const textClient = createEventsClient({
     baseUrl: "https://agent.test",
     fetch: async () => new Response("streaming not supported", { status: 500 }),

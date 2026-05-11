@@ -46,6 +46,8 @@ test("ReverieClient deletes thoughts and reads actions and targets", async () =>
 test("ReverieClient throws ReverieClientError with parsed and text bodies", async () => {
   const jsonClient = createReverieClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "reverie not initialized" }, { status: 404 }) });
   try { await jsonClient.stats(); throw new Error("expected stats to reject"); } catch (error) { assert(error instanceof ReverieClientError); assertEqual(error.status, 404); assertDeepEqual(error.body, { error: "reverie not initialized" }); assertEqual(error.message, "reverie not initialized"); }
+  const nestedClient = createReverieClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "reverie thought id is required" } }, { status: 400 }) });
+  try { await nestedClient.deleteThought(""); throw new Error("expected deleteThought to reject"); } catch (error) { assert(error instanceof ReverieClientError); assertEqual(error.status, 400); assertEqual(error.message, "reverie thought id is required"); }
   const textClient = createReverieClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.think(); throw new Error("expected think to reject"); } catch (error) { assert(error instanceof ReverieClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });

@@ -119,6 +119,20 @@ test("HeartbeatClient throws HeartbeatClientError with parsed and text bodies", 
     assertEqual(error.message, "heartbeat not configured");
   }
 
+  const nestedClient = createHeartbeatClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "heartbeat interval is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.update({ interval_minutes: 0 });
+    throw new Error("expected update to reject");
+  } catch (error) {
+    assert(error instanceof HeartbeatClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "heartbeat interval is required");
+  }
+
   const textClient = createHeartbeatClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("POST only", { status: 405 }),

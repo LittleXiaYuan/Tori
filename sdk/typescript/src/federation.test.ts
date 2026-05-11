@@ -47,6 +47,8 @@ test("FederationClient reads bridge stats and broadcasts capabilities", async ()
 test("FederationClient throws FederationClientError with parsed and text bodies", async () => {
   const jsonClient = createFederationClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "federation bridge not configured" }, { status: 500 }) });
   try { await jsonClient.capabilities(); throw new Error("expected capabilities to reject"); } catch (error) { assert(error instanceof FederationClientError); assertEqual(error.status, 500); assertDeepEqual(error.body, { error: "federation bridge not configured" }); assertEqual(error.message, "federation bridge not configured"); }
+  const nestedClient = createFederationClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "federation feature is required" } }, { status: 400 }) });
+  try { await nestedClient.discover({ feature: "" }); throw new Error("expected discover to reject"); } catch (error) { assert(error instanceof FederationClientError); assertEqual(error.status, 400); assertEqual(error.message, "federation feature is required"); }
   const textClient = createFederationClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.discover({ feature: "browser" }); throw new Error("expected discover to reject"); } catch (error) { assert(error instanceof FederationClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });
