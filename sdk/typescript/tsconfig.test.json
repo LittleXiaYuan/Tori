@@ -18,6 +18,7 @@
     "src/memory.ts",
     "src/tasks.ts",
     "src/knowledge.ts",
+    "src/providers.ts",
     "src/**/*.test.ts"
   ]
 }
