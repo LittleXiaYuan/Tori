@@ -169,7 +169,7 @@ func (s *ExperienceStore) CompileStrategiesForQuery(query string, limit int) str
 	experiences := make([]Experience, 0, len(s.data))
 	for i := len(s.data) - 1; i >= 0; i-- {
 		e := s.data[i]
-		if experienceMatchesQuery(e, q) {
+		if MatchesQuery(e, q) {
 			experiences = append(experiences, e)
 		}
 	}
@@ -279,7 +279,12 @@ func containsAny(tags []string, q string) bool {
 	return false
 }
 
-func experienceMatchesQuery(e Experience, q string) bool {
+// MatchesQuery reports whether an experience is relevant to a natural-language query.
+func MatchesQuery(e Experience, query string) bool {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return true
+	}
 	haystack := strings.ToLower(e.Lesson + "\n" + e.Context + "\n" + strings.Join(e.Tags, "\n"))
 	if strings.Contains(haystack, q) {
 		return true

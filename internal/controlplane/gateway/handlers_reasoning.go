@@ -7,7 +7,6 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"yunque-agent/internal/agentcore/state"
@@ -441,23 +440,13 @@ func reflectExperienceHasTag(e reflectpkg.Experience, tag string) bool {
 }
 
 func queryReflectExperiences(experiences []reflectpkg.Experience, query string) []reflectpkg.Experience {
-	q := strings.ToLower(query)
 	filtered := make([]reflectpkg.Experience, 0, len(experiences))
 	for _, e := range experiences {
-		if strings.Contains(strings.ToLower(e.Lesson), q) || strings.Contains(strings.ToLower(e.Context), q) || reflectExperienceTagsContain(e, q) {
+		if reflectpkg.MatchesQuery(e, query) {
 			filtered = append(filtered, e)
 		}
 	}
 	return filtered
-}
-
-func reflectExperienceTagsContain(e reflectpkg.Experience, query string) bool {
-	for _, tag := range e.Tags {
-		if strings.Contains(strings.ToLower(tag), query) {
-			return true
-		}
-	}
-	return false
 }
 
 func limitReflectExperiences(experiences []reflectpkg.Experience, limit int) []reflectpkg.Experience {

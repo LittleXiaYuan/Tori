@@ -99,6 +99,44 @@ func TestHandleExperiencesSearchFiltersBeforeLimit(t *testing.T) {
 	}
 }
 
+func TestHandleExperiencesSearchMatchesNaturalQueryTokens(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{
+		ID:       "code-review",
+		Source:   "task",
+		Category: "strategy",
+		Outcome:  "success",
+		Lesson:   "code review should run tests before summarizing risk",
+	})
+	store.Add(reflectpkg.Experience{
+		ID:       "web-search",
+		Source:   "task",
+		Category: "strategy",
+		Outcome:  "success",
+		Lesson:   "web search should cite sources before summarizing news",
+	})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?q=%E8%AF%B7%E5%81%9A+code+review&limit=1", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Experiences []reflectpkg.Experience `json:"experiences"`
+		Total       int                     `json:"total"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 || len(body.Experiences) != 1 || body.Experiences[0].ID != "code-review" {
+		t.Fatalf("natural query should match tokenized experience, body=%s", rec.Body.String())
+	}
+}
+
 func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
 	store.Add(reflectpkg.Experience{ID: "old-task", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "older task lesson"})
