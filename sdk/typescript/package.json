@@ -35,6 +35,10 @@
       "types": "./src/discovery.ts",
       "import": "./src/discovery.ts"
     },
+    "./interactions": {
+      "types": "./src/interactions.ts",
+      "import": "./src/interactions.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"

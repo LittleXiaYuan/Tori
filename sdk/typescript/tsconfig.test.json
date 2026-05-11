@@ -23,6 +23,7 @@
     "src/subagents.ts",
     "src/bots.ts",
     "src/discovery.ts",
+    "src/interactions.ts",
     "src/memory.ts",
     "src/tasks.ts",
     "src/task-context.ts",
