@@ -107,6 +107,10 @@
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"
     },
+    "./memory-search": {
+      "types": "./src/memory-search.ts",
+      "import": "./src/memory-search.ts"
+    },
     "./tasks": {
       "types": "./src/tasks.ts",
       "import": "./src/tasks.ts"
