@@ -79,6 +79,7 @@
     "src/state.ts",
     "src/triggers.ts",
     "src/missions.ts",
+    "src/reflect.ts",
     "src/tools.ts",
     "src/sandbox.ts",
     "src/**/*.test.ts"
