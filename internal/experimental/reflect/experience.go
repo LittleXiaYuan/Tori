@@ -144,10 +144,10 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 		return ""
 	}
 
-	var avoids, uses []string
+	var avoids, improvements, uses []string
 	seen := make(map[string]bool)
 
-	for i := len(s.data) - 1; i >= 0 && (len(avoids)+len(uses)) < limit; i-- {
+	for i := len(s.data) - 1; i >= 0 && (len(avoids)+len(improvements)+len(uses)) < limit; i-- {
 		e := s.data[i]
 		lesson := strings.TrimSpace(e.Lesson)
 		if len(lesson) < 20 {
@@ -169,10 +169,12 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 			avoids = append(avoids, fmt.Sprintf("- 避免: %s", lesson))
 		case "success":
 			uses = append(uses, fmt.Sprintf("- 推荐: %s", lesson))
+		case "partial":
+			improvements = append(improvements, fmt.Sprintf("- 改进: %s", lesson))
 		}
 	}
 
-	if len(avoids) == 0 && len(uses) == 0 {
+	if len(avoids) == 0 && len(improvements) == 0 && len(uses) == 0 {
 		return ""
 	}
 
@@ -180,6 +182,9 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 	// Show "do"s before "don't"s — positive guidance first
 	if len(uses) > 0 {
 		parts = append(parts, strings.Join(uses, "\n"))
+	}
+	if len(improvements) > 0 {
+		parts = append(parts, strings.Join(improvements, "\n"))
 	}
 	if len(avoids) > 0 {
 		parts = append(parts, strings.Join(avoids, "\n"))
