@@ -46,6 +46,10 @@
     "./approvals": {
       "types": "./src/approvals.ts",
       "import": "./src/approvals.ts"
+    },
+    "./trace": {
+      "types": "./src/trace.ts",
+      "import": "./src/trace.ts"
     }
   },
   "files": [

@@ -22,6 +22,7 @@
     "src/setup.ts",
     "src/documents.ts",
     "src/approvals.ts",
+    "src/trace.ts",
     "src/**/*.test.ts"
   ]
 }
