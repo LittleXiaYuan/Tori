@@ -120,6 +120,14 @@ function resumePlanJobHint(job?: Pick<PlannerCheckpointResumePlanJob, "status" |
   return "现场已保留，可进入详情页查看完整过程。";
 }
 
+function resumePlanJobEventSummaries(job?: Pick<PlannerCheckpointResumePlanJob, "events"> | null): string[] {
+  const events = job?.events || [];
+  return events
+    .slice(-2)
+    .map((event) => checkpointErrorLabel(event.summary || event.type || "续跑现场已更新。"))
+    .filter(Boolean);
+}
+
 function checkpointErrorLabel(error?: string): string {
   if (!error) return "";
   return formatErrorMessage(error, "任务暂时没有顺利完成，已保留现场。");
@@ -458,6 +466,11 @@ export function PlannerRecoveryShelf({
                 {resumePlanJobStatusLabel(resumePlanJob.status)}
               </span>
               {resumePlanJobHint(resumePlanJob) && <span style={{ color: "var(--yunque-text-muted)" }}>{resumePlanJobHint(resumePlanJob)}</span>}
+              {resumePlanJobEventSummaries(resumePlanJob).map((summary, index) => (
+                <span key={`${resumePlanJob.id}:event:${index}`} className="basis-full truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                  最近事件：{summary}
+                </span>
+              ))}
               <button
                 type="button"
                 disabled={disabled || refreshingResumePlanJob}

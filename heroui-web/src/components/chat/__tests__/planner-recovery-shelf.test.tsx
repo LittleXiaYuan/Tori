@@ -321,6 +321,7 @@ describe("PlannerRecoveryShelf", () => {
       expect(getResumePlanJob).toHaveBeenCalledWith({ planId: "plan-restore-1" });
       expect(screen.getByText("已读取最近续跑 resume-plan-latest-1：续跑中")).toBeInTheDocument();
       expect(screen.getByText("现场仍在更新，已记录 1 条事件。")).toBeInTheDocument();
+      expect(screen.getByText("最近事件：正在续跑")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /查看续跑/ })).toHaveAttribute("href", "/planner-checkpoint?plan_id=plan-restore-1&job_id=resume-plan-latest-1");
       expect(onSend).not.toHaveBeenCalled();
     });
@@ -353,6 +354,7 @@ describe("PlannerRecoveryShelf", () => {
           ],
         },
         events: [
+          { id: "evt-raw", type: "step", summary: "handoff agent execution failed: context deadline exceeded", timestamp: "2026-05-11T02:00:30Z" },
           { id: "evt-1", type: "step", summary: "步骤已完成", timestamp: "2026-05-11T02:01:00Z" },
         ],
         started_at: "2026-05-11T02:00:00Z",
@@ -371,6 +373,10 @@ describe("PlannerRecoveryShelf", () => {
         expect(getResumePlanJob).toHaveBeenCalledWith("resume-plan-chat-1");
         expect(screen.getByText(/原规划续跑 resume-plan-chat-1：已完成/)).toBeInTheDocument();
         expect(screen.getAllByText(/原规划续跑已完成，完成 3\/3。/).length).toBeGreaterThan(0);
+        expect(screen.getByText("最近事件：响应暂时超时，已保留现场，可稍后重试或继续。")).toBeInTheDocument();
+        expect(screen.getByText("最近事件：步骤已完成")).toBeInTheDocument();
+        expect(screen.queryByText(/handoff agent/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/context deadline exceeded/i)).not.toBeInTheDocument();
       });
     });
   });
