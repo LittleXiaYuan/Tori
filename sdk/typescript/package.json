@@ -62,6 +62,10 @@
     "./modes": {
       "types": "./src/modes.ts",
       "import": "./src/modes.ts"
+    },
+    "./ide": {
+      "types": "./src/ide.ts",
+      "import": "./src/ide.ts"
     }
   },
   "files": [
