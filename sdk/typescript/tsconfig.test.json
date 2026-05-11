@@ -27,6 +27,7 @@
     "src/runtime.ts",
     "src/modes.ts",
     "src/ide.ts",
+    "src/persona.ts",
     "src/**/*.test.ts"
   ]
 }

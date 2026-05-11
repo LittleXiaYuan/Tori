@@ -66,6 +66,10 @@
     "./ide": {
       "types": "./src/ide.ts",
       "import": "./src/ide.ts"
+    },
+    "./persona": {
+      "types": "./src/persona.ts",
+      "import": "./src/persona.ts"
     }
   },
   "files": [
