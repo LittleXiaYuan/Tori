@@ -140,6 +140,21 @@ test("PersonaClient throws PersonaClientError with parsed and text bodies", asyn
     assertEqual(error.message, "id required");
   }
 
+
+  const nestedClient = createPersonaClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "persona preset id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.switchPreset({ id: "" });
+    throw new Error("expected switchPreset to reject");
+  } catch (error) {
+    assert(error instanceof PersonaClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "persona preset id is required");
+  }
+
   const textClient = createPersonaClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("method not allowed", { status: 405 }),

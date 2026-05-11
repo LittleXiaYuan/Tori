@@ -137,6 +137,21 @@ test("CostClient throws CostClientError with parsed and text bodies", async () =
     assertEqual(error.message, "id is required");
   }
 
+
+  const nestedClient = createCostClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "cost task id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.task("");
+    throw new Error("expected task to reject");
+  } catch (error) {
+    assert(error instanceof CostClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "cost task id is required");
+  }
+
   const textClient = createCostClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("POST required", { status: 405 }),

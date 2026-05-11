@@ -129,6 +129,21 @@ test("TrustClient throws TrustClientError with parsed and text bodies", async ()
     assertEqual(error.message, "slug is required");
   }
 
+
+  const nestedClient = createTrustClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "trust skill slug is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.reset({ slug: "" });
+    throw new Error("expected reset to reject");
+  } catch (error) {
+    assert(error instanceof TrustClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "trust skill slug is required");
+  }
+
   const textClient = createTrustClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("POST required", { status: 405 }),

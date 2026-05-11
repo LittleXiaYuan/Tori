@@ -144,6 +144,21 @@ test("WorkflowClient throws WorkflowClientError with parsed and text bodies", as
     assertEqual(error.message, "definition_id is required");
   }
 
+
+  const nestedClient = createWorkflowClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "workflow definition id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.run({ definition_id: "" });
+    throw new Error("expected run to reject");
+  } catch (error) {
+    assert(error instanceof WorkflowClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "workflow definition id is required");
+  }
+
   const textClient = createWorkflowClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("workflow engine not available", { status: 404 }),
