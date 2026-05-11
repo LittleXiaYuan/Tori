@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -166,12 +167,24 @@ func (s *ExperienceStore) CompileStrategiesForQuery(query string, limit int) str
 	}
 
 	q := strings.ToLower(query)
-	experiences := make([]Experience, 0, len(s.data))
+	type scoredExperience struct {
+		experience Experience
+		score      int
+	}
+	scored := make([]scoredExperience, 0, len(s.data))
 	for i := len(s.data) - 1; i >= 0; i-- {
 		e := s.data[i]
-		if MatchesQuery(e, q) {
-			experiences = append(experiences, e)
+		if score := MatchQueryScore(e, q); score > 0 {
+			scored = append(scored, scoredExperience{experience: e, score: score})
 		}
+	}
+	sort.SliceStable(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
+
+	experiences := make([]Experience, 0, len(scored))
+	for _, item := range scored {
+		experiences = append(experiences, item.experience)
 	}
 	return CompileStrategiesFrom(experiences, limit)
 }
