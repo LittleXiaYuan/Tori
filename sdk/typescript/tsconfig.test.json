@@ -52,6 +52,7 @@
     "src/plugins.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
+    "src/state.ts",
     "src/**/*.test.ts"
   ]
 }

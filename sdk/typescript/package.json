@@ -150,6 +150,10 @@
     "./plugin-api": {
       "types": "./src/plugin-api.ts",
       "import": "./src/plugin-api.ts"
+    },
+    "./state": {
+      "types": "./src/state.ts",
+      "import": "./src/state.ts"
     }
   },
   "files": [

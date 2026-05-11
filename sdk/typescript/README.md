@@ -89,6 +89,7 @@ import { createSkillHubClient } from "yunque-client/skillhub";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
+import { createStateClient } from "yunque-client/state";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -414,13 +415,20 @@ const pluginReply = await pluginApi.llm({
   messages: [{ role: "user", content: "Summarize current task" }],
 });
 console.log(pluginReply.reply);
+
+const state = createStateClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const focus = await state.focus();
+console.log(focus.focus);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -483,6 +491,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
+| `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
