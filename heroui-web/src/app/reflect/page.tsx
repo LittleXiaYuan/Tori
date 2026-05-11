@@ -22,6 +22,7 @@ export default function ReflectPage() {
   const [source, setSource] = useState("");
   const [category, setCategory] = useState("");
   const [outcome, setOutcome] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [search, setSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const debouncedSearch = (val: string) => {
@@ -34,7 +35,7 @@ export default function ReflectPage() {
     async () => {
       const [statsRes, listRes, stratRes] = await Promise.all([
         api.getExperiences({ stats: true }),
-        api.getExperiences({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, q: search || undefined, limit: EXPERIENCE_LIST_LIMIT }),
+        api.getExperiences({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, tag: tagFilter || undefined, q: search || undefined, limit: EXPERIENCE_LIST_LIMIT }),
         api.getStrategies({ limit: STRATEGY_LIMIT }),
       ]);
       const stats = ("total" in statsRes && "by_source" in statsRes) ? statsRes as ExperienceStats : null;
@@ -43,7 +44,7 @@ export default function ReflectPage() {
       return { stats, experiences, strategies };
     },
     { stats: null as ExperienceStats | null, experiences: [] as ExperienceItem[], strategies: "" },
-    [source, category, outcome, search],
+    [source, category, outcome, tagFilter, search],
   );
   const { experiences, stats, strategies } = data;
 
@@ -110,6 +111,11 @@ export default function ReflectPage() {
           <div className="relative flex-1 min-w-[200px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--yunque-text-muted)" }} />
             <Input type="text" value={search} onChange={(e) => debouncedSearch(e.target.value)} placeholder="搜索经验..."
+              className="w-full pl-8" />
+          </div>
+          <div className="relative flex-1 min-w-[180px]">
+            <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--yunque-text-muted)" }} />
+            <Input type="text" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} placeholder="按标签过滤，如 quality:9"
               className="w-full pl-8" />
           </div>
         </div>

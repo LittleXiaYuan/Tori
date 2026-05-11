@@ -521,11 +521,12 @@ export const api = {
     fetcher<{ status: string }>("/v1/state/focus", { method: "POST", body: JSON.stringify({ focus, topics }) }),
 
   // Reflection Loop 鈥?experiences and strategies
-  getExperiences: (opts?: { source?: string; category?: string; outcome?: ExperienceOutcome; q?: string; stats?: boolean; limit?: number }) => {
+  getExperiences: (opts?: { source?: string; category?: string; outcome?: ExperienceOutcome; tag?: string; q?: string; stats?: boolean; limit?: number }) => {
     const params = new URLSearchParams();
     if (opts?.source) params.set("source", opts.source);
     if (opts?.category) params.set("category", opts.category);
     if (opts?.outcome) params.set("outcome", opts.outcome);
+    if (opts?.tag) params.set("tag", opts.tag);
     if (opts?.q) params.set("q", opts.q);
     if (opts?.stats) params.set("stats", "true");
     if (opts?.limit && Number.isFinite(opts.limit) && opts.limit > 0) params.set("limit", String(Math.trunc(opts.limit)));

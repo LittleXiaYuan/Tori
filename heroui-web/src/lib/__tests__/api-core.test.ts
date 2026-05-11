@@ -176,10 +176,10 @@ describe("api/reflectExperience", () => {
       new Response(JSON.stringify({ experiences: [], total: 0 }), { status: 200 }),
     );
 
-    await api.getExperiences({ q: "code review", source: "task", outcome: "partial", limit: 5 });
+    await api.getExperiences({ q: "code review", source: "task", outcome: "partial", tag: "quality:9", limit: 5 });
 
     const [url] = spy.mock.calls[0];
-    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=partial&q=code+review&limit=5");
+    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=partial&tag=quality%3A9&q=code+review&limit=5");
   });
 
   it("omits the query suffix when experience filters are empty", async () => {
@@ -198,10 +198,10 @@ describe("api/reflectExperience", () => {
       new Response(JSON.stringify({ total: 1, by_outcome: { success: 1 } }), { status: 200 }),
     );
 
-    await api.getExperiences({ stats: true, source: "task", outcome: "success" });
+    await api.getExperiences({ stats: true, source: "task", outcome: "success", tag: "quality:9" });
 
     const [url] = spy.mock.calls[0];
-    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=success&stats=true");
+    expect(url).toBe("/v1/reflect/experiences?source=task&outcome=success&tag=quality%3A9&stats=true");
   });
 
   it("serializes strategy limit only when requested", async () => {
