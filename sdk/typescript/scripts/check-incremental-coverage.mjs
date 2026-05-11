@@ -46,6 +46,16 @@ for (const name of srcSlices) {
   if (/^\s*(?:import|export)\s+.*from\s+["']\.\/(?:client|sdk|types)\.gen["']/m.test(source)) {
     fail(`src/${name}.ts imports generated SDK internals instead of staying incremental`);
   }
+  if (/messageFrom(?:Error)?Body/.test(source)) {
+    const hasNestedErrorParser =
+      source.includes('key === "error"') ||
+      source.includes("messageFromErrorBody(value)") ||
+      source.includes("messageFromBody(value)");
+    const testSourcePath = join(srcDir, `${name}.test.ts`);
+    const testSource = existsSync(testSourcePath) ? readFileSync(testSourcePath, "utf8") : "";
+    if (!hasNestedErrorParser) fail(`src/${name}.ts error parser does not read nested error.message bodies`);
+    if (!testSource.includes("nested")) fail(`src/${name}.test.ts missing nested gateway error coverage`);
+  }
   if (lineCount > maxSliceLines) fail(`src/${name}.ts has ${lineCount} lines, exceeds incremental slice budget ${maxSliceLines}`);
   if (byteCount > maxSliceBytes) fail(`src/${name}.ts has ${byteCount} bytes, exceeds incremental slice budget ${maxSliceBytes}`);
 }
