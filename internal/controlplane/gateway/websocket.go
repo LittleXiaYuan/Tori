@@ -173,6 +173,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var routedTier string
+	var routedModelID string
 	switch thinkingLevel {
 	case "deep":
 		routedTier = "expert"
@@ -187,6 +188,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 			routedTier = tier.String()
 			traceSpan.Attrs["router_tier"] = routedTier
 			if routedModel != nil {
+				routedModelID = routedModel.ModelID
 				traceSpan.Attrs["router_model"] = routedModel.ModelID
 			}
 		}
@@ -270,6 +272,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("planner error (stream)", "err", err, "tenant", tid)
+		g.recordRouterOutcome(routedTier, routedModelID, start, err, "", traceSpan)
 		errorData, _ := json.Marshal(map[string]string{
 			"code":    string(apperror.CodeLLMError),
 			"message": friendlyChatPipelineError(err),
@@ -281,6 +284,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reply := result.Reply
+	g.recordRouterOutcome(routedTier, routedModelID, start, nil, reply, traceSpan)
 
 	// Stream the final reply text as delta events for smooth UI rendering
 	replyChunks := chunkText(reply, 20)

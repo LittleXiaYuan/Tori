@@ -164,7 +164,7 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 	}
 
 	// ── 7. Model routing ──
-	routedTier, _ := g.resolveThinkingLevel(ctx, req.ThinkingLevel, msgs, traceSpan)
+	routedTier, routedModelID := g.resolveThinkingLevel(ctx, req.ThinkingLevel, msgs, traceSpan)
 
 	// ── 8. Budget pre-check ──
 	if g.costTracker != nil {
@@ -227,11 +227,13 @@ func (g *Gateway) ExecuteChatPipeline(ctx context.Context, req *ChatRequest) (*C
 
 	result, err := g.planner.Run(ctx, planReq)
 	if err != nil {
+		g.recordRouterOutcome(routedTier, routedModelID, start, err, "", traceSpan)
 		g.metrics.RecordRequest(time.Since(start), 0, 0, err)
 		observe.EndSpan(traceSpan, err)
 		g.triggerSelfHeal(ctx, req.Messages, err)
 		return nil, fmt.Errorf("planner: %w", err)
 	}
+	g.recordRouterOutcome(routedTier, routedModelID, start, nil, result.Reply, traceSpan)
 
 	// ── 12. Post-processing ──
 	estTokensIn := estimateMsgTokens(msgs)
