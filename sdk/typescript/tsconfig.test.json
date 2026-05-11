@@ -21,6 +21,7 @@
     "src/providers.ts",
     "src/setup.ts",
     "src/documents.ts",
+    "src/approvals.ts",
     "src/**/*.test.ts"
   ]
 }

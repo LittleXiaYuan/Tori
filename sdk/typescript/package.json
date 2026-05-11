@@ -42,6 +42,10 @@
     "./documents": {
       "types": "./src/documents.ts",
       "import": "./src/documents.ts"
+    },
+    "./approvals": {
+      "types": "./src/approvals.ts",
+      "import": "./src/approvals.ts"
     }
   },
   "files": [
