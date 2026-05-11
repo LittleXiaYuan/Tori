@@ -49,6 +49,17 @@ describe("chat-utils/friendlyError", () => {
     expect(out).not.toContain("EOF");
     expect(out).not.toContain("fallback");
   });
+
+  it("hides raw planner fallback and model-escalation traces seen in chat reasoning", () => {
+    const fallback = friendlyError('planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF');
+    expect(fallback).toContain("已保留现场");
+    expect(fallback).not.toMatch(/planner fc|all fallback|moonshot|EOF/i);
+
+    const escalation = friendlyError("当前：调用栈降级，正在级联唤醒备用引擎 [qwen3.5:4b]...");
+    expect(escalation).toBe("模型暂时没有回应，正在换用可用模型继续。");
+    expect(escalation).not.toContain("qwen3.5");
+  });
+
   it("falls through untouched when no pattern matches", () => {
     const odd = "some bespoke situation that does not match any heuristic";
     expect(friendlyError(odd)).toBe(odd);

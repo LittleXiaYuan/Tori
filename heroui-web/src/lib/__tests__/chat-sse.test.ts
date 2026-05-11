@@ -80,6 +80,22 @@ describe("parseAgenticChatStream", () => {
     expect(items[0]?.kind === "error" ? items[0].message : "").not.toContain("context deadline exceeded");
   });
 
+  it("formats error frame detail/error fields without leaking raw planner fallback traces", async () => {
+    const items = await collect([
+      "event: error\n",
+      "data: {\"detail\":\"planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post \\\"https://api.moonshot.ai/v1/chat/completions\\\": EOF\"}\n\n",
+      "data: {\"type\":\"error\",\"error\":\"handoff agent \\\"general_exec\\\" execution failed: context deadline exceeded\"}\n\n",
+    ]);
+
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item).toMatchObject({ kind: "error" });
+      const message = item.kind === "error" ? item.message : "";
+      expect(message).toMatch(/已保留现场|响应暂时超时/);
+      expect(message).not.toMatch(/planner fc|all fallback|moonshot|handoff agent|context deadline exceeded|EOF/i);
+    }
+  });
+
   it("uses a friendly idle-timeout message", () => {
     const err = new ChatStreamTimeoutError(60000);
     expect(err.message).toBe("响应暂时超时，已保留现场；60 秒内没有收到新内容，可以稍后重试或继续。");
