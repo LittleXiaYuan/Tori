@@ -105,6 +105,17 @@ function eventSummaryLabel(summary?: string): string {
   return formatErrorMessage(summary, "这一步状态已更新，现场已保留。");
 }
 
+function recoveryActionLabel(action?: string): string {
+  switch (action) {
+    case "retry_failed": return "重试失败步骤";
+    case "create_task": return "转为后台任务";
+    case "partial": return "先返回阶段结果";
+    case "inspect_dependencies": return "先查看依赖关系";
+    case "continue": return "继续执行";
+    default: return action ? formatErrorMessage(action, "继续恢复") : "";
+  }
+}
+
 function displayRecoveryText(text?: string): string {
   const raw = (text || "").trim();
   if (!raw) return "";
@@ -577,7 +588,7 @@ export function PlannerCheckpointDetail({
                   <div className="flex flex-wrap gap-2">
                     <Chip size="sm" style={{ background: "rgba(167,139,250,0.12)", color: "#c4b5fd" }}>{executionState.status || "unknown"}</Chip>
                     <Chip size="sm" style={{ background: "rgba(14,165,233,0.1)", color: "#7dd3fc" }}>{executionState.action || "continue"}</Chip>
-                    {executionState.next_action && <Chip size="sm" style={{ background: "rgba(251,191,36,0.1)", color: "#fcd34d" }}>下一步：{executionState.next_action}</Chip>}
+                    {executionState.next_action && <Chip size="sm" style={{ background: "rgba(251,191,36,0.1)", color: "#fcd34d" }}>下一步：{recoveryActionLabel(executionState.next_action)}</Chip>}
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">

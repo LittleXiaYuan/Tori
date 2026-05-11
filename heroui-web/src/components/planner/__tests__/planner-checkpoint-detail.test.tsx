@@ -84,4 +84,30 @@ describe("PlannerCheckpointDetail dependency view", () => {
     expect(screen.queryByText("被阻塞 1")).toBeNull();
     expect(screen.getByText("前置已完成：#0")).toBeInTheDocument();
   });
+
+  it("renders execution-state next action as a user-facing recovery label", async () => {
+    render(
+      <PlannerCheckpointDetail
+        planId="plan-123"
+        initialCheckpoint={makeCheckpoint()}
+        fetchExecutionState={async () => ({
+          plan_id: "plan-123",
+          status: "failed",
+          action: "continue",
+          next_action: "inspect_dependencies",
+          checkpoint: makeCheckpoint(),
+          events: [],
+        } as any)}
+        fetchCheckpoint={async () => makeCheckpoint()}
+        resumeCheckpoint={async () => ({ task_id: "task-123", status: "accepted", recovery_plan: { action: "continue", checkpoint: makeCheckpoint(), steps: [] }, run: true, checkpoint: makeCheckpoint() } as any)}
+        resumePlan={async () => ({ status: "accepted", action: "continue", plan_id: "plan-123", recovery_plan: { action: "continue", checkpoint: makeCheckpoint(), steps: [] } } as any)}
+        getResumePlanJob={async () => ({ job: dummyResumeJob })}
+        subscribeResumePlanEvents={() => () => {}}
+      />,
+    );
+
+    expect(await screen.findByText("统一执行现场")).toBeInTheDocument();
+    expect(screen.getByText("下一步：先查看依赖关系")).toBeInTheDocument();
+    expect(screen.queryByText("下一步：inspect_dependencies")).not.toBeInTheDocument();
+  });
 });
