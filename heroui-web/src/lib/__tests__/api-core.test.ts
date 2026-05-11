@@ -97,6 +97,15 @@ describe("api-core/fetcher", () => {
     await expect(fetcher("/v1/missing")).rejects.toThrow("404: not found");
   });
 
+  it("throws readable messages for nested gateway error bodies", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { code: "BAD_REQUEST", message: "unsupported recovery action; use continue, retry_failed, or partial" } }), { status: 400 }),
+    );
+    await expect(fetcher("/v1/planner/checkpoints/recover", { method: "POST" })).rejects.toThrow(
+      "400: BAD_REQUEST: unsupported recovery action; use continue, retry_failed, or partial",
+    );
+  });
+
   it("throws 'unauthorized' on 401 and clears token", async () => {
     localStorage.setItem("yunque_token", "stale");
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
