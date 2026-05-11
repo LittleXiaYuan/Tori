@@ -100,6 +100,20 @@ test("ModesClient throws ModesClientError with parsed body", async () => {
     assertDeepEqual(error.body, { error: "invalid mode", valid_modes: ["assistant"] });
     assertEqual(error.message, "invalid mode");
   }
+
+  const nestedClient = createModesClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested invalid mode" }, valid_modes: ["assistant"] }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.set({ mode: "unknown" });
+    throw new Error("expected nested set to reject");
+  } catch (error) {
+    assert(error instanceof ModesClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "nested invalid mode");
+  }
 });
 
 let failures = 0;

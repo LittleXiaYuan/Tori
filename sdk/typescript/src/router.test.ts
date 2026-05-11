@@ -25,6 +25,8 @@ test("RouterClient preserves not configured status with API key", async () => {
 test("RouterClient throws RouterClientError with parsed and text bodies", async () => {
   const jsonClient = createRouterClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "unauthorized" }, { status: 401 }) });
   try { await jsonClient.stats(); throw new Error("expected stats to reject"); } catch (error) { assert(error instanceof RouterClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "unauthorized" }); assertEqual(error.message, "unauthorized"); }
+  const nestedClient = createRouterClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "UNAUTHORIZED", message: "nested unauthorized" } }, { status: 401 }) });
+  try { await nestedClient.stats(); throw new Error("expected nested stats to reject"); } catch (error) { assert(error instanceof RouterClientError); assertEqual(error.status, 401); assertEqual(error.message, "nested unauthorized"); }
   const textClient = createRouterClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.stats(); throw new Error("expected stats to reject"); } catch (error) { assert(error instanceof RouterClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

@@ -32,6 +32,8 @@ test("MissionsClient reads experience stats and strategies", async () => {
 test("MissionsClient throws MissionsClientError with parsed and text bodies", async () => {
   const jsonClient = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "description is required" }, { status: 400 }) });
   try { await jsonClient.parse(""); throw new Error("expected parse to reject"); } catch (error) { assert(error instanceof MissionsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "description is required" }); assertEqual(error.message, "description is required"); }
+  const nestedClient = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested description is required" } }, { status: 400 }) });
+  try { await nestedClient.parse(""); throw new Error("expected nested parse to reject"); } catch (error) { assert(error instanceof MissionsClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested description is required"); }
   const textClient = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("experience store not initialized", { status: 404 }) });
   try { await textClient.strategies(); throw new Error("expected strategies to reject"); } catch (error) { assert(error instanceof MissionsClientError); assertEqual(error.status, 404); assertEqual(error.body, "experience store not initialized"); assertEqual(error.message, "experience store not initialized"); }
 });

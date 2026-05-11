@@ -95,6 +95,22 @@ test("IDEClient provides review helpers", async () => {
   assertEqual(JSON.parse(String(calls[2]?.init?.body)).mode, "full");
 });
 
+test("IDEClient throws IDEClientError with nested parsed body", async () => {
+  const client = createIDEClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested content or diff required" } }, { status: 400 }),
+  });
+
+  try {
+    await client.review({});
+    throw new Error("expected nested review to reject");
+  } catch (error) {
+    assert(error instanceof IDEClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "nested content or diff required");
+  }
+});
+
 test("IDEClient throws IDEClientError with text body", async () => {
   const client = createIDEClient({
     baseUrl: "http://localhost:9090",

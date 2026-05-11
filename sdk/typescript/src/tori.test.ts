@@ -34,6 +34,8 @@ test("ToriClient unbinds and supports not-bound responses", async () => {
 test("ToriClient throws ToriClientError with parsed and text bodies", async () => {
   const jsonClient = createToriClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "already bound, unbind first" }, { status: 409 }) });
   try { await jsonClient.bind(); throw new Error("expected bind to reject"); } catch (error) { assert(error instanceof ToriClientError); assertEqual(error.status, 409); assertDeepEqual(error.body, { error: "already bound, unbind first" }); assertEqual(error.message, "already bound, unbind first"); }
+  const nestedClient = createToriClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "CONFLICT", message: "nested already bound" } }, { status: 409 }) });
+  try { await nestedClient.bind(); throw new Error("expected nested bind to reject"); } catch (error) { assert(error instanceof ToriClientError); assertEqual(error.status, 409); assertEqual(error.message, "nested already bound"); }
   const textClient = createToriClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.unbind(); throw new Error("expected unbind to reject"); } catch (error) { assert(error instanceof ToriClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

@@ -86,6 +86,10 @@ function messageFromErrorBody(body: unknown): string | undefined {
   for (const key of ["message", "detail", "error", "reason"]) {
     const value = body[key];
     if (typeof value === "string" && value.trim()) return value;
+    if (key === "error" && isRecord(value)) {
+      const nested = messageFromErrorBody(value);
+      if (nested) return nested;
+    }
   }
   return undefined;
 }
