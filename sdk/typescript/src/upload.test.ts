@@ -32,6 +32,8 @@ test("UploadClient preserves analysis actions and rich payload", async () => {
 test("UploadClient throws UploadClientError with parsed and text bodies", async () => {
   const jsonClient = createUploadClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "file field required" }, { status: 400 }) });
   try { await jsonClient.upload({ file: new Blob([]) }); throw new Error("expected upload to reject"); } catch (error) { assert(error instanceof UploadClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "file field required" }); assertEqual(error.message, "file field required"); }
+  const nestedClient = createUploadClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested file field required" } }, { status: 400 }) });
+  try { await nestedClient.upload({ file: new Blob([]) }); throw new Error("expected nested upload to reject"); } catch (error) { assert(error instanceof UploadClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested file field required"); }
   const textClient = createUploadClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.file(new Blob(["x"]), "x.txt"); throw new Error("expected file to reject"); } catch (error) { assert(error instanceof UploadClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });

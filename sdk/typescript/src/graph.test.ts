@@ -39,6 +39,8 @@ test("GraphClient reads context and stats", async () => {
 test("GraphClient throws GraphClientError with parsed and text bodies", async () => {
   const jsonClient = createGraphClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "id required" }, { status: 400 }) });
   try { await jsonClient.deleteEntity(""); throw new Error("expected delete to reject"); } catch (error) { assert(error instanceof GraphClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "id required" }); assertEqual(error.message, "id required"); }
+  const nestedClient = createGraphClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested id required" } }, { status: 400 }) });
+  try { await nestedClient.deleteEntity(""); throw new Error("expected nested delete to reject"); } catch (error) { assert(error instanceof GraphClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested id required"); }
   const textClient = createGraphClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.putRelation({ from_id: "e1", to_id: "e2", type: "uses" }); throw new Error("expected relation to reject"); } catch (error) { assert(error instanceof GraphClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

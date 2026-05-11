@@ -32,6 +32,8 @@ test("FilesClient downloads artifacts as blobs with filename", async () => {
 test("FilesClient throws FilesClientError with parsed and text bodies", async () => {
   const jsonClient = createFilesClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "path required" }, { status: 400 }) });
   try { await jsonClient.preview(""); throw new Error("expected preview to reject"); } catch (error) { assert(error instanceof FilesClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "path required" }); assertEqual(error.message, "path required"); }
+  const nestedClient = createFilesClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested path required" } }, { status: 400 }) });
+  try { await nestedClient.preview(""); throw new Error("expected nested preview to reject"); } catch (error) { assert(error instanceof FilesClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested path required"); }
   const textClient = createFilesClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("not found", { status: 404 }) });
   try { await textClient.download("missing.txt"); throw new Error("expected download to reject"); } catch (error) { assert(error instanceof FilesClientError); assertEqual(error.status, 404); assertEqual(error.body, "not found"); assertEqual(error.message, "not found"); }
 });
