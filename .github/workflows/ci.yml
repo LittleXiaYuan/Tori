@@ -148,6 +148,9 @@ jobs:
       - name: npm ci
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: OpenAPI generation smoke test
+        run: npm run generate
+
       - name: Incremental SDK tests
         run: npm run test
 
