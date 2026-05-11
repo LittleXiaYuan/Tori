@@ -58,6 +58,7 @@ import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
+import { createKnowledgeClient } from "yunque-client/knowledge";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -106,12 +107,24 @@ const task = await tasks.create({
   constraints: { max_steps: 6, risk_level: "low" },
 });
 await tasks.run(task.id);
+
+const knowledge = createKnowledgeClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+await knowledge.ingest({
+  name: "technical-blueprint.md",
+  content: "Planner 恢复、任务编排、记忆与知识库是外部壳的最小闭环。",
+});
+const matches = await knowledge.search({ query: "Planner 恢复", limit: 5 });
+console.log(matches.chunks);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `memory`, or `tasks` without importing the
-generated 500KB+ SDK/types bundle. Add future slices in the same style when
-those surfaces need stable, lightweight integration APIs.
+in only `planner-recovery`, `chat`, `memory`, `tasks`, or `knowledge` without
+importing the generated 500KB+ SDK/types bundle. Add future slices in the same
+style when those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -141,6 +154,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
+| `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

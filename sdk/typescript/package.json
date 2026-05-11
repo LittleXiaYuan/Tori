@@ -26,6 +26,10 @@
     "./tasks": {
       "types": "./src/tasks.ts",
       "import": "./src/tasks.ts"
+    },
+    "./knowledge": {
+      "types": "./src/knowledge.ts",
+      "import": "./src/knowledge.ts"
     }
   },
   "files": [
