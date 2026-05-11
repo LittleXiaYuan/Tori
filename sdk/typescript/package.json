@@ -355,6 +355,10 @@
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
     },
+    "./notify-share": {
+      "types": "./src/notify-share.ts",
+      "import": "./src/notify-share.ts"
+    },
     "./notify-channels": {
       "types": "./src/notify-channels.ts",
       "import": "./src/notify-channels.ts"
