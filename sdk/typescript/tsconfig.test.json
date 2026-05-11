@@ -107,6 +107,7 @@
     "src/notify-channels.ts",
     "src/projects.ts",
     "src/project-read.ts",
+    "src/project-write.ts",
     "src/market.ts",
     "src/dispatch.ts",
     "src/orchestrator.ts",
@@ -127,3 +128,4 @@
     "src/**/*.test.ts"
   ]
 }
+

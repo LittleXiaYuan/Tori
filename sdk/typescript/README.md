@@ -182,6 +182,7 @@ import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
 import { createProjectsClient } from "yunque-client/projects";
 import { createProjectReadClient } from "yunque-client/project-read";
+import { createProjectWriteClient } from "yunque-client/project-write";
 import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
@@ -426,12 +427,18 @@ const projectRead = createProjectReadClient({
 
 const projectList = await projectRead.list();
 
+const projectWrite = createProjectWriteClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await projectWrite.update("project-1", { description: "updated by SDK" });
+
 const projects = createProjectsClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
-const projectList = await projects.list();
-console.log(projectList.projects.length);
+const fullProjectList = await projects.list();
+console.log(fullProjectList.projects.length);
 
 const market = createSkillMarketClient({
   baseUrl: "http://localhost:9090",
@@ -1124,6 +1131,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |
 | `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
 | `src/project-read.ts` | Lightweight project list/detail read facade without full SDK import |
+| `src/project-write.ts` | Lightweight project create/update/remove facade without full SDK import |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
@@ -1161,4 +1169,5 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
   package size.
 - Client uses ESM (`"type": "module"` in package.json). For CommonJS consumers,
   rebuild with a different tsconfig (`"module": "CommonJS"`).
+
 
