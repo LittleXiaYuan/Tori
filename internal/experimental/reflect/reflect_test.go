@@ -1,6 +1,7 @@
 package reflect
 
 import (
+	"context"
 	"testing"
 
 	"yunque-agent/pkg/jsonutil"
@@ -86,4 +87,34 @@ func TestLearningLoopReflectAccessor(t *testing.T) {
 	if ll.Reflect() == nil {
 		t.Fatal("Reflect() should return non-nil engine")
 	}
+}
+
+func TestLearningLoopHighQualityLessonTagsQuality(t *testing.T) {
+	ll := NewLearningLoop(nil, nil)
+	var gotOutcome string
+	var gotTags []string
+	ll.SetOnLesson(func(category, outcome, lesson, context string, tags []string) {
+		gotOutcome = outcome
+		gotTags = tags
+	})
+
+	ll.AfterInteraction(context.Background(), "请审查代码", "代码审查完成", []string{"review"}, 9)
+
+	if gotOutcome != "success" {
+		t.Fatalf("outcome = %q, want success", gotOutcome)
+	}
+	for _, want := range []string{"high_quality", "review", "quality:9", "outcome:success", "satisfied:true"} {
+		if !hasString(gotTags, want) {
+			t.Fatalf("tags %v missing %q", gotTags, want)
+		}
+	}
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

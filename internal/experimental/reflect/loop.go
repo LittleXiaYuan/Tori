@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -14,7 +15,7 @@ import (
 // After each interaction, it evaluates quality, extracts lessons, and updates strategy.
 type LearningLoop struct {
 	llm      *llm.Client
-	onUpdate func(key, value string)                                    // callback to update memory
+	onUpdate func(key, value string)                                        // callback to update memory
 	onLesson func(category, outcome, lesson, context string, tags []string) // callback to write structured lesson to ExperienceStore
 	engine   *Engine
 }
@@ -48,7 +49,8 @@ func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply
 				"User asked: "+truncateStr(userMsg, 100)+" → Skills: "+joinStr(skillsUsed)+" → Quality: high")
 		}
 		if l.onLesson != nil {
-			skillTags := append([]string{"high_quality"}, skillsUsed...)
+			skillTags := learningLessonTags(skillsUsed, quality, "success")
+			skillTags = append([]string{"high_quality"}, skillTags...)
 			l.onLesson("skill_usage", "success",
 				"高质量回复: "+truncateStr(userMsg, 80)+" (技能: "+joinStr(skillsUsed)+")",
 				truncateStr(agentReply, 120), skillTags)
@@ -70,10 +72,20 @@ func (l *LearningLoop) AfterInteraction(ctx context.Context, userMsg, agentReply
 			}
 			if l.onLesson != nil {
 				l.onLesson(lesson.Category, outcome, lesson.Insight,
-					truncateStr(userMsg, 80), skillsUsed)
+					truncateStr(userMsg, 80), learningLessonTags(skillsUsed, quality, outcome))
 			}
 		}
 	})
+}
+
+func learningLessonTags(skillsUsed []string, quality int, outcome string) []string {
+	tags := append([]string{}, skillsUsed...)
+	tags = append(tags,
+		"quality:"+strconv.Itoa(quality),
+		"outcome:"+outcome,
+		"satisfied:"+strconv.FormatBool(quality >= 8),
+	)
+	return tags
 }
 
 func (l *LearningLoop) extractLessons(ctx context.Context, userMsg, agentReply string, skillsUsed []string, quality int) []Lesson {
