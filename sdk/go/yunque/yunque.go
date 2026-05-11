@@ -37,8 +37,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -146,6 +148,130 @@ func errorMessageFromJSON(value any) string {
 		}
 	}
 	return ""
+}
+
+// ── Reflection Experience ──
+
+// Reflect provides access to the lightweight reflection experience API.
+var Reflect = &reflectNamespace{}
+
+type reflectNamespace struct{}
+
+// ReflectExperienceOptions filters reflection experiences.
+type ReflectExperienceOptions struct {
+	Query    string
+	Source   string
+	Category string
+	Outcome  string
+	Tag      string
+	Limit    int
+}
+
+// ReflectExperience is a structured reflection lesson captured by the agent.
+type ReflectExperience struct {
+	ID        string    `json:"id,omitempty"`
+	Source    string    `json:"source,omitempty"`
+	SourceID  string    `json:"source_id,omitempty"`
+	Category  string    `json:"category,omitempty"`
+	Outcome   string    `json:"outcome,omitempty"`
+	Lesson    string    `json:"lesson,omitempty"`
+	Context   string    `json:"context,omitempty"`
+	Tags      []string  `json:"tags,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+}
+
+// ReflectExperiencesResponse is returned by /v1/reflect/experiences.
+type ReflectExperiencesResponse struct {
+	Experiences []ReflectExperience `json:"experiences"`
+	Total       int                 `json:"total"`
+}
+
+// ReflectExperienceStats summarizes reflection experiences.
+type ReflectExperienceStats struct {
+	Total      int            `json:"total"`
+	BySource   map[string]int `json:"by_source"`
+	ByCategory map[string]int `json:"by_category"`
+	ByOutcome  map[string]int `json:"by_outcome"`
+	Recent7D   int            `json:"recent_7d"`
+}
+
+// Experiences lists reflection experiences with optional source/category/outcome/tag/query filters.
+func (r *reflectNamespace) Experiences(ctx context.Context, opts ReflectExperienceOptions) (ReflectExperiencesResponse, error) {
+	resp, err := apiCall(ctx, "GET", "/v1/reflect/experiences"+reflectExperienceQuery(opts, false), nil)
+	if err != nil {
+		return ReflectExperiencesResponse{}, err
+	}
+	var out ReflectExperiencesResponse
+	if err := decodeMapResponse(resp, &out); err != nil {
+		return ReflectExperiencesResponse{}, err
+	}
+	return out, nil
+}
+
+// Stats returns reflection experience counters using the same filters as Experiences.
+func (r *reflectNamespace) Stats(ctx context.Context, opts ReflectExperienceOptions) (ReflectExperienceStats, error) {
+	resp, err := apiCall(ctx, "GET", "/v1/reflect/experiences"+reflectExperienceQuery(opts, true), nil)
+	if err != nil {
+		return ReflectExperienceStats{}, err
+	}
+	var out ReflectExperienceStats
+	if err := decodeMapResponse(resp, &out); err != nil {
+		return ReflectExperienceStats{}, err
+	}
+	return out, nil
+}
+
+// Strategies returns compiled reflection strategy hints. Limit defaults to the server setting.
+func (r *reflectNamespace) Strategies(ctx context.Context, limit int) (string, error) {
+	path := "/v1/reflect/strategies"
+	if limit > 0 {
+		q := url.Values{}
+		q.Set("limit", strconv.Itoa(limit))
+		path += "?" + q.Encode()
+	}
+	resp, err := apiCall(ctx, "GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+	strategies, _ := resp["strategies"].(string)
+	return strategies, nil
+}
+
+func reflectExperienceQuery(opts ReflectExperienceOptions, stats bool) string {
+	q := url.Values{}
+	if opts.Query != "" {
+		q.Set("q", opts.Query)
+	}
+	if opts.Source != "" {
+		q.Set("source", opts.Source)
+	}
+	if opts.Category != "" {
+		q.Set("category", opts.Category)
+	}
+	if opts.Outcome != "" {
+		q.Set("outcome", opts.Outcome)
+	}
+	if opts.Tag != "" {
+		q.Set("tag", opts.Tag)
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if stats {
+		q.Set("stats", "true")
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
+}
+
+func decodeMapResponse(resp map[string]any, target any) error {
+	raw, err := json.Marshal(resp)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, target)
 }
 
 // ── LLM ──
