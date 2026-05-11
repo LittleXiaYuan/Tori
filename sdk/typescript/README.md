@@ -335,6 +335,12 @@ const cognis = createCognisClient({
 const cogniHealth = await cognis.health();
 console.log(cogniHealth);
 
+const experience = await cognis.experience("code-reviewer");
+console.log(experience.summary?.top_tools?.[0]?.tool);
+for (const pattern of experience.summary?.pending_patterns ?? []) {
+  if (pattern.id) await cognis.confirmExperiencePattern("code-reviewer", pattern.id);
+}
+
 const events = createEventsClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
