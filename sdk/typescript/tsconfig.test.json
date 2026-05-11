@@ -58,6 +58,7 @@
     "src/knowledge-import.ts",
     "src/knowledge-upload.ts",
     "src/providers.ts",
+    "src/provider-health.ts",
     "src/breaker.ts",
     "src/models.ts",
     "src/setup.ts",
