@@ -51,6 +51,7 @@ export default function ReflectPage() {
     { label: "总计", value: stats.total, color: "var(--yunque-accent)" },
     { label: "近7天", value: stats.recent_7d, color: "#a78bfa" },
     { label: "成功", value: stats.by_outcome?.success || 0, color: "#17c964" },
+    { label: "部分成功", value: stats.by_outcome?.partial || 0, color: "#ffaa00" },
     { label: "失败", value: stats.by_outcome?.failure || 0, color: "#f31260" },
   ] : [];
 
