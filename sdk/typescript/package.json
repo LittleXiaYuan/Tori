@@ -276,7 +276,7 @@
     "generate": "openapi-ts",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "test": "npm run typecheck:test && node scripts/run-incremental-tests.mjs",
+    "test": "npm run check:incremental && npm run typecheck:test && node scripts/run-incremental-tests.mjs",
     "check:incremental": "node scripts/check-incremental-coverage.mjs"
   },
   "devDependencies": {
