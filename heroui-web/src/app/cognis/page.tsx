@@ -91,6 +91,7 @@ export default function CognisPage() {
   const [verifying, setVerifying] = useState(false);
   const [refreshingTrace, setRefreshingTrace] = useState(false);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
+  const [confirmingPatternID, setConfirmingPatternID] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -229,6 +230,21 @@ export default function CognisPage() {
       setDetailEvolution(evolution);
     } catch {
       setDetailTraces([]);
+    }
+  };
+
+  const confirmExperiencePattern = async (patternID: string) => {
+    if (!detailID || confirmingPatternID) return;
+    setConfirmingPatternID(patternID);
+    try {
+      await api.confirmCogniExperiencePattern(detailID, patternID);
+      const refreshed = await api.getCogniExperience(detailID);
+      setDetailExperience(refreshed);
+      showToast("经验模式已确认", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "确认失败", "error");
+    } finally {
+      setConfirmingPatternID(null);
     }
   };
 
@@ -992,17 +1008,14 @@ export default function CognisPage() {
                             <div className="flex items-start justify-between gap-2">
                               <span>{p.trigger} → {p.response}</span>
                               {p.id && (
-                                <Button size="sm" variant="ghost" onPress={async () => {
-                                  try {
-                                    await api.confirmCogniExperiencePattern(detailID!, p.id!);
-                                    const refreshed = await api.getCogniExperience(detailID!);
-                                    setDetailExperience(refreshed);
-                                    showToast("经验模式已确认", "success");
-                                  } catch (e) {
-                                    showToast(e instanceof Error ? e.message : "确认失败", "error");
-                                  }
-                                }}>
-                                  确认
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  isPending={confirmingPatternID === p.id}
+                                  isDisabled={!!confirmingPatternID && confirmingPatternID !== p.id}
+                                  onPress={() => p.id && confirmExperiencePattern(p.id)}
+                                >
+                                  {confirmingPatternID === p.id ? "确认中" : "确认"}
                                 </Button>
                               )}
                             </div>
