@@ -19,6 +19,10 @@
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
     },
+    "./conversations": {
+      "types": "./src/conversations.ts",
+      "import": "./src/conversations.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"

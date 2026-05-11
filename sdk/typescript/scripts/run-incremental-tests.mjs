@@ -10,6 +10,8 @@ const sources = [
   "src/planner-recovery.test.ts",
   "src/chat.ts",
   "src/chat.test.ts",
+  "src/conversations.ts",
+  "src/conversations.test.ts",
   "src/memory.ts",
   "src/memory.test.ts",
   "src/tasks.ts",
@@ -119,6 +121,7 @@ if (compile.error || compile.status !== 0) {
 for (const testName of [
   "planner-recovery.test",
   "chat.test",
+  "conversations.test",
   "memory.test",
   "tasks.test",
   "task-context.test",
@@ -164,6 +167,7 @@ for (const testName of [
   compiledTest = compiledTest
     .replace('from "./planner-recovery"', 'from "./planner-recovery.js"')
     .replace('from "./chat"', 'from "./chat.js"')
+    .replace('from "./conversations"', 'from "./conversations.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
     .replace('from "./task-context"', 'from "./task-context.js"')
