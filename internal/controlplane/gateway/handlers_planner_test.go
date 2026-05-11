@@ -1212,6 +1212,41 @@ func TestPlannerResumePlanJobEndpointScopesJobsToTenant(t *testing.T) {
 	}
 }
 
+func TestPlannerResumePlanEventBroadcastCarriesTenant(t *testing.T) {
+	gw, _ := newTestGateway()
+	broker := NewSSEBroker()
+	gw.SetSSEBroker(broker)
+	_, ch, cleanup := broker.Subscribe()
+	defer cleanup()
+
+	job := plannerCheckpointResumePlanJob{
+		ID:       "resume-plan-event-tenant",
+		Status:   "running",
+		Action:   "continue",
+		TenantID: "tenant-event-owner",
+		PlanID:   "plan-event-tenant",
+	}
+	gw.appendAndBroadcastPlannerResumeJobEvent(&job, plannerCheckpointResumePlanJobEvent{
+		ID:        "evt-event-tenant",
+		Type:      "planner.tool_result",
+		Summary:   "恢复步骤完成",
+		Timestamp: "2026-05-11T05:00:00Z",
+	})
+
+	select {
+	case event := <-ch:
+		if event.Type != "planner.resume_plan_event" || event.TenantID != "tenant-event-owner" {
+			t.Fatalf("expected tenant-scoped planner resume event, got %+v", event)
+		}
+		data, ok := event.Data.(map[string]any)
+		if !ok || data["job_id"] != "resume-plan-event-tenant" {
+			t.Fatalf("expected job event payload, got %#v", event.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for planner resume event")
+	}
+}
+
 func TestPlannerResumePlanJobEventSummaryCoversToolExecutionFailures(t *testing.T) {
 	cases := map[string][]string{
 		"执行失败: unknown skill: missing_tool":        {"unknown skill"},
