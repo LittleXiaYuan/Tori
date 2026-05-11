@@ -1,6 +1,8 @@
 # yunque-client (TypeScript)
 
-Auto-generated TypeScript client for the Yunque (云雀) Agent HTTP API.
+TypeScript client for the Yunque (云雀) Agent HTTP API. The package contains
+both the generated full OpenAPI client and hand-written incremental slices for
+product integrations that should avoid importing the whole platform surface.
 
 - Source spec: [`docs/openapi.yaml`](../../docs/openapi.yaml)
 - Generator: [`@hey-api/openapi-ts`](https://github.com/hey-api/openapi-ts)
@@ -19,32 +21,55 @@ When/if we publish to npm, install with `npm i yunque-client`.
 
 ## Quick start
 
-```ts
-import { client } from "./src/client.gen";
-import {
-  getV1Cognis,
-  postV1CognisIdEvolve,
-  postV1CognisGenerate,
-  getV1ChatStream,
-} from "./src/sdk.gen";
+For app code, prefer subpath imports such as `yunque-client/chat` or
+`yunque-client/planner-recovery`. The package root (`yunque-client`) re-exports
+the generated all-in-one client for full API coverage and is intentionally
+heavier.
 
-client.setConfig({
+### Incremental client
+
+```ts
+import { createChatClient } from "yunque-client/chat";
+
+const chat = createChatClient({
   baseUrl: "http://localhost:9090",
-  headers: { Authorization: "Bearer <your-jwt>" },
+  token: "<your-jwt>",
 });
 
+const reply = await chat.send({
+  messages: [{ role: "user", content: "帮我总结这个任务的下一步" }],
+  session_id: "session_123",
+});
+
+console.log(reply);
+```
+
+### Full generated client
+
+Use this path when you need broad OpenAPI coverage and accept the larger import
+surface:
+
+```ts
+import { evolveCogni, generateCogni, listCognis } from "yunque-client";
+
+const options = {
+  baseUrl: "http://localhost:9090",
+  headers: { Authorization: "Bearer <your-jwt>" },
+};
+
 // List every Cogni
-const { data, error } = await getV1Cognis();
+const { data, error } = await listCognis(options);
 if (error) throw error;
 console.log(data);
 
 // Self-generate a Cogni
-const generated = await postV1CognisGenerate({
+const generated = await generateCogni({
+  ...options,
   body: { prompt: "Build a code-review cogni" },
 });
 
 // Trigger evolution on one cogni
-await postV1CognisIdEvolve({ path: { id: "code-reviewer" } });
+await evolveCogni({ ...options, path: { id: "code-reviewer" } });
 ```
 
 ## Incremental imports
@@ -776,6 +801,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 
 ## Caveats
 
-- 6 npm audit warnings come from `prettier` / `ruff` dev deps; runtime is clean.
+- `npm run check:pack` guards the published package shape: no test files,
+  required incremental subpath files present, no scripts/temp logs, and bounded
+  package size.
 - Client uses ESM (`"type": "module"` in package.json). For CommonJS consumers,
   rebuild with a different tsconfig (`"module": "CommonJS"`).

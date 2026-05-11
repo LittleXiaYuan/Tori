@@ -21,10 +21,46 @@ if (result.status !== 0) {
 const packs = JSON.parse(result.stdout);
 const pack = packs[0];
 const files = Array.isArray(pack?.files) ? pack.files : [];
-const testFiles = files.map((file) => String(file.path || "")).filter((file) => /\.test\.ts$/.test(file));
+const paths = files.map((file) => String(file.path || ""));
+const testFiles = paths.filter((file) => /\.test\.ts$/.test(file));
+const requiredFiles = [
+  "src/auth.ts",
+  "src/chat.ts",
+  "src/planner-recovery.ts",
+  "src/airi.ts",
+  "src/cognis.ts",
+  "src/events.ts",
+  "src/realtime.ts",
+  "src/upload.ts",
+  "src/index.ts",
+  "src/sdk.gen.ts",
+  "src/types.gen.ts",
+  "README.md",
+];
+const forbiddenPatterns = [
+  /^scripts\//,
+  /^node_modules\//,
+  /^\.tmp\//,
+  /^openapi-ts-error-.*\.log$/,
+  /^src\/.*\.test\.ts$/,
+];
 
 if (testFiles.length > 0) {
   console.error(`pack contains test files:\n${testFiles.join("\n")}`);
+  process.exit(1);
+}
+
+const missingRequiredFiles = requiredFiles.filter((file) => !paths.includes(file));
+
+if (missingRequiredFiles.length > 0) {
+  console.error(`pack is missing required SDK entry files:\n${missingRequiredFiles.join("\n")}`);
+  process.exit(1);
+}
+
+const forbiddenFiles = paths.filter((file) => forbiddenPatterns.some((pattern) => pattern.test(file)));
+
+if (forbiddenFiles.length > 0) {
+  console.error(`pack contains forbidden development artifacts:\n${forbiddenFiles.join("\n")}`);
   process.exit(1);
 }
 
