@@ -30,6 +30,7 @@
     "src/persona.ts",
     "src/workflow.ts",
     "src/cost.ts",
+    "src/lora.ts",
     "src/**/*.test.ts"
   ]
 }
