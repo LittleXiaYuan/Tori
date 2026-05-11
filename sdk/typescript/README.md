@@ -55,6 +55,7 @@ can import the hand-written incremental slice instead:
 
 ```ts
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
+import { createChatClient } from "yunque-client/chat";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -69,11 +70,22 @@ if (state.next_action === "retry_failed") {
     async: true,
   });
 }
+
+const chat = createChatClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const reply = await chat.send({
+  messages: [{ role: "user", content: "你好呀" }],
+  session_id: "demo-session",
+});
+console.log(reply.reply);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery` without importing the generated 500KB+ SDK/types
-bundle. Add future slices in the same style (`./chat`, `./memory`, `./tasks`)
+in only `planner-recovery` or `chat` without importing the generated 500KB+
+SDK/types bundle. Add future slices in the same style (`./memory`, `./tasks`)
 when those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
@@ -101,6 +113,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
+| `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

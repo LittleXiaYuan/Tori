@@ -14,6 +14,10 @@
     "./planner-recovery": {
       "types": "./src/planner-recovery.ts",
       "import": "./src/planner-recovery.ts"
+    },
+    "./chat": {
+      "types": "./src/chat.ts",
+      "import": "./src/chat.ts"
     }
   },
   "files": [
@@ -24,7 +28,7 @@
     "generate": "openapi-ts",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "test": "npm run typecheck:test && node scripts/run-planner-recovery-test.mjs"
+    "test": "npm run typecheck:test && node scripts/run-incremental-tests.mjs"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.81.0",
