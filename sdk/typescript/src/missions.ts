@@ -1,9 +1,23 @@
 /** Lightweight Missions and Reflection SDK slice. */
 export type MissionParseResult = { type: "task" | "workflow" | "cron" | "trigger" | (string & {}); name: string; description: string; config: Record<string, unknown>; confidence: number; explanation: string; [key: string]: unknown };
-export type ExperienceListOptions = { q?: string; source?: string; category?: string; outcome?: string };
-export type ExperiencesResponse = { experiences: unknown[]; total: number; [key: string]: unknown };
-export type ExperienceStatsResponse = Record<string, unknown>;
-export type StrategiesResponse = { strategies: unknown[]; [key: string]: unknown };
+export type ExperienceSource = "task" | "interaction" | "reverie" | (string & {});
+export type ExperienceOutcome = "success" | "failure" | "partial" | (string & {});
+export type ExperienceListOptions = { q?: string; source?: ExperienceSource; category?: string; outcome?: ExperienceOutcome };
+export type ReflectExperience = {
+  id?: string;
+  source?: ExperienceSource;
+  source_id?: string;
+  category?: string;
+  outcome?: ExperienceOutcome;
+  lesson?: string;
+  context?: string;
+  tags?: string[];
+  created_at?: string;
+  [key: string]: unknown;
+};
+export type ExperiencesResponse = { experiences: ReflectExperience[]; total: number; [key: string]: unknown };
+export type ExperienceStatsResponse = { total?: number; by_source?: Record<string, number>; by_category?: Record<string, number>; by_outcome?: Record<string, number>; recent_7d?: number; [key: string]: unknown };
+export type StrategiesResponse = { strategies: string; [key: string]: unknown };
 export type MissionsClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class MissionsClientError extends Error {

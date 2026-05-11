@@ -19,14 +19,14 @@ test("MissionsClient reads experiences with search and filters", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createMissionsClient({ baseUrl: "http://localhost:9090", apiKey: "key-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ experiences: [{ id: "e1", source: "task", category: "sdk", outcome: "success" }], total: 1 }); } });
   const result = await client.experiences({ q: "sdk", source: "task", category: "sdk", outcome: "success" });
-  assertEqual(result.total, 1); assertEqual(calls[0]?.url, "http://localhost:9090/v1/reflect/experiences?q=sdk&source=task&category=sdk&outcome=success"); assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
+  assertEqual(result.total, 1); assertEqual(result.experiences[0]?.outcome, "success"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/reflect/experiences?q=sdk&source=task&category=sdk&outcome=success"); assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
 test("MissionsClient reads experience stats and strategies", async () => {
   const calls: string[] = [];
-  const client = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async (url) => { calls.push(String(url)); if (String(url).includes("stats=true")) return jsonResponse({ total: 10, success_rate: 0.8 }); return jsonResponse({ strategies: [{ title: "Prefer small slices" }] }); } });
+  const client = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async (url) => { calls.push(String(url)); if (String(url).includes("stats=true")) return jsonResponse({ total: 10, by_outcome: { success: 8 }, recent_7d: 3 }); return jsonResponse({ strategies: "- 推荐: Prefer small slices" }); } });
   const stats = await client.experienceStats(); const strategies = await client.strategies();
-  assertEqual(stats.total, 10); assertEqual(strategies.strategies.length, 1); assertEqual(calls[0], "http://localhost:9090/v1/reflect/experiences?stats=true"); assertEqual(calls[1], "http://localhost:9090/v1/reflect/strategies");
+  assertEqual(stats.total, 10); assertEqual(stats.by_outcome?.success, 8); assertEqual(strategies.strategies.includes("Prefer small slices"), true); assertEqual(calls[0], "http://localhost:9090/v1/reflect/experiences?stats=true"); assertEqual(calls[1], "http://localhost:9090/v1/reflect/strategies");
 });
 
 test("MissionsClient throws MissionsClientError with parsed and text bodies", async () => {
