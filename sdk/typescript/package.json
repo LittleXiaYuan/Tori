@@ -207,6 +207,10 @@
       "types": "./src/trace.ts",
       "import": "./src/trace.ts"
     },
+    "./task-trace": {
+      "types": "./src/task-trace.ts",
+      "import": "./src/task-trace.ts"
+    },
     "./browser": {
       "types": "./src/browser.ts",
       "import": "./src/browser.ts"

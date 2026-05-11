@@ -66,6 +66,7 @@
     "src/approval-queue.ts",
     "src/approval-rules.ts",
     "src/trace.ts",
+    "src/task-trace.ts",
     "src/browser.ts",
     "src/runtime.ts",
     "src/router.ts",
