@@ -56,6 +56,8 @@ const sources = [
   "src/memory.test.ts",
   "src/memory-search.ts",
   "src/memory-search.test.ts",
+  "src/memory-stats.ts",
+  "src/memory-stats.test.ts",
   "src/tasks.ts",
   "src/tasks.test.ts",
   "src/task-context.ts",
@@ -220,6 +222,7 @@ for (const testName of [
   "permissions.test",
   "memory.test",
   "memory-search.test",
+  "memory-stats.test",
   "tasks.test",
   "task-context.test",
   "knowledge.test",
@@ -304,6 +307,7 @@ for (const testName of [
     .replace('from "./permissions"', 'from "./permissions.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./memory-search"', 'from "./memory-search.js"')
+    .replace('from "./memory-stats"', 'from "./memory-stats.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
     .replace('from "./task-context"', 'from "./task-context.js"')
     .replace('from "./knowledge"', 'from "./knowledge.js"')

@@ -111,6 +111,10 @@
       "types": "./src/memory-search.ts",
       "import": "./src/memory-search.ts"
     },
+    "./memory-stats": {
+      "types": "./src/memory-stats.ts",
+      "import": "./src/memory-stats.ts"
+    },
     "./tasks": {
       "types": "./src/tasks.ts",
       "import": "./src/tasks.ts"
