@@ -64,6 +64,7 @@
     "src/projects.ts",
     "src/market.ts",
     "src/dispatch.ts",
+    "src/orchestrator.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",

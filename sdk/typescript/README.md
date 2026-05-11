@@ -101,6 +101,7 @@ import { createNotifyClient } from "yunque-client/notify";
 import { createProjectsClient } from "yunque-client/projects";
 import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
+import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -229,6 +230,13 @@ const dispatch = createDispatchClient({
 });
 const workerConfig = await dispatch.workerConfig("cursor");
 console.log(workerConfig.server_url);
+
+const orchestrator = createOrchestratorClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const orchestratorStatus = await orchestrator.status();
+console.log(orchestratorStatus.running);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -657,6 +665,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
+| `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
