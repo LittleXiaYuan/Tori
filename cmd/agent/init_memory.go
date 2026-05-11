@@ -12,10 +12,10 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/config"
 	"yunque-agent/internal/controlplane/tenant"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 	pluginpkg "yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/safego"
@@ -169,6 +169,7 @@ func initMemory(app *agentrt.App) error {
 			if err := graphRAG.BuildCommunities(context.Background(), 10); err != nil {
 				slog.Warn("GraphRAG community detection failed", "err", err)
 			} else {
+				ldg.Recall.SetGraphRAG(graphRAG)
 				app.Set("graphrag", graphRAG)
 				slog.Info("GraphRAG initialized", "communities", len(graphRAG.Communities()))
 			}
