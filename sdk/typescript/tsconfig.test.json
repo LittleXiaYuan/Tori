@@ -51,6 +51,7 @@
     "src/skillhub.ts",
     "src/plugins.ts",
     "src/graph.ts",
+    "src/plugin-api.ts",
     "src/**/*.test.ts"
   ]
 }
