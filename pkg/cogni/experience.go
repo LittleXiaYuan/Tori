@@ -194,6 +194,7 @@ func (es *ExperienceStore) ConfirmPattern(id string) bool {
 	for i := range es.patterns {
 		if es.patterns[i].ID == id {
 			es.patterns[i].Confirmed = true
+			es.patterns[i].LastUsed = time.Now()
 			es.persist()
 			return true
 		}

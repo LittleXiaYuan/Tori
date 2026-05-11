@@ -83,6 +83,40 @@ func TestExperienceStore_Patterns(t *testing.T) {
 	}
 }
 
+func TestExperienceStore_ConfirmPatternUpdatesProfileTimestamp(t *testing.T) {
+	es := NewExperienceStore("test", ExperienceConfig{
+		StoreDir:      t.TempDir(),
+		RequireReview: true,
+	})
+	old := time.Now().Add(-24 * time.Hour)
+	es.SuggestPattern(BehaviorPattern{
+		ID:        "timeout-recovery",
+		Trigger:   "响应超时",
+		Response:  "保留轨迹并切备用模型",
+		CreatedAt: old,
+		LastUsed:  old,
+	})
+
+	before := es.Summary(5).UpdatedAt
+	if before.IsZero() {
+		t.Fatal("summary updated_at should include suggested pattern")
+	}
+	if !es.ConfirmPattern("timeout-recovery") {
+		t.Fatal("confirm pattern")
+	}
+	after := es.Summary(5)
+	if len(after.PendingPatterns) != 0 {
+		t.Fatalf("pending patterns = %d, want 0", len(after.PendingPatterns))
+	}
+	if !after.UpdatedAt.After(before) {
+		t.Fatalf("updated_at did not advance after confirmation: before=%s after=%s", before, after.UpdatedAt)
+	}
+	confirmed := es.ConfirmedPatterns()
+	if len(confirmed) != 1 || confirmed[0].LastUsed.IsZero() || !confirmed[0].LastUsed.After(old) {
+		t.Fatalf("confirmed pattern timestamp not refreshed: %+v", confirmed)
+	}
+}
+
 func TestExperienceStore_Patterns_AutoConfirm(t *testing.T) {
 	es := NewExperienceStore("test", ExperienceConfig{
 		StoreDir:      t.TempDir(),
