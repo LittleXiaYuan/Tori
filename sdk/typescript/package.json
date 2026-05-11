@@ -139,6 +139,10 @@
       "types": "./src/task-read.ts",
       "import": "./src/task-read.ts"
     },
+    "./task-create": {
+      "types": "./src/task-create.ts",
+      "import": "./src/task-create.ts"
+    },
     "./knowledge": {
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"
