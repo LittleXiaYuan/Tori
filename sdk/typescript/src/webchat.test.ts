@@ -29,6 +29,9 @@ test("buildWebChatEmbedSnippet supports custom script path and requires apiKey",
 test("WebChatClient throws WebChatClientError on widget fetch failure", async () => {
   const client = createWebChatClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response(JSON.stringify({ error: "widget unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } }) });
   try { await client.widgetScript(); throw new Error("expected widgetScript to reject"); } catch (error) { assert(error instanceof WebChatClientError); assertEqual(error.status, 503); assertEqual(error.message, "widget unavailable"); }
+
+  const nestedClient = createWebChatClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response(JSON.stringify({ error: { code: "BAD_REQUEST", message: "webchat origin is not allowed" } }), { status: 400, headers: { "Content-Type": "application/json" } }) });
+  try { await nestedClient.widgetScript("https://blocked.example"); throw new Error("expected widgetScript to reject"); } catch (error) { assert(error instanceof WebChatClientError); assertEqual(error.status, 400); assertEqual(error.message, "webchat origin is not allowed"); }
 });
 
 let failures = 0; for (const { name, fn } of tests) { try { await fn(); console.log(`ok - ${name}`); } catch (error) { failures += 1; console.error(`not ok - ${name}`); console.error(error); } }

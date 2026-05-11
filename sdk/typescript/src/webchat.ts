@@ -9,7 +9,8 @@ function trimBaseUrl(baseUrl: string): string { return baseUrl.replace(/\/+$/, "
 function mergeHeaders(base: HeadersInit | undefined, extra?: HeadersInit): Headers { const headers = new Headers(base); if (!extra) return headers; new Headers(extra).forEach((value, key) => headers.set(key, value)); return headers; }
 function escapeAttr(value: string): string { return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 async function parseResponse(response: Response): Promise<unknown> { const text = await response.text(); if (!text) return undefined; try { return JSON.parse(text); } catch { return text; } }
-function messageFromBody(body: unknown): string | undefined { if (typeof body === "string" && body.trim()) return body.trim(); if (typeof body === "object" && body !== null && !Array.isArray(body)) { for (const key of ["message", "detail", "error", "reason"]) { const value = (body as Record<string, unknown>)[key]; if (typeof value === "string" && value.trim()) return value; } } return undefined; }
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function messageFromBody(body: unknown): string | undefined { if (typeof body === "string" && body.trim()) return body.trim(); if (!isRecord(body)) return undefined; for (const key of ["message", "detail", "error", "reason"]) { const value = body[key]; if (typeof value === "string" && value.trim()) return value; if (key === "error" && isRecord(value)) { const nested = messageFromBody(value); if (nested) return nested; } } return undefined; }
 
 export class WebChatClient {
   private readonly baseUrl: string; private readonly headers: HeadersInit | undefined; private readonly fetchImpl: typeof fetch;
