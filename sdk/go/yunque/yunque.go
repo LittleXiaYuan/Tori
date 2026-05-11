@@ -46,7 +46,7 @@ import (
 )
 
 var (
-	apiBase    = envOr("YUNQUE_API_BASE", "http://localhost:9090")
+	apiBase     = envOr("YUNQUE_API_BASE", "http://localhost:9090")
 	pluginToken = os.Getenv("YUNQUE_PLUGIN_TOKEN")
 	pluginName  = envOr("YUNQUE_PLUGIN_NAME", os.Getenv("PLUGIN_NAME"))
 	pluginDir   = envOr("YUNQUE_PLUGIN_DIR", os.Getenv("PLUGIN_DIR"))
@@ -99,7 +99,7 @@ func apiCall(ctx context.Context, method, path string, body any) (map[string]any
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("api %s HTTP %d: %s", path, resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("api %s HTTP %d: %s", path, resp.StatusCode, apiErrorMessage(respBody))
 	}
 
 	var result map[string]any
@@ -107,6 +107,45 @@ func apiCall(ctx context.Context, method, path string, body any) (map[string]any
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return result, nil
+}
+
+func apiErrorMessage(body []byte) string {
+	text := strings.TrimSpace(string(body))
+	if text == "" {
+		return "request failed"
+	}
+	var parsed any
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return text
+	}
+	if msg := errorMessageFromJSON(parsed); msg != "" {
+		return msg
+	}
+	return text
+}
+
+func errorMessageFromJSON(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]any:
+		for _, key := range []string{"message", "detail", "reason"} {
+			if msg, ok := v[key].(string); ok && strings.TrimSpace(msg) != "" {
+				return strings.TrimSpace(msg)
+			}
+		}
+		if nested, ok := v["error"]; ok {
+			if msg := errorMessageFromJSON(nested); msg != "" {
+				if m, ok := nested.(map[string]any); ok {
+					if code, ok := m["code"].(string); ok && strings.TrimSpace(code) != "" && !strings.HasPrefix(msg, code+":") {
+						return strings.TrimSpace(code) + ": " + msg
+					}
+				}
+				return msg
+			}
+		}
+	}
+	return ""
 }
 
 // ── LLM ──
