@@ -125,6 +125,7 @@ import { createTaskContextClient } from "yunque-client/task-context";
 import { createTaskLifecycleClient } from "yunque-client/task-lifecycle";
 import { createTaskReadClient } from "yunque-client/task-read";
 import { createTaskCreateClient } from "yunque-client/task-create";
+import { createTaskDeleteClient } from "yunque-client/task-delete";
 import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createKnowledgeSearchClient } from "yunque-client/knowledge-search";
 import { createKnowledgeIngestClient } from "yunque-client/knowledge-ingest";
@@ -369,6 +370,12 @@ const taskCreate = createTaskCreateClient({
   token: "<your-jwt>",
 });
 await taskCreate.createFromDescription("拆 SDK 增量包", { title: "SDK" });
+
+const taskDelete = createTaskDeleteClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await taskDelete.delete("task_123");
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -872,7 +879,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-lifecycle`, `task-read`, `task-create`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -937,6 +944,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/task-lifecycle.ts` | Lightweight task run/pause/resume/restart/cancel facade without full SDK import |
 | `src/task-read.ts` | Lightweight task list/detail read-only facade without full SDK import |
 | `src/task-create.ts` | Lightweight task creation facade without full SDK import |
+| `src/task-delete.ts` | Lightweight task deletion facade without full SDK import |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `src/knowledge-search.ts` | Lightweight knowledge search-only facade without full SDK import |
 | `src/knowledge-ingest.ts` | Lightweight inline knowledge ingestion facade without full SDK import |
