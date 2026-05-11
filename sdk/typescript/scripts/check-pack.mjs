@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const maxUnpackedSize = 1_200_000;
-const maxEntryCount = 100;
+const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
 if (pkg.sideEffects !== false) {
@@ -46,6 +46,11 @@ const requiredFiles = [
   "package.json",
   ...[...exportedFiles].sort(),
 ];
+// The SDK intentionally grows by one published source file for each incremental
+// subpath. Keep the pack gate strict for unexpected extras, but scale the file
+// budget with declared exports so adding a legitimate slice does not require
+// repeatedly bumping a hard-coded total.
+const maxEntryCount = requiredFiles.length + maxNonEntryFiles;
 const forbiddenPatterns = [
   /^scripts\//,
   /^node_modules\//,
@@ -79,8 +84,8 @@ if (pack.unpackedSize > maxUnpackedSize) {
 }
 
 if (pack.entryCount > maxEntryCount) {
-  console.error(`pack entry count ${pack.entryCount} exceeds ${maxEntryCount}`);
+  console.error(`pack entry count ${pack.entryCount} exceeds dynamic budget ${maxEntryCount} (${requiredFiles.length} required files + ${maxNonEntryFiles} package overhead files)`);
   process.exit(1);
 }
 
-console.log(`pack check ok: ${pack.entryCount} files, ${pack.unpackedSize} bytes unpacked, ${pack.size} bytes tarball, ${exportedFiles.size} exported entry files verified`);
+console.log(`pack check ok: ${pack.entryCount}/${maxEntryCount} files, ${pack.unpackedSize} bytes unpacked, ${pack.size} bytes tarball, ${exportedFiles.size} exported entry files verified`);
