@@ -307,6 +307,37 @@ export interface NotifyChannel {
   enabled: boolean;
 }
 
+export interface NotifyShareFile {
+  name: string;
+  path: string;
+  size?: number;
+}
+
+export interface NotifyShareRequest {
+  channel_id: string;
+  title: string;
+  message?: string;
+  session_id?: string;
+  task_id?: string;
+  url?: string;
+  files?: NotifyShareFile[];
+}
+
+export interface NotifyShareResponse {
+  ok: boolean;
+  sent_at: string;
+  share?: {
+    code: string;
+    session_id: string;
+    created_at: string;
+  };
+  channel: {
+    id: string;
+    type: string;
+    name: string;
+  };
+}
+
 // --- Orchestrator: workers + projects ---
 
 export interface WorkerInfo {

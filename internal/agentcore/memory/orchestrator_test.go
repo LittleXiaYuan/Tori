@@ -204,16 +204,16 @@ func TestOrchestratorDecayFactor(t *testing.T) {
 		t.Fatalf("fresh item decay should be ~1.0, got %f", f)
 	}
 
-	// After 1 half-life
+	// After 1 stability period: FSRS uses R(t)=e^(-t/S), so e^(-1) ≈ 0.368
 	f = o.decayFactor(24 * time.Hour)
-	if f < 0.49 || f > 0.51 {
-		t.Fatalf("1 half-life decay should be ~0.5, got %f", f)
+	if f < 0.35 || f > 0.39 {
+		t.Fatalf("1 stability-period decay (FSRS) should be ~0.368, got %f", f)
 	}
 
-	// After 2 half-lives
+	// After 2 stability periods: FSRS e^(-2) ≈ 0.135
 	f = o.decayFactor(48 * time.Hour)
-	if f < 0.24 || f > 0.26 {
-		t.Fatalf("2 half-lives decay should be ~0.25, got %f", f)
+	if f < 0.12 || f > 0.15 {
+		t.Fatalf("2 stability-periods decay (FSRS) should be ~0.135, got %f", f)
 	}
 }
 
@@ -223,6 +223,70 @@ func TestOrchestratorDecayDisabled(t *testing.T) {
 	f := o.decayFactor(999 * time.Hour)
 	if f != 1.0 {
 		t.Fatalf("disabled decay should return 1.0, got %f", f)
+	}
+}
+
+func TestCategoryDifficulty(t *testing.T) {
+	tests := []struct {
+		category string
+		want     float64
+	}{
+		{"identity", 1.0},
+		{"name", 1.0},
+		{"persona", 1.0},
+		{"preference", 3.0},
+		{"knowledge", 5.0},
+		{"fact", 5.0},
+		{"chat", 8.0},
+		{"", 5.0},
+		{"unknown_category", 5.0},
+	}
+	for _, tt := range tests {
+		got := categoryDifficulty(tt.category)
+		if got != tt.want {
+			t.Errorf("categoryDifficulty(%q) = %f, want %f", tt.category, got, tt.want)
+		}
+	}
+}
+
+func TestCategoryAdaptiveDecay_IdentityDecaysSlower(t *testing.T) {
+	o := newTestOrchestrator()
+	o.config.DecayHalfLife = 24 * time.Hour
+	age := 7 * 24 * time.Hour // 1 week
+
+	identityDecay := o.decayFactorForCategory(age, 3, "identity")
+	chatDecay := o.decayFactorForCategory(age, 3, "chat")
+	knowledgeDecay := o.decayFactorForCategory(age, 3, "knowledge")
+
+	if identityDecay <= knowledgeDecay {
+		t.Errorf("identity (D=1.0) should decay slower than knowledge (D=5.0): identity=%f, knowledge=%f",
+			identityDecay, knowledgeDecay)
+	}
+	if knowledgeDecay <= chatDecay {
+		t.Errorf("knowledge (D=5.0) should decay slower than chat (D=8.0): knowledge=%f, chat=%f",
+			knowledgeDecay, chatDecay)
+	}
+	if identityDecay <= chatDecay {
+		t.Errorf("identity should decay much slower than chat: identity=%f, chat=%f",
+			identityDecay, chatDecay)
+	}
+}
+
+func TestCategoryAdaptiveDecay_EmptyCategoryUsesDefault(t *testing.T) {
+	o := newTestOrchestrator()
+	o.config.DecayHalfLife = 24 * time.Hour
+	age := 48 * time.Hour
+
+	defaultDecay := o.decayFactorForCategory(age, 2, "")
+	knowledgeDecay := o.decayFactorForCategory(age, 2, "knowledge")
+
+	// Empty category should match knowledge (both D=5.0)
+	diff := defaultDecay - knowledgeDecay
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > 0.001 {
+		t.Errorf("empty category should equal knowledge decay: default=%f, knowledge=%f", defaultDecay, knowledgeDecay)
 	}
 }
 

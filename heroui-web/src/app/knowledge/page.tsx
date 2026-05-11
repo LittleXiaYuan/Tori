@@ -219,7 +219,7 @@ export default function KnowledgePage() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-4 gap-3 stagger-children">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger-children">
         <Card className="section-card hover-lift">
           <Card.Content className="flex items-center gap-3 py-3">
             <Database size={18} style={{ color: "var(--yunque-accent)" }} />
@@ -403,7 +403,7 @@ export default function KnowledgePage() {
       )}
 
       {/* Search with filters */}
-      <Card>
+      <Card className="section-card">
         <Card.Content className="space-y-3">
           <div className="flex flex-row gap-3 items-end">
             <SearchField className="flex-1" name="kb-search" value={query} onChange={setQuery} onSubmit={handleSearch}>
@@ -545,7 +545,7 @@ export default function KnowledgePage() {
       {/* Edit Knowledge Modal */}
       {editSource && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }} onClick={() => setEditSource(null)}>
-          <div className="w-[480px] max-h-[80vh] rounded-2xl p-6 space-y-4 animate-scale-in" style={{ background: "var(--yunque-bg-card)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="w-[480px] max-h-[80vh] rounded-2xl p-6 space-y-4 animate-scale-in" style={{ background: "var(--glass-card, var(--yunque-card))", border: "1px solid var(--glass-edge, var(--yunque-border))", color: "var(--yunque-text)", backdropFilter: "blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate))" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold">编辑知识</h3>
               <Button isIconOnly variant="ghost" size="sm" onPress={() => setEditSource(null)}><X size={16} /></Button>

@@ -49,6 +49,10 @@ func (s *navigateSkill) Execute(ctx context.Context, args map[string]any, _ *ski
 	if url == "" {
 		return "", fmt.Errorf("url is required")
 	}
+	lower := strings.ToLower(strings.TrimSpace(url))
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return "", fmt.Errorf("only http:// and https:// URLs are allowed, got: %s", url)
+	}
 	result, err := callBrowser(ctx, s.ctrl, map[string]any{"type": "browser_navigate", "url": url})
 	if err != nil {
 		return result, err

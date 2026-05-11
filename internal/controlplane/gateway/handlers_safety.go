@@ -10,9 +10,11 @@ import (
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/apperror"
+	"yunque-agent/internal/observe"
 )
 
-//  from handlers_approval.go 
+//	from handlers_approval.go
+//
 // handleApprovalRouteSwitch dispatches /v1/approvals by method.
 func (g *Gateway) handleApprovalRouteSwitch(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -147,7 +149,7 @@ func (g *Gateway) handleApprovalDeny(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-//  from handlers_approval_rules.go 
+//  from handlers_approval_rules.go
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Approval Rules API Handlers
 //
@@ -231,7 +233,8 @@ func (g *Gateway) handleApprovalDecide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok", "decision": string(req.Decision)})
 }
 
-//  from handlers_rbac.go 
+//	from handlers_rbac.go
+//
 // handleRBACRolesSwitch dispatches /v1/rbac/roles by method.
 func (g *Gateway) handleRBACRolesSwitch(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -428,7 +431,7 @@ func (g *Gateway) handleRBACMyRoles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-//  from handlers_audit.go 
+// from handlers_audit.go
 func (g *Gateway) handleAuditTail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if g.auditChain == nil {
@@ -486,7 +489,7 @@ func (g *Gateway) handleAuditStats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(g.auditChain.Stats())
 }
 
-//  from handlers_trace.go 
+//  from handlers_trace.go
 // 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Trace API 鈥?query execution traces for audit/replay
 //
@@ -510,11 +513,13 @@ func (g *Gateway) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 	traceID := parts[0]
 
 	events := g.eventTrail.QueryByTraceID(traceID)
+	responseEvents, raw := traceEventsForResponse(r, events)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"trace_id": traceID,
 		"count":    len(events),
-		"events":   events,
+		"raw":      raw,
+		"events":   responseEvents,
 	})
 }
 
@@ -535,10 +540,12 @@ func (g *Gateway) handleTraceRecent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	events := g.eventTrail.Recent(limit)
+	responseEvents, raw := traceEventsForResponse(r, events)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"count":  len(events),
-		"events": events,
+		"raw":    raw,
+		"events": responseEvents,
 	})
 }
 
@@ -557,10 +564,31 @@ func (g *Gateway) handleTraceByTask(w http.ResponseWriter, r *http.Request) {
 	taskID := parts[0]
 
 	events := g.eventTrail.QueryByTaskID(taskID)
+	responseEvents, raw := traceEventsForResponse(r, events)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"task_id": taskID,
 		"count":   len(events),
-		"events":  events,
+		"raw":     raw,
+		"events":  responseEvents,
 	})
+}
+
+func traceEventsForResponse(r *http.Request, events []observe.AgentEvent) ([]observe.AgentEvent, bool) {
+	if traceRawMode(r) {
+		return events, true
+	}
+	out := make([]observe.AgentEvent, 0, len(events))
+	for _, event := range events {
+		out = append(out, friendlyAgentEventForStream(event))
+	}
+	return out, false
+}
+
+func traceRawMode(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	raw := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("raw")))
+	return raw == "1" || raw == "true" || raw == "yes"
 }

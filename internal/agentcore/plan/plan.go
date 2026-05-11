@@ -48,7 +48,7 @@ func DefaultBudget() Budget {
 	return Budget{MaxSteps: 20, MaxRevisions: 3, MaxDuration: 5 * time.Minute}
 }
 
-func (b *Budget) CanStep() bool  { return b.MaxSteps <= 0 || b.StepsUsed < b.MaxSteps }
+func (b *Budget) CanStep() bool   { return b.MaxSteps <= 0 || b.StepsUsed < b.MaxSteps }
 func (b *Budget) CanRevise() bool { return b.MaxRevisions <= 0 || b.RevisionsUsed < b.MaxRevisions }
 
 // ──────────────────────────────────────────────
@@ -125,12 +125,14 @@ func (p *Plan) ReadySteps() []int {
 		}
 		allMet := true
 		for _, dep := range step.DependsOn {
-			if dep >= 0 && dep < len(p.Steps) {
-				ds := p.Steps[dep].Status
-				if ds != StepCompleted && ds != StepSkipped {
-					allMet = false
-					break
-				}
+			if dep < 0 || dep >= len(p.Steps) {
+				allMet = false
+				break
+			}
+			ds := p.Steps[dep].Status
+			if ds != StepCompleted && ds != StepSkipped {
+				allMet = false
+				break
 			}
 		}
 		if allMet {
@@ -538,6 +540,16 @@ func (m *Manager) ExecuteDAG(ctx context.Context, planID string) error {
 		if !p.Budget.CanStep() {
 			p.Status = PlanFailed
 			return fmt.Errorf("plan: budget exhausted")
+		}
+		if p.Budget.MaxSteps > 0 {
+			remaining := p.Budget.MaxSteps - p.Budget.StepsUsed
+			if remaining <= 0 {
+				p.Status = PlanFailed
+				return fmt.Errorf("plan: budget exhausted")
+			}
+			if len(ready) > remaining {
+				ready = ready[:remaining]
+			}
 		}
 		type result struct {
 			idx   int

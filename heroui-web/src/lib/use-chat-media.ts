@@ -11,6 +11,9 @@ export type PendingFile = {
   size: number;
   preview?: string;
   base64?: string;
+  workspacePath?: string;
+  parsedText?: string;
+  parser?: string;
   type: "image" | "video" | "text" | "binary";
   status?: "ready" | "uploading" | "parsed" | "error";
   note?: string;
@@ -69,37 +72,49 @@ export function useChatMedia(
       setPendingFiles(prev => [...prev, {
         id: fileId, name: file.name, size: file.size,
         type: isText ? "text" : "binary", status: "uploading",
-        note: "Uploading to workspace...",
+        note: "正在添加附件…",
       }]);
-      const input = getCurrentInput();
       api.uploadFile(file).then(res => {
+        const parserName = typeof res.parse?.parser === "string" ? res.parse.parser : "";
         const parsePreview = typeof res.parse?.preview === "string" ? res.parse.preview.trim() : "";
-        const uploadLine = parsePreview
-          ? [`[Parsed document: ${file.name}]`, `Workspace path: ${res.path}`, "", parsePreview].join("\n")
-          : `Uploaded file: ${res.path}`;
-        chatD({ type: "SET_INPUT", value: input + (input ? "\n" : "") + uploadLine });
+        const parseNote = typeof res.parse?.note === "string" ? res.parse.note.trim() : "";
+        const parseStatus = typeof res.parse?.status === "string" ? res.parse.status : "";
+        const note = parsePreview
+          ? "已添加，发送后由模型读取"
+          : parseStatus === "needs_document_parser"
+            ? (parseNote || "附件已保留，等待文档解析后端展开正文")
+            : (parseNote || "附件已添加");
         setPendingFiles(prev => prev.map(item => item.id === fileId ? {
           ...item,
-          status: res.parse?.parser === "mineru" ? "parsed" : "ready",
-          note: res.parse?.parser === "mineru" ? "Parsed by MinerU" : `Saved to ${res.path}`,
+          workspacePath: res.path,
+          parsedText: parsePreview || undefined,
+          parser: parserName || undefined,
+          status: parsePreview ? "parsed" : "ready",
+          note,
         } : item));
-        if (res.parse?.parser === "mineru") {
-          showToast(`Parsed ${file.name} with MinerU.`, "success");
+        if (parsePreview) {
+          showToast(`附件 ${file.name} 已添加，发送后由模型读取。`, "success");
+        } else if (parseNote) {
+          showToast(parseNote, parseStatus === "needs_document_parser" ? "info" : "info");
         }
       }).catch(() => {
         setPendingFiles(prev => prev.map(item => item.id === fileId ? {
-          ...item, status: "error", note: "Upload failed, using local fallback",
+          ...item, status: "error", note: "上传失败，尝试作为文本附件加入",
         } : item));
         if (isText) {
           const reader = new FileReader();
           reader.onload = () => {
-            const text = reader.result as string;
-            chatD({ type: "SET_INPUT", value: input + (input ? "\n" : "") + `[File: ${file.name}]\n${text.slice(0, 4000)}` });
+            const text = String(reader.result || "").slice(0, 12000);
+            setPendingFiles(prev => prev.map(item => item.id === fileId ? {
+              ...item,
+              parsedText: text,
+              status: "parsed",
+              note: "已添加，发送后由模型读取",
+            } : item));
           };
           reader.readAsText(file);
         } else {
-          const sizeStr = file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
-          chatD({ type: "SET_INPUT", value: input + (input ? "\n" : "") + `[File: ${file.name} (${sizeStr})]` });
+          showToast(`文件 ${file.name} 上传失败，请重新上传。`, "error");
         }
       });
     }

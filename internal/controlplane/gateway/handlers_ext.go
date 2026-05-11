@@ -139,6 +139,7 @@ func (g *Gateway) handleConversationMessages(w http.ResponseWriter, r *http.Requ
 	switch r.Method {
 	case http.MethodGet:
 		msgs := g.convStore.Get(sessionID)
+		msgs = visibleConversationMessages(msgs)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"messages": msgs, "count": len(msgs)})
 	case http.MethodDelete:
@@ -148,6 +149,20 @@ func (g *Gateway) handleConversationMessages(w http.ResponseWriter, r *http.Requ
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET or DELETE only")
 	}
+}
+
+func visibleConversationMessages(msgs []llm.Message) []llm.Message {
+	if len(msgs) == 0 {
+		return nil
+	}
+	out := make([]llm.Message, 0, len(msgs))
+	for _, msg := range msgs {
+		if isHiddenAttachmentContextMessage(msg) {
+			continue
+		}
+		out = append(out, msg)
+	}
+	return out
 }
 
 // handleConversationManage handles rename, pin, archive operations on a conversation.
@@ -249,11 +264,21 @@ func (g *Gateway) handleFeishuWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Process message async and reply via Feishu API
-	if body.Event.Message.Content != "" {
+	incomingText := feishuMessageText(body.Event.Message.Content)
+	if incomingText != "" {
 		safego.Go("feishu-webhook-reply", func() {
 			ctx := context.Background()
+			if code, content, ok := parseCollabCommand(incomingText); ok {
+				reply := g.handleCollabInbound(ctx, code, content, "feishu", body.Event.Message.ChatID)
+				if g.feishuAPI != nil && body.Event.Message.ChatID != "" {
+					if err := g.feishuAPI.SendMessage(body.Event.Message.ChatID, reply); err != nil {
+						slog.Error("feishu collab reply error", "err", err)
+					}
+				}
+				return
+			}
 			result, err := g.planner.Run(ctx, planner.PlanRequest{
-				Messages: []llm.Message{{Role: "user", Content: body.Event.Message.Content}},
+				Messages: []llm.Message{{Role: "user", Content: incomingText}},
 				TenantID: "default",
 			})
 			if err != nil {
@@ -386,7 +411,6 @@ func (g *Gateway) handleIdentityProfiles(w http.ResponseWriter, r *http.Request)
 }
 
 // --- Cost Tracking API ---
-
 
 // --- Embeddings API ---
 

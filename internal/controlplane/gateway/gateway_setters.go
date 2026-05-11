@@ -7,37 +7,31 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/adaptive"
-	"yunque-agent/pkg/safego"
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/cron"
-	"yunque-agent/internal/experimental/distill"
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/guardrails"
-	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/instruction"
-	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
-	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/notify"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/rbac"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/agentcore/review"
 	"yunque-agent/internal/agentcore/router"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
 	"yunque-agent/internal/agentcore/session"
-	"yunque-agent/internal/experimental/skillgrow"
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/speech"
 	"yunque-agent/internal/agentcore/state"
@@ -51,12 +45,18 @@ import (
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
+	"yunque-agent/internal/experimental/distill"
+	"yunque-agent/internal/experimental/heartbeat"
+	"yunque-agent/internal/experimental/iterate"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
+	"yunque-agent/internal/experimental/skillgrow"
 	"yunque-agent/internal/integrations/mineru"
 	"yunque-agent/internal/observe"
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/plugin"
+	"yunque-agent/pkg/safego"
 )
 
 // --- Component setters ---
@@ -395,6 +395,26 @@ func (g *Gateway) ExecProvider() string {
 	return g.execProvider
 }
 
+// ProviderClient returns an enabled provider client by id.
+func (g *Gateway) ProviderClient(id string) (*llm.Client, bool) {
+	if g.providerReg == nil || id == "" || id == "smart" {
+		return nil, false
+	}
+	p := g.providerReg.Get(id)
+	if p == nil {
+		for _, status := range g.providerReg.List() {
+			if status.ID+"-"+status.Model == id {
+				p = g.providerReg.Get(status.ID)
+				break
+			}
+		}
+	}
+	if p == nil || !p.Config.Enabled || p.Client == nil {
+		return nil, false
+	}
+	return p.Client, true
+}
+
 // SetModelKVStore injects a Ledger KV store into the model manager for persistence.
 func (g *Gateway) SetModelKVStore(kvs modelKVStore) {
 	if g.modelMgr != nil {
@@ -408,6 +428,9 @@ func (g *Gateway) SetUsageKVStore(kvs usageKVStore) {
 		g.usage.SetKVStore(kvs)
 	}
 }
+
+// SetLedgerHealthChecker attaches the persistent state health check used by probes.
+func (g *Gateway) SetLedgerHealthChecker(h healthChecker) { g.ledgerHealth = h }
 
 // FlushUsageKV persists usage data before shutdown.
 func (g *Gateway) FlushUsageKV() {

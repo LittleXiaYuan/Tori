@@ -356,11 +356,17 @@ func writeDocx(path string, payload docxPayload) error {
 
 	bodyXML := buildDocxBodyXML(payload)
 
-	writeZipFile(w, "[Content_Types].xml", docxContentTypes)
-	writeZipFile(w, "_rels/.rels", docxRootRels)
-	writeZipFile(w, "word/_rels/document.xml.rels", docxDocRels)
-	writeZipFile(w, "word/styles.xml", docxStylesXML)
-	writeZipFile(w, "word/document.xml", bodyXML)
+	for _, entry := range []struct{ name, content string }{
+		{"[Content_Types].xml", docxContentTypes},
+		{"_rels/.rels", docxRootRels},
+		{"word/_rels/document.xml.rels", docxDocRels},
+		{"word/styles.xml", docxStylesXML},
+		{"word/document.xml", bodyXML},
+	} {
+		if err := writeZipFile(w, entry.name, entry.content); err != nil {
+			return fmt.Errorf("write %s: %w", entry.name, err)
+		}
+	}
 	return nil
 }
 
@@ -743,12 +749,13 @@ func parseDocContent(title, content string) []docBlock {
 	return out
 }
 
-func writeZipFile(w *zip.Writer, name, content string) {
+func writeZipFile(w *zip.Writer, name, content string) error {
 	f, err := w.Create(name)
 	if err != nil {
-		return
+		return err
 	}
-	f.Write([]byte(content))
+	_, err = f.Write([]byte(content))
+	return err
 }
 
 func docXMLEscape(s string) string {

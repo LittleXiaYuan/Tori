@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, createContext, useContext } from "react";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 interface ToastItem {
   id: string;
@@ -17,12 +18,12 @@ export const useToast = () => useContext(ToastContext);
 
 let globalToast: ToastCtx["toast"] = () => {};
 export function showToast(message: string, type: ToastItem["type"] = "info") {
-  globalToast(message, type);
+  globalToast(type === "error" ? formatErrorMessage(message, "操作失败") : message, type);
 }
 
 /** Shorthand for error toasts from catch blocks */
 export function showErrorToast(e: unknown, fallback = "操作失败") {
-  globalToast(e instanceof Error ? e.message : fallback, "error");
+  globalToast(formatErrorMessage(e, fallback), "error");
 }
 
 const typeStyles: Record<ToastItem["type"], { bg: string; border: string; text: string }> = {
@@ -37,7 +38,8 @@ export function Toaster() {
 
   const toast = useCallback((message: string, type: ToastItem["type"] = "info") => {
     const id = `t-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const displayMessage = type === "error" ? formatErrorMessage(message, "操作失败") : message;
+    setToasts((prev) => [...prev, { id, message: displayMessage, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }, []);
 

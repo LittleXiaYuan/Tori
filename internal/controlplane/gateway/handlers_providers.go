@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/tori"
 )
@@ -470,7 +472,7 @@ func (g *Gateway) handleExecProvider(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"exec_provider":      pid,
+			"exec_provider":       pid,
 			"available_providers": providers,
 		})
 
@@ -483,6 +485,7 @@ func (g *Gateway) handleExecProvider(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		g.SetExecProvider(req.ProviderID)
+		_ = os.WriteFile(appdir.File("exec_provider.json"), []byte(`{"provider_id":`+strconvQuote(req.ProviderID)+`}`), 0o600)
 		slog.Info("exec provider updated via API", "provider", req.ProviderID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "exec_provider": req.ProviderID})
@@ -490,6 +493,11 @@ func (g *Gateway) handleExecProvider(w http.ResponseWriter, r *http.Request) {
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 	}
+}
+
+func strconvQuote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 // handleBreakerReset manually resets all LLM circuit breakers.

@@ -5,6 +5,7 @@ import { api, type TrustEntry } from "@/lib/api";
 import { Card, Button, Spinner, Tooltip, Chip, ProgressBar } from "@heroui/react";
 import { ShieldCheck, Zap, RotateCcw, RefreshCw } from "lucide-react";
 import { useApiData } from "@/lib/use-api-data";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 const LEVEL_COLORS: Record<string, string> = {
   shell: "#ef4444", network: "#f59e0b", write: "#3b82f6", "read-only": "#6b7280",
@@ -29,13 +30,13 @@ export default function TrustPage() {
 
   const handleGrant = async (slug: string) => {
     setActing(slug);
-    try { await api.trustGrant(slug); refresh(); } catch (e: unknown) { setError(String((e as Error)?.message || "授权失败")); }
+    try { await api.trustGrant(slug); refresh(); } catch (e: unknown) { setError(formatErrorMessage(e, "授权失败")); }
     setActing("");
   };
 
   const handleReset = async (slug: string) => {
     setActing(slug);
-    try { await api.trustReset(slug); refresh(); } catch (e: unknown) { setError(String((e as Error)?.message || "重置失败")); }
+    try { await api.trustReset(slug); refresh(); } catch (e: unknown) { setError(formatErrorMessage(e, "重置失败")); }
     setActing("");
   };
 

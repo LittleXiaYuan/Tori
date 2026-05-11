@@ -7,9 +7,8 @@ package channel
 // Outbound: text (仅纯文本，无模板/交互消息)
 // Env vars: WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN,
 //           WHATSAPP_VERIFY_TOKEN, WHATSAPP_WEBHOOK_PATH
-// Status:   Stub — 基础可用，缺少签名校验和多媒体支持
+// Status:   Stub — 基础可用，已支持 webhook 签名校验, 缺少多媒体支持
 //
-// TODO: [P1] 添加 X-Hub-Signature-256 签名校验 (handleMessage)
 // TODO: [P2] 支持入站多媒体消息 (image/audio/document/video/location/sticker)
 // TODO: [P2] 支持出站交互消息 (interactive buttons/lists)
 // TODO: [P3] 支持 WhatsApp 模板消息 (template messages)
@@ -19,11 +18,14 @@ package channel
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -35,6 +37,7 @@ type WhatsApp struct {
 	phoneNumberID string // WhatsApp phone number ID
 	token         string // permanent or temporary access token
 	verifyToken   string // webhook verify token
+	appSecret     string // webhook app secret for X-Hub-Signature-256
 	client        *http.Client
 	webhookPath   string // e.g. "/webhook/whatsapp"
 }
@@ -44,6 +47,7 @@ type WhatsAppConfig struct {
 	PhoneNumberID string `json:"phone_number_id"`
 	AccessToken   string `json:"access_token"`
 	VerifyToken   string `json:"verify_token"`
+	AppSecret     string `json:"app_secret"`
 	WebhookPath   string `json:"webhook_path"`
 }
 
@@ -57,6 +61,7 @@ func NewWhatsApp(cfg WhatsAppConfig) *WhatsApp {
 		phoneNumberID: cfg.PhoneNumberID,
 		token:         cfg.AccessToken,
 		verifyToken:   cfg.VerifyToken,
+		appSecret:     cfg.AppSecret,
 		client:        &http.Client{Timeout: 30 * time.Second},
 		webhookPath:   path,
 	}
@@ -151,10 +156,27 @@ func (w *WhatsApp) handleVerify(rw http.ResponseWriter, r *http.Request) {
 
 // handleMessage processes incoming webhook events.
 func (w *WhatsApp) handleMessage(rw http.ResponseWriter, r *http.Request, handler func(Message) Reply) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		slog.Warn("whatsapp: read webhook body failed", "err", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	if w.appSecret != "" {
+		signature := r.Header.Get("X-Hub-Signature-256")
+		if !w.verifySignature(body, signature) {
+			slog.Warn("whatsapp: signature verification failed", "remote", r.RemoteAddr)
+			rw.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
 	rw.WriteHeader(http.StatusOK) // always ack quickly
 
 	var payload waWebhookPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(body, &payload); err != nil {
 		slog.Warn("whatsapp: invalid webhook payload", "err", err)
 		return
 	}
@@ -189,6 +211,58 @@ func (w *WhatsApp) handleMessage(rw http.ResponseWriter, r *http.Request, handle
 				}
 			}
 		}
+	}
+}
+
+func (w *WhatsApp) verifySignature(body []byte, signature string) bool {
+	if w.appSecret == "" || signature == "" {
+		return false
+	}
+	const prefix = "sha256="
+	if !strings.HasPrefix(signature, prefix) {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(w.appSecret))
+	if _, err := mac.Write(body); err != nil {
+		return false
+	}
+	expected := mac.Sum(nil)
+	actual, err := decodeHexString(strings.TrimPrefix(signature, prefix))
+	if err != nil {
+		return false
+	}
+	return hmac.Equal(expected, actual)
+}
+
+func decodeHexString(s string) ([]byte, error) {
+	if len(s)%2 != 0 {
+		return nil, fmt.Errorf("invalid hex length")
+	}
+	out := make([]byte, len(s)/2)
+	for i := 0; i < len(out); i++ {
+		hi, ok := fromHexNibble(s[2*i])
+		if !ok {
+			return nil, fmt.Errorf("invalid hex")
+		}
+		lo, ok := fromHexNibble(s[2*i+1])
+		if !ok {
+			return nil, fmt.Errorf("invalid hex")
+		}
+		out[i] = hi<<4 | lo
+	}
+	return out, nil
+}
+
+func fromHexNibble(c byte) (byte, bool) {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0', true
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10, true
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10, true
+	default:
+		return 0, false
 	}
 }
 

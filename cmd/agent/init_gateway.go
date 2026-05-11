@@ -14,19 +14,19 @@ import (
 	"syscall"
 	"time"
 
-	"yunque-agent/internal/backup"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/planner"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/session"
+	"yunque-agent/internal/backup"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/controlplane/tenant"
+	"yunque-agent/internal/desktop"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/scheduler"
-	"yunque-agent/internal/desktop"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/tori"
 	"yunque-agent/internal/updater"
 	pluginpkg "yunque-agent/pkg/plugin"
@@ -67,6 +67,9 @@ func initGateway(app *agentrt.App) error {
 	bindingRouter := agentrt.NewRouter(rtPool)
 	gw.SetRuntimePool(rtPool)
 	gw.SetBindingRouter(bindingRouter)
+	if app.Ledger != nil {
+		gw.SetLedgerHealthChecker(app.Ledger)
+	}
 	app.RuntimePool = rtPool
 	slog.Info("runtime pool + binding router initialized", "agents", rtPool.Count())
 
@@ -259,13 +262,13 @@ func initGateway(app *agentrt.App) error {
 	}
 	srv.Addr = actualAddr
 
-	go func() {
+	safego.Go("http-server", func() {
 		slog.Info("yunque-agent listening", "addr", actualAddr)
 		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			slog.Error("listen", "err", err)
 			os.Exit(1)
 		}
-	}()
+	})
 
 	browserURL := "http://localhost" + actualAddr
 	if os.Getenv("OPEN_BROWSER") != "false" {
@@ -393,4 +396,3 @@ func openBrowser(url string) {
 		slog.Debug("auto-open browser failed", "err", err)
 	}
 }
-

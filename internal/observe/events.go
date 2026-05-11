@@ -19,15 +19,15 @@ import (
 
 // AgentEvent is the universal event structure for all agent subsystems.
 type AgentEvent struct {
-	ID        string    `json:"id"`                   // unique event ID (evt-...)
-	TraceID   string    `json:"trace_id"`             // trace context
-	SpanID    string    `json:"span_id,omitempty"`    // span context
-	Timestamp time.Time `json:"ts"`                   // event time
-	Domain    string    `json:"domain"`               // "planner", "workflow", "approval", "agent"
-	Type      string    `json:"type"`                 // "thinking", "tool_start", "node_done", etc.
-	Summary   string    `json:"summary"`              // human-readable one-liner
-	Detail    any       `json:"detail,omitempty"`      // structured payload (skill args, node config, etc.)
-	Meta      EventMeta `json:"meta"`                 // correlation metadata
+	ID        string    `json:"id"`                // unique event ID (evt-...)
+	TraceID   string    `json:"trace_id"`          // trace context
+	SpanID    string    `json:"span_id,omitempty"` // span context
+	Timestamp time.Time `json:"ts"`                // event time
+	Domain    string    `json:"domain"`            // "planner", "workflow", "approval", "agent"
+	Type      string    `json:"type"`              // "thinking", "tool_start", "node_done", etc.
+	Summary   string    `json:"summary"`           // human-readable one-liner
+	Detail    any       `json:"detail,omitempty"`  // structured payload (skill args, node config, etc.)
+	Meta      EventMeta `json:"meta"`              // correlation metadata
 }
 
 // EventMeta carries correlation IDs for cross-system linkage.
@@ -66,6 +66,7 @@ const (
 	EventToolResult   = "tool_result"
 	EventReflect      = "reflect"
 	EventPlan         = "plan"
+	EventPartial      = "partial_result"
 	EventHandoffStart = "handoff_start"
 	EventHandoffDone  = "handoff_done"
 )
@@ -110,11 +111,13 @@ func NewEvent(traceID, domain, eventType, summary string) AgentEvent {
 
 // HandoffDetail is the Detail payload for handoff_start / handoff_done events.
 type HandoffDetail struct {
-	Agent string `json:"agent"`
-	Input string `json:"input,omitempty"`
-	Reply string `json:"reply,omitempty"`
-	Error string `json:"error,omitempty"`
-	DurMs int64  `json:"dur_ms,omitempty"`
+	Agent       string `json:"agent"`
+	Input       string `json:"input,omitempty"`
+	Reply       string `json:"reply,omitempty"`
+	Error       string `json:"error,omitempty"`
+	DurMs       int64  `json:"dur_ms,omitempty"`
+	Recoverable bool   `json:"recoverable,omitempty"`
+	NextStep    string `json:"next_step,omitempty"`
 }
 
 // ToolStartDetail is the Detail payload for tool_start events.
@@ -129,6 +132,27 @@ type ToolResultDetail struct {
 	Result string      `json:"result,omitempty"`
 	Error  string      `json:"error,omitempty"`
 	Files  []FileEntry `json:"files,omitempty"`
+}
+
+// PartialResultDetail is emitted when the planner has useful stage results
+// but cannot complete final synthesis in the current turn.
+type PartialResultDetail struct {
+	Recoverable    bool              `json:"recoverable"`
+	CompletedCount int               `json:"completed_count"`
+	FailedCount    int               `json:"failed_count"`
+	Steps          []PartialStepView `json:"steps,omitempty"`
+	NextStep       string            `json:"next_step"`
+	Reason         string            `json:"reason,omitempty"`
+}
+
+// PartialStepView is a UI-safe snapshot of a planner step.
+type PartialStepView struct {
+	ID     int    `json:"id"`
+	Skill  string `json:"skill,omitempty"`
+	Action string `json:"action,omitempty"`
+	Status string `json:"status"`
+	Result string `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
 }
 
 // FileEntry describes a file produced by a tool invocation.

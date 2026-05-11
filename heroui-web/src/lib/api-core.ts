@@ -1,3 +1,5 @@
+import { formatErrorMessage } from "./error-utils";
+
 const BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
 let apiKey = "";
@@ -42,7 +44,13 @@ export async function fetcher<T>(path: string, opts?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    let payload: unknown = text;
+    try {
+      payload = text ? JSON.parse(text) : text;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(`${res.status}: ${formatErrorMessage(payload, text || "request failed")}`);
   }
   return res.json();
 }

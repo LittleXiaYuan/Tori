@@ -16,13 +16,18 @@ import (
 // Ledger (SQLite) is the primary persistence layer, initialized here in Phase 1
 // so that all later phases (memory, planner, tasks) can access it via app.Get("github.com/LittleXiaYuan/ledger").
 func initStorage(app *agentrt.App) error {
-	ldg, err := iledger.InitLedger()
+	dbPath := os.Getenv("LEDGER_DB_PATH")
+	if dbPath == "" {
+		dbPath = app.Config.DataPath("ledger", "ledger.db")
+	}
+
+	ldg, err := iledger.InitLedgerAt(dbPath)
 	if err != nil {
 		if os.Getenv("ALLOW_EPHEMERAL") == "true" {
-		slog.Error("╔══════════════════════════════════════════════════════════╗")
-		slog.Error("║ LEDGER INIT FAILED - running in EPHEMERAL mode          ║")
-		slog.Error("║ All data will be LOST on restart!                        ║")
-		slog.Error("╚══════════════════════════════════════════════════════════╝",
+			slog.Error("╔══════════════════════════════════════════════════════════╗")
+			slog.Error("║ LEDGER INIT FAILED - running in EPHEMERAL mode          ║")
+			slog.Error("║ All data will be LOST on restart!                        ║")
+			slog.Error("╚══════════════════════════════════════════════════════════╝",
 				"err", err)
 			return nil
 		}
@@ -32,10 +37,6 @@ func initStorage(app *agentrt.App) error {
 	app.Set("github.com/LittleXiaYuan/ledger", ldg)
 	app.Ledger = ldg
 
-	dbPath := os.Getenv("LEDGER_DB_PATH")
-	if dbPath == "" {
-		dbPath = app.Config.DataPath("ledger.db")
-	}
 	slog.Info("storage: Ledger (SQLite) initialized", "db", dbPath)
 
 	// Periodic WAL checkpoint (every 5 minutes) + health check (every hour)

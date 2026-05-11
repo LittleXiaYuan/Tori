@@ -87,7 +87,8 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		} else if strings.Contains(err.Error(), "guardrail") {
 			apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		} else {
-			apperror.Write(w, apperror.Wrap(apperror.CodeLLMError, "planner execution failed", err))
+			slog.Warn("chat pipeline failed", "err", err)
+			apperror.Write(w, apperror.New(apperror.CodeLLMError, friendlyChatPipelineError(err)))
 		}
 		return
 	}
@@ -133,6 +134,17 @@ func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(out)
+}
+
+func friendlyChatPipelineError(err error) string {
+	if err == nil {
+		return "任务暂时没有完成，已保留现场，可稍后重试或继续。"
+	}
+	raw := strings.TrimSpace(err.Error())
+	if friendly := plannerKnownFriendlyError(raw); friendly != "" {
+		return friendly
+	}
+	return "任务暂时没有完成，已保留现场，可稍后重试或切换策略继续。"
 }
 
 // generateConversationTitle uses a fast LLM call to generate a short title for the conversation.

@@ -19,7 +19,9 @@ import (
 type MidTerm struct {
 	mu    sync.RWMutex
 	items map[string]map[string]Item // tenantID -> key -> Item
-	// IDF cache: rebuilt on mutation
+	// IDF cache: separate mutex to avoid write-under-RLock race when
+	// Search() lazily rebuilds the IDF index under items RLock.
+	idfMu    sync.Mutex
 	idfCache map[string]map[string]float64 // tenantID -> term -> idf
 	idfDirty map[string]bool               // tenantID -> needs rebuild
 }
@@ -80,7 +82,9 @@ func (m *MidTerm) Put(_ context.Context, tenantID string, item Item) error {
 			m.items[tenantID][item.Key] = item
 		}
 	}
+	m.idfMu.Lock()
 	m.idfDirty[tenantID] = true
+	m.idfMu.Unlock()
 	return nil
 }
 
@@ -204,7 +208,9 @@ func (m *MidTerm) Delete(_ context.Context, tenantID, key string) error {
 	defer m.mu.Unlock()
 	if m.items[tenantID] != nil {
 		delete(m.items[tenantID], key)
+		m.idfMu.Lock()
 		m.idfDirty[tenantID] = true
+		m.idfMu.Unlock()
 	}
 	return nil
 }
@@ -252,7 +258,12 @@ func (m *MidTerm) ExportAll() map[string][]Item {
 // --- TF-IDF engine ---
 
 // getIDF returns (or rebuilds) the IDF map for a tenant.
+// Uses a separate idfMu to safely rebuild the index while callers
+// hold only items RLock.
 func (m *MidTerm) getIDF(tenantID string) map[string]float64 {
+	m.idfMu.Lock()
+	defer m.idfMu.Unlock()
+
 	if !m.idfDirty[tenantID] && m.idfCache[tenantID] != nil {
 		return m.idfCache[tenantID]
 	}
@@ -263,7 +274,6 @@ func (m *MidTerm) getIDF(tenantID string) map[string]float64 {
 		return nil
 	}
 
-	// Count document frequency for each term
 	df := make(map[string]int)
 	for _, item := range tenant {
 		seen := make(map[string]bool)
@@ -277,7 +287,6 @@ func (m *MidTerm) getIDF(tenantID string) map[string]float64 {
 
 	idf := make(map[string]float64, len(df))
 	for term, count := range df {
-		// Standard IDF: log(N / df) + 1 (smoothed)
 		idf[term] = math.Log(N/float64(count)) + 1.0
 	}
 

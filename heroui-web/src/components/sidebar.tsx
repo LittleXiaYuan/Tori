@@ -11,16 +11,20 @@ import {
   SmilePlus, HeartPulse, Lightbulb, Bot, GraduationCap,
   MessageSquareText, Users, Share2, Menu, X, Languages,
   PanelLeftClose, PanelLeftOpen, FolderGit2, Boxes, CircuitBoard,
+  Sparkles, Layers,
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+
+type ProfileMode = "easy" | "full";
 
 interface NavItem {
   href: string;
   label: string;
   labelEn: string;
   icon: React.ReactNode;
+  tier?: ProfileMode;
 }
 
 interface NavCategory {
@@ -29,45 +33,46 @@ interface NavCategory {
   labelEn: string;
   icon: React.ReactNode;
   href?: string;
+  tier?: ProfileMode;
   children?: NavItem[];
 }
 
 const categories: NavCategory[] = [
-  { id: "dashboard", label: "概览", labelEn: "Overview", icon: <LayoutDashboard size={16} />, href: "/dashboard" },
-  { id: "chat", label: "对话", labelEn: "Chat", icon: <MessageCircle size={16} />, href: "/chat" },
+  { id: "dashboard", label: "概览", labelEn: "Overview", icon: <LayoutDashboard size={16} />, href: "/dashboard", tier: "easy" },
+  { id: "chat", label: "对话", labelEn: "Chat", icon: <MessageCircle size={16} />, href: "/chat", tier: "easy" },
   { id: "work", label: "工作", labelEn: "Work", icon: <Zap size={16} />, children: [
-    { href: "/missions", label: "任务中心", labelEn: "Missions", icon: <Zap size={16} /> },
-    { href: "/task-run", label: "执行视图", labelEn: "Execution", icon: <Terminal size={16} /> },
-    { href: "/workflows", label: "工作流", labelEn: "Workflows", icon: <Blocks size={16} /> },
-    { href: "/workers", label: "Worker", labelEn: "Workers", icon: <Cpu size={16} /> },
-    { href: "/projects", label: "项目", labelEn: "Projects", icon: <FolderGit2 size={16} /> },
-    { href: "/skills", label: "技能", labelEn: "Skills", icon: <Package size={16} /> },
-    { href: "/plugins", label: "插件", labelEn: "Plugins", icon: <Puzzle size={16} /> },
-    { href: "/cognis", label: "智体", labelEn: "Cognis", icon: <Boxes size={16} /> },
-    { href: "/tools", label: "终端", labelEn: "Terminal", icon: <Wrench size={16} /> },
-    { href: "/browser", label: "浏览器", labelEn: "Browser", icon: <Globe size={16} /> },
+    { href: "/missions", label: "任务中心", labelEn: "Missions", icon: <Zap size={16} />, tier: "easy" },
+    { href: "/task-run", label: "执行视图", labelEn: "Execution", icon: <Terminal size={16} />, tier: "full" },
+    { href: "/workflows", label: "工作流", labelEn: "Workflows", icon: <Blocks size={16} />, tier: "full" },
+    { href: "/workers", label: "Worker", labelEn: "Workers", icon: <Cpu size={16} />, tier: "full" },
+    { href: "/projects", label: "项目", labelEn: "Projects", icon: <FolderGit2 size={16} />, tier: "full" },
+    { href: "/skills", label: "技能", labelEn: "Skills", icon: <Package size={16} />, tier: "full" },
+    { href: "/plugins", label: "插件", labelEn: "Plugins", icon: <Puzzle size={16} />, tier: "full" },
+    { href: "/cognis", label: "智体", labelEn: "Cognis", icon: <Boxes size={16} />, tier: "full" },
+    { href: "/tools", label: "终端", labelEn: "Terminal", icon: <Wrench size={16} />, tier: "full" },
+    { href: "/browser", label: "浏览器", labelEn: "Browser", icon: <Globe size={16} />, tier: "full" },
   ]},
   { id: "intelligence", label: "智能", labelEn: "Intelligence", icon: <Brain size={16} />, children: [
-    { href: "/knowledge", label: "知识库", labelEn: "Knowledge", icon: <BookOpen size={16} /> },
-    { href: "/memory", label: "记忆", labelEn: "Memory", icon: <Brain size={16} /> },
-    { href: "/graph", label: "知识图谱", labelEn: "Graph", icon: <Share2 size={16} /> },
-    { href: "/persona", label: "角色", labelEn: "Persona", icon: <ScanFace size={16} /> },
-    { href: "/emotions", label: "情绪", labelEn: "Emotions", icon: <SmilePlus size={16} /> },
-    { href: "/reflect", label: "反思", labelEn: "Reflection", icon: <Lightbulb size={16} /> },
-    { href: "/reverie", label: "内心独白", labelEn: "Reverie", icon: <BrainCircuit size={16} /> },
-    { href: "/lora", label: "LoRA 训练", labelEn: "LoRA", icon: <CircuitBoard size={16} /> },
-    { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} /> },
+    { href: "/knowledge", label: "知识库", labelEn: "Knowledge", icon: <BookOpen size={16} />, tier: "easy" },
+    { href: "/memory", label: "记忆", labelEn: "Memory", icon: <Brain size={16} />, tier: "full" },
+    { href: "/graph", label: "知识图谱", labelEn: "Graph", icon: <Share2 size={16} />, tier: "full" },
+    { href: "/persona", label: "角色", labelEn: "Persona", icon: <ScanFace size={16} />, tier: "full" },
+    { href: "/emotions", label: "情绪", labelEn: "Emotions", icon: <SmilePlus size={16} />, tier: "full" },
+    { href: "/reflect", label: "反思", labelEn: "Reflection", icon: <Lightbulb size={16} />, tier: "full" },
+    { href: "/reverie", label: "思考记录", labelEn: "Reverie", icon: <BrainCircuit size={16} />, tier: "full" },
+    { href: "/lora", label: "LoRA 训练", labelEn: "LoRA", icon: <CircuitBoard size={16} />, tier: "full" },
+    { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} />, tier: "full" },
   ]},
   { id: "system", label: "系统", labelEn: "System", icon: <ShieldCheck size={16} />, children: [
-    { href: "/models", label: "模型", labelEn: "Models", icon: <Cpu size={16} /> },
-    { href: "/metrics", label: "指标", labelEn: "Metrics", icon: <BarChart3 size={16} /> },
-    { href: "/approvals", label: "审批", labelEn: "Approvals", icon: <ShieldCheck size={16} /> },
-    { href: "/audit", label: "审计", labelEn: "Audit", icon: <Shield size={16} /> },
-    { href: "/trust", label: "信任", labelEn: "Trust", icon: <ShieldCheck size={16} /> },
-    { href: "/tenants", label: "租户", labelEn: "Tenants", icon: <Users size={16} /> },
-    { href: "/backup", label: "备份", labelEn: "Backup", icon: <HardDriveDownload size={16} /> },
-    { href: "/bots", label: "Bot", labelEn: "Bots", icon: <Bot size={16} /> },
-    { href: "/settings", label: "设置", labelEn: "Settings", icon: <Settings size={16} /> },
+    { href: "/models", label: "模型", labelEn: "Models", icon: <Cpu size={16} />, tier: "easy" },
+    { href: "/metrics", label: "指标", labelEn: "Metrics", icon: <BarChart3 size={16} />, tier: "full" },
+    { href: "/approvals", label: "审批", labelEn: "Approvals", icon: <ShieldCheck size={16} />, tier: "full" },
+    { href: "/audit", label: "审计", labelEn: "Audit", icon: <Shield size={16} />, tier: "full" },
+    { href: "/trust", label: "信任", labelEn: "Trust", icon: <ShieldCheck size={16} />, tier: "full" },
+    { href: "/tenants", label: "租户", labelEn: "Tenants", icon: <Users size={16} />, tier: "full" },
+    { href: "/backup", label: "备份", labelEn: "Backup", icon: <HardDriveDownload size={16} />, tier: "full" },
+    { href: "/bots", label: "Bot", labelEn: "Bots", icon: <Bot size={16} />, tier: "full" },
+    { href: "/settings", label: "设置", labelEn: "Settings", icon: <Settings size={16} />, tier: "easy" },
   ]},
 ];
 
@@ -83,6 +88,30 @@ function resolveIcon(name: string): React.ReactNode {
 
 const COLLAPSED_KEY = "yunque_sidebar_collapsed";
 const EXPANDED_KEY = "yunque_sidebar_groups";
+const PROFILE_KEY = "yunque_profile_mode";
+
+function getStoredProfile(): ProfileMode {
+  if (typeof window === "undefined") return "full";
+  try {
+    const v = localStorage.getItem(PROFILE_KEY);
+    return v === "easy" ? "easy" : "full";
+  } catch { return "full"; }
+}
+
+function filterByProfile(cats: NavCategory[], mode: ProfileMode): NavCategory[] {
+  if (mode === "full") return cats;
+  return cats
+    .filter((cat) => {
+      if (cat.tier === "easy") return true;
+      if (cat.children) return cat.children.some((c) => c.tier === "easy");
+      return false;
+    })
+    .map((cat) => {
+      if (!cat.children) return cat;
+      const filteredChildren = cat.children.filter((c) => c.tier === "easy");
+      return filteredChildren.length > 0 ? { ...cat, children: filteredChildren } : cat;
+    });
+}
 
 function getStoredGroups(): Set<string> {
   if (typeof window === "undefined") return new Set(["work"]);
@@ -103,6 +132,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [, startTransition] = useTransition();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(getStoredGroups);
+  const [profileMode, setProfileMode] = useState<ProfileMode>(getStoredProfile);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -124,6 +154,14 @@ export default function Sidebar() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  const toggleProfileMode = useCallback(() => {
+    setProfileMode((prev) => {
+      const next: ProfileMode = prev === "easy" ? "full" : "easy";
+      localStorage.setItem(PROFILE_KEY, next);
       return next;
     });
   }, []);
@@ -159,13 +197,16 @@ export default function Sidebar() {
   }, []);
 
   const allCategories = useMemo(() => {
-    if (extItems.length === 0) return categories;
-    const extCategory: NavCategory = {
-      id: "extensions", label: "扩展", labelEn: "Extensions",
-      icon: <Blocks size={16} />, children: extItems,
-    };
-    return [...categories, extCategory];
-  }, [extItems]);
+    let cats = categories;
+    if (extItems.length > 0) {
+      const extCategory: NavCategory = {
+        id: "extensions", label: "扩展", labelEn: "Extensions",
+        icon: <Blocks size={16} />, children: extItems, tier: "full",
+      };
+      cats = [...cats, extCategory];
+    }
+    return filterByProfile(cats, profileMode);
+  }, [extItems, profileMode]);
 
   useEffect(() => {
     if (!pathname) return;
@@ -208,8 +249,13 @@ export default function Sidebar() {
       collapse: zh ? "折叠侧边栏" : "Collapse",
       expand: zh ? "展开侧边栏" : "Expand",
       settings: zh ? "设置" : "Settings",
+      profileEasy: zh ? "轻松模式" : "Easy Mode",
+      profileFull: zh ? "完整模式" : "Full Mode",
+      profileToggle: zh
+        ? (profileMode === "easy" ? "切换到完整模式" : "切换到轻松模式")
+        : (profileMode === "easy" ? "Switch to Full Mode" : "Switch to Easy Mode"),
     };
-  }, [locale]);
+  }, [locale, profileMode]);
 
   const renderLink = (href: string, label: string, labelEn: string, icon: React.ReactNode, indent = false) => {
     const active = pathname === href || pathname?.startsWith(href + "/");
@@ -319,6 +365,11 @@ export default function Sidebar() {
                 return renderLink(cat.href!, cat.label, cat.labelEn, cat.icon);
               }
 
+              if (profileMode === "easy" && cat.children.length === 1) {
+                const child = cat.children[0];
+                return renderLink(child.href, child.label, child.labelEn, child.icon);
+              }
+
               const childActive = cat.children.some(
                 (c) => pathname === c.href || pathname?.startsWith(c.href + "/"),
               );
@@ -355,6 +406,15 @@ export default function Sidebar() {
                   >
                     <span className="sidebar-link-icon">{cat.icon}</span>
                     <span className="sidebar-link-label">{locale === "zh" ? cat.label : cat.labelEn}</span>
+                    {!isOpen && cat.children && (
+                      <span className="sidebar-link-label" style={{
+                        fontSize: "var(--text-2xs)", color: childActive ? "var(--yunque-accent)" : "var(--yunque-text-disabled)",
+                        background: childActive ? "var(--yunque-accent-muted)" : "rgba(255,255,255,0.04)",
+                        padding: "1px 6px", borderRadius: 8, minWidth: 20, textAlign: "center",
+                      }}>
+                        {cat.children.length}
+                      </span>
+                    )}
                     <ChevronDown
                       size={12}
                       className="sidebar-link-label ml-auto"
@@ -377,6 +437,46 @@ export default function Sidebar() {
             })}
           </div>
         </nav>
+
+        {/* Profile mode toggle — enhanced with hint text */}
+        <div style={{ padding: collapsed ? "0 6px 4px" : "0 12px 4px" }}>
+          <Tooltip delay={0}>
+            <Tooltip.Trigger>
+              <button
+                className="sidebar-profile-toggle"
+                onClick={toggleProfileMode}
+                aria-label={ui.profileToggle}
+                role="switch"
+                aria-checked={profileMode === "easy"}
+                data-collapsed={collapsed || undefined}
+                data-mode={profileMode}
+                style={collapsed ? undefined : { flexDirection: "column", alignItems: "flex-start", gap: 2, minHeight: 44, padding: "8px 12px" }}
+              >
+                <span className="flex items-center gap-1.5">
+                  {profileMode === "easy"
+                    ? <Sparkles size={collapsed ? 14 : 12} style={{ color: "var(--yunque-accent)", flexShrink: 0 }} />
+                    : <Layers size={collapsed ? 14 : 12} style={{ color: "var(--yunque-text-muted)", flexShrink: 0 }} />
+                  }
+                  {!collapsed && (
+                    <span className="text-[11px] font-semibold" style={{ color: profileMode === "easy" ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}>
+                      {profileMode === "easy" ? ui.profileEasy : ui.profileFull}
+                    </span>
+                  )}
+                </span>
+                {!collapsed && (
+                  <span className="text-[9px]" style={{ color: "var(--yunque-text-disabled)", marginLeft: 18 }}>
+                    {profileMode === "easy"
+                      ? (locale === "zh" ? "切换完整模式 →" : "Switch to Full →")
+                      : (locale === "zh" ? "切换轻松模式" : "Switch to Easy")}
+                  </span>
+                )}
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Content placement={collapsed ? "right" : "top"}>
+              {ui.profileToggle}
+            </Tooltip.Content>
+          </Tooltip>
+        </div>
 
         {/* Footer */}
         <div className="sidebar-footer">

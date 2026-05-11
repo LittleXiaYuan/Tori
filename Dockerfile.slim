@@ -1,0 +1,78 @@
+# ╔══════════════════════════════════════════════╗
+# ║  Yunque Agent — Ultra-Slim Dockerfile       ║
+# ║  Target: ~30MB final image (scratch base)   ║
+# ╚══════════════════════════════════════════════╝
+#
+# Build context must be the PARENT directory containing both yunque-agent/
+# and ledger/. Run:
+#   docker build -f yunque-agent/Dockerfile.slim -t yunque-agent:slim .
+#
+# Differences from Dockerfile (production):
+#   - scratch base instead of alpine (~7MB saved)
+#   - No curl/python3 (agent --healthcheck replaces curl)
+#   - UPX compression on binary (~40-60% smaller)
+#   - Statically linked, zero external runtime deps
+#
+# Trade-offs:
+#   - No shell (cannot `docker exec -it ... sh`)
+#   - No package manager (cannot install debug tools at runtime)
+#   - Self-heal plugins (python) require sidecar or volume-mount runtime
+#   - For debugging, use the standard Dockerfile or ephemeral debug containers
+
+# ── Stage 1: Build Go agent ──
+FROM golang:1.26.2-alpine AS builder
+RUN apk add --no-cache git ca-certificates tzdata nodejs npm upx
+WORKDIR /src
+
+COPY ledger/ /src/ledger/
+COPY yunque-agent/go.mod yunque-agent/go.sum /src/yunque-agent/
+COPY yunque-agent/heroui-web/package.json yunque-agent/heroui-web/package-lock.json /src/yunque-agent/heroui-web/
+WORKDIR /src/yunque-agent
+RUN go mod download
+WORKDIR /src/yunque-agent/heroui-web
+RUN npm ci --prefer-offline --no-audit --no-fund
+
+COPY yunque-agent/heroui-web/ /src/yunque-agent/heroui-web/
+RUN npm run build
+
+WORKDIR /src/yunque-agent
+COPY yunque-agent/ /src/yunque-agent/
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags "-s -w -X yunque-agent/internal/version.Version=${VERSION} -X yunque-agent/internal/version.GitCommit=${GIT_COMMIT} -X yunque-agent/internal/version.BuildDate=${BUILD_DATE}" \
+    -o /agent ./cmd/agent
+
+# UPX compress (--best for maximum compression, --lzma for smaller output)
+ARG UPX_LEVEL=--best
+RUN upx ${UPX_LEVEL} --lzma /agent
+RUN mkdir -p /runtime-data
+
+# ── Stage 2: Minimal runtime (scratch — ~0 bytes base) ──
+FROM scratch
+
+# TLS root certificates (required for HTTPS calls to LLM providers)
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Timezone data (required for time.LoadLocation)
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# passwd entry for non-root UID
+COPY --from=builder /etc/passwd /etc/passwd
+
+COPY --from=builder /agent /app/agent
+COPY --from=builder --chown=1000:1000 /runtime-data /app/data
+
+WORKDIR /app
+USER 1000
+VOLUME ["/app/data"]
+
+ENV AGENT_ADDR=:9090
+ENV OPEN_BROWSER=false
+ENV TZ=UTC
+EXPOSE 9090
+
+# Self-contained healthcheck: the agent binary probes its own /livez endpoint
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/app/agent", "--healthcheck"]
+
+ENTRYPOINT ["/app/agent"]

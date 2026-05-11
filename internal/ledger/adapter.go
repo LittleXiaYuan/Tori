@@ -28,7 +28,13 @@ func InitLedger() (*ledger.Ledger, error) {
 	if dbPath == "" {
 		dbPath = filepath.Join(".", "data", "ledger", "ledger.db")
 	}
+	return InitLedgerAt(dbPath)
+}
 
+func InitLedgerAt(dbPath string) (*ledger.Ledger, error) {
+	if dbPath == "" {
+		return nil, fmt.Errorf("ledger db path must not be empty")
+	}
 	// Ensure directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -143,12 +149,8 @@ func (s *LedgerStore) Update(t *agtask.Task) error {
 
 	targetStatus := agentStatusToLedger(t.Status)
 	if targetStatus != lt.Status {
-		actor := "runtime"
-		if targetStatus == ledger.TaskCancelled {
-			actor = "user"
-		}
-		if err := s.ldg.Tasks.Transition(ctx, t.ID, targetStatus, actor, nil); err != nil {
-			_ = err
+		if err := s.transitionTaskStatus(ctx, t.ID, lt.Status, targetStatus); err != nil {
+			return fmt.Errorf("ledger transition %s -> %s: %w", lt.Status, targetStatus, err)
 		}
 	}
 
@@ -170,6 +172,97 @@ func (s *LedgerStore) Update(t *agtask.Task) error {
 	lt.FinishedAt = t.FinishedAt
 
 	return s.ldg.Backend().UpdateTask(ctx, lt)
+}
+
+func (s *LedgerStore) transitionTaskStatus(ctx context.Context, taskID string, from, to ledger.TaskStatus) error {
+	path, ok := ledgerTransitionPath(from, to)
+	if !ok {
+		return fmt.Errorf("unsupported transition path")
+	}
+	for _, next := range path {
+		actor := string(ledger.TransitionActorFor(from, next))
+		if err := s.ldg.Tasks.Transition(ctx, taskID, next, actor, nil); err != nil {
+			return err
+		}
+		from = next
+	}
+	return nil
+}
+
+func ledgerTransitionPath(from, to ledger.TaskStatus) ([]ledger.TaskStatus, bool) {
+	if from == to {
+		return nil, true
+	}
+	switch from {
+	case ledger.TaskCreated:
+		switch to {
+		case ledger.TaskReady:
+			return []ledger.TaskStatus{ledger.TaskReady}, true
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskWaitingInput, ledger.TaskBlocked, ledger.TaskRetrying:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning, to}, true
+		case ledger.TaskCancelled:
+			return []ledger.TaskStatus{ledger.TaskCancelled}, true
+		}
+	case ledger.TaskReady:
+		switch to {
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskWaitingInput, ledger.TaskBlocked, ledger.TaskRetrying:
+			return []ledger.TaskStatus{ledger.TaskRunning, to}, true
+		case ledger.TaskCancelled:
+			return []ledger.TaskStatus{ledger.TaskCancelled}, true
+		}
+	case ledger.TaskRunning:
+		switch to {
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskWaitingInput, ledger.TaskBlocked, ledger.TaskRetrying, ledger.TaskCancelled:
+			return []ledger.TaskStatus{to}, true
+		}
+	case ledger.TaskWaitingInput:
+		switch to {
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskBlocked, ledger.TaskRetrying:
+			return []ledger.TaskStatus{ledger.TaskRunning, to}, true
+		case ledger.TaskCancelled:
+			return []ledger.TaskStatus{ledger.TaskCancelled}, true
+		}
+	case ledger.TaskBlocked:
+		switch to {
+		case ledger.TaskReady:
+			return []ledger.TaskStatus{ledger.TaskReady}, true
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskWaitingInput, ledger.TaskRetrying:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning, to}, true
+		case ledger.TaskCancelled:
+			return []ledger.TaskStatus{ledger.TaskCancelled}, true
+		}
+	case ledger.TaskRetrying:
+		switch to {
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskWaitingInput, ledger.TaskBlocked:
+			return []ledger.TaskStatus{ledger.TaskRunning, to}, true
+		case ledger.TaskFailed:
+			return []ledger.TaskStatus{ledger.TaskFailed}, true
+		}
+	case ledger.TaskFailed, ledger.TaskCancelled:
+		switch to {
+		case ledger.TaskReady:
+			return []ledger.TaskStatus{ledger.TaskReady}, true
+		case ledger.TaskRunning:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning}, true
+		case ledger.TaskCompleted, ledger.TaskFailed, ledger.TaskWaitingInput, ledger.TaskBlocked, ledger.TaskRetrying:
+			return []ledger.TaskStatus{ledger.TaskReady, ledger.TaskRunning, to}, true
+		case ledger.TaskCancelled:
+			if from == ledger.TaskCancelled {
+				return nil, true
+			}
+		}
+	}
+	return nil, false
 }
 
 // Delete removes a task.
@@ -237,8 +330,8 @@ func ledgerToAgentTask(lt *ledger.Task, title string) *agtask.Task {
 
 	if len(lt.Metadata) > 0 {
 		var meta struct {
-			Title     string          `json:"title"`
-			Steps     []agtask.Step   `json:"steps"`
+			Title     string            `json:"title"`
+			Steps     []agtask.Step     `json:"steps"`
 			Artifacts []agtask.Artifact `json:"artifacts"`
 		}
 		if json.Unmarshal(lt.Metadata, &meta) == nil {

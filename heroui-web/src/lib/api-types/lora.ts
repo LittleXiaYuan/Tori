@@ -38,9 +38,27 @@ export interface LoRAStatus {
 }
 
 export interface FilterStats {
-  total_lines?: number;
-  kept_lines?: number;
-  dropped_lines?: number;
+  total_read?: number;
+  kept?: number;
+  dropped_empty?: number;
+  dropped_too_short?: number;
+  dropped_too_long?: number;
+  dropped_duplicate?: number;
+  dropped_low_score?: number;
+  dropped_malformed?: number;
+  dropped_garbage?: number;
+}
+
+export interface TrainingDataPreview {
+  tenant_id: string;
+  data_path: string;
+  raw_samples: number;
+  usable_samples: number;
+  min_samples: number;
+  filter_enabled: boolean;
+  filter_stats?: FilterStats;
+  ready: boolean;
+  reason?: string;
 }
 
 /** Single training run (localbrain.TrainingRecord) */

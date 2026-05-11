@@ -7,6 +7,7 @@ import { Cpu, Plus, Trash2, Sparkles, RefreshCw, Download, Wifi, ChevronDown, Ch
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
 import { showErrorToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 const clientLabels: Record<string, string> = {
   openai: "OpenAI", anthropic: "Anthropic", google: "Google", ollama: "Ollama",
@@ -50,7 +51,7 @@ export default function ModelsPage() {
         });
         imported++;
       } catch (e: unknown) {
-        errors.push(`${p.model}: ${(e as Error)?.message || "失败"}`);
+        errors.push(`${p.model}: ${formatErrorMessage(e, "导入失败")}`);
       }
     }
     setImporting(false);
@@ -76,7 +77,7 @@ export default function ModelsPage() {
       setResult({ ok: true, msg: "模型已添加" });
       refresh();
     } catch (e: unknown) {
-      setResult({ ok: false, msg: String((e as Error)?.message || "添加失败") });
+      setResult({ ok: false, msg: formatErrorMessage(e, "添加失败") });
     }
     setTimeout(() => setResult(null), 4000);
   };

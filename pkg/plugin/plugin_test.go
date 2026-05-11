@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"testing"
 
 	"yunque-agent/pkg/skills"
@@ -149,5 +151,105 @@ func TestAllIncludeDisabled(t *testing.T) {
 		if info.Name == "p2" && info.Enabled {
 			t.Fatal("p2 should be disabled")
 		}
+	}
+}
+
+func TestAllIncludeDisabledShowsSlot(t *testing.T) {
+	r := NewRegistry()
+	r.RegisterWithSlot(&mockPlugin{name: "mem-redis"}, "memory")
+	r.Register(&mockPlugin{name: "plain"})
+
+	all := r.AllIncludeDisabled()
+	for _, info := range all {
+		if info.Name == "mem-redis" && info.Slot != "memory" {
+			t.Fatalf("expected slot 'memory', got %q", info.Slot)
+		}
+		if info.Name == "plain" && info.Slot != "" {
+			t.Fatalf("expected empty slot for plain plugin, got %q", info.Slot)
+		}
+	}
+}
+
+func TestLoaderUsesSlotFromManifest(t *testing.T) {
+	dir := t.TempDir()
+
+	writePluginManifest := func(name, slot string) string {
+		pluginDir := dir + "/" + name
+		os.MkdirAll(pluginDir, 0755)
+		manifest := map[string]any{
+			"name":        name,
+			"description": "test",
+			"language":    "python",
+		}
+		if slot != "" {
+			manifest["slot"] = slot
+		}
+		data, _ := json.Marshal(manifest)
+		os.WriteFile(pluginDir+"/plugin.json", data, 0644)
+		return pluginDir
+	}
+
+	writePluginManifest("mem-a", "memory")
+	writePluginManifest("mem-b", "memory")
+	writePluginManifest("no-slot", "")
+
+	reg := NewRegistry()
+	loader := NewLoader(dir, reg, nil)
+	loaded := loader.LoadAll()
+
+	// mem-a should load with slot, mem-b should be rejected (slot conflict), no-slot should load normally
+	if loaded != 2 {
+		t.Fatalf("expected 2 loaded (mem-a + no-slot), got %d", loaded)
+	}
+
+	owner, ok := reg.SlotOwner("memory")
+	if !ok || owner != "mem-a" {
+		t.Fatalf("expected slot owner 'mem-a', got %q (ok=%v)", owner, ok)
+	}
+
+	_, okA := reg.Get("mem-a")
+	_, okB := reg.Get("mem-b")
+	_, okN := reg.Get("no-slot")
+	if !okA {
+		t.Fatal("mem-a should be registered")
+	}
+	if okB {
+		t.Fatal("mem-b should NOT be registered (slot conflict)")
+	}
+	if !okN {
+		t.Fatal("no-slot should be registered")
+	}
+}
+
+func TestLoaderReloadPreservesSlot(t *testing.T) {
+	dir := t.TempDir()
+	pluginDir := dir + "/slotted"
+	os.MkdirAll(pluginDir, 0755)
+	manifest := map[string]any{
+		"name":        "slotted",
+		"description": "test",
+		"language":    "python",
+		"slot":        "channel-tg",
+	}
+	data, _ := json.Marshal(manifest)
+	os.WriteFile(pluginDir+"/plugin.json", data, 0644)
+
+	reg := NewRegistry()
+	loader := NewLoader(dir, reg, nil)
+	loader.LoadAll()
+
+	owner, _ := reg.SlotOwner("channel-tg")
+	if owner != "slotted" {
+		t.Fatal("first load should own slot")
+	}
+
+	// Reload — same plugin re-registers same slot (should succeed)
+	loaded := loader.LoadAll()
+	if loaded != 1 {
+		t.Fatalf("reload expected 1, got %d", loaded)
+	}
+	owner2, _ := reg.SlotOwner("channel-tg")
+	if owner2 != "slotted" {
+		t.Fatal("reload should preserve slot ownership")
 	}
 }

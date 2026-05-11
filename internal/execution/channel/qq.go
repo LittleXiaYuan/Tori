@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: QQ ────────────────────────────────────────────
+// Type:     "qq"
+// Protocol: WebSocket网关 (QQ开放平台)
+// Inbound:  text (c2c/group/guild/dm 多场景)
+// Outbound: text (被动回复 msg_id 分片发送)
+// Env vars: QQ_APP_ID, QQ_APP_SECRET
+// Status:   Basic — WS网关完整, Send()几乎空实现(依赖被动回复)
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

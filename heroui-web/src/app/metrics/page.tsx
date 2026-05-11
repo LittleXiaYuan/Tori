@@ -6,6 +6,7 @@ import { api, type MetricsSnapshot } from "@/lib/api";
 import { BarChart3, RefreshCw, Activity, Clock, Zap, TrendingUp } from "lucide-react";
 import { usePolling } from "@/lib/use-polling";
 import PageHeader from "@/components/page-header";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 export default function MetricsPage() {
   const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
@@ -155,7 +156,7 @@ export default function MetricsPage() {
               <div className="space-y-2">
                 {metrics.recent_errors.map((err: { message: string; count: number }, i: number) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(239,68,68,0.05)" }}>
-                    <span className="text-sm truncate flex-1" style={{ color: "var(--yunque-text)" }}>{err.message}</span>
+                    <span className="text-sm truncate flex-1" style={{ color: "var(--yunque-text)" }}>{formatErrorMessage(err.message, "任务暂时没有完成，已保留现场，可稍后重试。")}</span>
                     <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "var(--yunque-danger)" }}>{err.count}x</Chip>
                   </div>
                 ))}

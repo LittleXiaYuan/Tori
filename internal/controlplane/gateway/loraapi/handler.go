@@ -14,9 +14,9 @@ import (
 
 // Handler serves LoRA training and evolution HTTP endpoints.
 type Handler struct {
-	Scheduler   *localbrain.LoRAScheduler
-	Metrics     *localbrain.TrainingMetrics
-	Evolution   *localbrain.EvolutionCoordinator
+	Scheduler *localbrain.LoRAScheduler
+	Metrics   *localbrain.TrainingMetrics
+	Evolution *localbrain.EvolutionCoordinator
 }
 
 // RegisterRoutes mounts all /v1/lora/* endpoints.
@@ -24,6 +24,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
 	mux.HandleFunc("/v1/lora/status", auth(h.handleStatus))
 	mux.HandleFunc("/v1/lora/history", auth(h.handleHistory))
 	mux.HandleFunc("/v1/lora/summary", auth(h.handleSummary))
+	mux.HandleFunc("/v1/lora/preview", auth(h.handlePreview))
 	mux.HandleFunc("/v1/lora/trigger", auth(h.handleTrigger))
 	mux.HandleFunc("/v1/lora/rollback", auth(h.handleRollback))
 	mux.HandleFunc("/v1/lora/evolution", auth(h.handleEvolution))
@@ -96,6 +97,34 @@ func (h *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"summary": m.Summary()})
+}
+
+func (h *Handler) handlePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
+		return
+	}
+	if h.Scheduler == nil {
+		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
+		return
+	}
+
+	tenantID := gwshared.TenantFromCtx(r.Context())
+	if tenantID == "" || tenantID == "setup" {
+		tenantID = "default"
+	}
+	if qTenant := r.URL.Query().Get("tenant_id"); qTenant != "" {
+		tenantID = qTenant
+	}
+
+	preview, err := h.Scheduler.PreviewTrainingData(tenantID)
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"preview": preview})
 }
 
 func (h *Handler) handleTrigger(w http.ResponseWriter, r *http.Request) {

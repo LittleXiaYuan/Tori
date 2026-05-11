@@ -1,4 +1,4 @@
-﻿package gateway
+package gateway
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 	"yunque-agent/internal/execution/channel"
 )
 
-//  from handlers_bots.go 
 func (g *Gateway) handleBots(w http.ResponseWriter, r *http.Request) {
 	if g.botMgr == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "bot manager not configured")
@@ -20,14 +19,14 @@ func (g *Gateway) handleBots(w http.ResponseWriter, r *http.Request) {
 		list := g.botMgr.List()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"bots":  list,
-			"total": g.botMgr.Count(),
+			"bots":   list,
+			"total":  g.botMgr.Count(),
 			"active": g.botMgr.ActiveCount(),
 		})
 	case http.MethodPost:
 		var req struct {
-			Name        string     `json:"name"`
-			Description string     `json:"description"`
+			Name        string         `json:"name"`
+			Description string         `json:"description"`
 			Config      bots.BotConfig `json:"config"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
@@ -68,10 +67,10 @@ func (g *Gateway) handleBotDetail(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(bot)
 	case http.MethodPut:
 		var req struct {
-			Name        *string        `json:"name"`
-			Description *string        `json:"description"`
+			Name        *string         `json:"name"`
+			Description *string         `json:"description"`
 			Config      *bots.BotConfig `json:"config"`
-			Active      *bool          `json:"active"`
+			Active      *bool           `json:"active"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		if req.Active != nil {
@@ -99,7 +98,6 @@ func (g *Gateway) handleBotDetail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//  from handlers_inbox.go 
 func (g *Gateway) handleInbox(w http.ResponseWriter, r *http.Request) {
 	if g.inbox == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "inbox not configured")
@@ -173,9 +171,7 @@ func (g *Gateway) handleInboxRead(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"marked": count})
 }
 
-//  from handlers_channel_groups.go 
 // handleChannelGroups handles GET /v1/channels/groups?type=telegram
-// Returns all groups the bot is currently in, optionally filtered by channel type.
 func (g *Gateway) handleChannelGroups(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -187,7 +183,7 @@ func (g *Gateway) handleChannelGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	typ := r.URL.Query().Get("type") // optional filter
+	typ := r.URL.Query().Get("type")
 
 	groups, err := g.channelReg.ListGroups(r.Context(), typ)
 	if err != nil {
@@ -195,7 +191,7 @@ func (g *Gateway) handleChannelGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if groups == nil {
-		groups = make([]channel.GroupInfo, 0) // ensure JSON array, not null
+		groups = make([]channel.GroupInfo, 0)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -204,4 +200,3 @@ func (g *Gateway) handleChannelGroups(w http.ResponseWriter, r *http.Request) {
 		"count":  len(groups),
 	})
 }
-

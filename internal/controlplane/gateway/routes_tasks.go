@@ -29,6 +29,14 @@ func (g *Gateway) registerTaskRoutes() {
 	g.mux.HandleFunc("/v1/tasks/resume", g.requireAuth(g.handleTaskResume))
 	g.mux.HandleFunc("/v1/tasks/restart", g.requireAuth(g.handleTaskRestart))
 
+	// Planner recovery checkpoints
+	g.mux.HandleFunc("/v1/planner/checkpoints", g.requireAuth(g.handlePlannerCheckpoints))
+	g.mux.HandleFunc("/v1/planner/execution-state", g.requireAuth(g.handlePlannerExecutionState))
+	g.mux.HandleFunc("/v1/planner/checkpoints/recover", g.requireAuth(g.handlePlannerCheckpointRecover))
+	g.mux.HandleFunc("/v1/planner/checkpoints/resume", g.requireAuth(g.handlePlannerCheckpointResumeTask))
+	g.mux.HandleFunc("/v1/planner/checkpoints/resume-plan", g.requireAuth(g.handlePlannerCheckpointResumePlan))
+	g.mux.HandleFunc("/v1/planner/checkpoints/resume-plan/jobs", g.requireAuth(g.handlePlannerCheckpointResumePlanJob))
+
 	// Gaps
 	g.mux.HandleFunc("/v1/tasks/gaps", g.requireAuth(g.handleGaps))
 	g.mux.HandleFunc("/v1/tasks/gaps/resolve", g.requireAuth(g.handleGapResolve))

@@ -13,6 +13,7 @@ import {
 import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/empty-state";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 type MissionTab = "tasks" | "cron" | "triggers" | "templates";
 type FilterTab = "all" | "active" | "scheduled" | "event" | "completed" | "failed";
@@ -387,7 +388,7 @@ export default function MissionsPage() {
                     {t.error && (
                       <Tooltip delay={0}>
                         <AlertTriangle size={11} style={{ color: "#ef4444" }} />
-                        <Tooltip.Content className="max-w-xs text-xs">{t.error}</Tooltip.Content>
+                        <Tooltip.Content className="max-w-xs text-xs">{formatErrorMessage(t.error, "触发失败")}</Tooltip.Content>
                       </Tooltip>
                     )}
                   </div>
@@ -585,7 +586,7 @@ export default function MissionsPage() {
                           {trig.last_error && (
                             <Tooltip delay={0}>
                               <AlertTriangle size={11} style={{ color: "#ef4444" }} />
-                              <Tooltip.Content className="max-w-xs text-xs">{trig.last_error}</Tooltip.Content>
+                              <Tooltip.Content className="max-w-xs text-xs">{formatErrorMessage(trig.last_error, "触发失败")}</Tooltip.Content>
                             </Tooltip>
                           )}
                         </div>

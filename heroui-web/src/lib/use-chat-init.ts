@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, type PresetInfo, type SkillInfo } from "@/lib/api";
 import type { ModelOption } from "@/components/model-selector-popup";
-import { showToast } from "@/components/toast-provider";
+import { showErrorToast } from "@/components/toast-provider";
 
 export interface ChatInitState {
   currentModel: string;
@@ -84,7 +84,7 @@ export function useChatInit(): ChatInitState {
     try {
       await api.switchPreset(presetId);
       setActivePreset(presetId);
-    } catch (e) { showToast(e instanceof Error ? e.message : "Failed to switch preset.", "error"); }
+    } catch (e) { showErrorToast(e, "切换预设失败，请稍后重试。"); }
   }, []);
 
   return {

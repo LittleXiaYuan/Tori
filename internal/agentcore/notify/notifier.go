@@ -45,20 +45,25 @@ type Event struct {
 
 // Notifier manages notification channels and dispatches events.
 type Notifier struct {
-	mu       sync.RWMutex
-	channels map[string]*Channel
-	client   *http.Client
-	store    string
+	mu         sync.RWMutex
+	channels   map[string]*Channel
+	shares     map[string]*ShareBinding
+	client     *http.Client
+	store      string
+	shareStore string
 }
 
 // New creates a new Notifier.
 func New() *Notifier {
 	n := &Notifier{
-		channels: make(map[string]*Channel),
-		client:   &http.Client{Timeout: 10 * time.Second},
-		store:    filepath.Join(appdir.DataDir(), "notify_channels.json"),
+		channels:   make(map[string]*Channel),
+		shares:     make(map[string]*ShareBinding),
+		client:     &http.Client{Timeout: 10 * time.Second},
+		store:      filepath.Join(appdir.DataDir(), "notify_channels.json"),
+		shareStore: filepath.Join(appdir.DataDir(), "notify_shares.json"),
 	}
 	n.load()
+	n.loadShares()
 	return n
 }
 
@@ -176,18 +181,45 @@ func (n *Notifier) sendWebhook(ctx context.Context, ch *Channel, event Event) er
 }
 
 func (n *Notifier) sendDingTalk(ctx context.Context, ch *Channel, event Event) error {
+	text := fmt.Sprintf("## %s\n\n%s\n\n> %s",
+		event.Title, event.Message, formatTime())
+	if event.URL != "" {
+		text += fmt.Sprintf("\n\n[打开云雀任务](%s)", event.URL)
+	}
 	payload := map[string]any{
 		"msgtype": "markdown",
 		"markdown": map[string]string{
 			"title": fmt.Sprintf("[云雀] %s", event.Title),
-			"text": fmt.Sprintf("## %s\n\n%s\n\n> %s",
-				event.Title, event.Message, formatTime()),
+			"text":  text,
 		},
 	}
 	return n.postJSON(ctx, ch.URL, payload)
 }
 
 func (n *Notifier) sendFeishu(ctx context.Context, ch *Channel, event Event) error {
+	elements := []map[string]any{
+		{
+			"tag": "markdown",
+			"content": fmt.Sprintf("%s\n\n时间: %s",
+				event.Message, formatTime()),
+		},
+	}
+	if event.URL != "" {
+		elements = append(elements, map[string]any{
+			"tag": "action",
+			"actions": []map[string]any{
+				{
+					"tag": "button",
+					"text": map[string]any{
+						"tag":     "plain_text",
+						"content": "打开云雀任务",
+					},
+					"url":  event.URL,
+					"type": "primary",
+				},
+			},
+		})
+	}
 	payload := map[string]any{
 		"msg_type": "interactive",
 		"card": map[string]any{
@@ -198,24 +230,22 @@ func (n *Notifier) sendFeishu(ctx context.Context, ch *Channel, event Event) err
 				},
 				"template": eventColor(event.Type),
 			},
-			"elements": []map[string]any{
-				{
-					"tag": "markdown",
-					"content": fmt.Sprintf("%s\n\n时间: %s",
-						event.Message, formatTime()),
-				},
-			},
+			"elements": elements,
 		},
 	}
 	return n.postJSON(ctx, ch.URL, payload)
 }
 
 func (n *Notifier) sendWechatWork(ctx context.Context, ch *Channel, event Event) error {
+	content := fmt.Sprintf("## <font color=\"info\">[云雀] %s</font>\n\n%s\n\n> 时间: %s",
+		event.Title, event.Message, formatTime())
+	if event.URL != "" {
+		content += fmt.Sprintf("\n\n[打开云雀任务](%s)", event.URL)
+	}
 	payload := map[string]any{
 		"msgtype": "markdown",
 		"markdown": map[string]any{
-			"content": fmt.Sprintf("## <font color=\"info\">[云雀] %s</font>\n\n%s\n\n> 时间: %s",
-				event.Title, event.Message, formatTime()),
+			"content": content,
 		},
 	}
 	return n.postJSON(ctx, ch.URL, payload)

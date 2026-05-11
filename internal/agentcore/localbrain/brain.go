@@ -31,6 +31,8 @@ type LocalBrain struct {
 	// 用户行为学习缓存（LoRA 微调前的在线适应）
 	userPatterns map[string]*UserPattern // tenantID → pattern
 
+	naiveBayes *NaiveBayesClassifier // sub-ms intent classification fast path
+
 	stats BrainStats
 }
 
@@ -90,12 +92,16 @@ func New(localClient *llm.Client, pool *llm.Pool, opts ...Option) *LocalBrain {
 		pool:         pool,
 		thresholds:   DefaultThresholds(),
 		userPatterns: make(map[string]*UserPattern),
+		naiveBayes:   NewNaiveBayesClassifier(),
 	}
 	for _, opt := range opts {
 		opt(b)
 	}
 	return b
 }
+
+// NaiveBayes returns the underlying Naive Bayes classifier for external training.
+func (b *LocalBrain) NaiveBayes() *NaiveBayesClassifier { return b.naiveBayes }
 
 // Option 配置选项。
 type Option func(*LocalBrain)
@@ -146,6 +152,25 @@ func (b *LocalBrain) Classify(ctx context.Context, query, tenantID string) (*Dec
 			Intent:  Intent{Category: "chat", Complexity: "simple", Confidence: 1.0, NeedTools: false},
 			Reason:  "simple greeting, no tools needed",
 		}, nil
+	}
+
+	// 快速路径：朴素贝叶斯分类器（sub-ms，零 API 消耗）
+	if b.naiveBayes != nil && b.naiveBayes.Trained() {
+		if nbIntent, nbConf := b.naiveBayes.Predict(query); nbIntent != nil && nbConf >= 0.85 {
+			b.stats.mu.Lock()
+			b.stats.LocalHandled++
+			b.stats.mu.Unlock()
+			handler := b.selectCloudTier(nbIntent)
+			if !nbIntent.NeedTools && nbIntent.Complexity == "simple" {
+				handler = "fast"
+			}
+			slog.Info("localbrain: NB fast-path hit", "category", nbIntent.Category, "confidence", nbConf)
+			return &Decision{
+				Handler: handler,
+				Intent:  *nbIntent,
+				Reason:  fmt.Sprintf("naive bayes high-conf (%.2f)", nbConf),
+			}, nil
+		}
 	}
 
 	// 快速路径：查询太长直接升级
@@ -301,6 +326,11 @@ func (b *LocalBrain) RecordFeedback(tenantID, query string, intent Intent, tier 
 	}
 	pattern.QueryHistory = append(pattern.QueryHistory, record)
 	pattern.LastUpdated = time.Now()
+
+	// Feed positive feedback into Naive Bayes classifier for incremental learning
+	if satisfied && b.naiveBayes != nil {
+		b.naiveBayes.Train(query, intent.Category)
+	}
 
 	// 滑动窗口：只保留最近 200 条
 	if len(pattern.QueryHistory) > 200 {

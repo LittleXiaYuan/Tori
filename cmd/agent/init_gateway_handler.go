@@ -110,12 +110,38 @@ func buildChannelHandler(
 
 		// Identity resolution
 		tenantID := "default"
+		var identityProfile map[string]string
 		if idResolver != nil && msg.ChannelType != "" {
 			profile := idResolver.Resolve(msg.ChannelType, msg.UserID, msg.UserName)
 			tenantID = profile.UnifiedID
+			identityProfile = profile.Metadata
 		}
 
-		// Session ID
+		// /resume command — show cross-channel roaming session status
+		if msg.Content == "/resume" {
+			if tenantID != "default" {
+				roamID := fmt.Sprintf("sess_roam_%s", tenantID)
+				history := convStore.Get(roamID)
+				if len(history) > 0 {
+					lastCh := ""
+					if identityProfile != nil {
+						lastCh = identityProfile["last_channel"]
+					}
+					hint := ""
+					if lastCh != "" && lastCh != msg.ChannelType {
+						hint = fmt.Sprintf("（上次在 %s 聊的）", lastCh)
+					}
+					return channel.Reply{
+						Content: fmt.Sprintf("💫 已接续漫游会话%s，共 %d 条对话记录。继续聊吧~", hint, len(history)),
+						Format:  "text",
+					}
+				}
+				return channel.Reply{Content: "💫 暂无跨渠道对话记录，发消息开始新对话吧~", Format: "text"}
+			}
+			return channel.Reply{Content: "⚠️ 跨渠道漫游需要先绑定身份（IdentityResolver 未配置）", Format: "text"}
+		}
+
+		// Session ID — cross-channel roaming for DMs
 		chatType := msg.Extra["chat_type"]
 		if tracker := channelReg.GetGroupTracker(); tracker != nil {
 			switch chatType {
@@ -128,12 +154,26 @@ func buildChannelHandler(
 
 		var sessionID string
 		isGroup := false
+		var channelSwitchNotice string
 		switch chatType {
 		case "group", "guild", "supergroup", "room", "GROUP":
 			sessionID = fmt.Sprintf("sess_%s_%s", msg.ChannelType, msg.ChannelID)
 			isGroup = true
 		default:
-			sessionID = fmt.Sprintf("sess_%s_%s", msg.ChannelType, msg.UserID)
+			if tenantID != "default" {
+				sessionID = fmt.Sprintf("sess_roam_%s", tenantID)
+				if identityProfile != nil {
+					prevCh := identityProfile["last_channel"]
+					if prevCh != "" && prevCh != msg.ChannelType {
+						channelSwitchNotice = fmt.Sprintf("💫 你从 %s 切换到了 %s，上下文已无缝衔接~\n\n", prevCh, msg.ChannelType)
+					}
+				}
+				if idResolver != nil {
+					idResolver.SetMeta(tenantID, "last_channel", msg.ChannelType)
+				}
+			} else {
+				sessionID = fmt.Sprintf("sess_%s_%s", msg.ChannelType, msg.UserID)
+			}
 		}
 
 		displayName := msg.UserName
@@ -323,7 +363,15 @@ func buildChannelHandler(
 			}
 		})
 
-		reply := channel.Reply{Content: result.Reply, Format: "markdown"}
+		replyContent := result.Reply
+		if channelSwitchNotice != "" {
+			replyContent = channelSwitchNotice + replyContent
+		}
+		reply := channel.Reply{Content: replyContent, Format: "markdown"}
+
+		if rich := gateway.RenderAgentActions(result.Actions); rich != nil && len(rich.Components) > 0 {
+			reply.Rich = rich
+		}
 
 		// Sticker reaction
 		safego.Go("StickerReaction", func() {

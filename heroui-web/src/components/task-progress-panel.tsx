@@ -6,6 +6,7 @@ import {
   Globe, FileText, Code2, Search, Bot, ChevronDown, ChevronRight,
 } from "lucide-react";
 import type { AgentEvent } from "./execution-trace";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 interface TaskStep {
   id: string;
@@ -23,6 +24,14 @@ const agentMeta: Record<string, { icon: React.ElementType; label: string; color:
   research_exec: { icon: Search,   label: "信息搜集",   color: "#10b981" },
   general_exec:  { icon: Bot,      label: "通用任务",   color: "#6366f1" },
 };
+
+function friendlyProgressText(text: string): string {
+  const stripped = text
+    .replace(/^🤖\s*委派\s*\[.*?\][：:]\s*/, "")
+    .replace(/^❌\s*\[.*?\]\s*失败[：:]\s*/, "")
+    .trim();
+  return formatErrorMessage(stripped || text, stripped || text);
+}
 
 function buildSteps(events: AgentEvent[]): TaskStep[] {
   const steps: TaskStep[] = [];
@@ -42,7 +51,7 @@ function buildSteps(events: AgentEvent[]): TaskStep[] {
       current = {
         id: evt.id,
         agent,
-        label: detail?.input || evt.summary,
+        label: friendlyProgressText(detail?.input || evt.summary),
         status: "running",
         subSteps: [],
       };
@@ -70,7 +79,7 @@ function buildSteps(events: AgentEvent[]): TaskStep[] {
         if (prev) prev.status = "done";
       }
       if (evt.type === "tool_start" || evt.type === "thinking") {
-        current.subSteps.push({ id: evt.id, summary: evt.summary, status });
+        current.subSteps.push({ id: evt.id, summary: friendlyProgressText(evt.summary), status });
       }
     }
   }
@@ -156,7 +165,7 @@ export function TaskProgressPanel({ events, isLive }: TaskProgressPanelProps) {
                         )}
                       </div>
                       <p className="text-[11px] mt-0.5 line-clamp-2" style={{ color: "var(--yunque-text-muted)" }}>
-                        {step.label.replace(/^🤖\s*委派\s*\[.*?\][：:]\s*/, "")}
+                        {step.label}
                       </p>
 
                       {isActive && step.subSteps.length > 0 && (

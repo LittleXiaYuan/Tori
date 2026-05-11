@@ -23,15 +23,33 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const lastCheckRef = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
+    let redirectFallback: ReturnType<typeof setTimeout> | undefined;
+    const redirectToLogin = () => {
+      router.replace("/login");
+      redirectFallback = setTimeout(() => {
+        if (typeof window === "undefined") return;
+        if (!PUBLIC_PATHS.some((path) => window.location.pathname.startsWith(path))) {
+          window.location.replace("/login");
+        }
+      }, 750);
+    };
+
     if (PUBLIC_PATHS.some((path) => pathname?.startsWith(path))) {
       setChecking(false);
-      return;
+      return () => {
+        cancelled = true;
+        if (redirectFallback) clearTimeout(redirectFallback);
+      };
     }
 
     const token = localStorage.getItem("yunque_token");
     if (!token) {
-      router.replace("/login");
-      return;
+      redirectToLogin();
+      return () => {
+        cancelled = true;
+        if (redirectFallback) clearTimeout(redirectFallback);
+      };
     }
 
     // Cached result is still fresh — render immediately without a roundtrip.
@@ -41,7 +59,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+    const timeout = setTimeout(() => {
+      controller.abort();
+      if (!cancelled) setChecking(false);
+    }, AUTH_TIMEOUT_MS);
     setChecking(true);
 
     fetch("/v1/auth/status", {
@@ -49,6 +70,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       signal: controller.signal,
     })
       .then(async (res) => {
+        if (cancelled) return null;
         if (!res.ok) {
           // Surface status code to the catch branch via Error.cause so we
           // can tell "401 revoked" apart from "502 upstream hiccup".
@@ -57,29 +79,30 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         return res.json();
       })
       .then((data) => {
+        if (cancelled || !data) return;
         if (data?.password_set === false) {
           // Server says no password is configured yet. Route to /login which
           // doubles as the "set password" flow; clear token so a stale one
           // can't sneak back.
           localStorage.removeItem("yunque_token");
-          router.replace("/login");
+          redirectToLogin();
           return;
         }
         if (!data?.authenticated) {
           localStorage.removeItem("yunque_token");
-          router.replace("/login");
+          redirectToLogin();
           return;
         }
         lastCheckRef.current = Date.now();
         setChecking(false);
       })
       .catch((error) => {
-        if (error?.name === "AbortError") return;
+        if (cancelled) return;
         const status = (error as { cause?: unknown })?.cause;
         if (status === 401 || status === 403) {
           // Explicit auth failure → token is actually invalid/revoked.
           localStorage.removeItem("yunque_token");
-          router.replace("/login");
+          redirectToLogin();
           return;
         }
         // Network hiccup, timeout, 502/503, unreachable backend, etc.
@@ -91,7 +114,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       .finally(() => clearTimeout(timeout));
 
     return () => {
+      cancelled = true;
       clearTimeout(timeout);
+      if (redirectFallback) clearTimeout(redirectFallback);
       controller.abort();
     };
   }, [pathname, router]);

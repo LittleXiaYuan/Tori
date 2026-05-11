@@ -1,5 +1,20 @@
 package channel
 
+// ─── Channel: Signal ────────────────────────────────────────
+// Type:     "signal"
+// Protocol: CLI守护进程 (signal-cli daemon --json)
+// Inbound:  text (仅文本消息)
+// Outbound: text (仅纯文本，无附件)
+// Env vars: SIGNAL_PHONE_NUMBER, SIGNAL_CONFIG_DIR
+// Status:   Stub — 依赖本机 signal-cli 守护进程，运维成本高
+//
+// TODO: [P2] 支持发送附件 (signal-cli send -a <file>)
+// TODO: [P2] 支持接收附件消息 (attachments in DataMessage)
+// TODO: [P3] 支持 Signal Reactions (sendReaction)
+// TODO: [P3] 处理消息自毁 (disappearing messages)
+// TODO: [P3] 实现 Reactor 接口 (消息表情回应)
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bufio"
 	"context"
@@ -100,7 +115,7 @@ func (s *Signal) Start(ctx context.Context, handler func(Message) Reply) error {
 		}
 
 		reply := handler(msg)
-		if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+		if !IsEmptyReply(reply) {
 			target := sender
 			if groupID != "" {
 				target = groupID

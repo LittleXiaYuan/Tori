@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -169,9 +170,28 @@ func TestChat_ValidRequest_PlannerError(t *testing.T) {
 	if w.Code == http.StatusBadRequest {
 		t.Fatal("validation should have passed; got 400 instead of 502")
 	}
+	bodyText := w.Body.String()
+	for _, raw := range []string{"planner execution failed", "execution failed", "context deadline exceeded", "handoff agent", "fallback", "EOF"} {
+		if strings.Contains(bodyText, raw) {
+			t.Fatalf("chat error response should be friendly, found raw %q in %s", raw, bodyText)
+		}
+	}
 	code := extractErrorCode(t, w)
 	if code != "LLM_ERROR" {
 		t.Fatalf("expected LLM_ERROR, got %v", code)
+	}
+}
+
+func TestFriendlyChatPipelineErrorSanitizesLowLevelPlannerFailures(t *testing.T) {
+	rawErr := errors.New(`planner fc step 1: all fallback LLM clients failed (FC): handoff agent "file_exec" execution failed: context deadline exceeded: EOF`)
+	got := friendlyChatPipelineError(rawErr)
+	for _, raw := range []string{"fallback", "handoff agent", "execution failed", "context deadline exceeded", "EOF"} {
+		if strings.Contains(got, raw) {
+			t.Fatalf("friendly error should not expose %q, got %q", raw, got)
+		}
+	}
+	if !strings.Contains(got, "现场") || (!strings.Contains(got, "重试") && !strings.Contains(got, "阶段结果") && !strings.Contains(got, "继续")) {
+		t.Fatalf("friendly error should guide recovery, got %q", got)
 	}
 }
 
@@ -349,6 +369,36 @@ func TestDetectRequestIntent_ParsedDocument(t *testing.T) {
 	}
 	if !strings.Contains(intent.DocumentHint, "primary source of truth") {
 		t.Fatalf("unexpected document hint: %q", intent.DocumentHint)
+	}
+}
+
+func TestDetectRequestIntent_AttachmentMetadata(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	intent := gw.detectRequestIntent("[Attachment file: 申请表.pdf]\nWorkspace path: uploads/申请表.pdf\n请读取附件", "t1")
+	if !intent.ReferencesDocument {
+		t.Fatal("expected document intent for attachment metadata")
+	}
+	if !strings.Contains(intent.DocumentHint, "may not be parsed yet") {
+		t.Fatalf("unexpected document hint: %q", intent.DocumentHint)
+	}
+}
+
+func TestDetectRequestIntent_LegacyOfficeExtensions(t *testing.T) {
+	gw, _ := newTestGateway()
+
+	for _, text := range []string{
+		"请读取这个 doc 文件",
+		"请分析这份 ppt 材料",
+		"帮我提取 xls 表格里的公司名称",
+	} {
+		intent := gw.detectRequestIntent(text, "t1")
+		if !intent.ReferencesDocument {
+			t.Fatalf("expected document intent for %q", text)
+		}
+		if !strings.Contains(intent.DocumentHint, "document_parse") {
+			t.Fatalf("unexpected document hint for %q: %q", text, intent.DocumentHint)
+		}
 	}
 }
 

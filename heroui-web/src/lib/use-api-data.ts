@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { formatErrorMessage } from "./error-utils";
 
 /**
  * Generic data-fetching hook with automatic cancellation on unmount
@@ -33,7 +34,7 @@ export function useApiData<T>(
       }
     } catch (e) {
       if (mountedRef.current && seq === seqRef.current) {
-        setError(e instanceof Error ? e : new Error(String(e)));
+        setError(new Error(formatErrorMessage(e, "加载失败")));
       }
     } finally {
       if (mountedRef.current && seq === seqRef.current) {

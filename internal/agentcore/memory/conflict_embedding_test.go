@@ -181,9 +181,9 @@ func TestEmbeddingGate_CacheEvictsOldest(t *testing.T) {
 			t.Fatalf("unexpected embed error at %d: %v", i, err)
 		}
 	}
-	g.mu.Lock()
+	g.cacheMu.Lock()
 	size := len(g.recentCache)
-	g.mu.Unlock()
+	g.cacheMu.Unlock()
 	if size > 512 {
 		t.Fatalf("cache grew past the 512 cap: size=%d", size)
 	}

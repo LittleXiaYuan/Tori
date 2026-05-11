@@ -1,21 +1,24 @@
-import { Avatar, Button, Spinner, Tooltip, Chip } from "@heroui/react";
+import { useMemo, useState } from "react";
+import { Avatar, Button, Spinner, Tooltip, Chip, Popover } from "@heroui/react";
 import {
   Pencil, RotateCcw, Copy, Undo2, Check, Library,
   Paperclip, Volume2, VolumeX, Heart, Monitor,
-  Brain, Sparkles, FileDown, BookOpen,
+  Brain, Sparkles, FileDown, BookOpen, Share2, Send, Settings, Eye, Wand2, Cpu, MoreHorizontal,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type FilePreviewResponse, type NotifyChannel } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
 import { BrowserConnectCard } from "@/components/browser-connect-card";
 import { SkillGrowthPanel } from "@/components/skill-growth-panel";
 import { EmotionBadge, StickerView, SkillTags, AgentActions, type AgentAction } from "@/components/chat-extras";
+import { CognitiveStatusBar } from "@/components/cognitive-status-bar";
 import { ThinkingTimer } from "@/components/chat/thinking-timer";
 import { openExternal } from "@/lib/safe-url";
 import { browserActionLabel } from "@/lib/browser-action-labels";
-import type { Message } from "@/lib/chat-types";
+import type { ChatSharePayload, Message } from "@/lib/chat-types";
 import { collectGeneratedFiles, summarizeAssistantWork } from "@/lib/chat-utils";
+import { formatErrorMessage } from "@/lib/error-utils";
 import type { BrowserBridgeState, BrowserSessionNotice } from "@/components/browser-session-card";
 
 export interface ChatMessageListProps {
@@ -37,18 +40,376 @@ export interface ChatMessageListProps {
   onSend: (text: string) => void;
   onBrowserRefresh: () => void;
   onBrowserContinue: (prompt: string) => void;
+  onShare: (messageId: string, channel: NotifyChannel, payload: ChatSharePayload) => Promise<void>;
+}
+
+function filePreviewStatusLabel(status?: string): string {
+  switch (status) {
+    case "parsed": return "已可预览";
+    case "needs_document_parser": return "等待读取正文";
+    case "ready": return "已添加";
+    case "error": return "需要处理";
+    default: return status || "";
+  }
+}
+
+function filePreviewNoteLabel(note?: string): string {
+  const raw = (note || "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (
+    raw.includes("本地解析器") ||
+    raw.includes("文档解析后端") ||
+    normalized.includes("mineru") ||
+    normalized.includes("parser")
+  ) {
+    if (raw.includes("不能直接展开") || raw.includes("文档解析") || normalized.includes("needs_document_parser")) {
+      return "附件已保留，暂时还不能直接展开正文；可稍后继续或补充文档读取能力后重试。";
+    }
+    return "附件状态已更新，发送后由模型继续读取。";
+  }
+  return formatErrorMessage(raw, raw);
+}
+
+function basenameFromAttachmentPath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, "/");
+  return normalized.split("/").filter(Boolean).pop() || normalized || "附件";
+}
+
+function maskParsedAttachmentMarker(line: string): string {
+  return line
+    .replace(/\[Parsed document:\s*([^\]]+)\]/gi, (_match, file: string) => `附件内容：${file.trim()}`)
+    .replace(/^Workspace path:\s*(.+)$/i, (_match, file: string) => `附件名称：${basenameFromAttachmentPath(file)}`)
+    .replace(/^Parser:\s*(.+)$/i, (_match, parser: string) => `附件解析器：${parser.trim()}`)
+    .replace(/^Status:\s*(.+)$/i, (_match, status: string) => `附件状态：${status.trim()}`)
+    .replace(/^Note:\s*(.+)$/i, (_match, note: string) => `附件说明：${note.trim()}`);
+}
+
+function displayChatText(text?: string): string {
+  const raw = (text || "").trim();
+  if (!raw) return "";
+  return raw
+    .split(/\r?\n/)
+    .map((line) => formatErrorMessage(line, line))
+    .map(maskParsedAttachmentMarker)
+    .join("\n")
+    .trim();
+}
+
+function displayMessageContent(msg: Message): string {
+  if (msg.role === "user") return msg.content;
+  return displayChatText(msg.content);
 }
 
 export function ChatMessageList({
   messages, streaming, chatMode, currentModel,
   copiedIdx, ttsPlaying, bridgeState, resumePromptForBrowser,
   onCopy, onPlayTTS, onEdit, onRollback, onRetry,
-  onAction, onSlashSelect, onSend, onBrowserRefresh, onBrowserContinue,
+  onAction, onSlashSelect, onSend, onBrowserRefresh, onBrowserContinue, onShare,
 }: ChatMessageListProps) {
   const { t } = useI18n();
   const isBubble = chatMode === "chat";
+  const [shareOpenKey, setShareOpenKey] = useState<string | null>(null);
+  const [shareChannels, setShareChannels] = useState<NotifyChannel[]>([]);
+  const [shareChannelsLoaded, setShareChannelsLoaded] = useState(false);
+  const [shareChannelsLoading, setShareChannelsLoading] = useState(false);
+  const [sharePendingKey, setSharePendingKey] = useState<string | null>(null);
+  const [previewOpenKey, setPreviewOpenKey] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<Record<string, FilePreviewResponse>>({});
+  const [previewLoadingKey, setPreviewLoadingKey] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<Record<string, string>>({});
+  const enabledShareChannels = useMemo(() => shareChannels.filter((ch) => ch.enabled), [shareChannels]);
+
+  async function ensureShareChannels() {
+    if (shareChannelsLoaded || shareChannelsLoading) return;
+    setShareChannelsLoading(true);
+    try {
+      const data = await api.notifyChannels();
+      setShareChannels(data.channels || []);
+      setShareChannelsLoaded(true);
+    } catch {
+      setShareChannels([]);
+      setShareChannelsLoaded(true);
+    } finally {
+      setShareChannelsLoading(false);
+    }
+  }
+
+  function shareMessagePayload(msg: Message): ChatSharePayload {
+    const files = collectGeneratedFiles(msg.traceEvents);
+    const content = displayMessageContent(msg).trim();
+    return {
+      title: files.length > 0 ? `云雀任务结果 · ${files.length} 个产物` : "云雀任务结果",
+      message: content.length > 6000 ? `${content.slice(0, 6000)}\n\n...已截断` : content,
+      files,
+    };
+  }
+
+  function shareFilePayload(msg: Message, file: { path: string; name: string; size?: number }): ChatSharePayload {
+    const name = file.name || file.path.split("/").pop() || file.path;
+    const summary = displayMessageContent(msg).trim();
+    return {
+      title: `云雀产物：${name}`,
+      message: summary ? `云雀生成了产物文件：${name}\n\n${summary.slice(0, 1200)}${summary.length > 1200 ? "\n\n...已截断" : ""}` : `云雀生成了产物文件：${name}`,
+      files: [file],
+    };
+  }
+
+  async function ensureFilePreview(key: string, path: string) {
+    if (previewData[key] || previewLoadingKey === key) return;
+    setPreviewLoadingKey(key);
+    setPreviewError((prev) => ({ ...prev, [key]: "" }));
+    try {
+      const preview = await api.previewFile(path);
+      setPreviewData((prev) => ({ ...prev, [key]: preview }));
+    } catch (e) {
+      setPreviewError((prev) => ({ ...prev, [key]: formatErrorMessage(e, "预览失败") }));
+    } finally {
+      setPreviewLoadingKey(null);
+    }
+  }
+
+  function continueFilePrompt(file: { path: string; name: string }) {
+    const name = file.name || file.path.split("/").pop() || file.path;
+    return `请继续处理这个产物文件：${name}\n路径：${file.path}\n\n请先分析文件内容，然后给出可执行的下一步编辑、优化或转换方案。`;
+  }
+
+  function dispatchToAIIDEPrompt(msg: Message, file?: { path: string; name: string; size?: number }) {
+    const files = file ? [file] : collectGeneratedFiles(msg.traceEvents);
+    const content = displayMessageContent(msg).trim();
+    const context = content.length > 4000 ? `${content.slice(0, 4000)}\n\n...已截断` : content;
+    const fileLines = files.length > 0
+      ? files.map((f) => `- ${f.name || f.path}: ${f.path}${f.size ? ` (${f.size} bytes)` : ""}`).join("\n")
+      : "无";
+    return [
+      "请把下面需求派给 AI IDE 执行（Cursor / Claude Code / Windsurf 均可）。",
+      "请优先使用 orchestrate_task 创建外部执行任务，让 AI IDE 领取并真实修改/验证；过程中需要我确认时回到 Chat/IM 询问。",
+      "",
+      "任务来源：当前 Chat 消息",
+      "",
+      "关联文件：",
+      fileLines,
+      "",
+      "需求/上下文：",
+      context || "请基于当前对话上下文继续完成这个开发任务。",
+      "",
+      "验收要求：",
+      "1. 说明改了哪些文件。",
+      "2. 运行必要的测试或类型检查。",
+      "3. 产物进入 Workspace 后可预览/下载。",
+    ].join("\n");
+  }
+
+  function renderFilePreview(key: string, file: { path: string; name: string; size?: number }) {
+    const preview = previewData[key];
+    const error = previewError[key];
+    const loading = previewLoadingKey === key;
+    return (
+      <Popover
+        isOpen={previewOpenKey === key}
+        onOpenChange={(open) => {
+          setPreviewOpenKey(open ? key : null);
+          if (open) void ensureFilePreview(key, file.path);
+        }}
+      >
+        <Popover.Trigger>
+          <Button isIconOnly variant="ghost" size="sm">
+            <Eye size={11} />
+          </Button>
+        </Popover.Trigger>
+        <Popover.Content placement="bottom end" offset={6}>
+          <Popover.Dialog className="w-[420px] max-w-[calc(100vw-32px)] p-3" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)", borderRadius: 16 }}>
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{file.name || file.path}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span>{preview ? `${preview.kind} · ${preview.ext.toUpperCase() || "FILE"}` : "产物预览"}</span>
+                  {preview?.parse?.status && preview.parse.status !== "parsed" && (
+                    <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}>
+                      {filePreviewStatusLabel(preview.parse.status)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewOpenKey(null);
+                  onSend(continueFilePrompt(file));
+                }}
+                className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium"
+                style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}
+              >
+                <Wand2 size={11} /> 继续处理
+              </button>
+            </div>
+            {loading && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-6 text-xs" style={{ color: "var(--yunque-text-muted)", background: "var(--yunque-bg-muted)" }}>
+                <Spinner size="sm" /> 正在生成预览
+              </div>
+            )}
+            {!loading && error && (
+              <div className="rounded-xl px-3 py-4 text-xs leading-5" style={{ color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.18)" }}>
+                {error}
+              </div>
+            )}
+            {!loading && preview?.parse?.note && (
+              <div className="mb-2 rounded-xl px-3 py-2 text-xs leading-5" style={{ color: "#fbbf24", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)" }}>
+                {filePreviewNoteLabel(preview.parse.note)}
+              </div>
+            )}
+            {!loading && preview && (
+              <div className="max-h-[360px] overflow-auto rounded-xl border p-3 text-xs leading-5" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)", color: "var(--yunque-text)" }}>
+                <pre className="whitespace-pre-wrap break-words font-mono">{preview.preview || preview.parse?.preview || "暂无可预览内容"}</pre>
+              </div>
+            )}
+            {preview?.truncated && (
+              <div className="mt-2 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>预览已截断，可下载完整文件或让云雀继续处理。</div>
+            )}
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+    );
+  }
+
+  function renderShareMenu(key: string, msg: Message, payload: ChatSharePayload, compact = false) {
+    const isOpen = shareOpenKey === key;
+    return (
+      <Popover
+        isOpen={isOpen}
+        onOpenChange={(open) => {
+          setShareOpenKey(open ? key : null);
+          if (open) void ensureShareChannels();
+        }}
+      >
+        <Popover.Trigger>
+          {compact ? (
+            <Button isIconOnly variant="ghost" size="sm">
+              <Share2 size={11} />
+            </Button>
+          ) : (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:scale-[1.02]"
+              style={{ background: "rgba(14,165,233,0.1)", border: "1px solid rgba(14,165,233,0.22)", color: "#7dd3fc" }}
+            >
+              <Share2 size={11} /> 协作同步
+            </button>
+          )}
+        </Popover.Trigger>
+        <Popover.Content placement="bottom end" offset={6}>
+          <Popover.Dialog className="w-[280px] p-3" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)", borderRadius: 16 }}>
+            <div className="mb-2">
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>同步到协作应用</div>
+              <div className="mt-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>发送后会生成协作码，可在 IM 中用 `/yq 协作码 内容` 回流到同一会话。</div>
+            </div>
+            {shareChannelsLoading && (
+              <div className="flex items-center gap-2 rounded-lg px-2 py-3 text-xs" style={{ color: "var(--yunque-text-muted)", background: "var(--yunque-bg-muted)" }}>
+                <Spinner size="sm" /> 正在加载渠道
+              </div>
+            )}
+            {!shareChannelsLoading && enabledShareChannels.length === 0 && (
+              <div className="space-y-2">
+                <div className="rounded-lg px-2 py-3 text-xs leading-5" style={{ color: "var(--yunque-text-muted)", background: "var(--yunque-bg-muted)" }}>
+                  还没有可用的协作同步渠道。
+                </div>
+                <a href="/settings/notifications" className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
+                  <Settings size={12} /> 去配置通知渠道
+                </a>
+              </div>
+            )}
+            {!shareChannelsLoading && enabledShareChannels.length > 0 && (
+              <div className="space-y-1.5">
+                {enabledShareChannels.map((ch) => {
+                  const pendingKey = `${key}:${ch.id}`;
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      disabled={sharePendingKey === pendingKey}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-all hover:scale-[1.01] disabled:opacity-60"
+                      style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
+                      onClick={async () => {
+                        setSharePendingKey(pendingKey);
+                        try {
+                          await onShare(msg.id, ch, payload);
+                          setShareOpenKey(null);
+                        } finally {
+                          setSharePendingKey(null);
+                        }
+                      }}
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
+                        {sharePendingKey === pendingKey ? <Spinner size="sm" /> : <Send size={13} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{ch.name}</span>
+                        <span className="block truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{ch.type}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+    );
+  }
+
+  function renderMoreActions(key: string, msg: Message) {
+    return (
+      <Popover>
+        <Popover.Trigger>
+          <Button isIconOnly variant="ghost" size="sm">
+            <MoreHorizontal size={11} />
+          </Button>
+        </Popover.Trigger>
+        <Popover.Content placement="bottom end" offset={6}>
+          <Popover.Dialog className="w-[220px] p-2" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)", borderRadius: 14 }}>
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => onPlayTTS(msg.id, msg.content)}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
+                style={{ color: "var(--yunque-text)", background: "transparent" }}
+              >
+                {ttsPlaying === msg.id ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                {ttsPlaying === msg.id ? t("chat.stopTTS") : t("chat.playTTS")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onRollback(msg.id)}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
+                style={{ color: "var(--yunque-text)", background: "transparent" }}
+              >
+                <Undo2 size={12} /> {t("chat.rollback")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSend(`/save_knowledge Save the above response to knowledge base.`)}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
+                style={{ color: "var(--yunque-text)", background: "transparent" }}
+              >
+                <BookOpen size={12} /> {t("chat.saveToKnowledge")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSend(`/report Generate a structured report from the above conversation.`)}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs"
+                style={{ color: "var(--yunque-text)", background: "transparent" }}
+              >
+                <FileDown size={12} /> {t("chat.exportReport")}
+              </button>
+              {renderShareMenu(`more-share:${key}`, msg, shareMessagePayload(msg), false)}
+            </div>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+    );
+  }
   return (
-    <div className="mx-auto space-y-5" style={{ maxWidth: "min(900px, 70%)" }}>
+    <div className="mx-auto space-y-5" style={{ maxWidth: "min(860px, 92vw)" }} aria-live="polite" aria-relevant="additions" role="log">
       {messages.map((msg, idx) => (
         <div key={msg.id} className={`group chat-message-row flex gap-2.5 ${isBubble && msg.role === "user" ? "justify-end" : ""}`}>
           {(!isBubble || msg.role === "assistant") && (
@@ -73,50 +434,52 @@ export function ChatMessageList({
             {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (() => {
               const isLive = streaming && msg.id === messages[messages.length - 1]?.id;
               const toolEvents = msg.traceEvents.filter(e => e.type === "tool_start" || e.type === "tool_result");
+              const summary = summarizeAssistantWork(msg);
               const warnEvents = msg.traceEvents.filter((e) => {
                 const summary = (e.summary || "").toLowerCase();
                 return e.type === "plan" && (summary.includes("warning") || summary.includes("risk") || summary.includes("blocked") || summary.includes("needs review"));
               });
+              const showSummary = isLive || summary.toolCount > 0 || summary.fileCount > 0 || warnEvents.length > 0;
+              const statusLabel = isLive ? "云雀正在工作" : "工作过程已记录";
+              const latestSummary = displayChatText(summary.latestSummary) || (summary.primarySkill ? `使用 ${summary.primarySkill}` : "");
               return (
                 <>
-                  <div className="chat-inline-panel mb-1.5 rounded-xl border px-2 py-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
-                        {isLive ? t("chat.running") : t("chat.completed")}
-                      </span>
-                      {(() => {
-                        const summary = summarizeAssistantWork(msg);
-                        return (
-                          <>
-                            {summary.primarySkill && (
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-secondary)" }}>
-                                {summary.primarySkill}
-                              </span>
-                            )}
-                            {summary.toolCount > 0 && (
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "var(--yunque-bg-muted)", color: "var(--yunque-text-secondary)" }}>
-                                {summary.toolCount} {t("chat.toolEvents")}
-                              </span>
-                            )}
-                            {summary.fileCount > 0 && (
-                              <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
-                                {summary.fileCount} {t("chat.files")}
-                              </span>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <div className="text-xs leading-6" style={{ color: "var(--yunque-text-muted)" }}>
-                      {isLive ? t("chat.runningDesc") : t("chat.completedDesc")}
-                    </div>
-                  </div>
-                  {warnEvents.length > 0 && (
-                    <div className="mb-2 rounded-lg px-3 py-1.5 text-[11px]" style={{ background: "rgba(245,158,11,0.08)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.15)" }}>
-                      {warnEvents.map((w, wi) => <div key={wi}>{w.summary}</div>)}
+                  {showSummary && (
+                    <div className="chat-inline-panel mb-1.5 rounded-xl border px-3 py-2" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(14,165,233,0.04))", borderColor: "rgba(59,130,246,0.16)" }}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "var(--yunque-accent-muted)", color: "var(--yunque-accent)" }}>
+                          {isLive && <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "var(--yunque-accent)" }} />}
+                          <Monitor size={10} /> {statusLabel}
+                        </span>
+                        {summary.sourceKinds.slice(0, 4).map((kind) => (
+                          <span key={kind} className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-secondary)" }}>
+                            {kind}
+                          </span>
+                        ))}
+                        {summary.toolCount > 0 && (
+                          <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "var(--yunque-text-muted)" }}>
+                            {summary.toolCount} {t("chat.toolEvents")}
+                          </span>
+                        )}
+                        {summary.fileCount > 0 && (
+                          <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(34,197,94,0.1)", color: "#4ade80" }}>
+                            {summary.fileCount} {t("chat.files")}
+                          </span>
+                        )}
+                      </div>
+                      {latestSummary && (
+                        <div className="mt-1.5 truncate text-[11px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                          当前：{latestSummary}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {toolEvents.length > 0 && (() => {
+                  {warnEvents.length > 0 && (
+                    <div className="mb-2 rounded-lg px-3 py-1.5 text-[11px]" style={{ background: "rgba(245,158,11,0.08)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.15)" }}>
+                      {warnEvents.map((w, wi) => <div key={wi}>{displayChatText(w.summary)}</div>)}
+                    </div>
+                  )}
+                  {isLive && toolEvents.length > 0 && (() => {
                     const uniqueSkills = [...new Set(toolEvents.map(e => e.meta?.skill).filter(Boolean))];
                     const lastSkill = toolEvents[toolEvents.length - 1]?.meta?.skill || "";
                     return (
@@ -155,6 +518,29 @@ export function ChatMessageList({
                   ))}
                 </div>
               )}
+              {msg.role === "user" && msg.files && msg.files.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {msg.files.map((file, i) => (
+                    <span
+                      key={`${file.path}:${i}`}
+                      className="inline-flex max-w-[260px] items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]"
+                      style={{
+                        background: "rgba(255,255,255,0.16)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        color: msg.role === "user" ? "var(--neutral-strong-fg)" : "var(--yunque-text-secondary)",
+                      }}
+                    >
+                      <Paperclip size={11} />
+                      <span className="truncate">{file.name || file.path}</span>
+                      {typeof file.size === "number" && file.size > 0 && (
+                        <span className="opacity-70">
+                          {file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
               {msg.role === "assistant" && msg.reasoning && (
                 <details className="mb-2" open={false} style={{ fontSize: "var(--text-sm)" }}>
                   <summary style={{ cursor: "pointer", color: "var(--yunque-text-muted)", fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
@@ -169,7 +555,7 @@ export function ChatMessageList({
                 </details>
               )}
               {msg.content ? (
-                msg.role === "assistant" ? <MarkdownRenderer content={msg.content} /> : (msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim() || (msg.images?.length ? null : msg.content))
+                msg.role === "assistant" ? <MarkdownRenderer content={displayMessageContent(msg)} /> : (msg.content.replace(/\[(Uploaded file|File):\s*[^\]]+\]\s*/g, "").trim() || (msg.images?.length ? null : msg.content))
               ) : (
                 !msg.images?.length && (
                   <div className="flex items-center gap-1.5">
@@ -224,6 +610,16 @@ export function ChatMessageList({
                 </div>
               </div>
             )}
+            {/* Cognitive status bar */}
+            {msg.role === "assistant" && (msg.cognitiveMemories?.length || msg.cognitiveReflections?.length || msg.cognitiveContextLayers?.length || msg.skills_used?.length) && (
+              <CognitiveStatusBar
+                memories={msg.cognitiveMemories}
+                reflections={msg.cognitiveReflections}
+                contextLayers={msg.cognitiveContextLayers}
+                activeSkills={msg.skills_used}
+                isLive={streaming && msg.id === messages[messages.length - 1]?.id}
+              />
+            )}
             {/* Actions */}
             {msg.role === "assistant" && msg.actions && msg.actions.length > 0 && (
               <div className="chat-inline-panel mt-2 rounded-xl border p-2" style={{ background: "var(--yunque-bg-muted)", borderColor: "var(--yunque-border)" }}>
@@ -264,14 +660,14 @@ export function ChatMessageList({
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)" }}><Monitor size={16} style={{ color: "#22c55e" }} /></div>
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>E2B Desktop</div>
+                    <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>云电脑</div>
                     <div className="text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{msg.sandbox.sandbox_id}</div>
                   </div>
                   <Chip size="sm" style={{ marginLeft: "auto", background: "rgba(34,197,94,0.12)", color: "#22c55e", fontSize: "10px" }}>LIVE</Chip>
                 </div>
                 {msg.sandbox.stream_url && (
                   <Button size="sm" className="w-full mt-1" onPress={() => openExternal(msg.sandbox?.stream_url)} style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}>
-                    <Monitor size={14} className="mr-2" /> {t("chat.openDesktop")}
+                    <Monitor size={14} className="mr-2" /> 打开云电脑
                   </Button>
                 )}
               </div>
@@ -288,7 +684,7 @@ export function ChatMessageList({
                       const ext = (f.name || f.path).split(".").pop()?.toLowerCase() || "";
                       const isDoc = ["pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"].includes(ext);
                       return (
-                        <a key={i} href={`/api/files/download?path=${encodeURIComponent(f.path)}`} download={f.name || f.path}
+                        <div key={i}
                           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01]"
                           style={{ background: isDoc ? "var(--yunque-accent-muted)" : "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: isDoc ? "var(--yunque-accent-muted)" : "var(--yunque-bg-muted)" }}><Paperclip size={18} /></div>
@@ -298,14 +694,53 @@ export function ChatMessageList({
                               {ext.toUpperCase()} {f.size != null && f.size > 0 ? `  ${f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${(f.size / 1024).toFixed(1)} KB`}` : ""}
                             </div>
                           </div>
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--yunque-accent-muted)" }}><span style={{ color: "var(--yunque-accent)", fontSize: 16 }}>↗</span></div>
-                        </a>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {renderFilePreview(`preview:${msg.id}:${i}`, f)}
+                            <Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(continueFilePrompt(f))}>
+                              <Wand2 size={11} />
+                            </Button>
+                            <Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg, f))}>
+                              <Cpu size={11} />
+                            </Button>
+                            {renderShareMenu(`file:${msg.id}:${i}`, msg, shareFilePayload(msg, f), true)}
+                            <a
+                              href={`/api/files/download?path=${encodeURIComponent(f.path)}`}
+                              download={f.name || f.path}
+                              className="w-8 h-8 rounded-full flex items-center justify-center"
+                              style={{ background: "var(--yunque-accent-muted)" }}
+                            >
+                              <span style={{ color: "var(--yunque-accent)", fontSize: 16 }}>↗</span>
+                            </a>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
               );
             })()}
+            {msg.role === "assistant" && msg.shareReceipts && msg.shareReceipts.length > 0 && (
+              <div className="mt-2 rounded-xl border px-3 py-2" style={{ background: "rgba(14,165,233,0.06)", borderColor: "rgba(14,165,233,0.18)" }}>
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: "#7dd3fc" }}>
+                  <Share2 size={12} /> 协作同步记录
+                </div>
+                <div className="space-y-1">
+                  {msg.shareReceipts.slice(-3).map((receipt) => (
+                    <div key={receipt.id} className="flex items-center gap-2 text-[11px]" style={{ color: receipt.status === "sent" ? "var(--yunque-text-muted)" : "#f87171" }}>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: receipt.status === "sent" ? "#22c55e" : "#f87171" }} />
+                      <span className="min-w-0 flex-1 truncate">
+                        {receipt.status === "sent" ? "已发送到" : "发送失败"} {receipt.channelName}
+                        {receipt.shareCode ? ` · ${receipt.shareCode}` : ""}
+                        {receipt.error ? `：${formatErrorMessage(receipt.error, "同步失败")}` : ""}
+                      </span>
+                      <span className="shrink-0 font-mono opacity-70">
+                        {new Date(receipt.sentAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Suggestions */}
             {msg.role === "assistant" && msg.suggestions && msg.suggestions.length > 0 && !streaming && (
               <details className="mt-3">
@@ -355,51 +790,41 @@ export function ChatMessageList({
             {msg.role === "assistant" && msg.traceEvents && msg.traceEvents.length > 0 && (
               <details className="mt-3">
                 <summary className="cursor-pointer text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{t("chat.executionTrace")}</summary>
-                <div className="mt-2"><ExecutionTrace events={msg.traceEvents} isLive={streaming && idx === messages.length - 1} /></div>
+                <div className="mt-2"><ExecutionTrace events={msg.traceEvents} isLive={streaming && idx === messages.length - 1} onRecoveryPrompt={onSend} /></div>
               </details>
             )}
             {/* Quick actions card for substantial responses */}
             {msg.role === "assistant" && msg.content && msg.content.length > 400 && !streaming && (
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => onSend("/save_knowledge Save the above response to knowledge base.")}
+                  onClick={() => onSend(dispatchToAIIDEPrompt(msg))}
                   className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:scale-[1.02]"
-                  style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", color: "#a78bfa" }}
+                  style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)", color: "#86efac" }}
                 >
-                  <BookOpen size={11} /> {t("chat.saveToKnowledge")}
+                  <Cpu size={11} /> 派给 AI IDE
                 </button>
-                <button
-                  onClick={() => onSend("/report Generate a structured report from the above conversation.")}
-                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:scale-[1.02]"
-                  style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", color: "#93c5fd" }}
-                >
-                  <FileDown size={11} /> {t("chat.exportReport")}
-                </button>
+                {renderShareMenu(`quick:${msg.id}`, msg, shareMessagePayload(msg))}
               </div>
             )}
             {/* Message tools */}
             {msg.content && (
               <div className={`chat-message-tools flex gap-0.5 mt-1 ${!isBubble ? "justify-end" : ""}`} style={isBubble ? { justifyContent: msg.role === "user" ? "flex-end" : "flex-start" } : undefined}>
                 {msg.role === "user" && (
-                  <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>{t("chat.edit")}</Tooltip.Content></Tooltip>
+                  <>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onEdit(msg.id)}><Pencil size={11} /></Button><Tooltip.Content>{t("chat.edit")}</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
+                  </>
                 )}
                 {msg.role === "assistant" && (
                   <>
                     <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, msg.content)}>
+                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onCopy(msg.id, displayMessageContent(msg))}>
                         {copiedIdx === msg.id ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
                       </Button>
                       <Tooltip.Content>{copiedIdx === msg.id ? t("chat.copied") : t("chat.copy")}</Tooltip.Content>
                     </Tooltip>
-                    <Tooltip delay={0}>
-                      <Button isIconOnly variant="ghost" size="sm" onPress={() => onPlayTTS(msg.id, msg.content)}>
-                        {ttsPlaying === msg.id ? <VolumeX size={11} style={{ color: "var(--yunque-accent)" }} /> : <Volume2 size={11} />}
-                      </Button>
-                      <Tooltip.Content>{ttsPlaying === msg.id ? t("chat.stopTTS") : t("chat.playTTS")}</Tooltip.Content>
-                    </Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRollback(msg.id)}><Undo2 size={11} /></Button><Tooltip.Content>{t("chat.rollback")}</Tooltip.Content></Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/save_knowledge Save the above response to knowledge base.`)}><BookOpen size={11} /></Button><Tooltip.Content>{t("chat.saveToKnowledge")}</Tooltip.Content></Tooltip>
-                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(`/report Generate a structured report from the above conversation.`)}><FileDown size={11} /></Button><Tooltip.Content>{t("chat.exportReport")}</Tooltip.Content></Tooltip>
+                    <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onSend(dispatchToAIIDEPrompt(msg))}><Cpu size={11} /></Button><Tooltip.Content>派给 AI IDE</Tooltip.Content></Tooltip>
+                    {renderMoreActions(`tools:${msg.id}`, msg)}
                   </>
                 )}
                 <Tooltip delay={0}><Button isIconOnly variant="ghost" size="sm" onPress={() => onRetry(msg.id)}><RotateCcw size={11} /></Button><Tooltip.Content>{t("chat.retry")}</Tooltip.Content></Tooltip>
@@ -417,3 +842,4 @@ export function ChatMessageList({
     </div>
   );
 }
+

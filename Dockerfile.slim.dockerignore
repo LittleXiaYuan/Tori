@@ -1,0 +1,55 @@
+# Build context is the parent directory containing yunque-agent/ and ledger/.
+# Start from a tight allowlist so sibling projects and local scratch data stay
+# out of Docker builds.
+**
+
+!ledger/
+!ledger/**
+!yunque-agent/
+!yunque-agent/**
+
+# Version control and local editor state.
+ledger/.git/
+yunque-agent/.git/
+yunque-agent/.cursor/
+yunque-agent/.idea/
+yunque-agent/.vscode/
+
+# Secrets and local environment files.
+yunque-agent/.env
+yunque-agent/.env.*
+!yunque-agent/.env.example
+
+# Runtime data, build outputs, dependency caches, and test artifacts.
+yunque-agent/data/
+yunque-agent/dist/
+yunque-agent/*.exe
+yunque-agent/agent
+yunque-agent/coverage
+yunque-agent/coverage_*
+yunque-agent/coverage.*
+yunque-agent/*.out
+yunque-agent/*.err
+yunque-agent/*.log
+yunque-agent/heroui-web/node_modules/
+yunque-agent/heroui-web/.next/
+yunque-agent/heroui-web/out/
+yunque-agent/heroui-web/coverage/
+yunque-agent/yunque-mcp/node_modules/
+ledger/coverage
+ledger/coverage_*
+ledger/coverage.*
+ledger/*.out
+ledger/*.err
+ledger/*.log
+
+# Large app/documentation areas that are not needed to compile the agent image.
+yunque-agent/browser-extension/
+yunque-agent/desktop/
+yunque-agent/desktop/src-tauri/target*/
+yunque-agent/xiaoyu/
+yunque-agent/.atomcode/
+yunque-agent/.tmp/
+yunque-agent/doc/
+yunque-agent/docs/
+yunque-agent/web/

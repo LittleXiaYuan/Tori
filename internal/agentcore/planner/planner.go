@@ -15,6 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/subagent"
+	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
 )
@@ -31,40 +32,42 @@ type SkillIndexFunc func() []SkillIndexEntry
 
 // Planner is the brain: understands intent, breaks tasks into steps, and drives skills.
 type Planner struct {
-	llm              *llm.Client
-	llmPool          *llm.Pool // multi-model pool (nil = single model mode)
-	registry         *skills.Registry
-	toolTimeout      time.Duration // per-tool execution timeout (default 60s)
-	maxSteps         int
-	memory           MemorySearchFunc
-	reflect          ReflectFunc
-	skillMetrics     SkillMetricsFunc
-	domainPrompt     string
-	personaPrompt    func() string                        // dynamic persona system prompt
-	graphContext     func(query string) string            // knowledge graph context injector
-	codeContext      func(query string) string            // code knowledge context injector (repo-level)
-	useNativeFC      bool                                 // use native LLM function calling
-	windowCfg        *ctxwindow.WindowConfig              // context window trimming config
-	ctxManager       *ctxwindow.Manager                   // multi-stage context compression manager
-	cachedSysPrompt  string                               // cached base system prompt
-	sysPromptVer     int                                  // incremented when skills change
-	skillIndex       SkillIndexFunc                       // L2 installed skill index (nil = no L2)
-	handoffReg       *subagent.HandoffRegistry            // handoff tool registry for subagent delegation
-	skillOptimizer   *SkillOptimizer                      // skill usage analytics and optimization hints
-	reverie          *Reverie                             // background inner monologue system
-	taskFailureMon   *TaskFailureMonitor                  // event-driven trigger on skill failure spikes
-	stateContext     func() string                        // structured state kernel context
-	strategyContext  func() string                        // reflection loop strategy context
-	dynContextBudget int                                  // max tokens for dynamic context layer assembly (0 = unlimited)
-	ackEnabled       bool                                 // send typing indicators / ack
-	skillScorer      *skills.SkillScorer                  // Ledger-driven skill scoring for intent routing
-	recentSkills     []string                             // last N skills used (for routing recency bonus)
-	recentSkillsMu   sync.Mutex
-	locale           string                               // agent locale (e.g. "zh-CN")
+	llm                    *llm.Client
+	llmPool                *llm.Pool // multi-model pool (nil = single model mode)
+	registry               *skills.Registry
+	toolTimeout            time.Duration // per-tool execution timeout (default 60s)
+	maxSteps               int
+	memory                 MemorySearchFunc
+	reflect                ReflectFunc
+	skillMetrics           SkillMetricsFunc
+	domainPrompt           string
+	personaPrompt          func() string              // dynamic persona system prompt
+	graphContext           func(query string) string  // knowledge graph context injector
+	codeContext            func(query string) string  // code knowledge context injector (repo-level)
+	useNativeFC            bool                       // use native LLM function calling
+	windowCfg              *ctxwindow.WindowConfig    // context window trimming config
+	ctxManager             *ctxwindow.Manager         // multi-stage context compression manager
+	cachedSysPrompt        string                     // cached base system prompt
+	sysPromptVer           int                        // incremented when skills change
+	skillIndex             SkillIndexFunc             // L2 installed skill index (nil = no L2)
+	handoffReg             *subagent.HandoffRegistry  // handoff tool registry for subagent delegation
+	skillOptimizer         *SkillOptimizer            // skill usage analytics and optimization hints
+	reverie                *Reverie                   // background inner monologue system
+	taskFailureMon         *TaskFailureMonitor        // event-driven trigger on skill failure spikes
+	longHorizonCheckpoints LongHorizonCheckpointStore // recoverable DAG checkpoint persistence
+	stateContext           func() string              // structured state kernel context
+	strategyContext        func() string              // reflection loop strategy context
+	dynContextBudget       int                        // max tokens for dynamic context layer assembly (DynContextBudgetDefault = use 4000)
+	ackEnabled             bool                       // send typing indicators / ack
+	skillScorer            *skills.SkillScorer        // Ledger-driven skill scoring for intent routing
+	recentSkills           []string                   // last N skills used (for routing recency bonus)
+	recentSkillsMu         sync.Mutex
+	locale                 string // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
 	trustRecord      func(skillName string, success bool) // trust score recorder (nil = disabled)
 	trustCheck       func(skillName string) error         // trust gate: returns non-nil to block skill
 	cognitiveContext CognitiveContextFunc                 // CognitivePlugin dynamic context injector
+	beliefContext    BeliefContextFunc                    // Cognition SDK belief context injector
 	ledger           *ldg.Ledger                          // Ledger instance for ReAct/Reasoning/Eval
 	reactMode        bool                                 // if true, use ReAct mode instead of basic FC loop
 	longHorizonMode  bool                                 // if true, use DAG planner for complex multi-step tasks
@@ -74,9 +77,11 @@ type Planner struct {
 	skillGrowth      *SkillGrowth                         // autonomous skill acquisition (nil = disabled)
 	fedBridge        FederationBridge                     // OPP federation bridge for A2A delegation (nil = disabled)
 	dataCollector    *DataCollector                       // training data collector (nil = disabled)
-	providerReg      *llm.ProviderRegistry               // capability-aware provider registry (nil = use pool only)
+	providerReg      *llm.ProviderRegistry                // capability-aware provider registry (nil = use pool only)
 	cogniContext     CogniContextFunc                     // declarative Cogni context injector (nil = disabled)
 	cogniSkillFilter CogniSkillFilterFunc                 // declarative Cogni surface filter (nil = identity)
+	cogniTrace       CogniTraceFunc                       // declarative Cogni trace snapshot for planner-visible events
+	metacogBridge    *iledger.MetaCogBridge               // metacognitive anomaly bridge (nil = disabled)
 }
 
 // CogniContextFunc returns the assembled Cogni context block for the current
@@ -85,11 +90,21 @@ type Planner struct {
 // the underlying Registry or its hook.
 type CogniContextFunc func(ctx context.Context, message, tenantID, channel string) string
 
+// BeliefContextFunc returns the assembled Cognition SDK context block for the
+// current turn — empty string when no pack activates.
+type BeliefContextFunc func(ctx context.Context, message, tenantID, channel string) string
+
 // CogniSkillFilterFunc narrows the candidate skill list to the union of
 // every activated cogni's ToolSurface. Implementations MUST return the
 // input unchanged when no cogni activates — the planner relies on this
 // "no-op default" so disabling cogni keeps existing behavior intact.
 type CogniSkillFilterFunc func(message, tenantID, channel string, in []skills.Skill) []skills.Skill
+
+// CogniTraceFunc returns the latest declarative Cogni decision snapshot for
+// the current turn. It lets the planner surface "which Cogni activated and how
+// it changed the tool surface" in the same SSE execution trace as normal
+// thinking/tool events, instead of hiding it only behind admin endpoints.
+type CogniTraceFunc func(message, tenantID, channel string) (CogniTraceDetail, bool)
 
 type MemorySearchFunc func(ctx context.Context, tenantID, query string) string
 
@@ -98,6 +113,11 @@ type ReflectFunc func(ctx context.Context, intent, reply string) bool
 func (p *Planner) SetMemory(fn MemorySearchFunc) { p.memory = fn }
 
 func (p *Planner) SetReflect(fn ReflectFunc) { p.reflect = fn }
+
+// SetMetaCogBridge attaches the metacognitive anomaly bridge.
+// When set, the planner checks for reasoning anomalies (loops, stalls,
+// drift) and injects correction hints into subsequent prompts.
+func (p *Planner) SetMetaCogBridge(b *iledger.MetaCogBridge) { p.metacogBridge = b }
 
 func (p *Planner) SetPersonaPrompt(fn func() string) { p.personaPrompt = fn }
 
@@ -115,6 +135,10 @@ func (p *Planner) SetCodeContext(fn func(query string) string) { p.codeContext =
 func (p *Planner) SetStateContext(fn func() string) { p.stateContext = fn }
 
 func (p *Planner) SetStrategyContext(fn func() string) { p.strategyContext = fn }
+
+// DynContextBudgetDefault signals "use the built-in default" (currently 4000 tokens).
+// Callers should use this constant instead of bare 0 to express intent clearly.
+const DynContextBudgetDefault = 0
 
 func (p *Planner) SetDynContextBudget(tokens int) { p.dynContextBudget = tokens }
 
@@ -164,6 +188,9 @@ func (p *Planner) SetTrustCheck(fn func(skillName string) error) { p.trustCheck 
 // SetCognitiveContext attaches the CognitivePlugin dynamic context collector.
 func (p *Planner) SetCognitiveContext(fn CognitiveContextFunc) { p.cognitiveContext = fn }
 
+// SetBeliefContext attaches the Cognition SDK dynamic context collector.
+func (p *Planner) SetBeliefContext(fn BeliefContextFunc) { p.beliefContext = fn }
+
 // SetLedger attaches a Ledger instance for ReAct mode, reasoning traces, and self-evaluation.
 func (p *Planner) SetLedger(l *ldg.Ledger) { p.ledger = l }
 
@@ -200,6 +227,10 @@ func (p *Planner) SetCogniContext(fn CogniContextFunc) { p.cogniContext = fn }
 // the union of every activated cogni's ToolSurface; nil keeps the full
 // skill set.
 func (p *Planner) SetCogniSkillFilter(fn CogniSkillFilterFunc) { p.cogniSkillFilter = fn }
+
+// SetCogniTrace attaches a declarative Cogni observability callback. Nil keeps
+// Cogni internal-only and preserves prior behaviour.
+func (p *Planner) SetCogniTrace(fn CogniTraceFunc) { p.cogniTrace = fn }
 
 // LocalBrain returns the attached local brain (may be nil).
 func (p *Planner) LocalBrain() *localbrain.LocalBrain { return p.localBrain }
@@ -466,7 +497,6 @@ func safeToolGo(ctx context.Context, timeout time.Duration, fn func(ctx context.
 	}()
 }
 
-
 // PlanRequest is the input to the planner.
 type PlanRequest struct {
 	Messages          []llm.Message
@@ -595,7 +625,7 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 	ctx, span := observe.StartSpan(ctx, "planner.Run")
 	span.Attrs["tenant_id"] = req.TenantID
 	span.Attrs["mode"] = "text-based"
-	if p.longHorizonMode && p.isComplexTask(req) {
+	if p.shouldUseLongHorizon(req) {
 		span.Attrs["mode"] = "long-horizon"
 	} else if p.reactMode && p.ledger != nil {
 		span.Attrs["mode"] = "react"
@@ -618,6 +648,14 @@ func (p *Planner) Run(ctx context.Context, req PlanRequest) (*PlanResult, error)
 		p.dataCollector.Collect(ctx, req, result, reflectScore)
 	}
 
+	// MetaCog post-execution: log anomaly summary and clear task state
+	if p.metacogBridge != nil && req.TaskID != "" {
+		if summary := p.metacogBridge.FormatAnomalySummary(req.TaskID); summary != "" {
+			slog.Info("planner: metacog summary", "detail", summary)
+		}
+		p.metacogBridge.ClearTask(req.TaskID)
+	}
+
 	return result, err
 }
 
@@ -629,6 +667,7 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 	if req.DisableTools {
 		slog.Info("planner: chat-only mode, skipping all tools")
 		messages, layers := p.BuildMessages(ctx, req)
+		p.maybeEmitCogniTrace(req)
 		reply, err := p.chatFallback(ctx, req, messages)
 		if err != nil {
 			return nil, fmt.Errorf("planner chat-only: %w", err)
@@ -665,6 +704,7 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 	if lbNoTools {
 		slog.Info("planner: NeedTools=false, using tool-free chat path")
 		messages, layers := p.BuildMessages(ctx, req)
+		p.maybeEmitCogniTrace(req)
 		reply, err := p.chatFallback(ctx, req, messages)
 		if err != nil {
 			return nil, fmt.Errorf("planner tool-free chat: %w", err)
@@ -674,7 +714,8 @@ func (p *Planner) runInner(ctx context.Context, req PlanRequest) (*PlanResult, e
 		return &PlanResult{Reply: cleaned, Steps: 1, ContextLayers: layers, Suggestions: nextMoves}, nil
 	}
 
-	if p.longHorizonMode && p.isComplexTask(req) {
+	if p.shouldUseLongHorizon(req) {
+		p.emitCognitiveLoadEvent(req, assessCognitiveLoad(req))
 		return p.runLongHorizon(ctx, req)
 	}
 	if p.reactMode && p.ledger != nil {

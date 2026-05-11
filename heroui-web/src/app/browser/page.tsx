@@ -35,6 +35,7 @@ import { BrowserSessionCard } from "@/components/browser-session-card";
 import { useBrowserBridge } from "@/lib/use-browser-bridge";
 import { openExternal } from "@/lib/safe-url";
 import { useI18n } from "@/lib/i18n";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 export default function BrowserPage() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export default function BrowserPage() {
         if (step.ok) {
           setActionLog((prev) => [`[${t}] [OK] Step ${step.step}: ${step.action}`, ...prev].slice(0, 50));
         } else {
-          setActionLog((prev) => [`[${t}] [FAIL] Step ${step.step}: ${step.action} - ${step.error}`, ...prev].slice(0, 50));
+          setActionLog((prev) => [`[${t}] [FAIL] Step ${step.step}: ${step.action} - ${formatErrorMessage(step.error, "步骤未完成")}`, ...prev].slice(0, 50));
         }
       }
       try {
@@ -164,7 +165,7 @@ export default function BrowserPage() {
       showToast(`${t("browserPage.scenarioComplete")}: ${scenario?.name || scenarioId}`, "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Scenario failed", "error");
-      setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] Scenario failed: ${e}`, ...prev].slice(0, 50));
+      setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] Scenario failed: ${formatErrorMessage(e, "场景未完成")}`, ...prev].slice(0, 50));
     }
     setRunningScenario(null);
   };
@@ -292,7 +293,7 @@ export default function BrowserPage() {
             <Tabs.Tab id="opp"><Tabs.Separator />{t("browserPage.tab.opp")}{oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />{t("browserPage.tab.scenarios")}{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="desktop"><Tabs.Separator /><Cloud size={12} className="mr-1 inline" />E2B Desktop{desktopSandbox && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>LIVE</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="desktop"><Tabs.Separator /><Cloud size={12} className="mr-1 inline" />云电脑{desktopSandbox && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>LIVE</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="config"><Tabs.Separator />{t("browserPage.tab.config")}<Tabs.Indicator /></Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
@@ -451,11 +452,11 @@ export default function BrowserPage() {
                     try {
                       await api.desktopDestroy();
                       setDesktopSandbox(null);
-                      showToast("Desktop sandbox destroyed", "success");
+                      showToast("云电脑已停止", "success");
                     } catch (e) { showToast(e instanceof Error ? e.message : "Failed", "error"); }
                     setDesktopLoading(false);
                   }} isPending={desktopLoading} style={{ color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}>
-                    <CloudOff size={14} className="mr-1" /> Stop
+                    <CloudOff size={14} className="mr-1" /> 停止
                   </Button>
                   <Button size="sm" variant="ghost" onPress={async () => {
                     try {
@@ -474,14 +475,14 @@ export default function BrowserPage() {
                     const r = await api.desktopCreate();
                     if (r.ok && r.sandbox) {
                       setDesktopSandbox(r.sandbox);
-                      showToast("Desktop sandbox created", "success");
+                      showToast("云电脑已创建", "success");
                     } else {
-                      showToast(r.message || "Failed to create sandbox", "error");
+                      showToast(r.message || "创建云电脑失败", "error");
                     }
                   } catch (e) { showToast(e instanceof Error ? e.message : "Failed", "error"); }
                   setDesktopLoading(false);
                 }} isPending={desktopLoading} className="btn-accent">
-                  <Cloud size={14} className="mr-1" /> Launch E2B Desktop
+                  <Cloud size={14} className="mr-1" /> 创建云电脑
                 </Button>
               )}
             </div>
@@ -490,7 +491,7 @@ export default function BrowserPage() {
               <Card className="section-card p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Desktop Sandbox Running</div>
+                    <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>云电脑运行中</div>
                     <div className="mt-1 text-xs font-mono" style={{ color: "var(--yunque-text-secondary)" }}>ID: {desktopSandbox.id}</div>
                   </div>
                 </div>
@@ -500,9 +501,9 @@ export default function BrowserPage() {
                 >
                   <Monitor size={48} className="mb-4" style={{ color: "var(--yunque-accent)" }} />
                   <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>XFCE 桌面已就绪</div>
-                  <div className="mb-6 text-xs" style={{ color: "var(--yunque-text-muted)" }}>点击下方按钮在新标签页中打开远程桌面</div>
+                  <div className="mb-6 text-xs" style={{ color: "var(--yunque-text-muted)" }}>点击下方按钮在新标签页中打开云电脑</div>
                   <Button size="lg" onPress={() => openExternal(desktopSandbox.stream_url)} className="btn-accent">
-                    <ExternalLink size={16} className="mr-2" /> 打开桌面
+                    <ExternalLink size={16} className="mr-2" /> 打开云电脑
                   </Button>
                 </div>
                 {desktopSandbox.vnc_log && desktopSandbox.vnc_log.length > 0 && (
@@ -517,7 +518,7 @@ export default function BrowserPage() {
             ) : desktopSandbox ? (
               <Card className="section-card p-6">
                 <Loader2 size={32} className="mx-auto mb-3 animate-spin" style={{ color: "var(--yunque-accent)" }} />
-                <div className="text-sm text-center" style={{ color: "var(--yunque-text-muted)" }}>Sandbox running — waiting for stream URL...</div>
+                <div className="text-sm text-center" style={{ color: "var(--yunque-text-muted)" }}>云电脑运行中，正在等待桌面入口...</div>
                 <div className="mt-2 text-xs font-mono text-center" style={{ color: "var(--yunque-text-secondary)" }}>ID: {desktopSandbox.id}</div>
                 {desktopSandbox.vnc_log && desktopSandbox.vnc_log.length > 0 && (
                   <div className="mt-4 p-3 rounded-lg text-xs font-mono" style={{ background: "rgba(0,0,0,0.3)", color: "var(--yunque-text-secondary)" }}>
@@ -529,8 +530,8 @@ export default function BrowserPage() {
             ) : (
               <Card className="section-card p-12 text-center">
                 <Cloud size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
-                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>Launch an E2B Desktop sandbox to get a full browser environment</div>
-                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>Requires E2B API key configured in Settings</div>
+                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>创建一台云电脑，让 Agent 获得完整浏览器和远程工作环境</div>
+                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>需要先在设置中配置云电脑服务密钥</div>
               </Card>
             )}
           </div>

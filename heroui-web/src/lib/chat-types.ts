@@ -6,6 +6,7 @@ import type {
   BrowserActionArtifactSummary,
 } from "@/components/browser-session-card";
 import type { BrowserRequirement } from "@/components/browser-connect-card";
+import type { MemoryAccess, ReflectionEvent, ContextLayer } from "@/components/cognitive-status-bar";
 
 export interface Suggestion {
   type: "followup" | "save_skill";
@@ -20,10 +21,35 @@ export interface SandboxInfo {
   message?: string;
 }
 
+export interface ChatShareFile {
+  path: string;
+  name: string;
+  size?: number;
+}
+
+export interface ChatSharePayload {
+  title: string;
+  message?: string;
+  files?: ChatShareFile[];
+}
+
+export interface ChatShareReceipt {
+  id: string;
+  status: "sent" | "failed";
+  channelId: string;
+  channelName: string;
+  channelType: string;
+  targetTitle: string;
+  sentAt: number;
+  shareCode?: string;
+  error?: string;
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
   id: string;
+  files?: ChatShareFile[];
   emotion?: EmotionResult;
   sticker?: StickerSuggestion;
   stickers?: Record<string, StickerSuggestion>;
@@ -43,4 +69,8 @@ export interface Message {
   airiSynced?: boolean;
   airiEmotion?: string;
   timestamp?: number;
+  cognitiveMemories?: MemoryAccess[];
+  cognitiveReflections?: ReflectionEvent[];
+  cognitiveContextLayers?: ContextLayer[];
+  shareReceipts?: ChatShareReceipt[];
 }

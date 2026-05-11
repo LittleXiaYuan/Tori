@@ -1,12 +1,14 @@
 package localbrain
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +18,8 @@ import (
 )
 
 // LoRAScheduler orchestrates the full LoRA lifecycle:
-//   data accumulation → training trigger → quality evaluation → hot deploy → rollback
+//
+//	data accumulation → training trigger → quality evaluation → hot deploy → rollback
 //
 // It connects the training data produced by DataCollector and NightScheduler
 // to the actual fine-tuning and deployment on a vLLM server.
@@ -31,17 +34,17 @@ import (
 type LoRAScheduler struct {
 	mu sync.Mutex
 
-	ledger   *ldg.Ledger
-	adapter  *LoRAAdapter
-	trainFn  TrainFunc
-	evalFn   EvalFunc
-	brain    *LocalBrain
-	dataDir  string
-	kvs      *iledger.KVConfigStore
-	metrics  *TrainingMetrics
+	ledger  *ldg.Ledger
+	adapter *LoRAAdapter
+	trainFn TrainFunc
+	evalFn  EvalFunc
+	brain   *LocalBrain
+	dataDir string
+	kvs     *iledger.KVConfigStore
+	metrics *TrainingMetrics
 
 	config       SchedulerConfig
-	state        SchedulerState            // default tenant state (backward compat)
+	state        SchedulerState             // default tenant state (backward compat)
 	tenantStates map[string]*SchedulerState // per-tenant state for multi-tenant isolation
 }
 
@@ -75,23 +78,23 @@ func DefaultSchedulerConfig() SchedulerConfig {
 
 // SchedulerState tracks the current state of the LoRA training pipeline.
 type SchedulerState struct {
-	LastTrainTime  time.Time      `json:"last_train_time"`
+	LastTrainTime   time.Time     `json:"last_train_time"`
 	LastTrainResult *TrainResult  `json:"last_train_result"`
-	CurrentAdapter string         `json:"current_adapter"` // active LoRA adapter name
+	CurrentAdapter  string        `json:"current_adapter"`  // active LoRA adapter name
 	PreviousAdapter string        `json:"previous_adapter"` // for rollback
-	ABTestActive   bool           `json:"ab_test_active"`
-	ABTestStart    time.Time      `json:"ab_test_start"`
-	ABTestMetrics  ABTestMetrics  `json:"ab_test_metrics"`
-	TotalTrains    int            `json:"total_trains"`
-	TotalRollbacks int            `json:"total_rollbacks"`
+	ABTestActive    bool          `json:"ab_test_active"`
+	ABTestStart     time.Time     `json:"ab_test_start"`
+	ABTestMetrics   ABTestMetrics `json:"ab_test_metrics"`
+	TotalTrains     int           `json:"total_trains"`
+	TotalRollbacks  int           `json:"total_rollbacks"`
 }
 
 // ABTestMetrics compares new vs old adapter performance.
 type ABTestMetrics struct {
-	NewAdapterQueries  int     `json:"new_adapter_queries"`
-	NewAdapterScore    float64 `json:"new_adapter_score"`
-	OldAdapterQueries  int     `json:"old_adapter_queries"`
-	OldAdapterScore    float64 `json:"old_adapter_score"`
+	NewAdapterQueries int     `json:"new_adapter_queries"`
+	NewAdapterScore   float64 `json:"new_adapter_score"`
+	OldAdapterQueries int     `json:"old_adapter_queries"`
+	OldAdapterScore   float64 `json:"old_adapter_score"`
 }
 
 // TrainFunc submits a LoRA training job. The implementation depends on the
@@ -146,6 +149,20 @@ type EvalResult struct {
 	Samples     int     `json:"samples"`
 	Passed      bool    `json:"passed"`
 	Details     string  `json:"details,omitempty"`
+}
+
+// TrainingDataPreview summarizes whether the current training dataset is ready
+// for a LoRA run without launching training.
+type TrainingDataPreview struct {
+	TenantID      string       `json:"tenant_id"`
+	DataPath      string       `json:"data_path"`
+	RawSamples    int          `json:"raw_samples"`
+	UsableSamples int          `json:"usable_samples"`
+	MinSamples    int          `json:"min_samples"`
+	FilterEnabled bool         `json:"filter_enabled"`
+	FilterStats   *FilterStats `json:"filter_stats,omitempty"`
+	Ready         bool         `json:"ready"`
+	Reason        string       `json:"reason,omitempty"`
 }
 
 // NewLoRAScheduler creates a LoRA training lifecycle scheduler.
@@ -223,7 +240,7 @@ func (ls *LoRAScheduler) UpdateConfig(patch SchedulerConfig) {
 }
 
 // SetTrainFunc sets the training backend callback.
-func (ls *LoRAScheduler) SetTrainFunc(fn TrainFunc)  { ls.trainFn = fn }
+func (ls *LoRAScheduler) SetTrainFunc(fn TrainFunc) { ls.trainFn = fn }
 
 // SetEvalFunc sets the evaluation callback.
 func (ls *LoRAScheduler) SetEvalFunc(fn EvalFunc) { ls.evalFn = fn }
@@ -247,6 +264,59 @@ func (ls *LoRAScheduler) State() SchedulerState {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 	return ls.state
+}
+
+// PreviewTrainingData audits the current training data and reports whether a
+// trigger would have enough usable samples after quality filtering.
+func (ls *LoRAScheduler) PreviewTrainingData(tenantID string) (*TrainingDataPreview, error) {
+	ls.mu.Lock()
+	minSamples := ls.config.MinSamples
+	filterEnabled := ls.config.FilterEnabled
+	filterConfig := ls.config.FilterConfig
+	ls.mu.Unlock()
+
+	samples, files, err := ls.findAvailableSampleFiles()
+	if err != nil {
+		return nil, fmt.Errorf("lora_scheduler: count samples: %w", err)
+	}
+	dataPath := ""
+	if len(files) == 1 {
+		dataPath = files[0]
+	}
+
+	preview := &TrainingDataPreview{
+		TenantID:      tenantID,
+		DataPath:      dataPath,
+		RawSamples:    samples,
+		UsableSamples: samples,
+		MinSamples:    minSamples,
+		FilterEnabled: filterEnabled,
+	}
+	if samples == 0 {
+		preview.Reason = "no training samples found"
+		return preview, nil
+	}
+	if len(files) > 1 {
+		dataPath = fmt.Sprintf("%d training files", len(files))
+		preview.DataPath = dataPath
+	}
+
+	if filterEnabled && len(files) > 0 {
+		filter := NewTrainingFilter(filterConfig)
+		stats, err := filter.PreviewFiles(files)
+		if err != nil {
+			return nil, fmt.Errorf("lora_scheduler: preview filter: %w", err)
+		}
+		preview.FilterStats = stats
+		preview.UsableSamples = stats.Kept
+	}
+
+	if preview.UsableSamples < minSamples {
+		preview.Reason = fmt.Sprintf("usable samples %d below min_samples %d", preview.UsableSamples, minSamples)
+		return preview, nil
+	}
+	preview.Ready = true
+	return preview, nil
 }
 
 // CheckAndTrigger checks if conditions are met for a new training run,
@@ -559,11 +629,11 @@ func (ls *LoRAScheduler) finalizeABTest() {
 			"old_score", m.OldAdapterScore,
 			"delta", improvement,
 		)
-	safego.Go("lora-rollback", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		ls.Rollback(ctx)
-	})
+		safego.Go("lora-rollback", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			ls.Rollback(ctx)
+		})
 	} else {
 		slog.Info("lora_scheduler: A/B test passed, keeping new adapter",
 			"new_score", m.NewAdapterScore,
@@ -587,28 +657,9 @@ func (ls *LoRAScheduler) ActiveModel() string {
 }
 
 func (ls *LoRAScheduler) countAvailableSamples() (int, string, error) {
-	dataDir := ls.config.TrainingDataDir
-	if dataDir == "" {
-		dataDir = "./data/training"
-	}
-
-	entries, err := os.ReadDir(dataDir)
+	total, files, err := ls.findAvailableSampleFiles()
 	if err != nil {
 		return 0, "", err
-	}
-
-	total := 0
-	var files []string
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
-			continue
-		}
-		path := filepath.Join(dataDir, e.Name())
-		count := countJSONLLines(path)
-		total += count
-		if count > 0 {
-			files = append(files, path)
-		}
 	}
 	if len(files) == 0 {
 		return 0, "", nil
@@ -617,20 +668,59 @@ func (ls *LoRAScheduler) countAvailableSamples() (int, string, error) {
 		return total, files[0], nil
 	}
 
-	merged, err := ls.mergeJSONLFiles(files, dataDir)
+	merged, err := ls.mergeJSONLFiles(files, ls.trainingDataDir())
 	if err != nil {
 		return total, files[len(files)-1], nil
 	}
 	return total, merged, nil
 }
 
+func (ls *LoRAScheduler) findAvailableSampleFiles() (int, []string, error) {
+	dataDir := ls.trainingDataDir()
+
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil, nil
+		}
+		return 0, nil, err
+	}
+
+	total := 0
+	var files []string
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || filepath.Ext(name) != ".jsonl" || isGeneratedTrainingArtifact(name) {
+			continue
+		}
+		path := filepath.Join(dataDir, name)
+		count := countJSONLLines(path)
+		total += count
+		if count > 0 {
+			files = append(files, path)
+		}
+	}
+	return total, files, nil
+}
+
+func (ls *LoRAScheduler) trainingDataDir() string {
+	if ls.config.TrainingDataDir != "" {
+		return ls.config.TrainingDataDir
+	}
+	return "./data/training"
+}
+
+func isGeneratedTrainingArtifact(name string) bool {
+	return strings.HasPrefix(name, "merged_") || strings.HasPrefix(name, "filtered_")
+}
+
 func (ls *LoRAScheduler) mergeJSONLFiles(files []string, dataDir string) (string, error) {
-	merged := filepath.Join(dataDir, fmt.Sprintf("merged_%s.jsonl", time.Now().Format("20060102_150405")))
-	out, err := os.Create(merged)
+	out, err := createTrainingJSONLOutput(dataDir, "merged")
 	if err != nil {
 		return "", err
 	}
 	defer out.Close()
+	merged := out.Name()
 
 	for _, f := range files {
 		data, err := os.ReadFile(f)
@@ -645,16 +735,37 @@ func (ls *LoRAScheduler) mergeJSONLFiles(files []string, dataDir string) (string
 	return merged, nil
 }
 
+func createTrainingJSONLOutput(dir, prefix string) (*os.File, error) {
+	stamp := time.Now().Format("20060102_150405_000000000")
+	for i := 0; i < 100; i++ {
+		name := fmt.Sprintf("%s_%s.jsonl", prefix, stamp)
+		if i > 0 {
+			name = fmt.Sprintf("%s_%s_%d.jsonl", prefix, stamp, i)
+		}
+		path := filepath.Join(dir, name)
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if err == nil {
+			return f, nil
+		}
+		if !os.IsExist(err) {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("create %s JSONL output: exhausted unique names", prefix)
+}
+
 func countJSONLLines(path string) int {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return 0
 	}
+	defer f.Close()
+
 	count := 0
-	for _, b := range data {
-		if b == '\n' {
-			count++
-		}
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+	for scanner.Scan() {
+		count++
 	}
 	return count
 }
@@ -695,8 +806,8 @@ func (ls *LoRAScheduler) generateEvalSamples(ctx context.Context) []EvalSample {
 }
 
 type persistedState struct {
-	Global  SchedulerState               `json:"global"`
-	Tenants map[string]*SchedulerState   `json:"tenants,omitempty"`
+	Global  SchedulerState             `json:"global"`
+	Tenants map[string]*SchedulerState `json:"tenants,omitempty"`
 }
 
 func (ls *LoRAScheduler) persistState() {

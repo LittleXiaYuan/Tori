@@ -85,6 +85,19 @@ func (t *AuditTrail) Recent(limit int) []AgentEvent {
 	return result
 }
 
+// QueryBySessionID returns all events for a given session ID.
+func (t *AuditTrail) QueryBySessionID(sessionID string) []AgentEvent {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	var result []AgentEvent
+	for _, e := range t.events {
+		if e.Meta.SessionID == sessionID {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
 // Len returns current event count.
 func (t *AuditTrail) Len() int {
 	t.mu.RLock()

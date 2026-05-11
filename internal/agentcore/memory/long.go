@@ -21,7 +21,9 @@ type LongTerm struct {
 	mu      sync.RWMutex
 	items   map[string][]Item // tenantID -> items
 	embedFn EmbedFunc
-	// BM25 stats: rebuilt lazily
+	// BM25 stats: separate mutex to avoid write-under-RLock race when
+	// Search() lazily rebuilds stats under items RLock.
+	statsMu    sync.Mutex
 	avgDocLen  map[string]float64        // tenantID -> average doc length
 	docFreq    map[string]map[string]int // tenantID -> term -> doc count
 	statsDirty map[string]bool
@@ -66,9 +68,11 @@ func (l *LongTerm) Put(ctx context.Context, tenantID string, item Item) error {
 	}
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.items[tenantID] = append(l.items[tenantID], item)
+	l.mu.Unlock()
+	l.statsMu.Lock()
 	l.statsDirty[tenantID] = true
+	l.statsMu.Unlock()
 	return nil
 }
 
@@ -165,7 +169,6 @@ func (l *LongTerm) bm25Search(tenantID, query string, limit int) []Item {
 		return nil
 	}
 
-	// Rebuild stats if dirty
 	l.rebuildStats(tenantID)
 
 	queryTerms := tokenizeForIDF(query)
@@ -173,11 +176,14 @@ func (l *LongTerm) bm25Search(tenantID, query string, limit int) []Item {
 		return nil
 	}
 
+	// Snapshot stats under statsMu to avoid racing with concurrent rebuilds
+	l.statsMu.Lock()
 	avgDL := l.avgDocLen[tenantID]
+	df := l.docFreq[tenantID]
+	l.statsMu.Unlock()
 	if avgDL == 0 {
 		avgDL = 50
 	}
-	df := l.docFreq[tenantID]
 
 	k1 := 1.5
 	b := 0.75
@@ -240,6 +246,9 @@ func (l *LongTerm) bm25Search(tenantID, query string, limit int) []Item {
 }
 
 func (l *LongTerm) rebuildStats(tenantID string) {
+	l.statsMu.Lock()
+	defer l.statsMu.Unlock()
+
 	if !l.statsDirty[tenantID] && l.docFreq[tenantID] != nil {
 		return
 	}
@@ -269,14 +278,20 @@ func (l *LongTerm) rebuildStats(tenantID string) {
 
 func (l *LongTerm) Delete(_ context.Context, tenantID, key string) error {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	items := l.items[tenantID]
+	found := false
 	for i, item := range items {
 		if item.Key == key || item.ID == key {
 			l.items[tenantID] = append(items[:i], items[i+1:]...)
-			l.statsDirty[tenantID] = true
-			return nil
+			found = true
+			break
 		}
+	}
+	l.mu.Unlock()
+	if found {
+		l.statsMu.Lock()
+		l.statsDirty[tenantID] = true
+		l.statsMu.Unlock()
 	}
 	return nil
 }

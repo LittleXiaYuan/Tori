@@ -105,6 +105,8 @@ export interface TaskStep {
   retry_count?: number;
   max_retries?: number;
   gap_type?: string;
+  depends_on?: number[];
+  metadata?: Record<string, unknown>;
   started_at?: string;
   done_at?: string;
   name?: string;
@@ -572,6 +574,166 @@ export interface WorkflowInstance {
   updated_at: string;
   started_at?: string;
   finished_at?: string;
+}
+
+// --- Planner recovery checkpoints ---
+
+export interface PlannerCheckpointStep {
+  id: number;
+  action: string;
+  skill?: string;
+  args?: Record<string, unknown>;
+  depends_on?: number[];
+  status?: string;
+  result?: string;
+  error?: string;
+}
+
+export interface PlannerCheckpointSummary {
+  plan_id: string;
+  task_id?: string;
+  goal?: string;
+  status: string;
+  current_step: number;
+  completed: number;
+  total: number;
+  steps_used: number;
+  revisions: number;
+  error?: string;
+  recoverable: boolean;
+  resume_hint?: string;
+  updated_at?: string;
+  plan_snapshot?: PlannerCheckpointStep[];
+}
+
+export interface PlannerCheckpointListResponse {
+  checkpoints: PlannerCheckpointSummary[];
+  limit: number;
+  count: number;
+}
+
+export type PlannerCheckpointRecoveryAction = "continue" | "retry_failed" | "partial";
+
+export interface PlannerCheckpointRecoverRequest {
+  plan_id: string;
+  action: PlannerCheckpointRecoveryAction;
+}
+
+export interface PlannerCheckpointRecoveryPlanStep {
+  id: number;
+  action: string;
+  skill?: string;
+  status: string;
+  depends_on?: number[];
+  selected: boolean;
+  reason?: string;
+}
+
+export interface PlannerCheckpointRecoveryPlan {
+  mode: PlannerCheckpointRecoveryAction;
+  executable: boolean;
+  reason?: string;
+  plan_id: string;
+  task_id?: string;
+  steps: PlannerCheckpointRecoveryPlanStep[];
+  prompt: string;
+}
+
+export interface PlannerCheckpointRecoverResponse {
+  action: PlannerCheckpointRecoveryAction;
+  plan_id: string;
+  task_id?: string;
+  prompt: string;
+  recovery_plan?: PlannerCheckpointRecoveryPlan;
+  checkpoint: PlannerCheckpointSummary;
+}
+
+export interface PlannerCheckpointResumeTaskResponse {
+  status: string;
+  task_id: string;
+  run: boolean;
+  recovery_plan: PlannerCheckpointRecoveryPlan;
+  checkpoint: PlannerCheckpointSummary;
+}
+
+export interface PlannerCheckpointResumePlanResponse {
+  status: string;
+  action: PlannerCheckpointRecoveryAction;
+  plan_id: string;
+  job_id?: string;
+  friendly_error?: string;
+  recoverable?: boolean;
+  next_action?: "retry_failed" | "create_task" | "partial" | "inspect_dependencies" | string;
+  result?: {
+    reply?: string;
+    skills_used?: string[];
+    steps?: number;
+    plan?: PlannerCheckpointStep[];
+  };
+  recovery_plan: PlannerCheckpointRecoveryPlan;
+  checkpoint: PlannerCheckpointSummary;
+}
+
+export interface PlannerCheckpointResumePlanJobEvent {
+  id: string;
+  type: string;
+  summary: string;
+  skill?: string;
+  timestamp: string;
+}
+
+export interface PlannerCheckpointResumePlanJob {
+  id: string;
+  status: string;
+  action: PlannerCheckpointRecoveryAction;
+  plan_id: string;
+  task_id?: string;
+  error?: string;
+  friendly_error?: string;
+  recoverable?: boolean;
+  next_action?: "retry_failed" | "create_task" | "partial" | "inspect_dependencies" | string;
+  result?: PlannerCheckpointResumePlanResponse["result"];
+  events?: PlannerCheckpointResumePlanJobEvent[];
+  started_at: string;
+  finished_at?: string;
+}
+
+export interface PlannerCheckpointResumePlanJobResponse {
+  job: PlannerCheckpointResumePlanJob;
+}
+
+export interface PlannerExecutionStateFailureSummary {
+  failed_count: number;
+  completed_count: number;
+  failed_tools?: string[];
+  tried?: string[];
+  ruled_out?: string[];
+  next_step?: string;
+}
+
+export interface PlannerExecutionStateCogniSummary {
+  activated?: string[];
+  context_bytes?: number;
+  tool_before?: number;
+  tool_after?: number;
+  removed?: string[];
+  last_summary?: string;
+  event_count: number;
+  events?: PlannerCheckpointResumePlanJobEvent[];
+}
+
+export interface PlannerExecutionStateResponse {
+  plan_id: string;
+  status: string;
+  action: PlannerCheckpointRecoveryAction;
+  next_action?: "retry_failed" | "create_task" | "partial" | "inspect_dependencies" | string;
+  updated_at?: string;
+  checkpoint?: PlannerCheckpointSummary;
+  latest_job?: PlannerCheckpointResumePlanJob;
+  recovery_plan?: PlannerCheckpointRecoveryPlan;
+  failure_summary?: PlannerExecutionStateFailureSummary;
+  cogni?: PlannerExecutionStateCogniSummary;
+  events?: PlannerCheckpointResumePlanJobEvent[];
 }
 
 // --- Tools execution + Audit + Backup ---

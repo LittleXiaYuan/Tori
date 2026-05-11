@@ -11,9 +11,41 @@ import (
 	"yunque-agent/internal/observe"
 )
 
+// ModelFallbackDetail is emitted with a fallback event so the UI can explain
+// the switch without exposing low-level client errors as scary status text.
+type ModelFallbackDetail struct {
+	Model   string `json:"model,omitempty"`
+	Attempt int    `json:"attempt"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+func modelFallbackSummary(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return "模型暂时没有回应，正在换一个可用模型继续。"
+	}
+	return fmt.Sprintf("模型暂时没有回应，正在换用 %s 继续。", model)
+}
+
+func (p *Planner) emitModelFallbackEvent(req PlanRequest, model string, attempt int, err error) {
+	if req.StepCallback == nil {
+		return
+	}
+	evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, modelFallbackSummary(model))
+	evt.Meta.TenantID = req.TenantID
+	evt.Meta.TaskID = req.TaskID
+	detail := ModelFallbackDetail{Model: model, Attempt: attempt}
+	if err != nil {
+		detail.Reason = truncate(plannerFriendlyFailureText(err.Error()), 160)
+	}
+	evt.Detail = detail
+	req.StepCallback(evt)
+}
+
 func (p *Planner) isComplexTask(req PlanRequest) bool {
 	goal := extractGoal(req)
-	if len([]rune(goal)) > 200 {
+	load := assessCognitiveLoad(req)
+	if load.NeedsLongHorizon() {
 		return true
 	}
 	return plan.NeedsPlan(goal)
@@ -23,6 +55,10 @@ func (p *Planner) isComplexTask(req PlanRequest) bool {
 func (p *Planner) adaptiveRoute(req PlanRequest) string {
 	if req.ModelOverride != "" {
 		return req.ModelOverride
+	}
+	if assessCognitiveLoad(req).NeedsLongHorizon() {
+		slog.Info("planner: adaptive reasoning activated (high cognitive load), elevating to expert tier")
+		return "expert"
 	}
 	lastMsg := ""
 	if len(req.Messages) > 0 {
@@ -103,11 +139,7 @@ func (p *Planner) chatFallback(ctx context.Context, req PlanRequest, messages []
 	for i, client := range chain {
 		if i > 0 {
 			slog.Warn("planner: degrading LLM client", "fallback_to", client.Model(), "err", lastErr)
-			if req.StepCallback != nil {
-				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, fmt.Sprintf("监测到主模型延迟，已静默切换至备用引擎 [%s]", client.Model()))
-				evt.Meta.TenantID = req.TenantID
-				req.StepCallback(evt)
-			}
+			p.emitModelFallbackEvent(req, client.Model(), i+1, lastErr)
 		}
 		reply, err := client.Chat(ctx, messages, 0.7)
 		if err == nil {
@@ -129,6 +161,7 @@ func (p *Planner) chatFallbackFull(ctx context.Context, req PlanRequest, message
 	for i, client := range chain {
 		if i > 0 {
 			slog.Warn("planner: degrading LLM client (full)", "fallback_to", client.Model(), "err", lastErr)
+			p.emitModelFallbackEvent(req, client.Model(), i+1, lastErr)
 		}
 		result, err := client.ChatFull(ctx, messages, 0.7, onDelta...)
 		if err == nil {
@@ -160,11 +193,7 @@ func (p *Planner) chatWithToolsFallback(ctx context.Context, req PlanRequest, me
 	for i, client := range chain {
 		if i > 0 {
 			slog.Warn("planner: degrading LLM client (FC)", "fallback_to", client.Model(), "err", lastErr)
-			if req.StepCallback != nil {
-				evt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventPlan, fmt.Sprintf("调用栈降级，正在级联唤醒备用引擎 [%s]...", client.Model()))
-				evt.Meta.TenantID = req.TenantID
-				req.StepCallback(evt)
-			}
+			p.emitModelFallbackEvent(req, client.Model(), i+1, lastErr)
 		}
 		var lastReasoning string
 		fcOpts := &llm.ChatWithToolsOpts{ThinkingEnabled: thinkingFlag, LastReasoningOut: &lastReasoning}

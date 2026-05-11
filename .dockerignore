@@ -35,13 +35,20 @@ heroui-web/node_modules/
 heroui-web/.next/
 heroui-web/out/
 
+# ── Local-only content to keep out of online builds ──
+xiaoyu/
+doc/
+docs/
+desktop/src-tauri/target*/
+desktop/src-tauri/frontend/
+sdk/typescript/node_modules/
+
 # ── Legacy frontend ──
 web/
 docs/node_modules/
 docs/.vitepress/
 
 # ── Documentation (not needed in image) ──
-doc/
 *.md
 !migrations/README.md
 

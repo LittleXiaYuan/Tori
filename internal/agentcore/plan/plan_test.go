@@ -186,6 +186,86 @@ func TestIsComplete(t *testing.T) {
 	}
 }
 
+func TestReadyStepsBlocksInvalidDependencies(t *testing.T) {
+	plan := &Plan{Steps: []PlanStep{
+		{Index: 0, Description: "bad dep", Status: StepPending, DependsOn: []int{99}},
+		{Index: 1, Description: "negative dep", Status: StepPending, DependsOn: []int{-1}},
+	}}
+	if ready := plan.ReadySteps(); len(ready) != 0 {
+		t.Fatalf("invalid dependencies must not be treated as ready: %#v", ready)
+	}
+}
+
+func TestExecuteDAGInvalidDependencyFailsClosed(t *testing.T) {
+	var executed int32
+	m := NewManager(nil, func(ctx context.Context, p *Plan, idx int) (string, []string, error) {
+		atomic.AddInt32(&executed, 1)
+		return "should not run", nil, nil
+	})
+	m.SetDecomposeDAG(func(ctx context.Context, task string) ([]PlanStep, error) {
+		return []PlanStep{{Description: "bad dep", Status: StepPending, DependsOn: []int{99}}}, nil
+	})
+	plan, err := m.CreateDAG(context.Background(), "bad dag", DefaultBudget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = m.ExecuteDAG(context.Background(), plan.ID)
+	if err == nil {
+		t.Fatal("expected no-ready error for invalid dependency")
+	}
+	if plan.Status != PlanFailed {
+		t.Fatalf("expected failed plan, got %s", plan.Status)
+	}
+	if atomic.LoadInt32(&executed) != 0 {
+		t.Fatal("invalid dependency step should not execute")
+	}
+}
+
+func TestExecuteDAGDoesNotStartMoreReadyStepsThanRemainingBudget(t *testing.T) {
+	var executed int32
+	m := NewManager(nil, func(ctx context.Context, p *Plan, idx int) (string, []string, error) {
+		atomic.AddInt32(&executed, 1)
+		return fmt.Sprintf("output-%d", idx), nil, nil
+	})
+	m.SetDecomposeDAG(func(ctx context.Context, task string) ([]PlanStep, error) {
+		return []PlanStep{
+			{Description: "parallel 1", Status: StepPending},
+			{Description: "parallel 2", Status: StepPending},
+			{Description: "parallel 3", Status: StepPending},
+		}, nil
+	})
+	plan, err := m.CreateDAG(context.Background(), "budgeted dag", Budget{MaxSteps: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = m.ExecuteDAG(context.Background(), plan.ID)
+	if err == nil {
+		t.Fatal("expected budget exhausted after executing only remaining budget")
+	}
+	if got := atomic.LoadInt32(&executed); got != 2 {
+		t.Fatalf("should execute only 2 steps within remaining budget, got %d", got)
+	}
+	if plan.Budget.StepsUsed != 2 {
+		t.Fatalf("steps used should stay within budget, got %d", plan.Budget.StepsUsed)
+	}
+	if plan.Status != PlanFailed {
+		t.Fatalf("expected failed plan after budget exhausted, got %s", plan.Status)
+	}
+	completed := 0
+	pending := 0
+	for _, step := range plan.Steps {
+		switch step.Status {
+		case StepCompleted:
+			completed++
+		case StepPending:
+			pending++
+		}
+	}
+	if completed != 2 || pending != 1 {
+		t.Fatalf("expected 2 completed and 1 pending step, got completed=%d pending=%d steps=%#v", completed, pending, plan.Steps)
+	}
+}
+
 func TestListAndActive(t *testing.T) {
 	m := NewManager(nil, nil)
 	m.CreateFromSteps("a", []string{"s"})

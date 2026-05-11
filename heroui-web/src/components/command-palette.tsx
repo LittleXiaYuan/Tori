@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
-  Puzzle, Search, FileText, ArrowRight,
+  Puzzle, Search, FileText, ArrowRight, Sparkles, Layers,
 } from "lucide-react";
 import { api, SearchResult } from "@/lib/api";
 import { NAV_ITEMS, NAV_GROUP_ORDER, type NavItem, type NavGroup } from "@/lib/nav-items";
@@ -102,13 +102,31 @@ export default function CommandPalette() {
 
   const navCommands: CommandItem[] = useMemo(() => {
     const all = [...NAV_ITEMS, ...extItems];
-    return all.map((item) => ({
-      ...item,
+    const isEasy = typeof window !== "undefined" && localStorage.getItem("yunque_profile_mode") === "easy";
+    const profileCmd: CommandItem = {
+      id: "profile-toggle",
+      label: isEasy ? "切换到完整模式" : "切换到轻松模式",
+      group: "操作",
+      icon: isEasy ? <Layers size={16} /> : <Sparkles size={16} />,
+      keywords: "easy full simple profile mode 简洁 轻松 完整 专家 switch toggle",
       action: () => {
-        if (item.href) router.push(item.href);
+        const next = isEasy ? "full" : "easy";
+        localStorage.setItem("yunque_profile_mode", next);
+        window.dispatchEvent(new StorageEvent("storage", { key: "yunque_profile_mode", newValue: next }));
+        window.location.reload();
         close();
       },
-    }));
+    };
+    return [
+      profileCmd,
+      ...all.map((item) => ({
+        ...item,
+        action: () => {
+          if (item.href) router.push(item.href);
+          close();
+        },
+      })),
+    ];
   }, [extItems, router, close]);
 
   const q = query.toLowerCase();

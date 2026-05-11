@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Spinner } from "@heroui/react";
 import { api } from "@/lib/api";
 import type { ConnectorView } from "@/lib/api-types";
+import { formatErrorMessage } from "@/lib/error-utils";
 import {
   GitBranch, Mail, Calendar, MessageSquare, Layers, BookOpen,
   ClipboardList, Plug, ArrowRight, Search, CheckCircle2, Globe2,
@@ -39,7 +40,7 @@ export default function ConnectorsPage() {
       setConnectors(connectorRes.connectors || []);
       setBrowserConnected(!!browserRes.connected);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "加载连接器失败");
+      setError(formatErrorMessage(e, "加载连接器失败"));
     } finally {
       setLoading(false);
     }
@@ -74,7 +75,7 @@ export default function ConnectorsPage() {
       setTokenInput("");
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "连接失败");
+      setError(formatErrorMessage(e, "连接失败"));
     } finally {
       setBusy(null);
     }
@@ -87,7 +88,7 @@ export default function ConnectorsPage() {
       await api.connectorDisconnect(id);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "断开失败");
+      setError(formatErrorMessage(e, "断开失败"));
     } finally {
       setBusy(null);
     }
@@ -117,7 +118,7 @@ export default function ConnectorsPage() {
           style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.14)", color: "#f87171" }}
         >
           <AlertTriangle size={16} />
-          <span className="flex-1">{error}</span>
+          <span className="flex-1">{formatErrorMessage(error, "加载连接器失败")}</span>
           <button onClick={() => setError("")} className="opacity-70 transition-opacity hover:opacity-100">关闭</button>
         </div>
       )}
@@ -338,7 +339,7 @@ export default function ConnectorsPage() {
                   </div>
                   {selected.error && (
                     <div className="mb-3 rounded-2xl border px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.16)", color: "#f87171" }}>
-                      {selected.error}
+                      {formatErrorMessage(selected.error, "连接失败")}
                     </div>
                   )}
                   <button

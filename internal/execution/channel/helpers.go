@@ -414,6 +414,16 @@ func sanitizeFilename(name string) string {
 }
 
 // ──────────────────────────────────────────────
+// Reply Helpers
+// ──────────────────────────────────────────────
+
+// IsEmptyReply returns true if the reply has no meaningful content after button fallback.
+// Use in handler callbacks to skip sending blank replies.
+func IsEmptyReply(reply Reply) bool {
+	return strings.TrimSpace(ContentWithButtonFallback(reply)) == ""
+}
+
+// ──────────────────────────────────────────────
 // Non-blocking Channel Send
 // ──────────────────────────────────────────────
 

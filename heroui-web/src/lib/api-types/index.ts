@@ -15,3 +15,4 @@ export * from "./runtime";
 export * from "./integrations";
 export * from "./cogni";
 export * from "./lora";
+export * from "./files";

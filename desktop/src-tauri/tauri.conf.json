@@ -5,7 +5,7 @@
   "identifier": "com.yunque.agent",
   "build": {
     "frontendDist": "./frontend",
-    "devUrl": "http://localhost:3002"
+    "devUrl": "http://localhost:3001"
   },
   "app": {
     "withGlobalTauri": true,

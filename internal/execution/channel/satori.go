@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: Satori ────────────────────────────────────────
+// Type:     "satori"
+// Protocol: Webhook (/satori/events POST) + REST发送
+// Inbound:  text (通用协议桥接)
+// Outbound: text
+// Env vars: SATORI_ENDPOINT, SATORI_TOKEN, SATORI_PLATFORM
+// Status:   Basic — 通用协议适配器，文本为主
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

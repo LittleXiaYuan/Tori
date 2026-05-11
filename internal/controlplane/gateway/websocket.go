@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"fmt"
@@ -44,7 +45,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 
 	// SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.Header().Set("X-Trace-ID", observe.TraceIDFromContext(ctx))
@@ -56,6 +57,38 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var streamMu sync.Mutex
+	sendEvent := func(event, data string) {
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		sseEvent(w, flusher, event, data)
+	}
+	sendKeepAlive := func() {
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		_, _ = w.Write([]byte(": yunque-agent keepalive " + strings.Repeat(".", 2048) + "\n\n"))
+		flusher.Flush()
+	}
+	sendKeepAlive()
+	sendEvent("ping", "")
+	heartbeatDone := make(chan struct{})
+	defer close(heartbeatDone)
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-heartbeatDone:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sendKeepAlive()
+				sendEvent("ping", "")
+			}
+		}
+	}()
+
 	var req struct {
 		Messages      []llm.Message `json:"messages"`
 		SessionID     string        `json:"session_id"`
@@ -65,23 +98,23 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		ThinkingLevel string        `json:"thinking_level,omitempty"` // "none" | "auto" | "deep"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
+		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
 		observe.EndSpan(traceSpan, err)
 		return
 	}
 	if len(req.Messages) == 0 {
-		sseEvent(w, flusher, "error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
+		sendEvent("error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
 		observe.EndSpan(traceSpan, nil)
 		return
 	}
 	if len(req.Messages) > 100 {
-		sseEvent(w, flusher, "error", `{"code":"TOO_MANY_MESSAGES","message":"max 100 messages"}`)
+		sendEvent("error", `{"code":"TOO_MANY_MESSAGES","message":"max 100 messages"}`)
 		observe.EndSpan(traceSpan, nil)
 		return
 	}
 	for _, m := range req.Messages {
 		if len(m.Content) > 32000 {
-			sseEvent(w, flusher, "error", `{"code":"MESSAGE_TOO_LONG","message":"max 32000 chars"}`)
+			sendEvent("error", `{"code":"MESSAGE_TOO_LONG","message":"max 32000 chars"}`)
 			observe.EndSpan(traceSpan, nil)
 			return
 		}
@@ -92,7 +125,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		lastMsg := req.Messages[len(req.Messages)-1].Content
 		guardResult := g.zhGuard.Run(ctx, lastMsg)
 		if guardResult.Blocked {
-			sseEvent(w, flusher, "error", `{"code":"BLOCKED","message":"内容安全检查未通过: `+guardResult.Rule+`"}`)
+			sendEvent("error", `{"code":"BLOCKED","message":"内容安全检查未通过: `+guardResult.Rule+`"}`)
 			observe.EndSpan(traceSpan, nil)
 			return
 		}
@@ -121,14 +154,15 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	msgs = g.augmentMessagesForIntent(msgs, tid)
 
 	// Memory: write user message(s) to short-term (Mem0-style Auto-Capture)
 	if g.orchestrator != nil && len(req.Messages) > 0 {
 		for _, m := range req.Messages {
-		if m.Role == "user" && m.Content != "" {
-			_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
-			g.metrics.Cognitive().MemoryIngest.Add(1)
-		}
+			if m.Role == "user" && m.Content != "" {
+				_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
+				g.metrics.Cognitive().MemoryIngest.Add(1)
+			}
 		}
 	}
 
@@ -195,12 +229,13 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	// StepCallback pushes intermediate events (thinking, tool_start, tool_result) as SSE.
 	traceID := observe.TraceIDFromContext(ctx)
 	stepCB := func(event observe.AgentEvent) {
+		event = friendlyAgentEventForStream(event)
 		stepData, _ := json.Marshal(map[string]any{
 			"type":    event.QualifiedType(),
 			"summary": event.Summary,
 			"detail":  event.Detail,
 		})
-		sseEvent(w, flusher, "step", string(stepData))
+		sendEvent("step", string(stepData))
 	}
 
 	var emotionHintForPlanner *emotion.Result
@@ -235,7 +270,11 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("planner error (stream)", "err", err, "tenant", tid)
-		sseEvent(w, flusher, "error", `{"code":"LLM_ERROR","message":"`+err.Error()+`"}`)
+		errorData, _ := json.Marshal(map[string]string{
+			"code":    string(apperror.CodeLLMError),
+			"message": friendlyChatPipelineError(err),
+		})
+		sendEvent("error", string(errorData))
 		g.metrics.RecordRequest(time.Since(start), 0, 0, err)
 		observe.EndSpan(traceSpan, err)
 		return
@@ -247,7 +286,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	replyChunks := chunkText(reply, 20)
 	for _, chunk := range replyChunks {
 		data, _ := json.Marshal(map[string]string{"content": chunk})
-		sseEvent(w, flusher, "delta", string(data))
+		sendEvent("delta", string(data))
 	}
 
 	// Output moderation: check agent reply for safety (post-stream)
@@ -276,7 +315,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	}
 	var sandboxInfo map[string]any
 	if result.Plan != nil {
-		doneData["plan"] = result.Plan
+		doneData["plan"] = summarizePlanSnapshot(result.Plan)
 		sandboxInfo = extractSandboxFromPlan(result.Plan)
 		if sandboxInfo != nil {
 			doneData["sandbox"] = sandboxInfo
@@ -296,7 +335,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	doneBytes, _ := json.Marshal(doneData)
-	sseEvent(w, flusher, "done", string(doneBytes))
+	sendEvent("done", string(doneBytes))
 
 	// Save assistant reply to session (with ExecutionSummary for multi-turn continuity)
 	if req.SessionID != "" {
@@ -326,7 +365,7 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 		if lastUserMsg != "" {
 			pipelineReply := reply
 			pipelineTID := tid
-		safego.Go("ws-memory-pipeline", func() {
+			safego.Go("ws-memory-pipeline", func() {
 				chatMsgs := []memory.ChatMessage{
 					{Role: "user", Content: lastUserMsg},
 					{Role: "assistant", Content: pipelineReply},
@@ -359,9 +398,9 @@ func (g *Gateway) handleStreamChat(w http.ResponseWriter, r *http.Request) {
 	// Adaptive loop: observe interaction
 	if g.adaptiveLoop != nil && len(req.Messages) > 0 {
 		userMsg := req.Messages[len(req.Messages)-1].Content
-	safego.Go("ws-adaptive-loop", func() {
-		g.adaptiveLoop.ObserveInteraction(context.Background(), userMsg, reply)
-	})
+		safego.Go("ws-adaptive-loop", func() {
+			g.adaptiveLoop.ObserveInteraction(context.Background(), userMsg, reply)
+		})
 	}
 
 	// ReplyHook broadcast

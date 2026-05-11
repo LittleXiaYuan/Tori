@@ -60,7 +60,7 @@ function MeterCard({ icon, label, value, sub, accent, bar, change, pulse }: Mete
 
 function useElapsed(startMs: number | undefined, endMs: number | undefined, isLive: boolean): number {
   const [now, setNow] = useState(Date.now());
-  const rafRef = useRef<ReturnType<typeof setInterval>>();
+  const rafRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     if (!isLive || !startMs) {

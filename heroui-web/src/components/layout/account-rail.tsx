@@ -210,8 +210,15 @@ export default function AccountRail() {
   }, []);
 
   const openCommandPalette = useCallback(() => {
+    closeFlyoutNow();
     document.dispatchEvent(new CustomEvent("yunque:open-command-palette"));
-  }, []);
+  }, [closeFlyoutNow]);
+
+  useEffect(() => {
+    const handler = () => closeFlyoutNow();
+    document.addEventListener("yunque:open-command-palette", handler);
+    return () => document.removeEventListener("yunque:open-command-palette", handler);
+  }, [closeFlyoutNow]);
 
   const ui = useMemo(() => {
     const zh = locale === "zh";
@@ -239,11 +246,10 @@ export default function AccountRail() {
 
   return (
     <>
-    <aside
+    <nav
       className="account-rail"
       data-sidebar
-      role="navigation"
-      aria-label={locale === "zh" ? "账号栏" : "Account Rail"}
+      aria-label={locale === "zh" ? "主导航" : "Main navigation"}
     >
       <div className="account-rail-top">
         <WindowControls />
@@ -426,7 +432,7 @@ export default function AccountRail() {
           <Tooltip.Content placement="right">{ui.logout}</Tooltip.Content>
         </Tooltip>
       </div>
-    </aside>
+    </nav>
 
     <AccountRailFlyout
       open={flyoutOpen}

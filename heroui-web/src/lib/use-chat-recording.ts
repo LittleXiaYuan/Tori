@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import type { ChatDispatch } from "@/lib/chat-state";
-import { showToast } from "@/components/toast-provider";
+import { showErrorToast, showToast } from "@/components/toast-provider";
 
 export interface ChatRecordingControls {
   ttsPlaying: string | null;
@@ -40,7 +40,7 @@ export function useChatRecording(
       audio.onended = () => { setTtsPlaying(null); URL.revokeObjectURL(url); };
       audio.onerror = () => { setTtsPlaying(null); URL.revokeObjectURL(url); };
       audio.play();
-    } catch (e) { setTtsPlaying(null); showToast(e instanceof Error ? e.message : "Text-to-speech playback failed.", "error"); }
+    } catch (e) { setTtsPlaying(null); showErrorToast(e, "语音播放失败，请稍后重试。"); }
   }, [ttsPlaying]);
 
   const startRecording = useCallback(async () => {

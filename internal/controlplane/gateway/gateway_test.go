@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -32,7 +33,9 @@ func newTestGateway() (*Gateway, *tenant.Manager) {
 	cs := session.NewStore(50)
 	pr := plugin.NewRegistry()
 	jwtCfg := &JWTConfig{Secret: "test-secret", Issuer: "test", Expiration: time.Hour}
-	return New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil), tm
+	gw := New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil)
+	gw.SetLedgerHealthChecker(fakeHealthChecker{})
+	return gw, tm
 }
 
 func TestHealthz(t *testing.T) {
@@ -107,6 +110,47 @@ func TestAuthWithAPIKey(t *testing.T) {
 	gw.ServeHTTP(w, req)
 	if w.Code != 200 {
 		t.Fatalf("expected 200 with valid key, got %d", w.Code)
+	}
+}
+
+func TestSearchEndpointsGracefullyHandleNoProviders(t *testing.T) {
+	gw, tm := newTestGateway()
+	t1 := tm.Register("search-org")
+
+	req := httptest.NewRequest("GET", "/v1/search/providers", nil)
+	req.Header.Set("X-API-Key", t1.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200 from providers endpoint, got %d", w.Code)
+	}
+	var providersBody map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &providersBody); err != nil {
+		t.Fatalf("invalid providers JSON: %v", err)
+	}
+	if enabled, _ := providersBody["enabled"].(bool); enabled {
+		t.Fatal("expected search providers to be disabled when none are configured")
+	}
+	if providers, _ := providersBody["providers"].([]any); len(providers) != 0 {
+		t.Fatalf("expected zero providers, got %d", len(providers))
+	}
+
+	req = httptest.NewRequest("GET", "/v1/search?q=test&limit=2", nil)
+	req.Header.Set("X-API-Key", t1.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200 from empty search, got %d", w.Code)
+	}
+	var searchBody map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &searchBody); err != nil {
+		t.Fatalf("invalid search JSON: %v", err)
+	}
+	if total, _ := searchBody["total"].(float64); total != 0 {
+		t.Fatalf("expected total=0, got %v", total)
+	}
+	if results, _ := searchBody["results"].([]any); len(results) != 0 {
+		t.Fatalf("expected zero search results, got %d", len(results))
 	}
 }
 
@@ -190,7 +234,7 @@ func (s stubDocumentParser) ParseFile(ctx context.Context, filePath string) (*mi
 }
 
 func TestIsMinerUSupportedExt(t *testing.T) {
-	for _, ext := range []string{".pdf", ".docx", ".pptx", ".png", ".jpeg", ".tiff"} {
+	for _, ext := range []string{".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".png", ".jpeg", ".tiff"} {
 		if !isMinerUSupportedExt(ext) {
 			t.Fatalf("expected supported ext: %s", ext)
 		}
@@ -243,5 +287,33 @@ func TestIngestKnowledgeWithMinerU(t *testing.T) {
 	}
 	if len(g.knowledgeStore.Sources()) != 1 {
 		t.Fatalf("expected source ingested, got %d", len(g.knowledgeStore.Sources()))
+	}
+}
+
+func TestParseFileWithMinerUPreviewKeepsUTF8AndRuneCount(t *testing.T) {
+	markdown := strings.Repeat("云雀", 700)
+	g := &Gateway{
+		documentParser: stubDocumentParser{
+			enabled: true,
+			result:  &mineru.ParseResult{Backend: "cli", Markdown: markdown},
+		},
+	}
+
+	parsed, err := g.parseFileWithMinerU(context.Background(), "demo.pdf", []byte("pdf bytes"))
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	preview, ok := parsed.Parse["preview"].(string)
+	if !ok || preview == "" {
+		t.Fatalf("expected preview string, got %#v", parsed.Parse["preview"])
+	}
+	if !strings.HasSuffix(preview, "...") {
+		t.Fatalf("expected truncated preview suffix, got %q", preview[len(preview)-12:])
+	}
+	if strings.ContainsRune(preview, '\uFFFD') {
+		t.Fatalf("preview should not contain replacement rune: %q", preview[len(preview)-24:])
+	}
+	if got := parsed.Parse["markdown_chars"]; got != 1400 {
+		t.Fatalf("expected rune markdown_chars=1400, got %#v", got)
 	}
 }

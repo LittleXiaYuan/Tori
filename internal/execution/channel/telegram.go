@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: Telegram ──────────────────────────────────────
+// Type:     "telegram"
+// Protocol: Long Polling + 可选 Webhook
+// Inbound:  text, image, sticker, audio, video, document
+// Outbound: text(Markdown), image, sticker, InlineKeyboard按钮
+// Env vars: TELEGRAM_BOT_TOKEN
+// Status:   Production — 功能完整，支持 ProgressSender/Reactor/StickerSender
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

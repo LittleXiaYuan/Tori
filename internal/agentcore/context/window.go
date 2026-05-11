@@ -1,6 +1,8 @@
 package context
 
 import (
+	"math"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -95,37 +97,39 @@ func TrimToFit(messages []Message, cfg WindowConfig) TrimResult {
 		}
 	}
 
-	// Drop middle messages from oldest until budget met
-	for total > budget {
-		dropped := false
-		for i := cfg.PreserveFirst; i < len(messages)-cfg.PreserveLast; i++ {
-			if keep[i] {
-				continue
-			}
-			total -= costs[i]
-			costs[i] = 0
-			keep[i] = false
-			dropped = true
-			if total <= budget {
-				break
-			}
+	// Entropy-aware trimming: drop lowest-entropy messages first.
+	// Shannon entropy H = -Σ P(r)·log₂(P(r)) measures information density.
+	// Low-entropy messages ("好的", "收到", "OK") are dropped before
+	// high-entropy messages (detailed facts, code, analysis).
+	type midMsg struct {
+		idx     int
+		entropy float64
+		cost    int
+	}
+	var mids []midMsg
+	for i := cfg.PreserveFirst; i < len(messages)-cfg.PreserveLast; i++ {
+		if i >= 0 && i < len(messages) {
+			mids = append(mids, midMsg{
+				idx:     i,
+				entropy: messageEntropy(messages[i].Content),
+				cost:    costs[i],
+			})
 		}
-		if !dropped {
+	}
+	sort.Slice(mids, func(i, j int) bool {
+		return mids[i].entropy < mids[j].entropy
+	})
+
+	for _, m := range mids {
+		if total <= budget {
 			break
 		}
-		// Second pass: drop already-kept middle messages if still over budget
-		for i := cfg.PreserveFirst; i < len(messages)-cfg.PreserveLast; i++ {
-			if !keep[i] || costs[i] == 0 {
-				continue
-			}
-			total -= costs[i]
-			costs[i] = 0
-			keep[i] = false
-			if total <= budget {
-				break
-			}
+		if costs[m.idx] == 0 {
+			continue
 		}
-		break
+		total -= costs[m.idx]
+		costs[m.idx] = 0
+		keep[m.idx] = false
 	}
 
 	var result []Message
@@ -172,6 +176,35 @@ func isCJK(r rune) bool {
 		(r >= 0xF900 && r <= 0xFAFF) ||
 		(r >= 0x3040 && r <= 0x30FF) ||
 		(r >= 0xAC00 && r <= 0xD7AF)
+}
+
+// messageEntropy computes normalized Shannon entropy of a message's content.
+// Returns a value in [0, 1] where 0 = completely uniform (low info) and
+// 1 = maximum diversity (high info). Used by TrimToFit to prioritize
+// dropping low-information messages like "好的", "OK", "收到".
+func messageEntropy(content string) float64 {
+	if len(content) == 0 {
+		return 0
+	}
+	freq := make(map[rune]int)
+	total := 0
+	for _, r := range content {
+		freq[r]++
+		total++
+	}
+	if total <= 1 {
+		return 0
+	}
+	var h float64
+	logTotal := math.Log2(float64(total))
+	for _, count := range freq {
+		p := float64(count) / float64(total)
+		h -= p * math.Log2(p)
+	}
+	if logTotal == 0 {
+		return 0
+	}
+	return h / logTotal
 }
 
 // PruneToolOutput truncates long tool outputs while preserving head and tail.

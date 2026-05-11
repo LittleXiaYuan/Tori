@@ -10,6 +10,7 @@ import { CherrySettingsModal } from "@/components/cherry/settings-modal";
 import { FloatingWidget } from "@/components/floating-widget";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { SelectionToolbar } from "@/components/selection-toolbar";
+import ServiceConnectionGuard from "@/components/service-connection-guard";
 import { I18nProvider } from "@/lib/i18n";
 import { DragRegion } from "@/components/title-bar";
 
@@ -104,13 +105,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const onAuthPath = NO_SIDEBAR_PATHS.some((path) => pathname?.startsWith(path));
   const onBarePath = BARE_PATHS.some((path) => pathname?.startsWith(path));
+  const showFloatingWidget = !onAuthPath && pathname !== "/chat" && !pathname?.startsWith("/chat/");
 
   if (onBarePath) return <>{children}</>;
 
   return (
     <I18nProvider>
       <DragRegion />
-      <AuthGuard>
+      <ServiceConnectionGuard>
+        <AuthGuard>
         {!onAuthPath && (
           <div style={{
             width: zenMode ? 0 : "var(--rail-w, 64px)",
@@ -134,10 +137,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onClose={() => setSettingsOpen(false)}
           />
         )}
-        {!onAuthPath && <FloatingWidget />}
+        {showFloatingWidget && <FloatingWidget />}
         {!onAuthPath && <OnboardingGuide />}
         {!onAuthPath && <SelectionToolbar onAction={handleSelectionAction} />}
-      </AuthGuard>
+        </AuthGuard>
+      </ServiceConnectionGuard>
     </I18nProvider>
   );
 }

@@ -8,48 +8,213 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
 
 const fileAnalyzeMaxBytes = 256 << 10 // 256 KiB preview for LLM
 
+type FileParseResult struct {
+	Preview       string
+	Parser        string
+	Backend       string
+	MarkdownChars int
+	HasLayoutJSON bool
+	Status        string
+	Note          string
+}
+
 // TryParseFile extracts a text preview from upload bytes based on filename extension.
 func TryParseFile(filename string, data []byte) string {
-	if len(data) > fileAnalyzeMaxBytes {
-		data = data[:fileAnalyzeMaxBytes]
-	}
+	return TryParseFileResult(filename, data).Preview
+}
+
+// TryParseFileResult extracts a text preview plus user-facing parse metadata.
+//
+// Important: for document-like formats that require the external document
+// parser (.pdf/.doc/.ppt/.xls), Preview is intentionally empty when the local
+// parser cannot unfold the body. This avoids passing a misleading placeholder
+// to the model as if it were the document content.
+func TryParseFileResult(filename string, data []byte) FileParseResult {
 	ext := strings.ToLower(filepath.Ext(filename))
+	result := FileParseResult{
+		Parser:  "local",
+		Backend: "go",
+		Status:  "parsed",
+	}
+	setPreview := func(s string) FileParseResult {
+		result.Preview = s
+		result.MarkdownChars = len([]rune(s))
+		return result
+	}
 	switch ext {
 	case ".csv":
+		if len(data) > fileAnalyzeMaxBytes {
+			data = data[:fileAnalyzeMaxBytes]
+		}
 		s, err := parseCSVBytes(data)
 		if err != nil {
-			return fmt.Sprintf("(csv parse error: %v)", err)
+			result.Status = "error"
+			return setPreview(fmt.Sprintf("(csv parse error: %v)", err))
 		}
-		return s
+		return setPreview(s)
 	case ".xlsx":
 		s, err := parseXLSXBytes(data, "")
 		if err != nil {
-			return fmt.Sprintf("(xlsx parse error: %v)", err)
+			result.Status = "error"
+			return setPreview(fmt.Sprintf("(xlsx parse error: %v)", err))
 		}
-		return s
+		return setPreview(s)
 	case ".docx":
 		s, err := parseDOCXBytes(data)
 		if err != nil {
-			return fmt.Sprintf("(docx parse error: %v)", err)
+			result.Status = "error"
+			return setPreview(fmt.Sprintf("(docx parse error: %v)", err))
 		}
-		return s
+		return setPreview(s)
+	case ".pptx":
+		s, err := parsePPTXBytes(data)
+		if err != nil {
+			result.Status = "error"
+			return setPreview(fmt.Sprintf("(pptx parse error: %v)", err))
+		}
+		return setPreview(s)
 	case ".txt", ".md", ".markdown", ".log", ".json", ".xml", ".yaml", ".yml":
+		if len(data) > fileAnalyzeMaxBytes {
+			data = data[:fileAnalyzeMaxBytes]
+		}
 		if !utf8.Valid(data) {
-			return string(data) // best effort
+			return setPreview(string(data)) // best effort
 		}
-		return string(data)
+		return setPreview(string(data))
 	default:
-		if utf8.Valid(data) && len(data) < 64<<10 {
-			return string(data)
+		if requiresDocumentParser(ext) {
+			result.Parser = "document"
+			result.Backend = "external"
+			result.Status = "needs_document_parser"
+			result.Note = fmt.Sprintf("附件已添加，但当前本地解析器还不能直接展开 %s 正文；配置文档解析后端后会自动提取正文。", ext)
+			return result
 		}
-		return fmt.Sprintf("(binary or unsupported extension %s, %d bytes)", ext, len(data))
+		if utf8.Valid(data) && len(data) < 64<<10 {
+			return setPreview(string(data))
+		}
+		result.Status = "unsupported"
+		result.Note = fmt.Sprintf("附件已添加，但当前无法直接预览该文件类型（%s，%d bytes）。", ext, len(data))
+		return result
 	}
+}
+
+func fileParseMetadata(result FileParseResult, previewLimit int) map[string]any {
+	if result.Parser == "" && result.Backend == "" && result.Status == "" && result.Note == "" && strings.TrimSpace(result.Preview) == "" {
+		return nil
+	}
+	preview := result.Preview
+	if previewLimit > 0 {
+		if r := []rune(preview); len(r) > previewLimit {
+			preview = string(r[:previewLimit]) + "\n\n...已截断"
+		}
+	}
+	meta := map[string]any{
+		"parser":          result.Parser,
+		"backend":         result.Backend,
+		"markdown_chars":  result.MarkdownChars,
+		"has_layout_json": result.HasLayoutJSON,
+		"status":          result.Status,
+		"note":            result.Note,
+	}
+	if strings.TrimSpace(preview) != "" {
+		meta["preview"] = preview
+	}
+	return meta
+}
+
+func requiresDocumentParser(ext string) bool {
+	switch strings.ToLower(strings.TrimSpace(ext)) {
+	case ".pdf", ".doc", ".ppt", ".xls":
+		return true
+	default:
+		return false
+	}
+}
+
+func parsePPTXBytes(data []byte) (string, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", err
+	}
+	var slides []*zip.File
+	for _, f := range zr.File {
+		if strings.HasPrefix(f.Name, "ppt/slides/slide") && strings.HasSuffix(f.Name, ".xml") {
+			slides = append(slides, f)
+		}
+	}
+	sort.Slice(slides, func(i, j int) bool { return slides[i].Name < slides[j].Name })
+	var sb strings.Builder
+	for i, f := range slides {
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		text := strings.TrimSpace(extractPPTXSlideText(rc))
+		rc.Close()
+		if text == "" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("[Slide %d]\n", i+1))
+		sb.WriteString(text)
+		sb.WriteString("\n\n")
+	}
+	if sb.Len() == 0 {
+		return "", fmt.Errorf("no slide text found")
+	}
+	return sb.String(), nil
+}
+
+func extractPPTXSlideText(r io.Reader) string {
+	decoder := xml.NewDecoder(r)
+	var sb strings.Builder
+	inText := false
+	paragraphHasContent := false
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			break
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "p":
+				if paragraphHasContent && !strings.HasSuffix(sb.String(), "\n") {
+					sb.WriteString("\n")
+				}
+				paragraphHasContent = false
+			case "t":
+				inText = true
+			}
+		case xml.EndElement:
+			switch t.Name.Local {
+			case "t":
+				inText = false
+			case "p":
+				if paragraphHasContent && !strings.HasSuffix(sb.String(), "\n") {
+					sb.WriteString("\n")
+				}
+			}
+		case xml.CharData:
+			if inText {
+				text := strings.TrimSpace(string(t))
+				if text != "" {
+					if paragraphHasContent {
+						sb.WriteString(" ")
+					}
+					sb.WriteString(text)
+					paragraphHasContent = true
+				}
+			}
+		}
+	}
+	return sb.String()
 }
 
 func parseCSVBytes(data []byte) (string, error) {
@@ -100,6 +265,8 @@ func extractDocxTextGateway(r io.Reader) (string, error) {
 	var sb strings.Builder
 	inParagraph := false
 	paragraphHasContent := false
+	inTableRow := false
+	rowHasCell := false
 
 	for {
 		tok, err := decoder.Token()
@@ -112,6 +279,24 @@ func extractDocxTextGateway(r io.Reader) (string, error) {
 		switch t := tok.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
+			case "tr":
+				if sb.Len() > 0 && !strings.HasSuffix(sb.String(), "\n") {
+					sb.WriteString("\n")
+				}
+				inTableRow = true
+				rowHasCell = false
+			case "tc":
+				if inTableRow {
+					if rowHasCell {
+						sb.WriteString("\t")
+					}
+					rowHasCell = true
+					// A table cell boundary already carries the separator. Reset
+					// paragraph state so the first paragraph in the next cell does
+					// not inherit paragraphHasContent from the previous cell and
+					// accidentally insert a newline after the tab.
+					paragraphHasContent = false
+				}
 			case "p":
 				if paragraphHasContent {
 					sb.WriteString("\n")
@@ -128,8 +313,14 @@ func extractDocxTextGateway(r io.Reader) (string, error) {
 				}
 			}
 		case xml.EndElement:
-			if t.Name.Local == "p" {
+			switch t.Name.Local {
+			case "p":
 				inParagraph = false
+			case "tr":
+				if sb.Len() > 0 && !strings.HasSuffix(sb.String(), "\n") {
+					sb.WriteString("\n")
+				}
+				inTableRow = false
 			}
 		case xml.CharData:
 			if inParagraph {
@@ -268,6 +459,7 @@ func extractSheetTextZip(r io.Reader, sharedStrings []string) string {
 	var cellType string
 	var cellValue string
 	inV := false
+	inInlineText := false
 	lastRow := ""
 
 	for {
@@ -298,11 +490,17 @@ func extractSheetTextZip(r io.Reader, sharedStrings []string) string {
 			case "v":
 				inV = true
 				cellValue = ""
+			case "t":
+				if cellType == "inlineStr" {
+					inInlineText = true
+				}
 			}
 		case xml.EndElement:
 			switch t.Name.Local {
 			case "v":
 				inV = false
+			case "t":
+				inInlineText = false
 			case "c":
 				val := cellValue
 				if cellType == "s" && sharedStrings != nil {
@@ -324,6 +522,8 @@ func extractSheetTextZip(r io.Reader, sharedStrings []string) string {
 			}
 		case xml.CharData:
 			if inV {
+				cellValue += string(t)
+			} else if inInlineText {
 				cellValue += string(t)
 			}
 		}

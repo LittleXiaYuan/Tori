@@ -8,6 +8,7 @@ import {
   Smile, Tag, Send, User, RefreshCw, ChevronDown, ChevronRight, Loader2,
 } from "lucide-react";
 import { relTime } from "@/lib/constants";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 /* ── Upload Panel ── */
 function UploadPanel({ onUploaded }: { onUploaded: () => void }) {
@@ -30,7 +31,7 @@ function UploadPanel({ onUploaded }: { onUploaded: () => void }) {
     if (!content.trim()) return;
     setLoading(true); setError("");
     try { await api.qqUpload(content, filename || "chat.txt"); setContent(""); setFilename(""); onUploaded(); }
-    catch (err: unknown) { setError(err instanceof Error ? err.message : "上传失败"); }
+    catch (err: unknown) { setError(formatErrorMessage(err, "上传失败")); }
     finally { setLoading(false); }
   };
 

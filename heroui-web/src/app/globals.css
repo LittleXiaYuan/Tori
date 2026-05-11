@@ -118,46 +118,86 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-base: 200ms;
+
+  /* ── Onboarding ─────────────────────── */
+  --onboard-bg:          rgba(10, 10, 12, 0.95);
+  --onboard-card-bg:     var(--glass-card);
+  --onboard-card-border: var(--glass-edge);
+  --onboard-progress:    var(--yunque-accent);
+  --onboard-progress-bg: rgba(59, 130, 246, 0.1);
+
+  /* ── NL Config Card ────────────────── */
+  --nl-config-accent:    var(--yunque-accent);
+  --nl-config-bg:        var(--glass-card);
+  --nl-config-border:    rgba(59, 130, 246, 0.15);
+
+  /* ── Context Hint ──────────────────── */
+  --hint-bg:             var(--glass-flyout);
+  --hint-border:         var(--glass-edge);
+
+  /* ── Slash Menu ────────────────────── */
+  --slash-bg:            var(--glass-flyout);
+  --slash-border:        var(--glass-edge);
+  --slash-item-active:   var(--yunque-accent-muted);
 }
 
 /* ── 亮色：纯白底，无毛玻璃，宽柔和阴影（竞品风） ── */
 [data-theme="light"], .light {
-  --yunque-bg:          #ffffff;
-  --yunque-sidebar:     #fafafa;
-  --yunque-card:        #ffffff;
-  --yunque-card-hover:  #f4f4f5;
-  --yunque-surface-2:   #f4f4f5;
-  --yunque-surface-3:   #e4e4e7;
-  --yunque-elevated:    #ffffff;
-  --yunque-bg-surface:  #ffffff;
-  --yunque-bg-muted:    rgba(0,0,0,0.04);
-  --yunque-border:        rgba(0,0,0,0.08);
-  --yunque-border-strong: rgba(0,0,0,0.16);
-  --yunque-text:           #18181b;
-  --yunque-text-secondary: #52525b;
-  --yunque-text-muted:     #71717a;
-  --yunque-text-disabled:  #a1a1aa;
+  --yunque-bg:          #e1e7ef;
+  --yunque-sidebar:     #d8e0e9;
+  --yunque-card:        #eef3f8;
+  --yunque-card-hover:  #e6edf4;
+  --yunque-surface-2:   #e4ebf2;
+  --yunque-surface-3:   #d1dbe5;
+  --yunque-elevated:    #eff4f8;
+  --yunque-bg-surface:  #ebf0f6;
+  --yunque-bg-muted:    rgba(71, 85, 105, 0.10);
+  --yunque-border:        rgba(100, 116, 139, 0.18);
+  --yunque-border-strong: rgba(71, 85, 105, 0.24);
+  --yunque-text:           #102033;
+  --yunque-text-secondary: #43566f;
+  --yunque-text-muted:     #718096;
+  --yunque-text-disabled:  #a7b4c6;
 
   /* 中性强调：亮色下=纯黑（竞品的黑徽章） */
   --neutral-strong-bg:   #18181b;
   --neutral-strong-fg:   #ffffff;
   --neutral-strong-hover: #27272a;
 
-  --shadow-sm:          0 1px 2px rgba(15,15,20,0.04);
-  --shadow-md:          0 4px 14px rgba(15,15,20,0.06);
-  --shadow-lg:          0 16px 40px rgba(15,15,20,0.10);
-  --shadow-card:        0 1px 2px rgba(15,15,20,0.04);
+  --shadow-sm:          0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md:          0 6px 18px rgba(56, 168, 248, 0.06);
+  --shadow-lg:          0 14px 36px rgba(37, 99, 235, 0.08);
+  --shadow-card:        0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(56, 168, 248, 0.04);
+
+  /* ── Onboarding (light) ── */
+  --onboard-bg: rgba(255, 255, 255, 0.92);
 
   /* ── Liquid glass（浅色：白色玻璃 + 高饱和 + 强边缘高光，iOS 风） ── */
-  --yunque-glass-blur:     16px;
-  --yunque-glass-saturate: 1.8;
-  --glass-card:    rgba(255, 255, 255, 0.55);
-  --glass-sidebar: rgba(250, 250, 251, 0.55);
-  --glass-flyout:  rgba(255, 255, 255, 0.72);
-  --glass-overlay: rgba(255, 255, 255, 0.30);
-  --glass-edge:    rgba(255, 255, 255, 0.65);
-  --glass-edge-strong: rgba(255, 255, 255, 0.85);
-  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --yunque-glass-blur:     0px;
+  --yunque-glass-saturate: 1;
+  --glass-card:    rgba(240, 243, 247, 0.98);
+  --glass-sidebar: rgba(223, 230, 237, 0.98);
+  --glass-flyout:  rgba(239, 243, 247, 0.98);
+  --glass-overlay: rgba(223, 230, 238, 0.56);
+  --glass-edge:    rgba(148, 163, 184, 0.18);
+  --glass-edge-strong: rgba(100, 116, 139, 0.24);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* Light mode prioritizes clarity and click responsiveness over glass effects. */
+[data-theme="light"] .card,
+[data-theme="light"] .section-card,
+[data-theme="light"] .sidebar,
+[data-theme="light"] .cmd-palette,
+[data-theme="light"] .cherry-overlay-card,
+[data-theme="light"] .cherry-drawer,
+[data-theme="light"] .onboard-card,
+[data-theme="light"] .interactive-preview-panel,
+[data-theme="light"] .browser-session-card,
+[data-theme="light"] .selection-toolbar,
+[data-theme="light"] .floating-widget-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 body {
@@ -189,10 +229,48 @@ body {
     radial-gradient(700px 600px at 50% 50%, rgba(45, 212, 191, 0.05), transparent 65%);
 }
 
+[data-theme="light"] #bg-overlay,
+.light #bg-overlay {
+  background:
+    radial-gradient(900px 600px at 12% 10%, rgba(59, 130, 246, 0.045), transparent 64%),
+    radial-gradient(800px 500px at 88% 80%, rgba(168, 85, 247, 0.028), transparent 66%),
+    radial-gradient(700px 600px at 50% 50%, rgba(45, 212, 191, 0.02), transparent 68%),
+    linear-gradient(180deg, rgba(233, 239, 246, 0.96), rgba(241, 245, 249, 0.98));
+}
+
 /* Enforce minimum readable sizes for Tailwind arbitrary classes */
 .text-\[9px\]  { font-size: var(--text-2xs) !important; }
 .text-\[10px\] { font-size: var(--text-2xs) !important; }
 .text-\[11px\] { font-size: var(--text-xs)  !important; }
+
+/* ═══════════════════════════════════════════════
+   Cognitive Status & Evolution Awareness Tokens
+   意图自流 UI — Agent 认知可视化层
+   ═══════════════════════════════════════════════ */
+:root {
+  --cogni-memory:        #a78bfa;
+  --cogni-memory-muted:  rgba(167,139,250,0.12);
+  --cogni-reflect:       #f472b6;
+  --cogni-reflect-muted: rgba(244,114,182,0.10);
+  --cogni-skill:         #22d3ee;
+  --cogni-skill-muted:   rgba(34,211,238,0.10);
+  --cogni-context:       #fb923c;
+  --cogni-context-muted: rgba(251,146,60,0.10);
+  --cogni-bar-bg:        rgba(255,255,255,0.02);
+  --cogni-bar-border:    rgba(255,255,255,0.06);
+  --evo-xp:              #34d399;
+  --evo-xp-muted:        rgba(52,211,153,0.12);
+  --evo-streak:          #fbbf24;
+  --evo-streak-muted:    rgba(251,191,36,0.12);
+  --evo-badge:           #c084fc;
+  --evo-badge-muted:     rgba(192,132,252,0.10);
+  --evo-card-bg:         linear-gradient(135deg, rgba(52,211,153,0.06), rgba(192,132,252,0.06));
+  --evo-card-border:     rgba(52,211,153,0.14);
+}
+[data-theme="light"], .light {
+  --cogni-bar-bg:        rgba(0,0,0,0.02);
+  --cogni-bar-border:    rgba(0,0,0,0.06);
+}
 
 /* ═══════════════════════════════════════════════
    Animations — respect prefers-reduced-motion
@@ -862,6 +940,27 @@ button, [role="button"] { border-radius: var(--radius-md); }
 .sidebar[data-collapsed] .sidebar-footer {
   padding: 4px 0 8px;
   border-top: 1px solid var(--yunque-border);
+}
+
+.sidebar-profile-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius-md);
+  background: var(--yunque-bg-muted);
+  border: 1px solid var(--yunque-border);
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+}
+.sidebar-profile-toggle:hover {
+  background: rgba(59,130,246,0.06);
+  border-color: rgba(59,130,246,0.2);
+}
+.sidebar-profile-toggle[data-collapsed] {
+  justify-content: center;
+  padding: 5px;
 }
 
 /* ═══════════════════════════════════════════════
@@ -2377,4 +2476,203 @@ html[data-platform="macos"] .account-rail {
 }
 html[data-platform="macos"] .titlebar-drag {
   left: 80px;
+}
+
+/* ═══════════════════════════════════════════════
+   Onboarding 2.0 — Interactive Guide
+   ═══════════════════════════════════════════════ */
+
+.onboard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--onboard-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.onboard-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--onboard-card-bg, var(--yunque-bg));
+  border: 1px solid var(--onboard-card-border, var(--yunque-border));
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  animation: cherryCardIn 0.3s var(--ease-out) both;
+}
+
+.onboard-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 0 0 16px;
+}
+.onboard-progress-dot {
+  height: 4px;
+  border-radius: 2px;
+  transition: all 0.3s var(--ease-out);
+  background: var(--onboard-progress-bg);
+}
+.onboard-progress-dot[data-active] {
+  width: 24px;
+  background: var(--onboard-progress);
+}
+.onboard-progress-dot:not([data-active]) {
+  width: 8px;
+}
+.onboard-progress-dot[data-done] {
+  background: var(--yunque-success);
+}
+
+.onboard-check-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: var(--text-sm);
+  color: var(--yunque-text-secondary);
+  animation: fadeInUp 0.3s var(--ease-out) both;
+}
+.onboard-check-item[data-done] {
+  color: var(--yunque-success);
+}
+
+.onboard-provider-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--yunque-bg-muted);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+  min-width: 110px;
+}
+.onboard-provider-card:hover {
+  border-color: var(--yunque-border-strong);
+  background: var(--yunque-surface-2);
+}
+.onboard-provider-card[data-selected] {
+  border-color: var(--yunque-accent);
+  background: var(--yunque-accent-soft);
+}
+
+.onboard-demo-card {
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--yunque-bg-muted);
+  border: 1px solid var(--yunque-border);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.onboard-demo-card:hover {
+  border-color: var(--yunque-accent);
+  background: var(--yunque-accent-soft);
+  transform: translateY(-1px);
+}
+
+.onboard-mode-card {
+  flex: 1;
+  padding: 24px 20px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--yunque-border);
+  background: var(--yunque-bg-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s var(--ease-out);
+}
+.onboard-mode-card:hover {
+  border-color: var(--yunque-border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.onboard-mode-card[data-selected] {
+  border-color: var(--yunque-accent);
+  background: var(--yunque-accent-soft);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ═══════════════════════════════════════════════
+   NL Config Card — Chat-inline Configuration
+   ═══════════════════════════════════════════════ */
+
+.nl-config-card {
+  background: var(--nl-config-bg, var(--glass-card));
+  border: 1px solid var(--nl-config-border);
+  border-left: 3px solid var(--nl-config-accent, var(--yunque-accent));
+  border-radius: var(--radius-lg);
+  padding: var(--card-pad);
+  margin: var(--sp-3) 0;
+  animation: panelEnterSoft 180ms var(--ease-out);
+  backdrop-filter: blur(var(--yunque-glass-blur));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur));
+}
+
+.nl-config-diff {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--yunque-bg-muted);
+  border-radius: var(--radius-sm);
+  margin: var(--sp-3) 0;
+}
+.nl-config-diff-from {
+  color: var(--yunque-text-muted);
+  text-decoration: line-through;
+  font-size: var(--text-sm);
+}
+.nl-config-diff-to {
+  color: var(--yunque-accent);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.nl-config-result {
+  background: var(--yunque-success-muted);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3) var(--sp-4);
+  color: var(--yunque-text);
+  animation: fadeInUp 0.3s var(--ease-out) both;
+}
+.nl-config-result--error {
+  background: var(--yunque-danger-muted);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ═══════════════════════════════════════════════
+   Context Hint Toast — Smart Feature Discovery
+   ═══════════════════════════════════════════════ */
+
+.context-hint-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  max-width: 320px;
+  padding: 16px 20px;
+  background: var(--hint-bg, var(--glass-flyout));
+  border: 1px solid var(--hint-border, var(--glass-edge));
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--yunque-glass-blur)) saturate(var(--yunque-glass-saturate));
+  box-shadow: var(--glass-inner-highlight, none), var(--shadow-lg);
+  animation: slideInRight 0.3s var(--ease-out) both;
+  z-index: 50;
+}
+
+@keyframes contextHintExit {
+  to { opacity: 0; transform: translateX(16px); }
+}
+.context-hint-toast[data-exiting] {
+  animation: contextHintExit 0.2s ease-in forwards;
 }

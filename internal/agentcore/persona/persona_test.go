@@ -150,6 +150,25 @@ func TestReload(t *testing.T) {
 	}
 }
 
+func TestRenameAndResetDefaults(t *testing.T) {
+	dir := tempDir(t)
+	p, _ := New(dir)
+
+	if err := p.Rename("小云"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if !strings.Contains(p.Identity(), "小云") {
+		t.Fatalf("identity should contain renamed value, got %q", p.Identity())
+	}
+
+	if err := p.ResetToDefaults(); err != nil {
+		t.Fatalf("reset defaults: %v", err)
+	}
+	if !strings.Contains(p.Identity(), "Yunque Agent") {
+		t.Fatalf("expected default identity after reset, got %q", p.Identity())
+	}
+}
+
 func TestParseSkillFile(t *testing.T) {
 	raw := "---\nname: test-skill\ndescription: A test\nenabled: false\n---\nDo something"
 	s := parseSkillFile(raw, "fallback")

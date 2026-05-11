@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { getAuthHeaders, getApiKey } from "@/lib/api";
 import { isSafeApiBase } from "@/lib/safe-url";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 interface TemplateResult {
   path: string; sections: number; fields: number;
@@ -78,7 +79,7 @@ export default function PaperPage() {
       const res = await fetch(`${BASE}/v1/ext/paper/upload-template`, { method: "POST", headers: { ...getAuthHeaders() }, body: form });
       if (!res.ok) throw new Error(`上传失败: ${res.status}`);
       setTemplateResult(await res.json());
-    } catch (e: unknown) { setUploadError(e instanceof Error ? e.message : String(e)); }
+    } catch (e: unknown) { setUploadError(formatErrorMessage(e, "上传模板失败")); }
     finally { setUploading(false); }
   };
 
@@ -241,7 +242,7 @@ export default function PaperPage() {
             </div>
             {status?.error && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm" style={{ background: "#ef444415", color: "#ef4444" }}>
-                <AlertCircle size={14} /> {status.error}
+                <AlertCircle size={14} /> {formatErrorMessage(status.error, "生成失败")}
               </div>
             )}
           </div>

@@ -115,15 +115,8 @@ func writeXlsx(path, sheetName string, rows [][]string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
 	w := zip.NewWriter(f)
-	defer w.Close()
-
-	writeZipFile(w, "[Content_Types].xml", xlsxContentTypes)
-	writeZipFile(w, "_rels/.rels", xlsxRels)
-	writeZipFile(w, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels)
-	writeZipFile(w, "xl/styles.xml", xlsxStyles)
 
 	var sharedStrings []string
 	ssIndex := make(map[string]int)
@@ -136,11 +129,27 @@ func writeXlsx(path, sheetName string, rows [][]string) error {
 		}
 	}
 
-	writeZipFile(w, "xl/sharedStrings.xml", buildSharedStringsXML(sharedStrings))
-	writeZipFile(w, "xl/worksheets/sheet1.xml", buildSheetXML(rows, ssIndex))
-	writeZipFile(w, "xl/workbook.xml", buildWorkbookXML(sheetName))
+	for _, entry := range []struct{ name, content string }{
+		{"[Content_Types].xml", xlsxContentTypes},
+		{"_rels/.rels", xlsxRels},
+		{"xl/_rels/workbook.xml.rels", xlsxWorkbookRels},
+		{"xl/styles.xml", xlsxStyles},
+		{"xl/sharedStrings.xml", buildSharedStringsXML(sharedStrings)},
+		{"xl/worksheets/sheet1.xml", buildSheetXML(rows, ssIndex)},
+		{"xl/workbook.xml", buildWorkbookXML(sheetName)},
+	} {
+		if err := writeZipFile(w, entry.name, entry.content); err != nil {
+			w.Close()
+			f.Close()
+			return fmt.Errorf("write %s: %w", entry.name, err)
+		}
+	}
 
-	return nil
+	if err := w.Close(); err != nil {
+		f.Close()
+		return fmt.Errorf("finalize xlsx: %w", err)
+	}
+	return f.Close()
 }
 
 func colRef(col int) string {

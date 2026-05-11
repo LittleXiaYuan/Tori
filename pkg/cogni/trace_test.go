@@ -112,6 +112,35 @@ func TestHook_TraceCaptured_OnFilterSkills(t *testing.T) {
 	}
 }
 
+func TestHook_TraceSnapshotReturnsCurrentTurnWithoutRawMessage(t *testing.T) {
+	r := NewRegistry()
+	_ = r.Add(&Declaration{
+		ID:          "doc",
+		DisplayName: "文档助手",
+		Activation:  ActivationRules{AlwaysOn: true},
+		Context:     ContextInjection{Static: "read files carefully"},
+		Surface:     ToolSurface{Only: []string{"file_open"}},
+	}, "test")
+	h := NewHook(r)
+	req := ContextRequest{Message: "请读取附件里的合同", TenantID: "t1", Channel: "web"}
+	_ = h.BuildContext(req)
+	_ = h.FilterSkills(req, []skills.Skill{sk("file_open"), sk("browser_search")})
+
+	tr, ok := h.TraceSnapshot(req)
+	if !ok {
+		t.Fatal("expected trace snapshot")
+	}
+	if len(tr.Activations) != 1 || tr.Activations[0].DisplayName != "文档助手" || !tr.Activations[0].Activated {
+		t.Fatalf("unexpected activations: %+v", tr.Activations)
+	}
+	if tr.MessageHash == "" || strings.Contains(tr.MessageHash, "合同") {
+		t.Fatalf("snapshot should expose only hash, got %q", tr.MessageHash)
+	}
+	if tr.Context.Bytes == 0 || tr.ToolFilter == nil || tr.ToolFilter.Before != 2 || tr.ToolFilter.After != 1 {
+		t.Fatalf("snapshot missing context/tool diff: %+v", tr)
+	}
+}
+
 func TestHook_TraceRecordsSuppressed(t *testing.T) {
 	store := NewInMemoryTraceStore(4)
 	r := NewRegistry()

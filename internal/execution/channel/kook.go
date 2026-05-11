@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: Kook (开黑啦) ─────────────────────────────────
+// Type:     "kook"
+// Protocol: WebSocket事件循环 + REST API, 可选 Webhook
+// Inbound:  text
+// Outbound: text, 表情回应
+// Env vars: KOOK_TOKEN
+// Status:   Production — 支持 Reactor 接口
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

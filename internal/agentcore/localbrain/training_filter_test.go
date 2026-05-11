@@ -55,6 +55,88 @@ func TestFilterFile_Deduplication(t *testing.T) {
 	}
 }
 
+func TestFilterFileUniqueOutputNames(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "train.jsonl")
+	line := `{"instruction":"hello","input":"world","output":"greeting response here"}`
+	os.WriteFile(input, []byte(line+"\n"), 0644)
+
+	f := NewTrainingFilter(DefaultFilterConfig())
+	first, _, err := f.FilterFile(input)
+	if err != nil {
+		t.Fatalf("first FilterFile failed: %v", err)
+	}
+	second, _, err := f.FilterFile(input)
+	if err != nil {
+		t.Fatalf("second FilterFile failed: %v", err)
+	}
+	if first == second {
+		t.Fatalf("filter should not reuse output names: %s", first)
+	}
+	if _, err := os.Stat(first); err != nil {
+		t.Fatalf("first filtered file missing: %v", err)
+	}
+	if _, err := os.Stat(second); err != nil {
+		t.Fatalf("second filtered file missing: %v", err)
+	}
+}
+
+func TestPreviewFileDoesNotWriteFilteredOutput(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "train.jsonl")
+
+	lines := []string{
+		`{"instruction":"hello","input":"world","output":"greeting response here"}`,
+		`{"instruction":"hello","input":"world","output":"greeting response here"}`,
+	}
+	os.WriteFile(input, []byte(strings.Join(lines, "\n")+"\n"), 0644)
+
+	f := NewTrainingFilter(DefaultFilterConfig())
+	stats, err := f.PreviewFile(input)
+	if err != nil {
+		t.Fatalf("PreviewFile failed: %v", err)
+	}
+	if stats.TotalRead != 2 || stats.Kept != 1 || stats.DroppedDup != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(dir, "filtered_*.jsonl"))
+	if err != nil {
+		t.Fatalf("glob filtered outputs: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("PreviewFile wrote filtered output files: %v", matches)
+	}
+}
+
+func TestPreviewFilesDeduplicatesAcrossInputs(t *testing.T) {
+	tmpDir := t.TempDir()
+	aPath := filepath.Join(tmpDir, "a.jsonl")
+	bPath := filepath.Join(tmpDir, "b.jsonl")
+	line := `{"instruction":"valid instruction","input":"useful input","output":"useful output text"}`
+	if err := os.WriteFile(aPath, []byte(line+"\n"), 0644); err != nil {
+		t.Fatalf("write a: %v", err)
+	}
+	if err := os.WriteFile(bPath, []byte(line+"\n"), 0644); err != nil {
+		t.Fatalf("write b: %v", err)
+	}
+
+	filter := NewTrainingFilter(DefaultFilterConfig())
+	stats, err := filter.PreviewFiles([]string{aPath, bPath})
+	if err != nil {
+		t.Fatalf("PreviewFiles: %v", err)
+	}
+	if stats.TotalRead != 2 {
+		t.Fatalf("TotalRead = %d, want 2", stats.TotalRead)
+	}
+	if stats.Kept != 1 {
+		t.Fatalf("Kept = %d, want 1", stats.Kept)
+	}
+	if stats.DroppedDup != 1 {
+		t.Fatalf("DroppedDup = %d, want 1", stats.DroppedDup)
+	}
+}
+
 func TestFilterFile_EmptyJSON(t *testing.T) {
 	dir := t.TempDir()
 	input := filepath.Join(dir, "train.jsonl")

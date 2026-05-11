@@ -101,6 +101,33 @@ func TestLedgerStore_Update(t *testing.T) {
 	if got.Description != "Updated description" {
 		t.Errorf("description = %s, want Updated description", got.Description)
 	}
+	if got.Status != agtask.StatusCompleted {
+		t.Errorf("status = %s, want completed", got.Status)
+	}
+}
+
+func TestLedgerStore_UpdateReturnsTransitionError(t *testing.T) {
+	ldg := newTestLedger(t)
+	store := NewLedgerStore(ldg, t.TempDir())
+
+	task, _ := store.Create(agtask.CreateRequest{
+		Description: "Already done",
+		TenantID:    "t1",
+	})
+	task.Status = agtask.StatusCompleted
+	if err := store.Update(task); err != nil {
+		t.Fatalf("complete task: %v", err)
+	}
+
+	task.Status = agtask.StatusRunning
+	if err := store.Update(task); err == nil {
+		t.Fatal("expected transition error when moving completed task back to running")
+	}
+
+	got, _ := store.Get(task.ID)
+	if got.Status != agtask.StatusCompleted {
+		t.Fatalf("status changed after failed transition: %s", got.Status)
+	}
 }
 
 func TestLedgerStore_Delete(t *testing.T) {

@@ -323,6 +323,28 @@ func TestManagerStats(t *testing.T) {
 	}
 }
 
+func TestManagerDeleteByQuery(t *testing.T) {
+	short := NewShortTerm(1 * time.Hour)
+	mid := NewMidTerm()
+	long := NewLongTerm()
+	mgr := NewManager(short, mid, long)
+	ctx := context.Background()
+
+	_ = mgr.AddPreference(ctx, "t1", "language", "喜欢 Markdown", "test")
+	_ = mgr.AddMid(ctx, "t1", Item{Key: "note", Value: "我喜欢 Markdown 输出"})
+	_ = mgr.AddLong(ctx, "t1", Item{Key: "archive", Value: "长期记忆：喜欢 Markdown"})
+
+	removed := mgr.DeleteByQuery(ctx, "t1", "Markdown")
+	if removed == 0 {
+		t.Fatal("expected removed memories")
+	}
+
+	results, _ := mgr.SearchAll(ctx, "t1", "Markdown", 10)
+	if len(results) != 0 {
+		t.Fatalf("expected no remaining results, got %d", len(results))
+	}
+}
+
 // --- Tokenizer tests ---
 
 func TestTokenizeForIDF(t *testing.T) {

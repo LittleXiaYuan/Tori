@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { EvolutionState, LoRAStatus, TrainingRecord, TrainingSummary } from "@/lib/api-types/lora";
+import type { EvolutionState, LoRAStatus, TrainingDataPreview, TrainingRecord, TrainingSummary } from "@/lib/api-types/lora";
 import type { LoRAConfig } from "@/lib/api-types/lora";
 import { Button, Card, Chip, Input, Label, Spinner, Table, TextField, Tooltip } from "@heroui/react";
 import {
@@ -42,13 +42,28 @@ function pct(n: number, d: number): string {
   return `${Math.round((n / d) * 100)}%`;
 }
 
+function droppedTotal(preview: TrainingDataPreview | null): number {
+  const s = preview?.filter_stats;
+  if (!s) return Math.max((preview?.raw_samples ?? 0) - (preview?.usable_samples ?? 0), 0);
+  return (
+    (s.dropped_empty ?? 0) +
+    (s.dropped_too_short ?? 0) +
+    (s.dropped_too_long ?? 0) +
+    (s.dropped_duplicate ?? 0) +
+    (s.dropped_low_score ?? 0) +
+    (s.dropped_malformed ?? 0) +
+    (s.dropped_garbage ?? 0)
+  );
+}
+
 export default function LoRAPage() {
   const [status, setStatus] = useState<LoRAStatus | null>(null);
   const [records, setRecords] = useState<TrainingRecord[]>([]);
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
   const [evolution, setEvolution] = useState<EvolutionState | null>(null);
+  const [preview, setPreview] = useState<TrainingDataPreview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"trigger" | "rollback" | "save-config" | null>(null);
+  const [busy, setBusy] = useState<"trigger" | "rollback" | "save-config" | "preview" | null>(null);
   const [disabledReason, setDisabledReason] = useState<string | null>(null);
   const [config, setConfig] = useState<LoRAConfig | null>(null);
   const [configDraft, setConfigDraft] = useState<Record<string, string>>({});
@@ -56,12 +71,13 @@ export default function LoRAPage() {
 
   const load = useCallback(async () => {
     setDisabledReason(null);
-    const [stR, histR, sumR, evoR, cfgR] = await Promise.allSettled([
+    const [stR, histR, sumR, evoR, cfgR, previewR] = await Promise.allSettled([
       api.getLoRAStatus(),
       api.getLoRAHistory(),
       api.getLoRASummary(),
       api.getEvolutionState(),
       api.getLoRAConfig(),
+      api.previewLoRATrainingData(),
     ]);
 
     if (stR.status === "fulfilled") {
@@ -107,6 +123,12 @@ export default function LoRAPage() {
       });
     }
 
+    if (previewR.status === "fulfilled") {
+      setPreview(previewR.value.preview ?? null);
+    } else {
+      setPreview(null);
+    }
+
     setLoading(false);
   }, []);
 
@@ -122,6 +144,19 @@ export default function LoRAPage() {
       await load();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "触发失败", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onPreview = async () => {
+    setBusy("preview");
+    try {
+      const res = await api.previewLoRATrainingData();
+      setPreview(res.preview);
+      showToast(res.preview.ready ? "训练数据已达标" : res.preview.reason || "训练数据未达标", res.preview.ready ? "success" : "info");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "预检失败", "error");
     } finally {
       setBusy(null);
     }
@@ -283,6 +318,58 @@ export default function LoRAPage() {
           </div>
         </Card>
       </div>
+
+      {/* 聚合统计 */}
+      <Card className="section-card p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Target size={16} style={{ color: "var(--yunque-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              训练数据预检
+            </h2>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5"
+            isPending={busy === "preview"}
+            isDisabled={!!disabledReason}
+            onPress={onPreview}
+          >
+            <RefreshCw size={13} /> 刷新
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <div className="text-[11px] kpi-label">原始样本</div>
+            <div className="text-lg font-semibold">{preview?.raw_samples ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-[11px] kpi-label">可用样本</div>
+            <div className="text-lg font-semibold">{preview?.usable_samples ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-[11px] kpi-label">过滤丢弃</div>
+            <div className="text-lg font-semibold">{droppedTotal(preview)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] kpi-label">状态</div>
+            <Chip
+              size="sm"
+              style={{
+                background: preview?.ready ? "rgba(34,197,94,0.15)" : "rgba(255,170,0,0.14)",
+                color: preview?.ready ? "#22c55e" : "var(--yunque-warning)",
+              }}
+            >
+              {preview?.ready ? "可训练" : "未达标"}
+            </Chip>
+          </div>
+        </div>
+        <div className="text-[11px] mt-3 truncate" style={{ color: "var(--yunque-text-muted)" }} title={preview?.data_path || ""}>
+          最小样本 {preview?.min_samples ?? config?.min_samples ?? 0} · 过滤{preview?.filter_enabled ? "开启" : "关闭"}
+          {preview?.reason ? ` · ${preview.reason}` : ""} · {preview?.data_path || "暂无数据文件"}
+        </div>
+      </Card>
 
       {/* 聚合统计 */}
       <Card className="section-card p-4">

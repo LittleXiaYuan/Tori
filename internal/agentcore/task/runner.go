@@ -303,6 +303,9 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 				prevResult = step.Result
 				continue
 			}
+			if missing := unmetTaskStepDependencies(t, step); len(missing) > 0 {
+				return r.markDependencyBlocked(t, step, missing)
+			}
 			if prevResult != "" {
 				step.Input = prevResult
 				r.store.Update(t)
@@ -367,6 +370,15 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 			defer grpCancel()
 
 			resultCh := make(chan stepResult, len(grp))
+			for _, idx := range grp {
+				step := &t.Steps[idx]
+				if step.Status == StepDone || step.Status == StepSkipped {
+					continue
+				}
+				if missing := unmetTaskStepDependencies(t, step); len(missing) > 0 {
+					return r.markDependencyBlocked(t, step, missing)
+				}
+			}
 			for _, idx := range grp {
 				step := &t.Steps[idx]
 				if step.Status == StepDone || step.Status == StepSkipped {
@@ -444,6 +456,48 @@ func (r *Runner) Run(ctx context.Context, taskID string) error {
 	r.emit("task_completed", taskID, fmt.Sprintf("%d steps", len(t.Steps)))
 	slog.Info("task: completed", "task", taskID, "steps", len(t.Steps))
 	return nil
+}
+
+func unmetTaskStepDependencies(t *Task, step *Step) []int {
+	if step == nil || len(step.DependsOn) == 0 {
+		return nil
+	}
+	byID := make(map[int]StepStatus, len(t.Steps))
+	for _, s := range t.Steps {
+		byID[s.ID] = s.Status
+	}
+	var missing []int
+	for _, depID := range step.DependsOn {
+		status, ok := byID[depID]
+		if !ok || (status != StepDone && status != StepSkipped) {
+			missing = append(missing, depID)
+		}
+	}
+	return missing
+}
+
+func (r *Runner) markDependencyBlocked(t *Task, step *Step, missing []int) error {
+	if t == nil || step == nil {
+		return fmt.Errorf("task dependency blocked")
+	}
+	t.Status = StatusInterrupted
+	t.Error = fmt.Sprintf("步骤 %d 等待依赖步骤完成：%s", step.ID, formatStepIDs(missing))
+	step.Status = StepPending
+	r.store.Update(t)
+	r.emit("task_interrupted", t.ID, t.Error)
+	slog.Info("task: dependency blocked", "task", t.ID, "step", step.ID, "missing", missing)
+	return fmt.Errorf("%s", t.Error)
+}
+
+func formatStepIDs(ids []int) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf("%d", id))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // markCancelled sets task status to cancelled.

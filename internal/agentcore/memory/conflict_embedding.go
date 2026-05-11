@@ -42,30 +42,71 @@ type EmbeddingGateConfig struct {
 	// gate, sorted by similarity descending. Prevents a single very-noisy
 	// embedding from flooding the LLM arbiter. 0 means unlimited.
 	MaxCandidates int
+
+	// TenantCacheTTL controls how long per-tenant stored-memory embeddings
+	// are cached. Longer values reduce embed API calls at the cost of stale
+	// vectors when memories are updated/deleted. Default: 5 minutes.
+	TenantCacheTTL time.Duration
+
+	// TenantCacheMaxItems caps the number of stored-memory vectors cached
+	// per tenant. Prevents unbounded memory growth for tenants with large
+	// memory stores. Default: 200.
+	TenantCacheMaxItems int
 }
 
 // DefaultEmbeddingGateConfig returns sensible defaults.
 func DefaultEmbeddingGateConfig() EmbeddingGateConfig {
 	return EmbeddingGateConfig{
-		Threshold:          0.82,
-		NewContentCacheTTL: 30 * time.Second,
-		MaxCandidates:      10,
+		Threshold:           0.82,
+		NewContentCacheTTL:  30 * time.Second,
+		MaxCandidates:       10,
+		TenantCacheTTL:      5 * time.Minute,
+		TenantCacheMaxItems: 200,
 	}
 }
+
+const tenantShardCount = 8
 
 // embeddingGate is an internal helper on ConflictDetector. Keeping the
 // embedding logic in its own type makes conflict.go easier to reason about
 // and lets tests exercise the cosine math in isolation.
+//
+// Concurrency: recentCache uses a dedicated RWMutex (read-heavy path);
+// tenantVecs are sharded across tenantShardCount buckets keyed by FNV hash
+// of the tenantID, each with its own RWMutex to minimize cross-tenant lock
+// contention.
 type embeddingGate struct {
-	mu          sync.Mutex
+	cacheMu     sync.RWMutex
 	embed       SingleEmbedFunc
 	cfg         EmbeddingGateConfig
 	recentCache map[string]cachedVec
+	shards      [tenantShardCount]tenantShard
+}
+
+type tenantShard struct {
+	mu   sync.RWMutex
+	vecs map[string]*tenantVecCache // tenantID → cached stored-memory vectors
 }
 
 type cachedVec struct {
 	vec []float32
 	at  time.Time
+}
+
+// tenantVecCache holds pre-embedded vectors for a tenant's stored memories,
+// avoiding O(existing) embed calls on every Ingest.
+type tenantVecCache struct {
+	items   map[string]cachedVec // content hash → vector
+	created time.Time
+}
+
+func tenantShardIdx(tenantID string) int {
+	var h uint32 = 2166136261
+	for i := 0; i < len(tenantID); i++ {
+		h ^= uint32(tenantID[i])
+		h *= 16777619
+	}
+	return int(h % tenantShardCount)
 }
 
 // SetEmbeddingGate enables embedding-based candidate filtering before the
@@ -83,11 +124,21 @@ func (d *ConflictDetector) SetEmbeddingGate(embed SingleEmbedFunc, cfg Embedding
 		d.embGate = nil
 		return
 	}
-	d.embGate = &embeddingGate{
+	if cfg.TenantCacheTTL <= 0 {
+		cfg.TenantCacheTTL = 5 * time.Minute
+	}
+	if cfg.TenantCacheMaxItems <= 0 {
+		cfg.TenantCacheMaxItems = 200
+	}
+	gate := &embeddingGate{
 		embed:       embed,
 		cfg:         cfg,
 		recentCache: make(map[string]cachedVec),
 	}
+	for i := range gate.shards {
+		gate.shards[i].vecs = make(map[string]*tenantVecCache)
+	}
+	d.embGate = gate
 }
 
 // filterByEmbedding returns the subset of `existing` items whose content is
@@ -101,6 +152,18 @@ func (d *ConflictDetector) SetEmbeddingGate(embed SingleEmbedFunc, cfg Embedding
 // a transient embedder failure.
 func (g *embeddingGate) filterByEmbedding(
 	ctx context.Context,
+	newContent string,
+	existing []RecallItem,
+) ([]RecallItem, bool) {
+	return g.filterByEmbeddingForTenant(ctx, "", newContent, existing)
+}
+
+// filterByEmbeddingForTenant is the tenant-aware variant that leverages
+// per-tenant vector caches to avoid re-embedding stored memories on every
+// Ingest call — resolving orchestrator.go TODO #4.
+func (g *embeddingGate) filterByEmbeddingForTenant(
+	ctx context.Context,
+	tenantID string,
 	newContent string,
 	existing []RecallItem,
 ) ([]RecallItem, bool) {
@@ -123,12 +186,8 @@ func (g *embeddingGate) filterByEmbedding(
 		if item.Content == "" {
 			continue
 		}
-		vec, err := g.embedCached(ctx, item.Content)
+		vec, err := g.embedForTenant(ctx, tenantID, item.Content)
 		if err != nil || len(vec) == 0 {
-			// Failing to embed a *specific* existing item is non-fatal; drop
-			// that one and let the rest through. We do NOT degrade the whole
-			// call because the caller may be processing dozens of items and
-			// one provider glitch should not poison all of them.
 			continue
 		}
 		score := cosineSimilarity32(newVec, vec)
@@ -138,8 +197,6 @@ func (g *embeddingGate) filterByEmbedding(
 		candidates = append(candidates, scored{item: item, score: score})
 	}
 
-	// Sort candidates by descending score (simple insertion sort is fine for
-	// MaxCandidates-level N; we typically stay under 32 here).
 	for i := 1; i < len(candidates); i++ {
 		for j := i; j > 0 && candidates[j-1].score < candidates[j].score; j-- {
 			candidates[j-1], candidates[j] = candidates[j], candidates[j-1]
@@ -156,34 +213,101 @@ func (g *embeddingGate) filterByEmbedding(
 	return out, true
 }
 
+// embedForTenant looks up a stored-memory vector from the per-tenant shard
+// cache first, falling back to embedCached (and populating the shard) on miss.
+func (g *embeddingGate) embedForTenant(ctx context.Context, tenantID, content string) ([]float32, error) {
+	if tenantID == "" {
+		return g.embedCached(ctx, content)
+	}
+
+	shard := &g.shards[tenantShardIdx(tenantID)]
+
+	// Fast path: RLock for cache hit
+	shard.mu.RLock()
+	tc := shard.vecs[tenantID]
+	if tc != nil && time.Since(tc.created) <= g.cfg.TenantCacheTTL {
+		if hit, ok := tc.items[content]; ok {
+			shard.mu.RUnlock()
+			return hit.vec, nil
+		}
+	}
+	shard.mu.RUnlock()
+
+	vec, err := g.embedCached(ctx, content)
+	if err != nil || len(vec) == 0 {
+		return vec, err
+	}
+
+	// Slow path: write lock to populate cache
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+
+	tc = shard.vecs[tenantID]
+	if tc == nil || time.Since(tc.created) > g.cfg.TenantCacheTTL {
+		tc = &tenantVecCache{items: make(map[string]cachedVec), created: time.Now()}
+		shard.vecs[tenantID] = tc
+	}
+	if len(tc.items) < g.cfg.TenantCacheMaxItems {
+		tc.items[content] = cachedVec{vec: vec, at: time.Now()}
+	}
+
+	// Per-shard eviction: cap at 64/tenantShardCount tenants per shard
+	maxPerShard := 64 / tenantShardCount
+	if maxPerShard < 4 {
+		maxPerShard = 4
+	}
+	if len(shard.vecs) > maxPerShard {
+		var oldestTenant string
+		var oldest time.Time
+		first := true
+		for tid, tvc := range shard.vecs {
+			if first || tvc.created.Before(oldest) {
+				oldest = tvc.created
+				oldestTenant = tid
+				first = false
+			}
+		}
+		delete(shard.vecs, oldestTenant)
+	}
+	return vec, nil
+}
+
+// InvalidateTenantCache removes the cached vectors for a specific tenant,
+// useful when memories are bulk-updated or deleted.
+func (g *embeddingGate) InvalidateTenantCache(tenantID string) {
+	if g == nil {
+		return
+	}
+	shard := &g.shards[tenantShardIdx(tenantID)]
+	shard.mu.Lock()
+	delete(shard.vecs, tenantID)
+	shard.mu.Unlock()
+}
+
 // embedCached is a tiny TTL cache so the same incoming content is not
 // re-embedded when the orchestrator loops through overlapping recall sets.
+// Uses RWMutex: RLock for cache-hit fast path, Lock only on miss+store.
 func (g *embeddingGate) embedCached(ctx context.Context, text string) ([]float32, error) {
 	now := time.Now()
-	g.mu.Lock()
+
+	// Fast path: RLock for cache hit
+	g.cacheMu.RLock()
 	if hit, ok := g.recentCache[text]; ok && now.Sub(hit.at) < g.cfg.NewContentCacheTTL {
 		vec := hit.vec
-		g.mu.Unlock()
+		g.cacheMu.RUnlock()
 		return vec, nil
 	}
-	g.mu.Unlock()
+	g.cacheMu.RUnlock()
 
 	vec, err := g.embed(ctx, text)
 	if err != nil {
 		return nil, err
 	}
 
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	// Slow path: write lock to store result
+	g.cacheMu.Lock()
+	defer g.cacheMu.Unlock()
 	g.recentCache[text] = cachedVec{vec: vec, at: now}
-	// Bound cache size. The cache is populated inside a per-ingest loop, so
-	// a naïve cap is enough; when we hit the limit, drop the oldest entry.
-	//
-	// Seed oldestKey with *any* existing key (not empty) so that Windows'
-	// ~1ms timer resolution – where dozens of consecutive inserts can
-	// share a `time.Now()` – cannot leave us with `oldestKey == ""`, which
-	// would turn the delete into a silent no-op and let the cache grow
-	// unbounded.
 	if len(g.recentCache) > 512 {
 		var oldestKey string
 		var oldest time.Time

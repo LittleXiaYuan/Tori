@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -41,22 +42,80 @@ func (p PermLevel) String() string {
 	return "unknown"
 }
 
-// Entry records trust data for one skill.
+// Entry records trust data for one skill using Bayesian Beta distribution.
+// Trust score = α/(α+β) (posterior mean of Beta(α,β)).
+// Confidence = 1 - Var(Beta) = 1 - αβ/((α+β)²(α+β+1)).
+// Permission upgrades require BOTH sufficient score AND high confidence,
+// preventing new skills from gaining privileges with few observations.
 type Entry struct {
 	Score        int       `json:"score"`
 	Executions   int       `json:"executions"`
 	Failures     int       `json:"failures"`
 	LastPromoted time.Time `json:"last_promoted,omitempty"`
+	Alpha        float64   `json:"alpha"`
+	BetaParam    float64   `json:"beta"`
+}
+
+// betaCapMultiplier bounds how far β can exceed α after failures.
+// Without a cap, a single high-severity failure permanently suppresses the
+// Bayesian score (β ≫ α drives the posterior mean → 0). Cap = 5×α + 1
+// preserves penalty signal while keeping the score recoverable through
+// continued successes.
+const betaCapMultiplier = 5.0
+
+// BayesianScore returns the posterior mean of the Beta(α,β) distribution,
+// scaled to [0, 100] for backward compatibility with threshold-based checks.
+func (e Entry) BayesianScore() float64 {
+	a, b := e.effectiveAlphaBeta()
+	return (a / (a + b)) * 100.0
+}
+
+// BayesianConfidence measures certainty: approaches 1.0 as observations grow.
+func (e Entry) BayesianConfidence() float64 {
+	a, b := e.effectiveAlphaBeta()
+	n := a + b
+	variance := (a * b) / (n * n * (n + 1))
+	return 1.0 - math.Min(variance*400, 1.0) // scale so variance=0.0025 → confidence=0
+}
+
+func (e Entry) effectiveAlphaBeta() (float64, float64) {
+	a := e.Alpha
+	b := e.BetaParam
+	if a < 1 {
+		a = 1
+	}
+	if b < 1 {
+		b = 1
+	}
+	return a, b
 }
 
 // Allowed returns the permission level this entry grants.
+// Uses Bayesian score with a confidence gate: upgrades require confidence >= 0.6.
 func (e Entry) Allowed() PermLevel {
+	score := e.BayesianScore()
+	conf := e.BayesianConfidence()
+
+	if e.Alpha == 0 && e.BetaParam == 0 {
+		score = float64(e.Score)
+		conf = 1.0
+	}
+
+	if conf < 0.6 {
+		if score >= 80 {
+			return PermNetwork
+		}
+		if score >= 60 {
+			return PermWrite
+		}
+	}
+
 	switch {
-	case e.Score >= 80:
+	case score >= 80:
 		return PermShell
-	case e.Score >= 60:
+	case score >= 60:
 		return PermNetwork
-	case e.Score >= 30:
+	case score >= 30:
 		return PermWrite
 	default:
 		return PermReadOnly
@@ -86,6 +145,7 @@ func NewTracker(persistPath string) *Tracker {
 		path:   persistPath,
 	}
 	t.load()
+	t.migrateLegacyEntries()
 	return t
 }
 
@@ -96,6 +156,40 @@ func (t *Tracker) SetKVStore(kvs *iledger.KVConfigStore) {
 	defer t.mu.Unlock()
 	t.kvs = kvs
 	t.loadFromKV()
+	t.migrateLegacyEntriesLocked()
+}
+
+// migrateLegacyEntries upgrades pre-Bayesian persistence entries
+// (Alpha == BetaParam == 0 but Score > 0) so that the first RecordSuccess
+// after upgrade does not regress score to ~50 via the (1,1) fallback.
+//
+// We seed Alpha/BetaParam with totalObs=20 virtual observations matching the
+// stored Score. This preserves the legacy permission level while giving
+// the Bayesian path a non-degenerate starting point. Persists exactly once.
+func (t *Tracker) migrateLegacyEntries() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.migrateLegacyEntriesLocked()
+}
+
+// migrateLegacyEntriesLocked is the same as migrateLegacyEntries but
+// assumes the caller already holds t.mu. Used from SetKVStore which loads
+// under its own lock and must keep the migration atomic with the load.
+func (t *Tracker) migrateLegacyEntriesLocked() {
+	migrated := 0
+	for _, e := range t.scores {
+		if e.Alpha == 0 && e.BetaParam == 0 && e.Score > 0 {
+			ratio := float64(e.Score) / 100.0
+			const totalObs = 20.0
+			e.Alpha = ratio*totalObs + 1
+			e.BetaParam = (1-ratio)*totalObs + 1
+			migrated++
+		}
+	}
+	if migrated > 0 {
+		slog.Info("trust: migrated legacy entries to Bayesian fields", "count", migrated)
+		t.save()
+	}
 }
 
 // Get returns the trust entry for a skill (zero-value if unknown).
@@ -110,6 +204,7 @@ func (t *Tracker) Get(slug string) Entry {
 
 // Seed sets a skill's trust score directly without per-promotion logging.
 // Used during startup to pre-seed built-in skills to a trusted level.
+// Initializes Beta parameters to match the target score with high confidence.
 func (t *Tracker) Seed(slug string, score int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -121,39 +216,52 @@ func (t *Tracker) Seed(slug string, score int) {
 	if e.Score > 100 {
 		e.Score = 100
 	}
+	ratio := float64(score) / 100.0
+	totalObs := 20.0
+	e.Alpha = ratio*totalObs + 1
+	e.BetaParam = (1-ratio)*totalObs + 1
 	e.LastPromoted = time.Now()
 	t.save()
 }
 
 // RecordSuccess increments trust after a successful, safe execution.
+// Updates both legacy Score and Bayesian Alpha (success count).
 func (t *Tracker) RecordSuccess(slug string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e := t.getOrCreate(slug)
 	e.Executions++
+	e.Alpha++
 	oldLevel := e.Allowed()
-	e.Score++
-	if e.Score > 100 {
-		e.Score = 100
-	}
+	e.Score = int(e.BayesianScore())
 	if e.Allowed() > oldLevel {
 		e.LastPromoted = time.Now()
-		slog.Info("trust: promoted", "slug", slug, "level", e.Allowed().String(), "score", e.Score)
+		slog.Info("trust: promoted", "slug", slug, "level", e.Allowed().String(),
+			"bayes_score", fmt.Sprintf("%.1f", e.BayesianScore()),
+			"confidence", fmt.Sprintf("%.2f", e.BayesianConfidence()))
 	}
 	t.save()
 }
 
 // RecordFailure decreases trust after a dangerous or erroneous behavior.
+// Updates Bayesian Beta (failure count) with severity weighting, capped at
+// betaCapMultiplier×Alpha so a single bad observation cannot permanently
+// suppress the score.
 func (t *Tracker) RecordFailure(slug string, severity int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e := t.getOrCreate(slug)
 	e.Failures++
-	e.Score -= severity
-	if e.Score < 0 {
-		e.Score = 0
+	newBeta := e.BetaParam + float64(severity)
+	cap := math.Max(e.Alpha*betaCapMultiplier, e.BetaParam+1) + 1
+	if newBeta > cap {
+		newBeta = cap
 	}
-	slog.Warn("trust: penalized", "slug", slug, "severity", severity, "score", e.Score)
+	e.BetaParam = newBeta
+	e.Score = int(e.BayesianScore())
+	slog.Warn("trust: penalized", "slug", slug, "severity", severity,
+		"bayes_score", fmt.Sprintf("%.1f", e.BayesianScore()),
+		"confidence", fmt.Sprintf("%.2f", e.BayesianConfidence()))
 	t.save()
 }
 

@@ -43,9 +43,10 @@ type Layer struct {
 
 // LayerAssembler collects context layers and assembles them within a budget.
 type LayerAssembler struct {
-	maxTokens    int // 0 = unlimited
-	maxPerLayer  int // 0 = no per-layer limit; max tokens any single layer may consume
-	dedup        bool // if true, detect and remove duplicate sentences across layers
+	maxTokens       int            // 0 = unlimited
+	maxPerLayer     int            // 0 = no per-layer limit; max tokens any single layer may consume
+	perLayerLimits  map[string]int // named per-layer limits (overrides maxPerLayer when set)
+	dedup           bool           // if true, detect and remove duplicate sentences across layers
 }
 
 // NewLayerAssembler creates an assembler with optional max token budget for dynamic context.
@@ -57,6 +58,14 @@ func NewLayerAssembler(maxDynTokens int) *LayerAssembler {
 // Layers exceeding this are truncated (not dropped), preserving partial context.
 func (la *LayerAssembler) WithPerLayerLimit(maxPerLayer int) *LayerAssembler {
 	la.maxPerLayer = maxPerLayer
+	return la
+}
+
+// WithPerLayerLimits sets named per-layer token budgets. Each layer's budget
+// is looked up by name; layers not in the map fall back to maxPerLayer.
+// Used by adaptive context budget allocation to vary budgets by intent type.
+func (la *LayerAssembler) WithPerLayerLimits(limits map[string]int) *LayerAssembler {
+	la.perLayerLimits = limits
 	return la
 }
 
@@ -79,10 +88,17 @@ func (la *LayerAssembler) Assemble(layers []Layer) (string, []string) {
 		if l.Tokens <= 0 {
 			l.Tokens = estimateTokens(l.Content)
 		}
-		// Per-layer truncation: truncate oversized layers instead of dropping them
-		if la.maxPerLayer > 0 && l.Tokens > la.maxPerLayer {
-			l.Content = truncateToTokens(l.Content, la.maxPerLayer)
-			l.Tokens = la.maxPerLayer
+		// Per-layer truncation: truncate oversized layers instead of dropping them.
+		// Named limits (from WithPerLayerLimits) take priority over the global cap.
+		limit := la.maxPerLayer
+		if la.perLayerLimits != nil {
+			if named, ok := la.perLayerLimits[l.Name]; ok {
+				limit = named
+			}
+		}
+		if limit > 0 && l.Tokens > limit {
+			l.Content = truncateToTokens(l.Content, limit)
+			l.Tokens = limit
 		}
 		active = append(active, l)
 	}

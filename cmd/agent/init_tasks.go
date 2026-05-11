@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"strconv"
@@ -13,8 +14,8 @@ import (
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/i18n"
 	"yunque-agent/internal/agentcore/knowledge"
-	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/models"
 	"yunque-agent/internal/agentcore/notify"
 	"yunque-agent/internal/agentcore/persona"
@@ -23,6 +24,7 @@ import (
 	"yunque-agent/internal/agentcore/skillmarket"
 	"yunque-agent/internal/agentcore/subagent"
 	"yunque-agent/internal/agentcore/websearch"
+	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/connectors"
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/controlplane/tenant"
@@ -30,8 +32,8 @@ import (
 	"yunque-agent/internal/experimental/docparse"
 	"yunque-agent/internal/experimental/filegen"
 	"yunque-agent/internal/experimental/imagegen"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/experimental/recommend"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/experimental/research"
 	"yunque-agent/internal/experimental/rlsched"
 	"yunque-agent/internal/integrations/mineru"
@@ -59,6 +61,7 @@ func initTasks(app *agentrt.App) error {
 
 	// ── Phase 2: Gateway ──
 	gw := gateway.New(p, tenantMgr, app.MemManager, app.SkillRegistry, sa.sched, sa.convStore, app.PluginReg, sa.feishuAPI, learningLoop, sa.jwtCfg, app.Metrics, app.MemPipeline, botPersona)
+	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
 	if sa.hbService != nil {
 		gw.SetHeartbeat(sa.hbService)
 	}
@@ -215,6 +218,16 @@ func initTasks(app *agentrt.App) error {
 func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) {
 	initExecProvider := os.Getenv("EXEC_PROVIDER")
 	if initExecProvider == "" {
+		var persisted struct {
+			ProviderID string `json:"provider_id"`
+		}
+		if b, err := os.ReadFile(appdir.File("exec_provider.json")); err == nil {
+			if err := json.Unmarshal(b, &persisted); err == nil {
+				initExecProvider = strings.TrimSpace(persisted.ProviderID)
+			}
+		}
+	}
+	if initExecProvider == "" {
 		initExecProvider = "smart"
 	}
 	gw.SetExecProvider(initExecProvider)
@@ -233,8 +246,10 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 		}
 
 		var sysNote string
-		if cfg, ok := handoffReg.Get(agentName); ok && cfg.SystemNote != "" {
+		var allowedSkills []string
+		if cfg, ok := handoffReg.Get(agentName); ok {
 			sysNote = cfg.SystemNote
+			allowedSkills = append([]string(nil), cfg.Skills...)
 		}
 
 		msgs := []llm.Message{{Role: "user", Content: input}}
@@ -242,7 +257,13 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 			Messages:          msgs,
 			ModelOverride:     override,
 			DisableDelegation: true,
+			AllowedSkills:     allowedSkills,
 			StepCallback:      planner.StepCallbackFromCtx(ctx),
+		}
+		if client, ok := gw.ProviderClient(override); ok {
+			req.ClientOverride = client
+			req.ModelOverride = ""
+			slog.Info("handoff: using exec provider client", "agent", agentName, "provider", override, "model", client.Model())
 		}
 		if sysNote != "" {
 			req.GroupSystemPrompt = sysNote
@@ -261,9 +282,9 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "file_exec",
-		Description: "文件执行代理：在独立上下文中生成/编辑文档（Word/Excel/PPT/PDF），避免主对话上下文膨胀。",
-		Skills:      []string{"docx_create", "docx_edit", "docx_fill", "xlsx_create", "xlsx_edit", "xlsx_fill", "xlsx_split", "pptx_create", "pptx_edit", "pptx_fill", "pdf_create", "html_export", "file_create", "file_write", "file_read"},
-		SystemNote:  "你是文件执行代理。根据用户需求生成或编辑文档。完成后返回文件路径和内容摘要。",
+		Description: "文件执行代理：只处理本地文件读取、搜索、生成和编辑（Word/Excel/PPT/PDF/HTML）。如果用户只是要求查看已上传文件，优先调用 file_open/file_search 或直接根据已解析内容回答，不要再委派其他代理。",
+		Skills:      []string{"file_open", "file_search", "file_create", "file_generate", "docx_create", "docx_edit", "docx_fill", "xlsx_create", "xlsx_edit", "xlsx_fill", "xlsx_split", "pptx_create", "pptx_edit", "pptx_fill", "pptx_template_search", "pdf_create", "html_export"},
+		SystemNote:  "你是文件执行代理。你只能使用文件/文档相关工具完成任务；不要调用浏览器、搜索网页或代码执行。若输入里已经包含 [Parsed document] 或文档正文，直接整理内容并回答；若只有文件名，先用 file_open/file_search 在工作区查找和读取。",
 	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "code_exec",
@@ -279,9 +300,9 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 	})
 	handoffReg.Register(subagent.HandoffConfig{
 		Name:        "general_exec",
-		Description: "通用执行代理：处理图片生成、翻译、邮件发送、数据分析等任务。将不属于浏览器/文件/代码/搜索的工具任务委派给此代理。",
-		Skills:      []string{},
-		SystemNote:  "你是通用执行代理。使用可用工具完成指定任务，完成后简洁汇报结果。",
+		Description: "通用执行代理：只处理轻量通用任务，例如翻译、图片生成、邮件发送；不要用于文件解析、代码执行、浏览器操作或联网研究。",
+		Skills:      []string{"translate", "image_generate", "image_gen", "send_email"},
+		SystemNote:  "你是通用执行代理。你只能处理翻译、图片生成、邮件发送等轻量通用任务。遇到文件解析、代码执行、浏览器或联网研究，应说明需要交给对应专用代理，而不是自己尝试。",
 	})
 
 	p.SetHandoffRegistry(handoffReg)

@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: Discord ───────────────────────────────────────
+// Type:     "discord"
+// Protocol: WebSocket (discordgo 长连接)
+// Inbound:  text, sticker, 组件交互 (Interaction)
+// Outbound: text, ActionRow按钮, 组件消息
+// Env vars: DISCORD_BOT_TOKEN
+// Status:   Production — 支持 Rich 组件映射, GroupLister
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"fmt"

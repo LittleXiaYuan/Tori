@@ -194,6 +194,8 @@ func init() {
 		"doctor.check_pass":        "[OK] %s",
 		"doctor.check_warn":        "[WARN] %s",
 		"doctor.check_fail":        "[FAIL] %s",
+		"planner.task_stopped":     "已停止当前任务。",
+		"planner.reflect_retry":   "你的回答质量不够好，请重新组织更完善的回答。",
 	}
 	for k, v := range defaults {
 		defaultBundle.Set(LocaleZH, k, v)
@@ -222,6 +224,8 @@ func init() {
 		"doctor.check_pass":        "[OK] %s",
 		"doctor.check_warn":        "[WARN] %s",
 		"doctor.check_fail":        "[FAIL] %s",
+		"planner.task_stopped":     "Task stopped.",
+		"planner.reflect_retry":   "Your response quality was insufficient. Please reorganize a more thorough answer.",
 	}
 	for k, v := range defaultsEN {
 		defaultBundle.Set(LocaleEN, k, v)

@@ -6,6 +6,7 @@ import { Button, Card, Chip, Input, Label, ProgressBar, Spinner, TextField } fro
 import { api, getAuthHeaders } from "@/lib/api";
 import type { SetupEnvironment, SetupTemplate } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { formatErrorMessage } from "@/lib/error-utils";
 import {
   Bot,
   CheckCircle2,
@@ -165,7 +166,7 @@ export default function SetupPage() {
     setApplying(true);
     api.setupApply(selectedTpl, { api_key: apiKey, base_url: baseURL, model })
       .then((data) => setApplyMessage(data.message || t("setup.done.subtitle")))
-      .catch((error) => setApplyMessage(error instanceof Error ? error.message : "Setup failed"))
+      .catch((error) => setApplyMessage(formatErrorMessage(error, "Setup failed")))
       .finally(() => setApplying(false));
   }, [step, selectedTpl, apiKey, baseURL, model, t]);
 
@@ -214,7 +215,7 @@ export default function SetupPage() {
       setToriAuthURL(authURL);
     } catch (error) {
       setToriBinding(false);
-      setToriError(error instanceof Error ? error.message : t("setup.tori.error"));
+      setToriError(formatErrorMessage(error, t("setup.tori.error")));
     }
   };
 
@@ -235,10 +236,10 @@ export default function SetupPage() {
           msg: result.provider.latency ? `Connection OK · ${result.provider.latency}` : "Connection OK",
         });
       } else {
-        setTestResult({ ok: false, msg: result.provider.error || "Connection failed" });
+        setTestResult({ ok: false, msg: formatErrorMessage(result.provider.error, "Connection failed") });
       }
     } catch (error) {
-      setTestResult({ ok: false, msg: error instanceof Error ? error.message : "Connection failed" });
+      setTestResult({ ok: false, msg: formatErrorMessage(error, "Connection failed") });
     } finally {
       setTesting(false);
     }
@@ -270,7 +271,7 @@ export default function SetupPage() {
             if (!line.startsWith("data: ")) continue;
             const payload = JSON.parse(line.slice(6));
             if (payload.stage === "error") {
-              setInstallMessage((prev) => ({ ...prev, [id]: { ok: false, msg: payload.detail || "Install failed" } }));
+              setInstallMessage((prev) => ({ ...prev, [id]: { ok: false, msg: formatErrorMessage(payload.detail, "Install failed") } }));
               return;
             }
             if (payload.stage === "done") {
@@ -278,17 +279,17 @@ export default function SetupPage() {
               await runDetect();
               return;
             }
-            setInstallProgress({ percent: payload.percent || 0, detail: payload.detail || "Installing..." });
+            setInstallProgress({ percent: payload.percent || 0, detail: formatErrorMessage(payload.detail, "Installing...") });
           }
         }
         return;
       }
 
       const data = await res.json();
-      setInstallMessage((prev) => ({ ...prev, [id]: { ok: !!data.success, msg: data.message || data.error || "Done" } }));
+      setInstallMessage((prev) => ({ ...prev, [id]: { ok: !!data.success, msg: formatErrorMessage(data.message || data.error, "Done") } }));
       if (data.success) await runDetect();
     } catch (error) {
-      setInstallMessage((prev) => ({ ...prev, [id]: { ok: false, msg: error instanceof Error ? error.message : "Install failed" } }));
+      setInstallMessage((prev) => ({ ...prev, [id]: { ok: false, msg: formatErrorMessage(error, "Install failed") } }));
     } finally {
       setInstallingId(null);
       setInstallProgress(null);
@@ -450,7 +451,7 @@ export default function SetupPage() {
                       <StatusRow
                         key={`${provider.name}-${provider.model}`}
                         ok={provider.available}
-                        label={`${provider.name}: ${provider.model || provider.base_url}${provider.latency ? ` · ${provider.latency}` : ""}${provider.error ? ` · ${provider.error}` : ""}`}
+                        label={`${provider.name}: ${provider.model || provider.base_url}${provider.latency ? ` · ${provider.latency}` : ""}${provider.error ? ` · ${formatErrorMessage(provider.error)}` : ""}`}
                       />
                     ))}
                   </div>
@@ -487,7 +488,7 @@ export default function SetupPage() {
                                   <ProgressBar aria-label="install-progress" value={installProgress.percent} maxValue={100} size="sm" />
                                 </div>
                               )}
-                              {message && <div className={`mt-2 text-xs ${message.ok ? "text-success" : "text-danger"}`}>{message.msg}</div>}
+                              {message && <div className={`mt-2 text-xs ${message.ok ? "text-success" : "text-danger"}`}>{formatErrorMessage(message.msg)}</div>}
                             </div>
                             {!installed &&
                               (component.installable ? (
@@ -554,7 +555,7 @@ export default function SetupPage() {
               </Button>
               {testResult && (
                 <Chip size="sm" style={{ background: testResult.ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)", color: testResult.ok ? "#22c55e" : "#ef4444" }}>
-                  {testResult.msg}
+                  {formatErrorMessage(testResult.msg)}
                 </Chip>
               )}
             </div>

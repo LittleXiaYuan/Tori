@@ -159,9 +159,12 @@ func detectDocumentIntentHint(text string) string {
 	if strings.Contains(text, "[Parsed document:") || strings.Contains(text, "【Parsed document:") {
 		return "The user message already includes parsed attachment context. Treat the uploaded document as the primary source of truth. Prioritize the parsed document content and file/document skills before using web_search."
 	}
+	if strings.Contains(text, "[Attachment file:") || strings.Contains(text, "【Attachment file:") {
+		return "The user message includes uploaded file metadata, but the document body may not be parsed yet. Acknowledge the file, prefer document/file parsing or ask for the missing body instead of pretending the attachment text is available."
+	}
 
 	if containsAny(lower,
-		"pdf", "docx", "pptx", "xlsx", "csv", "markdown", "附件", "文档", "文件",
+		"pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "markdown", "附件", "文档", "文件",
 		"解析文档", "上传的文档", "上传的文件", "这份文档", "这个文件", "材料里", "附件里",
 		"文档里", "文件里", "总结这份", "提取文档", "读取文档",
 	) {

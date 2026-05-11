@@ -21,6 +21,7 @@ import (
 type Builtin struct {
 	workDir string
 	apiBase string
+	apiKey  string
 	client  *http.Client
 }
 
@@ -36,9 +37,13 @@ func NewBuiltin(workDir string) *Builtin {
 	return &Builtin{
 		workDir: workDir,
 		apiBase: "http://127.0.0.1:" + port,
+		apiKey:  os.Getenv("AGENT_INTERNAL_KEY"),
 		client:  &http.Client{Timeout: 15 * time.Second},
 	}
 }
+
+// SetAPIKey sets the API key for authenticated loopback calls.
+func (b *Builtin) SetAPIKey(key string) { b.apiKey = key }
 
 func (b *Builtin) ListTools(_ context.Context) ([]mcp.Tool, error) {
 	return []mcp.Tool{
@@ -188,36 +193,36 @@ func (b *Builtin) codeExec(ctx context.Context, args map[string]any) (*mcp.CallR
 		return mcp.ErrorResult("code is required"), nil
 	}
 
-	var cmd *exec.Cmd
-	var ext string
+	var interpreter, ext string
 	switch lang {
 	case "python":
-		interpreter := "python3"
+		interpreter = "python3"
 		if runtime.GOOS == "windows" {
 			interpreter = "python"
 		}
 		ext = ".py"
-		tmpFile := filepath.Join(b.workDir, fmt.Sprintf("exec_%d%s", time.Now().UnixNano(), ext))
-		if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
-			return mcp.ErrorResult(err.Error()), nil
-		}
-		defer os.Remove(tmpFile)
-		cmd = exec.CommandContext(ctx, interpreter, tmpFile)
 	case "node":
+		interpreter = "node"
 		ext = ".js"
-		tmpFile := filepath.Join(b.workDir, fmt.Sprintf("exec_%d%s", time.Now().UnixNano(), ext))
-		if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
-			return mcp.ErrorResult(err.Error()), nil
-		}
-		defer os.Remove(tmpFile)
-		cmd = exec.CommandContext(ctx, "node", tmpFile)
 	default:
 		return mcp.ErrorResult("unsupported language: " + lang + " (use python or node)"), nil
 	}
 
+	tmpFile, err := os.CreateTemp(b.workDir, "exec_*"+ext)
+	if err != nil {
+		return mcp.ErrorResult(err.Error()), nil
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmpFile.WriteString(code); err != nil {
+		tmpFile.Close()
+		return mcp.ErrorResult(err.Error()), nil
+	}
+	tmpFile.Close()
+
 	execCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd = exec.CommandContext(execCtx, cmd.Path, cmd.Args[1:]...)
+	cmd := exec.CommandContext(execCtx, interpreter, tmpPath)
 	cmd.Dir = b.workDir
 
 	out, err := cmd.CombinedOutput()
@@ -264,7 +269,9 @@ func (b *Builtin) fileWrite(args map[string]any) (*mcp.CallResult, error) {
 		return mcp.ErrorResult("path escape not allowed"), nil
 	}
 
-	os.MkdirAll(filepath.Dir(fullPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return mcp.ErrorResult(fmt.Sprintf("create directory: %v", err)), nil
+	}
 	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
 		return mcp.ErrorResult(err.Error()), nil
 	}
@@ -335,6 +342,7 @@ func (b *Builtin) configureSettings(ctx context.Context, args map[string]any) (*
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
+		b.setAuthHeader(req)
 		resp, err := b.client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("write config: %w", err)
@@ -526,17 +534,27 @@ func (b *Builtin) settingsReadCompact(ctx context.Context) (*mcp.CallResult, err
 	return mcp.SuccessResult(strings.Join(lines, "\n")), nil
 }
 
+func (b *Builtin) setAuthHeader(req *http.Request) {
+	if b.apiKey != "" {
+		req.Header.Set("X-API-Key", b.apiKey)
+	}
+}
+
 func (b *Builtin) apiGet(ctx context.Context, path string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.apiBase+path, nil)
 	if err != nil {
 		return "", err
 	}
+	b.setAuthHeader(req)
 	resp, err := b.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("GET %s returned %d: %s", path, resp.StatusCode, string(body))
+	}
 	return string(body), nil
 }
 
@@ -545,12 +563,16 @@ func (b *Builtin) apiPost(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	b.setAuthHeader(req)
 	resp, err := b.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("POST %s returned %d: %s", path, resp.StatusCode, string(body))
+	}
 	return string(body), nil
 }
 

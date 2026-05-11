@@ -1,4 +1,4 @@
-﻿package gateway
+package gateway
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/memory"
+	"yunque-agent/internal/agentcore/websearch"
 	"yunque-agent/internal/apperror"
 )
 
@@ -318,8 +319,8 @@ func (g *Gateway) handleSearch(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET only")
 		return
 	}
-	if g.searchReg == nil {
-		apperror.WriteCode(w, apperror.CodeInternal, "search not configured")
+	if !g.searchOn.Load() {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "search is disabled")
 		return
 	}
 	query := r.URL.Query().Get("q")
@@ -332,6 +333,16 @@ func (g *Gateway) handleSearch(w http.ResponseWriter, r *http.Request) {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n
 		}
+	}
+	if g.searchReg == nil || len(g.searchReg.List()) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"results":   []websearch.Result{},
+			"total":     0,
+			"enabled":   false,
+			"providers": []string{},
+		})
+		return
 	}
 	provider := r.URL.Query().Get("provider")
 	var results any
@@ -358,11 +369,13 @@ func (g *Gateway) handleSearchProviders(w http.ResponseWriter, r *http.Request) 
 	}
 	if g.searchReg == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"providers": []string{}})
+		json.NewEncoder(w).Encode(map[string]any{"enabled": false, "providers": []string{}})
 		return
 	}
+	providers := g.searchReg.List()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"providers": g.searchReg.List(),
+		"enabled":   g.searchOn.Load() && len(providers) > 0,
+		"providers": providers,
 	})
 }
