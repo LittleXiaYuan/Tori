@@ -32,6 +32,8 @@ test("SandboxClient manages desktop sandbox lifecycle", async () => {
 test("SandboxClient throws SandboxClientError with parsed and text bodies", async () => {
   const jsonClient = createSandboxClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "command is required" }, { status: 400 }) });
   try { await jsonClient.exec({ command: "" }); throw new Error("expected exec to reject"); } catch (error) { assert(error instanceof SandboxClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "command is required" }); assertEqual(error.message, "command is required"); }
+  const nestedClient = createSandboxClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested command is required" } }, { status: 400 }) });
+  try { await nestedClient.exec({ command: "" }); throw new Error("expected nested exec to reject"); } catch (error) { assert(error instanceof SandboxClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested command is required"); }
   const textClient = createSandboxClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.createDesktop(); throw new Error("expected createDesktop to reject"); } catch (error) { assert(error instanceof SandboxClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });

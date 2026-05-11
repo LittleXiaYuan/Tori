@@ -32,6 +32,8 @@ test("NotifyClient shares chat artifacts to a channel", async () => {
 test("NotifyClient throws NotifyClientError with parsed and text bodies", async () => {
   const jsonClient = createNotifyClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "channel_id required" }, { status: 400 }) });
   try { await jsonClient.share({ channel_id: "" }); throw new Error("expected share to reject"); } catch (error) { assert(error instanceof NotifyClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "channel_id required" }); assertEqual(error.message, "channel_id required"); }
+  const nestedClient = createNotifyClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested channel_id required" } }, { status: 400 }) });
+  try { await nestedClient.share({ channel_id: "" }); throw new Error("expected nested share to reject"); } catch (error) { assert(error instanceof NotifyClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested channel_id required"); }
   const textClient = createNotifyClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST required", { status: 405 }) });
   try { await textClient.addChannel({ id: "", type: "webhook", name: "" }); throw new Error("expected addChannel to reject"); } catch (error) { assert(error instanceof NotifyClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST required"); assertEqual(error.message, "POST required"); }
 });

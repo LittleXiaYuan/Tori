@@ -40,6 +40,8 @@ test("SpeechClient builds STT stream websocket URLs", () => {
 test("SpeechClient throws SpeechClientError with parsed and text bodies", async () => {
   const jsonClient = createSpeechClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "speech not configured" }, { status: 500 }) });
   try { await jsonClient.voices(); throw new Error("expected voices to reject"); } catch (error) { assert(error instanceof SpeechClientError); assertEqual(error.status, 500); assertDeepEqual(error.body, { error: "speech not configured" }); assertEqual(error.message, "speech not configured"); }
+  const nestedClient = createSpeechClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "UNAVAILABLE", message: "nested speech not configured" } }, { status: 500 }) });
+  try { await nestedClient.voices(); throw new Error("expected nested voices to reject"); } catch (error) { assert(error instanceof SpeechClientError); assertEqual(error.status, 500); assertEqual(error.message, "nested speech not configured"); }
   const textClient = createSpeechClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.tts({ text: "x" }); throw new Error("expected tts to reject"); } catch (error) { assert(error instanceof SpeechClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

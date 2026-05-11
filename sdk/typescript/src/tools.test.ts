@@ -32,6 +32,8 @@ test("ToolsClient kills background sessions", async () => {
 test("ToolsClient throws ToolsClientError with parsed and text bodies", async () => {
   const jsonClient = createToolsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "Command blocked by shell policy", risk: "high" }, { status: 403 }) });
   try { await jsonClient.exec({ Command: "rm -rf /" }); throw new Error("expected exec to reject"); } catch (error) { assert(error instanceof ToolsClientError); assertEqual(error.status, 403); assertDeepEqual(error.body, { error: "Command blocked by shell policy", risk: "high" }); assertEqual(error.message, "Command blocked by shell policy"); }
+  const nestedClient = createToolsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "FORBIDDEN", message: "nested command blocked" }, risk: "high" }, { status: 403 }) });
+  try { await nestedClient.exec({ Command: "rm -rf /" }); throw new Error("expected nested exec to reject"); } catch (error) { assert(error instanceof ToolsClientError); assertEqual(error.status, 403); assertEqual(error.message, "nested command blocked"); }
   const textClient = createToolsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("session id required", { status: 400 }) });
   try { await textClient.poll(""); throw new Error("expected poll to reject"); } catch (error) { assert(error instanceof ToolsClientError); assertEqual(error.status, 400); assertEqual(error.body, "session id required"); assertEqual(error.message, "session id required"); }
 });
