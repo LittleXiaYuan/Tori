@@ -130,6 +130,8 @@ const sources = [
   "src/triggers.test.ts",
   "src/missions.ts",
   "src/missions.test.ts",
+  "src/reflect.ts",
+  "src/reflect.test.ts",
   "src/tools.ts",
   "src/tools.test.ts",
   "src/sandbox.ts",
@@ -225,6 +227,7 @@ for (const testName of [
   "state.test",
   "triggers.test",
   "missions.test",
+  "reflect.test",
   "tools.test",
   "sandbox.test",
 ]) {
@@ -293,6 +296,7 @@ for (const testName of [
     .replace('from "./state"', 'from "./state.js"')
     .replace('from "./triggers"', 'from "./triggers.js"')
     .replace('from "./missions"', 'from "./missions.js"')
+    .replace('from "./reflect"', 'from "./reflect.js"')
     .replace('from "./tools"', 'from "./tools.js"')
     .replace('from "./sandbox"', 'from "./sandbox.js"');
   writeFileSync(compiledTestPath, compiledTest);

@@ -259,6 +259,10 @@
       "types": "./src/missions.ts",
       "import": "./src/missions.ts"
     },
+    "./reflect": {
+      "types": "./src/reflect.ts",
+      "import": "./src/reflect.ts"
+    },
     "./tools": {
       "types": "./src/tools.ts",
       "import": "./src/tools.ts"
