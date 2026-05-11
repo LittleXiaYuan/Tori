@@ -103,6 +103,7 @@ import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createForkClient } from "yunque-client/fork";
+import { createSchedulerClient } from "yunque-client/scheduler";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -245,6 +246,13 @@ const fork = createForkClient({
 });
 const branches = await fork.list("session-1");
 console.log(branches.forks.length);
+
+const scheduler = createSchedulerClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const scheduledJobs = await scheduler.jobs();
+console.log(scheduledJobs.count);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -675,6 +683,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
+| `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |

@@ -66,6 +66,7 @@
     "src/dispatch.ts",
     "src/orchestrator.ts",
     "src/fork.ts",
+    "src/scheduler.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",
