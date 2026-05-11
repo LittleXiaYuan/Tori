@@ -27,6 +27,8 @@ test("AuthClient throws AuthClientError with parsed and text bodies", async () =
   try { await jsonClient.generateToken(); throw new Error("expected generateToken to reject"); } catch (error) { assert(error instanceof AuthClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "invalid api key" }); assertEqual(error.message, "invalid api key"); }
   const textClient = createAuthClient({ baseUrl: "http://localhost:9090", apiKey: "bad", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.generateToken(); throw new Error("expected text generateToken to reject"); } catch (error) { assert(error instanceof AuthClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
+  const nestedClient = createAuthClient({ baseUrl: "http://localhost:9090", apiKey: "bad", fetch: async () => jsonResponse({ error: { code: "UNAUTHORIZED", message: "invalid token" } }, { status: 401 }) });
+  try { await nestedClient.status(); throw new Error("expected nested status to reject"); } catch (error) { assert(error instanceof AuthClientError); assertEqual(error.status, 401); assertEqual(error.message, "invalid token"); }
 });
 
 
