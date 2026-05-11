@@ -37,6 +37,14 @@ test("SystemClient reads stats metrics prometheus cache and modules with API key
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
+
+test("SystemClient reads embedded SBOM metadata", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createSystemClient({ baseUrl: "http://localhost:9090/", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ bomFormat: "CycloneDX", specVersion: "1.5", components: [{ name: "yunque-agent" }] }); } });
+  const sbom = await client.sbom();
+  assertEqual(sbom.bomFormat, "CycloneDX"); assertEqual(sbom.components?.length, 1); assertEqual(calls[0]?.url, "http://localhost:9090/sbom");
+});
+
 test("SystemClient throws SystemClientError with parsed and text bodies", async () => {
   const jsonClient = createSystemClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "invalid api key" }, { status: 401 }) });
   try { await jsonClient.metrics(); throw new Error("expected metrics to reject"); } catch (error) { assert(error instanceof SystemClientError); assertEqual(error.status, 401); assertDeepEqual(error.body, { error: "invalid api key" }); assertEqual(error.message, "invalid api key"); }
