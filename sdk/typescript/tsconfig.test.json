@@ -31,6 +31,7 @@
     "src/bots.ts",
     "src/discovery.ts",
     "src/identity.ts",
+    "src/embeddings.ts",
     "src/interactions.ts",
     "src/rbac.ts",
     "src/memory.ts",

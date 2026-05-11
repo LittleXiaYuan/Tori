@@ -67,6 +67,10 @@
       "types": "./src/identity.ts",
       "import": "./src/identity.ts"
     },
+    "./embeddings": {
+      "types": "./src/embeddings.ts",
+      "import": "./src/embeddings.ts"
+    },
     "./interactions": {
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
