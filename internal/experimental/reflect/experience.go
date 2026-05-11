@@ -281,24 +281,59 @@ func containsAny(tags []string, q string) bool {
 
 // MatchesQuery reports whether an experience is relevant to a natural-language query.
 func MatchesQuery(e Experience, query string) bool {
+	return MatchQueryScore(e, query) > 0
+}
+
+// MatchQueryScore returns a small relevance score for natural-language query matching.
+// A full phrase match scores highest. Multi-token queries require at least two useful
+// token hits so generic words do not pull unrelated experiences into Planner context.
+func MatchQueryScore(e Experience, query string) int {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
-		return true
+		return 1
 	}
 	haystack := strings.ToLower(e.Lesson + "\n" + e.Context + "\n" + strings.Join(e.Tags, "\n"))
 	if strings.Contains(haystack, q) {
-		return true
+		return 10
 	}
-	for _, token := range strings.Fields(q) {
+
+	tokens := queryTokens(q)
+	if len(tokens) == 0 {
+		return 0
+	}
+	score := 0
+	for _, token := range tokens {
+		if strings.Contains(haystack, token) {
+			score++
+		}
+	}
+	if len(tokens) == 1 || score >= 2 {
+		return score
+	}
+	return 0
+}
+
+func queryTokens(query string) []string {
+	var tokens []string
+	seen := make(map[string]bool)
+	for _, token := range strings.Fields(query) {
 		token = strings.Trim(token, ".,，。:：;；!?！？()（）[]【】{}<>\"'`")
-		if len([]rune(token)) < 2 {
+		if len([]rune(token)) < 2 || isQueryStopword(token) || seen[token] {
 			continue
 		}
-		if strings.Contains(haystack, token) {
-			return true
-		}
+		seen[token] = true
+		tokens = append(tokens, token)
 	}
-	return false
+	return tokens
+}
+
+func isQueryStopword(token string) bool {
+	switch token {
+	case "please", "help", "with", "about", "this", "that", "请做", "帮我", "帮忙", "一下", "这个", "那个":
+		return true
+	default:
+		return false
+	}
 }
 
 // ──────────────────────────────────────────────

@@ -147,6 +147,29 @@ func TestCompileStrategiesForQuery(t *testing.T) {
 	}
 }
 
+func TestMatchesQueryRequiresMultipleUsefulTokenHits(t *testing.T) {
+	codeReview := Experience{
+		Lesson:  "code review 需要先跑测试再总结风险",
+		Context: "代码审查",
+		Tags:    []string{"review", "test"},
+	}
+	webSearch := Experience{
+		Lesson:  "web search 需要先确认来源时间再总结",
+		Context: "搜索新闻",
+		Tags:    []string{"search", "test"},
+	}
+
+	if !MatchesQuery(codeReview, "请做 code review") {
+		t.Fatal("expected multi-token code review query to match")
+	}
+	if MatchesQuery(webSearch, "请做 code review") {
+		t.Fatal("expected unrelated experience with no two useful token hits to be filtered out")
+	}
+	if !MatchesQuery(webSearch, "search") {
+		t.Fatal("expected single-token query to keep exact lightweight search behavior")
+	}
+}
+
 func TestCompileStrategiesEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
 	s := NewExperienceStore(path)
