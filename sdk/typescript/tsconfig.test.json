@@ -26,6 +26,7 @@
     "src/browser.ts",
     "src/runtime.ts",
     "src/modes.ts",
+    "src/ide.ts",
     "src/**/*.test.ts"
   ]
 }
