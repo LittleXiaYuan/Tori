@@ -125,6 +125,9 @@ type Sandbox struct {
 
 // New spins up a sandbox with its own workdir under baseDir.
 func New(baseDir string, policy Policy) (*Sandbox, error) {
+	if strings.TrimSpace(baseDir) == "" {
+		baseDir = os.TempDir()
+	}
 	workDir := filepath.Join(baseDir, fmt.Sprintf("sandbox_%d", time.Now().UnixNano()))
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return nil, fmt.Errorf("create sandbox dir: %w", err)

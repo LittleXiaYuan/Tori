@@ -77,6 +77,10 @@ test-mcp.json
 # ── Runtime-generated task snapshots ──
 internal/agentcore/task/*/
 
+# ── Runtime-generated sandbox workdirs ──
+sandbox_*/
+**/sandbox_*/
+
 # ── Environment (keep .env.example, ignore actual .env) ──
 .env
 !.env.example

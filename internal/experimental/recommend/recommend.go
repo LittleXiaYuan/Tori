@@ -31,15 +31,15 @@ type Engine struct {
 
 // ItemProfile represents a skill, topic, or response style with usage statistics.
 type ItemProfile struct {
-	ID          string   `json:"id"`
-	Category    string   `json:"category"`
-	Tags        []string `json:"tags"`
-	Uses        int64    `json:"uses"`
-	Successes   int64    `json:"successes"`
-	Failures    int64    `json:"failures"`
-	AvgRating   float64  `json:"avg_rating"`
-	LastUsed    time.Time `json:"last_used"`
-	Features    []float64 `json:"features"` // feature vector for similarity
+	ID        string    `json:"id"`
+	Category  string    `json:"category"`
+	Tags      []string  `json:"tags"`
+	Uses      int64     `json:"uses"`
+	Successes int64     `json:"successes"`
+	Failures  int64     `json:"failures"`
+	AvgRating float64   `json:"avg_rating"`
+	LastUsed  time.Time `json:"last_used"`
+	Features  []float64 `json:"features"` // feature vector for similarity
 }
 
 // UserPreference tracks accumulated user preference signals.
@@ -128,23 +128,42 @@ func (e *Engine) RecordOutcome(itemID string, rating float64, positive bool) {
 //   - Recency decay (15%)
 //   - Novelty bonus for under-explored items (15%)
 func (e *Engine) Recommend(k int, context string) []Recommendation {
+	return e.RecommendCandidates(k, context, nil)
+}
+
+// RecommendCandidates returns the top-K recommendations restricted to the
+// provided candidate IDs. Passing nil or an empty candidate list keeps the same
+// behavior as Recommend. This is useful for planner-time tool ranking where the
+// currently exposed skill set has already been filtered by readiness,
+// user-selected tools, or delegation mode.
+func (e *Engine) RecommendCandidates(k int, context string, candidateIDs []string) []Recommendation {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	if len(e.items) == 0 || k <= 0 {
 		return nil
 	}
+	candidates := make(map[string]bool, len(candidateIDs))
+	for _, id := range candidateIDs {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			candidates[id] = true
+		}
+	}
 
 	contextTerms := strings.Fields(strings.ToLower(context))
 
 	type scored struct {
-		item  *ItemProfile
-		score float64
+		item   *ItemProfile
+		score  float64
 		reason string
 	}
 	var results []scored
 
 	for _, item := range e.items {
+		if len(candidates) > 0 && !candidates[item.ID] {
+			continue
+		}
 		prefScore := e.preferenceScore(item)
 		thompsonScore := e.thompsonScore(item)
 		recencyScore := e.recencyScore(item)
@@ -169,6 +188,9 @@ func (e *Engine) Recommend(k int, context string) []Recommendation {
 		}
 
 		results = append(results, scored{item, total, reason})
+	}
+	if len(results) == 0 {
+		return nil
 	}
 
 	sort.Slice(results, func(i, j int) bool { return results[i].score > results[j].score })
@@ -206,8 +228,8 @@ func (e *Engine) SimilarItems(itemID string, k int) []Recommendation {
 	}
 
 	type scored struct {
-		id   string
-		sim  float64
+		id  string
+		sim float64
 	}
 	var results []scored
 
@@ -254,7 +276,7 @@ func (e *Engine) preferenceScore(item *ItemProfile) float64 {
 		}
 	}
 	if avoid, ok := e.userPref.AvoidCategories[item.Category]; ok {
-		score -= math.Tanh(avoid / 3.0) * 0.5
+		score -= math.Tanh(avoid/3.0) * 0.5
 	}
 	return math.Max(0, math.Min(1, (score+1)/2))
 }

@@ -182,9 +182,7 @@ func initTasks(app *agentrt.App) error {
 
 	// ── Recommendation / Q-Learning ──
 	recEngine := recommend.NewEngine()
-	for _, sk := range app.SkillRegistry.All() {
-		recEngine.RegisterItem(recommend.ItemProfile{ID: sk.Name()})
-	}
+	p.SetSkillRecommendationEngine(recEngine)
 	app.Set("recommend_engine", recEngine)
 	slog.Info("recommendation engine initialized", "items", len(app.SkillRegistry.All()))
 

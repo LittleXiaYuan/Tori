@@ -64,6 +64,27 @@ func TestRecommendContextMatch(t *testing.T) {
 	}
 }
 
+func TestRecommendCandidatesRestrictsToCurrentSurface(t *testing.T) {
+	e := NewEngine()
+	e.RegisterItem(ItemProfile{ID: "web_search", Category: "research", Tags: []string{"web", "search", "information"}})
+	e.RegisterItem(ItemProfile{ID: "file_read", Category: "file", Tags: []string{"file", "document"}})
+	e.RegisterItem(ItemProfile{ID: "old_hidden_skill", Category: "hidden", Tags: []string{"web", "search"}})
+
+	for i := 0; i < 10; i++ {
+		e.RecordOutcome("old_hidden_skill", 1.0, true)
+	}
+
+	recs := e.RecommendCandidates(3, "search web", []string{"web_search", "file_read"})
+	if len(recs) != 2 {
+		t.Fatalf("expected only visible candidates, got %d: %#v", len(recs), recs)
+	}
+	for _, rec := range recs {
+		if rec.ItemID == "old_hidden_skill" {
+			t.Fatalf("hidden/stale item should not be recommended: %#v", recs)
+		}
+	}
+}
+
 func TestSimilarItems(t *testing.T) {
 	e := NewEngine()
 	e.RegisterItem(ItemProfile{ID: "a", Features: []float64{1, 0, 0}})

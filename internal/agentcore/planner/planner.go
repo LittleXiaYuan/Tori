@@ -15,6 +15,7 @@ import (
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/subagent"
+	"yunque-agent/internal/experimental/recommend"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
@@ -60,7 +61,10 @@ type Planner struct {
 	dynContextBudget       int                        // max tokens for dynamic context layer assembly (DynContextBudgetDefault = use 4000)
 	ackEnabled             bool                       // send typing indicators / ack
 	skillScorer            *skills.SkillScorer        // Ledger-driven skill scoring for intent routing
-	recentSkills           []string                   // last N skills used (for routing recency bonus)
+	skillRecommender       *recommend.Engine          // experience-distilled skill recommendation/ranking
+	skillRecommendVersion  int                        // registry version last synced into skillRecommender
+	skillRecommendMu       sync.Mutex
+	recentSkills           []string // last N skills used (for routing recency bonus)
 	recentSkillsMu         sync.Mutex
 	locale                 string // agent locale (e.g. "zh-CN")
 	// browserDispatch removed — browser skills now handled via skill registry (browserskill package)
@@ -157,6 +161,20 @@ func (p *Planner) SetSkillMetrics(fn SkillMetricsFunc) { p.skillMetrics = fn }
 
 // SetSkillScorer sets the Ledger-derived skill scoring data for intent-based routing.
 func (p *Planner) SetSkillScorer(scorer *skills.SkillScorer) { p.skillScorer = scorer }
+
+// SetSkillRecommendationEngine attaches the experience-distilled recommender
+// used to rank the current planner skill surface. The recommender is seeded
+// with the registry's current skills immediately and re-synced when the
+// registry version changes.
+func (p *Planner) SetSkillRecommendationEngine(engine *recommend.Engine) {
+	p.skillRecommendMu.Lock()
+	defer p.skillRecommendMu.Unlock()
+	p.skillRecommender = engine
+	p.skillRecommendVersion = -1
+	if engine != nil {
+		p.syncSkillRecommendationItemsLocked()
+	}
+}
 
 // SetSkillIndex provides the L2 index: skills listed by name+description in the prompt,
 // loaded on demand via use_skill(slug).
