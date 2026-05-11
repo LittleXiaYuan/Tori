@@ -40,6 +40,8 @@ const sources = [
   "src/search.test.ts",
   "src/interactions.ts",
   "src/interactions.test.ts",
+  "src/instructions.ts",
+  "src/instructions.test.ts",
   "src/rbac.ts",
   "src/rbac.test.ts",
   "src/memory.ts",
@@ -200,6 +202,7 @@ for (const testName of [
   "embeddings.test",
   "search.test",
   "interactions.test",
+  "instructions.test",
   "rbac.test",
   "memory.test",
   "tasks.test",
@@ -278,6 +281,7 @@ for (const testName of [
     .replace('from "./embeddings"', 'from "./embeddings.js"')
     .replace('from "./search"', 'from "./search.js"')
     .replace('from "./interactions"', 'from "./interactions.js"')
+    .replace('from "./instructions"', 'from "./instructions.js"')
     .replace('from "./rbac"', 'from "./rbac.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
