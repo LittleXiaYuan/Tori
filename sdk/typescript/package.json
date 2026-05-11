@@ -243,6 +243,10 @@
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"
     },
+    "./workflow-runs": {
+      "types": "./src/workflow-runs.ts",
+      "import": "./src/workflow-runs.ts"
+    },
     "./cost": {
       "types": "./src/cost.ts",
       "import": "./src/cost.ts"
