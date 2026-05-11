@@ -34,6 +34,7 @@ import {
   browserTraceSummary,
   makeBrowserTraceEvent,
   friendlyError,
+  chatHttpErrorMessage,
   collectGeneratedFiles,
   summarizeAssistantWork,
 } from "@/lib/chat-utils";
@@ -520,7 +521,8 @@ export default function ChatPage() {
       } finally {
         window.clearTimeout(initialResponseTimer);
       }
-      if (!resp.ok || !resp.body) throw new Error(`请求失败 (${resp.status}${resp.statusText ? " " + resp.statusText : ""})`);
+      if (!resp.ok) throw new Error(await chatHttpErrorMessage(resp));
+      if (!resp.body) throw new Error("连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。");
 
       const IDLE_TIMEOUT = 180_000;
 

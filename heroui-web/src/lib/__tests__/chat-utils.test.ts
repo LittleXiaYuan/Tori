@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chatHttpErrorMessage,
   collectGeneratedFiles,
   friendlyError,
   newId,
@@ -67,6 +68,32 @@ describe("chat-utils/friendlyError", () => {
 
   it("tolerates empty / non-string-ish inputs", () => {
     expect(friendlyError("")).toBe("");
+  });
+});
+
+describe("chat-utils/chatHttpErrorMessage", () => {
+  it("preserves friendly backend planner errors from failed chat responses", async () => {
+    const resp = new Response(JSON.stringify({
+      code: "planner_failed",
+      detail: 'planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF',
+    }), { status: 502, statusText: "Bad Gateway" });
+
+    const out = await chatHttpErrorMessage(resp);
+    expect(out).toContain("已保留现场");
+    expect(out).not.toMatch(/planner fc|all fallback|moonshot|EOF/i);
+  });
+
+  it("unwraps nested backend error objects before formatting", async () => {
+    const resp = new Response(JSON.stringify({
+      error: { message: "handoff agent execution failed: context deadline exceeded" },
+    }), { status: 500 });
+
+    await expect(chatHttpErrorMessage(resp)).resolves.toBe("响应暂时超时，已保留现场，可稍后重试或继续。");
+  });
+
+  it("falls back to response status when the failed chat response has no body", async () => {
+    const resp = new Response("", { status: 503, statusText: "Service Unavailable" });
+    await expect(chatHttpErrorMessage(resp)).resolves.toBe("请求失败 (503 Service Unavailable)");
   });
 });
 

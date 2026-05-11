@@ -78,6 +78,41 @@ export function friendlyError(msg: string): string {
   return raw;
 }
 
+function responseStatusText(resp: Response): string {
+  return `请求失败 (${resp.status}${resp.statusText ? " " + resp.statusText : ""})`;
+}
+
+function normalizeErrorPayload(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  if (typeof record.message === "string" || typeof record.detail === "string" || typeof record.error === "string" || typeof record.reason === "string") {
+    return record;
+  }
+  if (typeof record.error === "object" && record.error !== null) return normalizeErrorPayload(record.error);
+  if (typeof record.detail === "object" && record.detail !== null) return normalizeErrorPayload(record.detail);
+  return record;
+}
+
+/** Read a failed chat HTTP response body and preserve backend friendly errors. */
+export async function chatHttpErrorMessage(resp: Response): Promise<string> {
+  const fallback = responseStatusText(resp);
+  let body = "";
+  try {
+    body = (await resp.clone().text()).trim();
+  } catch {
+    return fallback;
+  }
+  if (!body) return fallback;
+
+  let payload: unknown = body;
+  try {
+    payload = normalizeErrorPayload(JSON.parse(body));
+  } catch {
+    payload = body;
+  }
+  return formatErrorMessage(payload, fallback);
+}
+
 /** Collect files produced by tool events into a deduplicated list. */
 export function collectGeneratedFiles(
   traceEvents?: AgentEvent[],
