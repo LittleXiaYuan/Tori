@@ -138,6 +138,7 @@ import { createModelsClient } from "yunque-client/models";
 import { createSetupClient } from "yunque-client/setup";
 import { createDocumentsClient } from "yunque-client/documents";
 import { createApprovalsClient } from "yunque-client/approvals";
+import { createApprovalQueueClient } from "yunque-client/approval-queue";
 import { createApprovalRulesClient } from "yunque-client/approval-rules";
 import { createTraceClient } from "yunque-client/trace";
 import { createBrowserClient } from "yunque-client/browser";
@@ -607,6 +608,16 @@ if (pending.approvals[0]) {
   await approvals.decide(pending.approvals[0].id, "allow_once");
 }
 
+const approvalQueue = createApprovalQueueClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const queue = await approvalQueue.pending();
+if (queue.approvals[0]) {
+  await approvalQueue.approve(queue.approvals[0].id);
+}
+
 const approvalRules = createApprovalRulesClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -888,7 +899,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`approval-rules`/`trace`/`browser`/`runtime`/`router`/`modes`
+`providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -965,6 +976,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
+| `src/approval-queue.ts` | Lightweight approval queue and decision facade without full SDK import |
 | `src/approval-rules.ts` | Lightweight approval rule management facade without full SDK import |
 | `src/trace.ts` | Lightweight hand-written execution/audit trace inspection slice |
 | `src/browser.ts` | Lightweight hand-written browser extension automation and OPP slice |
