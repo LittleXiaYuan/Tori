@@ -174,10 +174,8 @@ func initMemory(app *agentrt.App) error {
 				slog.Info("GraphRAG initialized", "communities", len(graphRAG.Communities()))
 			}
 
-			// HNSW index (available as alternative to IVF for large-scale vector search)
-			hnswIdx := ledger.NewHNSW(ledger.DefaultHNSWConfig())
-			app.Set("hnsw_index", hnswIdx)
-			slog.Info("HNSW index initialized (standby)")
+			slog.Info("vector ANN backend will be configured after embeddings are wired",
+				"env", "VECTOR_ANN_BACKEND")
 		}
 	}
 	slog.Info("memory orchestrator initialized (5-layer)")
