@@ -28,6 +28,7 @@
     "src/modes.ts",
     "src/ide.ts",
     "src/persona.ts",
+    "src/workflow.ts",
     "src/**/*.test.ts"
   ]
 }

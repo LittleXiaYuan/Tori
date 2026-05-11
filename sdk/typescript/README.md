@@ -69,6 +69,7 @@ import { createRuntimeClient } from "yunque-client/runtime";
 import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
+import { createWorkflowClient } from "yunque-client/workflow";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -243,14 +244,26 @@ await persona.addSkill({
   content: "Prefer concise, evidence-first review comments.",
 });
 console.log(currentPersona.identity);
+
+const workflows = createWorkflowClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const saved = await workflows.save({
+  name: "daily-review",
+  nodes: [{ id: "review", name: "Review", type: "llm", position: { x: 0, y: 0 } }],
+  edges: [],
+});
+await workflows.run({ definition_id: saved.id!, variables: { topic: "sdk" } });
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona` without importing the generated 500KB+ SDK/types bundle. Add
-future slices in the same style when those surfaces need stable, lightweight
-integration APIs.
+`/ide`/`persona`/`workflow` without importing the generated 500KB+ SDK/types
+bundle. Add future slices in the same style when those surfaces need stable,
+lightweight integration APIs.
 
 ## Regenerating
 
@@ -291,6 +304,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
+| `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
