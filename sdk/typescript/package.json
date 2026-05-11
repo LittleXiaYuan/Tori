@@ -279,7 +279,8 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "test": "npm run check:incremental && npm run typecheck:test && node scripts/run-incremental-tests.mjs",
     "check:incremental": "node scripts/check-incremental-coverage.mjs",
-    "check:pack": "node scripts/check-pack.mjs"
+    "check:pack": "node scripts/check-pack.mjs",
+    "prepublishOnly": "npm run test && npm run typecheck && npm run check:pack && npm audit --audit-level=high"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.1",
