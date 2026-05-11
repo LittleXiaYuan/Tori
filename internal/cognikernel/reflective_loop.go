@@ -125,7 +125,7 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 			outcome,
 			lesson,
 			data.UserIntent,
-			data.SkillsUsed,
+			buildExperienceTags(data, result),
 		)
 		result.ExperiencesAdded++
 	}
@@ -152,6 +152,18 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 	}
 
 	return result, nil
+}
+
+func buildExperienceTags(data ConversationEndData, result *ReflectResult) []string {
+	tags := append([]string{}, data.SkillsUsed...)
+	tags = append(tags,
+		"quality:"+strconv.Itoa(result.Quality),
+		"satisfied:"+strconv.FormatBool(result.Satisfied),
+	)
+	if data.ModelTier != "" {
+		tags = append(tags, "model_tier:"+data.ModelTier)
+	}
+	return tags
 }
 
 func buildLesson(data ConversationEndData, result *ReflectResult) string {

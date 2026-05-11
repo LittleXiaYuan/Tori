@@ -68,6 +68,11 @@ func TestReflectiveLoop_Run(t *testing.T) {
 				t.Errorf("lesson %q missing %q", lesson, want)
 			}
 		}
+		for _, want := range []string{"knowledge_search", "quality:8", "satisfied:true", "model_tier:expert"} {
+			if !containsString(tags, want) {
+				t.Errorf("tags %v missing %q", tags, want)
+			}
+		}
 	})
 
 	rl.SetDistill(func(ctx context.Context, question, expertReply string) {
@@ -466,4 +471,13 @@ func longString(n int) string {
 		b[i] = 'x'
 	}
 	return string(b)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
