@@ -70,22 +70,26 @@ func NewReflectiveLoop() *ReflectiveLoop {
 	return &ReflectiveLoop{}
 }
 
-func (rl *ReflectiveLoop) SetReflectEval(fn ReflectEvalFunc)       { rl.reflectFn = fn }
+func (rl *ReflectiveLoop) SetReflectEval(fn ReflectEvalFunc)           { rl.reflectFn = fn }
 func (rl *ReflectiveLoop) SetExperienceRecord(fn ExperienceRecordFunc) { rl.experienceFn = fn }
-func (rl *ReflectiveLoop) SetDistill(fn DistillFunc)               { rl.distillFn = fn }
-func (rl *ReflectiveLoop) SetSelfDistillSink(sink SelfDistillSink) { rl.selfDistill = sink }
-func (rl *ReflectiveLoop) SetMemoryUpdate(fn MemoryUpdateFunc)     { rl.memoryUpdate = fn }
+func (rl *ReflectiveLoop) SetDistill(fn DistillFunc)                   { rl.distillFn = fn }
+func (rl *ReflectiveLoop) SetSelfDistillSink(sink SelfDistillSink)     { rl.selfDistill = sink }
+func (rl *ReflectiveLoop) SetMemoryUpdate(fn MemoryUpdateFunc)         { rl.memoryUpdate = fn }
 
 // Run executes the full reflective pipeline for one conversation.
 func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*ReflectResult, error) {
 	result := &ReflectResult{}
+	evaluated := false
 
 	// Step 1: Evaluate conversation quality
 	if rl.reflectFn != nil {
 		eval, err := rl.reflectFn(ctx, data.UserIntent, data.AgentReply, data.SkillsUsed)
 		if err != nil {
 			slog.Warn("reflective_loop: evaluation failed", "err", err)
+		} else if eval == nil {
+			slog.Warn("reflective_loop: evaluation returned nil")
 		} else {
+			evaluated = true
 			result.Satisfied = eval.Satisfied
 			result.Quality = eval.Quality
 			result.Score = float64(eval.Quality) / 10.0
@@ -105,7 +109,7 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 	}
 
 	// Step 2: Record structured experience
-	if rl.experienceFn != nil {
+	if rl.experienceFn != nil && evaluated {
 		outcome := "success"
 		if result.Quality < 5 {
 			outcome = "failure"

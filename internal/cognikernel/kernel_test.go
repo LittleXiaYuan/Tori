@@ -2,6 +2,7 @@ package cognikernel
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -139,6 +140,48 @@ func TestReflectiveLoop_LowQuality_NoDistill(t *testing.T) {
 	}
 	if result.DistilledRules != 0 {
 		t.Errorf("expected 0 distilled rules, got %d", result.DistilledRules)
+	}
+}
+
+func TestReflectiveLoop_SkipsExperienceWhenEvaluationUnavailable(t *testing.T) {
+	tests := []struct {
+		name string
+		eval ReflectEvalFunc
+	}{
+		{name: "missing evaluator"},
+		{name: "evaluator error", eval: func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
+			return nil, errors.New("llm unavailable")
+		}},
+		{name: "nil evaluator result", eval: func(ctx context.Context, intent, reply string, skills []string) (*ReflectEvalResult, error) {
+			return nil, nil
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rl := NewReflectiveLoop()
+			if tt.eval != nil {
+				rl.SetReflectEval(tt.eval)
+			}
+			var expCalled bool
+			rl.SetExperienceRecord(func(source, category, outcome, lesson, ctx string, tags []string) {
+				expCalled = true
+			})
+
+			result, err := rl.Run(context.Background(), ConversationEndData{
+				UserIntent: "你好",
+				AgentReply: "你好呀",
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if expCalled {
+				t.Fatal("experience record should not be called without a valid reflection evaluation")
+			}
+			if result.ExperiencesAdded != 0 {
+				t.Fatalf("experiences added = %d, want 0", result.ExperiencesAdded)
+			}
+		})
 	}
 }
 
