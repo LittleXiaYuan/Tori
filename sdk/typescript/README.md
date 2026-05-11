@@ -748,6 +748,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/trace.ts` | Lightweight hand-written execution/audit trace inspection slice |
 | `src/browser.ts` | Lightweight hand-written browser extension automation and OPP slice |
 | `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
+| `src/router.ts` | Lightweight hand-written smart-router stats and status slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
