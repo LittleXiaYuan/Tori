@@ -26,6 +26,13 @@ const failures = [];
 function fail(message) { failures.push(message); }
 function diff(a, b) { const bs = new Set(b); return a.filter((item) => !bs.has(item)); }
 
+if (!runner.includes("readdirSync(srcDir)") || !runner.includes("listIncrementalSlices")) {
+  fail("run-incremental-tests.mjs must auto-discover incremental slices from src/");
+}
+if (!runner.includes("addJsExtensionToRelativeImports") || !runner.includes("from\\s+")) {
+  fail("run-incremental-tests.mjs must rewrite relative test imports generically");
+}
+
 for (const name of diff(srcSlices, exportedSlices)) fail(`missing package export for src/${name}.ts`);
 for (const name of diff(exportedSlices, srcSlices)) fail(`package export has no src/${name}.ts`);
 
@@ -37,10 +44,6 @@ for (const name of srcSlices) {
   const byteCount = Buffer.byteLength(source, "utf8");
   if (!existsSync(join(srcDir, `${name}.test.ts`))) fail(`missing test file for ${name}`);
   if (!tsconfigFiles.has(name)) fail(`tsconfig.test.json missing src/${name}.ts`);
-  if (!runner.includes(`"src/${name}.ts"`)) fail(`run-incremental-tests.mjs missing src/${name}.ts`);
-  if (!runner.includes(`"src/${name}.test.ts"`)) fail(`run-incremental-tests.mjs missing src/${name}.test.ts`);
-  if (!runner.includes(`"${name}.test"`)) fail(`run-incremental-tests.mjs does not execute ${name}.test`);
-  if (!runner.includes(`from "./${name}"`) && !runner.includes(`from './${name}'`)) fail(`run-incremental-tests.mjs missing import rewrite for ${name}`);
   if (!readme.includes(`yunque-client/${name}`)) fail(`README.md missing import documentation for yunque-client/${name}`);
   if (!readme.includes(`src/${name}.ts`)) fail(`README.md missing slice map row for src/${name}.ts`);
   if (/^\s*(?:import|export)\s+.*from\s+["']\.\/(?:client|sdk|types)\.gen["']/m.test(source)) {
