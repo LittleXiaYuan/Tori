@@ -51,6 +51,7 @@
     "src/knowledge-search.ts",
     "src/knowledge-ingest.ts",
     "src/knowledge-sources.ts",
+    "src/knowledge-import.ts",
     "src/providers.ts",
     "src/breaker.ts",
     "src/models.ts",

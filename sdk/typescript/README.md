@@ -126,6 +126,7 @@ import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createKnowledgeSearchClient } from "yunque-client/knowledge-search";
 import { createKnowledgeIngestClient } from "yunque-client/knowledge-ingest";
 import { createKnowledgeSourcesClient } from "yunque-client/knowledge-sources";
+import { createKnowledgeImportClient } from "yunque-client/knowledge-import";
 import { createProvidersClient } from "yunque-client/providers";
 import { createBreakerClient } from "yunque-client/breaker";
 import { createModelsClient } from "yunque-client/models";
@@ -334,6 +335,12 @@ const knowledgeSources = createKnowledgeSourcesClient({
   apiKey: "<your-api-key>",
 });
 console.log((await knowledgeSources.list()).sources.length);
+
+const knowledgeImport = createKnowledgeImportClient({
+  baseUrl: "http://localhost:9090",
+  token: "<admin-jwt>",
+});
+await knowledgeImport.importUrlString("https://deepwiki.com/org/repo", { max_pages: 2 });
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -837,7 +844,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -903,6 +910,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/knowledge-search.ts` | Lightweight knowledge search-only facade without full SDK import |
 | `src/knowledge-ingest.ts` | Lightweight inline knowledge ingestion facade without full SDK import |
 | `src/knowledge-sources.ts` | Lightweight knowledge source stats/list/update/delete facade without full SDK import |
+| `src/knowledge-import.ts` | Lightweight URL/repo knowledge import facade without full SDK import |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
 | `src/breaker.ts` | Lightweight provider breaker reset facade for `/api/breaker/reset` without full SDK import |
 | `src/models.ts` | Lightweight models facade for listing and maintaining `/v1/models` without full SDK import |
