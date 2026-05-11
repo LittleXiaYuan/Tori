@@ -21,6 +21,7 @@
     "src/planner-recovery.ts",
     "src/chat.ts",
     "src/cognis.ts",
+    "src/events.ts",
     "src/webchat.ts",
     "src/conversations.ts",
     "src/subagents.ts",

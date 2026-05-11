@@ -27,6 +27,10 @@
       "types": "./src/cognis.ts",
       "import": "./src/cognis.ts"
     },
+    "./events": {
+      "types": "./src/events.ts",
+      "import": "./src/events.ts"
+    },
     "./webchat": {
       "types": "./src/webchat.ts",
       "import": "./src/webchat.ts"
