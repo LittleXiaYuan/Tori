@@ -57,3 +57,33 @@ func TestHandleExperiencesSearchRespectsFilters(t *testing.T) {
 		t.Fatalf("unexpected experience id %q", body.Experiences[0].ID)
 	}
 }
+
+func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "old-task", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "older task lesson"})
+	store.Add(reflectpkg.Experience{ID: "chat", Source: "interaction", Category: "strategy", Outcome: "partial", Lesson: "chat lesson"})
+	store.Add(reflectpkg.Experience{ID: "new-task", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "newer task lesson"})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?source=task&limit=1", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Experiences []reflectpkg.Experience `json:"experiences"`
+		Total       int                     `json:"total"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 || len(body.Experiences) != 1 {
+		t.Fatalf("expected one limited experience, got total=%d entries=%d body=%s", body.Total, len(body.Experiences), rec.Body.String())
+	}
+	if body.Experiences[0].ID != "new-task" {
+		t.Fatalf("limit should apply after source filter and preserve newest order, got %q", body.Experiences[0].ID)
+	}
+}
