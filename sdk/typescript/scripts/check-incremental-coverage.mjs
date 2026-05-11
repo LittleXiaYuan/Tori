@@ -30,6 +30,7 @@ for (const name of diff(exportedSlices, srcSlices)) fail(`package export has no 
 const tsconfigEntries = tsconfig.files ?? tsconfig.include ?? [];
 const tsconfigFiles = new Set(tsconfigEntries.map((file) => file.replace(/^src\//, "").replace(/\.ts$/, "")));
 for (const name of srcSlices) {
+  const source = readFileSync(join(srcDir, `${name}.ts`), "utf8");
   if (!existsSync(join(srcDir, `${name}.test.ts`))) fail(`missing test file for ${name}`);
   if (!tsconfigFiles.has(name)) fail(`tsconfig.test.json missing src/${name}.ts`);
   if (!runner.includes(`"src/${name}.ts"`)) fail(`run-incremental-tests.mjs missing src/${name}.ts`);
@@ -38,6 +39,9 @@ for (const name of srcSlices) {
   if (!runner.includes(`from "./${name}"`) && !runner.includes(`from './${name}'`)) fail(`run-incremental-tests.mjs missing import rewrite for ${name}`);
   if (!readme.includes(`yunque-client/${name}`)) fail(`README.md missing import documentation for yunque-client/${name}`);
   if (!readme.includes(`src/${name}.ts`)) fail(`README.md missing slice map row for src/${name}.ts`);
+  if (/^\s*(?:import|export)\s+.*from\s+["']\.\/(?:client|sdk|types)\.gen["']/m.test(source)) {
+    fail(`src/${name}.ts imports generated SDK internals instead of staying incremental`);
+  }
 }
 
 const gatewayDir = join(repoRoot, "internal/controlplane/gateway");
