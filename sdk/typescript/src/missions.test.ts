@@ -18,8 +18,8 @@ test("MissionsClient parses natural-language missions with bearer token", async 
 test("MissionsClient reads experiences with search and filters", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createMissionsClient({ baseUrl: "http://localhost:9090", apiKey: "key-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ experiences: [{ id: "e1", source: "task", category: "sdk", outcome: "success" }], total: 1 }); } });
-  const result = await client.experiences({ q: "sdk", source: "task", category: "sdk", outcome: "success" });
-  assertEqual(result.total, 1); assertEqual(result.experiences[0]?.outcome, "success"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/reflect/experiences?q=sdk&source=task&category=sdk&outcome=success"); assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
+  const result = await client.experiences({ q: "sdk", source: "task", category: "sdk", outcome: "success", limit: 5 });
+  assertEqual(result.total, 1); assertEqual(result.experiences[0]?.outcome, "success"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/reflect/experiences?q=sdk&source=task&category=sdk&outcome=success&limit=5"); assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
 test("MissionsClient reads experience stats and strategies", async () => {

@@ -2,7 +2,7 @@
 export type MissionParseResult = { type: "task" | "workflow" | "cron" | "trigger" | (string & {}); name: string; description: string; config: Record<string, unknown>; confidence: number; explanation: string; [key: string]: unknown };
 export type ExperienceSource = "task" | "interaction" | "reverie" | (string & {});
 export type ExperienceOutcome = "success" | "failure" | "partial" | (string & {});
-export type ExperienceListOptions = { q?: string; source?: ExperienceSource; category?: string; outcome?: ExperienceOutcome };
+export type ExperienceListOptions = { q?: string; source?: ExperienceSource; category?: string; outcome?: ExperienceOutcome; limit?: number };
 export type ReflectExperience = {
   id?: string;
   source?: ExperienceSource;
@@ -32,6 +32,7 @@ function isRecord(value: unknown): value is Record<string, unknown> { return typ
 function messageFromErrorBody(body: unknown): string | undefined { if (typeof body === "string" && body.trim()) return body.trim(); if (!isRecord(body)) return undefined; for (const key of ["message", "detail", "error", "reason"]) { const value = body[key]; if (typeof value === "string" && value.trim()) return value; if (key === "error" && isRecord(value)) { const nested = messageFromErrorBody(value); if (nested) return nested; } } return undefined; }
 async function parseResponse(response: Response): Promise<unknown> { const text = await response.text(); if (!text) return undefined; try { return JSON.parse(text); } catch { return text; } }
 function setOptionalQuery(url: URL, key: string, value: string | undefined): void { if (value === undefined || value === "") return; url.searchParams.set(key, value); }
+function setOptionalNumberQuery(url: URL, key: string, value: number | undefined): void { if (value === undefined || !Number.isFinite(value) || value <= 0) return; url.searchParams.set(key, String(Math.trunc(value))); }
 
 export class MissionsClient {
   private readonly baseUrl: string;
@@ -52,7 +53,7 @@ export class MissionsClient {
   }
 
   parse(description: string): Promise<MissionParseResult> { return this.json<MissionParseResult>("/v1/missions/parse", { method: "POST", body: JSON.stringify({ description }) }); }
-  experiences(options: ExperienceListOptions = {}): Promise<ExperiencesResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); setOptionalQuery(url, "q", options.q); setOptionalQuery(url, "source", options.source); setOptionalQuery(url, "category", options.category); setOptionalQuery(url, "outcome", options.outcome); return this.json<ExperiencesResponse>(url); }
+  experiences(options: ExperienceListOptions = {}): Promise<ExperiencesResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); setOptionalQuery(url, "q", options.q); setOptionalQuery(url, "source", options.source); setOptionalQuery(url, "category", options.category); setOptionalQuery(url, "outcome", options.outcome); setOptionalNumberQuery(url, "limit", options.limit); return this.json<ExperiencesResponse>(url); }
   experienceStats(): Promise<ExperienceStatsResponse> { const url = new URL(`${this.baseUrl}/v1/reflect/experiences`); url.searchParams.set("stats", "true"); return this.json<ExperienceStatsResponse>(url); }
   strategies(): Promise<StrategiesResponse> { return this.json<StrategiesResponse>("/v1/reflect/strategies"); }
 

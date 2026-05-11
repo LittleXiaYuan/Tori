@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
 
 	"yunque-agent/internal/agentcore/state"
 	"yunque-agent/internal/apperror"
@@ -360,12 +361,17 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("source")
 	category := r.URL.Query().Get("category")
 	outcome := r.URL.Query().Get("outcome")
+	limit := reflectExperienceLimit(r, 0)
 
 	// Search mode still respects source/category/outcome filters. This keeps the
 	// lightweight SDK's combined q+filter query semantics aligned with runtime.
 	query := r.URL.Query().Get("q")
 	if query != "" {
-		results := filterReflectExperiences(g.experienceStore.Search(query, 50), source, category, outcome)
+		searchLimit := 50
+		if limit > searchLimit {
+			searchLimit = limit
+		}
+		results := limitReflectExperiences(filterReflectExperiences(g.experienceStore.Search(query, searchLimit), source, category, outcome), limit)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": results, "total": len(results)})
 		return
@@ -375,14 +381,30 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	all := g.experienceStore.All()
 	// Apply filters
 	if source != "" || category != "" || outcome != "" {
-		filtered := filterReflectExperiences(all, source, category, outcome)
+		filtered := limitReflectExperiences(filterReflectExperiences(all, source, category, outcome), limit)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": filtered, "total": len(filtered)})
 		return
 	}
 
+	all = limitReflectExperiences(all, limit)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"experiences": all, "total": len(all)})
+}
+
+func reflectExperienceLimit(r *http.Request, fallback int) int {
+	raw := r.URL.Query().Get("limit")
+	if raw == "" {
+		return fallback
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit <= 0 {
+		return fallback
+	}
+	if limit > 200 {
+		return 200
+	}
+	return limit
 }
 
 func filterReflectExperiences(experiences []reflectpkg.Experience, source, category, outcome string) []reflectpkg.Experience {
@@ -403,6 +425,13 @@ func filterReflectExperiences(experiences []reflectpkg.Experience, source, categ
 		filtered = append(filtered, e)
 	}
 	return filtered
+}
+
+func limitReflectExperiences(experiences []reflectpkg.Experience, limit int) []reflectpkg.Experience {
+	if limit <= 0 || len(experiences) <= limit {
+		return experiences
+	}
+	return experiences[:limit]
 }
 
 func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {

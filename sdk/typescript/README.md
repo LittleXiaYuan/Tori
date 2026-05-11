@@ -698,6 +698,7 @@ const reflectExperiences = await missions.experiences({
   q: "code review",
   source: "task",
   outcome: "partial",
+  limit: 10,
 });
 console.log(reflectExperiences.experiences[0]?.lesson);
 const reflectStats = await missions.experienceStats();
