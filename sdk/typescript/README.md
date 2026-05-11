@@ -685,7 +685,8 @@ make openapi
 # 2. Regenerate this SDK
 cd sdk/typescript
 npm run generate
-npm run typecheck   # should be silent (0 errors)
+npm run typecheck           # should be silent (0 errors)
+npm run check:incremental   # verifies hand-written slice exports/tests/route coverage
 ```
 
 ## Layout
