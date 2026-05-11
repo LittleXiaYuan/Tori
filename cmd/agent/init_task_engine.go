@@ -29,6 +29,7 @@ import (
 	"yunque-agent/internal/controlplane/gateway"
 	"yunque-agent/internal/execution/channel"
 	reflectpkg "yunque-agent/internal/experimental/reflect"
+	"yunque-agent/internal/experimental/rlsched"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/internal/observe"
 	"yunque-agent/pkg/skills"
@@ -97,6 +98,10 @@ func initTaskEngine(
 	taskRunner := task.NewRunner(taskStore, app.SkillRegistry, costAwareLLM, &skills.Environment{
 		LLMCall: costAwareLLM,
 	})
+	qlScheduler := ensureTaskQLearner(app)
+	taskFeedback := rlsched.NewTaskFeedback(qlScheduler, taskStore)
+	taskRunner.OnTaskEvent(taskFeedback.OnTaskEvent)
+	slog.Info("Q-Learning task feedback wired", "actions", len([]string{"priority_high", "priority_normal", "priority_low", "defer"}))
 	gw.SetTaskStore(taskStore)
 	gw.SetTaskRunner(taskRunner)
 	app.Set(agentrt.CompTaskRunner, taskRunner)
@@ -439,4 +444,17 @@ func initTaskEngine(
 	app.Set("skill_optimizer", app.SkillOptimizer)
 
 	return nil
+}
+
+func ensureTaskQLearner(app *agentrt.App) *rlsched.QLearner {
+	if raw, ok := app.Get("ql_scheduler"); ok {
+		if ql, ok := raw.(*rlsched.QLearner); ok {
+			return ql
+		}
+		slog.Warn("ql_scheduler component present but wrong type", "type", fmt.Sprintf("%T", raw))
+	}
+	qlActions := []string{"priority_high", "priority_normal", "priority_low", "defer"}
+	ql := rlsched.NewQLearner(rlsched.DefaultQLearnerConfig(qlActions))
+	app.Set("ql_scheduler", ql)
+	return ql
 }
