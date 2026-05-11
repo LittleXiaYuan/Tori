@@ -199,6 +199,10 @@
       "types": "./src/dispatch.ts",
       "import": "./src/dispatch.ts"
     },
+    "./orchestrator": {
+      "types": "./src/orchestrator.ts",
+      "import": "./src/orchestrator.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
