@@ -175,6 +175,10 @@
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"
     },
+    "./provider-registry": {
+      "types": "./src/provider-registry.ts",
+      "import": "./src/provider-registry.ts"
+    },
     "./provider-control": {
       "types": "./src/provider-control.ts",
       "import": "./src/provider-control.ts"

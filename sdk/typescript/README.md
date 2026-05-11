@@ -133,6 +133,7 @@ import { createKnowledgeSourcesClient } from "yunque-client/knowledge-sources";
 import { createKnowledgeImportClient } from "yunque-client/knowledge-import";
 import { createKnowledgeUploadClient } from "yunque-client/knowledge-upload";
 import { createProvidersClient } from "yunque-client/providers";
+import { createProviderRegistryClient } from "yunque-client/provider-registry";
 import { createProviderControlClient } from "yunque-client/provider-control";
 import { createProviderHealthClient } from "yunque-client/provider-health";
 import { createBreakerClient } from "yunque-client/breaker";
@@ -550,6 +551,13 @@ await knowledge.ingest({
 const matches = await knowledge.search({ query: "Planner 恢复", limit: 5 });
 console.log(matches.chunks);
 
+const providerRegistry = createProviderRegistryClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+
+const presets = await providerRegistry.presets();
+
 const providerControl = createProviderControlClient({
   baseUrl: "http://localhost:9090",
   token: "<your-token>",
@@ -947,7 +955,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`breaker`/`models`/`setup`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`runtime`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1019,6 +1027,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/knowledge-import.ts` | Lightweight URL/repo knowledge import facade without full SDK import |
 | `src/knowledge-upload.ts` | Lightweight knowledge file upload facade without full SDK import |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
+| `src/provider-registry.ts` | Lightweight provider preset, registration and discovery facade without full SDK import |
 | `src/provider-control.ts` | Lightweight provider lifecycle and runtime selection facade without full SDK import |
 | `src/provider-health.ts` | Lightweight provider status, mode and connectivity facade without full SDK import |
 | `src/breaker.ts` | Lightweight provider breaker reset facade for `/api/breaker/reset` without full SDK import |
