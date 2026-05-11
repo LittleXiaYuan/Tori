@@ -694,6 +694,17 @@ const missions = createMissionsClient({
 const mission = await missions.parse("每天早上总结昨天的任务");
 console.log(mission.type);
 
+const reflectExperiences = await missions.experiences({
+  q: "code review",
+  source: "task",
+  outcome: "partial",
+});
+console.log(reflectExperiences.experiences[0]?.lesson);
+const reflectStats = await missions.experienceStats();
+console.log(reflectStats.by_outcome?.success ?? 0);
+const strategyContext = await missions.strategies();
+console.log(strategyContext.strategies.split("\n")[0]);
+
 const tools = createToolsClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
