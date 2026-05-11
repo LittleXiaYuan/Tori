@@ -203,6 +203,17 @@ async function parseResponse(response: Response): Promise<unknown> {
   }
 }
 
+function extractPlannerRecoveryErrorMessage(parsed: unknown): string | undefined {
+  if (!parsed || typeof parsed !== "object" || !("error" in parsed)) return undefined;
+  const error = (parsed as { error?: unknown }).error;
+  if (typeof error === "string") return error;
+  if (!error || typeof error !== "object") return undefined;
+  const message = (error as { message?: unknown }).message;
+  if (typeof message === "string" && message.trim()) return message;
+  const detail = (error as { detail?: unknown }).detail;
+  return typeof detail === "string" && detail.trim() ? detail : undefined;
+}
+
 export class PlannerRecoveryClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -268,10 +279,7 @@ export class PlannerRecoveryClient {
     const response = await this.fetchImpl(url, init);
     const parsed = await parseResponse(response);
     if (!response.ok) {
-      const message =
-        typeof parsed === "object" && parsed && "error" in parsed && typeof (parsed as { error?: unknown }).error === "string"
-          ? (parsed as { error: string }).error
-          : undefined;
+      const message = extractPlannerRecoveryErrorMessage(parsed);
       throw new PlannerRecoveryError(response.status, parsed, message);
     }
     return parsed as T;

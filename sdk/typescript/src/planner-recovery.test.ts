@@ -96,6 +96,26 @@ test("PlannerRecoveryClient throws PlannerRecoveryError with parsed body", async
   }
 });
 
+test("PlannerRecoveryClient reads nested gateway apperror messages", async () => {
+  const client = createPlannerRecoveryClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () =>
+      jsonResponse(
+        { error: { code: "BAD_REQUEST", message: "unsupported recovery action; use continue, retry_failed, or partial", detail: "" } },
+        { status: 400 },
+      ),
+  });
+
+  try {
+    await client.recoverCheckpoint({ plan_id: "plan-1", action: "continue" });
+    throw new Error("expected recoverCheckpoint to reject");
+  } catch (error) {
+    assert(error instanceof PlannerRecoveryError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "unsupported recovery action; use continue, retry_failed, or partial");
+  }
+});
+
 let failures = 0;
 for (const { name, fn } of tests) {
   try {
