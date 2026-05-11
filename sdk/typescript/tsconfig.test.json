@@ -20,6 +20,7 @@
     "src/auth.ts",
     "src/planner-recovery.ts",
     "src/chat.ts",
+    "src/cognis.ts",
     "src/webchat.ts",
     "src/conversations.ts",
     "src/subagents.ts",

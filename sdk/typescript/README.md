@@ -57,6 +57,7 @@ can import the hand-written incremental slice instead:
 import { createAuthClient } from "yunque-client/auth";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
+import { createCognisClient } from "yunque-client/cognis";
 import { createWebChatClient } from "yunque-client/webchat";
 import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
@@ -285,6 +286,13 @@ console.log(authStatus.password_set);
 const system = createSystemClient({ baseUrl: "http://localhost:9090" });
 const sbom = await system.sbom();
 console.log(sbom.bomFormat);
+
+const cognis = createCognisClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const cogniHealth = await cognis.health();
+console.log(cogniHealth);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -635,7 +643,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `planner-recovery`, `chat`, `cognis`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -669,6 +677,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
+| `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, evolution, and federation control slice |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
