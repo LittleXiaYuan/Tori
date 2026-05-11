@@ -47,6 +47,35 @@ const generated = await postV1CognisGenerate({
 await postV1CognisIdEvolve({ path: { id: "code-reviewer" } });
 ```
 
+## Incremental imports
+
+The generated `src/sdk.gen.ts` is useful for full API coverage, but it is a
+large all-in-one surface. Product integrations that only need Planner recovery
+can import the hand-written incremental slice instead:
+
+```ts
+import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
+
+const planner = createPlannerRecoveryClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+
+const state = await planner.getExecutionState({ plan_id: "plan_123" });
+if (state.next_action === "retry_failed") {
+  await planner.resumeCheckpointPlan({
+    plan_id: "plan_123",
+    action: "retry_failed",
+    async: true,
+  });
+}
+```
+
+This keeps the SDK usable as an **incremental package**: embedder code can bring
+in only `planner-recovery` without importing the generated 500KB+ SDK/types
+bundle. Add future slices in the same style (`./chat`, `./memory`, `./tasks`)
+when those surfaces need stable, lightweight integration APIs.
+
 ## Regenerating
 
 After spec changes:
@@ -71,6 +100,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/client.gen.ts` | Default client instance |
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
+| `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
