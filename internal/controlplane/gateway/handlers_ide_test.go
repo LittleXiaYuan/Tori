@@ -268,6 +268,18 @@ func TestWireTaskSSE_BridgesEvents(t *testing.T) {
 	}
 }
 
+func TestSSEEventVisibleToTenantFiltersTenantScopedEvents(t *testing.T) {
+	if !sseEventVisibleToTenant(SSEEvent{Type: "task.step_completed"}, "tenant-a") {
+		t.Fatal("global SSE events should remain visible")
+	}
+	if !sseEventVisibleToTenant(SSEEvent{Type: "planner.resume_plan_event", TenantID: "tenant-a"}, "tenant-a") {
+		t.Fatal("tenant-owned SSE event should be visible to same tenant")
+	}
+	if sseEventVisibleToTenant(SSEEvent{Type: "planner.resume_plan_event", TenantID: "tenant-a"}, "tenant-b") {
+		t.Fatal("tenant-scoped SSE event should not be visible to a different tenant")
+	}
+}
+
 func TestWireTaskSSE_NilSafe(t *testing.T) {
 	gw, _ := newTestGateway()
 	// Should not panic with nil runner or broker

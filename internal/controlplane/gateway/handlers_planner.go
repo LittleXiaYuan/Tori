@@ -819,7 +819,11 @@ func (g *Gateway) appendAndBroadcastPlannerResumeJobEvent(job *plannerCheckpoint
 	if g.sseBroker == nil || len(job.Events) == 0 {
 		return
 	}
-	g.sseBroker.Broadcast(SSEEvent{Type: "planner.resume_plan_event", Data: map[string]any{"job_id": job.ID, "event": job.Events[len(job.Events)-1]}})
+	g.sseBroker.Broadcast(SSEEvent{
+		Type:     "planner.resume_plan_event",
+		TenantID: job.TenantID,
+		Data:     map[string]any{"job_id": job.ID, "event": job.Events[len(job.Events)-1]},
+	})
 }
 
 func plannerResumeJobEventDisplaySummary(summary string) string {

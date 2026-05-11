@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,8 +35,9 @@ type SSEBroker struct {
 
 // SSEEvent is an event to be sent to all SSE clients.
 type SSEEvent struct {
-	Type string `json:"type"` // e.g. "task.step_completed", "approval.request"
-	Data any    `json:"data"`
+	Type     string `json:"type"` // e.g. "task.step_completed", "approval.request"
+	TenantID string `json:"tenant_id,omitempty"`
+	Data     any    `json:"data"`
 }
 
 // NewSSEBroker creates a new SSE broker.
@@ -55,11 +57,11 @@ func (b *SSEBroker) Subscribe() (string, <-chan SSEEvent, func()) {
 	b.clients[id] = ch
 	cleanup := func() {
 		b.mu.Lock()
-		delete(b.clients, id)
-		b.mu.Unlock()
-		// Drain remaining events
-		for range ch {
+		if _, ok := b.clients[id]; ok {
+			delete(b.clients, id)
+			close(ch)
 		}
+		b.mu.Unlock()
 	}
 	return id, ch, cleanup
 }
@@ -118,6 +120,7 @@ func (g *Gateway) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 
 	ctx := r.Context()
+	tenantID := tenantFromCtx(ctx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -125,6 +128,9 @@ func (g *Gateway) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 			return
 
 		case event := <-ch:
+			if !sseEventVisibleToTenant(event, tenantID) {
+				continue
+			}
 			data, _ := json.Marshal(event.Data)
 			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, data)
 			flusher.Flush()
@@ -134,4 +140,12 @@ func (g *Gateway) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func sseEventVisibleToTenant(event SSEEvent, tenantID string) bool {
+	eventTenant := strings.TrimSpace(event.TenantID)
+	if eventTenant == "" {
+		return true
+	}
+	return eventTenant == strings.TrimSpace(tenantID)
 }
