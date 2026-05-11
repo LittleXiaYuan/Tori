@@ -282,6 +282,10 @@ const auth = createAuthClient({ baseUrl: "http://localhost:9090" });
 const authStatus = await auth.status();
 console.log(authStatus.password_set);
 
+const system = createSystemClient({ baseUrl: "http://localhost:9090" });
+const sbom = await system.sbom();
+console.log(sbom.bomFormat);
+
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -695,7 +699,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/heartbeat.ts` | Lightweight hand-written proactive heartbeat lifecycle slice |
 | `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
 | `src/federation.ts` | Lightweight hand-written federation peers, capabilities, discovery, delegation, and broadcast slice |
-| `src/system.ts` | Lightweight hand-written health, version, metrics, cache, and module observability slice |
+| `src/system.ts` | Lightweight hand-written health, version, SBOM, metrics, cache, and module observability slice |
 | `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |
 | `src/tori.ts` | Lightweight hand-written Tori OAuth binding, status, health, and usage slice |
 | `src/speech.ts` | Lightweight hand-written speech TTS/STT, STT stream URL, voices, and file upload slice |

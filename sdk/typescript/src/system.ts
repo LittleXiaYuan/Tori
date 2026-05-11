@@ -10,6 +10,7 @@ export type SystemStatsResponse = { requests_total?: number; tenants?: number; s
 export type SystemMetricsResponse = Record<string, unknown>;
 export type SystemCacheStatsResponse = { llm_response_cache?: unknown; [key: string]: unknown };
 export type SystemModulesResponse = { modules: unknown[]; profile?: string; [key: string]: unknown };
+export type SystemSBOMResponse = { bomFormat?: string; specVersion?: string; serialNumber?: string; version?: number; metadata?: Record<string, unknown>; components?: unknown[]; dependencies?: unknown[]; [key: string]: unknown };
 export type SystemClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class SystemClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `System request failed with HTTP ${status}`); this.name = "SystemClientError"; this.status = status; this.body = body; } }
@@ -33,6 +34,7 @@ export class SystemClient {
   metricsPrometheus(): Promise<string> { return this.request<string>("/v1/metrics/prometheus"); }
   cacheStats(): Promise<SystemCacheStatsResponse> { return this.request<SystemCacheStatsResponse>("/v1/cache/stats"); }
   modules(): Promise<SystemModulesResponse> { return this.request<SystemModulesResponse>("/v1/modules"); }
+  sbom(): Promise<SystemSBOMResponse> { return this.request<SystemSBOMResponse>("/sbom"); }
   private async request<T>(path: string, options?: { allowStatuses?: number[] }): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`); const headers = mergeHeaders(this.headers);
     if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`); if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey);
