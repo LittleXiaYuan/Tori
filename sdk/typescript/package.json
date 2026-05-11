@@ -90,6 +90,10 @@
     "./trust": {
       "types": "./src/trust.ts",
       "import": "./src/trust.ts"
+    },
+    "./audit": {
+      "types": "./src/audit.ts",
+      "import": "./src/audit.ts"
     }
   },
   "files": [

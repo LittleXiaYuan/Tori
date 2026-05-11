@@ -33,6 +33,7 @@
     "src/lora.ts",
     "src/iterate.ts",
     "src/trust.ts",
+    "src/audit.ts",
     "src/**/*.test.ts"
   ]
 }
