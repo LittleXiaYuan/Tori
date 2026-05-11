@@ -29,6 +29,7 @@ export function buildHiddenContextAttachments(files: PendingFile[]): ChatContext
           `Parser: ${f.parser || "local"}`,
           `Status: ${f.status || "parsed"}`,
           f.note ? `Note: ${f.note}` : "",
+          "Instruction: This parsed document body is hidden working context. Do not echo the full body into chat unless the user explicitly asks to display the complete extracted text; summarize or use only the relevant fields by default.",
           "",
           f.parsedText || "",
         ].join("\n")),
