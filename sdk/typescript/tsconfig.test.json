@@ -48,6 +48,7 @@
     "src/admin.ts",
     "src/files.ts",
     "src/cron.ts",
+    "src/skillhub.ts",
     "src/**/*.test.ts"
   ]
 }

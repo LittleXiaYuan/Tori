@@ -134,6 +134,10 @@
     "./cron": {
       "types": "./src/cron.ts",
       "import": "./src/cron.ts"
+    },
+    "./skillhub": {
+      "types": "./src/skillhub.ts",
+      "import": "./src/skillhub.ts"
     }
   },
   "files": [
