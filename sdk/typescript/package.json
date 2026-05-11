@@ -363,6 +363,10 @@
       "types": "./src/connectors.ts",
       "import": "./src/connectors.ts"
     },
+    "./connector-catalog": {
+      "types": "./src/connector-catalog.ts",
+      "import": "./src/connector-catalog.ts"
+    },
     "./notify": {
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
@@ -479,6 +483,7 @@
   },
   "sideEffects": false
 }
+
 
 
 
