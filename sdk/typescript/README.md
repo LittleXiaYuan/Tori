@@ -65,6 +65,7 @@ import { createDocumentsClient } from "yunque-client/documents";
 import { createApprovalsClient } from "yunque-client/approvals";
 import { createTraceClient } from "yunque-client/trace";
 import { createBrowserClient } from "yunque-client/browser";
+import { createRuntimeClient } from "yunque-client/runtime";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -196,13 +197,21 @@ if (browserStatus.connected) {
   const pageText = await browser.ocr();
   console.log(pageText.text);
 }
+
+const runtime = createRuntimeClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const queues = await runtime.queues();
+console.log(queues.queues);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
-`providers`/`setup`/`documents`/`approvals`/`trace`/`browser` without importing
-the generated 500KB+ SDK/types bundle. Add future slices in the same style when
-those surfaces need stable, lightweight integration APIs.
+`providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime` without
+importing the generated 500KB+ SDK/types bundle. Add future slices in the same
+style when those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -239,6 +248,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
 | `src/trace.ts` | Lightweight hand-written execution/audit trace inspection slice |
 | `src/browser.ts` | Lightweight hand-written browser extension automation and OPP slice |
+| `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 

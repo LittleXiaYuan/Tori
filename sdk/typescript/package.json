@@ -54,6 +54,10 @@
     "./browser": {
       "types": "./src/browser.ts",
       "import": "./src/browser.ts"
+    },
+    "./runtime": {
+      "types": "./src/runtime.ts",
+      "import": "./src/runtime.ts"
     }
   },
   "files": [

@@ -24,6 +24,7 @@
     "src/approvals.ts",
     "src/trace.ts",
     "src/browser.ts",
+    "src/runtime.ts",
     "src/**/*.test.ts"
   ]
 }
