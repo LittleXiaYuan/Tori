@@ -58,6 +58,7 @@ type Planner struct {
 	longHorizonCheckpoints LongHorizonCheckpointStore // recoverable DAG checkpoint persistence
 	stateContext           func() string              // structured state kernel context
 	strategyContext        func() string              // reflection loop strategy context
+	strategyContextFor     func(query string) string  // query-aware reflection strategy context
 	dynContextBudget       int                        // max tokens for dynamic context layer assembly (DynContextBudgetDefault = use 4000)
 	ackEnabled             bool                       // send typing indicators / ack
 	skillScorer            *skills.SkillScorer        // Ledger-driven skill scoring for intent routing
@@ -139,6 +140,11 @@ func (p *Planner) SetCodeContext(fn func(query string) string) { p.codeContext =
 func (p *Planner) SetStateContext(fn func() string) { p.stateContext = fn }
 
 func (p *Planner) SetStrategyContext(fn func() string) { p.strategyContext = fn }
+
+// SetStrategyContextFor attaches a query-aware reflection strategy provider.
+// The legacy SetStrategyContext callback remains as a fallback for callers that
+// cannot cheaply scope strategy context to the current user message.
+func (p *Planner) SetStrategyContextFor(fn func(query string) string) { p.strategyContextFor = fn }
 
 // DynContextBudgetDefault signals "use the built-in default" (currently 4000 tokens).
 // Callers should use this constant instead of bare 0 to express intent clearly.

@@ -151,6 +151,33 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 	return CompileStrategiesFrom(experiences, limit)
 }
 
+// CompileStrategiesForQuery aggregates only experiences relevant to the query.
+// Falls back to the normal recent strategy context when no query is supplied.
+func (s *ExperienceStore) CompileStrategiesForQuery(query string, limit int) string {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return s.CompileStrategies(limit)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.data) == 0 {
+		return ""
+	}
+
+	q := strings.ToLower(query)
+	experiences := make([]Experience, 0, len(s.data))
+	for i := len(s.data) - 1; i >= 0; i-- {
+		e := s.data[i]
+		if strings.Contains(strings.ToLower(e.Lesson), q) ||
+			strings.Contains(strings.ToLower(e.Context), q) ||
+			containsAny(e.Tags, q) {
+			experiences = append(experiences, e)
+		}
+	}
+	return CompileStrategiesFrom(experiences, limit)
+}
+
 // CompileStrategiesFrom aggregates a newest-first experience list into actionable strategy hints.
 func CompileStrategiesFrom(experiences []Experience, limit int) string {
 	var avoids, improvements, uses []string
