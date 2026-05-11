@@ -79,6 +79,10 @@
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
     },
+    "./emotion": {
+      "types": "./src/emotion.ts",
+      "import": "./src/emotion.ts"
+    },
     "./instructions": {
       "types": "./src/instructions.ts",
       "import": "./src/instructions.ts"
