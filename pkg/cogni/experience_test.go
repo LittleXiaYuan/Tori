@@ -259,6 +259,79 @@ func TestExperienceStore_Stats(t *testing.T) {
 	}
 }
 
+func TestExperienceStore_SummaryRanksReusableProfile(t *testing.T) {
+	es := NewExperienceStore("test", ExperienceConfig{
+		StoreDir:      t.TempDir(),
+		RequireReview: true,
+	})
+	now := time.Now()
+
+	es.AddToolMemory(ToolExperience{
+		Tool:      "slow-tool",
+		Context:   "old context",
+		Learned:   "Use fallback",
+		UsedCount: 1,
+		CreatedAt: now.Add(-3 * time.Hour),
+		LastUsed:  now.Add(-3 * time.Hour),
+	})
+	es.AddToolMemory(ToolExperience{
+		Tool:      "fast-tool",
+		Context:   "hot context",
+		Learned:   "Use indexed path",
+		UsedCount: 4,
+		CreatedAt: now.Add(-2 * time.Hour),
+		LastUsed:  now.Add(-1 * time.Hour),
+	})
+	es.AddFact(DomainFact{
+		Fact:      "云雀的 Planner 需要可恢复执行轨迹",
+		Source:    "doc",
+		UsedCount: 3,
+		CreatedAt: now.Add(-90 * time.Minute),
+		LastUsed:  now.Add(-30 * time.Minute),
+	})
+	es.AddFact(DomainFact{
+		Fact:      "AaaS 对外接口保持轻量",
+		Source:    "doc",
+		UsedCount: 1,
+		CreatedAt: now.Add(-2 * time.Hour),
+		LastUsed:  now.Add(-2 * time.Hour),
+	})
+	es.SuggestPattern(BehaviorPattern{
+		ID:        "pending-review",
+		Trigger:   "模型响应失败",
+		Response:  "保留轨迹并切备用引擎",
+		UsedCount: 2,
+		CreatedAt: now.Add(-20 * time.Minute),
+		LastUsed:  now.Add(-10 * time.Minute),
+	})
+	es.SuggestPattern(BehaviorPattern{
+		ID:        "confirmed",
+		Trigger:   "测试失败",
+		Response:  "先收窄到最小包",
+		CreatedAt: now.Add(-10 * time.Minute),
+	})
+	if !es.ConfirmPattern("confirmed") {
+		t.Fatal("confirm pattern")
+	}
+
+	summary := es.Summary(1)
+	if summary.Stats["patterns_pending"] != 1 {
+		t.Fatalf("patterns_pending = %d, want 1", summary.Stats["patterns_pending"])
+	}
+	if len(summary.TopTools) != 1 || summary.TopTools[0].Tool != "fast-tool" {
+		t.Fatalf("top tools = %+v, want fast-tool only", summary.TopTools)
+	}
+	if len(summary.TopFacts) != 1 || summary.TopFacts[0].Fact != "云雀的 Planner 需要可恢复执行轨迹" {
+		t.Fatalf("top facts = %+v, want Chinese planner fact only", summary.TopFacts)
+	}
+	if len(summary.PendingPatterns) != 1 || summary.PendingPatterns[0].ID != "pending-review" {
+		t.Fatalf("pending patterns = %+v, want pending-review only", summary.PendingPatterns)
+	}
+	if summary.UpdatedAt.IsZero() {
+		t.Fatal("updated_at should be populated")
+	}
+}
+
 func TestExperienceStore_Persistence(t *testing.T) {
 	dir := t.TempDir()
 	es1 := NewExperienceStore("persist-test", ExperienceConfig{StoreDir: dir})

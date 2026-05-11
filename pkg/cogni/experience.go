@@ -49,6 +49,17 @@ type DomainFact struct {
 	LastUsed  time.Time `json:"last_used" yaml:"last_used"`
 }
 
+// ExperienceSummary is a compact, UI-friendly view of a Cogni's reusable
+// experience profile. It keeps the detailed stores available through their
+// existing accessors while giving dashboards a small ranked projection.
+type ExperienceSummary struct {
+	Stats           map[string]int    `json:"stats"`
+	TopTools        []ToolExperience  `json:"top_tools"`
+	TopFacts        []DomainFact      `json:"top_facts"`
+	PendingPatterns []BehaviorPattern `json:"pending_patterns"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+}
+
 // ExperienceConfig controls experience behavior.
 type ExperienceConfig struct {
 	Enabled       bool    `json:"enabled" yaml:"enabled"`
@@ -257,6 +268,58 @@ func (es *ExperienceStore) DomainFacts() []DomainFact {
 	return result
 }
 
+// Summary returns a ranked, compact profile for review surfaces and SDKs.
+func (es *ExperienceStore) Summary(limit int) ExperienceSummary {
+	es.mu.RLock()
+	defer es.mu.RUnlock()
+
+	if limit <= 0 {
+		limit = 5
+	}
+
+	topTools := make([]ToolExperience, len(es.toolMemory))
+	copy(topTools, es.toolMemory)
+	sort.SliceStable(topTools, func(i, j int) bool {
+		return experienceMoreRecentlyUseful(
+			topTools[i].UsedCount, topTools[i].LastUsed, topTools[i].CreatedAt,
+			topTools[j].UsedCount, topTools[j].LastUsed, topTools[j].CreatedAt,
+		)
+	})
+	topTools = limitToolExperience(topTools, limit)
+
+	topFacts := make([]DomainFact, len(es.facts))
+	copy(topFacts, es.facts)
+	sort.SliceStable(topFacts, func(i, j int) bool {
+		return experienceMoreRecentlyUseful(
+			topFacts[i].UsedCount, topFacts[i].LastUsed, topFacts[i].CreatedAt,
+			topFacts[j].UsedCount, topFacts[j].LastUsed, topFacts[j].CreatedAt,
+		)
+	})
+	topFacts = limitDomainFacts(topFacts, limit)
+
+	var pending []BehaviorPattern
+	for _, pattern := range es.patterns {
+		if !pattern.Confirmed {
+			pending = append(pending, pattern)
+		}
+	}
+	sort.SliceStable(pending, func(i, j int) bool {
+		return experienceMoreRecentlyUseful(
+			pending[i].UsedCount, pending[i].LastUsed, pending[i].CreatedAt,
+			pending[j].UsedCount, pending[j].LastUsed, pending[j].CreatedAt,
+		)
+	})
+	pending = limitBehaviorPatterns(pending, limit)
+
+	return ExperienceSummary{
+		Stats:           statsForExperience(es.toolMemory, es.patterns, es.facts),
+		TopTools:        topTools,
+		TopFacts:        topFacts,
+		PendingPatterns: pending,
+		UpdatedAt:       latestExperienceTime(es.toolMemory, es.patterns, es.facts),
+	}
+}
+
 // ── Experience Injection ──
 
 // ContextHints generates a text block to inject into the system prompt
@@ -441,11 +504,16 @@ func (es *ExperienceStore) Import(data []byte) error {
 func (es *ExperienceStore) Stats() map[string]int {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+	return statsForExperience(es.toolMemory, es.patterns, es.facts)
+}
+
+func statsForExperience(toolMemory []ToolExperience, patterns []BehaviorPattern, facts []DomainFact) map[string]int {
 	return map[string]int{
-		"tool_memories":      len(es.toolMemory),
-		"patterns_total":     len(es.patterns),
-		"patterns_confirmed": countConfirmed(es.patterns),
-		"domain_facts":       len(es.facts),
+		"tool_memories":      len(toolMemory),
+		"patterns_total":     len(patterns),
+		"patterns_confirmed": countConfirmed(patterns),
+		"patterns_pending":   len(patterns) - countConfirmed(patterns),
+		"domain_facts":       len(facts),
 	}
 }
 
@@ -506,4 +574,62 @@ func prefixRunes(s string, n int) string {
 		return s
 	}
 	return string(runes[:n])
+}
+
+func experienceMoreRecentlyUseful(leftCount int, leftLastUsed, leftCreatedAt time.Time, rightCount int, rightLastUsed, rightCreatedAt time.Time) bool {
+	if leftCount != rightCount {
+		return leftCount > rightCount
+	}
+	leftSeen := leftLastUsed
+	if leftSeen.IsZero() {
+		leftSeen = leftCreatedAt
+	}
+	rightSeen := rightLastUsed
+	if rightSeen.IsZero() {
+		rightSeen = rightCreatedAt
+	}
+	return leftSeen.After(rightSeen)
+}
+
+func latestExperienceTime(tools []ToolExperience, patterns []BehaviorPattern, facts []DomainFact) time.Time {
+	var latest time.Time
+	consider := func(ts time.Time) {
+		if ts.After(latest) {
+			latest = ts
+		}
+	}
+	for _, tool := range tools {
+		consider(tool.CreatedAt)
+		consider(tool.LastUsed)
+	}
+	for _, pattern := range patterns {
+		consider(pattern.CreatedAt)
+		consider(pattern.LastUsed)
+	}
+	for _, fact := range facts {
+		consider(fact.CreatedAt)
+		consider(fact.LastUsed)
+	}
+	return latest
+}
+
+func limitToolExperience(items []ToolExperience, limit int) []ToolExperience {
+	if len(items) <= limit {
+		return items
+	}
+	return items[:limit]
+}
+
+func limitDomainFacts(items []DomainFact, limit int) []DomainFact {
+	if len(items) <= limit {
+		return items
+	}
+	return items[:limit]
+}
+
+func limitBehaviorPatterns(items []BehaviorPattern, limit int) []BehaviorPattern {
+	if len(items) <= limit {
+		return items
+	}
+	return items[:limit]
 }
