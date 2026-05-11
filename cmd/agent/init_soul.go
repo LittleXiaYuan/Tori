@@ -83,6 +83,7 @@ func initSoulLayer(deps soulDeps) {
 
 		// Isolation Forest for statistical anomaly detection (supplements threshold-based MetaCog)
 		iforest := iforestpkg.NewIsolationForest(iforestpkg.DefaultIForestConfig())
+		metaCog.SetIsolationForest(iforest, 0.65)
 		app.Set("metacog_iforest", iforest)
 
 		metaCog.SetAlertFunc(func(alert metacog.Alert) {
