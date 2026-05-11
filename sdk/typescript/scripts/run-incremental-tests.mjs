@@ -46,6 +46,8 @@ const sources = [
   "src/knowledge.test.ts",
   "src/providers.ts",
   "src/providers.test.ts",
+  "src/breaker.ts",
+  "src/breaker.test.ts",
   "src/models.ts",
   "src/models.test.ts",
   "src/setup.ts",
@@ -195,6 +197,7 @@ for (const testName of [
   "task-context.test",
   "knowledge.test",
   "providers.test",
+  "breaker.test",
   "models.test",
   "setup.test",
   "documents.test",
@@ -269,6 +272,7 @@ for (const testName of [
     .replace('from "./task-context"', 'from "./task-context.js"')
     .replace('from "./knowledge"', 'from "./knowledge.js"')
     .replace('from "./providers"', 'from "./providers.js"')
+    .replace('from "./breaker"', 'from "./breaker.js"')
     .replace('from "./models"', 'from "./models.js"')
     .replace('from "./setup"', 'from "./setup.js"')
     .replace('from "./documents"', 'from "./documents.js"')

@@ -91,6 +91,10 @@
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"
     },
+    "./breaker": {
+      "types": "./src/breaker.ts",
+      "import": "./src/breaker.ts"
+    },
     "./models": {
       "types": "./src/models.ts",
       "import": "./src/models.ts"
