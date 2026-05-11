@@ -8,6 +8,8 @@ const pkg = JSON.parse(readFileSync(join(sdkRoot, "package.json"), "utf8"));
 const tsconfig = JSON.parse(readFileSync(join(sdkRoot, "tsconfig.test.json"), "utf8"));
 const runner = readFileSync(join(sdkRoot, "scripts/run-incremental-tests.mjs"), "utf8");
 const readme = readFileSync(join(sdkRoot, "README.md"), "utf8");
+const maxSliceLines = 350;
+const maxSliceBytes = 12_000;
 
 const generated = new Set(["client.gen", "sdk.gen", "types.gen", "index"]);
 const srcSlices = readdirSync(srcDir)
@@ -31,6 +33,8 @@ const tsconfigEntries = tsconfig.files ?? tsconfig.include ?? [];
 const tsconfigFiles = new Set(tsconfigEntries.map((file) => file.replace(/^src\//, "").replace(/\.ts$/, "")));
 for (const name of srcSlices) {
   const source = readFileSync(join(srcDir, `${name}.ts`), "utf8");
+  const lineCount = source.split(/\r?\n/).length;
+  const byteCount = Buffer.byteLength(source, "utf8");
   if (!existsSync(join(srcDir, `${name}.test.ts`))) fail(`missing test file for ${name}`);
   if (!tsconfigFiles.has(name)) fail(`tsconfig.test.json missing src/${name}.ts`);
   if (!runner.includes(`"src/${name}.ts"`)) fail(`run-incremental-tests.mjs missing src/${name}.ts`);
@@ -42,6 +46,8 @@ for (const name of srcSlices) {
   if (/^\s*(?:import|export)\s+.*from\s+["']\.\/(?:client|sdk|types)\.gen["']/m.test(source)) {
     fail(`src/${name}.ts imports generated SDK internals instead of staying incremental`);
   }
+  if (lineCount > maxSliceLines) fail(`src/${name}.ts has ${lineCount} lines, exceeds incremental slice budget ${maxSliceLines}`);
+  if (byteCount > maxSliceBytes) fail(`src/${name}.ts has ${byteCount} bytes, exceeds incremental slice budget ${maxSliceBytes}`);
 }
 
 const gatewayDir = join(repoRoot, "internal/controlplane/gateway");
@@ -90,4 +96,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`incremental coverage ok: ${srcSlices.length} slices, ${routeRefs} runtime /v1+/api route references checked`);
+console.log(`incremental coverage ok: ${srcSlices.length} slices, ${routeRefs} runtime /v1+/api route references checked, slice budget <= ${maxSliceLines} lines / ${maxSliceBytes} bytes`);
