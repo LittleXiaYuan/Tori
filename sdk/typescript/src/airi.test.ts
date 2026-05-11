@@ -33,8 +33,10 @@ async function testAiriStreamsCompletions() {
 async function testAiriErrors() {
   const client = createAiriClient({ baseUrl: "http://localhost:9090", fetch: async () => json({ error: "planner error" }, { status: 500 }) });
   try { await client.status(); throw new Error("expected status to reject"); } catch (error) { assert(error instanceof AiriClientError); assertEqual(error.status, 500); assertDeepEqual(error.body, { error: "planner error" }); assertEqual(error.message, "planner error"); }
+  const nestedClient = createAiriClient({ baseUrl: "http://localhost:9090", fetch: async () => json({ error: { code: "LLM_UNAVAILABLE", message: "model channel unavailable" } }, { status: 503 }) });
+  try { await nestedClient.chatCompletions({ messages: [{ role: "user", content: "hi" }] }); throw new Error("expected nested chat to reject"); } catch (error) { assert(error instanceof AiriClientError); assertEqual(error.status, 503); assertEqual(error.message, "model channel unavailable"); }
   const textClient = createAiriClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST required", { status: 405 }) });
-  try { await collect(textClient.streamChatCompletions({ messages: [] })); throw new Error("expected stream to reject"); } catch (error) { assert(error instanceof AiriClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST required"); }
+  try { await collect(textClient.streamChatCompletions({ messages: [] })); throw new Error("expected stream to reject"); } catch (error) { assert(error instanceof AiriClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST required"); assertEqual(error.message, "POST required"); }
   console.log("ok - AiriClient throws AiriClientError with parsed and text bodies");
 }
 
