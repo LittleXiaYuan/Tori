@@ -207,6 +207,10 @@
       "types": "./src/trace.ts",
       "import": "./src/trace.ts"
     },
+    "./trace-events": {
+      "types": "./src/trace-events.ts",
+      "import": "./src/trace-events.ts"
+    },
     "./task-trace": {
       "types": "./src/task-trace.ts",
       "import": "./src/task-trace.ts"
