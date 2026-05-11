@@ -71,7 +71,9 @@ func initTaskEngine(
 	gw.SetToolsManager(toolsMgr)
 
 	// ── Task Runtime ──
-	taskStore := iledger.NewLedgerStore(typedLdg, cfg.DataPath("tasks"))
+	baseTaskStore := iledger.NewLedgerStore(typedLdg, cfg.DataPath("tasks"))
+	qlScheduler := ensureTaskQLearner(app)
+	taskStore := rlsched.NewPolicyStore(baseTaskStore, qlScheduler)
 	app.Set(agentrt.CompTaskStore, taskStore)
 
 	costAwareLLM := func(ctx context.Context, system, user string) (string, error) {
@@ -98,7 +100,6 @@ func initTaskEngine(
 	taskRunner := task.NewRunner(taskStore, app.SkillRegistry, costAwareLLM, &skills.Environment{
 		LLMCall: costAwareLLM,
 	})
-	qlScheduler := ensureTaskQLearner(app)
 	taskFeedback := rlsched.NewTaskFeedback(qlScheduler, taskStore)
 	taskRunner.OnTaskEvent(taskFeedback.OnTaskEvent)
 	slog.Info("Q-Learning task feedback wired", "actions", len([]string{"priority_high", "priority_normal", "priority_low", "defer"}))

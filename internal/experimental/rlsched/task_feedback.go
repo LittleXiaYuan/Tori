@@ -70,6 +70,9 @@ func EncodeTaskState(store task.Store, t *task.Task, now time.Time) string {
 }
 
 func TaskSchedulingAction(t *task.Task) string {
+	if action, ok := learnedSchedulingAction(t); ok {
+		return action
+	}
 	switch priorityBucket(t) {
 	case "high":
 		return "priority_high"
