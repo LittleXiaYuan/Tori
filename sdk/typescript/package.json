@@ -243,6 +243,10 @@
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"
     },
+    "./workflow-definitions": {
+      "types": "./src/workflow-definitions.ts",
+      "import": "./src/workflow-definitions.ts"
+    },
     "./workflow-runs": {
       "types": "./src/workflow-runs.ts",
       "import": "./src/workflow-runs.ts"
