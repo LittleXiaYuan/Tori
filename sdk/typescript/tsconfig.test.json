@@ -24,6 +24,7 @@
     "src/bots.ts",
     "src/discovery.ts",
     "src/interactions.ts",
+    "src/rbac.ts",
     "src/memory.ts",
     "src/tasks.ts",
     "src/task-context.ts",

@@ -61,6 +61,7 @@ import { createSubagentsClient } from "yunque-client/subagents";
 import { createBotsClient } from "yunque-client/bots";
 import { createDiscoveryClient } from "yunque-client/discovery";
 import { createInteractionsClient } from "yunque-client/interactions";
+import { createRBACClient } from "yunque-client/rbac";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
@@ -169,6 +170,14 @@ const interactions = createInteractionsClient({
 });
 await interactions.createInstruction({ category: "style", content: "回答保持自然、简洁。" });
 await interactions.react({ channel_type: "telegram", target: "chat-1", message_id: "msg-1", emoji: "👍" });
+
+const rbac = createRBACClient({
+  baseUrl: "http://localhost:9090",
+  token: "<admin-jwt>",
+});
+await rbac.assignRole({ subject_id: "user-1", role_id: "operator", tenant_id: "tenant-a" });
+const permission = await rbac.check({ resource: "tasks", action: "write" });
+console.log(permission.allowed);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -519,7 +528,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -557,6 +566,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/bots.ts` | Lightweight hand-written bots, inbox, and channel group operations slice |
 | `src/discovery.ts` | Lightweight hand-written identity, embeddings, and web search discovery slice |
 | `src/interactions.ts` | Lightweight hand-written emotion history, stickers, instructions, reactions, and sticker sending slice |
+| `src/rbac.ts` | Lightweight hand-written RBAC roles, assignments, and permission-check slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |

@@ -39,6 +39,10 @@
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
     },
+    "./rbac": {
+      "types": "./src/rbac.ts",
+      "import": "./src/rbac.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"
