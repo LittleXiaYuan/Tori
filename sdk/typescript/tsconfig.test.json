@@ -25,6 +25,7 @@
     "src/trace.ts",
     "src/browser.ts",
     "src/runtime.ts",
+    "src/modes.ts",
     "src/**/*.test.ts"
   ]
 }
