@@ -114,6 +114,7 @@ import { createReactionsClient } from "yunque-client/reactions";
 import { createInstructionsClient } from "yunque-client/instructions";
 import { createRBACClient } from "yunque-client/rbac";
 import { createRolesClient } from "yunque-client/roles";
+import { createPermissionsClient } from "yunque-client/permissions";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
@@ -785,7 +786,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -839,6 +840,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/instructions.ts` | Lightweight user-instructions facade for `/v1/instructions*` without full SDK import |
 | `src/rbac.ts` | Lightweight hand-written RBAC roles, assignments, and permission-check slice |
 | `src/roles.ts` | Lightweight role/assignment facade over RBAC role endpoints without full SDK import |
+| `src/permissions.ts` | Lightweight permission check/current roles facade over RBAC without full SDK import |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
