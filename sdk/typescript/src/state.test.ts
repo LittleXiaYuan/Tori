@@ -39,6 +39,8 @@ test("StateClient manages resources", async () => {
 test("StateClient throws StateClientError with parsed and text bodies", async () => {
   const jsonClient = createStateClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "title required" }, { status: 400 }) });
   try { await jsonClient.saveGoal({ title: "" }); throw new Error("expected saveGoal to reject"); } catch (error) { assert(error instanceof StateClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "title required" }); assertEqual(error.message, "title required"); }
+  const nestedClient = createStateClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested title required" } }, { status: 400 }) });
+  try { await nestedClient.saveGoal({ title: "" }); throw new Error("expected nested saveGoal to reject"); } catch (error) { assert(error instanceof StateClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested title required"); }
   const textClient = createStateClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("state kernel not initialized", { status: 404 }) });
   try { await textClient.snapshot(); throw new Error("expected snapshot to reject"); } catch (error) { assert(error instanceof StateClientError); assertEqual(error.status, 404); assertEqual(error.body, "state kernel not initialized"); assertEqual(error.message, "state kernel not initialized"); }
 });

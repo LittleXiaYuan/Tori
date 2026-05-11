@@ -29,6 +29,8 @@ test("TriggersClient emits v2 events and reads runs/events", async () => {
 test("TriggersClient throws TriggersClientError with parsed and text bodies", async () => {
   const jsonClient = createTriggersClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "name is required" }, { status: 400 }) });
   try { await jsonClient.create({ name: "", actions: [] }); throw new Error("expected create to reject"); } catch (error) { assert(error instanceof TriggersClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "name is required" }); assertEqual(error.message, "name is required"); }
+  const nestedClient = createTriggersClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "nested name is required" } }, { status: 400 }) });
+  try { await nestedClient.create({ name: "", actions: [] }); throw new Error("expected nested create to reject"); } catch (error) { assert(error instanceof TriggersClientError); assertEqual(error.status, 400); assertEqual(error.message, "nested name is required"); }
   const textClient = createTriggersClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("trigger not found", { status: 404 }) });
   try { await textClient.get("missing"); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof TriggersClientError); assertEqual(error.status, 404); assertEqual(error.body, "trigger not found"); assertEqual(error.message, "trigger not found"); }
 });
