@@ -135,6 +135,10 @@
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"
     },
+    "./knowledge-search": {
+      "types": "./src/knowledge-search.ts",
+      "import": "./src/knowledge-search.ts"
+    },
     "./providers": {
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"

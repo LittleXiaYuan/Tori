@@ -123,6 +123,7 @@ import { createMemoryCompactClient } from "yunque-client/memory-compact";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
 import { createKnowledgeClient } from "yunque-client/knowledge";
+import { createKnowledgeSearchClient } from "yunque-client/knowledge-search";
 import { createProvidersClient } from "yunque-client/providers";
 import { createBreakerClient } from "yunque-client/breaker";
 import { createModelsClient } from "yunque-client/models";
@@ -312,6 +313,13 @@ const memoryCompact = createMemoryCompactClient({
   token: "<admin-jwt>",
 });
 await memoryCompact.compact({ target_count: 100, decay_days: 30 });
+
+const knowledgeSearch = createKnowledgeSearchClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const knowledgeHits = await knowledgeSearch.search("Planner 蓝图", { limit: 5, lang: "md" });
+console.log(knowledgeHits.count);
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -815,7 +823,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `knowledge`, `knowledge-search`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -878,6 +886,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
+| `src/knowledge-search.ts` | Lightweight knowledge search-only facade without full SDK import |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
 | `src/breaker.ts` | Lightweight provider breaker reset facade for `/api/breaker/reset` without full SDK import |
 | `src/models.ts` | Lightweight models facade for listing and maintaining `/v1/models` without full SDK import |
