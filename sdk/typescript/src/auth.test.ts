@@ -29,5 +29,28 @@ test("AuthClient throws AuthClientError with parsed and text bodies", async () =
   try { await textClient.generateToken(); throw new Error("expected text generateToken to reject"); } catch (error) { assert(error instanceof AuthClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });
 
+
+test("AuthClient reads setup/auth status with bearer token", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createAuthClient({ baseUrl: "http://localhost:9090/", token: "jwt", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ password_set: true, authenticated: true, oauth_tori: false }); } });
+  const result = await client.status();
+  assertEqual(result.password_set, true); assertEqual(result.authenticated, true); assertEqual(calls[0]?.url, "http://localhost:9090/v1/auth/status"); assertEqual(calls[0]?.init?.method, "GET"); assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt");
+});
+
+test("AuthClient logs in and sets passwords", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createAuthClient({ baseUrl: "http://localhost:9090", fetch: async (url, init) => { calls.push({ url: String(url), init }); if (String(url).endsWith("/login")) return jsonResponse({ token: "jwt-admin", expires_in: 604800 }); return jsonResponse({ status: "ok" }); } });
+  const login = await client.login({ password: "secret-pass", remember: true }); const changed = await client.setPassword({ current: "secret-pass", password: "new-secret" });
+  assertEqual(login.token, "jwt-admin"); assertEqual(login.expires_in, 604800); assertEqual(changed.status, "ok");
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/auth/login"); assertDeepEqual(JSON.parse(String(calls[0]?.init?.body)), { password: "secret-pass", remember: true });
+  assertEqual(calls[1]?.url, "http://localhost:9090/v1/auth/set-password"); assertDeepEqual(JSON.parse(String(calls[1]?.init?.body)), { current: "secret-pass", password: "new-secret" });
+});
+
+test("AuthClient builds Tori OAuth start URLs", () => {
+  const client = createAuthClient({ baseUrl: "http://localhost:9090/", fetch: async () => jsonResponse({}) });
+  assertEqual(client.toriOAuthUrl(), "http://localhost:9090/v1/auth/oauth/tori");
+  assertEqual(client.toriOAuthUrl("https://tori.example"), "http://localhost:9090/v1/auth/oauth/tori?tori_url=https%3A%2F%2Ftori.example");
+});
+
 let failures = 0; for (const { name, fn } of tests) { try { await fn(); console.log(`ok - ${name}`); } catch (error) { failures += 1; console.error(`not ok - ${name}`); console.error(error); } }
 if (failures > 0) process.exitCode = 1; else console.log(`1..${tests.length}`);
