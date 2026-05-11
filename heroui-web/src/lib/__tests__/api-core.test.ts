@@ -204,15 +204,15 @@ describe("api/reflectExperience", () => {
     expect(url).toBe("/v1/reflect/experiences?source=task&outcome=success&tag=quality%3A9&stats=true");
   });
 
-  it("serializes strategy limit only when requested", async () => {
+  it("serializes strategy filters and omits empty suffix", async () => {
     const spy = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ strategies: "" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ strategies: "" }), { status: 200 }));
 
-    await api.getStrategies({ limit: 3 });
+    await api.getStrategies({ source: "task", tag: "quality:9", q: "code review", limit: 3 });
     await api.getStrategies();
 
-    expect(spy.mock.calls[0][0]).toBe("/v1/reflect/strategies?limit=3");
+    expect(spy.mock.calls[0][0]).toBe("/v1/reflect/strategies?source=task&tag=quality%3A9&q=code+review&limit=3");
     expect(spy.mock.calls[1][0]).toBe("/v1/reflect/strategies");
   });
 });

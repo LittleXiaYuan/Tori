@@ -167,6 +167,9 @@ type ReflectExperienceOptions struct {
 	Limit    int
 }
 
+// ReflectStrategyOptions filters compiled reflection strategies.
+type ReflectStrategyOptions = ReflectExperienceOptions
+
 // ReflectExperience is a structured reflection lesson captured by the agent.
 type ReflectExperience struct {
 	ID        string    `json:"id,omitempty"`
@@ -223,13 +226,12 @@ func (r *reflectNamespace) Stats(ctx context.Context, opts ReflectExperienceOpti
 
 // Strategies returns compiled reflection strategy hints. Limit defaults to the server setting.
 func (r *reflectNamespace) Strategies(ctx context.Context, limit int) (string, error) {
-	path := "/v1/reflect/strategies"
-	if limit > 0 {
-		q := url.Values{}
-		q.Set("limit", strconv.Itoa(limit))
-		path += "?" + q.Encode()
-	}
-	resp, err := apiCall(ctx, "GET", path, nil)
+	return r.StrategiesWithOptions(ctx, ReflectStrategyOptions{Limit: limit})
+}
+
+// StrategiesWithOptions returns compiled strategy hints scoped by optional experience filters.
+func (r *reflectNamespace) StrategiesWithOptions(ctx context.Context, opts ReflectStrategyOptions) (string, error) {
+	resp, err := apiCall(ctx, "GET", "/v1/reflect/strategies"+reflectExperienceQuery(ReflectExperienceOptions(opts), false), nil)
 	if err != nil {
 		return "", err
 	}

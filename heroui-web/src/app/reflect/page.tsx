@@ -36,7 +36,7 @@ export default function ReflectPage() {
       const [statsRes, listRes, stratRes] = await Promise.all([
         api.getExperiences({ stats: true }),
         api.getExperiences({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, tag: tagFilter || undefined, q: search || undefined, limit: EXPERIENCE_LIST_LIMIT }),
-        api.getStrategies({ limit: STRATEGY_LIMIT }),
+        api.getStrategies({ source: source || undefined, category: category || undefined, outcome: outcome || undefined, tag: tagFilter || undefined, q: search || undefined, limit: STRATEGY_LIMIT }),
       ]);
       const stats = ("total" in statsRes && "by_source" in statsRes) ? statsRes as ExperienceStats : null;
       const experiences = ("experiences" in listRes) ? ((listRes as { experiences: ExperienceItem[] }).experiences || []) : [];

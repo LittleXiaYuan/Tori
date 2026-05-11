@@ -25,8 +25,8 @@ test("MissionsClient reads experiences with search and filters", async () => {
 test("MissionsClient reads experience stats and strategies", async () => {
   const calls: string[] = [];
   const client = createMissionsClient({ baseUrl: "http://localhost:9090", fetch: async (url) => { calls.push(String(url)); if (String(url).includes("stats=true")) return jsonResponse({ total: 10, by_outcome: { success: 8 }, recent_7d: 3 }); return jsonResponse({ strategies: "- 推荐: Prefer small slices" }); } });
-  const stats = await client.experienceStats({ source: "task", outcome: "success", tag: "quality:9" }); const strategies = await client.strategies({ limit: 3 });
-  assertEqual(stats.total, 10); assertEqual(stats.by_outcome?.success, 8); assertEqual(strategies.strategies.includes("Prefer small slices"), true); assertEqual(calls[0], "http://localhost:9090/v1/reflect/experiences?stats=true&source=task&outcome=success&tag=quality%3A9"); assertEqual(calls[1], "http://localhost:9090/v1/reflect/strategies?limit=3");
+  const stats = await client.experienceStats({ source: "task", outcome: "success", tag: "quality:9" }); const strategies = await client.strategies({ source: "task", tag: "quality:9", limit: 3 });
+  assertEqual(stats.total, 10); assertEqual(stats.by_outcome?.success, 8); assertEqual(strategies.strategies.includes("Prefer small slices"), true); assertEqual(calls[0], "http://localhost:9090/v1/reflect/experiences?stats=true&source=task&outcome=success&tag=quality%3A9"); assertEqual(calls[1], "http://localhost:9090/v1/reflect/strategies?source=task&tag=quality%3A9&limit=3");
 });
 
 test("MissionsClient throws MissionsClientError with parsed and text bodies", async () => {

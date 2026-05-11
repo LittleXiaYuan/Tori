@@ -144,11 +144,22 @@ func (s *ExperienceStore) CompileStrategies(limit int) string {
 		return ""
 	}
 
+	experiences := make([]Experience, 0, len(s.data))
+	for i := len(s.data) - 1; i >= 0; i-- {
+		experiences = append(experiences, s.data[i])
+	}
+	return CompileStrategiesFrom(experiences, limit)
+}
+
+// CompileStrategiesFrom aggregates a newest-first experience list into actionable strategy hints.
+func CompileStrategiesFrom(experiences []Experience, limit int) string {
 	var avoids, improvements, uses []string
 	seen := make(map[string]bool)
 
-	for i := len(s.data) - 1; i >= 0 && (len(avoids)+len(improvements)+len(uses)) < limit; i-- {
-		e := s.data[i]
+	for _, e := range experiences {
+		if limit > 0 && (len(avoids)+len(improvements)+len(uses)) >= limit {
+			break
+		}
 		lesson := strings.TrimSpace(e.Lesson)
 		if len(lesson) < 20 {
 			continue // skip trivially short lessons

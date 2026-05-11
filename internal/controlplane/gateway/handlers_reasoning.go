@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"yunque-agent/internal/agentcore/state"
@@ -443,6 +444,26 @@ func reflectExperienceHasTag(e reflectpkg.Experience, tag string) bool {
 	return false
 }
 
+func queryReflectExperiences(experiences []reflectpkg.Experience, query string) []reflectpkg.Experience {
+	q := strings.ToLower(query)
+	filtered := make([]reflectpkg.Experience, 0, len(experiences))
+	for _, e := range experiences {
+		if strings.Contains(strings.ToLower(e.Lesson), q) || strings.Contains(strings.ToLower(e.Context), q) || reflectExperienceTagsContain(e, q) {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered
+}
+
+func reflectExperienceTagsContain(e reflectpkg.Experience, query string) bool {
+	for _, tag := range e.Tags {
+		if strings.Contains(strings.ToLower(tag), query) {
+			return true
+		}
+	}
+	return false
+}
+
 func limitReflectExperiences(experiences []reflectpkg.Experience, limit int) []reflectpkg.Experience {
 	if limit <= 0 || len(experiences) <= limit {
 		return experiences
@@ -479,7 +500,23 @@ func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strategies := g.experienceStore.CompileStrategies(reflectExperienceLimit(r, 20))
+	limit := reflectExperienceLimit(r, 20)
+	source := r.URL.Query().Get("source")
+	category := r.URL.Query().Get("category")
+	outcome := r.URL.Query().Get("outcome")
+	tag := r.URL.Query().Get("tag")
+	query := r.URL.Query().Get("q")
+
+	strategies := ""
+	if source != "" || category != "" || outcome != "" || tag != "" || query != "" {
+		experiences := g.experienceStore.All()
+		if query != "" {
+			experiences = queryReflectExperiences(experiences, query)
+		}
+		strategies = reflectpkg.CompileStrategiesFrom(filterReflectExperiences(experiences, source, category, outcome, tag), limit)
+	} else {
+		strategies = g.experienceStore.CompileStrategies(limit)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"strategies": strategies})
 }
