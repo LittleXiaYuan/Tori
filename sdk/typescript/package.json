@@ -395,6 +395,10 @@
       "types": "./src/state.ts",
       "import": "./src/state.ts"
     },
+    "./goal-state": {
+      "types": "./src/goal-state.ts",
+      "import": "./src/goal-state.ts"
+    },
     "./triggers": {
       "types": "./src/triggers.ts",
       "import": "./src/triggers.ts"

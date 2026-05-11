@@ -113,6 +113,7 @@
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",
+    "src/goal-state.ts",
     "src/triggers.ts",
     "src/missions.ts",
     "src/reflect.ts",

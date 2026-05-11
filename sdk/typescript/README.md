@@ -188,6 +188,7 @@ import { createUploadClient } from "yunque-client/upload";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
+import { createGoalStateClient } from "yunque-client/goal-state";
 import { createTriggersClient } from "yunque-client/triggers";
 import { createMissionsClient } from "yunque-client/missions";
 import { createReflectClient } from "yunque-client/reflect";
@@ -901,6 +902,13 @@ const pluginReply = await pluginApi.llm({
 });
 console.log(pluginReply.reply);
 
+const goalState = createGoalStateClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+
+const goals = await goalState.list();
+
 const state = createStateClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
@@ -1082,6 +1090,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
+| `src/goal-state.ts` | Lightweight state goal list/save/delete facade without full SDK import |
 | `src/triggers.ts` | Lightweight hand-written legacy and v2 trigger CRUD, emit, runs, and events slice |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
 | `src/reflect.ts` | Lightweight reflect-only facade over experiences, stats, and strategy context |
