@@ -8,9 +8,14 @@ export type CogniHealthResponse = Record<string, unknown>;
 export type CogniAlertsResponse = { alerts?: unknown[]; count?: number; [key: string]: unknown };
 export type CogniVerifyResponse = Record<string, unknown>;
 export type CogniWorkflowRunRequest = Record<string, unknown>;
+export type CogniExperienceStats = { tool_memories?: number; patterns_total?: number; patterns_confirmed?: number; patterns_pending?: number; domain_facts?: number; [key: string]: unknown };
+export type CogniToolExperience = { tool?: string; context?: string; result?: string; learned?: string; confidence?: number; verified_by?: string; used_count?: number; success_rate?: number; created_at?: string; last_used?: string; [key: string]: unknown };
+export type CogniExperiencePattern = { id?: string; trigger?: string; response?: string; confirmed?: boolean; used_count?: number; success_rate?: number; created_at?: string; last_used?: string; [key: string]: unknown };
+export type CogniDomainFact = { fact?: string; source?: string; used_count?: number; created_at?: string; last_used?: string; [key: string]: unknown };
+export type CogniExperienceSummary = { stats?: CogniExperienceStats; top_tools?: CogniToolExperience[]; top_facts?: CogniDomainFact[]; pending_patterns?: CogniExperiencePattern[]; updated_at?: string; [key: string]: unknown };
 export type CogniExperienceRecordType = "tool_memory" | "pattern" | "fact" | string;
 export type CogniExperienceRecordRequest = { type: CogniExperienceRecordType; data: Record<string, unknown> };
-export type CogniExperienceResponse = { id?: string; enabled?: boolean; summary?: Record<string, unknown>; stats?: Record<string, unknown>; tool_memory?: unknown[]; patterns?: unknown[]; domain_facts?: unknown[]; [key: string]: unknown };
+export type CogniExperienceResponse = { id?: string; enabled?: boolean; summary?: CogniExperienceSummary; stats?: CogniExperienceStats; tool_memory?: CogniToolExperience[]; patterns?: CogniExperiencePattern[]; domain_facts?: CogniDomainFact[]; [key: string]: unknown };
 export type CognisClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class CognisClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Cognis request failed with HTTP ${status}`); this.name = "CognisClientError"; this.status = status; this.body = body; } }
