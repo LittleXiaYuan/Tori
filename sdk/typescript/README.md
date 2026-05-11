@@ -178,6 +178,7 @@ import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createNotifyClient } from "yunque-client/notify";
+import { createNotifyChannelsClient } from "yunque-client/notify-channels";
 import { createProjectsClient } from "yunque-client/projects";
 import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
@@ -395,6 +396,13 @@ const connectors = createConnectorsClient({
 });
 const connectorList = await connectors.list();
 console.log(connectorList.connectors.length);
+
+const notifyChannels = createNotifyChannelsClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+
+const channels = await notifyChannels.list();
 
 const notify = createNotifyClient({
   baseUrl: "http://localhost:9090",
@@ -1096,6 +1104,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
+| `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |
 | `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
