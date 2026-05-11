@@ -143,6 +143,10 @@
       "types": "./src/cost.ts",
       "import": "./src/cost.ts"
     },
+    "./usage": {
+      "types": "./src/usage.ts",
+      "import": "./src/usage.ts"
+    },
     "./lora": {
       "types": "./src/lora.ts",
       "import": "./src/lora.ts"

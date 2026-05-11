@@ -72,6 +72,8 @@ const sources = [
   "src/workflow.test.ts",
   "src/cost.ts",
   "src/cost.test.ts",
+  "src/usage.ts",
+  "src/usage.test.ts",
   "src/lora.ts",
   "src/lora.test.ts",
   "src/iterate.ts",
@@ -202,6 +204,7 @@ for (const testName of [
   "persona.test",
   "workflow.test",
   "cost.test",
+  "usage.test",
   "lora.test",
   "iterate.test",
   "trust.test",
@@ -273,6 +276,7 @@ for (const testName of [
     .replace('from "./persona"', 'from "./persona.js"')
     .replace('from "./workflow"', 'from "./workflow.js"')
     .replace('from "./cost"', 'from "./cost.js"')
+    .replace('from "./usage"', 'from "./usage.js"')
     .replace('from "./lora"', 'from "./lora.js"')
     .replace('from "./iterate"', 'from "./iterate.js"')
     .replace('from "./trust"', 'from "./trust.js"')

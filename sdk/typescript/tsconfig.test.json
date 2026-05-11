@@ -50,6 +50,7 @@
     "src/persona.ts",
     "src/workflow.ts",
     "src/cost.ts",
+    "src/usage.ts",
     "src/lora.ts",
     "src/iterate.ts",
     "src/trust.ts",
