@@ -138,6 +138,10 @@
     "./skillhub": {
       "types": "./src/skillhub.ts",
       "import": "./src/skillhub.ts"
+    },
+    "./plugins": {
+      "types": "./src/plugins.ts",
+      "import": "./src/plugins.ts"
     }
   },
   "files": [
