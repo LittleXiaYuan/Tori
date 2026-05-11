@@ -81,6 +81,7 @@ import { createFederationClient } from "yunque-client/federation";
 import { createSystemClient } from "yunque-client/system";
 import { createSettingsClient } from "yunque-client/settings";
 import { createToriClient } from "yunque-client/tori";
+import { createSpeechClient } from "yunque-client/speech";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -348,13 +349,20 @@ const tori = createToriClient({
 });
 const toriStatus = await tori.status();
 console.log(toriStatus.bound);
+
+const speech = createSpeechClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const voices = await speech.voices();
+console.log(voices.providers);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -409,6 +417,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/system.ts` | Lightweight hand-written health, version, metrics, cache, and module observability slice |
 | `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |
 | `src/tori.ts` | Lightweight hand-written Tori OAuth binding, status, health, and usage slice |
+| `src/speech.ts` | Lightweight hand-written speech TTS/STT, STT stream URL, voices, and file upload slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
