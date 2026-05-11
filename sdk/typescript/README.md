@@ -118,6 +118,7 @@ import { createPermissionsClient } from "yunque-client/permissions";
 import { createMemoryClient } from "yunque-client/memory";
 import { createMemorySearchClient } from "yunque-client/memory-search";
 import { createMemoryStatsClient } from "yunque-client/memory-stats";
+import { createMemoryAddClient } from "yunque-client/memory-add";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
 import { createKnowledgeClient } from "yunque-client/knowledge";
@@ -298,6 +299,12 @@ const memoryStats = createMemoryStatsClient({
   apiKey: "<your-api-key>",
 });
 console.log((await memoryStats.stats()).long ?? 0);
+
+const memoryAdd = createMemoryAddClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await memoryAdd.remember("用户偏好简洁中文回复", { layer: "long", source: "chat" });
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -801,7 +808,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -859,6 +866,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/memory-search.ts` | Lightweight memory search-only facade over Memory without full SDK import |
 | `src/memory-stats.ts` | Lightweight memory stats-only facade over Memory without full SDK import |
+| `src/memory-add.ts` | Lightweight memory write-only facade over Memory without full SDK import |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
