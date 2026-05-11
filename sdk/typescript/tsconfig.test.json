@@ -75,6 +75,7 @@
     "src/ide.ts",
     "src/persona.ts",
     "src/workflow.ts",
+    "src/workflow-runs.ts",
     "src/cost.ts",
     "src/usage.ts",
     "src/lora.ts",
