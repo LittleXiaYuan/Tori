@@ -539,6 +539,9 @@ func TestPlannerCheckpointRecoverValidatesRequest(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for unsupported action, got %d", w.Code)
 	}
+	if body := w.Body.String(); !strings.Contains(body, "continue, retry_failed, or partial") {
+		t.Fatalf("unsupported action response should list canonical actions, got %s", body)
+	}
 }
 
 func TestPlannerCheckpointResumeTaskCreatesSelectedTaskSteps(t *testing.T) {
