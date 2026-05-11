@@ -698,10 +698,11 @@ const reflectExperiences = await missions.experiences({
   q: "code review",
   source: "task",
   outcome: "partial",
+  tag: "quality:9",
   limit: 10,
 });
 console.log(reflectExperiences.experiences[0]?.lesson);
-const reflectStats = await missions.experienceStats({ source: "task" });
+const reflectStats = await missions.experienceStats({ source: "task", tag: "quality:9" });
 console.log(reflectStats.by_outcome?.success ?? 0);
 const strategyContext = await missions.strategies({ limit: 5 });
 console.log(strategyContext.strategies.split("\n")[0]);
