@@ -58,6 +58,7 @@ import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
+import { createTaskContextClient } from "yunque-client/task-context";
 import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createProvidersClient } from "yunque-client/providers";
 import { createSetupClient } from "yunque-client/setup";
@@ -142,6 +143,19 @@ const task = await tasks.create({
   constraints: { max_steps: 6, risk_level: "low" },
 });
 await tasks.run(task.id);
+
+const taskContext = createTaskContextClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const gaps = await taskContext.gaps("skill_missing");
+const memoryForTask = await taskContext.workingMemory(task.id);
+await taskContext.postThreadMessage(task.id, "请继续，但保持低风险。", {
+  channel_type: "feishu",
+  channel_id: "demo-chat",
+});
+console.log(gaps.length, memoryForTask.next_action);
 
 const knowledge = createKnowledgeClient({
   baseUrl: "http://localhost:9090",
@@ -456,7 +470,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
+in only `planner-recovery`, `chat`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -491,6 +505,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
+| `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
