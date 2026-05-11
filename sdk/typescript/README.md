@@ -105,6 +105,7 @@ import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
 import { createBotsClient } from "yunque-client/bots";
 import { createDiscoveryClient } from "yunque-client/discovery";
+import { createIdentityClient } from "yunque-client/identity";
 import { createInteractionsClient } from "yunque-client/interactions";
 import { createRBACClient } from "yunque-client/rbac";
 import { createMemoryClient } from "yunque-client/memory";
@@ -242,6 +243,12 @@ const discovery = createDiscoveryClient({
 const profile = await discovery.resolveIdentity({ channel: "feishu", user_id: "42", display_name: "小羽" });
 const web = await discovery.search("云雀 Agent Planner", { limit: 3 });
 console.log(profile.unified_id, web.results);
+
+const identity = createIdentityClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+console.log(await identity.profiles());
 
 const interactions = createInteractionsClient({
   baseUrl: "http://localhost:9090",
@@ -760,7 +767,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -805,6 +812,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
 | `src/bots.ts` | Lightweight hand-written bots, inbox, and channel group operations slice |
 | `src/discovery.ts` | Lightweight hand-written identity, embeddings, and web search discovery slice |
+| `src/identity.ts` | Lightweight identity resolve/profile facade for `/v1/identity/*` without full SDK import |
 | `src/interactions.ts` | Lightweight hand-written emotion history, stickers, instructions, reactions, and sticker sending slice |
 | `src/rbac.ts` | Lightweight hand-written RBAC roles, assignments, and permission-check slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
