@@ -58,6 +58,7 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 	newTime := time.Date(2026, 5, 10, 2, 0, 0, 0, time.UTC)
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-old",
+		TenantID:    tenant.ID,
 		Status:      "running",
 		Completed:   1,
 		Total:       3,
@@ -73,6 +74,7 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 	}
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-new",
+		TenantID:    tenant.ID,
 		TaskID:      "task-1",
 		Goal:        "继续推进云雀 planner",
 		Status:      "failed",
@@ -118,6 +120,66 @@ func TestPlannerCheckpointsListCompactByDefault(t *testing.T) {
 	}
 }
 
+func TestPlannerCheckpointsAreScopedToTenant(t *testing.T) {
+	gw, tm := newTestGateway()
+	owner := tm.Register("planner-checkpoints-owner")
+	other := tm.Register("planner-checkpoints-other")
+	third := tm.Register("planner-checkpoints-third")
+	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
+	gw.planner.SetLongHorizonCheckpointStore(store)
+
+	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
+		PlanID:      "plan-shared",
+		TenantID:    owner.ID,
+		TaskID:      "task-owner",
+		Goal:        "owner checkpoint",
+		Status:      "failed",
+		Recoverable: true,
+		UpdatedAt:   time.Date(2026, 5, 11, 1, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("save owner checkpoint: %v", err)
+	}
+	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
+		PlanID:      "plan-shared",
+		TenantID:    other.ID,
+		TaskID:      "task-other",
+		Goal:        "other checkpoint",
+		Status:      "failed",
+		Recoverable: true,
+		UpdatedAt:   time.Date(2026, 5, 11, 2, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("save other checkpoint: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		apiKey  string
+		wantID  string
+		wantCnt int
+	}{
+		{name: "owner", apiKey: owner.APIKey, wantID: "task-owner", wantCnt: 1},
+		{name: "other", apiKey: other.APIKey, wantID: "task-other", wantCnt: 1},
+		{name: "third", apiKey: third.APIKey, wantCnt: 0},
+	} {
+		req := authedRequest(http.MethodGet, "/v1/planner/checkpoints?plan_id=plan-shared&include_snapshot=1", "", tc.apiKey)
+		w := httptest.NewRecorder()
+		gw.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d body=%s", tc.name, w.Code, w.Body.String())
+		}
+		var resp plannerCheckpointListResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("%s: decode checkpoint list: %v", tc.name, err)
+		}
+		if resp.Count != tc.wantCnt || len(resp.Checkpoints) != tc.wantCnt {
+			t.Fatalf("%s: expected %d tenant-scoped checkpoints, got %+v", tc.name, tc.wantCnt, resp)
+		}
+		if tc.wantCnt == 1 && resp.Checkpoints[0].TaskID != tc.wantID {
+			t.Fatalf("%s: expected checkpoint task %q, got %+v", tc.name, tc.wantID, resp.Checkpoints[0])
+		}
+	}
+}
+
 func TestPlannerCheckpointsCanIncludeSnapshot(t *testing.T) {
 	gw, tm := newTestGateway()
 	tenant := tm.Register("planner-checkpoint-detail")
@@ -126,6 +188,7 @@ func TestPlannerCheckpointsCanIncludeSnapshot(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-detail",
+		TenantID:    tenant.ID,
 		Status:      "failed",
 		Completed:   1,
 		Total:       2,
@@ -168,6 +231,7 @@ func TestPlannerCheckpointsCanFilterByPlanID(t *testing.T) {
 	for _, cp := range []planner.LongHorizonCheckpoint{
 		{
 			PlanID:      "plan-a",
+			TenantID:    tenant.ID,
 			Status:      "failed",
 			Completed:   1,
 			Total:       2,
@@ -181,6 +245,7 @@ func TestPlannerCheckpointsCanFilterByPlanID(t *testing.T) {
 		},
 		{
 			PlanID:      "plan-b",
+			TenantID:    tenant.ID,
 			Status:      "failed",
 			Completed:   0,
 			Total:       1,
@@ -229,6 +294,7 @@ func TestPlannerCheckpointKnownErrorsAreDisplayedFriendly(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-friendly-error",
+		TenantID:    tenant.ID,
 		TaskID:      "task-friendly-error",
 		Status:      "failed",
 		Completed:   0,
@@ -293,6 +359,7 @@ func TestPlannerCheckpointKnownDiagnosticsInCompletedResultAreDisplayedFriendly(
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-friendly-result",
+		TenantID:    tenant.ID,
 		TaskID:      "task-friendly-result",
 		Goal:        "根据申请表.docx 生成入驻申请材料",
 		Status:      "failed",
@@ -377,6 +444,7 @@ func TestPlannerCheckpointRecoverBuildsBackendPrompt(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-recover",
+		TenantID:    tenant.ID,
 		TaskID:      "task-recover",
 		Goal:        "读取文档并继续规划",
 		Status:      "failed",
@@ -468,6 +536,7 @@ func TestPlannerCheckpointResumeTaskCreatesSelectedTaskSteps(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-task",
+		TenantID:    tenant.ID,
 		TaskID:      "origin-task",
 		Goal:        "恢复长程规划",
 		Status:      "failed",
@@ -552,6 +621,7 @@ func TestPlannerCheckpointResumeTaskRejectsUnsafeDependencies(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-blocked",
+		TenantID:    tenant.ID,
 		Status:      "failed",
 		Recoverable: true,
 		UpdatedAt:   time.Now().UTC(),
@@ -594,6 +664,7 @@ func TestPlannerCheckpointResumePlanRunsDAGWithoutRerunningCompleted(t *testing.
 	})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-direct",
+		TenantID:    tenant.ID,
 		TaskID:      "task-direct",
 		Goal:        "直接续跑 planner",
 		Status:      "failed",
@@ -649,6 +720,7 @@ func TestPlannerCheckpointResumePlanPartialReturnsCompletedAttachmentEvidence(t 
 	rawErr := `handoff agent "file_exec" execution failed: context deadline exceeded EOF`
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-partial-attachment",
+		TenantID:    tenant.ID,
 		TaskID:      "task-partial-attachment",
 		Goal:        "根据申请表.docx 生成入驻申请材料",
 		Status:      "failed",
@@ -710,6 +782,7 @@ func TestPlannerCheckpointResumePlanPartialAsyncJobCompletesWithEvidence(t *test
 	})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-partial-async",
+		TenantID:    tenant.ID,
 		TaskID:      "task-partial-async",
 		Goal:        "根据申请表.docx 生成入驻申请材料",
 		Status:      "failed",
@@ -781,6 +854,7 @@ func TestPlannerCheckpointResumePlanSyncFailureReturnsFriendlyAdvice(t *testing.
 	})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-sync-failed",
+		TenantID:    tenant.ID,
 		TaskID:      "task-sync-failed",
 		Goal:        "同步续跑失败也要可恢复",
 		Status:      "failed",
@@ -828,6 +902,7 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 	gw.registry.Register(plannerGatewayTestSkill{name: "resume_async"})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-async",
+		TenantID:    tenant.ID,
 		TaskID:      "task-async",
 		Goal:        "异步续跑 planner",
 		Status:      "failed",
@@ -905,6 +980,7 @@ func TestPlannerCheckpointResumePlanAsyncDeduplicatesRunningJob(t *testing.T) {
 	})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-async-dedup",
+		TenantID:    tenant.ID,
 		TaskID:      "task-async-dedup",
 		Goal:        "异步续跑不要重复执行同一个恢复点",
 		Status:      "failed",
@@ -989,6 +1065,7 @@ func TestPlannerCheckpointResumePlanAsyncJobReturnsFriendlyFailureAdvice(t *test
 	})
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-async-failed",
+		TenantID:    tenant.ID,
 		TaskID:      "task-async-failed",
 		Goal:        "异步续跑失败也要可恢复",
 		Status:      "failed",
@@ -1305,6 +1382,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 	raw := `handoff agent "file_exec" execution failed: planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF; context deadline exceeded`
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-state",
+		TenantID:    tenant.ID,
 		TaskID:      "task-state",
 		Goal:        "继续推进 Planner",
 		Status:      "failed",
@@ -1387,6 +1465,7 @@ func TestPlannerExecutionStateRecoveryPromptKeepsParsedAttachmentEvidence(t *tes
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-attachment-state",
+		TenantID:    tenant.ID,
 		TaskID:      "task-attachment-state",
 		Goal:        "根据申请表.docx 生成入驻申请材料",
 		Status:      "failed",
@@ -1468,6 +1547,7 @@ func TestPlannerExecutionStateHidesRawCompletedResultDiagnostics(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-state-friendly-result",
+		TenantID:    tenant.ID,
 		TaskID:      "task-state-friendly-result",
 		Goal:        "继续整理阶段结果",
 		Status:      "failed",
@@ -1543,6 +1623,7 @@ func TestPlannerExecutionStateIncludesCogniSummaryFromEventTrail(t *testing.T) {
 
 	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
 		PlanID:      "plan-cogni-state",
+		TenantID:    tenant.ID,
 		TaskID:      "task-cogni-state",
 		Goal:        "读取文档并续跑 Planner",
 		Status:      "running",

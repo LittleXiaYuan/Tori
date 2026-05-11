@@ -684,6 +684,34 @@ func TestFileLongHorizonCheckpointStoreRecentDeduplicatesPlanUpdates(t *testing.
 	}
 }
 
+func TestFileLongHorizonCheckpointStoreRecentForTenantScopesAndDeduplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "planner", "checkpoints.jsonl")
+	store := NewFileLongHorizonCheckpointStore(path)
+	for _, cp := range []LongHorizonCheckpoint{
+		{PlanID: "plan-shared", TenantID: "tenant-a", TaskID: "task-a-old", Completed: 0, Total: 2, Recoverable: true},
+		{PlanID: "plan-shared", TenantID: "tenant-b", TaskID: "task-b", Completed: 1, Total: 2, Recoverable: true},
+		{PlanID: "plan-shared", TenantID: "tenant-a", TaskID: "task-a-new", Completed: 2, Total: 2, Recoverable: true, Error: "latest-a"},
+	} {
+		if err := store.Save(context.Background(), cp); err != nil {
+			t.Fatalf("save checkpoint %s/%s: %v", cp.TenantID, cp.PlanID, err)
+		}
+	}
+	recentA, err := store.RecentForTenant(context.Background(), "tenant-a", 10)
+	if err != nil {
+		t.Fatalf("load tenant-a checkpoints: %v", err)
+	}
+	if len(recentA) != 1 || recentA[0].TaskID != "task-a-new" || recentA[0].Error != "latest-a" {
+		t.Fatalf("expected latest tenant-a checkpoint only, got %#v", recentA)
+	}
+	recentB, err := store.RecentForTenant(context.Background(), "tenant-b", 10)
+	if err != nil {
+		t.Fatalf("load tenant-b checkpoints: %v", err)
+	}
+	if len(recentB) != 1 || recentB[0].TaskID != "task-b" {
+		t.Fatalf("expected tenant-b checkpoint only, got %#v", recentB)
+	}
+}
+
 func TestEmitLongHorizonCheckpointPersistsSnapshot(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "checkpoints.jsonl")
 	store := NewFileLongHorizonCheckpointStore(path)

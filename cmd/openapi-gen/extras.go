@@ -19,7 +19,7 @@ type extraEndpoint struct {
 func extraPaths() []extraEndpoint {
 	return []extraEndpoint{
 		// ── Planner recovery checkpoints ─────────────────────────
-		{"/v1/planner/checkpoints", "get", "planner", "List recent recoverable planner checkpoints", "list_planner_checkpoints"},
+		{"/v1/planner/checkpoints", "get", "planner", "List recent tenant-scoped recoverable planner checkpoints", "list_planner_checkpoints"},
 		{"/v1/planner/execution-state", "get", "planner", "Read the joined execution state for one planner checkpoint", "get_planner_execution_state"},
 		{"/v1/planner/checkpoints/recover", "post", "planner", "Build a semantic recovery prompt for a planner checkpoint", "recover_planner_checkpoint"},
 		{"/v1/planner/checkpoints/resume", "post", "planner", "Create a background task from a planner checkpoint recovery plan", "resume_planner_checkpoint_task"},

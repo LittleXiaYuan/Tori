@@ -18,8 +18,12 @@ func TestE2E_PlannerCheckpointRecoveryAcrossRestart(t *testing.T) {
 
 	storePath := filepath.Join(t_tempDir(), "planner-checkpoints.jsonl")
 	store := planner.NewFileLongHorizonCheckpointStore(storePath)
+	gw, tm := newE2EGatewayFull(mock.URL)
+	gw.planner.SetLongHorizonCheckpointStore(store)
+	tenant := tm.Register("planner-recovery-e2e")
 	checkpoint := planner.LongHorizonCheckpoint{
 		PlanID:      "plan-recovery-e2e",
+		TenantID:    tenant.ID,
 		TaskID:      "task-recovery-e2e",
 		Goal:        "继续修复 planner 并保留恢复现场",
 		Status:      "failed",
@@ -53,10 +57,6 @@ func TestE2E_PlannerCheckpointRecoveryAcrossRestart(t *testing.T) {
 	if err := store.Save(context.Background(), checkpoint); err != nil {
 		t.Fatalf("save checkpoint: %v", err)
 	}
-
-	gw, tm := newE2EGatewayFull(mock.URL)
-	gw.planner.SetLongHorizonCheckpointStore(store)
-	tenant := tm.Register("planner-recovery-e2e")
 
 	req := authedRequest("GET", "/v1/planner/checkpoints?plan_id=plan-recovery-e2e&include_snapshot=1", "", tenant.APIKey)
 	w := httptest.NewRecorder()
