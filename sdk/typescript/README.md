@@ -104,6 +104,7 @@ import { createDispatchClient } from "yunque-client/dispatch";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createForkClient } from "yunque-client/fork";
 import { createSchedulerClient } from "yunque-client/scheduler";
+import { createUploadClient } from "yunque-client/upload";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -253,6 +254,13 @@ const scheduler = createSchedulerClient({
 });
 const scheduledJobs = await scheduler.jobs();
 console.log(scheduledJobs.count);
+
+const upload = createUploadClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const uploaded = await upload.file(new Blob(["hello"]), "note.txt");
+console.log(uploaded.parse?.status);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -606,7 +614,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`connectors`/`notify`/`projects`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -684,6 +692,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
 | `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
+| `src/upload.ts` | Lightweight hand-written authenticated multipart upload and parsed-file metadata slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
