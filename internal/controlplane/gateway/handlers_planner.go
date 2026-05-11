@@ -442,51 +442,45 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 		return
 	}
 	if req.Async {
-		job := plannerCheckpointResumePlanJob{
-			ID:        fmt.Sprintf("resume-plan-%d", time.Now().UnixNano()),
-			Status:    "running",
-			Action:    req.Action,
-			PlanID:    cp.PlanID,
-			TaskID:    cp.TaskID,
-			StartedAt: time.Now().UTC().Format(time.RFC3339),
-		}
-		g.savePlannerResumeJob(job)
+		job, reused := g.reservePlannerResumeJob(cp.PlanID, cp.TaskID, req.Action)
 		tenantID := tenantFromCtx(r.Context())
-		safego.Go("planner-resume-plan-"+job.ID, func() {
-			defer func() {
-				if rec := recover(); rec != nil {
+		if !reused {
+			safego.Go("planner-resume-plan-"+job.ID, func() {
+				defer func() {
+					if rec := recover(); rec != nil {
+						job.Status = "failed"
+						job.Error = fmt.Sprintf("planner resume interrupted: %v", rec)
+						applyPlannerResumeJobFailureAdvice(&job, recoveryPlan)
+						job.FinishedAt = time.Now().UTC().Format(time.RFC3339)
+						g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobTerminalEvent(job))
+					}
+				}()
+				result, err := g.planner.ResumeLongHorizonCheckpoint(context.Background(), planner.PlanRequest{
+					TenantID: tenantID,
+					TaskID:   cp.TaskID,
+					TraceID:  job.ID,
+					StepCallback: func(evt observe.AgentEvent) {
+						g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobEventFromAgent(evt))
+					},
+				}, cp, req.Action)
+				finished := time.Now().UTC().Format(time.RFC3339)
+				if err != nil {
 					job.Status = "failed"
-					job.Error = fmt.Sprintf("planner resume interrupted: %v", rec)
+					job.Error = err.Error()
 					applyPlannerResumeJobFailureAdvice(&job, recoveryPlan)
-					job.FinishedAt = time.Now().UTC().Format(time.RFC3339)
-					g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobTerminalEvent(job))
+				} else if req.Action != "partial" && plannerResumePlanResultFailed(result) {
+					job.Status = "failed"
+					job.Result = result
+					job.Error = plannerResumePlanResultError(result)
+					applyPlannerResumeJobFailureAdvice(&job, recoveryPlan)
+				} else {
+					job.Status = "completed"
+					job.Result = result
 				}
-			}()
-			result, err := g.planner.ResumeLongHorizonCheckpoint(context.Background(), planner.PlanRequest{
-				TenantID: tenantID,
-				TaskID:   cp.TaskID,
-				TraceID:  job.ID,
-				StepCallback: func(evt observe.AgentEvent) {
-					g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobEventFromAgent(evt))
-				},
-			}, cp, req.Action)
-			finished := time.Now().UTC().Format(time.RFC3339)
-			if err != nil {
-				job.Status = "failed"
-				job.Error = err.Error()
-				applyPlannerResumeJobFailureAdvice(&job, recoveryPlan)
-			} else if req.Action != "partial" && plannerResumePlanResultFailed(result) {
-				job.Status = "failed"
-				job.Result = result
-				job.Error = plannerResumePlanResultError(result)
-				applyPlannerResumeJobFailureAdvice(&job, recoveryPlan)
-			} else {
-				job.Status = "completed"
-				job.Result = result
-			}
-			job.FinishedAt = finished
-			g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobTerminalEvent(job))
-		})
+				job.FinishedAt = finished
+				g.appendAndBroadcastPlannerResumeJobEvent(&job, plannerResumeJobTerminalEvent(job))
+			})
+		}
 		w.WriteHeader(http.StatusAccepted)
 		writeJSON(w, plannerCheckpointResumePlanResponse{
 			Status:       "accepted",
@@ -1134,6 +1128,42 @@ func (g *Gateway) savePlannerResumeJob(job plannerCheckpointResumePlanJob) {
 			slog.Warn("planner resume job store append failed", "job", job.ID, "err", err)
 		}
 	}
+}
+
+func (g *Gateway) reservePlannerResumeJob(planID, taskID, action string) (plannerCheckpointResumePlanJob, bool) {
+	planID = strings.TrimSpace(planID)
+	action = normalizeCheckpointAction(action)
+	if err := g.loadPlannerResumeJobs(); err != nil {
+		slog.Warn("planner resume job store reload failed", "err", err)
+	}
+	now := time.Now().UTC()
+	job := plannerCheckpointResumePlanJob{
+		ID:        fmt.Sprintf("resume-plan-%d", now.UnixNano()),
+		Status:    "running",
+		Action:    action,
+		PlanID:    planID,
+		TaskID:    strings.TrimSpace(taskID),
+		StartedAt: now.Format(time.RFC3339),
+	}
+	g.plannerResumeJobsMu.Lock()
+	if g.plannerResumeJobs == nil {
+		g.plannerResumeJobs = make(map[string]plannerCheckpointResumePlanJob)
+	}
+	for _, existing := range g.plannerResumeJobs {
+		if existing.PlanID == planID && normalizeCheckpointAction(existing.Action) == action && existing.Status == "running" {
+			g.plannerResumeJobsMu.Unlock()
+			return existing, true
+		}
+	}
+	g.plannerResumeJobs[job.ID] = job
+	path := g.plannerResumeJobsPath
+	g.plannerResumeJobsMu.Unlock()
+	if path != "" {
+		if err := appendPlannerResumeJob(path, job); err != nil {
+			slog.Warn("planner resume job store append failed", "job", job.ID, "err", err)
+		}
+	}
+	return job, false
 }
 
 func (g *Gateway) getPlannerResumeJob(id string) (plannerCheckpointResumePlanJob, bool) {
