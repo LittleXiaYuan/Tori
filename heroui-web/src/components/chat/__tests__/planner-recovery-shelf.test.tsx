@@ -437,6 +437,71 @@ describe("PlannerRecoveryShelf", () => {
     });
   });
 
+  it("opens checkpoint dependency details when a failed resume job recommends inspection", () => {
+    const onSend = vi.fn();
+    const getCheckpointDetails = vi.fn().mockResolvedValue({
+      ...failedCheckpoint,
+      plan_snapshot: [
+        { id: 0, action: "读取附件", status: "failed" },
+        { id: 1, action: "基于附件继续", status: "pending", depends_on: [0] },
+      ],
+    });
+    const resumePlan = vi.fn().mockResolvedValue({
+      status: "accepted",
+      job_id: "resume-plan-inspect-1",
+      recovery_plan: {
+        mode: "continue",
+        executable: true,
+        plan_id: "plan-restore-1",
+        steps: [],
+        prompt: "prompt",
+      },
+    });
+    const getResumePlanJob = vi.fn().mockResolvedValue({
+      job: {
+        id: "resume-plan-inspect-1",
+        status: "failed",
+        action: "continue",
+        plan_id: "plan-restore-1",
+        friendly_error: "前置依赖尚未完成，建议先查看依赖关系。",
+        recoverable: true,
+        next_action: "inspect_dependencies",
+        events: [],
+      },
+    });
+
+    render(
+      <PlannerRecoveryShelf
+        fetchOnMount={false}
+        initialCheckpoints={[failedCheckpoint]}
+        onSend={onSend}
+        resumePlan={resumePlan}
+        getResumePlanJob={getResumePlanJob}
+        getCheckpointDetails={getCheckpointDetails}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "原规划续跑" }));
+
+    return waitFor(() => {
+      expect(screen.getByRole("button", { name: "刷新续跑状态" })).toBeInTheDocument();
+    }).then(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "刷新续跑状态" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "查看依赖关系" })).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: "查看依赖关系" }));
+
+      await waitFor(() => {
+        expect(getCheckpointDetails).toHaveBeenCalledWith("plan-restore-1");
+        expect(screen.getByText("已展开依赖视图，请先确认被阻塞步骤的前置依赖。")).toBeInTheDocument();
+        expect(screen.getByText("读取附件")).toBeInTheDocument();
+        expect(screen.getByText("基于附件继续")).toBeInTheDocument();
+        expect(screen.getByText("被阻塞 1")).toBeInTheDocument();
+        expect(screen.getByText("阻塞依赖：#0")).toBeInTheDocument();
+      });
+    });
+  });
+
   it("shows friendly direct resume failure advice without sending a chat prompt", () => {
     const onSend = vi.fn();
     const resumePlan = vi.fn().mockResolvedValue({

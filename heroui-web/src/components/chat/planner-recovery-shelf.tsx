@@ -424,6 +424,13 @@ export function PlannerRecoveryShelf({
     }
   }
 
+  async function inspectCheckpointDependencies(cp: PlannerCheckpointSummary) {
+    if (expandedPlanId !== cp.plan_id) {
+      await toggleCheckpointDetails(cp);
+    }
+    setPlanNotice("已展开依赖视图，请先确认被阻塞步骤的前置依赖。");
+  }
+
   const resumeTaskHint = taskRecoveryHint(resumeTask?.status, resumeTask?.error);
 
   return (
@@ -503,7 +510,15 @@ export function PlannerRecoveryShelf({
                     </button>
                   )}
                   {resumePlanJob.next_action === "inspect_dependencies" && (
-                    <span style={{ color: "#fcd34d" }}>建议先查看依赖关系。</span>
+                    <button
+                      type="button"
+                      disabled={disabled || detailLoadingPlanId === resumePlanJobCheckpoint.plan_id}
+                      onClick={() => void inspectCheckpointDependencies(resumePlanJobCheckpoint)}
+                      className="rounded-full px-2 py-0.5 font-medium disabled:opacity-50"
+                      style={{ color: "#fcd34d", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.22)" }}
+                    >
+                      查看依赖关系
+                    </button>
                   )}
                 </>
               )}
