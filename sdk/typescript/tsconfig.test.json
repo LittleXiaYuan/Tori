@@ -63,6 +63,7 @@
     "src/notify.ts",
     "src/projects.ts",
     "src/market.ts",
+    "src/dispatch.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",
