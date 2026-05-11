@@ -180,6 +180,7 @@ import { createSkillHubPolicyClient } from "yunque-client/skillhub-policy";
 import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createPluginCatalogClient } from "yunque-client/plugin-catalog";
+import { createPluginControlClient } from "yunque-client/plugin-control";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createConnectorCatalogClient } from "yunque-client/connector-catalog";
 import { createConnectorAuthClient } from "yunque-client/connector-auth";
@@ -963,6 +964,12 @@ const pluginCatalog = createPluginCatalogClient({
 const pluginList = await pluginCatalog.list();
 console.log(pluginList.plugins.length);
 
+const pluginControl = createPluginControlClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await pluginControl.reload();
+
 const plugins = createPluginsClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
@@ -1179,6 +1186,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/skills.ts` | Lightweight hand-written runtime skills catalog, scan, dynamic review, and suggestions slice |
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/plugin-catalog.ts` | Lightweight plugin list/status catalog facade without full SDK import |
+| `src/plugin-control.ts` | Lightweight plugin toggle/ui/reload/open-folder facade without full SDK import |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/connector-catalog.ts` | Lightweight connector list/detail catalog facade without full SDK import |
 | `src/connector-auth.ts` | Lightweight connector connect/disconnect facade without full SDK import |

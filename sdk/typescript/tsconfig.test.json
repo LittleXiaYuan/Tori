@@ -105,6 +105,7 @@
     "src/skills.ts",
     "src/plugins.ts",
     "src/plugin-catalog.ts",
+    "src/plugin-control.ts",
     "src/connectors.ts",
     "src/connector-catalog.ts",
     "src/connector-auth.ts",
@@ -135,6 +136,7 @@
     "src/**/*.test.ts"
   ]
 }
+
 
 
 
