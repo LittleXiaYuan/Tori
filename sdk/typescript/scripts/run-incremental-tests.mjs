@@ -14,6 +14,8 @@ const sources = [
   "src/memory.test.ts",
   "src/tasks.ts",
   "src/tasks.test.ts",
+  "src/task-context.ts",
+  "src/task-context.test.ts",
   "src/knowledge.ts",
   "src/knowledge.test.ts",
   "src/providers.ts",
@@ -119,6 +121,7 @@ for (const testName of [
   "chat.test",
   "memory.test",
   "tasks.test",
+  "task-context.test",
   "knowledge.test",
   "providers.test",
   "setup.test",
@@ -163,6 +166,7 @@ for (const testName of [
     .replace('from "./chat"', 'from "./chat.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
+    .replace('from "./task-context"', 'from "./task-context.js"')
     .replace('from "./knowledge"', 'from "./knowledge.js"')
     .replace('from "./providers"', 'from "./providers.js"')
     .replace('from "./setup"', 'from "./setup.js"')

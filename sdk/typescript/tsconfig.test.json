@@ -21,6 +21,7 @@
     "src/chat.ts",
     "src/memory.ts",
     "src/tasks.ts",
+    "src/task-context.ts",
     "src/knowledge.ts",
     "src/providers.ts",
     "src/setup.ts",

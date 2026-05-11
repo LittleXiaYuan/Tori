@@ -27,6 +27,10 @@
       "types": "./src/tasks.ts",
       "import": "./src/tasks.ts"
     },
+    "./task-context": {
+      "types": "./src/task-context.ts",
+      "import": "./src/task-context.ts"
+    },
     "./knowledge": {
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"
