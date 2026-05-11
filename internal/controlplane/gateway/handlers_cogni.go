@@ -94,6 +94,8 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 			g.cogniExperience(w, r, id)
 		case len(segs) == 3 && segs[1] == "experience" && segs[2] == "record":
 			g.cogniExperienceRecord(w, r, id)
+		case len(segs) == 3 && segs[1] == "experience" && strings.HasPrefix(segs[2], "patterns/"):
+			g.cogniExperiencePatternRoute(w, r, id, segs[2])
 		case len(segs) == 2 && segs[1] == "evolve":
 			g.cogniEvolve(w, r, id)
 		case len(segs) == 2 && segs[1] == "evolution":
@@ -571,4 +573,3 @@ func (g *Gateway) cogniWorkflowRun(w http.ResponseWriter, r *http.Request, id st
 }
 
 // ── Experience handlers ──
-

@@ -1157,6 +1157,11 @@ export const api = {
   // ── Cogni Experience ──
   getCogniExperience: (id: string) =>
     fetcher<import("./api-types/cogni").CogniExperienceResponse>(`/v1/cognis/${encodeURIComponent(id)}/experience`),
+  confirmCogniExperiencePattern: (id: string, patternID: string) =>
+    fetcher<{ status: string; id: string; confirmed: boolean }>(
+      `/v1/cognis/${encodeURIComponent(id)}/experience/patterns/${encodeURIComponent(patternID)}/confirm`,
+      { method: "POST" },
+    ),
 
   // ── Cogni Evolution ──
   triggerCogniEvolution: (id: string) =>

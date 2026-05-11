@@ -50,6 +50,7 @@ export class CognisClient {
   runWorkflow(id: string, workflow: string, request: CogniWorkflowRunRequest = {}): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("POST", `/v1/cognis/${enc(id)}/workflow/${enc(workflow)}`, request); }
   experience(id: string): Promise<CogniExperienceResponse> { return this.request<CogniExperienceResponse>("GET", `/v1/cognis/${enc(id)}/experience`); }
   recordExperience(id: string, request: CogniExperienceRecordRequest): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/experience/record`, request); }
+  confirmExperiencePattern(id: string, patternId: string): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/experience/patterns/${enc(patternId)}/confirm`); }
   evolve(id: string, request: Record<string, unknown> = {}): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/evolve`, request); }
   evolution(id?: string): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("GET", id ? `/v1/cognis/${enc(id)}/evolution` : "/v1/cognis/evolution"); }
 
