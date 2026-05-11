@@ -72,6 +72,8 @@ const sources = [
   "src/skillhub.test.ts",
   "src/plugins.ts",
   "src/plugins.test.ts",
+  "src/graph.ts",
+  "src/graph.test.ts",
 ];
 
 const compile = spawnSync(
@@ -134,6 +136,7 @@ for (const testName of [
   "cron.test",
   "skillhub.test",
   "plugins.test",
+  "graph.test",
 ]) {
   const compiledTestPath = join(outDir, `${testName}.js`);
   let compiledTest = readFileSync(compiledTestPath, "utf8");
@@ -170,7 +173,8 @@ for (const testName of [
     .replace('from "./files"', 'from "./files.js"')
     .replace('from "./cron"', 'from "./cron.js"')
     .replace('from "./skillhub"', 'from "./skillhub.js"')
-    .replace('from "./plugins"', 'from "./plugins.js"');
+    .replace('from "./plugins"', 'from "./plugins.js"')
+    .replace('from "./graph"', 'from "./graph.js"');
   writeFileSync(compiledTestPath, compiledTest);
 
   const run = spawnSync(process.execPath, [compiledTestPath], { stdio: "inherit" });

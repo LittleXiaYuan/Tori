@@ -142,6 +142,10 @@
     "./plugins": {
       "types": "./src/plugins.ts",
       "import": "./src/plugins.ts"
+    },
+    "./graph": {
+      "types": "./src/graph.ts",
+      "import": "./src/graph.ts"
     }
   },
   "files": [
