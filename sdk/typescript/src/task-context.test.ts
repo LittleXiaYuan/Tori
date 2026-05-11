@@ -43,6 +43,8 @@ test("TaskContextClient manages task threads", async () => {
 test("TaskContextClient throws TaskContextClientError with parsed body", async () => {
   const client = createTaskContextClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "template not found" }, { status: 404 }) });
   try { await client.template("missing"); throw new Error("expected template to reject"); } catch (error) { assert(error instanceof TaskContextClientError); assertEqual(error.status, 404); assertDeepEqual(error.body, { error: "template not found" }); assertEqual(error.message, "template not found"); }
+  const nestedClient = createTaskContextClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "task context id is required" } }, { status: 400 }) });
+  try { await nestedClient.workingMemory(""); throw new Error("expected nested memory to reject"); } catch (error) { assert(error instanceof TaskContextClientError); assertEqual(error.status, 400); assertEqual(error.message, "task context id is required"); }
 });
 
 let failures = 0; for (const { name, fn } of tests) { try { await fn(); console.log(`ok - ${name}`); } catch (error) { failures += 1; console.error(`not ok - ${name}`); console.error(error); } }
