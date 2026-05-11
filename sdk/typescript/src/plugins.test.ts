@@ -39,6 +39,8 @@ test("PluginsClient reads ui tabs reloads and opens plugin folder", async () => 
 test("PluginsClient throws PluginsClientError with parsed and text bodies", async () => {
   const jsonClient = createPluginsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "plugin not found" }, { status: 404 }) });
   try { await jsonClient.delete("missing"); throw new Error("expected delete to reject"); } catch (error) { assert(error instanceof PluginsClientError); assertEqual(error.status, 404); assertDeepEqual(error.body, { error: "plugin not found" }); assertEqual(error.message, "plugin not found"); }
+  const nestedClient = createPluginsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "plugin id is required" } }, { status: 400 }) });
+  try { await nestedClient.delete(""); throw new Error("expected delete to reject"); } catch (error) { assert(error instanceof PluginsClientError); assertEqual(error.status, 400); assertEqual(error.message, "plugin id is required"); }
   const textClient = createPluginsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("POST only", { status: 405 }) });
   try { await textClient.reload(); throw new Error("expected reload to reject"); } catch (error) { assert(error instanceof PluginsClientError); assertEqual(error.status, 405); assertEqual(error.body, "POST only"); assertEqual(error.message, "POST only"); }
 });

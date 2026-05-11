@@ -32,6 +32,8 @@ test("ConnectorsClient disconnects and executes actions", async () => {
 test("ConnectorsClient throws ConnectorsClientError with parsed and text bodies", async () => {
   const jsonClient = createConnectorsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "connector_id required" }, { status: 400 }) });
   try { await jsonClient.connect({ connector_id: "" }); throw new Error("expected connect to reject"); } catch (error) { assert(error instanceof ConnectorsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "connector_id required" }); assertEqual(error.message, "connector_id required"); }
+  const nestedClient = createConnectorsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "connector id is required" } }, { status: 400 }) });
+  try { await nestedClient.connect({ connector_id: "" }); throw new Error("expected connect to reject"); } catch (error) { assert(error instanceof ConnectorsClientError); assertEqual(error.status, 400); assertEqual(error.message, "connector id is required"); }
   const textClient = createConnectorsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.list(); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof ConnectorsClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

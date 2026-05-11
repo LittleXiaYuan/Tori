@@ -36,6 +36,8 @@ test("PluginApiClient registers extensions and lists them", async () => {
 test("PluginApiClient throws PluginApiClientError with parsed and text bodies", async () => {
   const jsonClient = createPluginApiClient({ baseUrl: "http://localhost:9090", token: "plg_demo", fetch: async () => jsonResponse({ error: "permission denied" }, { status: 403 }) });
   try { await jsonClient.llm({ messages: [] }); throw new Error("expected llm to reject"); } catch (error) { assert(error instanceof PluginApiClientError); assertEqual(error.status, 403); assertDeepEqual(error.body, { error: "permission denied" }); assertEqual(error.message, "permission denied"); }
+  const nestedClient = createPluginApiClient({ baseUrl: "http://localhost:9090", token: "plg_demo", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "plugin permission scope is required" } }, { status: 400 }) });
+  try { await nestedClient.llm({ messages: [] }); throw new Error("expected llm to reject"); } catch (error) { assert(error instanceof PluginApiClientError); assertEqual(error.status, 400); assertEqual(error.message, "plugin permission scope is required"); }
   const textClient = createPluginApiClient({ baseUrl: "http://localhost:9090", token: "plg_demo", fetch: async () => new Response("missing plugin token", { status: 401 }) });
   try { await textClient.extensions(); throw new Error("expected extensions to reject"); } catch (error) { assert(error instanceof PluginApiClientError); assertEqual(error.status, 401); assertEqual(error.body, "missing plugin token"); assertEqual(error.message, "missing plugin token"); }
 });
