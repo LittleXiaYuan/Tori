@@ -94,6 +94,10 @@
     "./audit": {
       "types": "./src/audit.ts",
       "import": "./src/audit.ts"
+    },
+    "./heartbeat": {
+      "types": "./src/heartbeat.ts",
+      "import": "./src/heartbeat.ts"
     }
   },
   "files": [

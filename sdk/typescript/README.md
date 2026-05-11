@@ -75,6 +75,7 @@ import { createLoRAClient } from "yunque-client/lora";
 import { createIterateClient } from "yunque-client/iterate";
 import { createTrustClient } from "yunque-client/trust";
 import { createAuditClient } from "yunque-client/audit";
+import { createHeartbeatClient } from "yunque-client/heartbeat";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -305,14 +306,20 @@ const audit = createAuditClient({
 });
 const integrity = await audit.verify();
 console.log(integrity.valid);
+
+const heartbeat = createHeartbeatClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await heartbeat.update({ enabled: true, interval_minutes: 30 });
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit` without
-importing the generated 500KB+ SDK/types bundle. Add future slices in the same
-style when those surfaces need stable, lightweight integration APIs.
+`/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
+without importing the generated 500KB+ SDK/types bundle. Add future slices in
+the same style when those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -359,6 +366,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |
 | `src/trust.ts` | Lightweight hand-written trust, review-gate and skill-growth slice |
 | `src/audit.ts` | Lightweight hand-written audit chain and audit trail inspection slice |
+| `src/heartbeat.ts` | Lightweight hand-written proactive heartbeat lifecycle slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
