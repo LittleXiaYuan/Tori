@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -884,6 +885,91 @@ func TestPlannerCheckpointResumePlanAsyncJobCanBePolled(t *testing.T) {
 	lastEvent := jobResp.Job.Events[len(jobResp.Job.Events)-1]
 	if lastEvent.Type != "planner.resume_plan_done" || !strings.Contains(lastEvent.Summary, "原规划续跑已完成") {
 		t.Fatalf("expected terminal completion event, got %+v", lastEvent)
+	}
+}
+
+func TestPlannerCheckpointResumePlanAsyncDeduplicatesRunningJob(t *testing.T) {
+	gw, tm := newTestGateway()
+	tenant := tm.Register("planner-checkpoint-resume-plan-async-dedup")
+	store := planner.NewFileLongHorizonCheckpointStore(filepath.Join(t.TempDir(), "checkpoints.jsonl"))
+	gw.planner = planner.NewPlanner(nil, gw.registry, 8)
+	gw.planner.SetLongHorizonCheckpointStore(store)
+	var calls atomic.Int32
+	gw.registry.Register(plannerGatewayTestSkill{
+		name: "resume_async_dedup",
+		execFn: func(context.Context, map[string]any, *skills.Environment) (string, error) {
+			calls.Add(1)
+			time.Sleep(150 * time.Millisecond)
+			return "dedup ok", nil
+		},
+	})
+	if err := store.Save(context.Background(), planner.LongHorizonCheckpoint{
+		PlanID:      "plan-async-dedup",
+		TaskID:      "task-async-dedup",
+		Goal:        "异步续跑不要重复执行同一个恢复点",
+		Status:      "failed",
+		Completed:   0,
+		Total:       1,
+		Recoverable: true,
+		UpdatedAt:   time.Now().UTC(),
+		PlanSnapshot: []planner.PlanStep{
+			{ID: 0, Action: "异步执行但只应该跑一次", Skill: "resume_async_dedup", Status: planner.StepPending},
+		},
+	}); err != nil {
+		t.Fatalf("save checkpoint: %v", err)
+	}
+
+	body := `{"plan_id":"plan-async-dedup","action":"continue","async":true}`
+	req := authedRequest(http.MethodPost, "/v1/planner/checkpoints/resume-plan", body, tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("first request expected 202, got %d body=%s", w.Code, w.Body.String())
+	}
+	var first plannerCheckpointResumePlanResponse
+	if err := json.NewDecoder(w.Body).Decode(&first); err != nil {
+		t.Fatalf("decode first accepted response: %v", err)
+	}
+	if first.JobID == "" {
+		t.Fatalf("first response missing job id: %+v", first)
+	}
+
+	req = authedRequest(http.MethodPost, "/v1/planner/checkpoints/resume-plan", body, tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("second request expected 202, got %d body=%s", w.Code, w.Body.String())
+	}
+	var second plannerCheckpointResumePlanResponse
+	if err := json.NewDecoder(w.Body).Decode(&second); err != nil {
+		t.Fatalf("decode second accepted response: %v", err)
+	}
+	if second.JobID != first.JobID {
+		t.Fatalf("expected duplicate async request to reuse running job %q, got %q", first.JobID, second.JobID)
+	}
+
+	var jobResp plannerCheckpointResumePlanJobResponse
+	for i := 0; i < 30; i++ {
+		req = authedRequest(http.MethodGet, "/v1/planner/checkpoints/resume-plan/jobs?id="+first.JobID, "", tenant.APIKey)
+		w = httptest.NewRecorder()
+		gw.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected job 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		jobResp = plannerCheckpointResumePlanJobResponse{}
+		if err := json.NewDecoder(w.Body).Decode(&jobResp); err != nil {
+			t.Fatalf("decode job response: %v", err)
+		}
+		if jobResp.Job.Status == "completed" || jobResp.Job.Status == "failed" {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if jobResp.Job.Status != "completed" {
+		t.Fatalf("expected completed deduplicated job, got %+v", jobResp.Job)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected running duplicate request to execute the resumed step once, got %d calls", got)
 	}
 }
 
