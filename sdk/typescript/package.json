@@ -79,6 +79,10 @@
       "types": "./src/interactions.ts",
       "import": "./src/interactions.ts"
     },
+    "./instructions": {
+      "types": "./src/instructions.ts",
+      "import": "./src/instructions.ts"
+    },
     "./rbac": {
       "types": "./src/rbac.ts",
       "import": "./src/rbac.ts"
