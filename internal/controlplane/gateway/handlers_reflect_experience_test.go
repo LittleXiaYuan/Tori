@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	reflectpkg "yunque-agent/internal/experimental/reflect"
@@ -85,5 +86,33 @@ func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
 	}
 	if body.Experiences[0].ID != "new-task" {
 		t.Fatalf("limit should apply after source filter and preserve newest order, got %q", body.Experiences[0].ID)
+	}
+}
+
+func TestHandleStrategiesRespectsLimit(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "first", Outcome: "success", Lesson: "first strategy lesson should appear in compiled hints"})
+	store.Add(reflectpkg.Experience{ID: "second", Outcome: "success", Lesson: "second strategy lesson should appear in compiled hints"})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/strategies?limit=1", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleStrategies(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Strategies string `json:"strategies"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Strategies == "" {
+		t.Fatal("expected strategies")
+	}
+	if count := strings.Count(body.Strategies, "推荐:"); count != 1 {
+		t.Fatalf("expected one compiled strategy, got %d in %q", count, body.Strategies)
 	}
 }
