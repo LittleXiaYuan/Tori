@@ -31,10 +31,15 @@ func initLedgerStateEngine(app *agentrt.App, typedLdg *ledger.Ledger, taskStore 
 				typedLdg.Vector.SetEmbedFunc(func(ctx context.Context, text string) ([]float32, error) {
 					return emb.Embed(ctx, text)
 				})
-				slog.Info("ledger vector index: embed function attached")
+				typedLdg.Vector.SetDimensions(emb.Dimensions())
+				slog.Info("ledger vector index: embed function attached", "dims", emb.Dimensions())
 			}
 		}
 	}
+	if typedLdg.Vector.Dimensions() == 0 {
+		typedLdg.Vector.SetDimensions(envInt("EMBED_DIMS", 0))
+	}
+	configureLedgerVectorANN(context.Background(), app, typedLdg, defaultTenantID())
 
 	typedLdg.Recall.SetGraph(typedLdg.Graph)
 
