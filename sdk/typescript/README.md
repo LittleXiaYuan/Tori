@@ -176,6 +176,7 @@ import { createCronClient } from "yunque-client/cron";
 import { createSkillHubClient } from "yunque-client/skillhub";
 import { createSkillHubCatalogClient } from "yunque-client/skillhub-catalog";
 import { createSkillHubInstallClient } from "yunque-client/skillhub-install";
+import { createSkillHubPolicyClient } from "yunque-client/skillhub-policy";
 import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
@@ -921,11 +922,17 @@ const skillhubInstall = createSkillHubInstallClient({
 const installedSkills = await skillhubInstall.installed();
 console.log(installedSkills.count);
 
+const skillhubPolicy = createSkillHubPolicyClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await skillhubPolicy.policy();
+
 const skillhub = createSkillHubClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
 });
-await skillhub.policy();
+await skillhub.analytics();
 
 const plugins = createPluginsClient({
   baseUrl: "http://localhost:9090",
@@ -1140,6 +1147,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/skillhub.ts` | Lightweight hand-written SkillHub search/install/update/policy slice |
 | `src/skillhub-catalog.ts` | Lightweight SkillHub search/trending/detail facade without full SDK import |
 | `src/skillhub-install.ts` | Lightweight SkillHub install/update/rollback lifecycle facade without full SDK import |
+| `src/skillhub-policy.ts` | Lightweight SkillHub policy/check/analytics facade without full SDK import |
 | `src/skills.ts` | Lightweight hand-written runtime skills catalog, scan, dynamic review, and suggestions slice |
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
