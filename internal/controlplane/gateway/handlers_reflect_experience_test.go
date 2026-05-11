@@ -147,6 +147,35 @@ func TestHandleStrategiesRespectsLimit(t *testing.T) {
 	}
 }
 
+func TestHandleStrategiesRespectsFilters(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "low", Source: "task", Category: "strategy", Outcome: "success", Lesson: "low quality strategy lesson should not appear", Tags: []string{"quality:4"}})
+	store.Add(reflectpkg.Experience{ID: "target", Source: "task", Category: "strategy", Outcome: "success", Lesson: "high quality strategy lesson should appear", Tags: []string{"quality:9"}})
+	store.Add(reflectpkg.Experience{ID: "chat", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat high quality strategy lesson should not appear", Tags: []string{"quality:9"}})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/strategies?source=task&tag=quality:9", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleStrategies(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Strategies string `json:"strategies"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body.Strategies, "high quality strategy lesson should appear") {
+		t.Fatalf("expected filtered strategy, got %q", body.Strategies)
+	}
+	if strings.Contains(body.Strategies, "low quality") || strings.Contains(body.Strategies, "chat high") {
+		t.Fatalf("strategies leaked non-matching experiences: %q", body.Strategies)
+	}
+}
+
 func TestHandleExperienceStatsRespectsFilters(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
 	store.Add(reflectpkg.Experience{ID: "task-success", Source: "task", Category: "strategy", Outcome: "success", Lesson: "task success lesson"})

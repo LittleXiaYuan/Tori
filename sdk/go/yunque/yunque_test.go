@@ -63,7 +63,7 @@ func TestReflectStatsAndStrategies(t *testing.T) {
 			}
 			_, _ = w.Write([]byte(`{"total":2,"by_source":{"task":2},"by_category":{"strategy":2},"by_outcome":{"success":2},"recent_7d":1}`))
 		case "/v1/reflect/strategies":
-			if r.URL.Query().Get("limit") != "3" {
+			if r.URL.Query().Get("limit") != "3" || r.URL.Query().Get("tag") != "quality:9" {
 				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"strategies":"- 推荐: keep slices small"}`))
@@ -76,7 +76,7 @@ func TestReflectStatsAndStrategies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	strategies, err := Reflect.Strategies(context.Background(), 3)
+	strategies, err := Reflect.StrategiesWithOptions(context.Background(), ReflectStrategyOptions{Tag: "quality:9", Limit: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
