@@ -203,6 +203,10 @@
       "types": "./src/orchestrator.ts",
       "import": "./src/orchestrator.ts"
     },
+    "./fork": {
+      "types": "./src/fork.ts",
+      "import": "./src/fork.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
