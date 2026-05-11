@@ -12,9 +12,16 @@ import (
 type Persona struct {
 	mu       sync.RWMutex
 	dataDir  string
-	identity string   // loaded from IDENTITY.md
-	soul     string   // loaded from SOUL.md
-	skills   []Skill  // loaded from skills/*.md
+	identity string  // loaded from IDENTITY.md
+	soul     string  // loaded from SOUL.md
+	skills   []Skill // loaded from skills/*.md
+}
+
+// DataDir returns the backing persona directory.
+func (p *Persona) DataDir() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.dataDir
 }
 
 // Skill is a modular instruction block with YAML frontmatter.
@@ -118,6 +125,56 @@ func (p *Persona) SetSoul(content string) error {
 	defer p.mu.Unlock()
 	p.soul = content
 	return os.WriteFile(filepath.Join(p.dataDir, "SOUL.md"), []byte(content), 0o644)
+}
+
+// Rename updates the displayed identity and persists it to disk.
+func (p *Persona) Rename(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("persona name is required")
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	lines := []string{fmt.Sprintf("# %s", name)}
+	if p.soul != "" {
+		lines = append(lines, "", p.soul)
+	}
+	content := strings.Join(lines, "\n")
+	p.identity = content
+	return os.WriteFile(filepath.Join(p.dataDir, "IDENTITY.md"), []byte(content), 0o644)
+}
+
+// ReplaceSoulContent replaces the soul/prompt body while preserving the file.
+func (p *Persona) ReplaceSoulContent(content string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.soul = content
+	return os.WriteFile(filepath.Join(p.dataDir, "SOUL.md"), []byte(content), 0o644)
+}
+
+// ReloadPresets is a helper for callers that want a stable reload point after
+// switching persona-related files on disk.
+func (p *Persona) ReloadPresets() {
+	p.Reload()
+}
+
+// ResetToDefaults restores the built-in identity and soul templates.
+func (p *Persona) ResetToDefaults() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.identity = defaultIdentity
+	p.soul = defaultSoul
+
+	if err := os.WriteFile(filepath.Join(p.dataDir, "IDENTITY.md"), []byte(defaultIdentity), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(p.dataDir, "SOUL.md"), []byte(defaultSoul), 0o644); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Skills returns all loaded skills.

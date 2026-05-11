@@ -25,6 +25,26 @@ func newTestLedger(t *testing.T) *ledger.Ledger {
 	return ldg
 }
 
+func TestInitLedgerAtUsesExplicitPath(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "custom", "ledger.db")
+
+	ldg, err := InitLedgerAt(dbPath)
+	if err != nil {
+		t.Fatalf("InitLedgerAt: %v", err)
+	}
+	t.Cleanup(func() { ldg.Close() })
+
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected ledger db at explicit path: %v", err)
+	}
+}
+
+func TestInitLedgerAtRejectsEmptyPath(t *testing.T) {
+	if _, err := InitLedgerAt(""); err == nil {
+		t.Fatal("expected error for empty db path")
+	}
+}
+
 func TestKVConfigStore_PutGet(t *testing.T) {
 	ldg := newTestLedger(t)
 	store := NewKVConfigStore(ldg, "test_ns")

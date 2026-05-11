@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { NotifyChannel } from "@/lib/api-types";
 import { showToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 import { Card, Button, Switch, Spinner, TextField, Input, Label, Select, ListBox } from "@heroui/react";
 import {
   Bell, Plus, Trash2, Send, MessageSquare, AlertTriangle,
@@ -33,7 +34,7 @@ export default function NotificationsPage() {
       const res = await api.notifyChannels();
       setChannels(res.channels || []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e, "加载通知渠道失败"));
     } finally {
       setLoading(false);
     }
@@ -53,7 +54,7 @@ export default function NotificationsPage() {
       setShowAdd(false);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e, "添加失败"));
     } finally {
       setBusy(null);
     }
@@ -65,7 +66,7 @@ export default function NotificationsPage() {
       await api.notifyRemove(id);
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e, "删除失败"));
     } finally {
       setBusy(null);
     }
@@ -76,7 +77,7 @@ export default function NotificationsPage() {
       await api.notifyToggle(id, enabled);
       setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, enabled } : ch));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e, "切换失败"));
     }
   };
 
@@ -86,7 +87,7 @@ export default function NotificationsPage() {
       await api.notifyTest(id);
       showToast("测试通知已发送", "success");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatErrorMessage(e, "测试失败"));
     } finally {
       setBusy(null);
     }

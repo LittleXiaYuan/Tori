@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: LINE ──────────────────────────────────────────
+// Type:     "line"
+// Protocol: Webhook (HMAC签名校验) + Push API
+// Inbound:  text, image, video, audio, sticker, location
+// Outbound: text, sticker (reply_token优先, push兜底)
+// Env vars: LINE_CHANNEL_SECRET, LINE_CHANNEL_TOKEN
+// Status:   Production — 签名校验完整, 支持 StickerSender
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

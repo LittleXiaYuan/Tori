@@ -8,6 +8,7 @@ import EmptyState from "@/components/empty-state";
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -137,7 +138,7 @@ function HeartbeatTab() {
                   {log.duration && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{log.duration}</span>}
                 </div>
                 {log.result && <div className="text-sm truncate mt-1" style={{ color: "var(--yunque-text)" }}>{log.result}</div>}
-                {log.error && <div className="text-sm truncate mt-1" style={{ color: "#f31260" }}>{log.error}</div>}
+                {log.error && <div className="text-sm truncate mt-1" style={{ color: "#f31260" }}>{formatErrorMessage(log.error, "运行失败")}</div>}
                 <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{new Date(log.started_at).toLocaleString()}</div>
               </div>
             </div>

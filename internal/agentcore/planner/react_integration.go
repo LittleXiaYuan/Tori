@@ -12,9 +12,9 @@ import (
 
 	"yunque-agent/pkg/safego"
 
-	ageval "yunque-agent/internal/experimental/eval"
 	"yunque-agent/internal/agentcore/llm"
 	"yunque-agent/internal/agentcore/localbrain"
+	ageval "yunque-agent/internal/experimental/eval"
 	agreact "yunque-agent/internal/experimental/react"
 	"yunque-agent/internal/observe"
 )
@@ -40,7 +40,8 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	initialObs := p.buildInitialObservation(req)
 
 	// Build available tools description for the LLM
-	toolsDesc := p.buildToolsDescription()
+	allowed := allowedSkillSet(req.AllowedSkills)
+	toolsDesc := p.buildToolsDescription(req.AllowedSkills)
 
 	cfg := ldg.ReActConfig{
 		MaxSteps:        p.maxSteps,
@@ -55,8 +56,14 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 	// ThinkFunc: uses LLM to produce thought + action
 	// 集成 AgenticThinking：小模型先判断思考深度，再选择对应层级的大模型
 	thinkFn := func(ctx context.Context, history []ldg.ReActStep) (*ldg.ThinkResult, error) {
-		// 第一阶段：Agentic Thinking 决定思考深度
+		// MetaCog escalation: force expert tier when critical anomalies accumulate
 		selectedTier := req.ModelOverride
+		if p.metacogBridge != nil && taskID != "" && p.metacogBridge.ShouldEscalate(taskID) && selectedTier == "" {
+			selectedTier = "expert"
+			slog.Info("planner: metacog escalation → expert tier", "task", taskID)
+		}
+
+		// 第一阶段：Agentic Thinking 决定思考深度
 		if p.agenticThinking != nil && len(history) > 0 {
 			lastObs := ""
 			if last := history[len(history)-1]; last.Result != nil {
@@ -112,7 +119,27 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 
 	// ActFunc: executes tool/skill calls
 	actFn := func(ctx context.Context, call ldg.ToolCall) (*ldg.ToolResult, error) {
-		skillName := call.Name
+		skillName := strings.TrimSpace(call.Name)
+		if len(allowed) > 0 && !allowed[skillName] {
+			errMsg := fmt.Sprintf("工具 %s 不在本次允许范围内，请改用已选择的工具继续。", skillName)
+			planSteps = append(planSteps, PlanStep{
+				ID:     len(planSteps) + 1,
+				Action: skillName,
+				Skill:  skillName,
+				Args:   call.Args,
+				Status: StepFailed,
+				Error:  errMsg,
+			})
+			if req.StepCallback != nil {
+				trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult,
+					fmt.Sprintf("[%s] 未执行：不在本次允许工具内", skillName))
+				trEvt.Meta.Skill = skillName
+				trEvt.Meta.TenantID = req.TenantID
+				trEvt.Detail = observe.ToolResultDetail{Skill: skillName, Error: errMsg}
+				req.StepCallback(trEvt)
+			}
+			return &ldg.ToolResult{Error: errMsg}, nil
+		}
 
 		// Notify: tool start
 		if req.StepCallback != nil {
@@ -124,29 +151,15 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			req.StepCallback(tsEvt)
 		}
 
-		t0 := time.Now()
-
-		// Execute the skill
-		skill, ok := p.registry.Get(skillName)
-		if !ok {
-			return &ldg.ToolResult{Error: fmt.Sprintf("unknown skill: %s", skillName)}, nil
-		}
-
-		// Trust gate
-		if p.trustCheck != nil {
-			if err := p.trustCheck(skillName); err != nil {
-				return &ldg.ToolResult{Error: fmt.Sprintf("blocked by trust gate: %s", err)}, nil
-			}
-		}
-
-		result, err := skill.Execute(ctx, call.Args, env)
-		dur := time.Since(t0)
-
-		if p.skillMetrics != nil {
-			p.skillMetrics(skillName, dur, err)
-		}
-		if p.trustRecord != nil {
-			p.trustRecord(skillName, err == nil)
+		exec := p.executeSkill(ctx, skillName, call.Args, env)
+		skillName = exec.SkillName
+		status := StepDone
+		resultText := truncate(exec.Output, 200)
+		errorText := ""
+		if exec.Err != nil {
+			status = StepFailed
+			resultText = ""
+			errorText = exec.Err.Error()
 		}
 
 		usedSkills = append(usedSkills, skillName)
@@ -154,28 +167,31 @@ func (p *Planner) runReAct(ctx context.Context, req PlanRequest) (*PlanResult, e
 			ID:     len(planSteps) + 1,
 			Action: skillName,
 			Skill:  skillName,
-			Args:   call.Args,
-			Status: StepDone,
-			Result: truncate(result, 200),
+			Args:   exec.Args,
+			Status: status,
+			Result: resultText,
+			Error:  errorText,
 		})
 
-		// Notify: tool result
 		if req.StepCallback != nil {
-			trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult,
-				fmt.Sprintf("[%s] 完成 (%dms)", skillName, dur.Milliseconds()))
+			summary := fmt.Sprintf("[%s] 完成 (%dms)", skillName, exec.Duration.Milliseconds())
+			detail := observe.ToolResultDetail{Skill: skillName, Result: truncate(exec.Output, 2000)}
+			if exec.Err != nil {
+				summary = fmt.Sprintf("[%s] 暂停：%s", skillName, plannerFriendlyFailureText(exec.Err.Error()))
+				detail = observe.ToolResultDetail{Skill: skillName, Error: plannerFriendlyFailureText(exec.Err.Error())}
+			}
+			trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, summary)
 			trEvt.Meta.Skill = skillName
 			trEvt.Meta.TenantID = req.TenantID
-			trEvt.Detail = observe.ToolResultDetail{Skill: skillName, Result: truncate(result, 2000)}
+			trEvt.Detail = detail
 			req.StepCallback(trEvt)
 		}
 
-		if err != nil {
-			planSteps[len(planSteps)-1].Status = StepFailed
-			planSteps[len(planSteps)-1].Error = err.Error()
-			return &ldg.ToolResult{Error: err.Error()}, nil
+		if exec.Err != nil {
+			return &ldg.ToolResult{Error: plannerFriendlyFailureText(exec.Err.Error())}, nil
 		}
 
-		return &ldg.ToolResult{Output: result}, nil
+		return &ldg.ToolResult{Output: exec.Output}, nil
 	}
 
 	// Step callback for UI updates
@@ -235,12 +251,16 @@ func (p *Planner) buildInitialObservation(req PlanRequest) string {
 }
 
 // buildToolsDescription creates a text description of available tools for the LLM.
-func (p *Planner) buildToolsDescription() string {
+func (p *Planner) buildToolsDescription(allowedSkills []string) string {
 	var b strings.Builder
 	b.WriteString("Available tools:\n")
+	allowed := allowedSkillSet(allowedSkills)
 
 	if p.registry != nil {
 		for _, skill := range p.registry.All() {
+			if len(allowed) > 0 && !allowed[skill.Name()] {
+				continue
+			}
 			b.WriteString(fmt.Sprintf("- %s: %s\n", skill.Name(), skill.Description()))
 		}
 	}
@@ -322,6 +342,16 @@ func (p *Planner) buildReActMessages(ctx context.Context, req PlanRequest, histo
 		})
 	}
 
+	// MetaCog correction hints: inject anomaly-based guidance when detected
+	if p.metacogBridge != nil && req.TaskID != "" {
+		if hint := p.metacogBridge.CorrectionHint(req.TaskID); hint != "" {
+			msgs = append(msgs, llm.Message{
+				Role:    "system",
+				Content: hint,
+			})
+		}
+	}
+
 	msgs = append(msgs, llm.Message{
 		Role:    "user",
 		Content: "基于上述观察和历史，输出你的下一步推理和动作（JSON 格式）。",
@@ -355,17 +385,8 @@ func (p *Planner) parseReActResponse(reply string) (*ldg.ThinkResult, error) {
 
 	// Try to find JSON object
 	if idx := strings.Index(reply, "{"); idx >= 0 {
-		depth := 0
-		for i := idx; i < len(reply); i++ {
-			if reply[i] == '{' {
-				depth++
-			} else if reply[i] == '}' {
-				depth--
-				if depth == 0 {
-					reply = reply[idx : i+1]
-					break
-				}
-			}
+		if end := findClosingBrace(reply, idx); end >= 0 {
+			reply = reply[idx : end+1]
 		}
 	}
 
@@ -393,7 +414,7 @@ func (p *Planner) parseReActResponse(reply string) (*ldg.ThinkResult, error) {
 
 	if parsed.Action != "" {
 		result.Action = &ldg.ToolCall{
-			Name: parsed.Action,
+			Name: strings.TrimSpace(parsed.Action),
 			Args: parsed.Args,
 		}
 	} else {

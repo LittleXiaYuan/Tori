@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Guardrails — input validation & safety checks.
@@ -31,11 +32,66 @@ type Guard interface {
 
 var (
 	emailRegex    = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
-	phoneRegex    = regexp.MustCompile(`(\+?\d{1,3}[\s\-]?)?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{3,4}`)
+	phoneRegex    = regexp.MustCompile(`(?:\+\d{1,3}[\s\-])?\(?\d{3,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{3,4}`)
 	ssnRegex      = regexp.MustCompile(`\b\d{3}[\-\s]?\d{2}[\-\s]?\d{4}\b`)
 	creditCardRegex = regexp.MustCompile(`\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b`)
-	ipRegex       = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
+	ipRegex       = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b`)
 )
+
+// isVersionLikeIP returns true if the IP-like match at matchStart is preceded
+// by a software version indicator (e.g., "go", "v", "version").
+func isVersionLikeIP(input string, matchStart int) bool {
+	if matchStart == 0 {
+		return false
+	}
+	start := matchStart - 30
+	if start < 0 {
+		start = 0
+	}
+	prefix := strings.ToLower(strings.TrimRight(input[start:matchStart], " \t"))
+	for _, vi := range []string{"go", "version", "ver", "node", "python", "ruby", "java", "php", "dotnet"} {
+		if strings.HasSuffix(prefix, vi) {
+			return true
+		}
+	}
+	if prefix == "v" || strings.HasSuffix(prefix, " v") || strings.HasSuffix(prefix, "\tv") {
+		return true
+	}
+	return false
+}
+
+// countDigits returns the number of ASCII digits in s.
+func countDigits(s string) int {
+	n := 0
+	for _, c := range s {
+		if c >= '0' && c <= '9' {
+			n++
+		}
+	}
+	return n
+}
+
+// replaceValidated replaces regex matches that pass the validator,
+// leaving non-validated matches untouched.
+func replaceValidated(input string, re *regexp.Regexp, mask string, validate func(string, int, int) bool) string {
+	locs := re.FindAllStringIndex(input, -1)
+	if len(locs) == 0 {
+		return input
+	}
+	var b strings.Builder
+	prev := 0
+	for _, loc := range locs {
+		b.WriteString(input[prev:loc[0]])
+		if validate(input, loc[0], loc[1]) {
+			b.WriteString(mask)
+		} else {
+			b.WriteString(input[loc[0]:loc[1]])
+		}
+		prev = loc[1]
+	}
+	b.WriteString(input[prev:])
+	return b.String()
+}
 
 type PIIGuard struct {
 	redact bool // if true, redact PII instead of blocking
@@ -54,28 +110,50 @@ func (g *PIIGuard) Check(_ context.Context, input string) CheckResult {
 	redacted := input
 
 	type piiType struct {
-		name  string
-		regex *regexp.Regexp
-		mask  string
+		name     string
+		regex    *regexp.Regexp
+		mask     string
+		validate func(string, int, int) bool
 	}
 	checks := []piiType{
-		{"email", emailRegex, "[EMAIL]"},
-		{"phone", phoneRegex, "[PHONE]"},
-		{"ssn", ssnRegex, "[SSN]"},
-		{"credit_card", creditCardRegex, "[CARD]"},
-		{"ip_address", ipRegex, "[IP]"},
+		{"email", emailRegex, "[EMAIL]", nil},
+		{"phone", phoneRegex, "[PHONE]", func(s string, start, end int) bool {
+			return countDigits(s[start:end]) >= 7
+		}},
+		{"ssn", ssnRegex, "[SSN]", nil},
+		{"credit_card", creditCardRegex, "[CARD]", nil},
+		{"ip_address", ipRegex, "[IP]", func(s string, start, _ int) bool {
+			return !isVersionLikeIP(s, start)
+		}},
 	}
 
 	for _, c := range checks {
-		if c.regex.MatchString(input) {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("PII detected: %s", c.name))
-			if g.redact {
-				redacted = c.regex.ReplaceAllString(redacted, c.mask)
-			} else {
-				result.Passed = false
-				result.Blocked = true
-				result.Rule = "pii_" + c.name
+		var detected bool
+		if c.validate != nil {
+			for _, loc := range c.regex.FindAllStringIndex(input, -1) {
+				if c.validate(input, loc[0], loc[1]) {
+					detected = true
+					break
+				}
 			}
+		} else {
+			detected = c.regex.MatchString(input)
+		}
+		if !detected {
+			continue
+		}
+
+		result.Warnings = append(result.Warnings, fmt.Sprintf("PII detected: %s", c.name))
+		if g.redact {
+			if c.validate != nil {
+				redacted = replaceValidated(redacted, c.regex, c.mask, c.validate)
+			} else {
+				redacted = c.regex.ReplaceAllString(redacted, c.mask)
+			}
+		} else {
+			result.Passed = false
+			result.Blocked = true
+			result.Rule = "pii_" + c.name
 		}
 	}
 
@@ -122,7 +200,7 @@ func (g *InjectionGuard) AddPattern(name, pattern string) {
 
 func (g *InjectionGuard) Check(_ context.Context, input string) CheckResult {
 	result := CheckResult{Passed: true}
-	lower := strings.ToLower(input)
+	lower := strings.ToLower(norm.NFKC.String(input))
 
 	for _, p := range g.patterns {
 		if strings.Contains(lower, strings.ToLower(p.pattern)) {

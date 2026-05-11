@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertTriangle, Loader2, Info,
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -32,7 +33,7 @@ export default function BackupPage() {
       const data = await api.backupInfo();
       setInfo(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load");
+      setError(formatErrorMessage(e, "加载备份信息失败"));
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ export default function BackupPage() {
       setResult(null);
       await api.backupExport();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Export failed");
+      setError(formatErrorMessage(e, "导出备份失败"));
     } finally {
       setExporting(false);
     }
@@ -62,7 +63,7 @@ export default function BackupPage() {
       setResult(res);
       fetchInfo();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Import failed");
+      setError(formatErrorMessage(e, "导入备份失败"));
     } finally {
       setImporting(false);
     }

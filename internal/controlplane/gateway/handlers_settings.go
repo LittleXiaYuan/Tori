@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -238,10 +237,7 @@ func (g *Gateway) handleSettingsCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	envExists := false
-	if _, err := os.Stat(".env"); err == nil {
-		envExists = true
-	}
+	envExists := config.ResolveEnvFilePath() != ""
 
 	values := readEnvFile()
 	hasLLMKey := values["LLM_API_KEY"] != ""
@@ -282,70 +278,11 @@ func (g *Gateway) handleSettingsCheck(w http.ResponseWriter, r *http.Request) {
 // --- helpers ---
 
 func readEnvFile() map[string]string {
-	values := make(map[string]string)
-	data, err := os.ReadFile(".env")
-	if err != nil {
-		return values
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			values[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-	}
-	return values
+	return config.ReadEnvFile()
 }
 
 func writeEnvFile(values map[string]string) error {
-	var lines []string
-	lines = append(lines, "# ╔════════════════════════════════════╗")
-	lines = append(lines, "# ║  云雀 Agent 配置文件               ║")
-	lines = append(lines, "# ║  由 Settings 页面管理              ║")
-	lines = append(lines, "# ╚════════════════════════════════════╝")
-	lines = append(lines, "")
-
-	// Write groups in schema order, then any extra keys
-	written := map[string]bool{}
-	for _, group := range configSchema {
-		lines = append(lines, fmt.Sprintf("# ── %s ──", group.Label))
-		for _, f := range group.Fields {
-			v := values[f.Key]
-			if v == "" {
-				lines = append(lines, fmt.Sprintf("# %s=", f.Key))
-			} else {
-				lines = append(lines, fmt.Sprintf("%s=%s", f.Key, v))
-			}
-			written[f.Key] = true
-		}
-		lines = append(lines, "")
-	}
-
-	// Write any extra keys not in the schema
-	var extras []string
-	for k := range values {
-		if !written[k] && values[k] != "" {
-			extras = append(extras, k)
-		}
-	}
-	if len(extras) > 0 {
-		sort.Strings(extras)
-		lines = append(lines, "# ── Extra ──")
-		for _, k := range extras {
-			lines = append(lines, fmt.Sprintf("%s=%s", k, values[k]))
-		}
-		lines = append(lines, "")
-	}
-
-	// Atomic write: write to temp file first, then rename
-	tmp := ".env.tmp"
-	if err := os.WriteFile(tmp, []byte(strings.Join(lines, "\n")+"\n"), 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, ".env")
+	return config.WriteEnvFile(values)
 }
 
 // handleConfigReload re-reads .env, recreates LLM clients, and hot-swaps them

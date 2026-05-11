@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"yunque-agent/pkg/safego"
@@ -43,6 +45,8 @@ import (
 //   "这是最终结果..."
 // ──────────────────────────────────────────────
 
+const hiddenAttachmentContextMarker = "[隐藏附件上下文]"
+
 func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	tid := tenantFromCtx(r.Context())
 	ctx, traceSpan := observe.StartTrace(r.Context(), "gateway.handleAgenticChat")
@@ -58,7 +62,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.Header().Set("X-Trace-ID", observe.TraceIDFromContext(ctx))
@@ -69,6 +73,47 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		observe.EndSpan(traceSpan, nil)
 		return
 	}
+
+	var streamMu sync.Mutex
+	sendEvent := func(event, data string) {
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		sseEvent(w, flusher, event, data)
+	}
+	sendKeepAlive := func() {
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		// Some dev/proxy layers buffer tiny SSE frames. A padded comment is a
+		// legal SSE heartbeat, ignored by our parser, but large enough to flush
+		// through Next/Tauri dev plumbing and reset the browser read timer.
+		_, _ = w.Write([]byte(": yunque-agent keepalive " + strings.Repeat(".", 2048) + "\n\n"))
+		flusher.Flush()
+	}
+
+	// Send an immediate empty frame so the browser knows the stream is alive
+	// before guardrails, memory, routing, or the first upstream LLM token runs.
+	// Some providers can take >60s to produce a first token; without this ping
+	// the frontend may show “响应超时（60s 无数据）” even though the request is still running.
+	sendKeepAlive()
+	sendEvent("ping", "")
+
+	heartbeatDone := make(chan struct{})
+	defer close(heartbeatDone)
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-heartbeatDone:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sendKeepAlive()
+				sendEvent("ping", "")
+			}
+		}
+	}()
 
 	// Attachment is an inline user-uploaded file. Currently used by the Cherry
 	// input-bar 📎 drawer. For now we stay in-process (no persistent storage)
@@ -87,20 +132,22 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		Thinking    *bool         `json:"thinking,omitempty"`
 		Mode        string        `json:"mode,omitempty"`
 		AiriMode    bool          `json:"airi_mode,omitempty"`
-		WebSearch   bool          `json:"web_search,omitempty"`   // Cherry 🌐 drawer: force-enable web search
-		ToolIDs     []string      `json:"tool_ids,omitempty"`     // Cherry 🔨 drawer: restrict to explicit skill subset
-		Attachments []Attachment  `json:"attachments,omitempty"`  // Cherry 📎 drawer: inline per-turn files
+		WebSearch   bool          `json:"web_search,omitempty"`  // Cherry 🌐 drawer: force-enable web search
+		ToolIDs     []string      `json:"tool_ids,omitempty"`    // Cherry 🔨 drawer: restrict to explicit skill subset
+		Attachments []Attachment  `json:"attachments,omitempty"` // Cherry 📎 drawer: inline per-turn files
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sseEvent(w, flusher, "error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
+		sendEvent("error", `{"code":"BAD_REQUEST","message":"invalid body"}`)
 		observe.EndSpan(traceSpan, err)
 		return
 	}
 	if len(req.Messages) == 0 {
-		sseEvent(w, flusher, "error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
+		sendEvent("error", `{"code":"MESSAGES_REQUIRED","message":"messages array is required"}`)
 		observe.EndSpan(traceSpan, nil)
 		return
 	}
+	visibleMessages := cloneLLMMessages(req.Messages)
+	hiddenAttachmentMessage := llm.Message{}
 
 	// Inline attachments: for text-like MIMEs we decode and append the body
 	// into the last user message. Binary / image attachments are only listed
@@ -110,16 +157,21 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		const maxPerFile = 64 * 1024
 		const maxFiles = 4
 		var inlined strings.Builder
+		hiddenAttachmentContext := ""
+		attachmentSummaries := make([]string, 0, len(req.Attachments))
 		for i, a := range req.Attachments {
 			if i >= maxFiles {
 				inlined.WriteString(fmt.Sprintf("\n[...%d more attachment(s) omitted]\n", len(req.Attachments)-maxFiles))
+				attachmentSummaries = append(attachmentSummaries, fmt.Sprintf("- 还有 %d 个附件已省略；如需处理请分批发送。", len(req.Attachments)-maxFiles))
 				break
 			}
 			decoded, err := base64.StdEncoding.DecodeString(a.DataB64)
 			if err != nil {
 				inlined.WriteString(fmt.Sprintf("\n[Attached: %s (%s) — decode failed]\n", a.Name, a.Mime))
+				attachmentSummaries = append(attachmentSummaries, fmt.Sprintf("- %s：读取失败，可重新上传。", a.Name))
 				continue
 			}
+			isAttachmentMetadata := strings.Contains(a.Mime, "x-yunque-attachment-metadata")
 			isText := strings.HasPrefix(a.Mime, "text/") ||
 				strings.Contains(a.Mime, "json") ||
 				strings.Contains(a.Mime, "xml") ||
@@ -128,17 +180,34 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 				strings.Contains(a.Mime, "typescript")
 			if isText {
 				body := string(decoded)
-				if len(body) > maxPerFile {
-					body = body[:maxPerFile] + "\n...[truncated]"
-				}
+				body = truncateUTF8ByBytes(body, maxPerFile, "\n...[truncated]")
 				inlined.WriteString(fmt.Sprintf("\n[Attached file: %s, %s, %d bytes]\n```\n%s\n```\n", a.Name, a.Mime, len(decoded), body))
+				if isAttachmentMetadata {
+					attachmentSummaries = append(attachmentSummaries, fmt.Sprintf("- %s（%s，%d bytes）：已记录文件信息，正文未直接展开。", a.Name, a.Mime, len(decoded)))
+				} else {
+					attachmentSummaries = append(attachmentSummaries, fmt.Sprintf("- %s（%s，%d bytes）：内容已作为隐藏上下文提供给模型。", a.Name, a.Mime, len(decoded)))
+				}
 			} else {
 				inlined.WriteString(fmt.Sprintf("\n[Attached binary: %s, %s, %d bytes (content omitted from prompt)]\n", a.Name, a.Mime, len(decoded)))
+				attachmentSummaries = append(attachmentSummaries, fmt.Sprintf("- %s（%s，%d bytes）：已记录文件信息，正文未直接展开。", a.Name, a.Mime, len(decoded)))
 			}
 		}
 		if inlined.Len() > 0 && len(req.Messages) > 0 {
 			lastIdx := len(req.Messages) - 1
-			req.Messages[lastIdx].Content = req.Messages[lastIdx].Content + inlined.String()
+			hiddenAttachmentContext = inlined.String()
+			req.Messages[lastIdx].Content = req.Messages[lastIdx].Content + hiddenAttachmentContext
+		}
+		if len(attachmentSummaries) > 0 && len(visibleMessages) > 0 {
+			lastIdx := len(visibleMessages) - 1
+			if visibleMessages[lastIdx].Role == "user" {
+				visibleMessages[lastIdx].Content = appendAttachmentSummaryForDisplay(visibleMessages[lastIdx].Content, attachmentSummaries)
+			}
+		}
+		if hiddenAttachmentContext != "" && req.SessionID != "" {
+			hiddenAttachmentMessage = llm.Message{
+				Role:    "system",
+				Content: buildHiddenAttachmentContextMessage(hiddenAttachmentContext),
+			}
 		}
 	}
 
@@ -158,12 +227,21 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		lastMsg := req.Messages[len(req.Messages)-1].Content
 		guardResult := g.zhGuard.Run(ctx, lastMsg)
 		if guardResult.Blocked {
-			sseEvent(w, flusher, "error", `{"code":"BLOCKED","message":"内容安全检查未通过"}`)
+			sendEvent("error", `{"code":"BLOCKED","message":"内容安全检查未通过"}`)
 			observe.EndSpan(traceSpan, nil)
 			return
 		}
 		if guardResult.Redacted != "" {
 			req.Messages[len(req.Messages)-1].Content = guardResult.Redacted
+			if len(visibleMessages) > 0 {
+				lastVisibleIdx := len(visibleMessages) - 1
+				if visibleMessages[lastVisibleIdx].Role == "user" && visibleMessages[lastVisibleIdx].Content != "" {
+					visibleGuard := g.zhGuard.Run(ctx, visibleMessages[lastVisibleIdx].Content)
+					if visibleGuard.Redacted != "" {
+						visibleMessages[lastVisibleIdx].Content = visibleGuard.Redacted
+					}
+				}
+			}
 		}
 	}
 
@@ -171,16 +249,21 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	msgs := req.Messages
 	if req.SessionID != "" {
 		_ = g.convStore.GetOrCreate(req.SessionID, tid)
+		history := g.convStore.Get(req.SessionID)
 		if len(req.Messages) <= 1 {
-			history := g.convStore.Get(req.SessionID)
 			if len(history) > 0 {
 				msgs = append(history, req.Messages...)
 			}
+		} else if hiddenContexts := hiddenAttachmentContextMessages(history); len(hiddenContexts) > 0 {
+			msgs = append(hiddenContexts, req.Messages...)
 		}
 		if len(req.Messages) > 0 {
-			lastMsg := req.Messages[len(req.Messages)-1]
+			lastMsg := visibleMessages[len(visibleMessages)-1]
 			if lastMsg.Role == "user" {
 				g.convStore.Append(req.SessionID, lastMsg)
+			}
+			if hiddenAttachmentMessage.Content != "" {
+				g.convStore.Append(req.SessionID, hiddenAttachmentMessage)
 			}
 		}
 	}
@@ -201,7 +284,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			}
 			chunk := string(runes[i:end])
 			data, _ := json.Marshal(map[string]string{"content": chunk})
-			sseEvent(w, flusher, "delta", string(data))
+			sendEvent("delta", string(data))
 		}
 		doneBytes, _ := json.Marshal(map[string]any{
 			"reply":               reply,
@@ -212,7 +295,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 				{"type": "followup", "label": "Open browser setup"},
 			},
 		})
-		sseEvent(w, flusher, "done", string(doneBytes))
+		sendEvent("done", string(doneBytes))
 		if req.SessionID != "" {
 			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
 		}
@@ -220,12 +303,12 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Memory: write user message(s) to short-term
-	if g.orchestrator != nil && len(req.Messages) > 0 {
-		for _, m := range req.Messages {
-		if m.Role == "user" && m.Content != "" {
-			_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
-			g.metrics.Cognitive().MemoryIngest.Add(1)
-		}
+	if g.orchestrator != nil && len(visibleMessages) > 0 {
+		for _, m := range visibleMessages {
+			if m.Role == "user" && m.Content != "" {
+				_ = g.orchestrator.Ingest(ctx, tid, m.Content, "conversation", "user_input")
+				g.metrics.Cognitive().MemoryIngest.Add(1)
+			}
 		}
 	}
 
@@ -278,10 +361,27 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// Session-level provider override
 	var sessionClient *llm.Client
-	if req.SessionID != "" && g.providerReg != nil {
-		if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
-			sessionClient = sp.Client
-			slog.Info("agentic: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
+	if g.providerReg != nil {
+		if req.SessionID != "" {
+			if sp := g.providerReg.GetForSession(req.SessionID); sp != nil {
+				sessionClient = sp.Client
+				slog.Info("agentic: using session provider override", "session", req.SessionID, "provider", sp.Config.ID)
+			}
+		}
+		// The provider settings page writes the visible "execution provider" via
+		// /api/providers/exec. Historically that only affected sub/exec agents,
+		// while the main agentic planner still used the smart tier (usually the
+		// env primary, e.g. Moonshot). Honor it here too so the model shown in
+		// chat is the model that actually answers.
+		if sessionClient == nil {
+			if execProvider := strings.TrimSpace(g.ExecProvider()); execProvider != "" && execProvider != "smart" {
+				if ep := g.providerReg.Get(execProvider); ep != nil && ep.Config.Enabled {
+					sessionClient = ep.Client
+					slog.Info("agentic: using exec provider override", "provider", ep.Config.ID, "model", ep.Config.Model)
+				} else {
+					slog.Warn("agentic: exec provider override not available, falling back", "provider", execProvider)
+				}
+			}
 		}
 	}
 
@@ -298,8 +398,9 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		DisableDelegation: chatMode,
 		AllowedSkills:     req.ToolIDs,
 		StepCallback: func(event observe.AgentEvent) {
-			data, _ := json.Marshal(event)
-			sseEvent(w, flusher, event.QualifiedType(), string(data))
+			streamEvent := friendlyAgentEventForStream(event)
+			data, _ := json.Marshal(streamEvent)
+			sendEvent(event.QualifiedType(), string(data))
 			// Record to audit trail
 			if g.eventTrail != nil {
 				g.eventTrail.Record(event)
@@ -310,8 +411,8 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	if slashResp, handled, slashErr := g.tryHandleSlashCommand(ctx, planReq); handled {
 		if slashErr != nil {
-			errData, _ := json.Marshal(map[string]string{"code": "SLASH_COMMAND_ERROR", "message": slashErr.Error()})
-			sseEvent(w, flusher, "error", string(errData))
+			errData, _ := json.Marshal(map[string]string{"code": "SLASH_COMMAND_ERROR", "message": friendlyChatPipelineError(slashErr)})
+			sendEvent("error", string(errData))
 			observe.EndSpan(traceSpan, slashErr)
 			return
 		}
@@ -326,11 +427,11 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 			}
 			chunk := string(runes[i:end])
 			data, _ := json.Marshal(map[string]string{"content": chunk})
-			sseEvent(w, flusher, "delta", string(data))
+			sendEvent("delta", string(data))
 		}
 
 		doneBytes, _ := json.Marshal(slashResp.Raw)
-		sseEvent(w, flusher, "done", string(doneBytes))
+		sendEvent("done", string(doneBytes))
 		if req.SessionID != "" {
 			g.convStore.Append(req.SessionID, llm.Message{Role: "assistant", Content: reply})
 		}
@@ -341,8 +442,8 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	result, err := g.planner.Run(ctx, planReq)
 	if err != nil {
 		slog.Error("agentic planner error", "err", err, "tenant", tid)
-		errData, _ := json.Marshal(map[string]string{"code": "PLANNER_ERROR", "message": err.Error()})
-		sseEvent(w, flusher, "error", string(errData))
+		errData, _ := json.Marshal(map[string]string{"code": "PLANNER_ERROR", "message": friendlyChatPipelineError(err)})
+		sendEvent("error", string(errData))
 		observe.EndSpan(traceSpan, err)
 		return
 	}
@@ -362,13 +463,13 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	if len(result.Actions) > 0 {
 		actJSON, _ := json.Marshal(result.Actions)
-		sseEvent(w, flusher, "actions", string(actJSON))
+		sendEvent("actions", string(actJSON))
 	}
 
 	// Stream reasoning content (thinking) if present
 	if result.ReasoningContent != "" {
 		thinkData, _ := json.Marshal(map[string]string{"content": result.ReasoningContent})
-		sseEvent(w, flusher, "thinking", string(thinkData))
+		sendEvent("thinking", string(thinkData))
 	}
 
 	// Stream final reply as delta events (chunked for smooth UX)
@@ -382,7 +483,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 		}
 		chunk := string(runes[i:end])
 		data, _ := json.Marshal(map[string]string{"content": chunk})
-		sseEvent(w, flusher, "delta", string(data))
+		sendEvent("delta", string(data))
 		time.Sleep(30 * time.Millisecond) // simulate natural typing
 	}
 
@@ -440,7 +541,7 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doneBytes, _ := json.Marshal(doneData)
-	sseEvent(w, flusher, "done", string(doneBytes))
+	sendEvent("done", string(doneBytes))
 
 	// Save assistant reply to session
 	if req.SessionID != "" {
@@ -455,11 +556,11 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Memory pipeline (async) — skipped in fast/chat mode
-	if g.pipeline != nil && !fastMode && !chatMode && len(req.Messages) > 0 {
+	if g.pipeline != nil && !fastMode && !chatMode && len(visibleMessages) > 0 {
 		lastUserMsg := ""
-		for i := len(req.Messages) - 1; i >= 0; i-- {
-			if req.Messages[i].Role == "user" {
-				lastUserMsg = req.Messages[i].Content
+		for i := len(visibleMessages) - 1; i >= 0; i-- {
+			if visibleMessages[i].Role == "user" {
+				lastUserMsg = visibleMessages[i].Content
 				break
 			}
 		}
@@ -486,9 +587,9 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 
 	// ReplyHook broadcast
 	lastUserMsgForHook := ""
-	for i := len(req.Messages) - 1; i >= 0; i-- {
-		if req.Messages[i].Role == "user" {
-			lastUserMsgForHook = req.Messages[i].Content
+	for i := len(visibleMessages) - 1; i >= 0; i-- {
+		if visibleMessages[i].Role == "user" {
+			lastUserMsgForHook = visibleMessages[i].Content
 			break
 		}
 	}
@@ -512,6 +613,181 @@ func (g *Gateway) handleAgenticChat(w http.ResponseWriter, r *http.Request) {
 	g.metrics.RecordRequest(time.Since(start), estTokens, estTokens, nil)
 
 	observe.EndSpan(traceSpan, nil)
+}
+
+func friendlyAgentEventForStream(event observe.AgentEvent) observe.AgentEvent {
+	streamEvent := event
+	if friendly := plannerKnownFriendlyError(streamEvent.Summary); friendly != "" {
+		streamEvent.Summary = friendly
+	}
+	streamEvent.Detail = friendlyAgentEventDetailForStream(streamEvent.Detail)
+	return streamEvent
+}
+
+func cloneLLMMessages(in []llm.Message) []llm.Message {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]llm.Message, len(in))
+	copy(out, in)
+	return out
+}
+
+func truncateUTF8ByBytes(s string, maxBytes int, suffix string) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(maxBytes + len(suffix))
+	for _, r := range s {
+		next := string(r)
+		if b.Len()+len(next) > maxBytes {
+			break
+		}
+		b.WriteString(next)
+	}
+	return b.String() + suffix
+}
+
+func appendAttachmentSummaryForDisplay(content string, summaries []string) string {
+	if len(summaries) == 0 {
+		return content
+	}
+	var b strings.Builder
+	b.WriteString(strings.TrimSpace(content))
+	if b.Len() > 0 {
+		b.WriteString("\n\n")
+	}
+	b.WriteString("[附件已读取]\n")
+	b.WriteString(strings.Join(summaries, "\n"))
+	return b.String()
+}
+
+func buildHiddenAttachmentContextMessage(context string) string {
+	context = strings.TrimSpace(context)
+	if context == "" {
+		return ""
+	}
+	return hiddenAttachmentContextMarker + "\n这段内容供后续追问时继续读取附件使用，不应直接展示给用户。\n\n" + context
+}
+
+func hiddenAttachmentContextMessages(msgs []llm.Message) []llm.Message {
+	if len(msgs) == 0 {
+		return nil
+	}
+	out := make([]llm.Message, 0, 2)
+	for _, msg := range msgs {
+		if isHiddenAttachmentContextMessage(msg) {
+			out = append(out, msg)
+		}
+	}
+	const maxHiddenAttachmentContexts = 2
+	if len(out) > maxHiddenAttachmentContexts {
+		out = append([]llm.Message(nil), out[len(out)-maxHiddenAttachmentContexts:]...)
+	}
+	return out
+}
+
+func isHiddenAttachmentContextMessage(msg llm.Message) bool {
+	return msg.Role == "system" && strings.Contains(msg.Content, hiddenAttachmentContextMarker)
+}
+
+func friendlyAgentEventDetailForStream(detail any) any {
+	switch d := detail.(type) {
+	case observe.HandoffDetail:
+		if friendly := plannerKnownFriendlyError(d.Error); friendly != "" {
+			d.Error = friendly
+		}
+		return d
+	case *observe.HandoffDetail:
+		if d == nil {
+			return detail
+		}
+		clone := *d
+		if friendly := plannerKnownFriendlyError(clone.Error); friendly != "" {
+			clone.Error = friendly
+		}
+		return &clone
+	case observe.ToolResultDetail:
+		if friendly := plannerKnownFriendlyError(d.Error); friendly != "" {
+			d.Error = friendly
+		}
+		if friendly := plannerKnownFriendlyError(d.Result); friendly != "" {
+			d.Result = friendly
+		}
+		return d
+	case *observe.ToolResultDetail:
+		if d == nil {
+			return detail
+		}
+		clone := *d
+		if friendly := plannerKnownFriendlyError(clone.Error); friendly != "" {
+			clone.Error = friendly
+		}
+		if friendly := plannerKnownFriendlyError(clone.Result); friendly != "" {
+			clone.Result = friendly
+		}
+		return &clone
+	case planner.ModelFallbackDetail:
+		if friendly := plannerKnownFriendlyError(d.Reason); friendly != "" {
+			d.Reason = friendly
+		}
+		return d
+	case *planner.ModelFallbackDetail:
+		if d == nil {
+			return detail
+		}
+		clone := *d
+		if friendly := plannerKnownFriendlyError(clone.Reason); friendly != "" {
+			clone.Reason = friendly
+		}
+		return &clone
+	default:
+		return sanitizeAgentEventDetailValue(detail)
+	}
+}
+
+func sanitizeAgentEventDetailValue(value any) any {
+	switch v := value.(type) {
+	case string:
+		if friendly := plannerKnownFriendlyError(v); friendly != "" {
+			return friendly
+		}
+		return value
+	case map[string]any:
+		clone := make(map[string]any, len(v))
+		changed := false
+		for key, raw := range v {
+			sanitized := sanitizeAgentEventDetailValue(raw)
+			clone[key] = sanitized
+			if !reflect.DeepEqual(sanitized, raw) {
+				changed = true
+			}
+		}
+		if changed {
+			return clone
+		}
+		return value
+	case []any:
+		clone := make([]any, len(v))
+		changed := false
+		for i, raw := range v {
+			sanitized := sanitizeAgentEventDetailValue(raw)
+			clone[i] = sanitized
+			if !reflect.DeepEqual(sanitized, raw) {
+				changed = true
+			}
+		}
+		if changed {
+			return clone
+		}
+		return value
+	default:
+		return value
+	}
 }
 
 // buildSuggestions generates follow-up suggestions.

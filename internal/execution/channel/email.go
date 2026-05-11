@@ -1,5 +1,21 @@
 package channel
 
+// ─── Channel: Email ─────────────────────────────────────────
+// Type:     "email"
+// Protocol: SMTP出站 (STARTTLS/SSL)，入站需外部 Push
+// Inbound:  text (通过 Push() 方法注入，需外部 IMAP/Webhook 对接)
+// Outbound: text (纯文本邮件)
+// Env vars: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
+//           SMTP_FROM, SMTP_USE_TLS
+// Status:   Stub — 仅出站 SMTP，无自主入站能力
+//
+// TODO: [P1] 实现 IMAP 轮询入站 (替代外部 Push 依赖)
+// TODO: [P2] 支持 HTML 富文本邮件 (Content-Type: text/html)
+// TODO: [P2] 支持邮件附件发送 (multipart/mixed MIME)
+// TODO: [P3] 支持入站 Webhook (如 SendGrid/Mailgun Inbound Parse)
+// TODO: [P3] 邮件主题智能提取优化
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"crypto/tls"

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -273,6 +274,17 @@ func TestCountJSONLLines(t *testing.T) {
 	}
 }
 
+func TestCountJSONLLines_NoTrailingNewline(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
+	os.WriteFile(path, []byte("{\"a\":1}\n{\"b\":2}"), 0644)
+
+	count := countJSONLLines(path)
+	if count != 2 {
+		t.Errorf("count = %d, want 2", count)
+	}
+}
+
 func TestCountJSONLLines_Missing(t *testing.T) {
 	count := countJSONLLines("/nonexistent/file.jsonl")
 	if count != 0 {
@@ -327,6 +339,50 @@ func TestCountAvailableSamples_SingleFile(t *testing.T) {
 	}
 }
 
+func TestCountAvailableSamples_SingleFileNoTrailingNewline(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+
+	singlePath := filepath.Join(tmpDir, "only.jsonl")
+	os.WriteFile(singlePath, []byte("{}"), 0644)
+
+	total, dataPath, err := s.countAvailableSamples()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("total = %d, want 1", total)
+	}
+	if dataPath != singlePath {
+		t.Errorf("single file should return original path, got %s", dataPath)
+	}
+}
+
+func TestCountAvailableSamples_IgnoresGeneratedArtifacts(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+
+	rawPath := filepath.Join(tmpDir, "raw.jsonl")
+	os.WriteFile(rawPath, []byte("{}\n{}\n"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "merged_20260505_120000.jsonl"), []byte("{}\n{}\n{}\n"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "filtered_20260505_120000.jsonl"), []byte("{}\n{}\n{}\n{}\n"), 0644)
+
+	total, dataPath, err := s.countAvailableSamples()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("total = %d, want 2", total)
+	}
+	if dataPath != rawPath {
+		t.Errorf("dataPath = %s, want %s", dataPath, rawPath)
+	}
+}
+
 func TestCountAvailableSamples_EmptyDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := DefaultSchedulerConfig()
@@ -339,6 +395,111 @@ func TestCountAvailableSamples_EmptyDir(t *testing.T) {
 	}
 	if total != 0 || dataPath != "" {
 		t.Errorf("empty dir: total=%d, path=%s", total, dataPath)
+	}
+}
+
+func TestCountAvailableSamples_MissingDir(t *testing.T) {
+	tmpDir := filepath.Join(t.TempDir(), "missing")
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+
+	total, dataPath, err := s.countAvailableSamples()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 0 || dataPath != "" {
+		t.Errorf("missing dir: total=%d, path=%s", total, dataPath)
+	}
+}
+
+func TestPreviewTrainingDataAppliesFilterReadiness(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	cfg.MinSamples = 2
+	cfg.FilterEnabled = true
+
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+	lines := []string{
+		`{"instruction":"valid instruction","input":"useful input","output":"useful output text"}`,
+		`{"instruction":"valid instruction","input":"useful input","output":"useful output text"}`,
+		`{"instruction":"x","input":"","output":"no"}`,
+	}
+	os.WriteFile(filepath.Join(tmpDir, "train.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0644)
+
+	preview, err := s.PreviewTrainingData("tenant-a")
+	if err != nil {
+		t.Fatalf("PreviewTrainingData: %v", err)
+	}
+	if preview.RawSamples != 3 {
+		t.Fatalf("RawSamples = %d, want 3", preview.RawSamples)
+	}
+	if preview.UsableSamples != 1 {
+		t.Fatalf("UsableSamples = %d, want 1", preview.UsableSamples)
+	}
+	if preview.Ready {
+		t.Fatal("preview should not be ready when usable samples are below min_samples")
+	}
+	if preview.FilterStats == nil || preview.FilterStats.DroppedDup != 1 || preview.FilterStats.DroppedTooShort != 1 {
+		t.Fatalf("unexpected filter stats: %+v", preview.FilterStats)
+	}
+}
+
+func TestPreviewTrainingDataMissingDirIsEmpty(t *testing.T) {
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = filepath.Join(t.TempDir(), "missing")
+	cfg.MinSamples = 2
+
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+
+	preview, err := s.PreviewTrainingData("tenant-a")
+	if err != nil {
+		t.Fatalf("PreviewTrainingData: %v", err)
+	}
+	if preview.RawSamples != 0 || preview.UsableSamples != 0 {
+		t.Fatalf("missing dir should preview as empty, got %+v", preview)
+	}
+	if preview.Ready {
+		t.Fatal("missing dir preview should not be ready")
+	}
+	if preview.Reason != "no training samples found" {
+		t.Fatalf("Reason = %q, want no training samples found", preview.Reason)
+	}
+}
+
+func TestPreviewTrainingDataMultipleFilesDoesNotMerge(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	cfg.MinSamples = 2
+	cfg.FilterEnabled = true
+
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+	valid := `{"instruction":"valid instruction","input":"useful input","output":"useful output text"}`
+	os.WriteFile(filepath.Join(tmpDir, "a.jsonl"), []byte(valid+"\n"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "b.jsonl"), []byte(valid+"\n"), 0644)
+
+	preview, err := s.PreviewTrainingData("tenant-a")
+	if err != nil {
+		t.Fatalf("PreviewTrainingData: %v", err)
+	}
+	if preview.RawSamples != 2 {
+		t.Fatalf("RawSamples = %d, want 2", preview.RawSamples)
+	}
+	if preview.UsableSamples != 1 {
+		t.Fatalf("UsableSamples = %d, want 1 after cross-file dedup", preview.UsableSamples)
+	}
+	if preview.FilterStats == nil || preview.FilterStats.DroppedDup != 1 {
+		t.Fatalf("unexpected filter stats: %+v", preview.FilterStats)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "merged_*.jsonl"))
+	if err != nil {
+		t.Fatalf("glob merged files: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("preview should not create merged files, found %v", matches)
 	}
 }
 
@@ -563,5 +724,37 @@ func TestMergeJSONLFiles(t *testing.T) {
 	count := countJSONLLines(merged)
 	if count != 2 {
 		t.Errorf("merged line count = %d, want 2", count)
+	}
+}
+
+func TestMergeJSONLFilesUniqueNames(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := DefaultSchedulerConfig()
+	cfg.TrainingDataDir = tmpDir
+	s := NewLoRAScheduler(nil, nil, nil, cfg)
+
+	os.WriteFile(filepath.Join(tmpDir, "a.jsonl"), []byte("{\"a\":1}\n"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "b.jsonl"), []byte("{\"b\":2}\n"), 0644)
+
+	files := []string{
+		filepath.Join(tmpDir, "a.jsonl"),
+		filepath.Join(tmpDir, "b.jsonl"),
+	}
+	first, err := s.mergeJSONLFiles(files, tmpDir)
+	if err != nil {
+		t.Fatalf("first merge failed: %v", err)
+	}
+	second, err := s.mergeJSONLFiles(files, tmpDir)
+	if err != nil {
+		t.Fatalf("second merge failed: %v", err)
+	}
+	if first == second {
+		t.Fatalf("merge should not reuse output names: %s", first)
+	}
+	if _, err := os.Stat(first); err != nil {
+		t.Fatalf("first merged file missing: %v", err)
+	}
+	if _, err := os.Stat(second); err != nil {
+		t.Fatalf("second merged file missing: %v", err)
 	}
 }

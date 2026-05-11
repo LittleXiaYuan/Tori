@@ -124,6 +124,11 @@ func (pc *PriorityChain) Presets() *PresetManager {
 	return pc.presets
 }
 
+// BasePersona returns the underlying persona store.
+func (pc *PriorityChain) BasePersona() *Persona {
+	return pc.base
+}
+
 // FeatureEnabled checks if a feature is enabled for the active preset.
 // Returns true when no PresetManager is configured (fail-open).
 func (pc *PriorityChain) FeatureEnabled(feature string) bool {

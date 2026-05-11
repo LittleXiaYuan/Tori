@@ -40,17 +40,17 @@ export interface ThemeConfig {
 }
 
 export const DEFAULT_THEME: ThemeConfig = {
-  presetTheme: "auto",
-  colorTheme: "time_monologue",
-  customColor: "#8b5cf6",
+  presetTheme: "light",
+  colorTheme: "deep_sea",
+  customColor: "#0284c7",
   radius: "default",
   sidebarOpacity: 100,
   contentOpacity: 100,
   interfaceBgImage: null,
   interfaceBgOpacity: 30,
   interfaceBgBlur: 8,
-  shadowColor: "#000000",
-  shadowOpacity: 20,
+  shadowColor: "#0f172a",
+  shadowOpacity: 8,
   logoImage: null,
   faviconImage: null,
   homeMode: "card",
@@ -61,7 +61,7 @@ export const DEFAULT_THEME: ThemeConfig = {
 
 export const COLOR_THEMES: { id: string; name: string; color: string }[] = [
   { id: "time_monologue", name: "时光独白", color: "#a1a1aa" },
-  { id: "deep_sea", name: "深海微光", color: "#0ea5e9" },
+  { id: "deep_sea", name: "深海微光", color: "#0284c7" },
   { id: "purple_jade", name: "紫玉幻境", color: "#a855f7" },
   { id: "mint_ice", name: "薄荷冰蓝", color: "#2dd4bf" },
   { id: "sakura_fall", name: "落樱飞雪", color: "#f472b6" },
@@ -113,6 +113,40 @@ function darkenHex(hex: string, amount: number): string {
     .padStart(2, "0")}`;
 }
 
+/* ---------------- WCAG contrast helpers ---------------- */
+
+function sRGBtoLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(hex: string): number {
+  const { r, g, b } = hexToRgb(hex);
+  return 0.2126 * sRGBtoLinear(r) + 0.7152 * sRGBtoLinear(g) + 0.0722 * sRGBtoLinear(b);
+}
+
+function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = relativeLuminance(hex1);
+  const l2 = relativeLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Check WCAG AA contrast for the accent colour against the current theme
+ * background. Returns a warning string if the ratio is below 3:1 (the
+ * minimum for UI components and large text), or null if acceptable.
+ */
+export function checkAccentContrast(accentHex: string, mode: "dark" | "light"): string | null {
+  const bg = mode === "light" ? "#ffffff" : "#0a0a0c";
+  const ratio = contrastRatio(accentHex, bg);
+  if (ratio < 3) {
+    return `WCAG warning: accent ${accentHex} vs ${mode} background has contrast ratio ${ratio.toFixed(2)}:1 (minimum 3:1 for UI components)`;
+  }
+  return null;
+}
+
 /* ---------------- apply ---------------- */
 
 /**
@@ -158,9 +192,14 @@ export function applyTheme(cfg: ThemeConfig): void {
   const palette =
     cfg.colorTheme === "custom"
       ? cfg.customColor
-      : COLOR_THEMES.find((c) => c.id === cfg.colorTheme)?.color ?? "#3b82f6";
+      : COLOR_THEMES.find((c) => c.id === cfg.colorTheme)?.color ?? "#0284c7";
   const hoverColor = darkenHex(palette, 0.15);
   const { r: pr, g: pg, b: pb } = hexToRgb(palette);
+
+  const contrastWarning = checkAccentContrast(palette, isLight ? "light" : "dark");
+  if (contrastWarning) {
+    console.warn(`[Theme] ${contrastWarning}`);
+  }
 
   s.setProperty("--yunque-accent", palette);
   s.setProperty("--yunque-accent-hover", hoverColor);

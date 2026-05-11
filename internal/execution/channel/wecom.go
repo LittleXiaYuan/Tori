@@ -1,5 +1,15 @@
 package channel
 
+// ─── Channel: WeCom (企业微信) ──────────────────────────────
+// Type:     "wecom"
+// Protocol: Webhook回调 (独立端口 :9880, /callback)
+// Inbound:  text (XML回调, SHA1签名校验)
+// Outbound: text (拆分2048字符, 应用消息API)
+// Env vars: WECOM_CORP_ID, WECOM_AGENT_ID, WECOM_SECRET,
+//           WECOM_TOKEN, WECOM_AES_KEY
+// Status:   Basic — 加密模式回调解密待完善
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"
@@ -109,7 +119,7 @@ func (w *WeCom) Start(ctx context.Context, handler func(Message) Reply) error {
 		case msg := <-w.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+				if !IsEmptyReply(reply) {
 					if err := w.Send(ctx, m.UserID, reply); err != nil {
 						slog.Warn("wecom: reply failed", "to", m.UserID, "err", err)
 					}

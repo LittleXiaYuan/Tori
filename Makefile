@@ -18,7 +18,7 @@ DIST_DIR    := dist
 # Cross-compilation targets
 PLATFORMS   := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: build build-full release clean test coverage lint lint-go lint-web vet setup openapi docs-api check web-ensure web-build sbom vulncheck release-safe
+.PHONY: build build-full release clean test test-web test-all coverage lint lint-go lint-web vet setup openapi docs-api check check-all web-ensure web-build sbom vulncheck release-safe
 
 ## web-ensure: Ensure heroui-web/out/ exists (placeholder if no build)
 web-ensure:
@@ -62,9 +62,22 @@ release: clean web-build
 test: web-ensure
 	go test ./... -count=1
 
+## test-web: Run frontend tests and typecheck
+test-web:
+	@echo "Running frontend tests..."
+	cd heroui-web && npm test && npm run typecheck
+
+## test-all: Run Go tests plus frontend tests
+test-all: test test-web
+
 ## coverage: Run tests with coverage report
+ifeq ($(OS),Windows_NT)
+coverage: web-ensure
+	powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/coverage.ps1
+else
 coverage: web-ensure
 	@bash scripts/coverage.sh
+endif
 
 ## lint: Run all linters (Go + frontend)
 lint: lint-go lint-web
@@ -87,6 +100,9 @@ vet:
 
 ## check: Pre-commit gate — lint + test (fails fast)
 check: lint test
+
+## check-all: Full repository gate — lint + Go tests + frontend tests
+check-all: lint test-all
 
 ## setup: Build and run setup wizard
 setup:
@@ -124,4 +140,8 @@ release-safe: vulncheck sbom release
 
 ## clean: Remove build artifacts
 clean:
-	rm -rf $(DIST_DIR)
+ifeq ($(OS),Windows_NT)
+	@powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Path 'coverage*','*.exe','dist' -Force -Recurse -ErrorAction SilentlyContinue"
+else
+	@rm -rf dist coverage coverage.out coverage.html coverage_new coverage_report*.txt *.exe
+endif

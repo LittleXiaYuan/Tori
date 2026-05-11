@@ -9,6 +9,7 @@ import {
   RefreshCw, Zap, CheckCircle2, XCircle,
 } from "lucide-react";
 import { showErrorToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 const categoryEmojis: Record<string, string> = {
   reflection: "--", insight: "*", question: "?", creative: "~",
@@ -83,7 +84,7 @@ export default function ReveriePage() {
       <div className="page-header">
         <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "var(--yunque-accent)", display: "flex" }}><BrainCircuit size={20} /></span>
-          内心独白
+          思考记录
         </h1>
         <div className="flex items-center gap-2">
           <Button isIconOnly aria-label="刷新" variant="ghost" size="sm" onPress={() => load()} isPending={loading}>
@@ -212,7 +213,7 @@ export default function ReveriePage() {
             {actionsOpen && (
               <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--yunque-border)" }}>
                 {actionLog.length === 0 ? (
-                  <EmptyState icon={<Zap size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无行动记录" description="Reverie 启用后，云雀的自主行动将在此展示。可在右侧配置中启用并设置态度阈值。" />
+                  <EmptyState icon={<Zap size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无行动记录" description="启用后，自动行动会在这里显示。可在右侧配置中开启并调整阈值。" />
                 ) : (
                   <div className="space-y-2 pt-3">
                     {actionLog.slice().reverse().slice(0, 50).map((rec, i) => (
@@ -229,7 +230,7 @@ export default function ReveriePage() {
                             <span className="font-medium">{rec.action.key}</span>
                             {rec.action.value && <span className="ml-2" style={{ color: "var(--yunque-text-muted)" }}>→ {rec.action.value}</span>}
                           </div>
-                          {rec.error && <div className="text-xs mt-1" style={{ color: "#f31260" }}>{rec.error}</div>}
+                          {rec.error && <div className="text-xs mt-1" style={{ color: "#f31260" }}>{formatErrorMessage(rec.error, "动作失败")}</div>}
                           <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{new Date(rec.at).toLocaleString()}</div>
                         </div>
                       </div>
@@ -247,7 +248,7 @@ export default function ReveriePage() {
           <Card className="section-card p-5">
             <div className="text-xs font-medium uppercase tracking-wider mb-4" style={{ color: "var(--yunque-text-muted)" }}>思维日记</div>
             {thoughts.length === 0 ? (
-              <EmptyState icon={<BrainCircuit size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无想法记录" description="启用 Reverie 并配置好 LLM 后，云雀会定期产生内心想法。也可以点击右侧「触发思考」手动运行一次。" />
+              <EmptyState icon={<BrainCircuit size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无思考记录" description="启用后，系统会定期生成思考记录。也可以点击右侧「触发思考」手动运行一次。" />
             ) : (
               <div className="space-y-2">
                 {thoughts.map((th) => (

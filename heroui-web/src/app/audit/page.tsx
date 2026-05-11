@@ -6,6 +6,7 @@ import { api, type AuditRecord, type AuditStats } from "@/lib/api";
 import { Shield, RefreshCw, CheckCircle, XCircle, AlertTriangle, Link2, User } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 export default function AuditPage() {
   const { data, loading, refresh } = useApiData(
@@ -28,7 +29,7 @@ export default function AuditPage() {
       const res = await api.auditVerify();
       setVerification(res);
     } catch (e: unknown) {
-      setVerification({ valid: false, error: e instanceof Error ? e.message : String(e) });
+      setVerification({ valid: false, error: formatErrorMessage(e, "审计链验证失败") });
     }
     setVerifying(false);
   };

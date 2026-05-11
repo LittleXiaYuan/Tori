@@ -78,9 +78,24 @@ x-agent-healthcheck: &agent-healthcheck
   start_period: 10s
   retries: 3
 
+x-agent-healthcheck-slim: &agent-healthcheck-slim
+  test: ["CMD", "/app/agent", "--healthcheck"]
+  interval: 15s
+  timeout: 5s
+  start_period: 10s
+  retries: 3
+
 x-agent-build: &agent-build
   context: ..
   dockerfile: yunque-agent/Dockerfile
+  args:
+    VERSION: ${VERSION:-0.1.0}
+    GIT_COMMIT: ${GIT_COMMIT:-dev}
+    BUILD_DATE: ${BUILD_DATE:-unknown}
+
+x-agent-build-slim: &agent-build-slim
+  context: ..
+  dockerfile: yunque-agent/Dockerfile.slim
   args:
     VERSION: ${VERSION:-0.1.0}
     GIT_COMMIT: ${GIT_COMMIT:-dev}
@@ -166,6 +181,28 @@ services:
           memory: 512M
         reservations:
           memory: 128M
+    networks:
+      - yunque-net
+
+  # ── Slim mode: scratch base, ~30MB image, zero external deps ──
+  agent-slim:
+    profiles: ["slim"]
+    build: *agent-build-slim
+    restart: unless-stopped
+    ports:
+      - "${AGENT_PORT:-9090}:9090"
+    volumes:
+      - agent-data:/app/data
+    environment:
+      <<: *agent-env
+    healthcheck: *agent-healthcheck-slim
+    logging: *agent-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
     networks:
       - yunque-net
 

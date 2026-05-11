@@ -10,15 +10,15 @@ import (
 
 	"github.com/LittleXiaYuan/ledger"
 
-	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/adaptive"
+	ctxwindow "yunque-agent/internal/agentcore/context"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
 	"yunque-agent/internal/agentcore/quality"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/trust"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	iledger "yunque-agent/internal/ledger"
 )
 
@@ -133,6 +133,10 @@ func initPlanner(app *agentrt.App) error {
 	app.SkillOptimizer = planner.NewSkillOptimizer(app.Metrics, cfg.DataPath("skill_performance.json"))
 	p.SetSkillOptimizer(app.SkillOptimizer)
 	slog.Info("skill optimizer initialized", "persist", cfg.DataPath("skill_performance.json"))
+
+	checkpointPath := cfg.DataPath("planner", "checkpoints.jsonl")
+	p.SetLongHorizonCheckpointStore(planner.NewFileLongHorizonCheckpointStore(checkpointPath))
+	slog.Info("planner checkpoint store initialized", "persist", checkpointPath)
 
 	// Ledger Recall → Planner graphContext
 	// When planning, the Planner queries Ledger for historical experiences

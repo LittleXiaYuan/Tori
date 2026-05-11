@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	rdebug "runtime/debug"
@@ -14,6 +15,35 @@ import (
 	"yunque-agent/internal/version"
 	"yunque-agent/pkg/safego"
 )
+
+// selfHealthCheck probes the local agent's /livez endpoint. Returns 0 on
+// success, 1 on failure. Used as Docker HEALTHCHECK in scratch/distroless
+// images where curl is not available.
+func selfHealthCheck() int {
+	addr := os.Getenv("AGENT_ADDR")
+	if addr == "" {
+		addr = ":9090"
+	}
+	if len(os.Args) >= 3 {
+		addr = os.Args[2]
+	}
+	host := addr
+	if host[0] == ':' {
+		host = "localhost" + host
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://" + host + "/livez")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "healthcheck failed: %v\n", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "healthcheck failed: status %d\n", resp.StatusCode)
+		return 1
+	}
+	return 0
+}
 
 func setupLogging() {
 	// Logs regularly contain request IDs, tenant IDs, and occasional LLM
@@ -38,6 +68,12 @@ func setupLogging() {
 }
 
 func main() {
+	// Self-contained health check for scratch/distroless containers (no curl needed).
+	// Usage: ./agent --healthcheck [addr]
+	if len(os.Args) >= 2 && os.Args[1] == "--healthcheck" {
+		os.Exit(selfHealthCheck())
+	}
+
 	setupLogging()
 	safego.SetPanicLogPath(appdir.File("panic.log"))
 

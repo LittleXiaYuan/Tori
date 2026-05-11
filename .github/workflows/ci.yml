@@ -6,6 +6,7 @@ name: ci
 #   * Go backend  — fmt, vet, build, test, golangci-lint
 #   * Frontend    — typecheck + production build (exported static SPA)
 #   * Desktop     — cargo check (sidecar excluded to keep the job under 5 min)
+#   * Docker      — build slim image + smoke test health probes
 #
 # Runs on Ubuntu unless the job explicitly needs another OS; none of the
 # backend / frontend paths depend on Windows-only APIs (the Tauri shell uses
@@ -28,12 +29,55 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
 jobs:
+  # ── Changed-path detection ──
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      web: ${{ steps.filter.outputs.web }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'heroui-web/**'
+              - '.github/workflows/ci.yml'
+            desktop:
+              - 'desktop/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - 'Dockerfile*'
+              - 'Dockerfile*.dockerignore'
+              - 'docker-compose.yml'
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+
   go:
     name: Go backend
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout Ledger sibling
+        run: |
+          set -euo pipefail
+          if [ ! -d ../ledger ]; then
+            git clone --depth=1 https://github.com/LittleXiaYuan/ledger.git ../ledger
+          fi
 
       - uses: actions/setup-go@v5
         with:
@@ -58,17 +102,42 @@ jobs:
         run: go build ./...
 
       - name: go test
-        # -race is deliberately off: the shared sqlite fixture plus several
-        # memory-layer tests don't pass -race cleanly yet; tracked in
-        # TECH-DEBT-2026-04-18.md. Turning -race on is a separate PR.
-        run: go test -count=1 -timeout 4m ./...
+        run: go test -count=1 -timeout 4m -coverprofile=coverage.out ./...
+
+      - name: go test -race (gateway + planner + core packages)
+        run: |
+          go test -race -count=1 -timeout 6m \
+            ./internal/controlplane/gateway/ \
+            ./internal/agentcore/planner/ \
+            ./internal/agentcore/session/ \
+            ./internal/agentcore/memory/ \
+            ./internal/agentcore/trust/ \
+            ./internal/agentcore/guardrails/ \
+            ./pkg/cogni/...
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage.out ]; then
+            go tool cover -func=coverage.out | tail -1
+          fi
 
   go-lint:
     name: Go lint (golangci-lint)
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout Ledger sibling
+        run: |
+          set -euo pipefail
+          if [ ! -d ../ledger ]; then
+            git clone --depth=1 https://github.com/LittleXiaYuan/ledger.git ../ledger
+          fi
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -83,6 +152,8 @@ jobs:
 
   web:
     name: Frontend (heroui-web)
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     defaults:
@@ -118,6 +189,8 @@ jobs:
 
   desktop:
     name: Desktop (Tauri / Rust)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -141,3 +214,77 @@ jobs:
         # (see copy-sidecar.mjs), but cargo check doesn't need them, so we
         # don't run the copy-sidecar step in CI.
         run: cargo check --locked
+
+  docker-smoke:
+    name: Docker build + health smoke test
+    needs: [changes, go]
+    if: (needs.changes.outputs.docker == 'true' || github.event_name == 'push') && needs.go.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout Ledger sibling
+        run: |
+          set -euo pipefail
+          if [ ! -d ../ledger ]; then
+            git clone --depth=1 https://github.com/LittleXiaYuan/ledger.git ../ledger
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker context ignore
+        run: cp Dockerfile.slim.dockerignore ../.dockerignore
+
+      - name: Build slim image
+        uses: docker/build-push-action@v6
+        with:
+          context: ..
+          file: yunque-agent/Dockerfile.slim
+          push: false
+          load: true
+          tags: yunque-agent:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image size check
+        run: |
+          SIZE=$(docker image inspect yunque-agent:smoke --format='{{.Size}}')
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "Image size: ${SIZE_MB}MB"
+          if [ "$SIZE_MB" -gt 50 ]; then
+            echo "::warning::Image size ${SIZE_MB}MB exceeds 50MB target"
+          fi
+
+      - name: Smoke test health probes
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker logs smoke-agent 2>&1 | tail -40 || true
+            docker rm -f smoke-agent >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          # Start container with minimal config (no LLM needed for health probes)
+          docker run -d --name smoke-agent \
+            -e AGENT_ADDR=:9090 \
+            -e JWT_SECRET=3f2a8c1e7d9b4a6f0c5e2d8a1b9f4c7e6a3d0b8c2f5e9a1d4c7b0e6f2a9d3c5b \
+            -e LLM_BASE_URL=http://localhost:0 \
+            -e LLM_API_KEY=test \
+            -e LLM_MODEL=test \
+            -p 19090:9090 \
+            yunque-agent:smoke
+
+          # Wait for startup
+          sleep 5
+
+          # Test all health endpoints
+          for endpoint in /livez /readyz /healthz /healthz/cognitive; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:19090${endpoint} || echo "000")
+            echo "${endpoint}: HTTP ${STATUS}"
+            if [ "$STATUS" != "200" ]; then
+              echo "::error::${endpoint} returned HTTP ${STATUS}"
+              exit 1
+            fi
+          done

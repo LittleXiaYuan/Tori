@@ -1,5 +1,16 @@
 package channel
 
+// ─── Channel: Feishu (飞书/Lark) ────────────────────────────
+// Type:     "feishu"
+// Protocol: Webhook (事件回调) + Token轮询
+// Inbound:  text, image, 卡片交互回调
+// Outbound: text, markdown, 交互卡片 (interactive card)
+// Env vars: FEISHU_APP_ID, FEISHU_APP_SECRET, FEISHU_ENCRYPT_KEY,
+//           FEISHU_VERIFICATION_TOKEN
+// Status:   Production — 双路径(通道包+网关Webhook)，卡片功能完整
+// 辅助文件: feishu_api.go, feishu_card.go, feishu_rich.go
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"

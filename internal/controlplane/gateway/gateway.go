@@ -15,38 +15,35 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/adaptive"
-	"yunque-agent/internal/agentcore/browserskill"
 	"yunque-agent/internal/agentcore/approval"
 	"yunque-agent/internal/agentcore/audit"
 	"yunque-agent/internal/agentcore/bots"
+	"yunque-agent/internal/agentcore/browserskill"
 	"yunque-agent/internal/agentcore/costtrack"
 	"yunque-agent/internal/agentcore/cron"
-	"yunque-agent/internal/experimental/distill"
 	"yunque-agent/internal/agentcore/rbac"
 	"yunque-agent/internal/agentcore/review"
-	"yunque-agent/internal/experimental/skillgrow"
 	"yunque-agent/internal/agentcore/tools"
 	"yunque-agent/internal/agentcore/trust"
 	"yunque-agent/internal/agentcore/workflow"
+	"yunque-agent/internal/experimental/distill"
+	"yunque-agent/internal/experimental/skillgrow"
 
 	"yunque-agent/internal/agentcore/embeddings"
 	"yunque-agent/internal/agentcore/emotion"
 	"yunque-agent/internal/agentcore/federation"
 	"yunque-agent/internal/agentcore/guardrails"
-	"yunque-agent/internal/experimental/heartbeat"
 	"yunque-agent/internal/agentcore/identity"
 	"yunque-agent/internal/agentcore/inbox"
 	"yunque-agent/internal/agentcore/instruction"
-	"yunque-agent/internal/experimental/iterate"
 	"yunque-agent/internal/agentcore/knowledge"
-	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/localbrain"
 	"yunque-agent/internal/agentcore/memory"
 	"yunque-agent/internal/agentcore/modes"
 	"yunque-agent/internal/agentcore/notify"
 	"yunque-agent/internal/agentcore/persona"
 	"yunque-agent/internal/agentcore/planner"
-	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/agentcore/router"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/selfheal"
@@ -68,14 +65,17 @@ import (
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
 	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
-	mcpserver "yunque-agent/internal/mcp/server"
-	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/controlplane/tenant"
 	"yunque-agent/internal/execution/channel"
 	"yunque-agent/internal/execution/sandbox"
 	"yunque-agent/internal/execution/scheduler"
+	"yunque-agent/internal/experimental/heartbeat"
+	"yunque-agent/internal/experimental/iterate"
+	reflectpkg "yunque-agent/internal/experimental/reflect"
 	"yunque-agent/internal/integrations/mineru"
+	mcpserver "yunque-agent/internal/mcp/server"
 	"yunque-agent/internal/observe"
+	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/plugin"
@@ -89,6 +89,10 @@ const ctxKeyReqID ctxKeyType = "req_id"
 type documentParser interface {
 	Enabled() bool
 	ParseFile(ctx context.Context, filePath string) (*mineru.ParseResult, error)
+}
+
+type healthChecker interface {
+	HealthCheck(ctx context.Context) error
 }
 
 // RequestID extracts the request ID from context.
@@ -126,20 +130,23 @@ type Gateway struct {
 	identityRes    *identity.Resolver
 
 	// ── Plugins & Skills ───────────────────────
-	registry             *skills.Registry
-	pluginReg            *plugin.Registry
-	pluginLoader         *plugin.Loader
-	skillMarket          *skillmarket.Market
-	skillInstaller       *skillmarket.Installer
-	skillPolicy          *skillmarket.SecurityPolicy
-	clawHub              *skillmarket.ClawHubProvider
-	toriHub              *skillmarket.ToriHubProvider
-	skillFileLoader      *skillmarket.SkillFileLoader
-	skillGrow            *skillgrow.Detector
-	skillSuggester       *memory.SkillSuggester
-	suggestCounter       atomic.Int64
-	pendingSuggestions   map[string][]memory.SkillSuggestion
-	pendingSuggestionsMu sync.Mutex
+	registry              *skills.Registry
+	pluginReg             *plugin.Registry
+	pluginLoader          *plugin.Loader
+	skillMarket           *skillmarket.Market
+	skillInstaller        *skillmarket.Installer
+	skillPolicy           *skillmarket.SecurityPolicy
+	clawHub               *skillmarket.ClawHubProvider
+	toriHub               *skillmarket.ToriHubProvider
+	skillFileLoader       *skillmarket.SkillFileLoader
+	skillGrow             *skillgrow.Detector
+	skillSuggester        *memory.SkillSuggester
+	suggestCounter        atomic.Int64
+	pendingSuggestions    map[string][]memory.SkillSuggestion
+	pendingSuggestionsMu  sync.Mutex
+	plannerResumeJobs     map[string]plannerCheckpointResumePlanJob
+	plannerResumeJobsMu   sync.Mutex
+	plannerResumeJobsPath string
 
 	// ── Persona & Emotion ──────────────────────
 	persona          *persona.Persona
@@ -174,17 +181,17 @@ type Gateway struct {
 	costTracker *costtrack.Tracker
 
 	// ── Tasks & Scheduling ─────────────────────
-	scheduler   *scheduler.Scheduler
-	cronMgr     *cron.Manager
-	taskStore   task.Store
-	taskRunner  *task.Runner
-	gapAnalyzer *task.GapAnalyzer
-	stateKernel *state.Kernel
+	scheduler     *scheduler.Scheduler
+	cronMgr       *cron.Manager
+	taskStore     task.Store
+	taskRunner    *task.Runner
+	gapAnalyzer   *task.GapAnalyzer
+	stateKernel   *state.Kernel
 	templateStore *task.TemplateStore
-	workMemMgr  *task.WorkingMemoryManager
-	threadMgr   *task.ThreadManager
-	triggerRT   *trigger.Runtime
-	triggerMgr  *trigger.Manager
+	workMemMgr    *task.WorkingMemoryManager
+	threadMgr     *task.ThreadManager
+	triggerRT     *trigger.Runtime
+	triggerMgr    *trigger.Manager
 
 	// ── Tools & Execution ──────────────────────
 	toolsMgr    *tools.ProcessManager
@@ -195,6 +202,7 @@ type Gateway struct {
 	channelReg *channel.Registry
 	botMgr     *bots.Manager
 	searchReg  *websearch.Registry
+	searchOn   atomic.Bool
 	inbox      *inbox.Store
 	speechReg  *speech.Registry
 
@@ -204,18 +212,19 @@ type Gateway struct {
 	fedTransport *federation.Transport
 
 	// ── Observability & Self-Heal ──────────────
-	metrics      *observe.Metrics
-	usage        *UsageTracker
-	heartbeat    *heartbeat.Service
-	healer       *selfheal.Healer
-	lifecycle    *selfheal.Lifecycle
-	adaptiveLoop *adaptive.Loop
-	learning     *reflectpkg.LearningLoop
-	iterateEngine *iterate.Engine
-	distiller    *distill.Distiller
+	metrics         *observe.Metrics
+	usage           *UsageTracker
+	ledgerHealth    healthChecker
+	heartbeat       *heartbeat.Service
+	healer          *selfheal.Healer
+	lifecycle       *selfheal.Lifecycle
+	adaptiveLoop    *adaptive.Loop
+	learning        *reflectpkg.LearningLoop
+	iterateEngine   *iterate.Engine
+	distiller       *distill.Distiller
 	experienceStore *reflectpkg.ExperienceStore
-	runtimePool  *agentrt.Pool
-	bindingRouter *agentrt.Router
+	runtimePool     *agentrt.Pool
+	bindingRouter   *agentrt.Router
 
 	allowedOrigins []string
 
@@ -317,9 +326,9 @@ type Gateway struct {
 	nlConfigTranslator *cogni.NLConfigTranslator
 
 	// LoRA training & evolution (optional — wired from app in init_tasks)
-	loraScheduler         *localbrain.LoRAScheduler
-	trainingMetrics       *localbrain.TrainingMetrics
-	evolutionCoordinator  *localbrain.EvolutionCoordinator
+	loraScheduler        *localbrain.LoRAScheduler
+	trainingMetrics      *localbrain.TrainingMetrics
+	evolutionCoordinator *localbrain.EvolutionCoordinator
 }
 
 // ReplyHook interceptor for outgoing messages.
@@ -352,19 +361,19 @@ func (g *Gateway) InvokeReplyHooks(ctx context.Context, msg channel.Message, rep
 
 // GatewayConfig holds the required dependencies for creating a Gateway.
 type GatewayConfig struct {
-	Planner     *planner.Planner
-	Tenants     *tenant.Manager
-	Memory      *memory.Manager
-	Skills      *skills.Registry
-	Scheduler   *scheduler.Scheduler
-	ConvStore   *session.Store
-	Plugins     *plugin.Registry
-	FeishuAPI   *channel.FeishuAPI
-	Learning    *reflectpkg.LearningLoop
-	JWTConfig   *JWTConfig
-	Metrics     *observe.Metrics
-	Pipeline    *memory.Pipeline
-	Persona     *persona.Persona
+	Planner   *planner.Planner
+	Tenants   *tenant.Manager
+	Memory    *memory.Manager
+	Skills    *skills.Registry
+	Scheduler *scheduler.Scheduler
+	ConvStore *session.Store
+	Plugins   *plugin.Registry
+	FeishuAPI *channel.FeishuAPI
+	Learning  *reflectpkg.LearningLoop
+	JWTConfig *JWTConfig
+	Metrics   *observe.Metrics
+	Pipeline  *memory.Pipeline
+	Persona   *persona.Persona
 }
 
 // New creates a new Gateway.
@@ -407,6 +416,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		modelMgr:        newModelManager(),
 		oauthPending:    make(map[string]*oauthPendingState),
 	}
+	g.searchOn.Store(true)
 	g.routes()
 	return g
 }
@@ -604,25 +614,25 @@ func (g *Gateway) routes() {
 	g.mux.HandleFunc("/", g.serveWebUI)
 
 	// Domain-specific route groups
-	g.registerSystemRoutes()     // healthz, version, tenants, metrics, settings, backup, speech, heartbeat, federation
-	g.registerChatRoutes()       // chat, ws, conversations, persona, emotion, bots, inbox, webhooks, webchat
-	g.registerMemoryRoutes()     // memory, graph, identity, embeddings, search
-	g.registerKnowledgeRoutes()  // knowledge base (RAG)
-	g.registerTaskRoutes()       // tasks, state kernel, reflection, documents
-	g.registerTriggerRoutes()    // triggers, cron, scheduler, tools, sandbox
-	g.registerPluginRoutes()     // plugins, skills, skill market, skillhub
-	g.registerGovernanceRoutes() // audit, trust, iterate, review, cost, usage
-	g.registerProviderRoutes()   // LLM providers, router stats
-	g.registerReverieRoutes()    // reverie inner monologue
-	g.registerRBACRoutes()       // role-based access control
-	g.registerApprovalRoutes()   // human-in-the-loop approval
-	g.registerSetupRoutes()      // setup, onboarding, templates
-	g.registerQueueRoutes()      // session task queues
-	g.registerSSERoutes()        // SSE event stream
-	g.registerTraceRoutes()      // execution trace / audit API
-	g.registerBrowserRoutes()    // browser engine management
-	g.registerIDERoutes()        // IDE supervisor plugin (review, status)
-	g.registerModesRoutes()      // persona mode management (/v1/persona/modes, mode, mode/current)
+	g.registerSystemRoutes()       // healthz, version, tenants, metrics, settings, backup, speech, heartbeat, federation
+	g.registerChatRoutes()         // chat, ws, conversations, persona, emotion, bots, inbox, webhooks, webchat
+	g.registerMemoryRoutes()       // memory, graph, identity, embeddings, search
+	g.registerKnowledgeRoutes()    // knowledge base (RAG)
+	g.registerTaskRoutes()         // tasks, state kernel, reflection, documents
+	g.registerTriggerRoutes()      // triggers, cron, scheduler, tools, sandbox
+	g.registerPluginRoutes()       // plugins, skills, skill market, skillhub
+	g.registerGovernanceRoutes()   // audit, trust, iterate, review, cost, usage
+	g.registerProviderRoutes()     // LLM providers, router stats
+	g.registerReverieRoutes()      // reverie inner monologue
+	g.registerRBACRoutes()         // role-based access control
+	g.registerApprovalRoutes()     // human-in-the-loop approval
+	g.registerSetupRoutes()        // setup, onboarding, templates
+	g.registerQueueRoutes()        // session task queues
+	g.registerSSERoutes()          // SSE event stream
+	g.registerTraceRoutes()        // execution trace / audit API
+	g.registerBrowserRoutes()      // browser engine management
+	g.registerIDERoutes()          // IDE supervisor plugin (review, status)
+	g.registerModesRoutes()        // persona mode management (/v1/persona/modes, mode, mode/current)
 	g.registerMCPDispatchRoutes()  // MCP dispatch server for external workers
 	g.registerProjectRoutes()      // project management (orchestrator)
 	g.registerOrchestratorRoutes() // orchestrator daemon control
@@ -643,7 +653,9 @@ func (g *Gateway) routes() {
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
 	(&notifyapi.Handler{
-		Notifier: g.notifier,
+		NotifierFunc: func() *notify.Notifier {
+			return g.notifier
+		},
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
 	(&workflowapi.Handler{

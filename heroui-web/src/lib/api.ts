@@ -25,7 +25,9 @@ import type {
   GraphEntity, GraphRelation, GraphStats, MemorySearchResult,
   SystemInfo, CacheStats, RouterStats, PersonaMode, SearchResult,
   FederationPeer, FederationStats, ProviderPreset, ToriBindingStatus, ToriHealthStatus, ToriUsageSummary, SkillSuggestion, SyncManifestItem,
-  ConnectorView, ConnectorDef, NotifyChannel, WorkerInfo, ProjectInfo,
+  ConnectorView, ConnectorDef, NotifyChannel, NotifyShareRequest, NotifyShareResponse, WorkerInfo, ProjectInfo,
+  PlannerCheckpointListResponse, PlannerCheckpointRecoverResponse, PlannerCheckpointResumeTaskResponse, PlannerCheckpointResumePlanResponse, PlannerCheckpointResumePlanJobResponse, PlannerCheckpointRecoveryAction, PlannerExecutionStateResponse,
+  FilePreviewResponse, FileUploadResponse,
 } from "./api-types";
 
 export type * from "./api-types";
@@ -35,6 +37,9 @@ export type * from "./api-types";
 // import directly from "./api-core".
 export { setApiKey, getApiKey, getAuthHeaders, BASE } from "./api-core";
 import { fetcher, getAuthHeaders, getApiKey, BASE } from "./api-core";
+import { legacyChatStreamChunks, parseAgenticChatStream } from "./chat-sse";
+
+export const DEFAULT_CHAT_STREAM_IDLE_TIMEOUT_MS = 180_000;
 
 export const api = {
   healthz: () => fetcher<{ status: string; version: string }>("/healthz"),
@@ -65,6 +70,42 @@ export const api = {
       body: JSON.stringify({ messages, session_id: sessionId, ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}) }),
     }),
 
+  plannerCheckpoints: (params?: { limit?: number; includeSnapshot?: boolean; planId?: string }) => {
+    const q = new URLSearchParams();
+    q.set("limit", String(params?.limit ?? 20));
+    if (params?.includeSnapshot) q.set("include_snapshot", "1");
+    if (params?.planId) q.set("plan_id", params.planId);
+    return fetcher<PlannerCheckpointListResponse>(`/v1/planner/checkpoints?${q.toString()}`);
+  },
+  plannerCheckpointRecover: (planId: string, action: PlannerCheckpointRecoveryAction) =>
+    fetcher<PlannerCheckpointRecoverResponse>("/v1/planner/checkpoints/recover", {
+      method: "POST",
+      body: JSON.stringify({ plan_id: planId, action }),
+    }),
+  plannerCheckpointResumeTask: (planId: string, action: PlannerCheckpointRecoveryAction, options?: { run?: boolean }) =>
+    fetcher<PlannerCheckpointResumeTaskResponse>("/v1/planner/checkpoints/resume", {
+      method: "POST",
+      body: JSON.stringify({ plan_id: planId, action, ...(options?.run === undefined ? {} : { run: options.run }) }),
+    }),
+  plannerCheckpointResumePlan: (planId: string, action: PlannerCheckpointRecoveryAction, options?: { async?: boolean }) =>
+    fetcher<PlannerCheckpointResumePlanResponse>("/v1/planner/checkpoints/resume-plan", {
+      method: "POST",
+      body: JSON.stringify({ plan_id: planId, action, ...(options?.async === undefined ? {} : { async: options.async }) }),
+    }),
+  plannerCheckpointResumePlanJob: (jobIdOrParams: string | { jobId?: string; planId?: string }) => {
+    const params = typeof jobIdOrParams === "string" ? { jobId: jobIdOrParams } : jobIdOrParams;
+    const q = new URLSearchParams();
+    if (params.jobId) q.set("id", params.jobId);
+    if (params.planId) q.set("plan_id", params.planId);
+    return fetcher<PlannerCheckpointResumePlanJobResponse>(`/v1/planner/checkpoints/resume-plan/jobs?${q.toString()}`);
+  },
+  plannerExecutionState: (planId: string, action?: PlannerCheckpointRecoveryAction) => {
+    const q = new URLSearchParams();
+    q.set("plan_id", planId);
+    if (action) q.set("action", action);
+    return fetcher<PlannerExecutionStateResponse>(`/v1/planner/execution-state?${q.toString()}`);
+  },
+
   chatStream: async function* (
     messages: Array<{ role: string; content: string }>,
     sessionId?: string,
@@ -77,6 +118,8 @@ export const api = {
       toolIds?: string[];
       /** Cherry 📎 drawer: inline files to splice into the last user message. */
       attachments?: Array<{ name: string; mime: string; dataB64: string }>;
+      /** Stop waiting if the stream goes quiet for too long. */
+      idleTimeoutMs?: number;
     },
   ): AsyncGenerator<string> {
     const body: Record<string, unknown> = { messages, session_id: sessionId };
@@ -100,71 +143,10 @@ export const api = {
       signal,
     });
     if (!res.ok) throw new Error(`${res.status}`);
-    const reader = res.body?.getReader();
-    if (!reader) return;
-    const decoder = new TextDecoder();
-    let buf = "";
-    let currentEvent = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() || "";
-      for (const line of lines) {
-        if (line.startsWith("event: ")) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          const raw = line.slice(6);
-          if (raw === "[DONE]") return;
-          if (currentEvent === "error") {
-            try {
-              const err = JSON.parse(raw);
-              throw new Error(err.message || raw);
-            } catch (e) {
-              if (e instanceof Error && e.message !== raw) throw e;
-              throw new Error(raw);
-            }
-          }
-          if (currentEvent === "done") {
-            // Parse final summary which may include emotion data
-            try {
-              const done = JSON.parse(raw);
-              if (done.emotion) {
-                yield `\n<!--emotion:${JSON.stringify(done.emotion)}-->`;
-              }
-              if (done.sticker_suggestion) {
-                yield `\n<!--sticker:${JSON.stringify(done.sticker_suggestion)}-->`;
-              }
-              if (done.sticker_suggestions) {
-                yield `\n<!--stickers:${JSON.stringify(done.sticker_suggestions)}-->`;
-              }
-              if (done.actions && done.actions.length > 0) {
-                yield `\n<!--actions:${JSON.stringify(done.actions)}-->`;
-              }
-            } catch { /* ignore parse errors */ }
-            continue;
-          }
-          if (currentEvent === "actions") {
-            // Standalone actions SSE event (emitted before done)
-            yield `\n<!--actions:${raw}-->`;
-            continue;
-          }
-          // Parse delta or step events
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed.content) {
-              yield parsed.content;
-            } else if (parsed.id && parsed.domain) {
-              yield raw;
-            }
-          } catch {
-            if (raw.trim()) yield raw;
-          }
-        } else if (line.trim() === "") {
-          currentEvent = ""; // reset on empty line (SSE event boundary)
-        }
-      }
+    if (!res.body) return;
+    for await (const item of parseAgenticChatStream(res.body, { idleTimeoutMs: options?.idleTimeoutMs ?? DEFAULT_CHAT_STREAM_IDLE_TIMEOUT_MS })) {
+      if (item.kind === "error") throw new Error(item.message);
+      for (const chunk of legacyChatStreamChunks(item)) yield chunk;
     }
   },
 
@@ -230,15 +212,16 @@ export const api = {
   listFiles: (path?: string) =>
     fetcher<{ files: Array<{ name: string; path: string; size: number; is_dir: boolean }> }>(`/api/files${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   fileDownloadUrl: (path: string) => `/api/files/download?path=${encodeURIComponent(path)}`,
+  previewFile: (path: string) =>
+    fetcher<FilePreviewResponse>(`/api/files/preview?path=${encodeURIComponent(path)}`),
 
   // File upload (saves to agent workspace)
-  uploadFile: async (file: File): Promise<{ filename: string; size: number; path: string; parse?: { parser: string; backend: string; markdown_chars: number; has_layout_json: boolean; preview?: string }; analysis?: unknown; actions?: unknown[]; rich?: unknown }> => {
-    const key = getApiKey();
+  uploadFile: async (file: File): Promise<FileUploadResponse> => {
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`${BASE}/v1/upload`, {
       method: "POST",
-      headers: { ...(key ? { "X-API-Key": key } : {}) },
+      headers: { ...getAuthHeaders() },
       body: form,
     });
     if (!res.ok) throw new Error(`upload failed: ${res.status}`);
@@ -476,6 +459,7 @@ export const api = {
     }
     return res.json();
   },
+
   voices: () =>
     fetcher<{ voices: Array<{ id: string; name: string; language: string; gender?: string }>; providers: string[] }>("/v1/speech/voices"),
 
@@ -1063,6 +1047,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ id }),
     }),
+  notifyShare: (payload: NotifyShareRequest) =>
+    fetcher<NotifyShareResponse>("/api/notify/share", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // Cloud Desktop Sandbox (E2B)
   desktopCreate: () =>
@@ -1199,6 +1188,10 @@ export const api = {
     fetcher<{ records: import("./api-types/lora").TrainingRecord[]; count: number }>("/v1/lora/history"),
   getLoRASummary: () =>
     fetcher<{ summary: import("./api-types/lora").TrainingSummary }>("/v1/lora/summary"),
+  previewLoRATrainingData: (tenantId?: string) =>
+    fetcher<{ preview: import("./api-types/lora").TrainingDataPreview }>(
+      `/v1/lora/preview${tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : ""}`,
+    ),
   triggerLoRATraining: (tenantId?: string) =>
     fetcher<{ status: string; tenant_id: string }>("/v1/lora/trigger", {
       method: "POST",

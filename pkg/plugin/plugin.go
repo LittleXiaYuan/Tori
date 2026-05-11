@@ -203,6 +203,7 @@ func (r *Registry) AllIncludeDisabled() []PluginInfo {
 			Description: e.plugin.Description(),
 			Enabled:     e.enabled,
 			SkillCount:  len(e.plugin.Skills()),
+			Slot:        e.slot,
 			Source:      "builtin",
 		}
 		if sp, ok := e.plugin.(*ScriptPlugin); ok {

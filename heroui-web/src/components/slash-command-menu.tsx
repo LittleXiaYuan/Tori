@@ -137,38 +137,52 @@ export function SlashCommandMenu({ query, visible, onSelect, onClose, anchorRef 
       </div>
 
       <div className="grid max-h-[420px] grid-cols-1 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="overflow-y-auto px-2 py-2 md:border-r" style={{ borderColor: "var(--yunque-border)" }}>
-          {filtered.map((cmd, idx) => {
-            const Icon = cmd.icon;
-            const active = idx === selectedIdx;
-            return (
-              <button
-                key={cmd.id}
-                data-idx={idx}
-                type="button"
-                className="interactive-list-item mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left last:mb-0"
-                data-active={active ? "true" : "false"}
-                style={{
-                  background: active ? "var(--neutral-strong-bg)" : "transparent",
-                  color: active ? "var(--neutral-strong-fg)" : undefined,
-                  border: "1px solid transparent",
-                }}
-                onMouseEnter={() => setSelectedIdx(idx)}
-                onClick={() => onSelect(`${cmd.command} `)}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: active ? "rgba(255,255,255,0.12)" : "var(--yunque-bg-muted)", color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-secondary)" }}>
-                  <Icon size={17} />
+        <div className="overflow-y-auto px-2 py-2 md:border-r" style={{ borderColor: "var(--yunque-border)" }} role="listbox" aria-label={t("slash.title")}>
+          {(() => {
+            const isFiltering = query.trim().length > 0;
+            let lastCategory = "";
+            return filtered.map((cmd, idx) => {
+              const Icon = cmd.icon;
+              const active = idx === selectedIdx;
+              const showCategoryHeader = !isFiltering && cmd.category !== lastCategory;
+              lastCategory = cmd.category;
+              return (
+                <div key={cmd.id}>
+                  {showCategoryHeader && (
+                    <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--yunque-text-muted)" }}>
+                      {cmd.category}
+                    </div>
+                  )}
+                  <button
+                    data-idx={idx}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className="interactive-list-item mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left last:mb-0"
+                    data-active={active ? "true" : "false"}
+                    style={{
+                      background: active ? "var(--neutral-strong-bg)" : "transparent",
+                      color: active ? "var(--neutral-strong-fg)" : undefined,
+                      border: "1px solid transparent",
+                    }}
+                    onMouseEnter={() => setSelectedIdx(idx)}
+                    onClick={() => onSelect(`${cmd.command} `)}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: active ? "rgba(255,255,255,0.12)" : "var(--yunque-bg-muted)", color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-secondary)" }}>
+                      <Icon size={17} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold" style={{ color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text)" }}>{cmd.title}</span>
+                        <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: active ? "rgba(255,255,255,0.12)" : "var(--yunque-bg-muted)", color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)" }}>{cmd.command}</span>
+                      </div>
+                      <div className="mt-1 text-xs leading-5" style={{ color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-secondary)", opacity: active ? 0.85 : 1 }}>{cmd.description}</div>
+                    </div>
+                  </button>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold" style={{ color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text)" }}>{cmd.title}</span>
-                    <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: active ? "rgba(255,255,255,0.12)" : "var(--yunque-bg-muted)", color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-muted)" }}>{cmd.command}</span>
-                  </div>
-                  <div className="mt-1 text-xs leading-5" style={{ color: active ? "var(--neutral-strong-fg)" : "var(--yunque-text-secondary)", opacity: active ? 0.85 : 1 }}>{cmd.description}</div>
-                </div>
-              </button>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
 
         <div className="animate-content-fade flex flex-col justify-between px-4 py-4">

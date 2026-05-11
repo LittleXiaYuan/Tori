@@ -53,14 +53,14 @@ type Hook struct {
 	traceMu sync.RWMutex
 	traces  TraceStore
 
-	memMu       sync.RWMutex
+	memMu        sync.RWMutex
 	memorySearch MemorySearchFunc
 
 	ownerMu    sync.RWMutex
 	skillOwner SkillOwnerFunc
 
-	expMu          sync.RWMutex
-	expProvider    ExperienceProvider
+	expMu       sync.RWMutex
+	expProvider ExperienceProvider
 
 	actMu        sync.RWMutex
 	onActivation func(cogniID string, score float64)
@@ -190,6 +190,20 @@ func (h *Hook) TraceStore() TraceStore {
 	return h.traces
 }
 
+// TraceSnapshot returns the current per-turn trace for a request fingerprint.
+// It is intended for host runtimes that want to surface Cogni routing decisions
+// inline in their execution trace. The method returns a copy and does not flush
+// the trace store; FilterSkills/flushTrace remain responsible for persistence.
+func (h *Hook) TraceSnapshot(req ContextRequest) (Trace, bool) {
+	st := h.evaluate(req)
+	if st == nil {
+		return Trace{}, false
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.trace, true
+}
+
 // ContextRequest captures the per-turn information needed to evaluate
 // activation rules.
 type ContextRequest struct {
@@ -209,11 +223,11 @@ type ContextRequest struct {
 // entire decision (context bytes + tool filter diff) rather than splitting it
 // across two records.
 type turnState struct {
-	mu          sync.Mutex
-	created     time.Time
-	activations []Activation
-	rawResults  []Activation // pre-exclusivity, for trace reasons
-	trace       Trace
+	mu           sync.Mutex
+	created      time.Time
+	activations  []Activation
+	rawResults   []Activation // pre-exclusivity, for trace reasons
+	trace        Trace
 	traceEmitted bool
 }
 

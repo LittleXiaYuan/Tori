@@ -145,129 +145,143 @@ func (c *Client) ChatWithToolsEx(ctx context.Context, messages []Message, tools 
 			continue
 		}
 
-		if resp.StatusCode != 200 {
-			respBody := make([]byte, 2048)
-			n, _ := resp.Body.Read(respBody)
-			resp.Body.Close()
-			errDetail := string(respBody[:n])
-			lastErr = fmt.Errorf("chat API status %d: %.500s", resp.StatusCode, errDetail)
-			slog.Warn("llm: ChatWithTools non-200", "status", resp.StatusCode, "model", c.model, "body", errDetail)
+		// handleResp wraps single-attempt response processing so defer
+		// reliably closes the body on every exit path (return / panic).
+		type fcAttemptResult struct {
+			content string
+			calls   []ToolCall
+			done    bool // true = return to caller; false = continue retry
+			fatal   bool // true = return lastErr immediately
+		}
+		ar := func() fcAttemptResult {
+			defer resp.Body.Close()
 
-			if resp.StatusCode == 400 {
-				if strings.Contains(errDetail, "max_prompt_tokens") || strings.Contains(errDetail, "input tokens") || strings.Contains(errDetail, "context_length") || strings.Contains(errDetail, "max_tokens") {
-					if len(messages) > 3 {
-						slog.Warn("llm: token limit exceeded, trimming messages", "model", c.model, "msgs_before", len(messages))
-						keep := len(messages) / 2
-						if keep < 3 {
-							keep = 3
+			if resp.StatusCode != 200 {
+				respBody := make([]byte, 2048)
+				n, _ := resp.Body.Read(respBody)
+				errDetail := string(respBody[:n])
+				lastErr = fmt.Errorf("chat API status %d: %.500s", resp.StatusCode, errDetail)
+				slog.Warn("llm: ChatWithTools non-200", "status", resp.StatusCode, "model", c.model, "body", errDetail)
+
+				if resp.StatusCode == 400 {
+					if strings.Contains(errDetail, "max_prompt_tokens") || strings.Contains(errDetail, "input tokens") || strings.Contains(errDetail, "context_length") || strings.Contains(errDetail, "max_tokens") {
+						if len(messages) > 3 {
+							slog.Warn("llm: token limit exceeded, trimming messages", "model", c.model, "msgs_before", len(messages))
+							keep := len(messages) / 2
+							if keep < 3 {
+								keep = 3
+							}
+							trimmed := make([]Message, 0, keep+1)
+							if messages[0].Role == "system" {
+								trimmed = append(trimmed, messages[0])
+								trimmed = append(trimmed, messages[len(messages)-keep:]...)
+							} else {
+								trimmed = append(trimmed, messages[len(messages)-keep:]...)
+							}
+							messages = trimmed
+							reqBody["messages"] = messages
+							body, _ = json.Marshal(reqBody)
+							return fcAttemptResult{}
 						}
-						trimmed := make([]Message, 0, keep+1)
-						if messages[0].Role == "system" {
-							trimmed = append(trimmed, messages[0])
-							trimmed = append(trimmed, messages[len(messages)-keep:]...)
-						} else {
-							trimmed = append(trimmed, messages[len(messages)-keep:]...)
-						}
-						messages = trimmed
+					}
+					if messagesHaveImages(messages) {
+						slog.Warn("llm: ChatWithTools 400 with images, falling back to text-only", "model", c.model)
+						messages = stripImages(messages)
 						reqBody["messages"] = messages
 						body, _ = json.Marshal(reqBody)
-						continue
+						return fcAttemptResult{}
+					}
+					if attempt == 0 {
+						slog.Info("llm: ChatWithTools 400, auto-sanitizing request params", "model", c.model)
+						delete(reqBody, "temperature")
+						delete(reqBody, "response_format")
+						delete(reqBody, "top_p")
+						delete(reqBody, "frequency_penalty")
+						delete(reqBody, "presence_penalty")
+						body, _ = json.Marshal(reqBody)
+						return fcAttemptResult{}
 					}
 				}
-				if messagesHaveImages(messages) {
-					slog.Warn("llm: ChatWithTools 400 with images, falling back to text-only", "model", c.model)
-					messages = stripImages(messages)
-					reqBody["messages"] = messages
-					body, _ = json.Marshal(reqBody)
-					continue
+				if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != 429 {
+					c.breaker.RecordFailure()
+					return fcAttemptResult{fatal: true}
 				}
-				if attempt == 0 {
-					slog.Info("llm: ChatWithTools 400, auto-sanitizing request params", "model", c.model)
-					delete(reqBody, "temperature")
-					delete(reqBody, "response_format")
-					delete(reqBody, "top_p")
-					delete(reqBody, "frequency_penalty")
-					delete(reqBody, "presence_penalty")
-					body, _ = json.Marshal(reqBody)
-					continue
-				}
+				return fcAttemptResult{}
 			}
-			if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != 429 {
-				c.breaker.RecordFailure()
-				return "", nil, lastErr
-			}
-			continue
-		}
 
-		ct := resp.Header.Get("Content-Type")
-		if strings.Contains(ct, "text/event-stream") {
-			var reasonDeltaFn []func(string)
-			if opts != nil && opts.OnReasoningDelta != nil {
-				reasonDeltaFn = append(reasonDeltaFn, opts.OnReasoningDelta)
+			ct := resp.Header.Get("Content-Type")
+			if strings.Contains(ct, "text/event-stream") {
+				var reasonDeltaFn []func(string)
+				if opts != nil && opts.OnReasoningDelta != nil {
+					reasonDeltaFn = append(reasonDeltaFn, opts.OnReasoningDelta)
+				}
+				content, reasoning, calls, err := c.readSSEToolCalls(resp.Body, reasonDeltaFn...)
+				if err != nil {
+					lastErr = err
+					return fcAttemptResult{}
+				}
+				c.breaker.RecordSuccess()
+				if reasoning != "" && opts != nil {
+					if opts.OnReasoning != nil {
+						opts.OnReasoning(reasoning)
+					}
+					if opts.LastReasoningOut != nil {
+						*opts.LastReasoningOut = reasoning
+					}
+				}
+				if len(calls) > 0 {
+					names := make([]string, len(calls))
+					for i, tc := range calls {
+						names[i] = tc.Function.Name
+					}
+					slog.Info("llm: tool_calls returned", "count", len(calls), "tools", names)
+				} else {
+					slog.Info("llm: no tool_calls, text reply", "content_len", len(content), "content_head", truncateStr(content, 120))
+				}
+				return fcAttemptResult{content: content, calls: calls, done: true}
 			}
-			content, reasoning, calls, err := c.readSSEToolCalls(resp.Body, reasonDeltaFn...)
-			resp.Body.Close()
-			if err != nil {
-				lastErr = err
-				continue
+
+			var result ChatResponseFC
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				lastErr = fmt.Errorf("decode: %w", err)
+				return fcAttemptResult{}
 			}
+
+			if len(result.Choices) == 0 {
+				lastErr = fmt.Errorf("no choices returned")
+				return fcAttemptResult{}
+			}
+
 			c.breaker.RecordSuccess()
-			if reasoning != "" && opts != nil {
+			choice := result.Choices[0]
+			if choice.Message.ReasoningContent != "" && opts != nil {
 				if opts.OnReasoning != nil {
-					opts.OnReasoning(reasoning)
+					opts.OnReasoning(choice.Message.ReasoningContent)
 				}
 				if opts.LastReasoningOut != nil {
-					*opts.LastReasoningOut = reasoning
+					*opts.LastReasoningOut = choice.Message.ReasoningContent
 				}
 			}
-			if len(calls) > 0 {
-				names := make([]string, len(calls))
-				for i, tc := range calls {
+			if len(choice.Message.ToolCalls) > 0 {
+				names := make([]string, len(choice.Message.ToolCalls))
+				for i, tc := range choice.Message.ToolCalls {
 					names[i] = tc.Function.Name
 				}
-				slog.Info("llm: tool_calls returned", "count", len(calls), "tools", names)
+				slog.Info("llm: tool_calls returned", "count", len(choice.Message.ToolCalls), "tools", names, "finish_reason", choice.FinishReason)
 			} else {
-				slog.Info("llm: no tool_calls, text reply", "content_len", len(content), "content_head", truncateStr(content, 120))
+				slog.Info("llm: no tool_calls, text reply", "finish_reason", choice.FinishReason, "content_len", len(choice.Message.Content), "content_head", truncateStr(choice.Message.Content, 120))
 			}
-			return content, calls, nil
-		}
+			return fcAttemptResult{content: choice.Message.Content, calls: choice.Message.ToolCalls, done: true}
+		}()
 
-		var result ChatResponseFC
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			resp.Body.Close()
-			lastErr = fmt.Errorf("decode: %w", err)
-			continue
+		if ar.fatal {
+			return "", nil, lastErr
 		}
-		resp.Body.Close()
-
-		if len(result.Choices) == 0 {
-			lastErr = fmt.Errorf("no choices returned")
+		if !ar.done {
 			continue
 		}
 
-		c.breaker.RecordSuccess()
-		choice := result.Choices[0]
-
-		if choice.Message.ReasoningContent != "" && opts != nil {
-			if opts.OnReasoning != nil {
-				opts.OnReasoning(choice.Message.ReasoningContent)
-			}
-			if opts.LastReasoningOut != nil {
-				*opts.LastReasoningOut = choice.Message.ReasoningContent
-			}
-		}
-
-		if len(choice.Message.ToolCalls) > 0 {
-			names := make([]string, len(choice.Message.ToolCalls))
-			for i, tc := range choice.Message.ToolCalls {
-				names[i] = tc.Function.Name
-			}
-			slog.Info("llm: tool_calls returned", "count", len(choice.Message.ToolCalls), "tools", names, "finish_reason", choice.FinishReason)
-		} else {
-			slog.Info("llm: no tool_calls, text reply", "finish_reason", choice.FinishReason, "content_len", len(choice.Message.Content), "content_head", truncateStr(choice.Message.Content, 120))
-		}
-
-		return choice.Message.Content, choice.Message.ToolCalls, nil
+		return ar.content, ar.calls, nil
 	}
 
 	c.breaker.RecordFailure()

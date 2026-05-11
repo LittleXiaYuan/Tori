@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { usePolling } from "@/lib/use-polling";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 /* ── helpers ───────────────────────────────────── */
 
@@ -431,7 +432,7 @@ export default function DashboardPage() {
                     padding: "6px 8px", borderRadius: "var(--radius-sm)",
                     background: "var(--yunque-surface-2)",
                   }}>
-                    <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message}</span>
+                    <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatErrorMessage(e.message, "任务暂时没有完成，已保留现场。")}</span>
                     <span style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--yunque-danger)" }}>{e.count}×</span>
                   </div>
                 ))}

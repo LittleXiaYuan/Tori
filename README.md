@@ -1,8 +1,6 @@
 # 云雀 Agent (Yunque Agent)
 
-开箱即用的 AI Agent 平台 — 双击运行，自动打开浏览器，零依赖。
-
-Production-ready AI Agent with embedded WebUI, multi-model routing, self-iteration, and 90+ API endpoints.
+一个集成 WebUI、后端网关、记忆、知识库和插件系统的 AI Agent 项目。
 
 > **Language Note** — Code comments, godoc, and architecture docs are in English.
 > Log messages, system prompts, and user-facing strings are in Chinese, reflecting the primary target market.
@@ -21,6 +19,8 @@ Production-ready AI Agent with embedded WebUI, multi-model routing, self-iterati
 | `data/skills/` | 文件技能热加载目录 |
 
 详细结构见 `docs/repo-layout.md`。
+
+更完整的构建说明见 `BUILD.md`。
 
 ## 30 秒上手
 
@@ -125,22 +125,20 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 
 ## 核心特性
 
-- **开箱即用**: 单二进制，零依赖，自动开浏览器，嵌入式 WebUI
-- **多模型路由**: Fast/Smart/Expert 三层池 + 智能路由 + 断路器 + Fallback
-- **多LLM Provider**: 多厂商Provider注册中心，密钥轮换，会话级模型覆盖
-- **5层记忆**: Short/Mid/Long + 知识图谱 + 可编辑记忆，统一召回
-- **知识库 RAG**: 文件导入 + 混合检索 (BM25稀疏 + 向量密集 + RRF融合 + 可选Rerank二阶排序)
-- **上下文压缩**: 多阶段压缩管线 (轮数限制 → LLM摘要 → 紧急减半)
-- **富消息组件**: 15种消息组件 (文本/图片/音视频/文件/@/回复/卡片/按钮/链接/emoji/表情贴纸/微信表情/face 等)
-- **受控自我迭代**: Agent 分析失败→提案→多 Agent 讨论→人工批准→应用
-- **信任分系统**: 渐进式权限 (0→read, 30→write, 60→network, 80→shell)
-- **安全护栏**: PII脱敏 + 注入防护 + 内容审核 + 风险分级审查
-- **审计链**: Merkle 防篡改 + 每日 JSON Trail + 完整性验证
-- **SkillHub**: 远程技能市场搜索/安装/卸载
-- **15渠道接入**: Telegram/Feishu/Discord/Slack/WhatsApp/Signal/Email/QQ/企业微信/钉钉/微信公众号/LINE/Kook/Satori + WebChat（HTTP 网关）
-- **语音能力**: TTS语音合成 + STT语音识别 (OpenAI Whisper兼容)
-- **浏览器自动化**: Headless Chrome 网页截图/内容提取/表单填充
-- **联邦**: 多 Agent 实例互联协作
+### 构建与运行
+
+- **Go 编译 + 前端嵌入**: 后端二进制内嵌 `heroui-web/out/`
+- **启动即打开浏览器**: 默认进入 Dashboard
+- **多平台构建**: `make release` 生成 Windows/macOS/Linux 构建产物
+- **Docker 部署**: 提供轻量版、完整版和开发版脚本
+
+### 业务能力
+
+- **多渠道接入**: Telegram、Feishu、Discord、Slack、WhatsApp、Signal、Email、QQ、企业微信、钉钉、微信公众号、LINE、Kook、Satori 和 WebChat
+- **记忆与知识**: 多层记忆、知识图谱、文件导入和混合检索
+- **智能体调度**: 多模型路由、上下文压缩、工具编排和受控自我迭代
+- **安全与审计**: 信任分级、安全护栏和审计链
+- **生态扩展**: SkillHub、SDK、语音能力和浏览器自动化
 
 ## API 端点概览
 
@@ -176,9 +174,10 @@ make release   # 生成 Windows/macOS/Linux (amd64+arm64) 6 个二进制
 **Audit Trail**: `/api/audit/trail`
 **Skill Grow**: `/api/skillgrow/patterns`
 **Review**: `/api/review/status`
+**Cognis**: `/v1/cognis` (GET/POST), `/v1/cognis/{id}` (GET/DELETE), `/v1/cognis/generate`, `/v1/cognis/{id}/workflows`, `/v1/cognis/{id}/workflow/{name}`, `/v1/cognis/{id}/experience`, `/v1/cognis/{id}/evolve`, `/v1/cognis/evolution`, `/v1/cognis/federation`, `/v1/cognis/federation/peers`, `/v1/cognis/economics`
 **Webhook**: `/webhook/feishu`
 
-完整 API 文档可在 Dashboard 的 System 标签页中查看。
+完整 API 文档及 Scalar 交互式参考站可在 Dashboard 的 System 标签页中查看，或运行 `make docs-api` 启动本地文档服务器。
 
 ## 环境变量
 

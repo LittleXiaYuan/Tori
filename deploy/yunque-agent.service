@@ -1,0 +1,47 @@
+[Unit]
+Description=Yunque Agent — AI Agent Platform
+Documentation=https://github.com/LittleXiaYuan/Tori
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yunque
+Group=yunque
+WorkingDirectory=/opt/yunque-agent
+ExecStart=/opt/yunque-agent/yunque-agent
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+EnvironmentFile=/opt/yunque-agent/.env
+
+# Go runtime memory tuning (critical for 2G RAM servers)
+Environment="GOMEMLIMIT=400MiB"
+Environment="GOGC=50"
+Environment="GOMAXPROCS=2"
+
+LimitNOFILE=65536
+LimitNPROC=4096
+
+MemoryMax=768M
+MemoryHigh=512M
+CPUQuota=180%
+
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/yunque-agent/data
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# Watchdog: systemd restarts if agent becomes unresponsive
+# Agent's /livez endpoint responds within 5s when alive
+ExecStartPost=/bin/sh -c 'sleep 5 && curl -sf http://127.0.0.1:9090/livez > /dev/null || exit 1'
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yunque-agent
+
+[Install]
+WantedBy=multi-user.target

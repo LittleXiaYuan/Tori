@@ -13,6 +13,7 @@ import {
 import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, fmtTime, dur } from "@/lib/constants";
 import { usePolling } from "@/lib/use-polling";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 const stepStatusIcon: Record<string, React.ReactNode> = {
   pending: <Clock size={14} className="text-gray-400" />,
@@ -22,6 +23,33 @@ const stepStatusIcon: Record<string, React.ReactNode> = {
   failed: <XCircle size={14} className="text-red-400" />,
   skipped: <Clock size={14} className="text-gray-300" />,
 };
+
+function basenameFromAttachmentPath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, "/");
+  return normalized.split("/").filter(Boolean).pop() || normalized || "附件";
+}
+
+function maskParsedAttachmentMarker(line: string): string {
+  return line
+    .replace(/\[Parsed document:\s*([^\]]+)\]/gi, (_match, file: string) => `附件内容：${file.trim()}`)
+    .replace(/^Workspace path:\s*(.+)$/i, (_match, file: string) => `附件名称：${basenameFromAttachmentPath(file)}`);
+}
+
+function displayRecoveryText(text?: string): string {
+  const raw = (text || "").trim();
+  if (!raw) return "";
+  return raw
+    .split(/\r?\n/)
+    .map((line) => formatErrorMessage(line, line))
+    .map(maskParsedAttachmentMarker)
+    .join("\n")
+    .trim();
+}
+
+function clippedDisplayText(text?: string, limit = 800): string {
+  const clean = displayRecoveryText(text);
+  return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
+}
 
 /* ── Overview Panel ── */
 function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | null }) {
@@ -73,7 +101,7 @@ function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | n
             <AlertTriangle size={14} className="text-red-400" />
             <span className="text-sm font-medium text-red-400">错误</span>
           </div>
-          <div className="text-sm text-red-300">{task.error}</div>
+          <div className="text-sm text-red-300">{formatErrorMessage(task.error, "任务执行失败")}</div>
         </Card>
       )}
 
@@ -111,7 +139,7 @@ function OverviewPanel({ task, wm }: { task: TaskInfo; wm: TaskWorkingMemory | n
 }
 
 /* ── Execution Panel ── */
-function ExecutionPanel({ task }: { task: TaskInfo }) {
+export function ExecutionPanel({ task }: { task: TaskInfo }) {
   const steps = task.steps || [];
   if (steps.length === 0) {
     return <EmptyState icon={<GitBranch size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无执行步骤" description="任务开始运行后将在此显示执行流" />;
@@ -146,14 +174,35 @@ function ExecutionPanel({ task }: { task: TaskInfo }) {
                 </div>
               </div>
               <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>{step.action}</div>
+              {(step.depends_on?.length || step.metadata?.planner_step_id) ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                  {step.metadata?.planner_step_id ? (
+                    <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd" }}>
+                      原规划步骤 #{String(step.metadata.planner_step_id)}
+                    </span>
+                  ) : null}
+                  {step.depends_on?.length ? (
+                    <span className="rounded-full px-2 py-0.5" style={{ background: "rgba(148,163,184,0.1)" }}>
+                      依赖步骤：{step.depends_on.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {step.input && (
+                <div className="mt-2 text-xs p-3 rounded-lg whitespace-pre-wrap break-words max-h-36 overflow-y-auto"
+                  style={{ background: "rgba(34,197,94,0.08)", color: "var(--yunque-text-muted)", border: "1px solid rgba(34,197,94,0.14)" }}>
+                  <div className="mb-1 font-medium" style={{ color: "#86efac" }}>接续输入（已保留证据）</div>
+                  {clippedDisplayText(step.input)}
+                </div>
+              )}
               {step.result && (
                 <div className="mt-2 text-xs p-3 rounded-lg whitespace-pre-wrap break-words max-h-40 overflow-y-auto"
                   style={{ background: "var(--yunque-bg)", color: "var(--yunque-text-muted)" }}>
-                  {step.result.length > 800 ? step.result.slice(0, 800) + "…" : step.result}
+                  {clippedDisplayText(step.result)}
                 </div>
               )}
               {step.error && (
-                <div className="mt-2 text-xs p-3 rounded-lg text-red-400" style={{ background: "#ef444410" }}>{step.error}</div>
+                <div className="mt-2 text-xs p-3 rounded-lg text-red-400" style={{ background: "#ef444410" }}>{formatErrorMessage(step.error, "步骤执行失败")}</div>
               )}
             </Card>
           </div>
@@ -164,6 +213,20 @@ function ExecutionPanel({ task }: { task: TaskInfo }) {
 }
 
 /* ── Thread Tab ── */
+export function TaskThreadMessage({ msg, index = 0 }: { msg: { role: string; content: string }; index?: number }) {
+  const isUser = msg.role === "user";
+  const isSystem = msg.role === "system";
+  return (
+    <div key={index} className="flex" style={{ justifyContent: isUser ? "flex-end" : isSystem ? "center" : "flex-start" }}>
+      <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap break-words ${isSystem ? "w-full text-center" : ""}`}
+        style={{ background: isSystem ? "transparent" : isUser ? "var(--yunque-accent)" : "#374151", color: isSystem ? "var(--yunque-text-muted)" : "#fff", fontSize: isSystem ? "12px" : "14px", fontStyle: isSystem ? "italic" : "normal" }}>
+        {!isSystem && <div className="text-xs opacity-60 mb-0.5">{isUser ? "[U]" : "[A]"} {msg.role}</div>}
+        {displayRecoveryText(msg.content)}
+      </div>
+    </div>
+  );
+}
+
 function ThreadTab({ taskId }: { taskId: string }) {
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [info, setInfo] = useState<{ state: string; messages: number } | null>(null);
@@ -226,19 +289,7 @@ function ThreadTab({ taskId }: { taskId: string }) {
             <EmptyState icon={<MessageSquare size={24} style={{ color: "var(--yunque-accent)" }} />} title="暂无消息" description="在下方输入框向 Agent 发送第一条消息" />
           </div>
         ) : (
-          messages.map((msg, i) => {
-            const isUser = msg.role === "user";
-            const isSystem = msg.role === "system";
-            return (
-              <div key={i} className="flex" style={{ justifyContent: isUser ? "flex-end" : isSystem ? "center" : "flex-start" }}>
-                <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap break-words ${isSystem ? "w-full text-center" : ""}`}
-                  style={{ background: isSystem ? "transparent" : isUser ? "var(--yunque-accent)" : "#374151", color: isSystem ? "var(--yunque-text-muted)" : "#fff", fontSize: isSystem ? "12px" : "14px", fontStyle: isSystem ? "italic" : "normal" }}>
-                  {!isSystem && <div className="text-xs opacity-60 mb-0.5">{isUser ? "[U]" : "[A]"} {msg.role}</div>}
-                  {msg.content}
-                </div>
-              </div>
-            );
-          })
+          messages.map((msg, i) => <TaskThreadMessage key={i} msg={msg} index={i} />)
         )}
         <div ref={endRef} />
       </div>

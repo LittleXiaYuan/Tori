@@ -51,25 +51,24 @@ func (d *ConflictDetector) DetectConflicts(
 	newContent string,
 	existing []RecallItem,
 ) []Conflict {
+	return d.DetectConflictsForTenant(ctx, "", newContent, existing)
+}
+
+// DetectConflictsForTenant is tenant-aware: it uses the per-tenant embedding
+// cache to avoid re-embedding stored memories on every call.
+func (d *ConflictDetector) DetectConflictsForTenant(
+	ctx context.Context,
+	tenantID string,
+	newContent string,
+	existing []RecallItem,
+) []Conflict {
 	if len(existing) == 0 || newContent == "" {
 		return nil
 	}
 
-	// Stage 1: when an embedding gate is configured, pre-filter `existing`
-	// down to only items that are semantically close to the new fact. This
-	// kills false positives the keyword path generates (e.g. two unrelated
-	// sentences that happen to share "改为" / "搬到") and gives the LLM a
-	// tight candidate set instead of 10+ noisy items.
-	//
-	// On gate failure (embedder offline, partial embed error) we fall
-	// through with the full existing list — degraded mode, never crashed.
 	if d.embGate != nil {
-		if filtered, ok := d.embGate.filterByEmbedding(ctx, newContent, existing); ok {
+		if filtered, ok := d.embGate.filterByEmbeddingForTenant(ctx, tenantID, newContent, existing); ok {
 			if len(filtered) == 0 {
-				// Nothing semantically similar → genuinely no conflict. The
-				// keyword path would have returned [] anyway because it
-				// requires both negation words AND overlap, but we short-
-				// circuit here to save the downstream LLM token cost.
 				return nil
 			}
 			existing = filtered
@@ -83,47 +82,153 @@ func (d *ConflictDetector) DetectConflicts(
 	return d.detectHeuristic(newContent, existing)
 }
 
-// detectHeuristic: keyword-based contradiction check.
-// Looks for negation words + entity overlap between old and new facts.
+// detectHeuristic uses Jaccard similarity + normalized Levenshtein distance
+// to find contradictions between new and existing memories. Combined with
+// negation-word detection for directional signals.
+//
+// Confidence = 0.4×Jaccard + 0.3×(1-NormEditDist) + 0.3×NegationBoost
 func (d *ConflictDetector) detectHeuristic(newContent string, existing []RecallItem) []Conflict {
 	newLower := strings.ToLower(newContent)
+	newWords := significantWords(newLower)
 
-	// Negation keywords that suggest contradiction
+	negationBoost := 0.0
 	negations := []string{
 		"不再", "不是", "不喜欢", "换了", "搬到", "改为", "变成",
 		"取消", "放弃", "改变", "不用", "停止", "不想",
 		"no longer", "not anymore", "changed to", "moved to",
 		"switched to", "stopped", "quit", "don't",
 	}
-
-	hasNegation := false
 	for _, neg := range negations {
 		if strings.Contains(newLower, neg) {
-			hasNegation = true
+			negationBoost = 1.0
 			break
 		}
 	}
-	if !hasNegation {
+
+	if negationBoost == 0 {
 		return nil
 	}
 
 	var conflicts []Conflict
 	for _, item := range existing {
-		// Simple overlap: if old and new share significant words, may conflict
-		overlap := d.wordOverlap(newLower, strings.ToLower(item.Content))
-		if overlap >= 2 { // at least 2 shared meaningful words
+		oldLower := strings.ToLower(item.Content)
+		oldWords := significantWords(oldLower)
+
+		jaccard := jaccardSimilarity(newWords, oldWords)
+		normEdit := normalizedLevenshtein(newLower, oldLower)
+
+		confidence := 0.4*jaccard + 0.3*(1.0-normEdit) + 0.3*negationBoost
+
+		if confidence >= 0.35 && jaccard >= 0.1 {
 			conflicts = append(conflicts, Conflict{
 				Subject:    d.extractSubject(newContent, item.Content),
 				OldFact:    item.Content,
 				OldSource:  item.Source,
 				NewFact:    newContent,
-				Resolution: ResKeepBoth, // heuristic can't determine with certainty
-				Confidence: 0.3 + float64(overlap)*0.1,
+				Resolution: ResKeepBoth,
+				Confidence: confidence,
 				DetectedAt: time.Now(),
 			})
 		}
 	}
 	return conflicts
+}
+
+// jaccardSimilarity computes J(A,B) = |A∩B| / |A∪B| for word sets.
+func jaccardSimilarity(a, b []string) float64 {
+	if len(a) == 0 && len(b) == 0 {
+		return 0
+	}
+	setA := make(map[string]bool, len(a))
+	for _, w := range a {
+		setA[w] = true
+	}
+	setB := make(map[string]bool, len(b))
+	for _, w := range b {
+		setB[w] = true
+	}
+
+	intersection := 0
+	for w := range setA {
+		if setB[w] {
+			intersection++
+		}
+	}
+	union := len(setA)
+	for w := range setB {
+		if !setA[w] {
+			union++
+		}
+	}
+	if union == 0 {
+		return 0
+	}
+	return float64(intersection) / float64(union)
+}
+
+// normalizedLevenshtein returns edit distance / max(len(a), len(b)).
+// Result in [0, 1] where 0 = identical, 1 = completely different.
+// Operates on rune slices for CJK correctness.
+func normalizedLevenshtein(a, b string) float64 {
+	ra, rb := []rune(a), []rune(b)
+	la, lb := len(ra), len(rb)
+	if la == 0 && lb == 0 {
+		return 0
+	}
+
+	maxLen := la
+	if lb > maxLen {
+		maxLen = lb
+	}
+
+	// Optimize: if length difference alone exceeds threshold, skip full DP
+	if la > 200 || lb > 200 {
+		lenDiff := la - lb
+		if lenDiff < 0 {
+			lenDiff = -lenDiff
+		}
+		return float64(lenDiff) / float64(maxLen)
+	}
+
+	// Standard DP with two-row optimization
+	prev := make([]int, lb+1)
+	curr := make([]int, lb+1)
+	for j := 0; j <= lb; j++ {
+		prev[j] = j
+	}
+	for i := 1; i <= la; i++ {
+		curr[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			del := prev[j] + 1
+			ins := curr[j-1] + 1
+			sub := prev[j-1] + cost
+			curr[j] = del
+			if ins < curr[j] {
+				curr[j] = ins
+			}
+			if sub < curr[j] {
+				curr[j] = sub
+			}
+		}
+		prev, curr = curr, prev
+	}
+	return float64(prev[lb]) / float64(maxLen)
+}
+
+// significantWords extracts words with >1 rune, filtering out common stop words.
+func significantWords(s string) []string {
+	fields := strings.Fields(s)
+	var out []string
+	for _, w := range fields {
+		if len([]rune(w)) > 1 {
+			out = append(out, w)
+		}
+	}
+	return out
 }
 
 func (d *ConflictDetector) detectWithLLM(ctx context.Context, newContent string, existing []RecallItem) []Conflict {

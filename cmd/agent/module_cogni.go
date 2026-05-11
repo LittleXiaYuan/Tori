@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
+	"yunque-agent/internal/agentcore/planner"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	builtinCogni "yunque-agent/internal/cognikernel/builtin"
 	"yunque-agent/internal/controlplane/gateway"
@@ -61,9 +62,11 @@ type cogniModule struct {
 	autoOrganizer  *cogni.AutoOrganizer
 }
 
-func (m *cogniModule) Name() string        { return "cogni" }
-func (m *cogniModule) Description() string { return "声明式智体注册中心，支持热插拔加载/启停" }
-func (m *cogniModule) Profile() string     { return "lite" }
+func (m *cogniModule) Name() string { return "cogni" }
+func (m *cogniModule) Description() string {
+	return "声明式智体注册中心，支持热插拔加载/启停"
+}
+func (m *cogniModule) Profile() string { return "lite" }
 
 func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 	m.registry = cogni.NewRegistry()
@@ -319,6 +322,38 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 				TenantID: tenantID,
 				Channel:  channel,
 			}, in)
+		})
+		app.Planner.SetCogniTrace(func(message, tenantID, channel string) (planner.CogniTraceDetail, bool) {
+			trace, ok := hook.TraceSnapshot(cogni.ContextRequest{
+				Message:  message,
+				TenantID: tenantID,
+				Channel:  channel,
+			})
+			if !ok {
+				return planner.CogniTraceDetail{}, false
+			}
+			detail := planner.CogniTraceDetail{
+				ContextBytes:      trace.Context.Bytes,
+				TemplateFallbacks: trace.Context.TemplateFallbacks,
+				MessageHash:       trace.MessageHash,
+				DurationMs:        trace.DurationMs,
+			}
+			for _, a := range trace.Activations {
+				if a.Activated {
+					if a.DisplayName != "" {
+						detail.Activated = append(detail.Activated, a.DisplayName)
+					} else {
+						detail.Activated = append(detail.Activated, a.ID)
+					}
+				}
+			}
+			if tf := trace.ToolFilter; tf != nil {
+				detail.ToolBefore = tf.Before
+				detail.ToolAfter = tf.After
+				detail.Removed = append([]string(nil), tf.Removed...)
+				detail.FellBackToInput = tf.FellBackToInput
+			}
+			return detail, true
 		})
 		// Wire cost tracking + bus routing on activation
 		{

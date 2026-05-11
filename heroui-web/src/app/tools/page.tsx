@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Terminal, Send, Trash2, Square, Plus, FolderOpen, Play, XCircle, RefreshCw } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import PageHeader from "@/components/page-header";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 interface ToolSession {
   id: string;
@@ -74,12 +75,13 @@ export default function ToolsPage() {
         return next;
       });
     } catch (e: unknown) {
+      const friendly = formatErrorMessage(e, "执行失败");
       setSessions((prev) => {
         const next = [...prev];
         if (next[activeIdx]) {
           next[activeIdx] = {
             ...next[activeIdx],
-            output: next[activeIdx].output + `Error: ${e instanceof Error ? e.message : String(e)}\n`,
+            output: next[activeIdx].output + `Error: ${friendly}\n`,
             running: false,
           };
         }

@@ -1,6 +1,6 @@
 import type { Dispatch } from "react";
 import type { AgentEvent } from "@/components/execution-trace";
-import type { Message } from "@/lib/chat-types";
+import type { ChatShareReceipt, Message } from "@/lib/chat-types";
 
 export interface ChatState {
   messages: Message[];
@@ -19,6 +19,7 @@ export type ChatAction =
   | { type: "UPDATE_LAST"; updates: Partial<Message> }
   | { type: "APPEND_LAST_TRACE"; event: AgentEvent }
   | { type: "APPEND_LAST_REASONING"; delta: string }
+  | { type: "ADD_SHARE_RECEIPT"; messageId: string; receipt: ChatShareReceipt }
   | { type: "ERROR_LAST"; error: string }
   | { type: "REMOVE_MSG"; id: string }
   | { type: "START_SEND" }
@@ -81,6 +82,16 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       if (!last.reasoning) last.reasoningStartMs = Date.now();
       last.reasoning = (last.reasoning || "") + action.delta;
       msgs[msgs.length - 1] = last;
+      return { ...state, messages: msgs };
+    }
+    case "ADD_SHARE_RECEIPT": {
+      const msgs = state.messages.map((msg) => {
+        if (msg.id !== action.messageId) return msg;
+        return {
+          ...msg,
+          shareReceipts: [...(msg.shareReceipts || []), action.receipt],
+        };
+      });
       return { ...state, messages: msgs };
     }
     case "ERROR_LAST": {

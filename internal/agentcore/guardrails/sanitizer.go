@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"golang.org/x/text/unicode/norm"
 
 	"yunque-agent/internal/agentcore/audit"
 )
@@ -123,6 +124,17 @@ var commandInjectionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)/etc/(passwd|shadow|hosts)`),
 	regexp.MustCompile(`(?i)\b(nc|ncat|netcat)\s+-[elp]`),
 	regexp.MustCompile(`(?i)\b(wget|curl)\s+.{5,}\s*\|\s*(bash|sh)\b`),
+	// PowerShell-specific vectors
+	regexp.MustCompile(`(?i)\bInvoke-Expression\b`),
+	regexp.MustCompile(`(?i)\biex\s+\S`),
+	regexp.MustCompile(`(?i)\bStart-Process\b`),
+	regexp.MustCompile(`(?i)\bNew-Object\b.*\bNet\.WebClient\b`),
+	regexp.MustCompile(`(?i)\[System\.Net\.WebClient\]`),
+	regexp.MustCompile(`(?i)\.DownloadString\s*\(`),
+	regexp.MustCompile(`(?i)\.DownloadFile\s*\(`),
+	regexp.MustCompile(`(?i)\b(?:powershell|pwsh)(?:\.exe)?\b.*\s-e(?:nc(?:odedcommand)?)?\b`),
+	regexp.MustCompile(`(?i)\bSet-ExecutionPolicy\b`),
+	regexp.MustCompile(`(?i)\bAdd-Type\b.*-TypeDefinition\b`),
 }
 
 // --- Path traversal patterns ---
@@ -134,6 +146,19 @@ var pathTraversalPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)%2e%2e%2f`),
 	regexp.MustCompile(`(?i)\.\.%5c`),
 	regexp.MustCompile(`(?i)%252e%252e`),
+}
+
+// sqlBlockCommentRegex matches SQL block comments used to evade keyword detection
+// (e.g., S/**/E/**/L/**/E/**/C/**/T → SELECT after stripping).
+var sqlBlockCommentRegex = regexp.MustCompile(`/\*[^*]*\*+(?:[^/*][^*]*\*+)*/`)
+
+// normalizeForDetection applies NFKC normalization (collapses fullwidth chars,
+// Unicode homoglyphs) and strips SQL block comments. The result is used only
+// for pattern matching; the original input is preserved for output/sanitization.
+func normalizeForDetection(input string) string {
+	out := norm.NFKC.String(input)
+	out = sqlBlockCommentRegex.ReplaceAllString(out, "")
+	return out
 }
 
 // Sanitize validates and sanitizes a single external input.
@@ -166,8 +191,11 @@ func (s *Sanitizer) Sanitize(ctx context.Context, req SanitizeRequest) SanitizeR
 		s.auditEvent("sanitize", "null_byte", req.Source, "")
 	}
 
+	// Normalize for detection (NFKC + strip SQL block comments)
+	detectInput := normalizeForDetection(input)
+
 	// Custom block patterns
-	lower := strings.ToLower(input)
+	lower := strings.ToLower(detectInput)
 	for _, pat := range s.config.CustomBlockPatterns {
 		if strings.Contains(lower, strings.ToLower(pat)) {
 			result.Passed = false
@@ -183,7 +211,7 @@ func (s *Sanitizer) Sanitize(ctx context.Context, req SanitizeRequest) SanitizeR
 
 	// SQL injection (skip for pure user prompts in chat mode unless embedded in tool args)
 	if s.config.EnableSQLInjection && req.Source != SourceUserPrompt {
-		if threat := matchPatterns(input, sqlInjectionPatterns); threat != "" {
+		if threat := matchPatterns(detectInput, sqlInjectionPatterns); threat != "" {
 			result.Passed = false
 			result.Blocked = true
 			result.Rule = "sanitizer_sql_injection"
@@ -198,7 +226,7 @@ func (s *Sanitizer) Sanitize(ctx context.Context, req SanitizeRequest) SanitizeR
 
 	// XSS
 	if s.config.EnableXSS {
-		if threat := matchPatterns(input, xssPatterns); threat != "" {
+		if threat := matchPatterns(detectInput, xssPatterns); threat != "" {
 			sanitized := sanitizeXSS(input)
 			result.Sanitized = sanitized
 			result.ThreatType = "xss"
@@ -212,7 +240,7 @@ func (s *Sanitizer) Sanitize(ctx context.Context, req SanitizeRequest) SanitizeR
 
 	// Command injection (only for tool/MCP inputs)
 	if s.config.EnableCommandInjection && (req.Source == SourceToolReturn || req.Source == SourceMCPResponse) {
-		if threat := matchPatterns(input, commandInjectionPatterns); threat != "" {
+		if threat := matchPatterns(detectInput, commandInjectionPatterns); threat != "" {
 			result.Passed = false
 			result.Blocked = true
 			result.Rule = "sanitizer_command_injection"
@@ -227,7 +255,7 @@ func (s *Sanitizer) Sanitize(ctx context.Context, req SanitizeRequest) SanitizeR
 
 	// Path traversal
 	if s.config.EnablePathTraversal {
-		if threat := matchPatterns(input, pathTraversalPatterns); threat != "" {
+		if threat := matchPatterns(detectInput, pathTraversalPatterns); threat != "" {
 			result.Passed = false
 			result.Blocked = true
 			result.Rule = "sanitizer_path_traversal"

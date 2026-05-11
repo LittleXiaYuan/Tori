@@ -97,6 +97,8 @@ type Step struct {
 	MaxRetries int            `json:"max_retries,omitempty"` // max allowed retries (default 2)
 	GapType    string         `json:"gap_type,omitempty"`    // capability gap classification if failed
 	Group      int            `json:"group,omitempty"`       // parallel group: steps with same group run concurrently
+	DependsOn  []int          `json:"depends_on,omitempty"`  // task-local prerequisite step IDs
+	Metadata   map[string]any `json:"metadata,omitempty"`    // extensible step provenance and planner state
 	StartedAt  *time.Time     `json:"started_at,omitempty"`
 	DoneAt     *time.Time     `json:"done_at,omitempty"`
 }
@@ -168,6 +170,15 @@ func (t *Task) clone() *Task {
 				cp.Steps[i].Args = make(map[string]any, len(s.Args))
 				for k, v := range s.Args {
 					cp.Steps[i].Args[k] = v
+				}
+			}
+			if s.DependsOn != nil {
+				cp.Steps[i].DependsOn = append([]int(nil), s.DependsOn...)
+			}
+			if s.Metadata != nil {
+				cp.Steps[i].Metadata = make(map[string]any, len(s.Metadata))
+				for k, v := range s.Metadata {
+					cp.Steps[i].Metadata[k] = v
 				}
 			}
 		}

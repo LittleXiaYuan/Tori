@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Button, Card, Checkbox, FieldError, Input, Label, Spinner, TextField } from "@heroui/react";
 import { Eye, EyeOff, Shield, ExternalLink } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { formatErrorMessage } from "@/lib/error-utils";
+
+const AUTH_STATUS_TIMEOUT_MS = 8000;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,11 +26,18 @@ export default function LoginPage() {
 
   useEffect(() => {
     let mounted = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      if (mounted) setCheckingAuth(false);
+    }, AUTH_STATUS_TIMEOUT_MS);
+
     (async () => {
       try {
         const token = localStorage.getItem("yunque_token");
         const res = await fetch("/v1/auth/status", {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: controller.signal,
         });
         const data = await res.json();
         if (!mounted) return;
@@ -40,11 +50,14 @@ export default function LoginPage() {
       } catch {
         // ignore
       } finally {
+        clearTimeout(timeout);
         if (mounted) setCheckingAuth(false);
       }
     })();
     return () => {
       mounted = false;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [router]);
 
@@ -74,7 +87,7 @@ export default function LoginPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(data?.error || t("auth.networkError"));
+          setError(formatErrorMessage(data?.error, t("auth.networkError")));
           return;
         }
         setNeedsSetup(false);
@@ -91,7 +104,7 @@ export default function LoginPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data?.error || "Login failed");
+        setError(formatErrorMessage(data?.error, "Login failed"));
         return;
       }
       localStorage.setItem("yunque_token", data.token);
@@ -118,29 +131,62 @@ export default function LoginPage() {
       <div
         className="pointer-events-none absolute"
         style={{
-          width: 480,
-          height: 480,
+          width: 600,
+          height: 600,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)",
-          filter: "blur(40px)",
+          background: "radial-gradient(circle, rgba(59,130,246,0.055) 0%, rgba(168,85,247,0.025) 42%, transparent 70%)",
+          filter: "blur(58px)",
         }}
       />
-      <Card className="section-card relative w-full max-w-[420px] animate-scale-in">
-        <Card.Header className="flex flex-col items-center gap-4 pt-10 pb-4">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl"
-            style={{
-              background: "var(--yunque-accent)",
-              boxShadow: "0 0 32px rgba(59,130,246,0.28), 0 0 8px rgba(59,130,246,0.18)",
-            }}
-          >
-            <Shield size={30} className="text-white" />
-          </div>
-          <div className="space-y-1 text-center">
-            <h1 className="text-xl font-bold" style={{ color: "var(--yunque-text)" }}>
-              {needsSetup ? t("auth.setupTitle") : t("auth.loginTitle")}
+      <div className="relative flex flex-col items-center gap-6 w-full max-w-[420px] animate-scale-in">
+        <div className="text-center space-y-2 mb-2">
+          <div className="flex items-center justify-center gap-3">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl"
+              style={{
+                background: "linear-gradient(135deg, var(--yunque-accent), var(--yunque-success))",
+                boxShadow: "0 0 24px rgba(59,130,246,0.22)",
+              }}
+            >
+              <Shield size={24} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>
+              云雀 Agent
             </h1>
-            <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
+          </div>
+          <p className="text-sm" style={{ color: "var(--yunque-text-muted)", maxWidth: 320, margin: "0 auto" }}>
+            全栈 AI Agent 平台 — 对话、思考、行动、进化
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {[
+            { icon: "💬", label: "智能对话", desc: "多模型路由 · 深度思考" },
+            { icon: "🌐", label: "浏览器操控", desc: "自动化网页操作" },
+            { icon: "🧠", label: "认知架构", desc: "记忆 · 反思 · 进化" },
+            { icon: "⚡", label: "工作流引擎", desc: "技能编排 · 定时任务" },
+          ].map((f) => (
+            <div
+              key={f.label}
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+              style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)" }}
+            >
+              <span className="text-base">{f.icon}</span>
+              <div className="min-w-0">
+                <div className="text-xs font-medium" style={{ color: "var(--yunque-text)" }}>{f.label}</div>
+                <div className="text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      <Card className="section-card relative w-full">
+        <Card.Header className="flex flex-col items-center gap-3 pt-8 pb-3">
+          <div className="space-y-1 text-center">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--yunque-text)" }}>
+              {needsSetup ? t("auth.setupTitle") : t("auth.loginTitle")}
+            </h2>
+            <p className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>
               {needsSetup ? t("auth.setupSubtitle") : t("auth.loginSubtitle")}
             </p>
           </div>
@@ -241,6 +287,7 @@ export default function LoginPage() {
           </form>
         </Card.Content>
       </Card>
+      </div>
     </div>
   );
 }

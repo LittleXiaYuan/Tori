@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sort"
+	"strings"
 )
 
 // Layer weights for cross-layer score normalization.
@@ -58,6 +59,57 @@ func (m *Manager) AddLong(ctx context.Context, tenantID string, item Item) error
 		m.persister.MarkDirty()
 	}
 	return err
+}
+
+// AddPreference stores a preference fact in mid-term memory.
+func (m *Manager) AddPreference(ctx context.Context, tenantID, key, value, source string) error {
+	return m.AddMid(ctx, tenantID, Item{
+		Key:      key,
+		Value:    value,
+		Category: "preference",
+		Source:   source,
+	})
+}
+
+// DeleteByQuery removes matching memories across all layers.
+func (m *Manager) DeleteByQuery(ctx context.Context, tenantID, query string) int {
+	if query == "" {
+		return 0
+	}
+	removed := 0
+	needle := strings.ToLower(query)
+
+	if items, _ := m.Short.List(ctx, tenantID, "", 500); len(items) > 0 {
+		for _, item := range items {
+			if strings.Contains(strings.ToLower(item.Key), needle) || strings.Contains(strings.ToLower(item.Value), needle) {
+				_ = m.Short.Delete(ctx, tenantID, item.Key)
+				removed++
+			}
+		}
+	}
+
+	if items, _ := m.Mid.List(ctx, tenantID, "", 500); len(items) > 0 {
+		for _, item := range items {
+			if strings.Contains(strings.ToLower(item.Key), needle) || strings.Contains(strings.ToLower(item.Value), needle) {
+				_ = m.Mid.Delete(ctx, tenantID, item.Key)
+				removed++
+			}
+		}
+	}
+
+	if items, _ := m.Long.List(ctx, tenantID, "", 500); len(items) > 0 {
+		for _, item := range items {
+			if strings.Contains(strings.ToLower(item.Key), needle) || strings.Contains(strings.ToLower(item.Value), needle) {
+				_ = m.Long.Delete(ctx, tenantID, item.Key)
+				removed++
+			}
+		}
+	}
+
+	if removed > 0 && m.persister != nil {
+		m.persister.MarkDirty()
+	}
+	return removed
 }
 
 // StopPersister flushes and stops the persister.

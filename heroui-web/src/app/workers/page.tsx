@@ -7,7 +7,7 @@ import {
   Cpu, RefreshCw, Trash2, Copy, Plus,
   CheckCircle2, AlertTriangle, Clock,
   Monitor, Terminal, Globe,
-  Play, Square, Activity,
+  Play, Square, Activity, MessageCircle, FolderOpen,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import EmptyState from "@/components/empty-state";
@@ -47,7 +47,7 @@ export default function WorkersPage() {
       const res = await api.listWorkers();
       setWorkers(res.workers || []);
     } catch {
-      showToast("加载 Worker 列表失败", "error");
+      showToast("加载执行器列表失败", "error");
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export default function WorkersPage() {
   const handleRemove = async (id: string) => {
     try {
       await api.removeWorker(id);
-      showToast("Worker 已移除", "success");
+      showToast("执行器已移除", "success");
       loadWorkers();
     } catch {
       showToast("移除失败", "error");
@@ -127,28 +127,62 @@ export default function WorkersPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--yunque-fg)" }}>
-            <Cpu size={22} /> Worker 管理
+            <Cpu size={22} /> AI IDE 协作
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--yunque-fg-muted)" }}>
-            管理已连接的外部 Worker（Cursor、Claude Code、Windsurf 等）
+            把 Cursor、Claude Code、Windsurf 接入云雀，让它们从 Chat 或 IM 中领取代码任务。
           </p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onPress={loadWorkers}><RefreshCw size={14} /> 刷新</Button>
           <Button size="sm" variant="primary" onPress={() => { setShowConfig(true); loadConfig("cursor"); }}>
-            <Plus size={14} /> 连接 Worker
+            <Plus size={14} /> 连接 AI IDE
           </Button>
         </div>
       </div>
 
-      {/* Worker List */}
+      <Card className="mb-6 p-4" style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="flex gap-3">
+            <span className="p-2 rounded-lg h-fit" style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }}><MessageCircle size={16} /></span>
+            <div>
+              <div className="text-sm font-medium" style={{ color: "var(--yunque-fg)" }}>Chat / IM 随时指挥</div>
+              <div className="text-xs mt-1" style={{ color: "var(--yunque-fg-muted)" }}>在 Chat 或协作码回流中说“派给 Cursor 做”，云雀会创建可领取任务。</div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <span className="p-2 rounded-lg h-fit" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}><Terminal size={16} /></span>
+            <div>
+              <div className="text-sm font-medium" style={{ color: "var(--yunque-fg)" }}>AI IDE 真实执行</div>
+              <div className="text-xs mt-1" style={{ color: "var(--yunque-fg-muted)" }}>外部 IDE 通过 MCP 注册、领取任务、汇报进度并提交结果。</div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <span className="p-2 rounded-lg h-fit" style={{ background: "rgba(14,165,233,0.12)", color: "#38bdf8" }}><FolderOpen size={16} /></span>
+            <div>
+              <div className="text-sm font-medium" style={{ color: "var(--yunque-fg)" }}>Workspace 验收产物</div>
+              <div className="text-xs mt-1" style={{ color: "var(--yunque-fg-muted)" }}>进度回到任务线程，文件进入工作区预览、下载和继续处理。</div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg p-3" style={{ background: "var(--yunque-bg)" }}>
+          <div className="text-xs" style={{ color: "var(--yunque-fg-muted)" }}>
+            推荐说法：把这个需求派给 AI IDE 执行，过程中需要我确认时回到 Chat/IM 询问。
+          </div>
+          <Button size="sm" variant="ghost" onPress={() => copyToClipboard("把这个需求派给 AI IDE 执行，过程中需要我确认时回到 Chat/IM 询问。")}>
+            <Copy size={12} /> 复制提示词
+          </Button>
+        </div>
+      </Card>
+
+      {/* Executor List */}
       {loading ? (
         <div className="flex justify-center py-20"><Spinner size="lg" /></div>
       ) : workers.length === 0 ? (
         <EmptyState
           icon={<Cpu size={40} />}
-          title="暂无 Worker"
-          description="点击「连接 Worker」获取配置说明，将 Cursor/Claude Code/Windsurf 连接到云雀"
+          title="暂无 AI IDE 执行器"
+          description="点击「连接 AI IDE」获取配置说明，将 Cursor/Claude Code/Windsurf 连接到云雀"
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -209,7 +243,7 @@ export default function WorkersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
           <div className="w-full max-w-2xl mx-4 rounded-xl overflow-hidden" style={{ background: "var(--yunque-bg)", border: "1px solid var(--yunque-border)" }}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: "var(--yunque-border)" }}>
-              <h2 className="text-lg font-bold" style={{ color: "var(--yunque-fg)" }}>连接 Worker</h2>
+              <h2 className="text-lg font-bold" style={{ color: "var(--yunque-fg)" }}>连接 AI IDE</h2>
               <Button size="sm" variant="ghost" isIconOnly onPress={() => setShowConfig(false)}>✕</Button>
             </div>
 
@@ -256,13 +290,13 @@ export default function WorkersPage() {
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium" style={{ color: "var(--yunque-fg)" }}>Worker 指令</span>
+                      <span className="text-sm font-medium" style={{ color: "var(--yunque-fg)" }}>AI IDE 执行指令</span>
                       <Button size="sm" variant="ghost" onPress={() => copyToClipboard(configData.instructions)}>
                         <Copy size={12} /> 复制
                       </Button>
                     </div>
                     <p className="text-xs mb-2" style={{ color: "var(--yunque-fg-muted)" }}>
-                      添加为 Cursor Rules / Claude Code 系统提示，让 AI 自动轮询和执行任务
+                      添加为 Cursor Rules / Claude Code 系统提示，让外部 AI IDE 自动领取和执行任务
                     </p>
                     <pre
                       className="p-3 rounded-lg text-xs overflow-auto max-h-48"
@@ -276,9 +310,9 @@ export default function WorkersPage() {
                     <p className="font-medium mb-1" style={{ color: "var(--yunque-fg)" }}>连接步骤：</p>
                     <ol className="list-decimal list-inside space-y-1" style={{ color: "var(--yunque-fg-muted)" }}>
                       <li>复制上面的 MCP 配置到目标工具的 MCP 设置中</li>
-                      <li>复制 Worker 指令到工具的系统提示 / Rules 文件中</li>
+                      <li>复制 AI IDE 执行指令到工具的系统提示 / Rules 文件中</li>
                       <li>在目标工具中发送消息「开始工作」以触发注册</li>
-                      <li>Worker 将自动出现在上方的列表中</li>
+                      <li>AI IDE 执行器将自动出现在上方的列表中</li>
                     </ol>
                   </div>
                 </div>
@@ -332,7 +366,7 @@ export default function WorkersPage() {
           <Card style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}>
             <div className="p-3 text-center">
               <div className="text-2xl font-bold" style={{ color: "#22c55e" }}>{workers.length}</div>
-              <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>已连接 Worker</div>
+              <div className="text-xs" style={{ color: "var(--yunque-muted)" }}>已连接执行器</div>
             </div>
           </Card>
         </div>

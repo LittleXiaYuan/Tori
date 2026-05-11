@@ -48,7 +48,9 @@ func newE2EGateway(mockURL string) (*Gateway, *tenant.Manager) {
 	cs := session.NewStore(50)
 	pr := plugin.NewRegistry()
 	jwtCfg := &JWTConfig{Secret: "e2e-test-secret", Issuer: "e2e", Expiration: time.Hour}
-	return New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil), tm
+	gw := New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil)
+	gw.SetLedgerHealthChecker(fakeHealthChecker{})
+	return gw, tm
 }
 
 func authedRequest(method, path, body string, apiKey string) *http.Request {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joho/godotenv"
 	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/config"
 )
@@ -19,7 +18,11 @@ import (
 // long-standing UX issue where the CLI wizard would block a GUI desktop
 // launch on stdin.
 func loadConfig() *config.Config {
-	_ = godotenv.Load()
+	if path, err := config.LoadBestEnvFile(); err != nil {
+		slog.Warn("env load failed", "err", err)
+	} else if path != "" {
+		slog.Info("env loaded", "path", path)
+	}
 
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 type HealthMap = Record<string, CogniHealthMetrics>;
 
@@ -707,7 +708,7 @@ export default function CognisPage() {
                     }}
                   >
                     <ShieldCheck size={10} className="inline mr-1" />
-                    {c.load_error}
+                    {formatErrorMessage(c.load_error, "加载失败")}
                   </div>
                 )}
 

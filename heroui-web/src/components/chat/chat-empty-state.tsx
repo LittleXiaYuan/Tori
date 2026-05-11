@@ -1,6 +1,6 @@
 import {
-  BookOpen, Search, Brain, Zap, Package, Sparkles,
-  AlertTriangle, ArrowRight, Blocks,
+  BookOpen, Search, Zap, Package, Sparkles,
+  AlertTriangle, ArrowRight, Cpu, FolderOpen, MessageCircle,
 } from "lucide-react";
 import type { SkillInfo } from "@/lib/api";
 import type { ChatDispatch } from "@/lib/chat-state";
@@ -27,23 +27,56 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
           <a href="/settings/providers" className="inline-flex items-center gap-1 text-xs mt-2 font-medium" style={{ color: "#f59e0b" }}>前往配置提供商 →</a>
         </div>
       )}
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center chat-hero-icon" style={{ background: "rgba(0,111,238,0.1)" }}>
-        <Sparkles size={24} style={{ color: "var(--yunque-accent)" }} />
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center chat-hero-icon" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(168,85,247,0.10))" }}>
+        <Sparkles size={28} style={{ color: "var(--yunque-accent)" }} />
       </div>
-      <div className="max-w-lg text-center space-y-1.5">
-        <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>有什么可以帮你的？</h1>
-        <p className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>研究、写作、编码、分析 —— 描述你的需求，我来帮你完成。</p>
+      <div className="max-w-xl text-center space-y-2">
+        <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>你好，我是云雀</h1>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--yunque-text-muted)", maxWidth: 540, margin: "0 auto" }}>
+          你的全能 AI 助手。可以聊天、研究、写代码、处理文件、调度 AI IDE；复杂能力会被收进清晰的工作路径里。
+        </p>
       </div>
 
-      <div className="mt-1 grid w-full max-w-[520px] grid-cols-2 gap-2">
+      <div className="grid w-full max-w-[620px] grid-cols-3 gap-2">
+        {[
+          { icon: <MessageCircle size={13} />, title: "直接对话", desc: "先说需求，不用先理解工具。" },
+          { icon: <Cpu size={13} />, title: "AI IDE 执行", desc: "复杂代码任务可交给外部 IDE。" },
+          { icon: <FolderOpen size={13} />, title: "Workspace 验收", desc: "文件产物可预览、下载、继续改。" },
+        ].map((item) => (
+          <div
+            key={item.title}
+            className="rounded-2xl px-3 py-2.5 text-left"
+            style={{ background: "var(--yunque-bg-muted)", border: "1px solid var(--yunque-border)" }}
+          >
+            <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <span style={{ color: "var(--yunque-accent)" }}>{item.icon}</span>
+              {item.title}
+            </div>
+            <div className="text-[10px] leading-4" style={{ color: "var(--yunque-text-muted)" }}>{item.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-1 grid w-full max-w-[620px] grid-cols-2 gap-2.5">
         {(() => {
           const fixedCards = [
-            { icon: <BookOpen size={14} />, label: "帮我总结这份文档", desc: "贴入文档或笔记，提炼要点与行动项。", prompt: "" },
-            { icon: <Search size={14} />, label: "/research 最新的AI Agent技术趋势", desc: "自动浏览、提取、对比，生成结构化报告。", displayLabel: "深度研究一个主题", autoSend: true },
+            {
+              icon: <Cpu size={14} />,
+              label: "请把这个需求派给 AI IDE 执行，过程中需要我确认时回到 Chat/IM 询问。",
+              desc: "适合代码修改、重构、测试、修 Bug。",
+              displayLabel: "写代码 / 修 Bug",
+            },
+            {
+              icon: <Search size={14} />,
+              label: "/research 最新的AI Agent技术趋势，并生成可分享的结构化报告",
+              desc: "自动研究、提炼信息、沉淀为报告。",
+              displayLabel: "研究一个主题",
+              autoSend: true,
+            },
           ];
           const fallbackCards = [
-            { icon: <Brain size={14} />, label: "帮我拆解这个任务", desc: "把复杂需求拆解成可执行的步骤。", prompt: "" },
-            { icon: <Zap size={14} />, label: "写一个Python脚本，监控指定文件夹的变化并发送通知", desc: "点击直接运行，查看效果。", displayLabel: "帮我写段代码", autoSend: true },
+            { icon: <BookOpen size={14} />, label: "帮我总结这份文档，并输出待办事项和可交付结论", desc: "贴入文档或笔记，提炼要点与行动项。", displayLabel: "总结文档" },
+            { icon: <Zap size={14} />, label: "帮我把这个复杂任务拆成可执行计划，并告诉我第一步怎么验收", desc: "从想法变成可执行任务列表。", displayLabel: "拆解任务" },
           ];
           const dynamicCards = heroSkills.slice(0, 2).map((sk) => ({
             icon: <Package size={14} />,
@@ -63,27 +96,34 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
                   inputRef.current?.focus();
                 }
               }}
-              className="flex items-start gap-2.5 rounded-[16px] p-2.5 text-left transition-all duration-200 hover-lift"
-              style={{ background: "var(--yunque-card)", border: "1px solid var(--yunque-border)" }}
+              className="flex items-start gap-2.5 rounded-[16px] p-3 text-left transition-all duration-200 hover-lift group/card"
+              style={{ background: "var(--glass-card, var(--yunque-card))", border: "1px solid var(--glass-edge, var(--yunque-border))" }}
             >
-              <span className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }}>{card.icon}</span>
-              <div className="min-w-0">
-                <div className="text-[13px] font-medium" style={{ color: "var(--yunque-text)" }}>{"displayLabel" in card ? (card as any).displayLabel : card.label}</div>
-                <div className="mt-0.5 text-[10px] leading-5" style={{ color: "var(--yunque-text-muted)" }}>{card.desc}</div>
+              <span className="mt-0.5 shrink-0 flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-accent)" }}>{card.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium flex items-center gap-1" style={{ color: "var(--yunque-text)" }}>
+                  {"displayLabel" in card ? (card as any).displayLabel : card.label}
+                  <ArrowRight size={10} className="opacity-0 group-hover/card:opacity-60 transition-opacity" style={{ color: "var(--yunque-text-muted)" }} />
+                </div>
+                <div className="mt-0.5 text-[10px] leading-[1.5]" style={{ color: "var(--yunque-text-muted)" }}>{card.desc}</div>
               </div>
             </button>
           ));
         })()}
       </div>
 
-      <div className="mt-2 flex w-full max-w-[520px] items-center justify-center gap-3">
-        <a href="/skills" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
+      <div className="mt-3 flex w-full max-w-[620px] items-center justify-center gap-3">
+        <a href="/knowledge" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--yunque-bg-muted)]"
           style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
-          <Package size={12} /> 浏览技能库 <ArrowRight size={10} />
+          <BookOpen size={12} /> 导入知识库 <ArrowRight size={10} />
         </a>
-        <a href="/workflows" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5"
+        <a href="/workspace" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--yunque-bg-muted)]"
           style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
-          <Blocks size={12} /> 浏览工作流 <ArrowRight size={10} />
+          <FolderOpen size={12} /> 打开 Workspace <ArrowRight size={10} />
+        </a>
+        <a href="/workers" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--yunque-bg-muted)]"
+          style={{ color: "var(--yunque-text-secondary)", border: "1px solid var(--yunque-border)" }}>
+          <Cpu size={12} /> 连接 AI IDE <ArrowRight size={10} />
         </a>
       </div>
     </div>

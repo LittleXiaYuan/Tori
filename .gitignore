@@ -4,9 +4,18 @@
 tori
 tori_*
 /agent
+/agent.exe
+/yunque.exe
 dist/
 yunque-agent-*
 yunque-agent.exe
+
+# ── Test / coverage outputs ──
+coverage
+coverage_*
+coverage.*
+coverage_report*.txt
+*.test
 
 # ── Logs & temp files ──
 *.log
@@ -40,12 +49,23 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 .next/
 
+# ── Generated SDK dependencies ──
+sdk/typescript/node_modules/
+sdk/typescript/.cache/
+sdk/typescript/.turbo/
+
 # ── Frontend (源码在 heroui-web/src，构建产物在 heroui-web/out/) ──
 heroui-web/node_modules/
 heroui-web/.next/
-heroui-web/out/
+heroui-web/out/*
+!heroui-web/out/.keep
 heroui-web/.env.local
 heroui-web/tsconfig.tsbuildinfo
+desktop/src-tauri/frontend/
+
+# ── Generated HTML snapshots ──
+docs/api-reference.html
+internal/controlplane/gateway/dashboard.html
 
 # ── Local MCP smoke-test fixtures (not part of the repo) ──
 test-mcp.json
@@ -81,4 +101,12 @@ doc/
 # ── Competitive analysis (not for public) ──
 browser-extension/manus-analysis/
 
+# ── AtomCode local agent memories (personal, never commit) ──
+.atomcode/memory.md
 
+# ── Local agent/cache artifacts ──
+.atomcode/
+.tmp/
+
+# ── Tauri/Rust build outputs ──
+desktop/src-tauri/target*/

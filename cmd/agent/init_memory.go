@@ -18,6 +18,7 @@ import (
 	"yunque-agent/internal/controlplane/tenant"
 	iledger "yunque-agent/internal/ledger"
 	pluginpkg "yunque-agent/pkg/plugin"
+	"yunque-agent/pkg/safego"
 
 	"github.com/LittleXiaYuan/ledger"
 
@@ -52,7 +53,7 @@ func initMemory(app *agentrt.App) error {
 
 	// Memory GC (using NewTicker + context for clean shutdown)
 	app.Lifecycle.RegisterFunc("memory_gc", func(ctx context.Context) error {
-		go func() {
+		safego.Go("memory-gc-ticker", func() {
 			ticker := time.NewTicker(5 * time.Minute)
 			defer ticker.Stop()
 			for {
@@ -63,7 +64,7 @@ func initMemory(app *agentrt.App) error {
 					app.ShortMem.GC()
 				}
 			}
-		}()
+		})
 		return nil
 	}, nil)
 
@@ -115,10 +116,10 @@ func initMemory(app *agentrt.App) error {
 		err    error
 	}
 	dailyCh := make(chan dailyResult, 1)
-	go func() {
+	safego.Go("memory-daily-load", func() {
 		loaded, err := memory.LoadDailyFiles(cfg.DataPath("memory", "daily"), app.MemManager)
 		dailyCh <- dailyResult{loaded: loaded, err: err}
-	}()
+	})
 
 	// Knowledge graph + editable memory
 	app.KnGraph = memory.NewGraph()
@@ -206,18 +207,18 @@ func initMemory(app *agentrt.App) error {
 	{
 		var loadWg sync.WaitGroup
 		loadWg.Add(2)
-		go func() {
+		safego.Go("orch-persist-load", func() {
 			defer loadWg.Done()
 			if op, ok := app.Get(agentrt.CompOrchPersist); ok {
 				if loader, lok := op.(interface{ Load() error }); lok {
 					loader.Load()
 				}
 			}
-		}()
-		go func() {
+		})
+		safego.Go("adaptive-loop-load", func() {
 			defer loadWg.Done()
 			adaptiveLoop.LoadFrom(cfg.DataPath("adaptive.json"))
-		}()
+		})
 		loadWg.Wait()
 	}
 	slog.Info("adaptive loop initialized")
@@ -282,7 +283,7 @@ func initMemory(app *agentrt.App) error {
 
 	// Periodic memory promotion (using NewTicker + context for clean shutdown)
 	app.Lifecycle.RegisterFunc("memory_promote", func(ctx context.Context) error {
-		go func() {
+		safego.Go("memory-promote-ticker", func() {
 			ticker := time.NewTicker(10 * time.Minute)
 			defer ticker.Stop()
 			for {
@@ -298,7 +299,7 @@ func initMemory(app *agentrt.App) error {
 					}
 				}
 			}
-		}()
+		})
 		return nil
 	}, nil)
 

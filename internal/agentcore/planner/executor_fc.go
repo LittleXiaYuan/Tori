@@ -26,10 +26,12 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	messages, ctxLayers := p.BuildMessages(ctx, req)
 	userMsg := extractUserMessage(req)
 	tools := p.buildFunctionDefs(userMsg, req.TenantID, req.ChannelType, req.DisableDelegation, req.AllowedSkills)
+	p.maybeEmitCogniTrace(req)
 
 	var usedSkills []string
 	var planSteps []PlanStep
 	steps := 0
+	lastRecoveryFailedCount := 0
 
 	for steps < p.maxSteps {
 		steps++
@@ -63,6 +65,9 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 		// session override short-circuits the chain inside clientForRequest.
 		reply, toolCalls, lastReasoning, err := p.chatWithToolsFallback(ctx, req, messages, tools)
 		if err != nil {
+			if len(planSteps) > 0 {
+				return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+			}
 			return nil, fmt.Errorf("planner fc step %d: %w", steps, err)
 		}
 
@@ -119,12 +124,12 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				timeout = 10 * time.Minute
 			}
 
-		toolParentCtx := ctx
-		if tc.Function.Name == "generate_skill" {
-			var gsCancel context.CancelFunc
-			toolParentCtx, gsCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-			defer gsCancel()
-		}
+			toolParentCtx := ctx
+			if tc.Function.Name == "generate_skill" {
+				var gsCancel context.CancelFunc
+				toolParentCtx, gsCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+				defer gsCancel()
+			}
 
 			go func(toolParentCtx context.Context, timeout time.Duration, idx int, tc llm.ToolCall) {
 				defer func() {
@@ -142,107 +147,77 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 					defer cancel()
 				}
 				func(toolCtx context.Context) {
-				var args map[string]any
-				json.Unmarshal([]byte(tc.Function.Arguments), &args)
+					var args map[string]any
+					json.Unmarshal([]byte(tc.Function.Arguments), &args)
 
-				if p.handoffReg != nil && !req.DisableDelegation {
-					if agentName, ok := p.handoffReg.IsHandoffCall(tc.Function.Name); ok {
-						input, _ := args["input"].(string)
-						slog.Info("planner: handoff delegation (fc)", "agent", agentName, "step", steps)
+					if p.handoffReg != nil && !req.DisableDelegation {
+						if agentName, ok := p.handoffReg.IsHandoffCall(tc.Function.Name); ok {
+							input, _ := args["input"].(string)
+							slog.Info("planner: handoff delegation (fc)", "agent", agentName, "step", steps)
 
-						if req.StepCallback != nil {
-							evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
-								fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
-							evt.Meta.TenantID = req.TenantID
-							evt.Meta.Skill = agentName
-							evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
-							req.StepCallback(evt)
-						}
-
-						cbCtx := toolCtx
-						if req.StepCallback != nil {
-							cbCtx = WithStepCallback(toolCtx, req.StepCallback)
-						}
-
-						t0 := time.Now()
-						hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
-						dur := time.Since(t0)
-						if p.skillMetrics != nil {
-							p.skillMetrics(tc.Function.Name, dur, err)
-						}
-						if p.taskFailureMon != nil {
-							p.taskFailureMon.Record(err != nil)
-						}
-
-						if req.StepCallback != nil {
-							doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
-								fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
-							doneEvt.Meta.TenantID = req.TenantID
-							doneEvt.Meta.Skill = agentName
-							detail := observe.HandoffDetail{Agent: agentName, DurMs: dur.Milliseconds()}
-							if err != nil {
-								doneEvt.Summary = fmt.Sprintf("❌ [%s] 失败: %s", agentName, err.Error())
-								detail.Error = err.Error()
-							} else {
-								detail.Reply = truncate(hr.Reply, 200)
+							if req.StepCallback != nil {
+								evt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffStart,
+									fmt.Sprintf("🤖 委派 [%s]：%s", agentName, truncate(input, 80)))
+								evt.Meta.TenantID = req.TenantID
+								evt.Meta.Skill = agentName
+								evt.Detail = observe.HandoffDetail{Agent: agentName, Input: truncate(input, 200)}
+								req.StepCallback(evt)
 							}
-							doneEvt.Detail = detail
-							req.StepCallback(doneEvt)
-						}
 
-						if err != nil {
-							resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: err}
-						} else {
-							resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: hr.Reply}
-						}
-						return
-					}
-				}
+							cbCtx := toolCtx
+							if req.StepCallback != nil {
+								cbCtx = WithStepCallback(toolCtx, req.StepCallback)
+							}
 
-				skill, ok := p.registry.Get(tc.Function.Name)
-				if !ok {
-					// Resolve hierarchical meta-tool: use_browser{action:"browser_navigate", args:{...}} → browser_navigate(args)
-					if strings.HasPrefix(tc.Function.Name, "use_") {
-						actionName, _ := args["action"].(string)
-						innerArgs, _ := args["args"].(map[string]any)
-						if actionName != "" {
-							if realSkill, found := p.registry.Get(actionName); found {
-								skill = realSkill
-								ok = true
-								if innerArgs != nil {
-									args = innerArgs
+							t0 := time.Now()
+							hr, err := p.handoffReg.Execute(cbCtx, req.TenantID, agentName, input, req.ModelOverride)
+							dur := time.Since(t0)
+							if p.skillMetrics != nil {
+								p.skillMetrics(tc.Function.Name, dur, err)
+							}
+							if p.taskFailureMon != nil {
+								p.taskFailureMon.Record(err != nil)
+							}
+
+							if req.StepCallback != nil {
+								doneEvt := observe.NewEvent(req.TraceID, observe.DomainAgent, observe.EventHandoffDone,
+									fmt.Sprintf("✅ [%s] 完成 (%.1fs)", agentName, dur.Seconds()))
+								doneEvt.Meta.TenantID = req.TenantID
+								doneEvt.Meta.Skill = agentName
+								detail := observe.HandoffDetail{Agent: agentName, DurMs: dur.Milliseconds()}
+								if err != nil {
+									doneEvt.Summary = handoffFailureSummary(agentName, err)
+									detail = buildHandoffFailureDetail(agentName, dur, err)
+								} else {
+									detail.Reply = truncate(hr.Reply, 200)
 								}
+								doneEvt.Detail = detail
+								req.StepCallback(doneEvt)
 							}
+
+							if err != nil {
+								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: err}
+							} else {
+								resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: hr.Reply}
+							}
+							return
 						}
 					}
-				}
-				if !ok {
-					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: fmt.Sprintf("未知技能: %s", tc.Function.Name)}
-					return
-				}
-				slog.Info("planner: executing skill (fc/parallel)", "skill", tc.Function.Name, "step", steps)
-				// Notify: tool_start
-				if req.StepCallback != nil {
-					tsEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolStart,
-						fmt.Sprintf("🔧 正在调用 [%s]...", tc.Function.Name))
-					tsEvt.Meta.Skill = tc.Function.Name
-					tsEvt.Detail = observe.ToolStartDetail{Skill: tc.Function.Name, Args: args}
-					req.StepCallback(tsEvt)
-				}
-				t0 := time.Now()
-				r, err := skill.Execute(toolCtx, args, env)
-				dur := time.Since(t0)
-				if p.skillMetrics != nil {
-					p.skillMetrics(tc.Function.Name, dur, err)
-				}
-				if p.taskFailureMon != nil {
-					p.taskFailureMon.Record(err != nil)
-				}
-				if err != nil {
-					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, err: err}
-				} else {
-					resultsCh <- tcResult{idx: idx, id: tc.ID, name: tc.Function.Name, args: args, output: r}
-				}
+
+					slog.Info("planner: executing skill (fc/parallel)", "skill", tc.Function.Name, "step", steps)
+					if req.StepCallback != nil {
+						tsEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolStart,
+							fmt.Sprintf("🔧 正在调用 [%s]...", tc.Function.Name))
+						tsEvt.Meta.Skill = tc.Function.Name
+						tsEvt.Detail = observe.ToolStartDetail{Skill: tc.Function.Name, Args: args}
+						req.StepCallback(tsEvt)
+					}
+					exec := p.executeSkill(toolCtx, tc.Function.Name, args, env)
+					if exec.Err != nil {
+						resultsCh <- tcResult{idx: idx, id: tc.ID, name: exec.SkillName, args: exec.Args, err: exec.Err}
+					} else {
+						resultsCh <- tcResult{idx: idx, id: tc.ID, name: exec.SkillName, args: exec.Args, output: exec.Output}
+					}
 				}(toolCtx)
 			}(toolParentCtx, timeout, idx, tc)
 		}
@@ -265,7 +240,7 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 			if r.err != nil {
 				step.Status = StepFailed
 				step.Error = r.err.Error()
-				r.output = fmt.Sprintf("执行失败: %v", r.err)
+				r.output = "暂未完成：" + plannerFriendlyFailureText(r.err.Error())
 			}
 			planSteps = append(planSteps, step)
 			pruned := pruneToolResult(r.output, steps)
@@ -276,8 +251,8 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				trSummary := fmt.Sprintf("✅ [%s] 完成", r.name)
 				trErr := ""
 				if r.err != nil {
-					trSummary = fmt.Sprintf("❌ [%s] 执行失败", r.name)
-					trErr = r.err.Error()
+					trSummary = fmt.Sprintf("⏸️ [%s] 暂未完成：%s", r.name, plannerFriendlyFailureText(r.err.Error()))
+					trErr = plannerFriendlyFailureText(r.err.Error())
 				}
 				trEvt := observe.NewEvent(req.TraceID, observe.DomainPlanner, observe.EventToolResult, trSummary)
 				trEvt.Meta.Skill = r.name
@@ -285,21 +260,20 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 				req.StepCallback(trEvt)
 			}
 		}
+		if summary, ok := buildPlannerFailureSummary(planSteps); ok && summary.FailedCount > lastRecoveryFailedCount {
+			lastRecoveryFailedCount = summary.FailedCount
+			p.maybeEmitFailureRecovery(req, summary)
+			messages = append(messages, llm.Message{Role: "user", Content: formatFailureRecoveryPrompt(summary)})
+		}
 
 		// If the request context was cancelled (e.g. SSE disconnect) but tool
 		// results are available, return them directly instead of calling the
 		// LLM again (which would fail with "context canceled").
 		if ctx.Err() != nil {
-			var reply string
-			for _, r := range tcResults {
-				if r.err == nil && r.output != "" {
-					reply += r.output + "\n"
-				}
+			if len(planSteps) > 0 {
+				return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, ctx.Err().Error()), nil
 			}
-			if reply == "" {
-				reply = "任务已执行但连接中断。"
-			}
-			return &PlanResult{Reply: reply, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+			return &PlanResult{Reply: "连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 		}
 	}
 
@@ -308,8 +282,10 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 	client := p.clientForRequest(req)
 	reply, _, err := client.ChatWithTools(ctx, messages, tools, 0.7)
 	if err != nil {
-		summary := "任务已执行 " + fmt.Sprintf("%d", steps) + " 步，但生成总结时出错。"
-		return &PlanResult{Reply: summary, SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
+		if len(planSteps) > 0 {
+			return p.partialPlanResult(req, planSteps, usedSkills, steps, ctxLayers, err.Error()), nil
+		}
+		return &PlanResult{Reply: "任务已执行 " + fmt.Sprintf("%d", steps) + " 步，现场已保留。", SkillsUsed: usedSkills, Steps: steps, Plan: planSteps, ContextLayers: ctxLayers}, nil
 	}
 
 	if len(usedSkills) > 0 {
@@ -336,13 +312,10 @@ func (p *Planner) runNativeFC(ctx context.Context, req PlanRequest) (*PlanResult
 func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, disableDelegation bool, allowedSkills []string) []llm.FunctionDef {
 	allSkills := p.registry.All()
 	if len(allowedSkills) > 0 {
-		allow := make(map[string]struct{}, len(allowedSkills))
-		for _, n := range allowedSkills {
-			allow[n] = struct{}{}
-		}
+		allow := allowedSkillSet(allowedSkills)
 		filtered := make([]skills.Skill, 0, len(allowedSkills))
 		for _, s := range allSkills {
-			if _, ok := allow[s.Name()]; ok {
+			if allow[s.Name()] {
 				filtered = append(filtered, s)
 			}
 		}
@@ -369,7 +342,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Cogni surface filter — narrows the tool list to the union of every
 	// activated cogni's ToolSurface. The hook returns the input unchanged
 	// when no cogni activates, so the previous behaviour is preserved.
-	if p.cogniSkillFilter != nil {
+	if p.cogniSkillFilter != nil && !disableDelegation && len(allowedSkills) == 0 {
 		before := len(allSkills)
 		allSkills = p.cogniSkillFilter(userMessage, tenantID, channelType, allSkills)
 		if after := len(allSkills); after != before {
@@ -422,7 +395,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 	// Fallback: direct mode (no delegation agents or fewer than 4)
 	// Strategy 1: Dynamic filtering by intent (threshold lowered from 25 to 10
 	// so intent-based narrowing kicks in earlier, reducing tool noise for LLMs)
-	if userMessage != "" && len(allSkills) > 10 && len(cats) > 0 {
+	if userMessage != "" && len(allSkills) > 10 && len(cats) > 0 && len(allowedSkills) == 0 {
 		scorer := p.skillScorer
 		if scorer != nil {
 			p.recentSkillsMu.Lock()
@@ -447,7 +420,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 					Parameters:  s.Parameters(),
 				})
 			}
-			if p.handoffReg != nil {
+			if p.handoffReg != nil && !disableDelegation {
 				for _, hd := range p.handoffReg.ToolDefinitions() {
 					fn, _ := hd["function"].(map[string]any)
 					if fn == nil {
@@ -472,7 +445,7 @@ func (p *Planner) buildFunctionDefs(userMessage, tenantID, channelType string, d
 		})
 	}
 
-	if p.handoffReg != nil {
+	if p.handoffReg != nil && !disableDelegation {
 		for _, hd := range p.handoffReg.ToolDefinitions() {
 			fn, _ := hd["function"].(map[string]any)
 			if fn == nil {

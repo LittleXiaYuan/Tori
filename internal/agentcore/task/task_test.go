@@ -49,6 +49,69 @@ func TestCreateValidation(t *testing.T) {
 	}
 }
 
+func TestTaskCloneDeepCopiesStepProvenance(t *testing.T) {
+	tk := &Task{
+		ID: "task-copy",
+		Steps: []Step{{
+			ID:        1,
+			Action:    "resume step",
+			SkillName: "file_exec",
+			Args:      map[string]any{"path": "doc"},
+			DependsOn: []int{0},
+			Metadata:  map[string]any{"planner_step_id": 2},
+			Status:    StepPending,
+		}},
+	}
+
+	cp := tk.clone()
+	cp.Steps[0].Args["path"] = "changed"
+	cp.Steps[0].DependsOn[0] = 99
+	cp.Steps[0].Metadata["planner_step_id"] = 9
+
+	if tk.Steps[0].Args["path"] != "doc" {
+		t.Fatalf("args map was not deep-copied: %+v", tk.Steps[0].Args)
+	}
+	if tk.Steps[0].DependsOn[0] != 0 {
+		t.Fatalf("depends_on slice was not deep-copied: %+v", tk.Steps[0].DependsOn)
+	}
+	if tk.Steps[0].Metadata["planner_step_id"] != 2 {
+		t.Fatalf("metadata map was not deep-copied: %+v", tk.Steps[0].Metadata)
+	}
+}
+
+func TestRunnerBlocksStepWhenDependenciesUnmet(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+	reg := skills.NewRegistry()
+	var calls atomic.Int32
+	reg.Register(&countSkill{counter: &calls})
+	runner := NewRunner(s, reg, nil, &skills.Environment{})
+
+	tk, _ := s.Create(CreateRequest{Description: "dependency blocked"})
+	tk.Steps = []Step{
+		{ID: 2, Action: "should wait", SkillName: "count_skill", Args: map[string]any{"data": "blocked"}, Status: StepPending, DependsOn: []int{1}},
+		{ID: 1, Action: "not done yet", Status: StepPending},
+	}
+	if err := s.Update(tk); err != nil {
+		t.Fatalf("update task: %v", err)
+	}
+
+	err := runner.Run(context.Background(), tk.ID)
+	if err == nil {
+		t.Fatal("expected dependency blocked error")
+	}
+	got, _ := s.Get(tk.ID)
+	if got.Status != StatusInterrupted {
+		t.Fatalf("expected interrupted for dependency block, got %s", got.Status)
+	}
+	if !strings.Contains(got.Error, "等待依赖步骤完成") {
+		t.Fatalf("expected dependency error, got %q", got.Error)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("blocked step should not execute skill, got %d calls", calls.Load())
+	}
+}
+
 func TestListAndDelete(t *testing.T) {
 	dir := t.TempDir()
 	s := NewStore(dir)

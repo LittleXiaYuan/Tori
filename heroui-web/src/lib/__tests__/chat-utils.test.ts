@@ -24,14 +24,15 @@ describe("chat-utils/newId", () => {
 
 describe("chat-utils/friendlyError", () => {
   const cases: Array<[string, RegExp]> = [
-    ["no provider configured for this request", /model provider/i],
-    ["planner_error: budget exceeded", /planning step failed/i],
-    ["context deadline exceeded after 30s", /timed out/i],
-    ["429 Too Many Requests", /Too many requests/i],
-    ["401 Unauthorized: invalid api key", /API key/i],
-    ["502 Bad Gateway — upstream", /upstream model service/i],
-    ["failed to fetch", /network connection lost/i],
-    ["Request failed with status 500", /request failed/i],
+    ["no provider configured for this request", /还没有配置可用模型/],
+    ["planner_error: budget exceeded", /规划这一步暂时没有顺利完成/],
+    ["context deadline exceeded after 30s", /响应暂时超时/],
+    ["429 Too Many Requests", /当前请求较多/],
+    ["401 Unauthorized: invalid api key", /模型密钥/],
+    ["llm api 404: {\"error_message\":\"404, token not found\"}", /模型密钥/],
+    ["502 Bad Gateway — upstream", /模型服务暂时不可用/],
+    ["failed to fetch", /连接暂时中断/],
+    ["Request failed with status 500", /请求暂时没有完成/],
   ];
   for (const [input, pattern] of cases) {
     it(`maps "${input}" to a friendly sentence`, () => {
@@ -40,6 +41,14 @@ describe("chat-utils/friendlyError", () => {
     });
   }
 
+
+  it("keeps dropped-task wording recoverable and hides raw transport detail", () => {
+    const out = friendlyError("任务已执行但连接中断。");
+    expect(out).toContain("现场已保留");
+    expect(out).toContain("最近可恢复任务");
+    expect(out).not.toContain("EOF");
+    expect(out).not.toContain("fallback");
+  });
   it("falls through untouched when no pattern matches", () => {
     const odd = "some bespoke situation that does not match any heuristic";
     expect(friendlyError(odd)).toBe(odd);

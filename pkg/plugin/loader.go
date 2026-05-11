@@ -71,7 +71,15 @@ func (l *Loader) LoadAll() int {
 		wasEnabled := l.registry.IsEnabled(sp.Name())
 		_, existed := l.registry.Get(sp.Name())
 
-		l.registry.Register(sp)
+		slot := sp.Manifest().Slot
+		if slot != "" {
+			if err := l.registry.RegisterWithSlot(sp, slot); err != nil {
+				slog.Warn("plugin slot conflict, skipping", "plugin", sp.Name(), "slot", slot, "err", err)
+				continue
+			}
+		} else {
+			l.registry.Register(sp)
+		}
 		if existed && !wasEnabled {
 			l.registry.SetEnabled(sp.Name(), false)
 		}

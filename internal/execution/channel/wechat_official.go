@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: WeChat Official (微信公众号) ──────────────────
+// Type:     "wechat_official"
+// Protocol: Webhook回调 (独立端口 :9882, /wechat/callback)
+// Inbound:  text, image, voice, video, location, link, event
+// Outbound: text (客服消息API, 拆分600字符)
+// Env vars: WECHAT_APPID, WECHAT_SECRET, WECHAT_TOKEN
+// Status:   Basic — 多类型入站解析完整，出站仅文本
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"
@@ -105,7 +114,7 @@ func (w *WeChatOfficial) Start(ctx context.Context, handler func(Message) Reply)
 		case msg := <-w.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+				if !IsEmptyReply(reply) {
 					if err := w.Send(ctx, m.UserID, reply); err != nil {
 						slog.Warn("wechat official: reply failed", "to", m.UserID, "err", err)
 					}
@@ -248,8 +257,11 @@ func (w *WeChatOfficial) Send(_ context.Context, target string, reply Reply) err
 			return fmt.Errorf("wechat official: send: %w", err)
 		}
 		var result wxOfficialAPIResponse
-		json.NewDecoder(resp.Body).Decode(&result)
+		decErr := json.NewDecoder(resp.Body).Decode(&result)
 		resp.Body.Close()
+		if decErr != nil {
+			return fmt.Errorf("wechat official: decode response: %w", decErr)
+		}
 		if result.ErrCode != 0 {
 			return fmt.Errorf("wechat official: send error %d: %s", result.ErrCode, result.ErrMsg)
 		}

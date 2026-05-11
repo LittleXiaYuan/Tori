@@ -564,6 +564,12 @@ func parseYAML(data []byte, m *Manifest) error {
 	m.Description, _ = jsonMap["description"].(string)
 	m.Language, _ = jsonMap["language"].(string)
 	m.SystemPrompt, _ = jsonMap["system_prompt"].(string)
+	m.Slot, _ = jsonMap["slot"].(string)
+	if t, ok := jsonMap["type"].(string); ok {
+		m.Type = PluginType(t)
+	}
+	m.Entrypoint, _ = jsonMap["entrypoint"].(string)
+	m.HealthCheck, _ = jsonMap["health_check"].(string)
 
 	if skillsRaw, ok := jsonMap["_skills"]; ok {
 		if skillsList, ok := skillsRaw.([]map[string]any); ok {

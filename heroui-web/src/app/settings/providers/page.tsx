@@ -14,6 +14,7 @@ import { useApiData } from "@/lib/use-api-data";
 import { openExternal } from "@/lib/safe-url";
 import { api, type ProviderInfo, type ProviderPreset, type ToriBindingStatus, type ToriHealthStatus, type ToriUsageSummary } from "@/lib/api";
 import { showToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 type ProviderModeType = "local" | "tori" | "hybrid";
 
@@ -131,7 +132,7 @@ export default function ProvidersPage() {
       refresh();
     } catch (e: unknown) {
       setLocalMode(null);
-      setModeError(String((e as Error)?.message || "切换模式失败"));
+      setModeError(formatErrorMessage(e, "切换模式失败"));
       setTimeout(() => setModeError(null), 5000);
     }
   }, [refresh]);
@@ -187,7 +188,7 @@ export default function ProvidersPage() {
       setRegisterForm({ apiKey: "", model: "", baseUrl: "" });
       refresh();
     } catch (e: unknown) {
-      setRegResult({ ok: false, msg: String((e as Error)?.message || "添加失败") });
+      setRegResult({ ok: false, msg: formatErrorMessage(e, "添加失败") });
     }
     setRegistering(false);
     setTimeout(() => setRegResult(null), 4000);

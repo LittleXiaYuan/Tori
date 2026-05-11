@@ -23,9 +23,9 @@ func initMarketplace(app *agentrt.App, gw *gateway.Gateway, p *planner.Planner) 
 	_ = market.LoadFrom(appdir.File("market.json"))
 	gw.SetSkillMarket(market)
 
-	clawHub := skillmarket.NewClawHubProvider("", appdir.Sub("cache", "clawhub"))
+	clawHub := skillmarket.NewClawHubProvider(os.Getenv("CLAWHUB_BASE_URL"), appdir.Sub("cache", "clawhub"))
 	gw.SetClawHubProvider(clawHub)
-	toriHub := skillmarket.NewToriHubProvider("")
+	toriHub := skillmarket.NewToriHubProvider(os.Getenv("TORIHUB_BASE_URL"))
 	gw.SetToriHubProvider(toriHub)
 
 	skillAuditor := skillmarket.NewAuditor(appdir.Sub("skills"))

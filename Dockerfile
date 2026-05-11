@@ -11,17 +11,25 @@
 #   FROM golang:1.26.2-alpine@sha256:<digest>
 # Refresh digests with `docker buildx imagetools inspect golang:1.26.2-alpine`.
 FROM golang:1.26.2-alpine AS builder
-RUN apk add --no-cache git ca-certificates
+RUN apk add --no-cache git ca-certificates nodejs npm
 WORKDIR /src
 
 # Copy ledger dependency first (referenced by go.mod replace directive)
 COPY ledger/ /src/ledger/
 
-# Copy yunque-agent source
+# Copy dependency manifests first for better layer caching.
 COPY yunque-agent/go.mod yunque-agent/go.sum /src/yunque-agent/
+COPY yunque-agent/heroui-web/package.json yunque-agent/heroui-web/package-lock.json /src/yunque-agent/heroui-web/
 WORKDIR /src/yunque-agent
 RUN go mod download
+WORKDIR /src/yunque-agent/heroui-web
+RUN npm ci --prefer-offline --no-audit --no-fund
 
+# Build the static WebUI before compiling Go so go:embed includes the real UI.
+COPY yunque-agent/heroui-web/ /src/yunque-agent/heroui-web/
+RUN npm run build
+
+WORKDIR /src/yunque-agent
 COPY yunque-agent/ /src/yunque-agent/
 ARG VERSION=dev
 ARG GIT_COMMIT=unknown

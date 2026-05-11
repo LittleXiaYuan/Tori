@@ -286,8 +286,26 @@ func truncate(s string, maxLen int) string {
 // findClosingBrace finds the matching closing brace for an opening brace at position start.
 func findClosingBrace(s string, start int) int {
 	depth := 0
+	inString := false
+	escaped := false
 	for i := start; i < len(s); i++ {
-		switch s[i] {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch ch {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
 		case '{':
 			depth++
 		case '}':

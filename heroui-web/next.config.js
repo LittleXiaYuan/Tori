@@ -23,7 +23,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       // Tauri 2 的 IPC 走 https://ipc.localhost 协议（Windows WebView2）
       // 以及 ipc: 协议（macOS/Linux）；不放行会导致前端 ti.invoke() 全部被 CSP 阻止。
-      "connect-src 'self' http://localhost:* ws://localhost:* https://ipc.localhost ipc: https: wss:",
+      "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://ipc.localhost ipc: https: wss:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -39,25 +39,29 @@ const securityHeaders = [
 const nextConfig = {
   ...(isProd ? { output: "export" } : {}),
   images: { unoptimized: true },
+  allowedDevOrigins: ["localhost", "127.0.0.1"],
   trailingSlash: true,
   // 关掉 dev 模式左下角的 "Rendering..."/编译状态浮标：放在桌面应用里
   // 看起来像应用 BUG，而 Tauri 已经有自己的窗口呈现机制。
   // 生产构建（output: export）本来就不会出现这个浮标，这里只影响 next dev。
   devIndicators: false,
-  async rewrites() {
-    if (isProd) return [];
-    const api = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9090";
-    return [
-      { source: "/v1/:path*", destination: `${api}/v1/:path*` },
-      { source: "/api/:path*", destination: `${api}/api/:path*` },
-      { source: "/healthz", destination: `${api}/healthz` },
-    ];
-  },
-  async headers() {
-    return [
-      { source: "/:path*", headers: securityHeaders },
-    ];
-  },
+  ...(!isProd
+    ? {
+        async rewrites() {
+          const api = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9090";
+          return [
+            { source: "/v1/:path*", destination: `${api}/v1/:path*` },
+            { source: "/api/:path*", destination: `${api}/api/:path*` },
+            { source: "/healthz", destination: `${api}/healthz` },
+          ];
+        },
+        async headers() {
+          return [
+            { source: "/:path*", headers: securityHeaders },
+          ];
+        },
+      }
+    : {}),
 };
 
 module.exports = nextConfig;

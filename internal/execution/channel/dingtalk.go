@@ -1,5 +1,14 @@
 package channel
 
+// ─── Channel: DingTalk (钉钉) ───────────────────────────────
+// Type:     "dingtalk"
+// Protocol: Webhook回调 (独立端口 :9881, /callback/dingtalk)
+// Inbound:  text, richText (提取纯文本)
+// Outbound: Markdown模板 (sampleMarkdown)
+// Env vars: DINGTALK_APP_KEY, DINGTALK_APP_SECRET
+// Status:   Production — HMAC签名校验完整
+// ─────────────────────────────────────────────────────────────
+
 import (
 	"bytes"
 	"context"
@@ -100,7 +109,7 @@ func (d *DingTalk) Start(ctx context.Context, handler func(Message) Reply) error
 		case msg := <-d.msgCh:
 			go func(m Message) {
 				reply := handler(m)
-				if strings.TrimSpace(ContentWithButtonFallback(reply)) != "" {
+				if !IsEmptyReply(reply) {
 					target := m.Extra["conversation_id"]
 					if target == "" {
 						target = m.UserID
@@ -121,12 +130,17 @@ func (d *DingTalk) handleCallback(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify signature
+	// Verify signature — fail-closed when clientSecret is configured
 	timestamp := r.Header.Get("timestamp")
 	sign := r.Header.Get("sign")
-	if d.clientSecret != "" && timestamp != "" && sign != "" {
+	if d.clientSecret != "" {
+		if timestamp == "" || sign == "" {
+			slog.Warn("dingtalk: missing signature headers", "remote", r.RemoteAddr)
+			rw.WriteHeader(403)
+			return
+		}
 		if !d.verifySignature(timestamp, sign) {
-			slog.Warn("dingtalk: signature verification failed")
+			slog.Warn("dingtalk: signature verification failed", "remote", r.RemoteAddr)
 			rw.WriteHeader(403)
 			return
 		}
@@ -336,7 +350,10 @@ func (d *DingTalk) refreshAccessToken() {
 		AccessToken string `json:"accessToken"`
 		ExpireIn    int    `json:"expireIn"`
 	}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		slog.Error("dingtalk: token refresh decode failed", "err", err)
+		return
+	}
 	if result.AccessToken == "" {
 		slog.Error("dingtalk: token refresh returned empty token")
 		return

@@ -1,6 +1,7 @@
 import type { AgentEvent } from "@/components/execution-trace";
 import { browserActionPhase } from "@/lib/browser-action-labels";
 import type { Message } from "@/lib/chat-types";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 let msgId = 0;
 
@@ -40,29 +41,41 @@ export function makeBrowserTraceEvent(
 
 /** Map technical error messages to user-friendly text. */
 export function friendlyError(msg: string): string {
-  const m = (msg || "").toLowerCase();
+  const raw = msg || "";
+  const formatted = formatErrorMessage(raw, raw);
+  if (formatted !== raw) return formatted;
+
+  const m = raw.toLowerCase();
   if (m.includes("no provider") || m.includes("provider not"))
-    return "No model provider is configured yet. Add an API key in Settings first.";
+    return "还没有配置可用模型，请先到模型设置里添加密钥。";
   if (m.includes("planner_error") || m.includes("planner error"))
-    return "The planning step failed. Retry or switch models.";
+    return "规划这一步暂时没有顺利完成，已保留现场，可重试或切换策略继续。";
   if (m.includes("context deadline") || m.includes("timeout"))
-    return "The request timed out. Please try again.";
+    return "响应暂时超时，已保留现场，可稍后重试或继续。";
+  if (m.includes("任务已执行但连接中断") || m.includes("connection closed") || m.includes("connection reset"))
+    return "连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。";
   if (m.includes("rate limit") || m.includes("429"))
-    return "Too many requests right now. Please retry in a moment.";
-  if (m.includes("401") || m.includes("unauthorized") || m.includes("invalid api key"))
-    return "The API key looks invalid or expired. Check provider settings.";
+    return "当前请求较多，请稍后重试。";
+  if (
+    m.includes("401") ||
+    m.includes("unauthorized") ||
+    m.includes("invalid api key") ||
+    m.includes("token not found") ||
+    (m.includes("404") && m.includes("token"))
+  )
+    return "模型密钥可能无效或已过期，请检查模型设置。";
   if (m.includes("502") || m.includes("503") || m.includes("bad gateway"))
-    return "The upstream model service is temporarily unavailable.";
+    return "模型服务暂时不可用，现场已保留，可稍后重试或换用其它模型。";
   if (
     m.includes("failed to fetch") ||
     m.includes("network") ||
     m.includes("err_connection") ||
     m.includes("load failed")
   )
-    return "Network connection lost. Please check your connection and try again.";
+    return "连接暂时中断，现场已保留；请检查服务状态后重试，或从最近可恢复任务继续。";
   if (m.includes("request failed"))
-    return "The request failed. Check network or service status and try again.";
-  return msg;
+    return "请求暂时没有完成，已保留现场，可检查服务状态后重试。";
+  return raw;
 }
 
 /** Collect files produced by tool events into a deduplicated list. */
@@ -92,6 +105,8 @@ export function summarizeAssistantWork(message: Message): {
   primarySkill: string;
   fileCount: number;
   warningCount: number;
+  latestSummary: string;
+  sourceKinds: string[];
 } {
   const traceEvents = message.traceEvents || [];
   const toolEvents = traceEvents.filter(
@@ -101,6 +116,19 @@ export function summarizeAssistantWork(message: Message): {
     ...new Set(toolEvents.map((event) => event.meta?.skill).filter(Boolean)),
   ];
   const files = collectGeneratedFiles(traceEvents);
+  const sourceKinds = [
+    ...new Set(
+      toolEvents.map((event) => {
+        const text = `${event.meta?.skill || ""} ${event.type || ""} ${event.summary || ""}`.toLowerCase();
+        if (text.includes("browser") || text.includes("navigate") || text.includes("screenshot") || text.includes("search")) return "浏览器";
+        if (text.includes("shell") || text.includes("exec") || text.includes("command") || text.includes("run") || text.includes("terminal")) return "终端";
+        if (text.includes("read") || text.includes("write") || text.includes("edit") || text.includes("file") || text.includes("grep") || text.includes("workspace")) return "文件";
+        if (text.includes("sandbox") || text.includes("computer") || text.includes("daytona") || text.includes("e2b") || text.includes("cloud")) return "云电脑";
+        if (text.includes("worker") || text.includes("ide") || text.includes("cursor") || text.includes("windsurf")) return "AI IDE";
+        return "工具";
+      }),
+    ),
+  ];
   const warnings = traceEvents.filter((event) => {
     const summary = (event.summary || "").toLowerCase();
     return (
@@ -118,5 +146,7 @@ export function summarizeAssistantWork(message: Message): {
     primarySkill: String(skills[skills.length - 1] || ""),
     fileCount: files.length,
     warningCount: warnings.length,
+    latestSummary: traceEvents[traceEvents.length - 1]?.summary || "",
+    sourceKinds,
   };
 }

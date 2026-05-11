@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ type PromptBuilder struct {
 	skillOptimizer   *SkillOptimizer
 	cognitiveContext CognitiveContextFunc // CognitivePlugin dynamic context
 	cogniContext     CogniContextFunc     // declarative Cogni context (pkg/cogni hook)
+	beliefContext    BeliefContextFunc    // Cognition SDK belief context
 	dynBudget        int
 	contextFilter    *localbrain.LocalBrain // System 1 context filter (nil = disabled)
 }
@@ -47,6 +49,7 @@ func NewPromptBuilder(p *Planner) *PromptBuilder {
 		skillOptimizer:   p.skillOptimizer,
 		cognitiveContext: p.cognitiveContext,
 		cogniContext:     p.cogniContext,
+		beliefContext:    p.beliefContext,
 		dynBudget:        p.dynContextBudget,
 		contextFilter:    p.localBrain,
 	}
@@ -59,6 +62,50 @@ type DynamicContextRequest struct {
 	Channel     string
 	TaskContext string
 	EmotionHint *emotion.Result
+	IntentHint  string // intent from LocalBrain (code/chat/search/tool/complex); drives adaptive budget
+}
+
+// BudgetAllocation maps layer names to their token budget share (0.0-1.0).
+type BudgetAllocation struct {
+	Memory    float64
+	Graph     float64
+	Code      float64
+	Cognition float64
+	Hints     float64
+}
+
+// adaptiveBudgetEnabled caches the env var check at package init time.
+var adaptiveBudgetEnabled = strings.EqualFold(strings.TrimSpace(os.Getenv("ADAPTIVE_BUDGET_ENABLED")), "true") ||
+	os.Getenv("ADAPTIVE_BUDGET_ENABLED") == "1"
+
+// AllocateBudget returns per-layer budget proportions based on the user's
+// intent classification. When intent is empty or adaptive budget is disabled,
+// returns uniform allocation.
+func AllocateBudget(intent string) BudgetAllocation {
+	switch intent {
+	case "code":
+		return BudgetAllocation{Memory: 0.15, Graph: 0.05, Code: 0.60, Cognition: 0.10, Hints: 0.10}
+	case "chat":
+		return BudgetAllocation{Memory: 0.50, Graph: 0.10, Code: 0.00, Cognition: 0.30, Hints: 0.10}
+	case "search":
+		return BudgetAllocation{Memory: 0.15, Graph: 0.50, Code: 0.10, Cognition: 0.15, Hints: 0.10}
+	case "tool":
+		return BudgetAllocation{Memory: 0.20, Graph: 0.15, Code: 0.20, Cognition: 0.15, Hints: 0.30}
+	case "complex":
+		return BudgetAllocation{Memory: 0.25, Graph: 0.25, Code: 0.20, Cognition: 0.20, Hints: 0.10}
+	default:
+		return BudgetAllocation{Memory: 0.25, Graph: 0.20, Code: 0.20, Cognition: 0.20, Hints: 0.15}
+	}
+}
+
+// layerBudget computes the token budget for a specific layer given the total
+// budget and the allocation proportion. Enforces a minimum of 200 tokens.
+func layerBudget(total int, proportion float64) int {
+	b := int(float64(total) * proportion)
+	if b < 200 && proportion > 0 {
+		b = 200
+	}
+	return b
 }
 
 // BuildDynamicContext assembles the 5-priority dynamic context layers and
@@ -217,6 +264,17 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 		}
 	}
 
+	// P3.7: Cognition SDK belief context — packed inner state and disposition.
+	if pb.beliefContext != nil {
+		if beliefCtx := pb.beliefContext(ctx, req.LastMessage, req.TenantID, req.Channel); beliefCtx != "" {
+			layers = append(layers, ctxwindow.Layer{
+				Name:     "belief",
+				Priority: ctxwindow.LayerPriorityCognition,
+				Content:  beliefCtx,
+			})
+		}
+	}
+
 	// P4: Cognition — only inject what's genuinely relevant to the current query.
 	// Emotion and strategy have higher priority than reverie (which is speculative).
 	if req.EmotionHint != nil {
@@ -305,13 +363,41 @@ func (pb *PromptBuilder) BuildDynamicContext(ctx context.Context, req DynamicCon
 	if budget <= 0 {
 		budget = 4000
 	}
-	perLayer := budget / 3 // no single layer gets more than ~33% of budget
+
+	// Adaptive budget allocation: when enabled and intent is available,
+	// assign per-layer budgets proportional to the intent type instead
+	// of the fixed 33% cap.
+	perLayer := budget / 3
 	if perLayer < 500 {
 		perLayer = 500
 	}
 	assembler := ctxwindow.NewLayerAssembler(budget).
-		WithPerLayerLimit(perLayer).
 		WithDedup()
+
+	if adaptiveBudgetEnabled && req.IntentHint != "" {
+		alloc := AllocateBudget(req.IntentHint)
+		assembler = assembler.WithPerLayerLimits(map[string]int{
+			"memory":            layerBudget(budget, alloc.Memory),
+			"graph":             layerBudget(budget, alloc.Graph),
+			"code":              layerBudget(budget, alloc.Code),
+			"emotion":           layerBudget(budget, alloc.Cognition),
+			"strategy":          layerBudget(budget, alloc.Cognition),
+			"state":             layerBudget(budget, alloc.Cognition),
+			"cognitive_plugins": layerBudget(budget, alloc.Cognition),
+			"cogni":             layerBudget(budget, alloc.Cognition),
+			"skill_hints":       layerBudget(budget, alloc.Hints),
+			"reverie":           layerBudget(budget, alloc.Hints),
+		})
+		slog.Debug("prompt_builder: adaptive budget",
+			"intent", req.IntentHint,
+			"memory", layerBudget(budget, alloc.Memory),
+			"code", layerBudget(budget, alloc.Code),
+			"graph", layerBudget(budget, alloc.Graph),
+		)
+	} else {
+		assembler = assembler.WithPerLayerLimit(perLayer)
+	}
+
 	assembled, included := assembler.Assemble(layers)
 	pb.LastIncludedLayers = included
 	return assembled

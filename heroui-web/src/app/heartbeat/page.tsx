@@ -6,6 +6,7 @@ import { Card, Button, Switch, Chip } from "@heroui/react";
 import { HeartPulse, Play, Circle, Mail, CheckCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 export default function HeartbeatPage() {
   const [running, setRunning] = useState(false);
@@ -106,7 +107,7 @@ export default function HeartbeatPage() {
                     {log.duration && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{log.duration}</span>}
                   </div>
                   {log.result && <div className="text-sm truncate" style={{ color: "var(--yunque-text)" }}>{log.result}</div>}
-                  {log.error && <div className="text-sm truncate" style={{ color: "#f31260" }}>{log.error}</div>}
+                  {log.error && <div className="text-sm truncate" style={{ color: "#f31260" }}>{formatErrorMessage(log.error, "心跳失败")}</div>}
                   <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>{new Date(log.started_at).toLocaleString()}</div>
                 </div>
               </div>

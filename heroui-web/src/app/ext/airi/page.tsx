@@ -5,6 +5,7 @@ import { Card, Button, Spinner, Chip, Tooltip } from "@heroui/react";
 import { Bot, Wifi, WifiOff, Server, Clock, Copy, Check, RefreshCw, Terminal, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getAuthHeaders } from "@/lib/api";
 import { usePolling } from "@/lib/use-polling";
+import { formatErrorMessage } from "@/lib/error-utils";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
@@ -32,7 +33,7 @@ export default function AiriPage() {
 
   const refresh = useCallback(async () => {
     try { const s = await fetchAiriStatus(); setStatus(s); setError(""); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed to fetch"); }
+    catch (e: unknown) { setError(formatErrorMessage(e, "获取 Airi 桥接状态失败")); }
     finally { setLoading(false); }
   }, []);
 

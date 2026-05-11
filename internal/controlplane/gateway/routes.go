@@ -210,6 +210,7 @@ func (g *Gateway) registerTriggerRoutes() {
 
 	// Agent output files
 	g.mux.HandleFunc("/api/files", g.requireAuth(g.handleFileList))
+	g.mux.HandleFunc("/api/files/preview", g.requireAuth(g.handleFilePreview))
 	g.mux.HandleFunc("/api/files/download", g.requireAuth(g.handleFileDownload))
 }
 

@@ -5,8 +5,11 @@ import { useI18n } from "@/lib/i18n";
 import {
   Brain,
   ChevronRight,
+  CheckCircle2,
+  Circle,
   FileCode,
   Globe,
+  Loader2,
   Monitor,
   Sparkles,
   Terminal,
@@ -14,7 +17,7 @@ import {
 } from "lucide-react";
 import type { AgentEvent } from "@/components/execution-trace";
 
-type ComputerTab = "terminal" | "browser" | "editor" | "thinking";
+type ComputerTab = "timeline" | "terminal" | "browser" | "editor" | "thinking";
 
 interface OutputFile {
   path: string;
@@ -49,6 +52,19 @@ interface EditorFile {
 interface ThinkingEntry {
   text: string;
   type: "thought" | "observation" | "plan";
+  time: number;
+}
+
+type TimelineKind = "terminal" | "browser" | "file" | "thinking" | "cloud" | "ide" | "workspace";
+type TimelineStatus = "running" | "done" | "error" | "info";
+
+interface TimelineItem {
+  id: string;
+  kind: TimelineKind;
+  status: TimelineStatus;
+  label: string;
+  evidence?: string;
+  skill?: string;
   time: number;
 }
 
@@ -87,6 +103,120 @@ function detectLanguage(path: string): string {
 
 function safePreview(value: string, max = 3000) {
   return (value || "").slice(0, max);
+}
+
+function compactText(value: unknown, max = 900) {
+  if (typeof value === "string") return safePreview(value, max);
+  if (value == null) return "";
+  try {
+    return safePreview(JSON.stringify(value), max);
+  } catch {
+    return "";
+  }
+}
+
+function classifyWorkKind(skill: string, type = "", summary = ""): TimelineKind {
+  const text = `${skill} ${type} ${summary}`.toLowerCase();
+  if (text.includes("browser") || text.includes("navigate") || text.includes("screenshot") || text.includes("search") || text.includes("searx")) return "browser";
+  if (text.includes("shell") || text.includes("exec") || text.includes("command") || text.includes("run") || text.includes("terminal") || text.includes("npm") || text.includes("test")) return "terminal";
+  if (text.includes("read") || text.includes("write") || text.includes("edit") || text.includes("file") || text.includes("grep") || text.includes("find") || text.includes("workspace")) return "file";
+  if (text.includes("think") || text.includes("plan") || text.includes("reason") || text.includes("reflect")) return "thinking";
+  if (text.includes("sandbox") || text.includes("computer") || text.includes("daytona") || text.includes("e2b") || text.includes("cloud")) return "cloud";
+  if (text.includes("worker") || text.includes("ide") || text.includes("cursor") || text.includes("windsurf")) return "ide";
+  return "workspace";
+}
+
+function workKindLabel(kind: TimelineKind) {
+  switch (kind) {
+    case "terminal": return "终端";
+    case "browser": return "浏览器";
+    case "file": return "文件";
+    case "thinking": return "思考";
+    case "cloud": return "云电脑";
+    case "ide": return "AI IDE";
+    default: return "工作现场";
+  }
+}
+
+function timelineIcon(kind: TimelineKind) {
+  switch (kind) {
+    case "terminal": return <Terminal size={13} />;
+    case "browser": return <Globe size={13} />;
+    case "file": return <FileCode size={13} />;
+    case "thinking": return <Brain size={13} />;
+    case "cloud": return <Monitor size={13} />;
+    case "ide": return <Sparkles size={13} />;
+    default: return <Circle size={13} />;
+  }
+}
+
+function statusFromStep(step: TaskStep): TimelineStatus {
+  const status = (step.status || "").toLowerCase();
+  if (step.error || status.includes("fail") || status.includes("error")) return "error";
+  if (status === "done" || status === "completed" || status === "success") return "done";
+  if (status === "running" || status === "pending") return "running";
+  return step.result ? "done" : "info";
+}
+
+function timelineLabelFromStep(step: TaskStep) {
+  const skill = step.skill_name || step.action || "执行步骤";
+  const args = step.args || {};
+  const command = args.command || args.cmd;
+  const url = args.url;
+  const path = args.path || args.file;
+  if (command) return `运行命令：${command}`;
+  if (url) return `访问网页：${url}`;
+  if (path) return `处理文件：${path}`;
+  return step.action || skill;
+}
+
+function parseStepTimeline(step: TaskStep, index: number): TimelineItem {
+  const skill = step.skill_name || step.action || "";
+  return {
+    id: step.id || `step-${index}`,
+    kind: classifyWorkKind(skill, step.status || "", step.action || ""),
+    status: statusFromStep(step),
+    label: timelineLabelFromStep(step),
+    evidence: safePreview(step.error || step.result || "", 900),
+    skill: step.skill_name,
+    time: Date.now() + index,
+  };
+}
+
+function statusFromEvent(evt: AgentEvent): TimelineStatus {
+  const type = (evt.type || "").toLowerCase();
+  const summary = (evt.summary || "").toLowerCase();
+  if (type.includes("fail") || type.includes("error") || summary.includes("failed") || summary.includes("error")) return "error";
+  if (type === "tool_result" || type.includes("done") || type.includes("complete") || type === "approved") return "done";
+  if (type === "tool_start" || type.includes("start") || type === "thinking" || type.includes("plan")) return "running";
+  return "info";
+}
+
+function parseEventTimeline(evt: AgentEvent, index: number): TimelineItem {
+  const detail = evt.detail as Record<string, unknown> | undefined;
+  const args = ((detail?.args as Record<string, unknown>) || {}) as Record<string, unknown>;
+  const command = compactText(args.command || args.cmd, 180);
+  const url = compactText(args.url, 180);
+  const path = compactText(args.path || args.file, 180);
+  const result = compactText(detail?.result, 900);
+  const skill = evt.meta?.skill || "";
+  const kind = classifyWorkKind(skill, evt.type, evt.summary);
+  const label = command
+    ? `运行命令：${command}`
+    : url
+      ? `访问网页：${url}`
+      : path
+        ? `处理文件：${path}`
+        : evt.summary || `${workKindLabel(kind)}活动`;
+  return {
+    id: evt.id || `event-${index}`,
+    kind,
+    status: statusFromEvent(evt),
+    label,
+    evidence: result || (label !== evt.summary ? safePreview(evt.summary || "", 500) : ""),
+    skill,
+    time: new Date(evt.ts).getTime() || Date.now() + index,
+  };
 }
 
 function parseStepResult(step: TaskStep): {
@@ -239,6 +369,66 @@ function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: strin
   );
 }
 
+function TimelineView({ items, isLive }: { items: TimelineItem[]; isLive?: boolean }) {
+  if (!items.length) {
+    return <EmptyState icon={<Monitor size={22} />} title="暂无工作现场" desc="Agent 调用本地沙箱、浏览器、云电脑或 AI IDE 时，会在这里显示推进过程和执行证据。" />;
+  }
+
+  const statusTone: Record<TimelineStatus, { color: string; bg: string; label: string }> = {
+    running: { color: "#60a5fa", bg: "rgba(59,130,246,0.14)", label: "进行中" },
+    done: { color: "#34d399", bg: "rgba(52,211,153,0.12)", label: "完成" },
+    error: { color: "#f87171", bg: "rgba(248,113,113,0.12)", label: "异常" },
+    info: { color: "#cbd5e1", bg: "rgba(203,213,225,0.09)", label: "记录" },
+  };
+
+  return (
+    <div className="h-full overflow-y-auto p-4">
+      <div className="mb-4 rounded-[24px] border p-4" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), rgba(14,165,233,0.04))", borderColor: "rgba(59,130,246,0.18)" }}>
+        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#e0f2fe" }}>
+          {isLive ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+          <span>{isLive ? "云雀正在推进任务" : "工作过程已记录"}</span>
+        </div>
+        <div className="mt-2 text-xs leading-6" style={{ color: "#94a3b8" }}>
+          这里把本地沙箱、浏览器、云电脑和 AI IDE 的动作收敛成同一条时间线，优先展示推进状态和可验证证据。
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {items.map((item, index) => {
+          const displayStatus = item.status === "running" && !isLive ? "done" : item.status;
+          const tone = statusTone[displayStatus];
+          return (
+            <div key={`${item.id}-${index}`} className="relative pl-8">
+              {index < items.length - 1 && <div className="absolute left-[13px] top-8 bottom-[-14px] w-px" style={{ background: "rgba(148,163,184,0.18)" }} />}
+              <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full" style={{ background: tone.bg, color: tone.color, boxShadow: displayStatus === "running" ? `0 0 12px ${tone.color}55` : undefined }}>
+                {displayStatus === "running" ? <Loader2 size={13} className="animate-spin" /> : timelineIcon(item.kind)}
+              </div>
+              <div className="rounded-[22px] border px-4 py-3" style={{ background: "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)" }}>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full px-2.5 py-1 text-[10px] font-medium" style={{ background: tone.bg, color: tone.color }}>{tone.label}</span>
+                      <span className="rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.06)", color: "#cbd5e1" }}>{workKindLabel(item.kind)}</span>
+                      {item.skill && <span className="max-w-[160px] truncate rounded-full px-2.5 py-1 text-[10px]" style={{ background: "rgba(255,255,255,0.04)", color: "#94a3b8" }}>{item.skill}</span>}
+                    </div>
+                    <div className="mt-2 text-sm leading-6" style={{ color: "#f8fafc" }}>{item.label}</div>
+                    {item.evidence && (
+                      <pre className="mt-2 max-h-[140px] overflow-y-auto whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[11px] leading-5" style={{ background: "rgba(4,7,16,0.48)", color: "#b6c3d1" }}>{item.evidence}</pre>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[10px] font-mono" style={{ color: "#64748b" }}>
+                    {new Date(item.time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function TerminalView({ lines }: { lines: TerminalLine[] }) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lines.length]);
@@ -369,7 +559,7 @@ function humanFileSize(size?: number) {
 }
 
 export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive, className, onClose, suggestedTab }: ComputerPanelProps) {
-  const [activeTab, setActiveTab] = useState<ComputerTab>(suggestedTab || "terminal");
+  const [activeTab, setActiveTab] = useState<ComputerTab>(suggestedTab || "timeline");
   const [sseImage, setSseImage] = useState("");
   const [sseUrl, setSseUrl] = useState("");
 
@@ -383,6 +573,7 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
     const editor: EditorFile[] = [];
     const thinking: ThinkingEntry[] = [];
     const files: OutputFile[] = [];
+    const timeline: TimelineItem[] = [];
 
     const mergeEditor = (next: EditorFile) => {
       const idx = editor.findIndex((item) => item.path === next.path);
@@ -392,6 +583,7 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
 
     for (const step of steps || []) {
       if (step.status === "pending") continue;
+      timeline.push(parseStepTimeline(step, timeline.length));
       const next = parseStepResult(step);
       if (next.terminal) terminal.push(...next.terminal);
       if (next.browser) browser.push(next.browser);
@@ -401,6 +593,7 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
     }
 
     for (const evt of traceEvents || []) {
+      timeline.push(parseEventTimeline(evt, timeline.length));
       const next = parseAgentEvent(evt);
       if (next.terminal) terminal.push(...next.terminal);
       if (next.browser) browser.push(next.browser);
@@ -409,7 +602,9 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
       if (next.files) files.push(...next.files);
     }
 
-    return { terminal, browser, editor, thinking, files };
+    timeline.sort((a, b) => a.time - b.time);
+
+    return { terminal, browser, editor, thinking, files, timeline };
   }, [steps, traceEvents]);
 
   useEffect(() => {
@@ -452,9 +647,10 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
   }, []);
 
   const tabs = [
+    { key: "timeline" as const, label: "Timeline", icon: <Monitor size={14} />, count: parsed.timeline.length },
     { key: "terminal" as const, label: "Terminal", icon: <Terminal size={14} />, count: parsed.terminal.length },
     { key: "browser" as const, label: "Browser", icon: <Globe size={14} />, count: parsed.browser.length + (sseUrl || sseImage ? 1 : 0) },
-    { key: "editor" as const, label: "Editor", icon: <FileCode size={14} />, count: parsed.editor.length },
+    { key: "editor" as const, label: "Files", icon: <FileCode size={14} />, count: parsed.editor.length },
     { key: "thinking" as const, label: "Thinking", icon: <Brain size={14} />, count: parsed.thinking.length },
   ];
 
@@ -462,6 +658,8 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
   const progressDone = (steps || []).filter((item) => item.status === "done" || item.status === "completed").length;
   const progressPct = progressTotal ? Math.round((progressDone / progressTotal) * 100) : 0;
   const activeSummary = isLive || taskStatus === "running" || taskStatus === "planning";
+  const latestTimeline = parsed.timeline[parsed.timeline.length - 1];
+  const activeLabel = latestTimeline?.label || "等待 Agent 开始使用本地沙箱、浏览器、云电脑或 AI IDE。";
 
   return (
     <div className={`flex h-full flex-col overflow-hidden ${className || ""}`} style={{ background: "linear-gradient(180deg, rgba(12,18,30,0.98), rgba(8,10,18,0.98))" }}>
@@ -470,10 +668,10 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px]" style={{ background: "rgba(59,130,246,0.12)", color: "#93c5fd" }}>
               <Monitor size={12} />
-              <span>Agent workspace</span>
+              <span>Computer workspace</span>
             </div>
-            <div className="text-sm font-semibold" style={{ color: "#f8fafc" }}>{taskName || "Live execution console"}</div>
-            <div className="mt-1 text-xs" style={{ color: "#94a3b8" }}>{activeSummary ? "Watching the agent reason, browse, and execute in real time." : "Open a tab to inspect what the agent just did."}</div>
+            <div className="text-sm font-semibold" style={{ color: "#f8fafc" }}>{taskName || "工作现场"}</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: "#94a3b8" }}>{activeSummary ? `当前：${activeLabel}` : "查看 Agent 刚刚使用过的终端、浏览器、文件和思考证据。"}</div>
           </div>
           {onClose && (
             <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-2xl transition-colors" style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>
@@ -499,9 +697,9 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
           {activeSummary && (
             <div className={`${progressTotal > 1 ? "mt-3" : ""} flex items-center gap-2 text-[11px]`} style={{ color: "#cbd5e1" }}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "rgba(59,130,246,0.14)", color: "#60a5fa" }}><Sparkles size={11} /></span>
-              <span>{tabs.find((tab) => tab.key === activeTab)?.label || "Workspace"} is active</span>
+              <span>{tabs.find((tab) => tab.key === activeTab)?.label || "Timeline"} is active</span>
               <ChevronRight size={12} style={{ color: "#3b82f6" }} />
-              <span style={{ color: "#94a3b8" }}>{taskStatus || (isLive ? "running" : "ready")}</span>
+              <span className="min-w-0 truncate" style={{ color: "#94a3b8" }}>{taskStatus || (isLive ? "running" : "ready")}</span>
             </div>
           )}
         </div>
@@ -529,6 +727,7 @@ export function ComputerPanel({ steps, traceEvents, taskStatus, taskName, isLive
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
+        {activeTab === "timeline" && <TimelineView items={parsed.timeline} isLive={activeSummary} />}
         {activeTab === "terminal" && <TerminalView lines={parsed.terminal} />}
         {activeTab === "browser" && <BrowserView frames={parsed.browser} sseImage={sseImage} sseUrl={sseUrl} />}
         {activeTab === "editor" && <EditorView files={parsed.editor} />}

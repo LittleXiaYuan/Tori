@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode/utf8"
 )
 
@@ -51,40 +50,100 @@ func NewTrainingFilter(cfg FilterConfig) *TrainingFilter {
 
 // FilterStats reports what the filter did to the data.
 type FilterStats struct {
-	TotalRead       int `json:"total_read"`
-	Kept            int `json:"kept"`
-	DroppedEmpty    int `json:"dropped_empty"`
-	DroppedTooShort int `json:"dropped_too_short"`
-	DroppedTooLong  int `json:"dropped_too_long"`
-	DroppedDup      int `json:"dropped_duplicate"`
-	DroppedLowScore int `json:"dropped_low_score"`
+	TotalRead        int `json:"total_read"`
+	Kept             int `json:"kept"`
+	DroppedEmpty     int `json:"dropped_empty"`
+	DroppedTooShort  int `json:"dropped_too_short"`
+	DroppedTooLong   int `json:"dropped_too_long"`
+	DroppedDup       int `json:"dropped_duplicate"`
+	DroppedLowScore  int `json:"dropped_low_score"`
 	DroppedMalformed int `json:"dropped_malformed"`
-	DroppedGarbage  int `json:"dropped_garbage"`
+	DroppedGarbage   int `json:"dropped_garbage"`
 }
 
 // FilterFile reads a JSONL file, applies quality filters, and writes a
 // filtered version. Returns the path to the filtered file and stats.
 func (tf *TrainingFilter) FilterFile(inputPath string) (string, *FilterStats, error) {
+	return tf.processFile(inputPath, true)
+}
+
+// PreviewFile reads a JSONL file and returns filter stats without writing a
+// filtered output file. Use this for training readiness checks before starting
+// an expensive LoRA job.
+func (tf *TrainingFilter) PreviewFile(inputPath string) (*FilterStats, error) {
+	return tf.PreviewFiles([]string{inputPath})
+}
+
+// PreviewFiles reads one or more JSONL files and returns filter stats without
+// writing filtered output files. Deduplication is applied across all files.
+func (tf *TrainingFilter) PreviewFiles(inputPaths []string) (*FilterStats, error) {
+	stats := &FilterStats{}
+	seen := make(map[string]struct{})
+	for _, inputPath := range inputPaths {
+		if err := tf.processFileInto(inputPath, nil, stats, seen); err != nil {
+			return stats, err
+		}
+	}
+	return stats, nil
+}
+
+func (tf *TrainingFilter) processFile(inputPath string, writeOutput bool) (string, *FilterStats, error) {
 	in, err := os.Open(inputPath)
 	if err != nil {
 		return "", nil, fmt.Errorf("open input: %w", err)
 	}
 	defer in.Close()
 
-	dir := filepath.Dir(inputPath)
-	outName := fmt.Sprintf("filtered_%s.jsonl", time.Now().Format("20060102_150405"))
-	outPath := filepath.Join(dir, outName)
-
-	out, err := os.Create(outPath)
-	if err != nil {
-		return "", nil, fmt.Errorf("create output: %w", err)
+	outPath := ""
+	var enc *json.Encoder
+	if writeOutput {
+		dir := filepath.Dir(inputPath)
+		out, err := createTrainingJSONLOutput(dir, "filtered")
+		if err != nil {
+			return "", nil, fmt.Errorf("create output: %w", err)
+		}
+		outPath = out.Name()
+		defer out.Close()
+		enc = json.NewEncoder(out)
 	}
-	defer out.Close()
 
 	stats := &FilterStats{}
 	seen := make(map[string]struct{})
-	enc := json.NewEncoder(out)
+	if err := tf.processOpenFileInto(in, enc, stats, seen); err != nil {
+		return outPath, stats, err
+	}
 
+	slog.Info("training_filter: complete",
+		"input", inputPath,
+		"output", outPath,
+		"write_output", writeOutput,
+		"total", stats.TotalRead,
+		"kept", stats.Kept,
+		"dropped_dup", stats.DroppedDup,
+		"dropped_short", stats.DroppedTooShort,
+		"dropped_long", stats.DroppedTooLong,
+		"dropped_score", stats.DroppedLowScore,
+		"dropped_garbage", stats.DroppedGarbage,
+		"dropped_malformed", stats.DroppedMalformed,
+	)
+
+	return outPath, stats, nil
+}
+
+func (tf *TrainingFilter) processFileInto(inputPath string, enc *json.Encoder, stats *FilterStats, seen map[string]struct{}) error {
+	in, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("open input: %w", err)
+	}
+	defer in.Close()
+
+	if err := tf.processOpenFileInto(in, enc, stats, seen); err != nil {
+		return fmt.Errorf("%s: %w", inputPath, err)
+	}
+	return nil
+}
+
+func (tf *TrainingFilter) processOpenFileInto(in *os.File, enc *json.Encoder, stats *FilterStats, seen map[string]struct{}) error {
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 
@@ -136,30 +195,18 @@ func (tf *TrainingFilter) FilterFile(inputPath string) (string, *FilterStats, er
 		}
 		seen[hash] = struct{}{}
 
-		if err := enc.Encode(record); err != nil {
-			continue
+		if enc != nil {
+			if err := enc.Encode(record); err != nil {
+				continue
+			}
 		}
 		stats.Kept++
 	}
 
 	if err := scanner.Err(); err != nil {
-		return outPath, stats, fmt.Errorf("scan error: %w", err)
+		return fmt.Errorf("scan error: %w", err)
 	}
-
-	slog.Info("training_filter: complete",
-		"input", inputPath,
-		"output", outPath,
-		"total", stats.TotalRead,
-		"kept", stats.Kept,
-		"dropped_dup", stats.DroppedDup,
-		"dropped_short", stats.DroppedTooShort,
-		"dropped_long", stats.DroppedTooLong,
-		"dropped_score", stats.DroppedLowScore,
-		"dropped_garbage", stats.DroppedGarbage,
-		"dropped_malformed", stats.DroppedMalformed,
-	)
-
-	return outPath, stats, nil
+	return nil
 }
 
 func (tf *TrainingFilter) shouldDrop(record map[string]interface{}) string {

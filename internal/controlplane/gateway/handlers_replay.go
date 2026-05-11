@@ -13,15 +13,15 @@ import (
 )
 
 type replayTurn struct {
-	Turn          int              `json:"turn"`
-	Timestamp     time.Time        `json:"timestamp"`
-	UserMessage   string           `json:"user_message"`
-	AssistReply   string           `json:"assistant_reply"`
-	TraceID       string           `json:"trace_id,omitempty"`
-	Pipeline      []pipelinePhase  `json:"pipeline"`
-	TrustDelta    float64          `json:"trust_delta,omitempty"`
-	TokensIn      int64            `json:"tokens_in,omitempty"`
-	TokensOut     int64            `json:"tokens_out,omitempty"`
+	Turn        int             `json:"turn"`
+	Timestamp   time.Time       `json:"timestamp"`
+	UserMessage string          `json:"user_message"`
+	AssistReply string          `json:"assistant_reply"`
+	TraceID     string          `json:"trace_id,omitempty"`
+	Pipeline    []pipelinePhase `json:"pipeline"`
+	TrustDelta  float64         `json:"trust_delta,omitempty"`
+	TokensIn    int64           `json:"tokens_in,omitempty"`
+	TokensOut   int64           `json:"tokens_out,omitempty"`
 }
 
 type pipelinePhase struct {
@@ -52,6 +52,7 @@ func (g *Gateway) handleConversationReplay(w http.ResponseWriter, r *http.Reques
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"session_id":  sessionID,
+			"raw":         traceRawMode(r),
 			"turns":       []replayTurn{},
 			"total_turns": 0,
 		})
@@ -59,9 +60,13 @@ func (g *Gateway) handleConversationReplay(w http.ResponseWriter, r *http.Reques
 	}
 
 	turns := buildTurnsFromMessages(messages)
+	rawEvents := traceRawMode(r)
 
 	if g.eventTrail != nil {
 		events := g.eventTrail.QueryBySessionID(sessionID)
+		if !rawEvents {
+			events, _ = traceEventsForResponse(r, events)
+		}
 		enrichTurnsWithEvents(turns, events)
 	}
 
@@ -98,6 +103,7 @@ func (g *Gateway) handleConversationReplay(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"session_id":  sessionID,
+		"raw":         rawEvents,
 		"turns":       turns,
 		"total_turns": total,
 	})
@@ -119,9 +125,13 @@ func buildTurnsFromMessages(messages []llm.Message) []replayTurn {
 			Pipeline:    []pipelinePhase{},
 		}
 
-		if i+1 < len(messages) && messages[i+1].Role == "assistant" {
-			turn.AssistReply = truncateStrReplay(messages[i+1].Content, 500)
-			i++
+		nextIdx := i + 1
+		for nextIdx < len(messages) && isHiddenAttachmentContextMessage(messages[nextIdx]) {
+			nextIdx++
+		}
+		if nextIdx < len(messages) && messages[nextIdx].Role == "assistant" {
+			turn.AssistReply = truncateStrReplay(messages[nextIdx].Content, 500)
+			i = nextIdx
 		}
 
 		turns = append(turns, turn)
