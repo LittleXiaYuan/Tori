@@ -136,6 +136,21 @@ test("LoRAClient throws LoRAClientError with parsed and text bodies", async () =
     assertEqual(error.message, "LoRA scheduler not configured");
   }
 
+
+  const nestedClient = createLoRAClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "lora training config is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.trigger({});
+    throw new Error("expected trigger to reject");
+  } catch (error) {
+    assert(error instanceof LoRAClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "lora training config is required");
+  }
+
   const textClient = createLoRAClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("method not allowed", { status: 405 }),

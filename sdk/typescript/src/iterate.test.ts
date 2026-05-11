@@ -126,6 +126,21 @@ test("IterateClient throws IterateClientError with parsed and text bodies", asyn
     assertEqual(error.message, "id is required");
   }
 
+
+  const nestedClient = createIterateClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "proposal id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.approve({ id: "" });
+    throw new Error("expected approve to reject");
+  } catch (error) {
+    assert(error instanceof IterateClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "proposal id is required");
+  }
+
   const textClient = createIterateClient({
     baseUrl: "http://localhost:9090",
     fetch: async () => new Response("POST required", { status: 405 }),
