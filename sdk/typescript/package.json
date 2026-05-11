@@ -288,5 +288,6 @@
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.10.0"
-  }
+  },
+  "sideEffects": false
 }

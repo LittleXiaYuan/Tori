@@ -5,6 +5,11 @@ const maxUnpackedSize = 1_200_000;
 const maxEntryCount = 100;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
+if (pkg.sideEffects !== false) {
+  console.error("package.json must declare sideEffects=false so bundlers can tree-shake unused SDK slices");
+  process.exit(1);
+}
+
 const result = process.platform === "win32"
   ? spawnSync("npm pack --dry-run --json", {
       encoding: "utf8",
