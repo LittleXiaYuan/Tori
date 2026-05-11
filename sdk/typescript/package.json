@@ -50,6 +50,10 @@
     "./trace": {
       "types": "./src/trace.ts",
       "import": "./src/trace.ts"
+    },
+    "./browser": {
+      "types": "./src/browser.ts",
+      "import": "./src/browser.ts"
     }
   },
   "files": [
