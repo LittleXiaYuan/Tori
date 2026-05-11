@@ -23,6 +23,10 @@
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
     },
+    "./webchat": {
+      "types": "./src/webchat.ts",
+      "import": "./src/webchat.ts"
+    },
     "./conversations": {
       "types": "./src/conversations.ts",
       "import": "./src/conversations.ts"
