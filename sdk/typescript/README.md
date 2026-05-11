@@ -278,6 +278,10 @@ const router = createRouterClient({
 const routerStats = await router.stats();
 console.log(routerStats.status ?? routerStats.stats);
 
+const auth = createAuthClient({ baseUrl: "http://localhost:9090" });
+const authStatus = await auth.status();
+console.log(authStatus.password_set);
+
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -658,7 +662,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/client.gen.ts` | Default client instance |
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
-| `src/auth.ts` | Lightweight hand-written API-key to JWT token exchange slice |
+| `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
