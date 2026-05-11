@@ -3,6 +3,7 @@ package cognikernel
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -61,6 +62,11 @@ func TestReflectiveLoop_Run(t *testing.T) {
 		expCalled = true
 		if outcome != "success" {
 			t.Errorf("expected 'success' outcome for quality=8, got %s", outcome)
+		}
+		for _, want := range []string{"质量=8/10", "满足=true", "模型层级=expert"} {
+			if !strings.Contains(lesson, want) {
+				t.Errorf("lesson %q missing %q", lesson, want)
+			}
 		}
 	})
 

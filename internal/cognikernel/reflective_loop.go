@@ -3,6 +3,7 @@ package cognikernel
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 )
 
@@ -154,17 +155,22 @@ func (rl *ReflectiveLoop) Run(ctx context.Context, data ConversationEndData) (*R
 }
 
 func buildLesson(data ConversationEndData, result *ReflectResult) string {
+	meta := "质量=" + strconv.Itoa(result.Quality) + "/10，满足=" + strconv.FormatBool(result.Satisfied)
+	if data.ModelTier != "" {
+		meta += "，模型层级=" + data.ModelTier
+	}
+
 	if result.Quality >= 8 {
 		skills := "direct response"
 		if len(data.SkillsUsed) > 0 {
 			skills = joinStrings(data.SkillsUsed, ", ")
 		}
-		return "高质量回答（" + skills + "），用户意图被充分满足"
+		return meta + "；高质量回答（" + skills + "），用户意图被充分满足"
 	}
 	if result.Quality < 5 {
-		return "回复质量不足，可能未正确理解用户意图或工具使用不当"
+		return meta + "；回复质量不足，可能未正确理解用户意图或工具使用不当"
 	}
-	return "回复基本满足但有改进空间"
+	return meta + "；回复基本满足但有改进空间"
 }
 
 func categorizeInteraction(skillsUsed []string) string {
