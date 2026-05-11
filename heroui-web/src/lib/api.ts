@@ -11,7 +11,7 @@ import type {
   SkillVersionInfo, SkillPolicy, PolicyCheckResult, MarketAnalytics,
   BackupInfo, BackupRestoreResult, ConversationInfo,
   TaskInfo, GapRecord, GapStats, StateGoal,
-  StateSnapshot, ExperienceItem, ExperienceStats, TaskTemplate,
+  StateSnapshot, ExperienceItem, ExperienceOutcome, ExperienceStats, TaskTemplate,
   PluginUITab, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
   CostTaskSummary, CostUsageEvent, CostBreakdown,
   TriggerItem, TriggerDef, TriggerRun, TriggerLogEvent, TriggerEventPayload,
@@ -521,7 +521,7 @@ export const api = {
     fetcher<{ status: string }>("/v1/state/focus", { method: "POST", body: JSON.stringify({ focus, topics }) }),
 
   // Reflection Loop 鈥?experiences and strategies
-  getExperiences: (opts?: { source?: string; category?: string; outcome?: string; q?: string; stats?: boolean; limit?: number }) => {
+  getExperiences: (opts?: { source?: string; category?: string; outcome?: ExperienceOutcome; q?: string; stats?: boolean; limit?: number }) => {
     const params = new URLSearchParams();
     if (opts?.source) params.set("source", opts.source);
     if (opts?.category) params.set("category", opts.category);

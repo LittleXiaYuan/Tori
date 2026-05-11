@@ -210,12 +210,14 @@ export interface StateSnapshot {
   updated_at: string;
 }
 
+export type ExperienceOutcome = "success" | "failure" | "partial" | "neutral" | (string & {});
+
 export interface ExperienceItem {
   id: string;
   source: string;
   source_id: string;
   category: string;
-  outcome: string;
+  outcome: ExperienceOutcome;
   lesson: string;
   context: string;
   tags?: string[];
