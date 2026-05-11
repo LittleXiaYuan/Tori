@@ -367,6 +367,10 @@
       "types": "./src/projects.ts",
       "import": "./src/projects.ts"
     },
+    "./project-read": {
+      "types": "./src/project-read.ts",
+      "import": "./src/project-read.ts"
+    },
     "./market": {
       "types": "./src/market.ts",
       "import": "./src/market.ts"
