@@ -14,6 +14,12 @@ describe("formatErrorMessage", () => {
     expect(formatErrorMessage({ code: "bad_request", detail: "invalid token" })).toBe("bad_request: invalid token");
   });
 
+  it("formats nested gateway apperror objects", () => {
+    expect(formatErrorMessage({ error: { code: "BAD_REQUEST", message: "unsupported recovery action; use continue, retry_failed, or partial" } })).toBe(
+      "BAD_REQUEST: unsupported recovery action; use continue, retry_failed, or partial",
+    );
+  });
+
   it("serializes unknown objects instead of returning React-hostile values", () => {
     expect(formatErrorMessage({ retryable: false })).toBe('{"retryable":false}');
   });

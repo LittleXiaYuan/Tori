@@ -46,11 +46,13 @@ export function formatErrorMessage(value: unknown, fallback = "Unknown error"): 
   if (typeof value !== "object") return fallback;
 
   const record = value as Record<string, unknown>;
+  const nestedError = record.error && typeof record.error === "object" ? formatErrorMessage(record.error, "") : "";
   const body =
     primitiveMessage(record.message) ||
     primitiveMessage(record.detail) ||
     primitiveMessage(record.error) ||
-    primitiveMessage(record.reason);
+    primitiveMessage(record.reason) ||
+    nestedError;
   const code = primitiveMessage(record.code);
 
   const friendly = friendlyKnownError(body);
