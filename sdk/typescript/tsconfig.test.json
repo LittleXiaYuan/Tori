@@ -41,6 +41,7 @@
     "src/heartbeat.ts",
     "src/reverie.ts",
     "src/federation.ts",
+    "src/system.ts",
     "src/**/*.test.ts"
   ]
 }
