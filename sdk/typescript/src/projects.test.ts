@@ -33,6 +33,8 @@ test("ProjectsClient removes projects with body id", async () => {
 test("ProjectsClient throws ProjectsClientError with parsed and text bodies", async () => {
   const jsonClient = createProjectsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "repo_path is required" }, { status: 400 }) });
   try { await jsonClient.create({ name: "bad", repo_path: "" }); throw new Error("expected create to reject"); } catch (error) { assert(error instanceof ProjectsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "repo_path is required" }); assertEqual(error.message, "repo_path is required"); }
+  const nestedClient = createProjectsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "project repo path is required" } }, { status: 400 }) });
+  try { await nestedClient.create({ name: "bad", repo_path: "" }); throw new Error("expected create to reject"); } catch (error) { assert(error instanceof ProjectsClientError); assertEqual(error.status, 400); assertEqual(error.message, "project repo path is required"); }
   const textClient = createProjectsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.list(); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof ProjectsClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

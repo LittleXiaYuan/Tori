@@ -40,6 +40,8 @@ test("OrchestratorClient manages policy and custom adapters", async () => {
 test("OrchestratorClient throws OrchestratorClientError with parsed and text bodies", async () => {
   const jsonClient = createOrchestratorClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "task_id required" }, { status: 400 }) });
   try { await jsonClient.taskTimeline(""); throw new Error("expected taskTimeline to reject"); } catch (error) { assert(error instanceof OrchestratorClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "task_id required" }); assertEqual(error.message, "task_id required"); }
+  const nestedClient = createOrchestratorClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "orchestrator task id is required" } }, { status: 400 }) });
+  try { await nestedClient.taskTimeline(""); throw new Error("expected taskTimeline to reject"); } catch (error) { assert(error instanceof OrchestratorClientError); assertEqual(error.status, 400); assertEqual(error.message, "orchestrator task id is required"); }
   const textClient = createOrchestratorClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.status(); throw new Error("expected status to reject"); } catch (error) { assert(error instanceof OrchestratorClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

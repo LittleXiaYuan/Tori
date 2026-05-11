@@ -32,6 +32,8 @@ test("CronClient removes and runs jobs by id query", async () => {
 test("CronClient throws CronClientError with parsed and text bodies", async () => {
   const jsonClient = createCronClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "job id required" }, { status: 400 }) });
   try { await jsonClient.run(""); throw new Error("expected run to reject"); } catch (error) { assert(error instanceof CronClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "job id required" }); assertEqual(error.message, "job id required"); }
+  const nestedClient = createCronClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "cron expression is required" } }, { status: 400 }) });
+  try { await nestedClient.add({ name: "bad", schedule: { type: "cron", cron_expr: "", timezone: "Asia/Shanghai" }, payload: { kind: "systemEvent", data: {} } }); throw new Error("expected add to reject"); } catch (error) { assert(error instanceof CronClientError); assertEqual(error.status, 400); assertEqual(error.message, "cron expression is required"); }
   const textClient = createCronClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("not found", { status: 404 }) });
   try { await textClient.remove("missing"); throw new Error("expected remove to reject"); } catch (error) { assert(error instanceof CronClientError); assertEqual(error.status, 404); assertEqual(error.body, "not found"); assertEqual(error.message, "not found"); }
 });

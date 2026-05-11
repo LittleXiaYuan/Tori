@@ -32,6 +32,8 @@ test("SchedulerClient removes jobs by body id", async () => {
 test("SchedulerClient throws SchedulerClientError with parsed and text bodies", async () => {
   const jsonClient = createSchedulerClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "invalid interval (min 1m)" }, { status: 400 }) });
   try { await jsonClient.add({ name: "bad", prompt: "x", interval: "1s" }); throw new Error("expected add to reject"); } catch (error) { assert(error instanceof SchedulerClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "invalid interval (min 1m)" }); assertEqual(error.message, "invalid interval (min 1m)"); }
+  const nestedClient = createSchedulerClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "scheduler interval is required" } }, { status: 400 }) });
+  try { await nestedClient.add({ name: "bad", prompt: "x", interval: "" }); throw new Error("expected add to reject"); } catch (error) { assert(error instanceof SchedulerClientError); assertEqual(error.status, 400); assertEqual(error.message, "scheduler interval is required"); }
   const textClient = createSchedulerClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.jobs(); throw new Error("expected jobs to reject"); } catch (error) { assert(error instanceof SchedulerClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });

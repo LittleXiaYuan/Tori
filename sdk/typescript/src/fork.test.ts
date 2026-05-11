@@ -40,6 +40,8 @@ test("ForkClient preserves empty root response", async () => {
 test("ForkClient throws ForkClientError with parsed and text bodies", async () => {
   const jsonClient = createForkClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "session_id required" }, { status: 400 }) });
   try { await jsonClient.list(""); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof ForkClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "session_id required" }); assertEqual(error.message, "session_id required"); }
+  const nestedClient = createForkClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "fork session id is required" } }, { status: 400 }) });
+  try { await nestedClient.list(""); throw new Error("expected list to reject"); } catch (error) { assert(error instanceof ForkClientError); assertEqual(error.status, 400); assertEqual(error.message, "fork session id is required"); }
   const textClient = createForkClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("method not allowed", { status: 405 }) });
   try { await textClient.get("fork_1"); throw new Error("expected get to reject"); } catch (error) { assert(error instanceof ForkClientError); assertEqual(error.status, 405); assertEqual(error.body, "method not allowed"); assertEqual(error.message, "method not allowed"); }
 });
