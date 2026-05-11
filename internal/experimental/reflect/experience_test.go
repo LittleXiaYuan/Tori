@@ -108,6 +108,7 @@ func TestCompileStrategies(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
 	s := NewExperienceStore(path)
 	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "web_search 配合 summarize 效果好，可以先搜索再总结"})
+	s.Add(Experience{Category: "strategy", Outcome: "partial", Lesson: "代码审查基本完成但需要补充测试验证和风险说明"})
 	s.Add(Experience{Category: "error_pattern", Outcome: "failure", Lesson: "translate 对长文本容易超时，需要先分段再翻译"})
 
 	strategies := s.CompileStrategies(10)
@@ -119,6 +120,9 @@ func TestCompileStrategies(t *testing.T) {
 	}
 	if !contains(strategies, "避免") {
 		t.Error("missing failure directive")
+	}
+	if !contains(strategies, "改进") {
+		t.Error("missing partial directive")
 	}
 	if !contains(strategies, "web_search") {
 		t.Error("missing web_search strategy")
