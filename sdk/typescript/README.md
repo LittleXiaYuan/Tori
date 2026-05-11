@@ -95,6 +95,7 @@ surface; reserve the package root for full generated API coverage.
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
+import { createPlannerClient } from "yunque-client/planner";
 import { createChatClient } from "yunque-client/chat";
 import { createCognisClient } from "yunque-client/cognis";
 import { createEventsClient } from "yunque-client/events";
@@ -178,6 +179,13 @@ if (state.next_action === "retry_failed") {
     async: true,
   });
 }
+
+const plannerFacade = createPlannerClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const plannerState = await plannerFacade.getExecutionState({ plan_id: "plan_123" });
+console.log(plannerState.next_action);
 
 const chat = createChatClient({
   baseUrl: "http://localhost:9090",
@@ -728,7 +736,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -763,6 +771,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
+| `src/planner.ts` | Lightweight planner facade over checkpoint recovery and execution state |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, experience, evolution, and federation control slice |
 | `src/events.ts` | Lightweight hand-written SSE event stream slice for task/workflow/approval live updates |
