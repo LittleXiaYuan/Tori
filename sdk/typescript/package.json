@@ -395,6 +395,10 @@
       "types": "./src/state.ts",
       "import": "./src/state.ts"
     },
+    "./resource-state": {
+      "types": "./src/resource-state.ts",
+      "import": "./src/resource-state.ts"
+    },
     "./focus-state": {
       "types": "./src/focus-state.ts",
       "import": "./src/focus-state.ts"
