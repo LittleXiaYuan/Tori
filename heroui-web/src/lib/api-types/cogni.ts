@@ -187,6 +187,7 @@ export interface CogniExperienceStats {
   tool_memories: number;
   patterns_total: number;
   patterns_confirmed: number;
+  patterns_pending?: number;
   domain_facts: number;
 }
 
@@ -222,18 +223,53 @@ export interface CogniVerifyResponse {
 
 // ── Experience Response ──
 export interface CogniExperiencePattern {
+  id?: string;
   trigger: string;
   response: string;
   confirmed?: boolean;
+  used_count?: number;
+  success_rate?: number;
+  created_at?: string;
+  last_used?: string;
+}
+
+export interface CogniToolExperience {
+  tool: string;
+  context?: string;
+  result?: string;
+  learned?: string;
+  confidence?: number;
+  verified_by?: string;
+  used_count?: number;
+  success_rate?: number;
+  created_at?: string;
+  last_used?: string;
+}
+
+export interface CogniDomainFact {
+  fact: string;
+  source?: string;
+  used_count?: number;
+  created_at?: string;
+  last_used?: string;
+}
+
+export interface CogniExperienceSummary {
+  stats?: CogniExperienceStats;
+  top_tools?: CogniToolExperience[];
+  top_facts?: CogniDomainFact[];
+  pending_patterns?: CogniExperiencePattern[];
+  updated_at?: string;
 }
 
 export interface CogniExperienceResponse {
   id: string;
   enabled: boolean;
+  summary?: CogniExperienceSummary;
   stats?: CogniExperienceStats;
-  tool_memory?: unknown[];
+  tool_memory?: CogniToolExperience[];
   patterns?: CogniExperiencePattern[];
-  domain_facts?: unknown[];
+  domain_facts?: CogniDomainFact[];
 }
 
 // ── Evolution Response ──
