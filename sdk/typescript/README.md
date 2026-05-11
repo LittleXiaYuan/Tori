@@ -129,6 +129,7 @@ import { createUsageClient } from "yunque-client/usage";
 import { createLoRAClient } from "yunque-client/lora";
 import { createIterateClient } from "yunque-client/iterate";
 import { createTrustClient } from "yunque-client/trust";
+import { createReviewClient } from "yunque-client/review";
 import { createAuditClient } from "yunque-client/audit";
 import { createHeartbeatClient } from "yunque-client/heartbeat";
 import { createReverieClient } from "yunque-client/reverie";
@@ -753,7 +754,7 @@ console.log(sandboxStatus.key_source);
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
-`/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
+`/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
@@ -820,6 +821,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/lora.ts` | Lightweight hand-written LoRA training and evolution lifecycle slice |
 | `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |
 | `src/trust.ts` | Lightweight hand-written trust, review-gate and skill-growth slice |
+| `src/review.ts` | Lightweight review-gate status facade for `/api/review/status` without full SDK import |
 | `src/audit.ts` | Lightweight hand-written audit chain and audit trail inspection slice |
 | `src/heartbeat.ts` | Lightweight hand-written proactive heartbeat lifecycle slice |
 | `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
