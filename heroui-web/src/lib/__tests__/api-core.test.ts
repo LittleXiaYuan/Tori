@@ -182,6 +182,17 @@ describe("api/reflectExperience", () => {
     expect(url).toBe("/v1/reflect/experiences?source=task&outcome=partial&q=code+review&limit=5");
   });
 
+  it("omits the query suffix when experience filters are empty", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ experiences: [], total: 0 }), { status: 200 }),
+    );
+
+    await api.getExperiences();
+
+    const [url] = spy.mock.calls[0];
+    expect(url).toBe("/v1/reflect/experiences");
+  });
+
   it("serializes experience stats filters", async () => {
     const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(JSON.stringify({ total: 1, by_outcome: { success: 1 } }), { status: 200 }),
