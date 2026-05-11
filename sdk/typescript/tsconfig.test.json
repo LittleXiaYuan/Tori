@@ -104,6 +104,7 @@
     "src/skillhub-policy.ts",
     "src/skills.ts",
     "src/plugins.ts",
+    "src/plugin-catalog.ts",
     "src/connectors.ts",
     "src/connector-catalog.ts",
     "src/connector-auth.ts",
@@ -134,6 +135,7 @@
     "src/**/*.test.ts"
   ]
 }
+
 
 
 
