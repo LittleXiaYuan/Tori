@@ -740,7 +740,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
-| `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, evolution, and federation control slice |
+| `src/cognis.ts` | Lightweight hand-written Cogni registry, health, traces, workflow, experience, evolution, and federation control slice |
 | `src/events.ts` | Lightweight hand-written SSE event stream slice for task/workflow/approval live updates |
 | `src/realtime.ts` | Lightweight hand-written `/v1/ws` URL, connect, ping/chat message helper slice |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
@@ -820,3 +820,4 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
   package size.
 - Client uses ESM (`"type": "module"` in package.json). For CommonJS consumers,
   rebuild with a different tsconfig (`"module": "CommonJS"`).
+

@@ -8,6 +8,9 @@ export type CogniHealthResponse = Record<string, unknown>;
 export type CogniAlertsResponse = { alerts?: unknown[]; count?: number; [key: string]: unknown };
 export type CogniVerifyResponse = Record<string, unknown>;
 export type CogniWorkflowRunRequest = Record<string, unknown>;
+export type CogniExperienceRecordType = "tool_memory" | "pattern" | "fact" | string;
+export type CogniExperienceRecordRequest = { type: CogniExperienceRecordType; data: Record<string, unknown> };
+export type CogniExperienceResponse = { id?: string; enabled?: boolean; summary?: Record<string, unknown>; stats?: Record<string, unknown>; tool_memory?: unknown[]; patterns?: unknown[]; domain_facts?: unknown[]; [key: string]: unknown };
 export type CognisClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class CognisClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Cognis request failed with HTTP ${status}`); this.name = "CognisClientError"; this.status = status; this.body = body; } }
@@ -45,6 +48,8 @@ export class CognisClient {
 
   workflows(id: string): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("GET", `/v1/cognis/${enc(id)}/workflows`); }
   runWorkflow(id: string, workflow: string, request: CogniWorkflowRunRequest = {}): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("POST", `/v1/cognis/${enc(id)}/workflow/${enc(workflow)}`, request); }
+  experience(id: string): Promise<CogniExperienceResponse> { return this.request<CogniExperienceResponse>("GET", `/v1/cognis/${enc(id)}/experience`); }
+  recordExperience(id: string, request: CogniExperienceRecordRequest): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/experience/record`, request); }
   evolve(id: string, request: Record<string, unknown> = {}): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/evolve`, request); }
   evolution(id?: string): Promise<Record<string, unknown>> { return this.request<Record<string, unknown>>("GET", id ? `/v1/cognis/${enc(id)}/evolution` : "/v1/cognis/evolution"); }
 
