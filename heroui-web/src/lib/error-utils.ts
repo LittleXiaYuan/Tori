@@ -12,7 +12,7 @@ function friendlyKnownError(message: string): string {
     return "连接暂时中断，现场已保留；如果任务已经推进，可以从最近可恢复任务继续。";
   }
   if (/当前模型响应失败|备用模型|调用栈降级|级联唤醒/i.test(message)) {
-    return "模型暂时没有回应，正在换用可用模型继续。";
+    return "模型暂时没有回应，已保留现场，正在换用可用模型继续。";
   }
   if (/context canceled|context cancelled|连接中断|连接已断开/i.test(message)) {
     return "连接暂时中断，已保留现场，可稍后继续或先查看阶段结果。";

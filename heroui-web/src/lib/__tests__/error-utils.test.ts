@@ -34,8 +34,8 @@ describe("formatErrorMessage", () => {
   });
 
   it("hides model fallback escalation wording", () => {
-    expect(formatErrorMessage("当前模型响应失败，正在尝试备用模型 qwen3.5:4b...")).toBe("模型暂时没有回应，正在换用可用模型继续。");
-    expect(formatErrorMessage("调用栈降级，正在级联唤醒备用引擎")).toBe("模型暂时没有回应，正在换用可用模型继续。");
+    expect(formatErrorMessage("当前模型响应失败，正在尝试备用模型 qwen3.5:4b...")).toBe("模型暂时没有回应，已保留现场，正在换用可用模型继续。");
+    expect(formatErrorMessage("调用栈降级，正在级联唤醒备用引擎")).toBe("模型暂时没有回应，已保留现场，正在换用可用模型继续。");
   });
 
   it("hides raw tool execution implementation errors", () => {
@@ -44,3 +44,4 @@ describe("formatErrorMessage", () => {
     expect(formatErrorMessage(new Error("tool panic: nil pointer"))).toBe("工具运行时遇到异常，已保留现场，可重试或切换策略继续。");
   });
 });
+

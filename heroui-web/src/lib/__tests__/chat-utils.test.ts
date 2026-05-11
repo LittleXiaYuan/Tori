@@ -57,7 +57,7 @@ describe("chat-utils/friendlyError", () => {
     expect(fallback).not.toMatch(/planner fc|all fallback|moonshot|EOF/i);
 
     const escalation = friendlyError("当前：调用栈降级，正在级联唤醒备用引擎 [qwen3.5:4b]...");
-    expect(escalation).toBe("模型暂时没有回应，正在换用可用模型继续。");
+    expect(escalation).toBe("模型暂时没有回应，已保留现场，正在换用可用模型继续。");
     expect(escalation).not.toContain("qwen3.5");
   });
 
@@ -147,3 +147,4 @@ describe("chat-utils/collectGeneratedFiles", () => {
     expect(out[0].path).toBe("/kept.txt");
   });
 });
+
