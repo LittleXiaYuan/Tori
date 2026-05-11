@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlannerRecoveryShelf, fallbackPlannerCheckpointPrompt } from "../planner-recovery-shelf";
 import type { PlannerCheckpointSummary } from "@/lib/api-types";
+import { api } from "@/lib/api";
 
 const failedCheckpoint: PlannerCheckpointSummary = {
   plan_id: "plan-restore-1",
@@ -17,7 +18,31 @@ const failedCheckpoint: PlannerCheckpointSummary = {
   updated_at: "2026-05-11T02:00:00Z",
 };
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("PlannerRecoveryShelf", () => {
+  it("reloads recoverable checkpoints when refreshSignal changes", async () => {
+    const onSend = vi.fn();
+    const list = vi.spyOn(api, "plannerCheckpoints")
+      .mockResolvedValueOnce({ checkpoints: [], count: 0, limit: 5 })
+      .mockResolvedValueOnce({ checkpoints: [failedCheckpoint], count: 1, limit: 5 });
+
+    const { rerender } = render(<PlannerRecoveryShelf onSend={onSend} />);
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("最近可恢复任务")).not.toBeInTheDocument();
+
+    rerender(<PlannerRecoveryShelf onSend={onSend} refreshSignal={1} />);
+
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("最近可恢复任务")).toBeInTheDocument();
+      expect(screen.getByText("plan-restore-1")).toBeInTheDocument();
+    });
+  });
+
   it("renders recoverable checkpoints and sends a continue prompt", () => {
     const onSend = vi.fn();
     const recoverCheckpoint = vi.fn().mockResolvedValue({

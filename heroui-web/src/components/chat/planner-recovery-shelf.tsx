@@ -11,6 +11,7 @@ interface PlannerRecoveryShelfProps {
   onSend: (text: string) => void;
   disabled?: boolean;
   fetchOnMount?: boolean;
+  refreshSignal?: number | string;
   initialCheckpoints?: PlannerCheckpointSummary[];
   recoverCheckpoint?: (planId: string, action: PlannerCheckpointRecoveryAction) => Promise<Pick<PlannerCheckpointRecoverResponse, "prompt" | "recovery_plan">>;
   resumeCheckpoint?: (planId: string, action: PlannerCheckpointRecoveryAction, options?: { run?: boolean }) => Promise<Pick<PlannerCheckpointResumeTaskResponse, "task_id" | "status" | "recovery_plan">>;
@@ -156,6 +157,7 @@ export function PlannerRecoveryShelf({
   onSend,
   disabled = false,
   fetchOnMount = true,
+  refreshSignal,
   initialCheckpoints = [],
   recoverCheckpoint = api.plannerCheckpointRecover,
   resumeCheckpoint = api.plannerCheckpointResumeTask,
@@ -197,6 +199,10 @@ export function PlannerRecoveryShelf({
   useEffect(() => {
     if (fetchOnMount) void load();
   }, [fetchOnMount, load]);
+
+  useEffect(() => {
+    if (fetchOnMount && refreshSignal !== undefined) void load();
+  }, [fetchOnMount, load, refreshSignal]);
 
   const recoverable = useMemo(
     () => items.filter((cp) => cp.recoverable || cp.error || cp.status === "failed").slice(0, 3),
