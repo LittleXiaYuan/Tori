@@ -307,7 +307,9 @@ func (p *Planner) emitLongHorizonCheckpoint(req PlanRequest, pl *plan.Plan, errT
 	req.StepCallback(evt)
 }
 
-func normalizeCheckpointResumeAction(raw string) string {
+// NormalizeCheckpointResumeAction maps UI/SDK/user-facing checkpoint resume
+// aliases onto the canonical actions accepted by the planner recovery flow.
+func NormalizeCheckpointResumeAction(raw string) string {
 	action := strings.ToLower(strings.TrimSpace(raw))
 	action = strings.ReplaceAll(action, "-", "_")
 	switch action {
@@ -323,7 +325,7 @@ func normalizeCheckpointResumeAction(raw string) string {
 }
 
 func rebuildCheckpointDAGSteps(cp LongHorizonCheckpoint, action string) ([]plan.PlanStep, error) {
-	action = normalizeCheckpointResumeAction(action)
+	action = NormalizeCheckpointResumeAction(action)
 	if action == "" {
 		return nil, fmt.Errorf("unsupported checkpoint resume action")
 	}

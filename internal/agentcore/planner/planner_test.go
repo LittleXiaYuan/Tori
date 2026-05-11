@@ -1226,8 +1226,8 @@ func TestNormalizeCheckpointResumeActionAcceptsUiAliases(t *testing.T) {
 		"unknown":               "",
 	}
 	for input, want := range cases {
-		if got := normalizeCheckpointResumeAction(input); got != want {
-			t.Fatalf("normalizeCheckpointResumeAction(%q) = %q, want %q", input, got, want)
+		if got := NormalizeCheckpointResumeAction(input); got != want {
+			t.Fatalf("NormalizeCheckpointResumeAction(%q) = %q, want %q", input, got, want)
 		}
 	}
 }
