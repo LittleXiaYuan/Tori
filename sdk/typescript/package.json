@@ -191,6 +191,10 @@
       "types": "./src/projects.ts",
       "import": "./src/projects.ts"
     },
+    "./market": {
+      "types": "./src/market.ts",
+      "import": "./src/market.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"

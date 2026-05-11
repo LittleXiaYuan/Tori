@@ -99,6 +99,7 @@ import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createNotifyClient } from "yunque-client/notify";
 import { createProjectsClient } from "yunque-client/projects";
+import { createSkillMarketClient } from "yunque-client/market";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -213,6 +214,13 @@ const projects = createProjectsClient({
 });
 const projectList = await projects.list();
 console.log(projectList.projects.length);
+
+const market = createSkillMarketClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const topSkills = await market.top({ n: 5, by: "rating" });
+console.log(topSkills.skills.length);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -639,6 +647,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
 | `src/projects.ts` | Lightweight hand-written project workspace CRUD slice |
+| `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
