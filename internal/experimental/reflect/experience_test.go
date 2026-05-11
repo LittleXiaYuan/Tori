@@ -135,7 +135,7 @@ func TestCompileStrategiesForQuery(t *testing.T) {
 	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "web_search 配合 summarize 效果好，可以先搜索再总结", Context: "搜索新闻"})
 	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "code review 需要先跑测试再总结风险", Context: "代码审查"})
 
-	strategies := s.CompileStrategiesForQuery("code review", 10)
+	strategies := s.CompileStrategiesForQuery("请做 code review", 10)
 	if strategies == "" {
 		t.Fatal("expected query-specific strategies")
 	}
