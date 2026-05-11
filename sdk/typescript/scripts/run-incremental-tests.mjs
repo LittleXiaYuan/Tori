@@ -92,6 +92,8 @@ const sources = [
   "src/plugins.test.ts",
   "src/connectors.ts",
   "src/connectors.test.ts",
+  "src/notify.ts",
+  "src/notify.test.ts",
   "src/graph.ts",
   "src/graph.test.ts",
   "src/plugin-api.ts",
@@ -178,6 +180,7 @@ for (const testName of [
   "skillhub.test",
   "plugins.test",
   "connectors.test",
+  "notify.test",
   "graph.test",
   "plugin-api.test",
   "state.test",
@@ -232,6 +235,7 @@ for (const testName of [
     .replace('from "./skillhub"', 'from "./skillhub.js"')
     .replace('from "./plugins"', 'from "./plugins.js"')
     .replace('from "./connectors"', 'from "./connectors.js"')
+    .replace('from "./notify"', 'from "./notify.js"')
     .replace('from "./graph"', 'from "./graph.js"')
     .replace('from "./plugin-api"', 'from "./plugin-api.js"')
     .replace('from "./state"', 'from "./state.js"')
