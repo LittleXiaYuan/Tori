@@ -529,7 +529,8 @@ export const api = {
     if (opts?.q) params.set("q", opts.q);
     if (opts?.stats) params.set("stats", "true");
     if (opts?.limit && Number.isFinite(opts.limit) && opts.limit > 0) params.set("limit", String(Math.trunc(opts.limit)));
-    return fetcher<ExperienceStats | { experiences: ExperienceItem[]; total: number }>(`/v1/reflect/experiences?${params}`);
+    const suffix = params.toString();
+    return fetcher<ExperienceStats | { experiences: ExperienceItem[]; total: number }>(`/v1/reflect/experiences${suffix ? `?${suffix}` : ""}`);
   },
   getStrategies: (opts?: { limit?: number }) => {
     const params = new URLSearchParams();
