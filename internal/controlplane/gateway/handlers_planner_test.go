@@ -1065,6 +1065,7 @@ func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
 		ID:        "resume-plan-raw",
 		Status:    "failed",
 		Action:    "continue",
+		TenantID:  tenant.ID,
 		PlanID:    "plan-raw",
 		TaskID:    "task-raw",
 		Error:     raw,
@@ -1079,6 +1080,7 @@ func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
 
 	for _, path := range []string{
 		"/v1/planner/checkpoints/resume-plan/jobs?id=resume-plan-raw",
+		"/v1/planner/checkpoints/resume-plan/jobs?job_id=resume-plan-raw",
 		"/v1/planner/checkpoints/resume-plan/jobs?plan_id=plan-raw",
 	} {
 		req := authedRequest(http.MethodGet, path, "", tenant.APIKey)
@@ -1096,6 +1098,40 @@ func TestPlannerResumePlanJobEndpointSanitizesStoredRawFailure(t *testing.T) {
 		if !strings.Contains(w.Body.String(), "现场已保留") {
 			t.Fatalf("%s: expected actionable friendly recovery wording, got %s", path, w.Body.String())
 		}
+	}
+}
+
+func TestPlannerResumePlanJobEndpointScopesJobsToTenant(t *testing.T) {
+	gw, tm := newTestGateway()
+	owner := tm.Register("planner-resume-job-owner")
+	other := tm.Register("planner-resume-job-other")
+	gw.savePlannerResumeJob(plannerCheckpointResumePlanJob{
+		ID:        "resume-plan-tenant-owned",
+		Status:    "completed",
+		Action:    "continue",
+		TenantID:  owner.ID,
+		PlanID:    "plan-shared",
+		StartedAt: "2026-05-11T04:00:00Z",
+	})
+
+	for _, path := range []string{
+		"/v1/planner/checkpoints/resume-plan/jobs?id=resume-plan-tenant-owned",
+		"/v1/planner/checkpoints/resume-plan/jobs?job_id=resume-plan-tenant-owned",
+		"/v1/planner/checkpoints/resume-plan/jobs?plan_id=plan-shared",
+	} {
+		req := authedRequest(http.MethodGet, path, "", other.APIKey)
+		w := httptest.NewRecorder()
+		gw.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("%s: other tenant should not read owner resume job, got %d body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	req := authedRequest(http.MethodGet, "/v1/planner/checkpoints/resume-plan/jobs?job_id=resume-plan-tenant-owned", "", owner.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("owner should read resume job with job_id alias, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -1200,6 +1236,7 @@ func TestPlannerResumePlanJobPersistsAcrossGatewayInstances(t *testing.T) {
 		ID:         "resume-plan-persist-1",
 		Status:     "completed",
 		Action:     "continue",
+		TenantID:   "tenant-persist",
 		PlanID:     "plan-persist",
 		StartedAt:  "2026-05-11T00:00:00Z",
 		FinishedAt: "2026-05-11T00:00:03Z",
@@ -1209,7 +1246,7 @@ func TestPlannerResumePlanJobPersistsAcrossGatewayInstances(t *testing.T) {
 
 	g2 := &Gateway{}
 	g2.SetPlannerResumeJobStore(path)
-	job, ok := g2.getPlannerResumeJob("resume-plan-persist-1")
+	job, ok := g2.getPlannerResumeJob("resume-plan-persist-1", "tenant-persist")
 	if !ok {
 		t.Fatal("expected persisted resume-plan job")
 	}
@@ -1231,6 +1268,7 @@ func TestPlannerResumePlanJobCanBeResolvedByPlanID(t *testing.T) {
 		ID:        "resume-plan-old",
 		Status:    "running",
 		Action:    "continue",
+		TenantID:  tenant.ID,
 		PlanID:    "plan-latest",
 		StartedAt: "2026-05-11T00:00:01Z",
 	})
@@ -1238,6 +1276,7 @@ func TestPlannerResumePlanJobCanBeResolvedByPlanID(t *testing.T) {
 		ID:        "resume-plan-new",
 		Status:    "completed",
 		Action:    "continue",
+		TenantID:  tenant.ID,
 		PlanID:    "plan-latest",
 		StartedAt: "2026-05-11T00:00:02Z",
 	})
@@ -1285,6 +1324,7 @@ func TestPlannerExecutionStateUnifiesCheckpointLatestJobAndFailureSummary(t *tes
 		ID:            "resume-plan-state",
 		Status:        "failed",
 		Action:        "retry_failed",
+		TenantID:      tenant.ID,
 		PlanID:        "plan-state",
 		TaskID:        "task-state",
 		Error:         raw,
@@ -1446,6 +1486,7 @@ func TestPlannerExecutionStateHidesRawCompletedResultDiagnostics(t *testing.T) {
 		ID:         "resume-plan-friendly-result",
 		Status:     "failed",
 		Action:     "retry_failed",
+		TenantID:   tenant.ID,
 		PlanID:     "plan-state-friendly-result",
 		TaskID:     "task-state-friendly-result",
 		Error:      rawErr,

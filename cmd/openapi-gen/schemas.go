@@ -43,7 +43,7 @@ func schemaOverrides() []schemaOverride {
 		{
 			Path: "/v1/planner/checkpoints/resume-plan/jobs", Method: "get",
 			Response200:     plannerResumePlanJobResponseSchema(),
-			Response200Desc: "Latest or explicit resume-plan job.",
+			Response200Desc: "Latest or explicit tenant-scoped resume-plan job.",
 		},
 		{
 			Path: "/v1/planner/execution-state", Method: "get",
