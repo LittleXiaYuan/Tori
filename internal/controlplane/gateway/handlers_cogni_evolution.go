@@ -29,6 +29,7 @@ func (g *Gateway) cogniExperience(w http.ResponseWriter, r *http.Request, id str
 	json.NewEncoder(w).Encode(map[string]any{
 		"id":           id,
 		"enabled":      true,
+		"summary":      es.Summary(5),
 		"stats":        es.Stats(),
 		"tool_memory":  es.ToolMemory(""),
 		"patterns":     es.Patterns(),
