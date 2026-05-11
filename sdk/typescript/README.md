@@ -56,6 +56,7 @@ can import the hand-written incremental slice instead:
 ```ts
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
+import { createConversationsClient } from "yunque-client/conversations";
 import { createMemoryClient } from "yunque-client/memory";
 import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
@@ -120,6 +121,15 @@ const reply = await chat.send({
   session_id: "demo-session",
 });
 console.log(reply.reply);
+
+const conversations = createConversationsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const history = await conversations.messages("demo-session");
+const replay = await conversations.replay("demo-session", { limit: 5 });
+console.log(history.count, replay.total_turns);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -470,7 +480,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `planner-recovery`, `chat`, `conversations`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -503,6 +513,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/core/` | Internal helpers |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
+| `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `src/tasks.ts` | Lightweight hand-written Task create/list/lifecycle slice |
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
