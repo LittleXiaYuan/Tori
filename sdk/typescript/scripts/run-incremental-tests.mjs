@@ -12,6 +12,8 @@ const sources = [
   "src/planner-recovery.test.ts",
   "src/chat.ts",
   "src/chat.test.ts",
+  "src/cognis.ts",
+  "src/cognis.test.ts",
   "src/webchat.ts",
   "src/webchat.test.ts",
   "src/conversations.ts",
@@ -158,6 +160,7 @@ for (const testName of [
   "auth.test",
   "planner-recovery.test",
   "chat.test",
+  "cognis.test",
   "webchat.test",
   "conversations.test",
   "subagents.test",
@@ -222,6 +225,7 @@ for (const testName of [
     .replace('from "./auth"', 'from "./auth.js"')
     .replace('from "./planner-recovery"', 'from "./planner-recovery.js"')
     .replace('from "./chat"', 'from "./chat.js"')
+    .replace('from "./cognis"', 'from "./cognis.js"')
     .replace('from "./webchat"', 'from "./webchat.js"')
     .replace('from "./conversations"', 'from "./conversations.js"')
     .replace('from "./subagents"', 'from "./subagents.js"')
