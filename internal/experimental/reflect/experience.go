@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"yunque-agent/internal/agentcore/llm"
 	iledger "yunque-agent/internal/ledger"
@@ -329,20 +330,50 @@ func MatchQueryScore(e Experience, query string) int {
 func queryTokens(query string) []string {
 	var tokens []string
 	seen := make(map[string]bool)
-	for _, token := range strings.Fields(query) {
-		token = strings.Trim(token, ".,，。:：;；!?！？()（）[]【】{}<>\"'`")
+	add := func(token string) {
 		if len([]rune(token)) < 2 || isQueryStopword(token) || seen[token] {
-			continue
+			return
 		}
 		seen[token] = true
 		tokens = append(tokens, token)
 	}
+	for _, token := range strings.Fields(query) {
+		token = strings.Trim(token, ".,，。:：;；!?！？()（）[]【】{}<>\"'`")
+		add(token)
+
+		runes := []rune(token)
+		if !isCompactCJKToken(runes) || len(runes) < 4 {
+			continue
+		}
+		for size := 2; size <= 4; size++ {
+			if len(runes) < size {
+				continue
+			}
+			for i := 0; i <= len(runes)-size; i++ {
+				add(string(runes[i : i+size]))
+			}
+		}
+	}
 	return tokens
+}
+
+func isCompactCJKToken(runes []rune) bool {
+	hasCJK := false
+	for _, r := range runes {
+		switch {
+		case unicode.Is(unicode.Han, r):
+			hasCJK = true
+		case unicode.IsLetter(r), unicode.IsDigit(r):
+		default:
+			return false
+		}
+	}
+	return hasCJK
 }
 
 func isQueryStopword(token string) bool {
 	switch token {
-	case "please", "help", "with", "about", "this", "that", "请做", "帮我", "帮忙", "一下", "这个", "那个":
+	case "please", "help", "with", "about", "this", "that", "请做", "请帮", "帮我", "帮忙", "我做", "一下", "这个", "那个", "怎么", "如何":
 		return true
 	default:
 		return false

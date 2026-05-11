@@ -185,6 +185,29 @@ func TestMatchesQueryRequiresMultipleUsefulTokenHits(t *testing.T) {
 	}
 }
 
+func TestMatchesQuerySupportsCompactChineseQuery(t *testing.T) {
+	codeReview := Experience{
+		Lesson:  "代码审查需要先跑核心测试，再按风险级别输出结论",
+		Context: "review pull request",
+		Tags:    []string{"review", "test"},
+	}
+	webSearch := Experience{
+		Lesson:  "搜索新闻需要优先核对发布时间与来源可信度",
+		Context: "web search",
+		Tags:    []string{"search"},
+	}
+
+	if !MatchesQuery(codeReview, "请帮我做代码审查") {
+		t.Fatal("expected compact Chinese code-review query to match the code-review experience")
+	}
+	if MatchesQuery(codeReview, "请帮我搜索新闻") {
+		t.Fatal("expected unrelated compact Chinese query to be filtered out")
+	}
+	if !MatchesQuery(webSearch, "帮我搜索新闻") {
+		t.Fatal("expected compact Chinese search query to match the search experience")
+	}
+}
+
 func TestCompileStrategiesEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exp.json")
 	s := NewExperienceStore(path)
