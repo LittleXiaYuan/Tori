@@ -63,6 +63,7 @@
     "src/setup.ts",
     "src/documents.ts",
     "src/approvals.ts",
+    "src/approval-rules.ts",
     "src/trace.ts",
     "src/browser.ts",
     "src/runtime.ts",
