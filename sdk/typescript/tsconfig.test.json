@@ -12,5 +12,5 @@
     "allowSyntheticDefaultImports": true,
     "noEmit": true
   },
-  "include": ["src/planner-recovery.ts", "src/chat.ts", "src/**/*.test.ts"]
+  "include": ["src/planner-recovery.ts", "src/chat.ts", "src/memory.ts", "src/**/*.test.ts"]
 }

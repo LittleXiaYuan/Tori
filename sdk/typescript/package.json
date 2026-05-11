@@ -18,6 +18,10 @@
     "./chat": {
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
+    },
+    "./memory": {
+      "types": "./src/memory.ts",
+      "import": "./src/memory.ts"
     }
   },
   "files": [

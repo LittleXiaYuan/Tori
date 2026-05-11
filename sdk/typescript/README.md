@@ -56,6 +56,7 @@ can import the hand-written incremental slice instead:
 ```ts
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
+import { createMemoryClient } from "yunque-client/memory";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -81,12 +82,23 @@ const reply = await chat.send({
   session_id: "demo-session",
 });
 console.log(reply.reply);
+
+const memory = createMemoryClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+await memory.add({
+  layer: "long",
+  content: "用户希望回答更简洁",
+  source: "demo-shell",
+});
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery` or `chat` without importing the generated 500KB+
-SDK/types bundle. Add future slices in the same style (`./memory`, `./tasks`)
-when those surfaces need stable, lightweight integration APIs.
+in only `planner-recovery`, `chat`, or `memory` without importing the generated
+500KB+ SDK/types bundle. Add future slices in the same style (`./tasks`) when
+those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -114,6 +126,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/core/` | Internal helpers |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
+| `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
