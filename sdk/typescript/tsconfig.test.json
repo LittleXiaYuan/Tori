@@ -42,6 +42,7 @@
     "src/reverie.ts",
     "src/federation.ts",
     "src/system.ts",
+    "src/settings.ts",
     "src/**/*.test.ts"
   ]
 }

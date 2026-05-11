@@ -79,6 +79,7 @@ import { createHeartbeatClient } from "yunque-client/heartbeat";
 import { createReverieClient } from "yunque-client/reverie";
 import { createFederationClient } from "yunque-client/federation";
 import { createSystemClient } from "yunque-client/system";
+import { createSettingsClient } from "yunque-client/settings";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -332,13 +333,20 @@ console.log(matches.count);
 const system = createSystemClient({ baseUrl: "http://localhost:9090" });
 const readiness = await system.readyz();
 console.log(readiness.status);
+
+const settings = createSettingsClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const backup = await settings.backupInfo();
+console.log(backup.file_count);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -391,6 +399,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
 | `src/federation.ts` | Lightweight hand-written federation peers, capabilities, discovery, delegation, and broadcast slice |
 | `src/system.ts` | Lightweight hand-written health, version, metrics, cache, and module observability slice |
+| `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
