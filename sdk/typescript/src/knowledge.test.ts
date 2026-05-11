@@ -148,6 +148,19 @@ test("KnowledgeClient throws KnowledgeClientError with parsed body", async () =>
     assertDeepEqual(error.body, { error: "source not found" });
     assertEqual(error.message, "source not found");
   }
+
+  const nestedClient = createKnowledgeClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "knowledge query is required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.search({ query: "" });
+    throw new Error("expected nested search to reject");
+  } catch (error) {
+    assert(error instanceof KnowledgeClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "knowledge query is required");
+  }
 });
 
 let failures = 0;
