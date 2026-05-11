@@ -47,6 +47,7 @@
     "src/memory-compact.ts",
     "src/tasks.ts",
     "src/task-context.ts",
+    "src/task-lifecycle.ts",
     "src/knowledge.ts",
     "src/knowledge-search.ts",
     "src/knowledge-ingest.ts",

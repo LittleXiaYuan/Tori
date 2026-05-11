@@ -131,6 +131,10 @@
       "types": "./src/task-context.ts",
       "import": "./src/task-context.ts"
     },
+    "./task-lifecycle": {
+      "types": "./src/task-lifecycle.ts",
+      "import": "./src/task-lifecycle.ts"
+    },
     "./knowledge": {
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"
