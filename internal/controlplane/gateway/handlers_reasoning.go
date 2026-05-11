@@ -444,7 +444,7 @@ func (g *Gateway) handleStrategies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	strategies := g.experienceStore.CompileStrategies(20)
+	strategies := g.experienceStore.CompileStrategies(reflectExperienceLimit(r, 20))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"strategies": strategies})
 }

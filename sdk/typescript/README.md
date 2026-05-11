@@ -703,7 +703,7 @@ const reflectExperiences = await missions.experiences({
 console.log(reflectExperiences.experiences[0]?.lesson);
 const reflectStats = await missions.experienceStats();
 console.log(reflectStats.by_outcome?.success ?? 0);
-const strategyContext = await missions.strategies();
+const strategyContext = await missions.strategies({ limit: 5 });
 console.log(strategyContext.strategies.split("\n")[0]);
 
 const tools = createToolsClient({
