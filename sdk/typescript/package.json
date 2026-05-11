@@ -83,6 +83,10 @@
       "types": "./src/emotion.ts",
       "import": "./src/emotion.ts"
     },
+    "./reactions": {
+      "types": "./src/reactions.ts",
+      "import": "./src/reactions.ts"
+    },
     "./instructions": {
       "types": "./src/instructions.ts",
       "import": "./src/instructions.ts"

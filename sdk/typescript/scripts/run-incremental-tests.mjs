@@ -42,6 +42,8 @@ const sources = [
   "src/interactions.test.ts",
   "src/emotion.ts",
   "src/emotion.test.ts",
+  "src/reactions.ts",
+  "src/reactions.test.ts",
   "src/instructions.ts",
   "src/instructions.test.ts",
   "src/rbac.ts",
@@ -205,6 +207,7 @@ for (const testName of [
   "search.test",
   "interactions.test",
   "emotion.test",
+  "reactions.test",
   "instructions.test",
   "rbac.test",
   "memory.test",
@@ -285,6 +288,7 @@ for (const testName of [
     .replace('from "./search"', 'from "./search.js"')
     .replace('from "./interactions"', 'from "./interactions.js"')
     .replace('from "./emotion"', 'from "./emotion.js"')
+    .replace('from "./reactions"', 'from "./reactions.js"')
     .replace('from "./instructions"', 'from "./instructions.js"')
     .replace('from "./rbac"', 'from "./rbac.js"')
     .replace('from "./memory"', 'from "./memory.js"')
