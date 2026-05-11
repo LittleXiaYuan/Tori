@@ -112,6 +112,7 @@ import { createTasksClient } from "yunque-client/tasks";
 import { createTaskContextClient } from "yunque-client/task-context";
 import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createProvidersClient } from "yunque-client/providers";
+import { createBreakerClient } from "yunque-client/breaker";
 import { createModelsClient } from "yunque-client/models";
 import { createSetupClient } from "yunque-client/setup";
 import { createDocumentsClient } from "yunque-client/documents";
@@ -435,6 +436,12 @@ await providers.registerProvider({
 await providers.testProvider("deepseek-deepseek-chat");
 await providers.setExecProvider("deepseek-deepseek-chat");
 
+const breaker = createBreakerClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await breaker.reset();
+
 const models = createModelsClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -754,7 +761,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
-`providers`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
+`providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -805,6 +812,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/task-context.ts` | Lightweight hand-written Task gaps, working memory, templates, and thread context slice |
 | `src/knowledge.ts` | Lightweight hand-written Knowledge search/ingest/import/upload slice |
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
+| `src/breaker.ts` | Lightweight provider breaker reset facade for `/api/breaker/reset` without full SDK import |
 | `src/models.ts` | Lightweight models facade for listing and maintaining `/v1/models` without full SDK import |
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
