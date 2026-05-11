@@ -25,7 +25,7 @@ describe("TaskProgressPanel", () => {
 
     expect(screen.getByText("任务进度")).toBeInTheDocument();
     expect(screen.getByText("读取附件并总结")).toBeInTheDocument();
-    expect(screen.getByText("模型暂时没有回应，正在换用可用模型继续。")).toBeInTheDocument();
+    expect(screen.getByText("模型暂时没有回应，已保留现场，正在换用可用模型继续。")).toBeInTheDocument();
     expect(screen.queryByText(/备用模型|qwen3\.5|当前模型响应失败/)).toBeNull();
   });
 
@@ -38,3 +38,4 @@ describe("TaskProgressPanel", () => {
     expect(screen.queryByText(/context deadline exceeded|handoff agent|execution failed/)).toBeNull();
   });
 });
+

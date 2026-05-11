@@ -348,6 +348,8 @@ func TestPlannerKnownFriendlyErrorCoversToolExecutionFailures(t *testing.T) {
 		"unknown skill: file_exec":          {"unknown skill"},
 		"blocked by trust gate: need allow": {"blocked by trust gate", "trust gate"},
 		"tool panic: nil pointer":           {"tool panic", "panic"},
+		`planner fc step 1: all fallback LLM clients failed (FC): chat with tools: Post "https://api.moonshot.ai/v1/chat/completions": EOF`: {"planner fc", "all fallback", "moonshot", "EOF"},
+		"当前：调用栈降级，正在级联唤醒备用引擎 [qwen3.5:4b]...":                                                                                               {"调用栈降级", "级联唤醒", "qwen3.5"},
 	}
 	for raw, banned := range cases {
 		friendly := plannerKnownFriendlyError(raw)
