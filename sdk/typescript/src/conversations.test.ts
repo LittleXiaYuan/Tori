@@ -39,6 +39,8 @@ test("ConversationsClient reads replay timeline with pagination", async () => {
 test("ConversationsClient throws ConversationsClientError with text and JSON bodies", async () => {
   const jsonClient = createConversationsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: "session_id is required" }, { status: 400 }) });
   try { await jsonClient.replay(""); throw new Error("expected replay to reject"); } catch (error) { assert(error instanceof ConversationsClientError); assertEqual(error.status, 400); assertDeepEqual(error.body, { error: "session_id is required" }); assertEqual(error.message, "session_id is required"); }
+  const nestedClient = createConversationsClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "conversation session id is required" } }, { status: 400 }) });
+  try { await nestedClient.messages(""); throw new Error("expected messages to reject"); } catch (error) { assert(error instanceof ConversationsClientError); assertEqual(error.status, 400); assertEqual(error.message, "conversation session id is required"); }
   const textClient = createConversationsClient({ baseUrl: "http://localhost:9090", fetch: async () => new Response("GET or DELETE only", { status: 405 }) });
   try { await textClient.messages("s1"); throw new Error("expected messages to reject"); } catch (error) { assert(error instanceof ConversationsClientError); assertEqual(error.status, 405); assertEqual(error.body, "GET or DELETE only"); assertEqual(error.message, "GET or DELETE only"); }
 });
