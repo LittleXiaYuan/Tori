@@ -38,6 +38,7 @@
     "src/reactions.ts",
     "src/instructions.ts",
     "src/rbac.ts",
+    "src/roles.ts",
     "src/memory.ts",
     "src/tasks.ts",
     "src/task-context.ts",
