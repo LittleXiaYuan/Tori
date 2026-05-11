@@ -45,6 +45,7 @@
     "src/settings.ts",
     "src/tori.ts",
     "src/speech.ts",
+    "src/admin.ts",
     "src/**/*.test.ts"
   ]
 }
