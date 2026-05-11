@@ -179,6 +179,19 @@ test("ProvidersClient throws ProvidersClientError with parsed body", async () =>
     assertDeepEqual(error.body, { error: "provider registry not available" });
     assertEqual(error.message, "provider registry not available");
   }
+
+  const nestedClient = createProvidersClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "provider api key is required" } }, { status: 400 }),
+  });
+  try {
+    await nestedClient.registerProvider({ preset_id: "deepseek" });
+    throw new Error("expected registerProvider to reject");
+  } catch (error) {
+    assert(error instanceof ProvidersClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "provider api key is required");
+  }
 });
 
 let failures = 0;
