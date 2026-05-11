@@ -103,6 +103,7 @@
     "src/plugins.ts",
     "src/connectors.ts",
     "src/notify.ts",
+    "src/notify-share.ts",
     "src/notify-channels.ts",
     "src/projects.ts",
     "src/market.ts",
