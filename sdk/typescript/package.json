@@ -270,6 +270,7 @@
   },
   "files": [
     "src",
+    "!src/**/*.test.ts",
     "README.md"
   ],
   "scripts": {
@@ -277,7 +278,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "test": "npm run check:incremental && npm run typecheck:test && node scripts/run-incremental-tests.mjs",
-    "check:incremental": "node scripts/check-incremental-coverage.mjs"
+    "check:incremental": "node scripts/check-incremental-coverage.mjs",
+    "check:pack": "node scripts/check-pack.mjs"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.1",
