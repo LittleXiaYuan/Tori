@@ -55,6 +55,7 @@
     "src/state.ts",
     "src/triggers.ts",
     "src/missions.ts",
+    "src/tools.ts",
     "src/**/*.test.ts"
   ]
 }

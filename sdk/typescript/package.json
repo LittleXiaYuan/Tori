@@ -162,6 +162,10 @@
     "./missions": {
       "types": "./src/missions.ts",
       "import": "./src/missions.ts"
+    },
+    "./tools": {
+      "types": "./src/tools.ts",
+      "import": "./src/tools.ts"
     }
   },
   "files": [
