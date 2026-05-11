@@ -57,6 +57,7 @@ can import the hand-written incremental slice instead:
 import { createAuthClient } from "yunque-client/auth";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
+import { createWebChatClient } from "yunque-client/webchat";
 import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
 import { createBotsClient } from "yunque-client/bots";
@@ -134,6 +135,9 @@ const reply = await chat.send({
   session_id: "demo-session",
 });
 console.log(reply.reply);
+
+const webchat = createWebChatClient({ baseUrl: "http://localhost:9090" });
+console.log(webchat.embedSnippet({ apiKey: "<your-api-key>", title: "Tori Assistant" }));
 
 const conversations = createConversationsClient({
   baseUrl: "http://localhost:9090",
@@ -536,7 +540,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -570,6 +574,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/auth.ts` | Lightweight hand-written API-key to JWT token exchange slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
+| `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
 | `src/bots.ts` | Lightweight hand-written bots, inbox, and channel group operations slice |
