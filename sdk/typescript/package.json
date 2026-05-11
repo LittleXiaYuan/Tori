@@ -211,6 +211,10 @@
       "types": "./src/scheduler.ts",
       "import": "./src/scheduler.ts"
     },
+    "./upload": {
+      "types": "./src/upload.ts",
+      "import": "./src/upload.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"

@@ -106,6 +106,8 @@ const sources = [
   "src/fork.test.ts",
   "src/scheduler.ts",
   "src/scheduler.test.ts",
+  "src/upload.ts",
+  "src/upload.test.ts",
   "src/graph.ts",
   "src/graph.test.ts",
   "src/plugin-api.ts",
@@ -199,6 +201,7 @@ for (const testName of [
   "orchestrator.test",
   "fork.test",
   "scheduler.test",
+  "upload.test",
   "graph.test",
   "plugin-api.test",
   "state.test",
@@ -260,6 +263,7 @@ for (const testName of [
     .replace('from "./orchestrator"', 'from "./orchestrator.js"')
     .replace('from "./fork"', 'from "./fork.js"')
     .replace('from "./scheduler"', 'from "./scheduler.js"')
+    .replace('from "./upload"', 'from "./upload.js"')
     .replace('from "./graph"', 'from "./graph.js"')
     .replace('from "./plugin-api"', 'from "./plugin-api.js"')
     .replace('from "./state"', 'from "./state.js"')
