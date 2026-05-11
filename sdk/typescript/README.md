@@ -73,6 +73,7 @@ import { createWorkflowClient } from "yunque-client/workflow";
 import { createCostClient } from "yunque-client/cost";
 import { createLoRAClient } from "yunque-client/lora";
 import { createIterateClient } from "yunque-client/iterate";
+import { createTrustClient } from "yunque-client/trust";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -286,13 +287,23 @@ const pending = await iterate.pendingProposals();
 if (pending.proposals[0]) {
   await iterate.approve({ id: pending.proposals[0].id });
 }
+
+const trust = createTrustClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const reviewGate = await trust.reviewStatus();
+if (reviewGate.trust_enabled) {
+  console.log(await trust.scores());
+}
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
-`/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate` without importing the
-generated 500KB+ SDK/types bundle. Add future slices in the same style when
+`/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust` without importing
+the generated 500KB+ SDK/types bundle. Add future slices in the same style when
 those surfaces need stable, lightweight integration APIs.
 
 ## Regenerating
@@ -338,6 +349,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
 | `src/lora.ts` | Lightweight hand-written LoRA training and evolution lifecycle slice |
 | `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |
+| `src/trust.ts` | Lightweight hand-written trust, review-gate and skill-growth slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
