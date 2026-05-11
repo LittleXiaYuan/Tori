@@ -31,6 +31,10 @@
       "types": "./src/bots.ts",
       "import": "./src/bots.ts"
     },
+    "./discovery": {
+      "types": "./src/discovery.ts",
+      "import": "./src/discovery.ts"
+    },
     "./memory": {
       "types": "./src/memory.ts",
       "import": "./src/memory.ts"
