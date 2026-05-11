@@ -86,6 +86,11 @@ submitting them directly. The gateway accepts common UI aliases such as
 `retry-failed-step` or `重试失败`, but SDK callers should prefer the canonical
 request actions for portable integrations.
 
+The package declares `sideEffects: false`, so modern bundlers can drop unused
+subpath slices when applications import only the clients they need. Prefer
+subpath imports like `yunque-client/planner-recovery` for the smallest runtime
+surface; reserve the package root for full generated API coverage.
+
 ```ts
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
