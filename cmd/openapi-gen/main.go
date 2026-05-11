@@ -149,18 +149,20 @@ func shouldInclude(p string) bool {
 }
 
 func extractPaths(dir string) ([]string, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
-	if err != nil {
-		return nil, err
-	}
 	seen := map[string]bool{}
-	for _, f := range files {
-		if strings.HasSuffix(f, "_test.go") {
-			continue
+	err := filepath.WalkDir(dir, func(f string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(f) != ".go" || strings.HasSuffix(f, "_test.go") {
+			return nil
 		}
 		data, err := os.ReadFile(f)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, m := range routePattern.FindAllStringSubmatch(string(data), -1) {
 			p := m[1]
@@ -174,6 +176,10 @@ func extractPaths(dir string) ([]string, error) {
 			}
 			seen[p] = true
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	out := make([]string, 0, len(seen))
 	for p := range seen {
@@ -337,80 +343,81 @@ func inferTag(p string) string {
 
 func tagDescription(tag string) string {
 	descs := map[string]string{
-		"chat":       "Chat & conversations (SSE streaming, agentic mode, WebSocket)",
-		"tasks":      "Task runtime, workflows, missions, state kernel",
-		"memory":     "Multi-layer memory store, search, embeddings",
-		"graph":      "Knowledge graph (entities, relations, context)",
-		"knowledge":  "RAG knowledge base (sources, ingest, search)",
-		"plugins":    "Plugin lifecycle (CRUD, toggle, reload)",
-		"skills":     "Skills runtime + dynamic skill suggestions",
-		"skillhub":   "Skill marketplace (search, install, versions)",
-		"market":     "Skill market analytics",
-		"triggers":   "Event triggers (legacy + v2)",
-		"cron":       "Cron scheduling",
-		"scheduler":  "Generic job scheduler",
-		"tools":      "Tool execution (subprocess)",
-		"sandbox":    "Sandbox & desktop session (admin)",
-		"audit":      "Audit log (tail, verify, stats)",
-		"trust":      "Trust scoring",
-		"iterate":    "Self-improvement proposals",
-		"cost":       "Cost tracking & budgets",
-		"usage":      "Usage & quota",
-		"providers":  "LLM providers, presets, smart router",
-		"router":     "Router stats",
-		"reverie":    "Inner monologue / journaling",
-		"rbac":       "Role-based access control",
-		"approvals":  "Human-in-the-loop approval queue",
-		"setup":      "First-run setup wizard",
-		"sessions":   "Session queue",
-		"events":     "SSE event stream",
-		"trace":      "Execution traces",
-		"browser":    "Browser engine + extension connector",
-		"ide":        "IDE supervisor plugin",
-		"persona":    "Persona, presets, modes",
-		"workflows":  "Workflow DAG engine",
-		"notify":     "Notification channels",
-		"connectors": "External connectors",
-		"system":     "Health & version",
-		"federation": "Federated agent network (peers, discover, broadcast)",
-		"cognis":     "Cogni declarative AI-cognition shells",
-		"modules":    "Hot-pluggable modules",
-		"speech":     "TTS / STT",
-		"heartbeat":  "Liveness heartbeat",
-		"backup":     "Backup & restore",
-		"settings":   "Runtime settings",
-		"models":     "Model registry",
-		"identity":   "Identity resolution",
-		"embeddings": "Embedding computation",
-		"search":     "Web search providers",
-		"emotion":    "Emotion analysis & stickers",
-		"react":      "React handler",
-		"sticker":    "Sticker dispatch",
-		"channels":   "Channel groups",
-		"inbox":      "Inbox messages",
-		"webhook":    "Inbound webhooks (Feishu etc.)",
-		"webchat":    "Embeddable web chat widget",
-		"ws":         "WebSocket endpoint",
-		"token":      "JWT token generation",
+		"chat":          "Chat & conversations (SSE streaming, agentic mode, WebSocket)",
+		"tasks":         "Task runtime, workflows, missions, state kernel",
+		"memory":        "Multi-layer memory store, search, embeddings",
+		"graph":         "Knowledge graph (entities, relations, context)",
+		"knowledge":     "RAG knowledge base (sources, ingest, search)",
+		"plugins":       "Plugin lifecycle (CRUD, toggle, reload)",
+		"skills":        "Skills runtime + dynamic skill suggestions",
+		"skillhub":      "Skill marketplace (search, install, versions)",
+		"market":        "Skill market analytics",
+		"triggers":      "Event triggers (legacy + v2)",
+		"cron":          "Cron scheduling",
+		"scheduler":     "Generic job scheduler",
+		"tools":         "Tool execution (subprocess)",
+		"sandbox":       "Sandbox & desktop session (admin)",
+		"audit":         "Audit log (tail, verify, stats)",
+		"trust":         "Trust scoring",
+		"iterate":       "Self-improvement proposals",
+		"cost":          "Cost tracking & budgets",
+		"usage":         "Usage & quota",
+		"providers":     "LLM providers, presets, smart router",
+		"router":        "Router stats",
+		"reverie":       "Inner monologue / journaling",
+		"rbac":          "Role-based access control",
+		"approvals":     "Human-in-the-loop approval queue",
+		"setup":         "First-run setup wizard",
+		"sessions":      "Session queue",
+		"events":        "SSE event stream",
+		"trace":         "Execution traces",
+		"browser":       "Browser engine + extension connector",
+		"ide":           "IDE supervisor plugin",
+		"persona":       "Persona, presets, modes",
+		"planner":       "Planner checkpoints, recovery plans, and execution-state read models",
+		"workflows":     "Workflow DAG engine",
+		"notify":        "Notification channels",
+		"connectors":    "External connectors",
+		"system":        "Health & version",
+		"federation":    "Federated agent network (peers, discover, broadcast)",
+		"cognis":        "Cogni declarative AI-cognition shells",
+		"modules":       "Hot-pluggable modules",
+		"speech":        "TTS / STT",
+		"heartbeat":     "Liveness heartbeat",
+		"backup":        "Backup & restore",
+		"settings":      "Runtime settings",
+		"models":        "Model registry",
+		"identity":      "Identity resolution",
+		"embeddings":    "Embedding computation",
+		"search":        "Web search providers",
+		"emotion":       "Emotion analysis & stickers",
+		"react":         "React handler",
+		"sticker":       "Sticker dispatch",
+		"channels":      "Channel groups",
+		"inbox":         "Inbox messages",
+		"webhook":       "Inbound webhooks (Feishu etc.)",
+		"webchat":       "Embeddable web chat widget",
+		"ws":            "WebSocket endpoint",
+		"token":         "JWT token generation",
 		"conversations": "Conversation history",
-		"fork":       "Conversation fork & branches",
-		"subagent":   "Subagent dispatch",
-		"bots":       "Bot directory",
-		"reflect":    "Reflection / experience replay",
-		"documents":  "Document generation",
-		"missions":   "Mission parser",
-		"state":      "State kernel snapshots",
-		"metrics":    "Metrics (JSON + Prometheus)",
-		"cache":      "Cache stats",
-		"tenants":    "Tenant management",
-		"upload":     "File upload",
-		"config":     "Config reload",
-		"desktop":    "Desktop integration",
-		"tori":       "Tori (sister product) bind",
-		"breaker":    "Circuit breaker reset",
-		"files":      "Output file listing",
-		"version":    "Version info",
-		"quota":      "Quota management",
+		"fork":          "Conversation fork & branches",
+		"subagent":      "Subagent dispatch",
+		"bots":          "Bot directory",
+		"reflect":       "Reflection / experience replay",
+		"documents":     "Document generation",
+		"missions":      "Mission parser",
+		"state":         "State kernel snapshots",
+		"metrics":       "Metrics (JSON + Prometheus)",
+		"cache":         "Cache stats",
+		"tenants":       "Tenant management",
+		"upload":        "File upload",
+		"config":        "Config reload",
+		"desktop":       "Desktop integration",
+		"tori":          "Tori (sister product) bind",
+		"breaker":       "Circuit breaker reset",
+		"files":         "Output file listing",
+		"version":       "Version info",
+		"quota":         "Quota management",
 	}
 	if d, ok := descs[tag]; ok {
 		return d

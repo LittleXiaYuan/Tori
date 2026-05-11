@@ -18,6 +18,14 @@ type extraEndpoint struct {
 
 func extraPaths() []extraEndpoint {
 	return []extraEndpoint{
+		// ── Planner recovery checkpoints ─────────────────────────
+		{"/v1/planner/checkpoints", "get", "planner", "List recent recoverable planner checkpoints", "list_planner_checkpoints"},
+		{"/v1/planner/execution-state", "get", "planner", "Read the joined execution state for one planner checkpoint", "get_planner_execution_state"},
+		{"/v1/planner/checkpoints/recover", "post", "planner", "Build a semantic recovery prompt for a planner checkpoint", "recover_planner_checkpoint"},
+		{"/v1/planner/checkpoints/resume", "post", "planner", "Create a background task from a planner checkpoint recovery plan", "resume_planner_checkpoint_task"},
+		{"/v1/planner/checkpoints/resume-plan", "post", "planner", "Resume a planner checkpoint through the original planner DAG runner", "resume_planner_checkpoint_plan"},
+		{"/v1/planner/checkpoints/resume-plan/jobs", "get", "planner", "Read a planner resume-plan job by job id or plan id", "get_planner_resume_plan_job"},
+
 		// ── Cognis collection ────────────────────────────────────
 		{"/v1/cognis", "get", "cognis", "List every registered Cogni declaration", "list_cognis"},
 		{"/v1/cognis", "post", "cognis", "Add an inline Cogni declaration (JSON body)", "create_cogni"},
