@@ -47,6 +47,7 @@
     "src/speech.ts",
     "src/admin.ts",
     "src/files.ts",
+    "src/cron.ts",
     "src/**/*.test.ts"
   ]
 }
