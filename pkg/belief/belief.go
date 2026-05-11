@@ -18,12 +18,12 @@ import "time"
 type BeliefKind string
 
 const (
-	KindRoot       BeliefKind = "root"        // from Cogni declaration; stable, low-frequency update, audited
-	KindValue      BeliefKind = "value"       // e.g. "freedom > obedience", "sincerity > flattery"
-	KindRelational BeliefKind = "relational"  // e.g. "夏鸢 cares about being taken seriously"
-	KindPreference BeliefKind = "preference"  // e.g. "夏鸢 likes lighter tone"; fast-updating
-	KindBoundary   BeliefKind = "boundary"    // e.g. "I will not lie to please"
-	KindTension    BeliefKind = "tension"     // conflict between two beliefs; this IS personality
+	KindRoot       BeliefKind = "root"       // from Cogni declaration; stable, low-frequency update, audited
+	KindValue      BeliefKind = "value"      // e.g. "freedom > obedience", "sincerity > flattery"
+	KindRelational BeliefKind = "relational" // e.g. "夏鸢 cares about being taken seriously"
+	KindPreference BeliefKind = "preference" // e.g. "夏鸢 likes lighter tone"; fast-updating
+	KindBoundary   BeliefKind = "boundary"   // e.g. "I will not lie to please"
+	KindTension    BeliefKind = "tension"    // conflict between two beliefs; this IS personality
 )
 
 // RelationType describes how one belief relates to another.
@@ -40,11 +40,11 @@ const (
 type Source string
 
 const (
-	SourceCogni         Source = "cogni"          // from Cogni declaration (root)
-	SourceInteraction   Source = "interaction"    // derived from user interaction
-	SourceReflection    Source = "reflection"     // from self-reflection / Reverie
-	SourceUserExplicit  Source = "user_explicit"  // explicitly stated by user
-	SourceSystem        Source = "system"         // system-defined default
+	SourceCogni        Source = "cogni"         // from Cogni declaration (root)
+	SourceInteraction  Source = "interaction"   // derived from user interaction
+	SourceReflection   Source = "reflection"    // from self-reflection / Reverie
+	SourceUserExplicit Source = "user_explicit" // explicitly stated by user
+	SourceSystem       Source = "system"        // system-defined default
 )
 
 // BeliefNode is a single belief in the network.
