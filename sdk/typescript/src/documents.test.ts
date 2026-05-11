@@ -111,6 +111,20 @@ test("DocumentsClient throws DocumentsClientError with parsed body", async () =>
     assertDeepEqual(error.body, { error: "unsupported format: pdf" });
     assertEqual(error.message, "unsupported format: pdf");
   }
+
+  const nestedClient = createDocumentsClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "document content is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.generate({ format: "docx", content: "" });
+    throw new Error("expected generate to reject");
+  } catch (error) {
+    assert(error instanceof DocumentsClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "document content is required");
+  }
 });
 
 let failures = 0;
