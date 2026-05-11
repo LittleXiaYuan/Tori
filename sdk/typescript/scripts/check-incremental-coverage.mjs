@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const sdkRoot = process.cwd();
@@ -38,6 +38,17 @@ for (const name of srcSlices) {
 }
 
 const gatewayDir = join(repoRoot, "internal/controlplane/gateway");
+
+function listGoFiles(dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) out.push(...listGoFiles(path));
+    else if (name.endsWith(".go") && !name.endsWith("_test.go")) out.push(path);
+  }
+  return out;
+}
 const routePrefixAliases = new Set([
   ...exportedSlices,
   "auth", "token", "chat", "conversations", "subagent", "bots", "persona", "emotion", "instructions", "react", "sticker", "channels", "inbox",
@@ -46,17 +57,23 @@ const routePrefixAliases = new Set([
   "federation", "nl-config", "tasks", "planner", "missions", "state", "reflect", "documents", "workers", "dispatch", "setup", "usage", "quota", "cost",
   "cron", "scheduler", "tools", "sandbox", "sandboxes", "triggers", "workflows", "ide", "rbac", "skill-suggestions", "reverie", "models", "providers",
   "version", "ws", "events", "ext",
+  // /api control planes that are intentionally owned by existing slices.
+  "settings", "providers", "files", "browser", "connectors", "notify", "skillhub", "iterate", "trust", "audit", "review", "skillgrow", "breaker",
 ]);
-const routeRe = /"(\/v1\/[^"?#]+)(?:\?[^"#]*)?"/g;
+const routeRe = /"(\/(?:v1|api)\/[^"?#]+)(?:\?[^"#]*)?"/g;
 let routeRefs = 0;
-for (const file of readdirSync(gatewayDir).filter((name) => name.endsWith(".go"))) {
-  const text = readFileSync(join(gatewayDir, file), "utf8");
-  for (const match of text.matchAll(routeRe)) {
-    const path = match[1];
-    const prefix = path.split("/")[2];
-    if (!prefix) continue;
-    routeRefs += 1;
-    if (!routePrefixAliases.has(prefix)) fail(`unmapped /v1 route prefix "${prefix}" from ${file}: ${path}`);
+for (const filePath of listGoFiles(gatewayDir)) {
+  const text = readFileSync(filePath, "utf8");
+  const rel = filePath.slice(gatewayDir.length + 1).replaceAll("\\", "/");
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.includes("HandleFunc(") && !line.includes(".Handle(")) continue;
+    for (const match of line.matchAll(routeRe)) {
+      const path = match[1];
+      const prefix = path.split("/")[2];
+      if (!prefix) continue;
+      routeRefs += 1;
+      if (!routePrefixAliases.has(prefix)) fail(`unmapped route prefix "${prefix}" from ${rel}: ${path}`);
+    }
   }
 }
 
@@ -66,4 +83,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`incremental coverage ok: ${srcSlices.length} slices, ${routeRefs} /v1 route references checked`);
+console.log(`incremental coverage ok: ${srcSlices.length} slices, ${routeRefs} runtime /v1+/api route references checked`);
