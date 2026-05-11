@@ -129,6 +129,20 @@ test("ApprovalsClient throws ApprovalsClientError with parsed body", async () =>
     assertDeepEqual(error.body, { error: "approval system not available" });
     assertEqual(error.message, "approval system not available");
   }
+
+  const nestedClient = createApprovalsClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "approval id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.approve("");
+    throw new Error("expected approve to reject");
+  } catch (error) {
+    assert(error instanceof ApprovalsClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "approval id is required");
+  }
 });
 
 let failures = 0;

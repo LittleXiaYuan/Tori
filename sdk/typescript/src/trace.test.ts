@@ -99,6 +99,20 @@ test("TraceClient throws TraceClientError with text body", async () => {
     assertDeepEqual(error.body, "audit trail not available");
     assertEqual(error.message, "audit trail not available");
   }
+
+  const nestedClient = createTraceClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "trace id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.byTraceId("");
+    throw new Error("expected byTraceId to reject");
+  } catch (error) {
+    assert(error instanceof TraceClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "trace id is required");
+  }
 });
 
 let failures = 0;

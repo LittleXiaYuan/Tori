@@ -125,6 +125,20 @@ test("RuntimeClient throws RuntimeClientError with text body", async () => {
     assertDeepEqual(error.body, "SSE not available");
     assertEqual(error.message, "SSE not available");
   }
+
+  const nestedClient = createRuntimeClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async () => jsonResponse({ error: { code: "BAD_REQUEST", message: "runtime session id is required" } }, { status: 400 }),
+  });
+
+  try {
+    await nestedClient.cancelQueuedTask("", "task-1");
+    throw new Error("expected cancelQueuedTask to reject");
+  } catch (error) {
+    assert(error instanceof RuntimeClientError);
+    assertEqual(error.status, 400);
+    assertEqual(error.message, "runtime session id is required");
+  }
 });
 
 let failures = 0;
