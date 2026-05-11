@@ -23,6 +23,7 @@
     "src/documents.ts",
     "src/approvals.ts",
     "src/trace.ts",
+    "src/browser.ts",
     "src/**/*.test.ts"
   ]
 }
