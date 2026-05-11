@@ -147,6 +147,21 @@ func TestCompileStrategiesForQuery(t *testing.T) {
 	}
 }
 
+func TestCompileStrategiesForQueryRanksHigherScoreBeforeRecency(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "exp.json")
+	s := NewExperienceStore(path)
+	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "code review 应先阅读 diff 再按风险分类给出结论", Context: "代码审查"})
+	s.Add(Experience{Category: "strategy", Outcome: "success", Lesson: "review 前先运行 code tests 能减少遗漏但不是完整审查策略", Context: "测试验证"})
+
+	strategies := s.CompileStrategiesForQuery("code review", 1)
+	if !contains(strategies, "阅读 diff") {
+		t.Fatalf("expected exact phrase match to outrank newer token match, got: %s", strategies)
+	}
+	if contains(strategies, "code tests") {
+		t.Fatalf("expected limit to keep only the highest-scored strategy, got: %s", strategies)
+	}
+}
+
 func TestMatchesQueryRequiresMultipleUsefulTokenHits(t *testing.T) {
 	codeReview := Experience{
 		Lesson:  "code review 需要先跑测试再总结风险",
