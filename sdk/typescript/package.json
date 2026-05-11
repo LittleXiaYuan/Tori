@@ -339,6 +339,10 @@
       "types": "./src/skillhub.ts",
       "import": "./src/skillhub.ts"
     },
+    "./skillhub-catalog": {
+      "types": "./src/skillhub-catalog.ts",
+      "import": "./src/skillhub-catalog.ts"
+    },
     "./skills": {
       "types": "./src/skills.ts",
       "import": "./src/skills.ts"
