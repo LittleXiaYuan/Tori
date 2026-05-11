@@ -126,6 +126,10 @@
     "./admin": {
       "types": "./src/admin.ts",
       "import": "./src/admin.ts"
+    },
+    "./files": {
+      "types": "./src/files.ts",
+      "import": "./src/files.ts"
     }
   },
   "files": [

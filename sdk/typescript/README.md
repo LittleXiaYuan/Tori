@@ -83,6 +83,7 @@ import { createSettingsClient } from "yunque-client/settings";
 import { createToriClient } from "yunque-client/tori";
 import { createSpeechClient } from "yunque-client/speech";
 import { createAdminClient } from "yunque-client/admin";
+import { createFilesClient } from "yunque-client/files";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -364,13 +365,20 @@ const admin = createAdminClient({
 });
 const tenants = await admin.listTenants();
 console.log(tenants.count);
+
+const files = createFilesClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const artifacts = await files.list();
+console.log(artifacts.files.length);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -427,6 +435,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/tori.ts` | Lightweight hand-written Tori OAuth binding, status, health, and usage slice |
 | `src/speech.ts` | Lightweight hand-written speech TTS/STT, STT stream URL, voices, and file upload slice |
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
+| `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
