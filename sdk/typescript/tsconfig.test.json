@@ -32,6 +32,7 @@
     "src/cost.ts",
     "src/lora.ts",
     "src/iterate.ts",
+    "src/trust.ts",
     "src/**/*.test.ts"
   ]
 }

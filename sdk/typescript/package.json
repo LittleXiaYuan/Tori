@@ -86,6 +86,10 @@
     "./iterate": {
       "types": "./src/iterate.ts",
       "import": "./src/iterate.ts"
+    },
+    "./trust": {
+      "types": "./src/trust.ts",
+      "import": "./src/trust.ts"
     }
   },
   "files": [
