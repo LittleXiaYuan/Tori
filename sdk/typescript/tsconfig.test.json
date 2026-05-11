@@ -35,6 +35,7 @@
     "src/trust.ts",
     "src/audit.ts",
     "src/heartbeat.ts",
+    "src/reverie.ts",
     "src/**/*.test.ts"
   ]
 }

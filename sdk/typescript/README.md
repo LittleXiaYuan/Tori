@@ -76,6 +76,7 @@ import { createIterateClient } from "yunque-client/iterate";
 import { createTrustClient } from "yunque-client/trust";
 import { createAuditClient } from "yunque-client/audit";
 import { createHeartbeatClient } from "yunque-client/heartbeat";
+import { createReverieClient } from "yunque-client/reverie";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -312,14 +313,21 @@ const heartbeat = createHeartbeatClient({
   token: "<your-jwt>",
 });
 await heartbeat.update({ enabled: true, interval_minutes: 30 });
+
+const reverie = createReverieClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await reverie.think({ event_type: "task_completed", trigger: "sdk-demo" });
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-without importing the generated 500KB+ SDK/types bundle. Add future slices in
-the same style when those surfaces need stable, lightweight integration APIs.
+`/reverie` without importing the generated 500KB+ SDK/types bundle. Add future
+slices in the same style when those surfaces need stable, lightweight
+integration APIs.
 
 ## Regenerating
 
@@ -367,6 +375,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/trust.ts` | Lightweight hand-written trust, review-gate and skill-growth slice |
 | `src/audit.ts` | Lightweight hand-written audit chain and audit trail inspection slice |
 | `src/heartbeat.ts` | Lightweight hand-written proactive heartbeat lifecycle slice |
+| `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
