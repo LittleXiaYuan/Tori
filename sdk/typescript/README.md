@@ -77,6 +77,7 @@ import { createTrustClient } from "yunque-client/trust";
 import { createAuditClient } from "yunque-client/audit";
 import { createHeartbeatClient } from "yunque-client/heartbeat";
 import { createReverieClient } from "yunque-client/reverie";
+import { createFederationClient } from "yunque-client/federation";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -319,13 +320,20 @@ const reverie = createReverieClient({
   token: "<your-jwt>",
 });
 await reverie.think({ event_type: "task_completed", trigger: "sdk-demo" });
+
+const federation = createFederationClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const matches = await federation.discover({ feature: "browser", intent: "open page" });
+console.log(matches.count);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -376,6 +384,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/audit.ts` | Lightweight hand-written audit chain and audit trail inspection slice |
 | `src/heartbeat.ts` | Lightweight hand-written proactive heartbeat lifecycle slice |
 | `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
+| `src/federation.ts` | Lightweight hand-written federation peers, capabilities, discovery, delegation, and broadcast slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
