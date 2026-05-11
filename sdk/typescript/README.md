@@ -86,6 +86,7 @@ import { createAdminClient } from "yunque-client/admin";
 import { createFilesClient } from "yunque-client/files";
 import { createCronClient } from "yunque-client/cron";
 import { createSkillHubClient } from "yunque-client/skillhub";
+import { createPluginsClient } from "yunque-client/plugins";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -388,13 +389,20 @@ const skillhub = createSkillHubClient({
 });
 const skills = await skillhub.search({ q: "browser", limit: 10 });
 console.log(skills.count);
+
+const plugins = createPluginsClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const pluginList = await plugins.list();
+console.log(pluginList.plugins.length);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -454,6 +462,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |
 | `src/skillhub.ts` | Lightweight hand-written SkillHub search/install/update/policy slice |
+| `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
