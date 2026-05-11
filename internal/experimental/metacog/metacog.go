@@ -12,12 +12,23 @@ import (
 // MetaCogMonitor monitors the agent's reasoning quality in real-time.
 // It detects anomalous patterns: loops, goal drift, confidence drops, stalls.
 type MetaCogMonitor struct {
-	bus        *ledger.EventBus
-	events     *ledger.EventStore
-	thresholds Thresholds
-	sub        *ledger.Subscription
-	alertFn    AlertFunc
-	state      map[string]*taskMonitorState
+	bus                *ledger.EventBus
+	events             *ledger.EventStore
+	thresholds         Thresholds
+	sub                *ledger.Subscription
+	alertFn            AlertFunc
+	state              map[string]*taskMonitorState
+	isolation          IsolationForest
+	isolationThreshold float64
+}
+
+// IsolationForest is the statistical anomaly scorer used to supplement
+// threshold-based rules. It intentionally matches anomaly.IsolationForest but
+// stays interface-based so tests can inject deterministic scorers.
+type IsolationForest interface {
+	IsTrained() bool
+	Fit(data [][]float64)
+	Score(point []float64) float64
 }
 
 // Thresholds configures when to fire alerts.
@@ -42,12 +53,12 @@ func DefaultThresholds() Thresholds {
 
 // Alert represents a detected anomaly.
 type Alert struct {
-	TaskID    string        `json:"task_id"`
-	Kind      AlertKind     `json:"kind"`
-	Severity  Severity      `json:"severity"`
-	Message   string        `json:"message"`
-	Details   ledger.JSON   `json:"details"`
-	Timestamp time.Time     `json:"timestamp"`
+	TaskID    string      `json:"task_id"`
+	Kind      AlertKind   `json:"kind"`
+	Severity  Severity    `json:"severity"`
+	Message   string      `json:"message"`
+	Details   ledger.JSON `json:"details"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 // AlertKind classifies the type of metacognitive alert.
@@ -60,6 +71,7 @@ const (
 	AlertStall              AlertKind = "stall"
 	AlertNoProgress         AlertKind = "no_progress"
 	AlertGoalDrift          AlertKind = "goal_drift"
+	AlertStatisticalAnomaly AlertKind = "statistical_anomaly"
 )
 
 // Severity levels for alerts.
@@ -75,13 +87,14 @@ const (
 type AlertFunc func(alert Alert)
 
 type taskMonitorState struct {
-	taskID         string
-	lastActions    []string
-	lastConfidence float64
-	backtracks     int
-	stepsSinceNew  int
-	lastEventAt    time.Time
-	observations   map[string]bool
+	taskID           string
+	lastActions      []string
+	lastConfidence   float64
+	backtracks       int
+	stepsSinceNew    int
+	lastEventAt      time.Time
+	observations     map[string]bool
+	lastIForestScore float64
 }
 
 const EventMetaCogAlert ledger.EventKind = "metacog.alert"
@@ -103,6 +116,20 @@ func NewFromLedger(ldg *ledger.Ledger, thresholds Thresholds) *MetaCogMonitor {
 
 // SetAlertFunc sets the callback for anomaly alerts.
 func (m *MetaCogMonitor) SetAlertFunc(fn AlertFunc) { m.alertFn = fn }
+
+// SetIsolationForest attaches an Isolation Forest scorer to supplement
+// threshold rules. If the forest is untrained, MetaCog fits a conservative
+// synthetic baseline representing normal reasoning trajectories.
+func (m *MetaCogMonitor) SetIsolationForest(f IsolationForest, threshold float64) {
+	m.isolation = f
+	if threshold <= 0 {
+		threshold = 0.65
+	}
+	m.isolationThreshold = threshold
+	if f != nil && !f.IsTrained() {
+		f.Fit(defaultIsolationBaseline())
+	}
+}
 
 // Start begins monitoring by subscribing to reasoning events.
 func (m *MetaCogMonitor) Start() {
@@ -134,10 +161,10 @@ func (m *MetaCogMonitor) processEvent(e *ledger.Event) {
 	state.lastEventAt = e.CreatedAt
 
 	var p struct {
-		Decision   string   `json:"decision,omitempty"`
-		Confidence *float64 `json:"confidence,omitempty"`
-		Thought    string   `json:"thought,omitempty"`
-		Observation string  `json:"observation,omitempty"`
+		Decision    string   `json:"decision,omitempty"`
+		Confidence  *float64 `json:"confidence,omitempty"`
+		Thought     string   `json:"thought,omitempty"`
+		Observation string   `json:"observation,omitempty"`
 	}
 	json.Unmarshal(e.Payload, &p)
 
@@ -171,6 +198,7 @@ func (m *MetaCogMonitor) processEvent(e *ledger.Event) {
 			state.lastConfidence = *p.Confidence
 		}
 	}
+	m.checkIsolationForest(state)
 }
 
 func (m *MetaCogMonitor) checkLoop(state *taskMonitorState, action string) {
@@ -243,6 +271,75 @@ func (m *MetaCogMonitor) checkNoProgress(state *taskMonitorState) {
 			Message:  fmt.Sprintf("No new information in %d steps", state.stepsSinceNew),
 			Details:  ledger.MakePayload(map[string]interface{}{"steps_without_progress": state.stepsSinceNew}),
 		})
+	}
+}
+
+func (m *MetaCogMonitor) checkIsolationForest(state *taskMonitorState) {
+	if m.isolation == nil {
+		return
+	}
+	threshold := m.isolationThreshold
+	if threshold <= 0 {
+		threshold = 0.65
+	}
+	features := metaCogFeatureVector(state)
+	score := m.isolation.Score(features)
+	previous := state.lastIForestScore
+	state.lastIForestScore = score
+	if score < threshold || previous >= threshold {
+		return
+	}
+	severity := SeverityWarning
+	if score >= threshold+0.15 {
+		severity = SeverityCritical
+	}
+	m.fireAlert(Alert{
+		TaskID:   state.taskID,
+		Kind:     AlertStatisticalAnomaly,
+		Severity: severity,
+		Message:  fmt.Sprintf("Statistical reasoning anomaly detected (score %.2f)", score),
+		Details: ledger.MakePayload(map[string]interface{}{
+			"score":     score,
+			"threshold": threshold,
+			"features":  features,
+		}),
+	})
+}
+
+func metaCogFeatureVector(state *taskMonitorState) []float64 {
+	confidenceRisk := 0.5
+	if state.lastConfidence > 0 {
+		confidenceRisk = 1 - state.lastConfidence
+	}
+	stallMinutes := 0.0
+	if !state.lastEventAt.IsZero() {
+		stallMinutes = time.Since(state.lastEventAt).Minutes()
+		if stallMinutes < 0 {
+			stallMinutes = 0
+		}
+		if stallMinutes > 30 {
+			stallMinutes = 30
+		}
+	}
+	return []float64{
+		float64(len(state.lastActions)),
+		float64(state.backtracks),
+		confidenceRisk,
+		float64(state.stepsSinceNew),
+		stallMinutes,
+	}
+}
+
+func defaultIsolationBaseline() [][]float64 {
+	return [][]float64{
+		{1, 0, 0.10, 0, 0},
+		{2, 0, 0.20, 0, 0},
+		{2, 1, 0.25, 1, 0.1},
+		{3, 1, 0.30, 1, 0.2},
+		{3, 2, 0.35, 2, 0.3},
+		{1, 0, 0.15, 0, 0.1},
+		{2, 0, 0.25, 0, 0.1},
+		{3, 1, 0.30, 2, 0.2},
 	}
 }
 
