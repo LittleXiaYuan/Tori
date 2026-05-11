@@ -88,6 +88,8 @@ const sources = [
   "src/cron.test.ts",
   "src/skillhub.ts",
   "src/skillhub.test.ts",
+  "src/skills.ts",
+  "src/skills.test.ts",
   "src/plugins.ts",
   "src/plugins.test.ts",
   "src/connectors.ts",
@@ -192,6 +194,7 @@ for (const testName of [
   "files.test",
   "cron.test",
   "skillhub.test",
+  "skills.test",
   "plugins.test",
   "connectors.test",
   "notify.test",
@@ -254,6 +257,7 @@ for (const testName of [
     .replace('from "./files"', 'from "./files.js"')
     .replace('from "./cron"', 'from "./cron.js"')
     .replace('from "./skillhub"', 'from "./skillhub.js"')
+    .replace('from "./skills"', 'from "./skills.js"')
     .replace('from "./plugins"', 'from "./plugins.js"')
     .replace('from "./connectors"', 'from "./connectors.js"')
     .replace('from "./notify"', 'from "./notify.js"')
