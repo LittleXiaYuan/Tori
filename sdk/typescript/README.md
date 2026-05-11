@@ -174,6 +174,7 @@ import { createAdminClient } from "yunque-client/admin";
 import { createFilesClient } from "yunque-client/files";
 import { createCronClient } from "yunque-client/cron";
 import { createSkillHubClient } from "yunque-client/skillhub";
+import { createSkillHubCatalogClient } from "yunque-client/skillhub-catalog";
 import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
@@ -905,12 +906,19 @@ const cron = createCronClient({
 const jobs = await cron.list();
 console.log(jobs.jobs.length);
 
+const skillhubCatalog = createSkillHubCatalogClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const skills = await skillhubCatalog.search({ q: "browser", limit: 10 });
+console.log(skills.count);
+
 const skillhub = createSkillHubClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
 });
-const skills = await skillhub.search({ q: "browser", limit: 10 });
-console.log(skills.count);
+const installedSkills = await skillhub.installed();
+console.log(installedSkills.count);
 
 const plugins = createPluginsClient({
   baseUrl: "http://localhost:9090",
@@ -1123,6 +1131,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |
 | `src/skillhub.ts` | Lightweight hand-written SkillHub search/install/update/policy slice |
+| `src/skillhub-catalog.ts` | Lightweight SkillHub search/trending/detail facade without full SDK import |
 | `src/skills.ts` | Lightweight hand-written runtime skills catalog, scan, dynamic review, and suggestions slice |
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
