@@ -7,6 +7,7 @@ const srcDir = join(sdkRoot, "src");
 const pkg = JSON.parse(readFileSync(join(sdkRoot, "package.json"), "utf8"));
 const tsconfig = JSON.parse(readFileSync(join(sdkRoot, "tsconfig.test.json"), "utf8"));
 const runner = readFileSync(join(sdkRoot, "scripts/run-incremental-tests.mjs"), "utf8");
+const readme = readFileSync(join(sdkRoot, "README.md"), "utf8");
 
 const generated = new Set(["client.gen", "sdk.gen", "types.gen", "index"]);
 const srcSlices = readdirSync(srcDir)
@@ -35,6 +36,8 @@ for (const name of srcSlices) {
   if (!runner.includes(`"src/${name}.test.ts"`)) fail(`run-incremental-tests.mjs missing src/${name}.test.ts`);
   if (!runner.includes(`"${name}.test"`)) fail(`run-incremental-tests.mjs does not execute ${name}.test`);
   if (!runner.includes(`from "./${name}"`) && !runner.includes(`from './${name}'`)) fail(`run-incremental-tests.mjs missing import rewrite for ${name}`);
+  if (!readme.includes(`yunque-client/${name}`)) fail(`README.md missing import documentation for yunque-client/${name}`);
+  if (!readme.includes(`src/${name}.ts`)) fail(`README.md missing slice map row for src/${name}.ts`);
 }
 
 const gatewayDir = join(repoRoot, "internal/controlplane/gateway");
