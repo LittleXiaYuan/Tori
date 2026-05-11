@@ -367,6 +367,10 @@
       "types": "./src/connector-catalog.ts",
       "import": "./src/connector-catalog.ts"
     },
+    "./connector-auth": {
+      "types": "./src/connector-auth.ts",
+      "import": "./src/connector-auth.ts"
+    },
     "./notify": {
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
@@ -483,6 +487,7 @@
   },
   "sideEffects": false
 }
+
 
 
 

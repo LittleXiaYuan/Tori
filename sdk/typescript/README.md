@@ -181,6 +181,7 @@ import { createSkillsClient } from "yunque-client/skills";
 import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createConnectorCatalogClient } from "yunque-client/connector-catalog";
+import { createConnectorAuthClient } from "yunque-client/connector-auth";
 import { createNotifyClient } from "yunque-client/notify";
 import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
@@ -403,6 +404,12 @@ const connectorCatalog = createConnectorCatalogClient({
 });
 const connectorList = await connectorCatalog.list();
 console.log(connectorList.connectors.length);
+
+const connectorAuth = createConnectorAuthClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await connectorAuth.disconnect("github");
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -1159,6 +1166,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/connector-catalog.ts` | Lightweight connector list/detail catalog facade without full SDK import |
+| `src/connector-auth.ts` | Lightweight connector connect/disconnect facade without full SDK import |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
 | `src/notify-share.ts` | Lightweight notification share dispatch facade without full SDK import |
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |

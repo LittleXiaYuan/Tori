@@ -106,6 +106,7 @@
     "src/plugins.ts",
     "src/connectors.ts",
     "src/connector-catalog.ts",
+    "src/connector-auth.ts",
     "src/notify.ts",
     "src/notify-share.ts",
     "src/notify-channels.ts",
@@ -132,6 +133,7 @@
     "src/**/*.test.ts"
   ]
 }
+
 
 
 
