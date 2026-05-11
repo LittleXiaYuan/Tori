@@ -92,6 +92,22 @@ func TestShouldInclude(t *testing.T) {
 	}
 }
 
+func TestExtractPathsScansGatewaySubpackages(t *testing.T) {
+	paths, err := extractPaths("../../internal/controlplane/gateway")
+	if err != nil {
+		t.Fatalf("extractPaths: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, p := range paths {
+		seen[p] = true
+	}
+	for _, want := range []string{"/api/connectors", "/api/notify/channels", "/v1/scheduler/jobs", "/v1/workflows"} {
+		if !seen[want] {
+			t.Fatalf("expected recursive route scan to include %s", want)
+		}
+	}
+}
+
 func TestMakeOperationID(t *testing.T) {
 	cases := []struct {
 		method, path, want string
@@ -103,6 +119,66 @@ func TestMakeOperationID(t *testing.T) {
 	for _, c := range cases {
 		if got := makeOperationID(c.method, c.path); got != c.want {
 			t.Errorf("makeOperationID(%q, %q) = %q, want %q", c.method, c.path, got, c.want)
+		}
+	}
+}
+
+func TestGeneratedSpecIncludesPlannerRecoveryEndpoints(t *testing.T) {
+	const path = "../../docs/openapi.yaml"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("spec not generated: %v (run `go run ./cmd/openapi-gen`)", err)
+	}
+
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("yaml unmarshal: %v", err)
+	}
+	paths, ok := doc["paths"].(map[string]any)
+	if !ok {
+		t.Fatal("missing paths section")
+	}
+
+	want := map[string]string{
+		"/v1/planner/checkpoints":                  "get",
+		"/v1/planner/execution-state":              "get",
+		"/v1/planner/checkpoints/recover":          "post",
+		"/v1/planner/checkpoints/resume":           "post",
+		"/v1/planner/checkpoints/resume-plan":      "post",
+		"/v1/planner/checkpoints/resume-plan/jobs": "get",
+	}
+	for p, method := range want {
+		raw, ok := paths[p]
+		if !ok {
+			t.Fatalf("missing planner recovery path %s", p)
+		}
+		methods, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("path %s is not a map", p)
+		}
+		if _, ok := methods[method]; !ok {
+			t.Fatalf("path %s missing method %s", p, method)
+		}
+		for gotMethod := range methods {
+			if gotMethod != method {
+				t.Fatalf("path %s should only expose %s, found extra method %s", p, method, gotMethod)
+			}
+		}
+	}
+
+	recoverOp := paths["/v1/planner/checkpoints/recover"].(map[string]any)["post"].(map[string]any)
+	if recoverOp["requestBody"] == nil {
+		t.Fatal("recover endpoint should include a request body schema")
+	}
+	responses := recoverOp["responses"].(map[string]any)
+	okResp := responses["200"].(map[string]any)
+	content := okResp["content"].(map[string]any)
+	appJSON := content["application/json"].(map[string]any)
+	schema := appJSON["schema"].(map[string]any)
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"prompt", "recovery_plan", "checkpoint"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("recover response schema missing %s", field)
 		}
 	}
 }
