@@ -259,7 +259,7 @@ func (g *Gateway) handlePlannerCheckpointRecover(w http.ResponseWriter, r *http.
 		return
 	}
 	if req.Action == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "unsupported recovery action")
+		apperror.WriteCode(w, apperror.CodeBadRequest, unsupportedCheckpointActionMessage())
 		return
 	}
 
@@ -317,7 +317,7 @@ func (g *Gateway) handlePlannerCheckpointResumeTask(w http.ResponseWriter, r *ht
 		return
 	}
 	if req.Action == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "unsupported recovery action")
+		apperror.WriteCode(w, apperror.CodeBadRequest, unsupportedCheckpointActionMessage())
 		return
 	}
 
@@ -424,7 +424,7 @@ func (g *Gateway) handlePlannerCheckpointResumePlan(w http.ResponseWriter, r *ht
 		return
 	}
 	if req.Action == "" {
-		apperror.WriteCode(w, apperror.CodeBadRequest, "unsupported recovery action")
+		apperror.WriteCode(w, apperror.CodeBadRequest, unsupportedCheckpointActionMessage())
 		return
 	}
 	cp, ok, err := g.findPlannerCheckpoint(r, req.PlanID)
@@ -1331,6 +1331,10 @@ func parseBoolQuery(raw string) bool {
 
 func normalizeCheckpointAction(raw string) string {
 	return planner.NormalizeCheckpointResumeAction(raw)
+}
+
+func unsupportedCheckpointActionMessage() string {
+	return "unsupported recovery action; use continue, retry_failed, or partial"
 }
 
 func summarizePlannerCheckpoint(cp planner.LongHorizonCheckpoint, includeSnapshot bool) plannerCheckpointSummary {
