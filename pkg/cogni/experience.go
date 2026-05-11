@@ -109,7 +109,31 @@ func (es *ExperienceStore) AddToolMemory(exp ToolExperience) {
 		exp.CreatedAt = time.Now()
 	}
 	exp.LastUsed = time.Now()
-	exp.UsedCount = 1
+	if exp.UsedCount <= 0 {
+		exp.UsedCount = 1
+	}
+
+	for i := range es.toolMemory {
+		existing := &es.toolMemory[i]
+		if existing.Tool == exp.Tool && existing.Context == exp.Context && existing.Learned == exp.Learned {
+			existing.UsedCount += exp.UsedCount
+			existing.LastUsed = exp.LastUsed
+			if exp.Confidence > existing.Confidence {
+				existing.Confidence = exp.Confidence
+			}
+			if exp.SuccessRate > 0 {
+				existing.SuccessRate = exp.SuccessRate
+			}
+			if exp.Result != "" {
+				existing.Result = exp.Result
+			}
+			if exp.VerifiedBy != "" {
+				existing.VerifiedBy = exp.VerifiedBy
+			}
+			es.persist()
+			return
+		}
+	}
 
 	es.toolMemory = append(es.toolMemory, exp)
 	es.persist()
@@ -198,7 +222,19 @@ func (es *ExperienceStore) AddFact(fact DomainFact) {
 		fact.CreatedAt = time.Now()
 	}
 	fact.LastUsed = time.Now()
-	fact.UsedCount = 1
+	if fact.UsedCount <= 0 {
+		fact.UsedCount = 1
+	}
+
+	for i := range es.facts {
+		existing := &es.facts[i]
+		if existing.Fact == fact.Fact && existing.Source == fact.Source {
+			existing.UsedCount += fact.UsedCount
+			existing.LastUsed = fact.LastUsed
+			es.persist()
+			return
+		}
+	}
 
 	// Enforce max facts
 	if len(es.facts) >= es.cfg.MaxFacts {
