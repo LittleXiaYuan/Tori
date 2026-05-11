@@ -359,6 +359,10 @@
       "types": "./src/plugins.ts",
       "import": "./src/plugins.ts"
     },
+    "./plugin-catalog": {
+      "types": "./src/plugin-catalog.ts",
+      "import": "./src/plugin-catalog.ts"
+    },
     "./connectors": {
       "types": "./src/connectors.ts",
       "import": "./src/connectors.ts"
@@ -491,6 +495,7 @@
   },
   "sideEffects": false
 }
+
 
 
 
