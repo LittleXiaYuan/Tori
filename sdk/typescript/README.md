@@ -62,6 +62,7 @@ import { createKnowledgeClient } from "yunque-client/knowledge";
 import { createProvidersClient } from "yunque-client/providers";
 import { createSetupClient } from "yunque-client/setup";
 import { createDocumentsClient } from "yunque-client/documents";
+import { createApprovalsClient } from "yunque-client/approvals";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -163,13 +164,23 @@ await documents.generateDocx({
   title: "技术蓝图摘要",
   content: "# 云雀技术蓝图摘要\n\nPlanner、任务、记忆与知识库已经拆成增量 SDK。",
 });
+
+const approvals = createApprovalsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+const pending = await approvals.pending();
+if (pending.approvals[0]) {
+  await approvals.decide(pending.approvals[0].id, "allow_once");
+}
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
-`providers`/`setup`/`documents` without importing the generated 500KB+ SDK/types
-bundle. Add future slices in the same style when those surfaces need stable,
-lightweight integration APIs.
+`providers`/`setup`/`documents`/`approvals` without importing the generated
+500KB+ SDK/types bundle. Add future slices in the same style when those surfaces
+need stable, lightweight integration APIs.
 
 ## Regenerating
 
@@ -203,6 +214,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/providers.ts` | Lightweight hand-written LLM provider/model configuration slice |
 | `src/setup.ts` | Lightweight hand-written first-run setup/configuration wizard slice |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
+| `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
