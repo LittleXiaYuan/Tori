@@ -92,6 +92,7 @@ import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
 import { createTriggersClient } from "yunque-client/triggers";
 import { createMissionsClient } from "yunque-client/missions";
+import { createToolsClient } from "yunque-client/tools";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -437,13 +438,20 @@ const missions = createMissionsClient({
 });
 const mission = await missions.parse("每天早上总结昨天的任务");
 console.log(mission.type);
+
+const tools = createToolsClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const sessions = await tools.list();
+console.log(sessions.sessions.length);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -509,6 +517,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
 | `src/triggers.ts` | Lightweight hand-written legacy and v2 trigger CRUD, emit, runs, and events slice |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
+| `src/tools.ts` | Lightweight hand-written guarded process execution sessions list/poll/kill slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
