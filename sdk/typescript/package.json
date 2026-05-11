@@ -147,6 +147,10 @@
       "types": "./src/knowledge-sources.ts",
       "import": "./src/knowledge-sources.ts"
     },
+    "./knowledge-import": {
+      "types": "./src/knowledge-import.ts",
+      "import": "./src/knowledge-import.ts"
+    },
     "./providers": {
       "types": "./src/providers.ts",
       "import": "./src/providers.ts"
