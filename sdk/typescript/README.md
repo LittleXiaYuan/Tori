@@ -110,6 +110,7 @@ import { createEmbeddingsClient } from "yunque-client/embeddings";
 import { createSearchClient } from "yunque-client/search";
 import { createInteractionsClient } from "yunque-client/interactions";
 import { createEmotionClient } from "yunque-client/emotion";
+import { createReactionsClient } from "yunque-client/reactions";
 import { createInstructionsClient } from "yunque-client/instructions";
 import { createRBACClient } from "yunque-client/rbac";
 import { createMemoryClient } from "yunque-client/memory";
@@ -783,7 +784,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `instructions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`breaker`/`models`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -833,6 +834,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/search.ts` | Lightweight search facade for `/v1/search` and `/v1/search/providers` without full SDK import |
 | `src/interactions.ts` | Lightweight hand-written emotion history, stickers, instructions, reactions, and sticker sending slice |
 | `src/emotion.ts` | Lightweight emotion history/sticker mapping facade for `/v1/emotion/*` without full SDK import |
+| `src/reactions.ts` | Lightweight reaction/sticker sending facade for `/v1/react` and `/v1/sticker/send` without full SDK import |
 | `src/instructions.ts` | Lightweight user-instructions facade for `/v1/instructions*` without full SDK import |
 | `src/rbac.ts` | Lightweight hand-written RBAC roles, assignments, and permission-check slice |
 | `src/memory.ts` | Lightweight hand-written Memory stats/search/add/compact slice |
