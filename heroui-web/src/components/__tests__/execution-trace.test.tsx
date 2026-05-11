@@ -176,7 +176,7 @@ describe("ExecutionTrace detail cards", () => {
     fireEvent.click(screen.getByText("内部状态已记录"));
 
     expect(screen.getByText(/响应暂时超时，已保留现场/)).toBeInTheDocument();
-    expect(screen.getByText(/任务暂时没有完成，已保留现场/)).toBeInTheDocument();
+    expect(screen.getByText(/所有可用模型通道暂时失败，已保留现场/)).toBeInTheDocument();
     expect(screen.queryByText(/context deadline exceeded|handoff agent|all fallback|EOF/)).toBeNull();
   });
 
@@ -229,7 +229,7 @@ describe("ExecutionTrace detail cards", () => {
     expect(screen.getByText("失败模式：模型或子任务响应不稳定")).toBeInTheDocument();
     expect(screen.getByText(/推荐策略：先返回阶段结果或切为后台任务/)).toBeInTheDocument();
     expect(screen.getByText(/响应暂时超时，已保留现场/)).toBeInTheDocument();
-    expect(screen.getByText(/任务暂时没有完成，已保留现场/)).toBeInTheDocument();
+    expect(screen.getByText(/所有可用模型通道暂时失败，已保留现场/)).toBeInTheDocument();
     expect(screen.queryByText(/context deadline exceeded|all fallback|EOF/)).toBeNull();
 
     fireEvent.click(screen.getByText("换策略继续"));

@@ -14,6 +14,9 @@ function friendlyKnownError(message: string): string {
   if (/当前模型响应失败|备用模型|调用栈降级|级联唤醒/i.test(message)) {
     return "模型暂时没有回应，已保留现场，正在换用可用模型继续。";
   }
+  if (/all fallback llm clients failed|moonshot.*EOF|Post .*\/chat\/completions.*EOF/i.test(message)) {
+    return "所有可用模型通道暂时失败，已保留现场；可以稍后重试，或先切换模型/供应商继续。";
+  }
   if (/context canceled|context cancelled|连接中断|连接已断开/i.test(message)) {
     return "连接暂时中断，已保留现场，可稍后继续或先查看阶段结果。";
   }
@@ -29,7 +32,7 @@ function friendlyKnownError(message: string): string {
   if (/tool panic|panic/i.test(message)) {
     return "工具运行时遇到异常，已保留现场，可重试或切换策略继续。";
   }
-  if (/execution failed|handoff agent|all fallback llm clients failed|EOF/i.test(message)) {
+  if (/execution failed|handoff agent|EOF/i.test(message)) {
     return "任务暂时没有完成，已保留现场，可切换策略或稍后继续。";
   }
   return "";
