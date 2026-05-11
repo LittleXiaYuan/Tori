@@ -371,6 +371,10 @@
       "types": "./src/plugin-files.ts",
       "import": "./src/plugin-files.ts"
     },
+    "./plugin-crud": {
+      "types": "./src/plugin-crud.ts",
+      "import": "./src/plugin-crud.ts"
+    },
     "./connectors": {
       "types": "./src/connectors.ts",
       "import": "./src/connectors.ts"
@@ -503,6 +507,7 @@
   },
   "sideEffects": false
 }
+
 
 
 
