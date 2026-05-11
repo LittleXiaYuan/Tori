@@ -6,6 +6,8 @@ const outDir = ".tmp/incremental-tests";
 rmSync(outDir, { recursive: true, force: true });
 
 const sources = [
+  "src/auth.ts",
+  "src/auth.test.ts",
   "src/planner-recovery.ts",
   "src/planner-recovery.test.ts",
   "src/chat.ts",
@@ -129,6 +131,7 @@ if (compile.error || compile.status !== 0) {
 }
 
 for (const testName of [
+  "auth.test",
   "planner-recovery.test",
   "chat.test",
   "conversations.test",
@@ -180,6 +183,7 @@ for (const testName of [
   const compiledTestPath = join(outDir, `${testName}.js`);
   let compiledTest = readFileSync(compiledTestPath, "utf8");
   compiledTest = compiledTest
+    .replace('from "./auth"', 'from "./auth.js"')
     .replace('from "./planner-recovery"', 'from "./planner-recovery.js"')
     .replace('from "./chat"', 'from "./chat.js"')
     .replace('from "./conversations"', 'from "./conversations.js"')
