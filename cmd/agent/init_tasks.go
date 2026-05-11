@@ -187,9 +187,13 @@ func initTasks(app *agentrt.App) error {
 	slog.Info("recommendation engine initialized", "items", len(app.SkillRegistry.All()))
 
 	qlActions := []string{"priority_high", "priority_normal", "priority_low", "defer"}
-	qlAgent := rlsched.NewQLearner(rlsched.DefaultQLearnerConfig(qlActions))
-	app.Set("ql_scheduler", qlAgent)
-	slog.Info("Q-Learning scheduler initialized", "actions", len(qlActions))
+	if _, exists := app.Get("ql_scheduler"); exists {
+		slog.Info("Q-Learning scheduler already initialized and wired", "actions", len(qlActions))
+	} else {
+		qlAgent := rlsched.NewQLearner(rlsched.DefaultQLearnerConfig(qlActions))
+		app.Set("ql_scheduler", qlAgent)
+		slog.Info("Q-Learning scheduler initialized", "actions", len(qlActions))
+	}
 
 	// ── Module Registry ──
 	gw.SetModuleRegistry(app.Modules, cfg.Profile)
