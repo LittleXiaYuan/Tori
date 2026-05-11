@@ -17,6 +17,7 @@
     "noEmit": true
   },
   "include": [
+    "src/auth.ts",
     "src/planner-recovery.ts",
     "src/chat.ts",
     "src/conversations.ts",

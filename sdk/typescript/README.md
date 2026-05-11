@@ -54,6 +54,7 @@ large all-in-one surface. Product integrations that only need Planner recovery
 can import the hand-written incremental slice instead:
 
 ```ts
+import { createAuthClient } from "yunque-client/auth";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createChatClient } from "yunque-client/chat";
 import { createConversationsClient } from "yunque-client/conversations";
@@ -101,6 +102,13 @@ import { createTriggersClient } from "yunque-client/triggers";
 import { createMissionsClient } from "yunque-client/missions";
 import { createToolsClient } from "yunque-client/tools";
 import { createSandboxClient } from "yunque-client/sandbox";
+
+const auth = createAuthClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const tokenExchange = await auth.generateToken({ role: "viewer" });
+console.log(tokenExchange.type);
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -528,7 +536,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
+in only `auth`, `planner-recovery`, `chat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -559,6 +567,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/client.gen.ts` | Default client instance |
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
+| `src/auth.ts` | Lightweight hand-written API-key to JWT token exchange slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
 | `src/chat.ts` | Lightweight hand-written Chat/SSE slice for incremental imports |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
