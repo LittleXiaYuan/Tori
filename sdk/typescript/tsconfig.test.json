@@ -3,7 +3,11 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -36,6 +40,7 @@
     "src/audit.ts",
     "src/heartbeat.ts",
     "src/reverie.ts",
+    "src/federation.ts",
     "src/**/*.test.ts"
   ]
 }

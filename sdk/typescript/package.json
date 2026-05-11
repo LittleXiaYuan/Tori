@@ -102,6 +102,10 @@
     "./reverie": {
       "types": "./src/reverie.ts",
       "import": "./src/reverie.ts"
+    },
+    "./federation": {
+      "types": "./src/federation.ts",
+      "import": "./src/federation.ts"
     }
   },
   "files": [
