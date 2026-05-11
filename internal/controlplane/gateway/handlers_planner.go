@@ -214,7 +214,7 @@ func (g *Gateway) handlePlannerCheckpoints(w http.ResponseWriter, r *http.Reques
 		})
 		return
 	}
-	checkpoints, err := g.planner.RecentLongHorizonCheckpoints(r.Context(), limit)
+	checkpoints, err := g.planner.RecentLongHorizonCheckpointsForTenant(r.Context(), tenantFromCtx(r.Context()), limit)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "failed to read planner checkpoints")
 		return
@@ -1290,7 +1290,7 @@ func readPlannerResumeJobs(path string) (map[string]plannerCheckpointResumePlanJ
 }
 
 func (g *Gateway) findPlannerCheckpoint(r *http.Request, planID string) (planner.LongHorizonCheckpoint, bool, error) {
-	checkpoints, err := g.planner.RecentLongHorizonCheckpoints(r.Context(), 100)
+	checkpoints, err := g.planner.RecentLongHorizonCheckpointsForTenant(r.Context(), tenantFromCtx(r.Context()), 100)
 	if err != nil {
 		return planner.LongHorizonCheckpoint{}, false, err
 	}

@@ -22,6 +22,7 @@ import (
 // to show what completed, what failed, and which step can be retried later.
 type LongHorizonCheckpoint struct {
 	PlanID       string     `json:"plan_id"`
+	TenantID     string     `json:"tenant_id,omitempty"`
 	TaskID       string     `json:"task_id,omitempty"`
 	Goal         string     `json:"goal,omitempty"`
 	Status       string     `json:"status"`
@@ -44,6 +45,7 @@ func buildLongHorizonCheckpoint(req PlanRequest, pl *plan.Plan, errText string) 
 	completed, total := pl.Progress()
 	cp := LongHorizonCheckpoint{
 		PlanID:       pl.ID,
+		TenantID:     req.TenantID,
 		TaskID:       req.TaskID,
 		Goal:         truncate(extractGoal(req), 500),
 		Status:       string(pl.Status),
@@ -118,6 +120,10 @@ type LongHorizonCheckpointStore interface {
 	Recent(ctx context.Context, limit int) ([]LongHorizonCheckpoint, error)
 }
 
+type tenantScopedLongHorizonCheckpointStore interface {
+	RecentForTenant(ctx context.Context, tenantID string, limit int) ([]LongHorizonCheckpoint, error)
+}
+
 // FileLongHorizonCheckpointStore appends checkpoints as JSONL under the local
 // data directory. It intentionally stays append-only: the newest line is the
 // source of truth, while older lines remain useful for debugging/replay.
@@ -163,9 +169,18 @@ func (s *FileLongHorizonCheckpointStore) Save(ctx context.Context, cp LongHorizo
 }
 
 func (s *FileLongHorizonCheckpointStore) Recent(ctx context.Context, limit int) ([]LongHorizonCheckpoint, error) {
+	return s.recent(ctx, "", limit, false)
+}
+
+func (s *FileLongHorizonCheckpointStore) RecentForTenant(ctx context.Context, tenantID string, limit int) ([]LongHorizonCheckpoint, error) {
+	return s.recent(ctx, tenantID, limit, true)
+}
+
+func (s *FileLongHorizonCheckpointStore) recent(ctx context.Context, tenantID string, limit int, filterTenant bool) ([]LongHorizonCheckpoint, error) {
 	if s == nil || s.path == "" {
 		return nil, nil
 	}
+	tenantID = strings.TrimSpace(tenantID)
 	if limit <= 0 {
 		limit = 20
 	}
@@ -189,6 +204,9 @@ func (s *FileLongHorizonCheckpointStore) Recent(ctx context.Context, limit int) 
 		}
 		var cp LongHorizonCheckpoint
 		if err := json.Unmarshal(scanner.Bytes(), &cp); err == nil && cp.PlanID != "" {
+			if filterTenant && strings.TrimSpace(cp.TenantID) != tenantID {
+				continue
+			}
 			all = append(all, cp)
 		}
 	}
@@ -205,13 +223,18 @@ func (s *FileLongHorizonCheckpointStore) Recent(ctx context.Context, limit int) 
 	seen := make(map[string]bool, len(all))
 	for i := len(all) - 1; i >= 0 && len(recent) < limit; i-- {
 		cp := all[i]
-		if seen[cp.PlanID] {
+		key := longHorizonCheckpointDedupKey(cp)
+		if seen[key] {
 			continue
 		}
-		seen[cp.PlanID] = true
+		seen[key] = true
 		recent = append(recent, cp)
 	}
 	return recent, nil
+}
+
+func longHorizonCheckpointDedupKey(cp LongHorizonCheckpoint) string {
+	return strings.TrimSpace(cp.TenantID) + "\x00" + strings.TrimSpace(cp.PlanID)
 }
 
 func (p *Planner) SetLongHorizonCheckpointStore(store LongHorizonCheckpointStore) {
@@ -227,6 +250,34 @@ func (p *Planner) RecentLongHorizonCheckpoints(ctx context.Context, limit int) (
 		return nil, nil
 	}
 	return p.longHorizonCheckpoints.Recent(ctx, limit)
+}
+
+func (p *Planner) RecentLongHorizonCheckpointsForTenant(ctx context.Context, tenantID string, limit int) ([]LongHorizonCheckpoint, error) {
+	if p == nil || p.longHorizonCheckpoints == nil {
+		return nil, nil
+	}
+	tenantID = strings.TrimSpace(tenantID)
+	if scoped, ok := p.longHorizonCheckpoints.(tenantScopedLongHorizonCheckpointStore); ok {
+		return scoped.RecentForTenant(ctx, tenantID, limit)
+	}
+	scanLimit := limit
+	if scanLimit < 100 {
+		scanLimit = 100
+	}
+	checkpoints, err := p.longHorizonCheckpoints.Recent(ctx, scanLimit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]LongHorizonCheckpoint, 0, len(checkpoints))
+	for _, cp := range checkpoints {
+		if strings.TrimSpace(cp.TenantID) == tenantID {
+			out = append(out, cp)
+			if limit > 0 && len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
 }
 
 func (p *Planner) persistLongHorizonCheckpoint(req PlanRequest, cp LongHorizonCheckpoint) {
