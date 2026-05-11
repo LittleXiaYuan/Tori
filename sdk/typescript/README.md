@@ -182,6 +182,7 @@ import { createPluginsClient } from "yunque-client/plugins";
 import { createConnectorsClient } from "yunque-client/connectors";
 import { createConnectorCatalogClient } from "yunque-client/connector-catalog";
 import { createConnectorAuthClient } from "yunque-client/connector-auth";
+import { createConnectorActionsClient } from "yunque-client/connector-actions";
 import { createNotifyClient } from "yunque-client/notify";
 import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
@@ -411,11 +412,17 @@ const connectorAuth = createConnectorAuthClient({
 });
 await connectorAuth.disconnect("github");
 
+const connectorActions = createConnectorActionsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await connectorActions.execute({ connector_id: "github", action_id: "list_issues" });
+
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
-await connectors.execute({ connector_id: "github", action_id: "list_issues" });
+await connectors.detail("github");
 
 const notifyShare = createNotifyShareClient({
   baseUrl: "http://localhost:9090",
@@ -1167,6 +1174,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/connector-catalog.ts` | Lightweight connector list/detail catalog facade without full SDK import |
 | `src/connector-auth.ts` | Lightweight connector connect/disconnect facade without full SDK import |
+| `src/connector-actions.ts` | Lightweight connector action execution facade without full SDK import |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
 | `src/notify-share.ts` | Lightweight notification share dispatch facade without full SDK import |
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |
