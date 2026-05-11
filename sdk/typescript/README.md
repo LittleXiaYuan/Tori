@@ -93,6 +93,7 @@ import { createStateClient } from "yunque-client/state";
 import { createTriggersClient } from "yunque-client/triggers";
 import { createMissionsClient } from "yunque-client/missions";
 import { createToolsClient } from "yunque-client/tools";
+import { createSandboxClient } from "yunque-client/sandbox";
 
 const planner = createPlannerRecoveryClient({
   baseUrl: "http://localhost:9090",
@@ -445,13 +446,20 @@ const tools = createToolsClient({
 });
 const sessions = await tools.list();
 console.log(sessions.sessions.length);
+
+const sandbox = createSandboxClient({
+  baseUrl: "http://localhost:9090",
+  token: "<admin-jwt>",
+});
+const sandboxStatus = await sandbox.probe();
+console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `planner-recovery`, `chat`, `memory`, `tasks`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -518,6 +526,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/triggers.ts` | Lightweight hand-written legacy and v2 trigger CRUD, emit, runs, and events slice |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
 | `src/tools.ts` | Lightweight hand-written guarded process execution sessions list/poll/kill slice |
+| `src/sandbox.ts` | Lightweight hand-written sandbox exec, cloud probe, and desktop lifecycle slice |
 | `openapi-ts.config.ts` | Generator configuration |
 | `tsconfig.json` | TypeScript compiler config (`DOM.Iterable` required for `Headers.entries`) |
 
