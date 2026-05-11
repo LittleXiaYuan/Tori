@@ -89,6 +89,36 @@ func TestHandleExperiencesLimitAppliesAfterFilters(t *testing.T) {
 	}
 }
 
+func TestHandleExperiencesFiltersByTag(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "low-quality", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "low quality lesson", Tags: []string{"quality:4", "outcome:partial"}})
+	store.Add(reflectpkg.Experience{ID: "high-quality", Source: "task", Category: "strategy", Outcome: "success", Lesson: "high quality lesson", Tags: []string{"quality:9", "outcome:success"}})
+	store.Add(reflectpkg.Experience{ID: "chat-high", Source: "interaction", Category: "strategy", Outcome: "success", Lesson: "chat high lesson", Tags: []string{"quality:9", "outcome:success"}})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?source=task&tag=quality:9", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Experiences []reflectpkg.Experience `json:"experiences"`
+		Total       int                     `json:"total"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 || len(body.Experiences) != 1 {
+		t.Fatalf("expected one tag-filtered experience, got total=%d entries=%d body=%s", body.Total, len(body.Experiences), rec.Body.String())
+	}
+	if body.Experiences[0].ID != "high-quality" {
+		t.Fatalf("unexpected experience id %q", body.Experiences[0].ID)
+	}
+}
+
 func TestHandleStrategiesRespectsLimit(t *testing.T) {
 	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
 	store.Add(reflectpkg.Experience{ID: "first", Outcome: "success", Lesson: "first strategy lesson should appear in compiled hints"})
@@ -144,5 +174,31 @@ func TestHandleExperienceStatsRespectsFilters(t *testing.T) {
 	}
 	if body.ByOutcome["failure"] != 0 || body.BySource["interaction"] != 0 {
 		t.Fatalf("stats leaked filtered experiences: %+v", body)
+	}
+}
+
+func TestHandleExperienceStatsRespectsTagFilter(t *testing.T) {
+	store := reflectpkg.NewExperienceStore(filepath.Join(t.TempDir(), "experiences.json"))
+	store.Add(reflectpkg.Experience{ID: "ok", Source: "task", Category: "strategy", Outcome: "success", Lesson: "ok lesson", Tags: []string{"quality:9"}})
+	store.Add(reflectpkg.Experience{ID: "partial", Source: "task", Category: "strategy", Outcome: "partial", Lesson: "partial lesson", Tags: []string{"quality:5"}})
+
+	g := &Gateway{experienceStore: store}
+	req := httptest.NewRequest(http.MethodGet, "/v1/reflect/experiences?stats=true&tag=quality:9", nil)
+	rec := httptest.NewRecorder()
+
+	g.handleExperiences(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body reflectpkg.ExperienceStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Total != 1 || body.ByOutcome["success"] != 1 {
+		t.Fatalf("unexpected tag-filtered stats: %+v", body)
+	}
+	if body.ByOutcome["partial"] != 0 {
+		t.Fatalf("stats leaked non-matching tag: %+v", body)
 	}
 }

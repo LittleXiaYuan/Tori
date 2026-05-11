@@ -354,13 +354,14 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	source := r.URL.Query().Get("source")
 	category := r.URL.Query().Get("category")
 	outcome := r.URL.Query().Get("outcome")
+	tag := r.URL.Query().Get("tag")
 	limit := reflectExperienceLimit(r, 0)
 
 	// Stats mode supports the same filters as list/search so dashboards can ask
 	// for scoped counters without fetching the full experience list.
 	if r.URL.Query().Get("stats") == "true" {
 		all := g.experienceStore.All()
-		st := summarizeReflectExperiences(filterReflectExperiences(all, source, category, outcome))
+		st := summarizeReflectExperiences(filterReflectExperiences(all, source, category, outcome, tag))
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(st)
 		return
@@ -374,7 +375,7 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 		if limit > searchLimit {
 			searchLimit = limit
 		}
-		results := limitReflectExperiences(filterReflectExperiences(g.experienceStore.Search(query, searchLimit), source, category, outcome), limit)
+		results := limitReflectExperiences(filterReflectExperiences(g.experienceStore.Search(query, searchLimit), source, category, outcome, tag), limit)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": results, "total": len(results)})
 		return
@@ -383,8 +384,8 @@ func (g *Gateway) handleExperiences(w http.ResponseWriter, r *http.Request) {
 	// List all
 	all := g.experienceStore.All()
 	// Apply filters
-	if source != "" || category != "" || outcome != "" {
-		filtered := limitReflectExperiences(filterReflectExperiences(all, source, category, outcome), limit)
+	if source != "" || category != "" || outcome != "" || tag != "" {
+		filtered := limitReflectExperiences(filterReflectExperiences(all, source, category, outcome, tag), limit)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"experiences": filtered, "total": len(filtered)})
 		return
@@ -410,8 +411,8 @@ func reflectExperienceLimit(r *http.Request, fallback int) int {
 	return limit
 }
 
-func filterReflectExperiences(experiences []reflectpkg.Experience, source, category, outcome string) []reflectpkg.Experience {
-	if source == "" && category == "" && outcome == "" {
+func filterReflectExperiences(experiences []reflectpkg.Experience, source, category, outcome, tag string) []reflectpkg.Experience {
+	if source == "" && category == "" && outcome == "" && tag == "" {
 		return experiences
 	}
 	filtered := make([]reflectpkg.Experience, 0, len(experiences))
@@ -425,9 +426,21 @@ func filterReflectExperiences(experiences []reflectpkg.Experience, source, categ
 		if outcome != "" && e.Outcome != outcome {
 			continue
 		}
+		if tag != "" && !reflectExperienceHasTag(e, tag) {
+			continue
+		}
 		filtered = append(filtered, e)
 	}
 	return filtered
+}
+
+func reflectExperienceHasTag(e reflectpkg.Experience, tag string) bool {
+	for _, t := range e.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 func limitReflectExperiences(experiences []reflectpkg.Experience, limit int) []reflectpkg.Experience {
