@@ -30,6 +30,10 @@
     "./knowledge": {
       "types": "./src/knowledge.ts",
       "import": "./src/knowledge.ts"
+    },
+    "./providers": {
+      "types": "./src/providers.ts",
+      "import": "./src/providers.ts"
     }
   },
   "files": [

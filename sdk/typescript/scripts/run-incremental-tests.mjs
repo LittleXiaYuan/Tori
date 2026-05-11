@@ -16,6 +16,8 @@ const sources = [
   "src/tasks.test.ts",
   "src/knowledge.ts",
   "src/knowledge.test.ts",
+  "src/providers.ts",
+  "src/providers.test.ts",
 ];
 
 const compile = spawnSync(
@@ -44,7 +46,14 @@ if (compile.error || compile.status !== 0) {
   process.exit(compile.status ?? 1);
 }
 
-for (const testName of ["planner-recovery.test", "chat.test", "memory.test", "tasks.test", "knowledge.test"]) {
+for (const testName of [
+  "planner-recovery.test",
+  "chat.test",
+  "memory.test",
+  "tasks.test",
+  "knowledge.test",
+  "providers.test",
+]) {
   const compiledTestPath = join(outDir, `${testName}.js`);
   let compiledTest = readFileSync(compiledTestPath, "utf8");
   compiledTest = compiledTest
@@ -52,7 +61,8 @@ for (const testName of ["planner-recovery.test", "chat.test", "memory.test", "ta
     .replace('from "./chat"', 'from "./chat.js"')
     .replace('from "./memory"', 'from "./memory.js"')
     .replace('from "./tasks"', 'from "./tasks.js"')
-    .replace('from "./knowledge"', 'from "./knowledge.js"');
+    .replace('from "./knowledge"', 'from "./knowledge.js"')
+    .replace('from "./providers"', 'from "./providers.js"');
   writeFileSync(compiledTestPath, compiledTest);
 
   const run = spawnSync(process.execPath, [compiledTestPath], { stdio: "inherit" });
