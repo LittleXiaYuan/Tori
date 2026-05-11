@@ -227,14 +227,16 @@ func (es *ExperienceStore) DomainFacts() []DomainFact {
 // based on relevant accumulated experience. The message is used to find
 // the most relevant experience entries.
 func (es *ExperienceStore) ContextHints(_ context.Context, message string) string {
-	es.mu.RLock()
-	defer es.mu.RUnlock()
+	es.mu.Lock()
+	defer es.mu.Unlock()
 
 	var parts []string
 	now := time.Now()
+	used := false
 
 	// Relevant tool experiences
-	for _, tm := range es.toolMemory {
+	for i := range es.toolMemory {
+		tm := &es.toolMemory[i]
 		if tm.Learned == "" || tm.Confidence < es.cfg.MinConfidence {
 			continue
 		}
@@ -244,13 +246,17 @@ func (es *ExperienceStore) ContextHints(_ context.Context, message string) strin
 		}
 		if strings.Contains(strings.ToLower(message), strings.ToLower(tm.Tool)) ||
 			strings.Contains(strings.ToLower(message), strings.ToLower(tm.Context)) {
+			tm.UsedCount++
+			tm.LastUsed = now
+			used = true
 			parts = append(parts, fmt.Sprintf("- [工具经验] %s: %s (置信度: %.0f%%)",
 				tm.Tool, tm.Learned, tm.Confidence*100))
 		}
 	}
 
 	// Confirmed behavior patterns
-	for _, p := range es.patterns {
+	for i := range es.patterns {
+		p := &es.patterns[i]
 		if !p.Confirmed {
 			continue
 		}
@@ -259,6 +265,9 @@ func (es *ExperienceStore) ContextHints(_ context.Context, message string) strin
 			continue
 		}
 		if strings.Contains(strings.ToLower(message), strings.ToLower(p.Trigger)) {
+			p.UsedCount++
+			p.LastUsed = now
+			used = true
 			parts = append(parts, fmt.Sprintf("- [行为模式] 当 \"%s\" → %s (成功率: %.0f%%)",
 				p.Trigger, p.Response, p.SuccessRate*100))
 		}
@@ -266,7 +275,8 @@ func (es *ExperienceStore) ContextHints(_ context.Context, message string) strin
 
 	// Domain facts (top 5 most relevant)
 	factCount := 0
-	for _, f := range es.facts {
+	for i := range es.facts {
+		f := &es.facts[i]
 		if factCount >= 5 {
 			break
 		}
@@ -274,7 +284,10 @@ func (es *ExperienceStore) ContextHints(_ context.Context, message string) strin
 		if weight < 0.1 {
 			continue
 		}
-		if strings.Contains(strings.ToLower(message), strings.ToLower(f.Fact[:min(len(f.Fact), 20)])) {
+		if strings.Contains(strings.ToLower(message), strings.ToLower(prefixRunes(f.Fact, 20))) {
+			f.UsedCount++
+			f.LastUsed = now
+			used = true
 			parts = append(parts, fmt.Sprintf("- [领域知识] %s", f.Fact))
 			factCount++
 		}
@@ -282,6 +295,9 @@ func (es *ExperienceStore) ContextHints(_ context.Context, message string) strin
 
 	if len(parts) == 0 {
 		return ""
+	}
+	if used {
+		es.persist()
 	}
 
 	return "## 相关经验\n" + strings.Join(parts, "\n")
@@ -445,9 +461,13 @@ func readJSON(path string, v any) {
 	json.Unmarshal(data, v)
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func prefixRunes(s string, n int) string {
+	if n <= 0 {
+		return ""
 	}
-	return b
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n])
 }

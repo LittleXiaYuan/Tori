@@ -116,6 +116,52 @@ func TestExperienceStore_ContextHints(t *testing.T) {
 	}
 }
 
+func TestExperienceStore_ContextHintsMarksExperienceUsed(t *testing.T) {
+	es := NewExperienceStore("test", ExperienceConfig{
+		StoreDir:      t.TempDir(),
+		MinConfidence: 0.5,
+	})
+	old := time.Now().Add(-24 * time.Hour)
+	es.AddToolMemory(ToolExperience{
+		Tool:        "search",
+		Context:     "large query",
+		Learned:     "Paginate results",
+		Confidence:  0.9,
+		UsedCount:   1,
+		SuccessRate: 0.8,
+		LastUsed:    old,
+	})
+	es.SuggestPattern(BehaviorPattern{
+		ID:          "deploy-first",
+		Trigger:     "deploy failed",
+		Response:    "Check env vars first",
+		Confirmed:   true,
+		SuccessRate: 0.9,
+		UsedCount:   1,
+		LastUsed:    old,
+	})
+	es.AddFact(DomainFact{
+		Fact:      "青岛开源生态需要持续运营",
+		Source:    "test",
+		UsedCount: 1,
+		LastUsed:  old,
+	})
+
+	hints := es.ContextHints(context.Background(), "deploy failed: search 青岛开源生态需要持续运营")
+	if hints == "" {
+		t.Fatal("expected non-empty hints")
+	}
+	if es.toolMemory[0].UsedCount != 2 || !es.toolMemory[0].LastUsed.After(old) {
+		t.Fatalf("tool memory usage not updated: count=%d last=%s", es.toolMemory[0].UsedCount, es.toolMemory[0].LastUsed)
+	}
+	if es.patterns[0].UsedCount != 2 || !es.patterns[0].LastUsed.After(old) {
+		t.Fatalf("pattern usage not updated: count=%d last=%s", es.patterns[0].UsedCount, es.patterns[0].LastUsed)
+	}
+	if es.facts[0].UsedCount != 2 || !es.facts[0].LastUsed.After(old) {
+		t.Fatalf("fact usage not updated: count=%d last=%s", es.facts[0].UsedCount, es.facts[0].LastUsed)
+	}
+}
+
 func TestExperienceStore_ContextHints_NoMatch(t *testing.T) {
 	es := NewExperienceStore("test", ExperienceConfig{StoreDir: t.TempDir()})
 	hints := es.ContextHints(context.Background(), "unrelated query")
