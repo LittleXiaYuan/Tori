@@ -59,6 +59,7 @@
     "src/cron.ts",
     "src/skillhub.ts",
     "src/plugins.ts",
+    "src/connectors.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
     "src/state.ts",

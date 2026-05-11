@@ -179,6 +179,10 @@
       "types": "./src/plugins.ts",
       "import": "./src/plugins.ts"
     },
+    "./connectors": {
+      "types": "./src/connectors.ts",
+      "import": "./src/connectors.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"

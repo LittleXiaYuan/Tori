@@ -96,6 +96,7 @@ import { createFilesClient } from "yunque-client/files";
 import { createCronClient } from "yunque-client/cron";
 import { createSkillHubClient } from "yunque-client/skillhub";
 import { createPluginsClient } from "yunque-client/plugins";
+import { createConnectorsClient } from "yunque-client/connectors";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createStateClient } from "yunque-client/state";
@@ -190,6 +191,13 @@ const rbac = createRBACClient({
 await rbac.assignRole({ subject_id: "user-1", role_id: "operator", tenant_id: "tenant-a" });
 const permission = await rbac.check({ resource: "tasks", action: "write" });
 console.log(permission.allowed);
+
+const connectors = createConnectorsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const connectorList = await connectors.list();
+console.log(connectorList.connectors.length);
 
 const memory = createMemoryClient({
   baseUrl: "http://localhost:9090",
@@ -543,7 +551,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `planner-recovery`, `chat`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `interactions`, `rbac`, `memory`, `tasks`, `task-context`, `knowledge`, or
 `providers`/`setup`/`documents`/`approvals`/`trace`/`browser`/`runtime`/`modes`
 `/ide`/`persona`/`workflow`/`cost`/`lora`/`iterate`/`trust`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`admin`/`files`/`cron`/`skillhub`/`plugins`/`connectors`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -613,6 +621,7 @@ npm run typecheck   # should be silent (0 errors)
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |
 | `src/skillhub.ts` | Lightweight hand-written SkillHub search/install/update/policy slice |
 | `src/plugins.ts` | Lightweight hand-written plugin CRUD, files, UI tabs, reload, and folder-open slice |
+| `src/connectors.ts` | Lightweight hand-written connector catalog, auth, and action execution slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
