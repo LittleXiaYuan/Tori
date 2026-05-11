@@ -308,12 +308,14 @@ func (p *Planner) emitLongHorizonCheckpoint(req PlanRequest, pl *plan.Plan, errT
 }
 
 func normalizeCheckpointResumeAction(raw string) string {
-	switch raw {
-	case "", "continue", "resume", "resume_plan":
+	action := strings.ToLower(strings.TrimSpace(raw))
+	action = strings.ReplaceAll(action, "-", "_")
+	switch action {
+	case "", "continue", "resume", "resume_plan", "继续":
 		return "continue"
-	case "retry", "retry_failed", "retry_failed_step":
+	case "retry", "retry_failed", "retry_failed_step", "重试", "重试失败":
 		return "retry_failed"
-	case "partial", "return_partial", "return_partial_result":
+	case "partial", "return_partial", "return_partial_result", "阶段结果", "返回阶段结果":
 		return "partial"
 	default:
 		return ""
