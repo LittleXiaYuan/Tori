@@ -195,6 +195,10 @@
       "types": "./src/market.ts",
       "import": "./src/market.ts"
     },
+    "./dispatch": {
+      "types": "./src/dispatch.ts",
+      "import": "./src/dispatch.ts"
+    },
     "./graph": {
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
