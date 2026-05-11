@@ -1,4 +1,5 @@
 import { createPlannerRecoveryClient, PlannerRecoveryError } from "./planner-recovery";
+import type { CheckpointRecoveryAction, RecoveryNextAction } from "./planner-recovery";
 
 declare const process: { exitCode?: number };
 
@@ -33,6 +34,14 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
     ...init,
   });
 }
+
+const checkpointAction: CheckpointRecoveryAction = "retry_failed";
+const nextAction: RecoveryNextAction = "inspect_dependencies";
+void checkpointAction;
+void nextAction;
+// @ts-expect-error checkpoint resume requests only accept canonical resume actions.
+const invalidCheckpointAction: CheckpointRecoveryAction = "inspect_dependencies";
+void invalidCheckpointAction;
 
 test("PlannerRecoveryClient lists checkpoints with auth and query params", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
