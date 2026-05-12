@@ -160,6 +160,49 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestChatHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/chat":
+			_, _ = w.Write([]byte(`{"reply":"basic"}`))
+		case "/v1/chat/agentic":
+			_, _ = w.Write([]byte(`{"reply":"agentic"}`))
+		default:
+			t.Fatalf("unexpected request: %s", r.URL.Path)
+		}
+	})
+
+	request := ChatRequest{Messages: []ChatMessage{{Role: "user", Content: "hi"}}, SessionID: "s1"}
+	basic, err := ChatSDK.Send(context.Background(), request)
+	if err != nil || basic["reply"] != "basic" {
+		t.Fatalf("unexpected basic chat: %+v err=%v", basic, err)
+	}
+	agentic, err := ChatSDK.Agentic(context.Background(), request)
+	if err != nil || agentic["reply"] != "agentic" {
+		t.Fatalf("unexpected agentic chat: %+v err=%v", agentic, err)
+	}
+	if ChatSDK.StreamURL() != strings.TrimRight(apiBase, "/")+"/v1/chat/stream" {
+		t.Fatalf("unexpected stream URL: %s", ChatSDK.StreamURL())
+	}
+	streamReq := ChatSDK.StreamRequest(request)
+	if !streamReq.Stream {
+		t.Fatalf("stream request should set stream=true")
+	}
+	items := ChatSDK.ParseStream("event: message\ndata: {\"type\":\"delta\",\"content\":\"你\"}\n\nevent: error\ndata: {\"error\":\"bad\"}\n\n")
+	if len(items) != 2 || items[0].Kind != "delta" || items[0].Content != "你" || items[1].Kind != "error" {
+		t.Fatalf("unexpected stream items: %+v", items)
+	}
+	if NewAgentKit().Chat != ChatSDK {
+		t.Fatalf("agent kit should reuse Chat namespace")
+	}
+	if len(seen) != 2 {
+		t.Fatalf("expected 2 requests, got %d", len(seen))
+	}
+}
+
 func TestRealtimeHelpers(t *testing.T) {
 	oldBase, oldToken := apiBase, pluginToken
 	apiBase, pluginToken = "https://agent.example/", "plugin-token"

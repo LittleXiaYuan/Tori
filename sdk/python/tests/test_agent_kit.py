@@ -66,6 +66,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"running": True}
             if path == "/v1/reverie/stats":
                 return {"total": 2}
+            if path == "/v1/chat":
+                return {"reply": "hello from chat"}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -98,6 +100,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.events.parse("event: connected\ndata: {\"ok\":true}\n\n")[0]["data"]["ok"], True)
             self.assertEqual(kit.reverie.stats()["total"], 2)
             self.assertEqual(kit.realtime.parse(kit.realtime.serialize(kit.realtime.chat("你好", session="s1")))["session"], "s1")
+            self.assertEqual(kit.chat.send([{"role": "user", "content": "hi"}])["reply"], "hello from chat")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -125,10 +128,12 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.events, yunque.events)
         self.assertIs(kit.reverie, yunque.reverie)
         self.assertIs(kit.realtime, yunque.realtime)
+        self.assertIs(kit.chat, yunque.chat_sdk)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
         self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))
-        self.assertEqual(calls[22], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[22], ("POST", "/v1/chat", {"messages": [{"role": "user", "content": "hi"}]}))
+        self.assertEqual(calls[23], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

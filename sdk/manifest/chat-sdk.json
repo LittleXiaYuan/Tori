@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "domain": "chat-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/chat, /v1/chat/stream, and /v1/chat/agentic so external chat panes, plugin UIs, CLIs, sidecars, and automation scripts can talk to the agent without importing the full platform client.",
+  "principles": [
+    "Expose basic, streaming, and agentic chat as a focused SDK slice for external interactive surfaces.",
+    "Keep chat request construction and stream parsing directly callable without coupling callers to generated SDK internals.",
+    "Make Chat access available through Agent Kit for one-stop lightweight interaction workflows."
+  ],
+  "routes": ["POST /v1/chat", "POST /v1/chat/stream", "POST /v1/chat/agentic"],
+  "capabilities": [
+    { "name": "send", "route": "POST /v1/chat", "readOnly": false, "description": "Send a basic chat request." },
+    { "name": "stream", "route": "POST /v1/chat/stream", "readOnly": false, "description": "Open a streaming chat request or construct the stream endpoint/request." },
+    { "name": "agentic", "route": "POST /v1/chat/agentic", "readOnly": false, "description": "Send an agentic planning chat request." },
+    { "name": "parseStream", "route": "local parse", "readOnly": true, "description": "Parse chat SSE frames into lightweight stream items." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/chat.ts", "sdk/typescript/src/chat-basic.ts", "sdk/typescript/src/chat-stream.ts", "sdk/typescript/src/chat-agentic.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": { "send": "createChatClient().send", "stream": "createChatClient().stream", "agentic": "createChatClient().agentic", "parseStream": "createChatClient().parseStream" }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": { "send": "yunque.ChatSDK.Send", "stream": "yunque.ChatSDK.StreamURL", "agentic": "yunque.ChatSDK.Agentic", "parseStream": "yunque.ChatSDK.ParseStream" }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": { "send": "yunque.chat_sdk.send", "stream": "yunque.chat_sdk.stream_url", "agentic": "yunque.chat_sdk.agentic", "parseStream": "yunque.chat_sdk.parse_stream" }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": { "send": "ChatClient::send", "stream": "ChatClient::stream_url", "agentic": "ChatClient::agentic", "parseStream": "ChatClient::parse_stream" }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

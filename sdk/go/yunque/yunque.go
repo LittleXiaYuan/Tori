@@ -320,6 +320,7 @@ type AgentKit struct {
 	Events       *eventsNamespace
 	Reverie      *reverieNamespace
 	Realtime     *realtimeNamespace
+	Chat         *chatNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1831,6 +1832,9 @@ var Reverie = &reverieNamespace{}
 // Realtime provides focused access to /v1/ws URL construction and message helpers.
 var Realtime = &realtimeNamespace{}
 
+// ChatSDK provides focused access to /v1/chat, /v1/chat/stream, and /v1/chat/agentic.
+var ChatSDK = &chatNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2731,6 +2735,93 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Chat Runtime ──
+
+type chatNamespace struct{}
+
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+	Name    string `json:"name,omitempty"`
+}
+
+type ChatRequest struct {
+	Messages      []ChatMessage `json:"messages"`
+	SessionID     string        `json:"session_id,omitempty"`
+	TaskID        string        `json:"task_id,omitempty"`
+	ClassID       string        `json:"class_id,omitempty"`
+	TeacherID     string        `json:"teacher_id,omitempty"`
+	StudentID     string        `json:"student_id,omitempty"`
+	Platform      string        `json:"platform,omitempty"`
+	ThinkingLevel string        `json:"thinking_level,omitempty"`
+	Stream        bool          `json:"stream,omitempty"`
+}
+
+type ChatResponse map[string]any
+
+type ChatStreamItem struct {
+	Kind    string `json:"kind"`
+	Event   string `json:"event,omitempty"`
+	Content string `json:"content,omitempty"`
+	Message string `json:"message,omitempty"`
+	Data    any    `json:"data,omitempty"`
+	Raw     string `json:"raw,omitempty"`
+}
+
+func (c *chatNamespace) Send(ctx context.Context, request ChatRequest) (ChatResponse, error) {
+	var out ChatResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/chat", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatNamespace) Agentic(ctx context.Context, request ChatRequest) (ChatResponse, error) {
+	var out ChatResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/chat/agentic", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatNamespace) StreamURL() string {
+	return strings.TrimRight(apiBase, "/") + "/v1/chat/stream"
+}
+
+func (c *chatNamespace) StreamRequest(request ChatRequest) ChatRequest {
+	request.Stream = true
+	return request
+}
+
+func (c *chatNamespace) ParseStream(text string) []ChatStreamItem {
+	messages := Events.Parse(text)
+	out := make([]ChatStreamItem, 0, len(messages))
+	for _, message := range messages {
+		if strings.TrimSpace(message.Raw) == "data: [DONE]" {
+			continue
+		}
+		item := ChatStreamItem{Kind: message.Event, Event: message.Event, Data: message.Data, Raw: message.Raw}
+		if item.Kind == "" || item.Kind == "message" {
+			item.Kind = "raw"
+		}
+		if data, ok := message.Data.(map[string]any); ok {
+			if content, ok := data["content"].(string); ok {
+				item.Kind = "delta"
+				item.Content = content
+			}
+			if typ, ok := data["type"].(string); ok && typ == "error" {
+				item.Kind = "error"
+			}
+			if errText, ok := data["error"].(string); ok {
+				item.Kind = "error"
+				item.Message = errText
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 // ── Realtime WebSocket Chat ──
 
 type realtimeNamespace struct{}
@@ -3176,6 +3267,7 @@ func NewAgentKit() AgentKit {
 		Events:       Events,
 		Reverie:      Reverie,
 		Realtime:     Realtime,
+		Chat:         ChatSDK,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,

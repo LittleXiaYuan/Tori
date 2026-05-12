@@ -33,6 +33,7 @@
     "proactive-heartbeat",
     "server-sent-events",
     "proactive-reverie",
+    "chat-runtime",
     "realtime-websocket",
     "plugin-api-runtime"
   ],
@@ -138,6 +139,10 @@
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
     {
+      "name": "chat",
+      "description": "Access the lightweight Chat runtime client or namespace for /v1/chat, /v1/chat/stream, and /v1/chat/agentic."
+    },
+    {
       "name": "realtime",
       "description": "Access the lightweight Realtime WebSocket chat client or namespace."
     },
@@ -186,7 +191,7 @@
         "events": "AgentKit.events",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
-        "realtime": "AgentKit.realtime"
+        "chat": "AgentKit.chat"
       }
     },
     "go": {
@@ -227,7 +232,8 @@
         "heartbeat": "AgentKit.Heartbeat",
         "events": "AgentKit.Events",
         "reverie": "AgentKit.Reverie",
-        "realtime": "AgentKit.Realtime"
+        "realtime": "AgentKit.Realtime",
+        "chat": "AgentKit.Chat"
       }
     },
     "python": {
@@ -268,7 +274,8 @@
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
         "reverie": "AgentKit.reverie",
-        "realtime": "AgentKit.realtime"
+        "realtime": "AgentKit.realtime",
+        "chat": "AgentKit.chat"
       }
     },
     "rust": {
@@ -309,7 +316,8 @@
         "heartbeat": "AgentKit::heartbeat",
         "events": "AgentKit::events",
         "reverie": "AgentKit::reverie",
-        "realtime": "AgentKit::realtime"
+        "realtime": "AgentKit::realtime",
+        "chat": "AgentKit::chat"
       }
     }
   },
