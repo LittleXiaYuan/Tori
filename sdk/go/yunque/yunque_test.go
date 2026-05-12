@@ -161,6 +161,59 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestRuntimeHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/sessions/queue":
+			if r.Method != http.MethodGet {
+				t.Fatalf("unexpected queue method: %s", r.Method)
+			}
+			if r.URL.Query().Get("id") == "session 1" {
+				_, _ = w.Write([]byte(`{"session_id":"session 1","tasks":[{"id":"task/1"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"queues":{"session 1":1}}`))
+		case "/v1/sessions/queue/cancel":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected cancel method: %s", r.Method)
+			}
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["session_id"] != "session 1" || body["task_id"] != "task/1" {
+				t.Fatalf("unexpected cancel body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"cancelled"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	overview, err := Runtime.Queues(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := Runtime.SessionQueue(ctx, "session 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := Runtime.CancelQueuedTask(ctx, "session 1", "task/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview["queues"] == nil || session["session_id"] != "session 1" || cancelled["status"] != "cancelled" || Runtime.EventsStreamURL() != strings.TrimRight(apiBase, "/")+"/v1/events/stream" || NewAgentKit().Runtime != Runtime {
+		t.Fatalf("unexpected runtime results: overview=%+v session=%+v cancelled=%+v", overview, session, cancelled)
+	}
+	if len(seen) != 3 || seen[0] != "GET /v1/sessions/queue" || seen[1] != "GET /v1/sessions/queue?id=session+1" || seen[2] != "POST /v1/sessions/queue/cancel" {
+		t.Fatalf("unexpected runtime requests: %v", seen)
+	}
+}
+
 func TestBrowserHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -629,6 +682,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/state/focus":
 			_, _ = w.Write([]byte(`{"focus":"sdk"}`))
+		case "/v1/sessions/queue":
+			_, _ = w.Write([]byte(`{"queues":{"s1":1}}`))
 		case "/v1/reflect/strategies":
 			if r.URL.Query().Get("tag") != "sdk" {
 				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
@@ -698,6 +753,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 
 	kit := NewAgentKit()
 	focus, err := kit.State.Focus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimeQueues, err := kit.Runtime.Queues(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -805,14 +864,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || runtimeQueues["queues"] == nil || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 27 {
-		t.Fatalf("expected 27 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 28 {
+		t.Fatalf("expected 28 requests, got %d: %v", len(seen), seen)
 	}
 }
 

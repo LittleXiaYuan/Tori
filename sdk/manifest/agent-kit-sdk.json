@@ -32,6 +32,7 @@
     "execution-trace",
     "proactive-heartbeat",
     "server-sent-events",
+    "runtime-operations",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -140,6 +141,10 @@
       "description": "Access the lightweight Server-Sent Events stream client or namespace."
     },
     {
+      "name": "runtime",
+      "description": "Access the lightweight Runtime operations client or namespace for session queue inspection/cancellation and runtime event streams."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -214,6 +219,7 @@
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
+        "runtime": "AgentKit.runtime",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -261,6 +267,7 @@
         "trace": "AgentKit.Trace",
         "heartbeat": "AgentKit.Heartbeat",
         "events": "AgentKit.Events",
+        "runtime": "AgentKit.Runtime",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -308,6 +315,7 @@
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
+        "runtime": "AgentKit.runtime",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -355,6 +363,7 @@
         "trace": "AgentKit::trace",
         "heartbeat": "AgentKit::heartbeat",
         "events": "AgentKit::events",
+        "runtime": "AgentKit::runtime",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

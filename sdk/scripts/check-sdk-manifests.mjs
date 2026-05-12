@@ -27,6 +27,7 @@ const checks = [
   ["Trace SDK manifest", "sdk/scripts/check-trace-sdk-manifest.mjs"],
   ["Heartbeat SDK manifest", "sdk/scripts/check-heartbeat-sdk-manifest.mjs"],
   ["Events SDK manifest", "sdk/scripts/check-events-sdk-manifest.mjs"],
+  ["Runtime SDK manifest", "sdk/scripts/check-runtime-sdk-manifest.mjs"],
   ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
   ["Realtime SDK manifest", "sdk/scripts/check-realtime-sdk-manifest.mjs"],
   ["Chat SDK manifest", "sdk/scripts/check-chat-sdk-manifest.mjs"],
