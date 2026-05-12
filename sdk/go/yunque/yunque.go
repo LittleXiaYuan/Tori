@@ -306,6 +306,7 @@ type AgentKit struct {
 	Workflows   *workflowsNamespace
 	Connectors  *connectorsNamespace
 	Notify      *notifyNamespace
+	Projects    *projectsNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1506,6 +1507,94 @@ func (n *notifyNamespace) Share(ctx context.Context, req NotifyShareRequest) (No
 	return out, nil
 }
 
+// ── Projects ──
+
+// Projects provides focused access to project workspace CRUD APIs.
+var Projects = &projectsNamespace{}
+
+type projectsNamespace struct{}
+
+type Project struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	RepoPath    string            `json:"repo_path"`
+	RepoURL     string            `json:"repo_url,omitempty"`
+	Description string            `json:"description,omitempty"`
+	DefaultCaps []string          `json:"default_caps,omitempty"`
+	Meta        map[string]string `json:"meta,omitempty"`
+	CreatedAt   string            `json:"created_at,omitempty"`
+	UpdatedAt   string            `json:"updated_at,omitempty"`
+}
+
+type ProjectsListResponse struct {
+	Projects []Project `json:"projects"`
+}
+
+type CreateProjectRequest struct {
+	Name        string            `json:"name"`
+	RepoPath    string            `json:"repo_path"`
+	RepoURL     string            `json:"repo_url,omitempty"`
+	Description string            `json:"description,omitempty"`
+	DefaultCaps []string          `json:"default_caps,omitempty"`
+	Meta        map[string]string `json:"meta,omitempty"`
+}
+
+type UpdateProjectRequest struct {
+	Name        string            `json:"name,omitempty"`
+	RepoPath    string            `json:"repo_path,omitempty"`
+	RepoURL     string            `json:"repo_url,omitempty"`
+	Description string            `json:"description,omitempty"`
+	DefaultCaps []string          `json:"default_caps,omitempty"`
+	Meta        map[string]string `json:"meta,omitempty"`
+}
+
+type DeleteProjectResponse struct {
+	Status string `json:"status"`
+}
+
+func (p *projectsNamespace) List(ctx context.Context) (ProjectsListResponse, error) {
+	var out ProjectsListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/projects", nil, &out); err != nil {
+		return ProjectsListResponse{}, err
+	}
+	if out.Projects == nil {
+		out.Projects = []Project{}
+	}
+	return out, nil
+}
+
+func (p *projectsNamespace) Create(ctx context.Context, req CreateProjectRequest) (Project, error) {
+	var out Project
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/projects", req, &out); err != nil {
+		return Project{}, err
+	}
+	return out, nil
+}
+
+func (p *projectsNamespace) Detail(ctx context.Context, id string) (Project, error) {
+	var out Project
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/projects/detail?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return Project{}, err
+	}
+	return out, nil
+}
+
+func (p *projectsNamespace) Update(ctx context.Context, id string, req UpdateProjectRequest) (Project, error) {
+	var out Project
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/projects/detail?id="+url.QueryEscape(id), req, &out); err != nil {
+		return Project{}, err
+	}
+	return out, nil
+}
+
+func (p *projectsNamespace) Remove(ctx context.Context, id string) (DeleteProjectResponse, error) {
+	var out DeleteProjectResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/projects/remove", map[string]string{"id": id}, &out); err != nil {
+		return DeleteProjectResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -1582,6 +1671,7 @@ func NewAgentKit() AgentKit {
 		Workflows:   Workflows,
 		Connectors:  Connectors,
 		Notify:      Notify,
+		Projects:    Projects,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

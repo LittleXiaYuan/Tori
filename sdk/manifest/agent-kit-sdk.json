@@ -21,6 +21,7 @@
     "workflow-orchestration",
     "connector-runtime",
     "notification-runtime",
+    "project-workspaces",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -77,6 +78,10 @@
       "description": "Access the lightweight host Notification runtime client or namespace."
     },
     {
+      "name": "projects",
+      "description": "Access the lightweight host Projects workspace client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -107,7 +112,8 @@
         "graph": "AgentKit.graph",
         "knowledge": "AgentKit.knowledge",
         "lora": "AgentKit.lora",
-        "workflows": "AgentKit.workflows"
+        "workflows": "AgentKit.workflows",
+        "projects": "AgentKit.projects"
       }
     },
     "go": {
@@ -135,7 +141,8 @@
         "graph": "AgentKit.Graph",
         "knowledge": "AgentKit.KnowledgeKB",
         "lora": "AgentKit.LoRA",
-        "workflows": "AgentKit.Workflows"
+        "workflows": "AgentKit.Workflows",
+        "projects": "AgentKit.Projects"
       }
     },
     "python": {
@@ -163,7 +170,8 @@
         "graph": "AgentKit.graph",
         "knowledge": "AgentKit.knowledge_base",
         "lora": "AgentKit.lora",
-        "workflows": "AgentKit.workflows"
+        "workflows": "AgentKit.workflows",
+        "projects": "AgentKit.projects"
       }
     },
     "rust": {
@@ -191,7 +199,8 @@
         "graph": "AgentKit::graph",
         "knowledge": "AgentKit::knowledge",
         "lora": "AgentKit::lora",
-        "workflows": "AgentKit::workflows"
+        "workflows": "AgentKit::workflows",
+        "projects": "AgentKit::projects"
       }
     }
   },

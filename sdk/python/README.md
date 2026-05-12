@@ -227,3 +227,8 @@ yunque.triggers.emit("review.done", data={"task_id": "task_1"})
 runs = yunque.triggers.runs(trigger_id=created["id"], limit=10)
 print(defs["total"], runs["total"])
 ```
+
+
+### Projects SDK
+
+Projects SDK exposes lightweight project workspace CRUD helpers (`list`, `create`, `detail`, `update`, `remove`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.projects` / `kit.Projects` for one-stop automation composition.
