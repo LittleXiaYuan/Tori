@@ -308,6 +308,7 @@ type AgentKit struct {
 	Notify      *notifyNamespace
 	Projects    *projectsNamespace
 	Market      *skillMarketNamespace
+	Dispatch    *dispatchNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1508,6 +1509,107 @@ func (n *notifyNamespace) Share(ctx context.Context, req NotifyShareRequest) (No
 	return out, nil
 }
 
+// ── MCP Dispatch ──
+
+// Dispatch provides focused access to external worker registry and dispatch queue APIs.
+var Dispatch = &dispatchNamespace{}
+
+type dispatchNamespace struct{}
+
+type DispatchWorker struct {
+	ID           string         `json:"id,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	Type         string         `json:"type,omitempty"`
+	Capabilities []string       `json:"capabilities,omitempty"`
+	Status       string         `json:"status,omitempty"`
+	LastSeen     string         `json:"last_seen,omitempty"`
+	Extra        map[string]any `json:"-"`
+}
+
+type DispatchWorkersResponse struct {
+	Workers []DispatchWorker `json:"workers"`
+	Count   int              `json:"count"`
+}
+
+type DispatchQueueResponse map[string]any
+
+type DispatchEnqueueRequest struct {
+	TaskID       string   `json:"task_id"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	Priority     int      `json:"priority,omitempty"`
+}
+
+type DispatchEnqueueResponse struct {
+	TaskID string `json:"task_id"`
+	Status string `json:"status"`
+}
+
+type DispatchWorkerConfigResponse struct {
+	Type         string `json:"type"`
+	MCPConfig    string `json:"mcp_config"`
+	Instructions string `json:"instructions"`
+	ServerURL    string `json:"server_url"`
+}
+
+type DispatchStatusResponse struct {
+	Status string `json:"status"`
+}
+
+func (d *dispatchNamespace) Workers(ctx context.Context) (DispatchWorkersResponse, error) {
+	var out DispatchWorkersResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workers", nil, &out); err != nil {
+		return DispatchWorkersResponse{}, err
+	}
+	if out.Workers == nil {
+		out.Workers = []DispatchWorker{}
+	}
+	return out, nil
+}
+
+func (d *dispatchNamespace) Worker(ctx context.Context, id string) (DispatchWorker, error) {
+	var out DispatchWorker
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workers/detail?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return DispatchWorker{}, err
+	}
+	return out, nil
+}
+
+func (d *dispatchNamespace) RemoveWorker(ctx context.Context, id string) (DispatchStatusResponse, error) {
+	var out DispatchStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/workers/remove", map[string]string{"id": id}, &out); err != nil {
+		return DispatchStatusResponse{}, err
+	}
+	return out, nil
+}
+
+func (d *dispatchNamespace) Queue(ctx context.Context) (DispatchQueueResponse, error) {
+	var out DispatchQueueResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/dispatch/queue", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (d *dispatchNamespace) Enqueue(ctx context.Context, req DispatchEnqueueRequest) (DispatchEnqueueResponse, error) {
+	var out DispatchEnqueueResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/dispatch/enqueue", req, &out); err != nil {
+		return DispatchEnqueueResponse{}, err
+	}
+	return out, nil
+}
+
+func (d *dispatchNamespace) WorkerConfig(ctx context.Context, workerType string) (DispatchWorkerConfigResponse, error) {
+	path := "/v1/workers/config"
+	if workerType != "" {
+		path += "?type=" + url.QueryEscape(workerType)
+	}
+	var out DispatchWorkerConfigResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return DispatchWorkerConfigResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -1758,6 +1860,7 @@ func NewAgentKit() AgentKit {
 		Notify:      Notify,
 		Projects:    Projects,
 		Market:      SkillMarket,
+		Dispatch:    Dispatch,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

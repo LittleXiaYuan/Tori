@@ -30,6 +30,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/api/notify/channels")) return jsonResponse({ channels: [{ id: "feishu-main", type: "feishu", name: "Feishu", enabled: true }] });
       if (value.endsWith("/v1/projects")) return jsonResponse({ projects: [{ id: "p1", name: "云雀", repo_path: "C:/Code/AI/云雀/yunque-agent" }] });
       if (value.endsWith("/v1/market/stats")) return jsonResponse({ total: 3, categories: { coding: 1 } });
+      if (value.endsWith("/v1/workers")) return jsonResponse({ workers: [{ id: "w1", type: "cursor", capabilities: ["coding"] }], count: 1 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -48,6 +49,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.notify.channels()).channels[0]?.id, "feishu-main");
   assertEqual((await kit.projects.list()).projects[0]?.id, "p1");
   assertEqual((await kit.market.stats()).total, 3);
+  assertEqual((await kit.dispatch.workers()).count, 1);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -61,7 +63,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[10]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[11]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[12]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[13]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[13]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[14]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

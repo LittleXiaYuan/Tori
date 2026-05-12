@@ -23,6 +23,7 @@
     "notification-runtime",
     "project-workspaces",
     "skill-market",
+    "mcp-dispatch",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -87,6 +88,10 @@
       "description": "Access the lightweight host Skill Market client or namespace."
     },
     {
+      "name": "dispatch",
+      "description": "Access the lightweight MCP Dispatch worker and queue client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -119,7 +124,8 @@
         "lora": "AgentKit.lora",
         "workflows": "AgentKit.workflows",
         "projects": "AgentKit.projects",
-        "market": "AgentKit.market"
+        "market": "AgentKit.market",
+        "dispatch": "AgentKit.dispatch"
       }
     },
     "go": {
@@ -149,7 +155,8 @@
         "lora": "AgentKit.LoRA",
         "workflows": "AgentKit.Workflows",
         "projects": "AgentKit.Projects",
-        "market": "AgentKit.Market"
+        "market": "AgentKit.Market",
+        "dispatch": "AgentKit.Dispatch"
       }
     },
     "python": {
@@ -179,7 +186,8 @@
         "lora": "AgentKit.lora",
         "workflows": "AgentKit.workflows",
         "projects": "AgentKit.projects",
-        "market": "AgentKit.market"
+        "market": "AgentKit.market",
+        "dispatch": "AgentKit.dispatch"
       }
     },
     "rust": {
@@ -209,7 +217,8 @@
         "lora": "AgentKit::lora",
         "workflows": "AgentKit::workflows",
         "projects": "AgentKit::projects",
-        "market": "AgentKit::market"
+        "market": "AgentKit::market",
+        "dispatch": "AgentKit::dispatch"
       }
     }
   },

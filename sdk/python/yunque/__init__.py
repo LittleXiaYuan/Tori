@@ -475,6 +475,44 @@ class _NotifyNamespace:
 notify = _NotifyNamespace()
 
 
+# ── MCP Dispatch (/v1/workers, /v1/dispatch) ──
+
+class _DispatchNamespace:
+    """Lightweight helpers for external MCP worker dispatch and queue control."""
+
+    def workers(self) -> dict:
+        return _api_call("GET", "/v1/workers")
+
+    def worker(self, worker_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/workers/detail?{urlencode({'id': worker_id})}")
+
+    def remove_worker(self, worker_id: str) -> dict:
+        return _api_call("POST", "/v1/workers/remove", {"id": worker_id})
+
+    def queue(self) -> dict:
+        return _api_call("GET", "/v1/dispatch/queue")
+
+    def enqueue(self, task_id: str | dict, *, capabilities: Optional[list[str]] = None, priority: int = 0) -> dict:
+        if isinstance(task_id, dict):
+            body = dict(task_id)
+        else:
+            body = {"task_id": task_id}
+            if capabilities is not None:
+                body["capabilities"] = capabilities
+            if priority:
+                body["priority"] = priority
+        return _api_call("POST", "/v1/dispatch/enqueue", body)
+
+    def worker_config(self, type: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'type': type})}" if type else ""
+        return _api_call("GET", f"/v1/workers/config{suffix}")
+
+
+dispatch = _DispatchNamespace()
+
+
 # ── Skill Market (/v1/market) ──
 
 class _SkillMarketNamespace:
@@ -1066,6 +1104,7 @@ class AgentKit:
         self.notify = notify
         self.projects = projects
         self.market = market
+        self.dispatch = dispatch
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

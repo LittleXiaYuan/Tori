@@ -1377,6 +1377,7 @@ pub struct AgentKit {
     pub notify: NotifyClient,
     pub projects: ProjectsClient,
     pub market: SkillMarketClient,
+    pub dispatch: DispatchClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1415,6 +1416,7 @@ impl AgentKit {
             notify: NotifyClient::new(base_url.clone(), token.as_ref())?,
             projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
+            dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1443,6 +1445,7 @@ impl AgentKit {
             notify: NotifyClient::new_with_client(base_url.clone(), plugin_http.clone()),
             projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2073,6 +2076,181 @@ impl WorkflowClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
+    }
+}
+
+/// External MCP worker record returned by `/v1/workers*`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchWorker {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub last_seen: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchWorkersResponse {
+    #[serde(default)]
+    pub workers: Vec<DispatchWorker>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+pub type DispatchQueueResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchEnqueueRequest {
+    pub task_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub priority: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchEnqueueResponse {
+    pub task_id: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchWorkerConfigResponse {
+    pub r#type: String,
+    pub mcp_config: String,
+    pub instructions: String,
+    pub server_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DispatchStatusResponse {
+    pub status: String,
+}
+
+/// Small Rust helper over host `/v1/workers*` and `/v1/dispatch/*` endpoints.
+#[derive(Debug, Clone)]
+pub struct DispatchClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl DispatchClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn workers(&self) -> Result<DispatchWorkersResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/workers"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn worker(&self, id: &str) -> Result<DispatchWorker, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/workers/detail?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn remove_worker(&self, id: &str) -> Result<DispatchStatusResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/workers/remove"))
+            .json(&serde_json::json!({ "id": id }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn queue(&self) -> Result<DispatchQueueResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/dispatch/queue"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn enqueue(
+        &self,
+        request: &DispatchEnqueueRequest,
+    ) -> Result<DispatchEnqueueResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/dispatch/enqueue"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn worker_config(
+        &self,
+        worker_type: &str,
+    ) -> Result<DispatchWorkerConfigResponse, reqwest::Error> {
+        let path = if worker_type.is_empty() {
+            "/v1/workers/config".to_string()
+        } else {
+            format!(
+                "/v1/workers/config?type={}",
+                url_encode_query_component(worker_type)
+            )
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
     }
 }
 
@@ -3783,6 +3961,10 @@ mod tests {
             "http://localhost:9090/v1/market/stats"
         );
         assert_eq!(
+            kit.dispatch.url("/v1/workers"),
+            "http://localhost:9090/v1/workers"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -4006,6 +4188,31 @@ mod tests {
         assert_eq!(
             client.url("/api/connectors"),
             "http://localhost:9090/api/connectors"
+        );
+    }
+
+    #[test]
+    fn dispatch_types_deserialize_incremental_bodies() {
+        let workers: DispatchWorkersResponse = serde_json::from_str(
+            r#"{"workers":[{"id":"w1","type":"cursor","capabilities":["coding"]}],"count":1}"#,
+        )
+        .unwrap();
+        assert_eq!(workers.count, 1);
+        assert_eq!(workers.workers[0].r#type, "cursor");
+
+        let request = DispatchEnqueueRequest {
+            task_id: "t1".to_string(),
+            capabilities: vec!["coding".to_string()],
+            priority: 10,
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["task_id"], "t1");
+
+        let client =
+            DispatchClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/workers"),
+            "http://localhost:9090/v1/workers"
         );
     }
 
