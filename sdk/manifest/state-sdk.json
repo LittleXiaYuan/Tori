@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "domain": "state-kernel",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque State Kernel integration.",
+  "principles": [
+    "Prefer focused SDK slices over importing full generated clients.",
+    "Keep read-only snapshot/actions/capabilities helpers separate from mutation-capable state helpers.",
+    "Expose stable entrypoints for external projects, frontends, plugins, sidecars, CLIs, and automation scripts."
+  ],
+  "routes": [
+    "GET /v1/state",
+    "GET /v1/state/goals",
+    "POST /v1/state/goals",
+    "GET /v1/state/focus",
+    "GET /v1/state/resources"
+  ],
+  "capabilities": [
+    { "name": "snapshot", "route": "GET /v1/state", "readOnly": true, "description": "Read the full State Kernel snapshot." },
+    { "name": "actions", "route": "GET /v1/state", "readOnly": true, "description": "Read recent actions from the State Kernel snapshot." },
+    { "name": "capabilities", "route": "GET /v1/state", "readOnly": true, "description": "Read current skill and capability summary from the State Kernel snapshot." },
+    { "name": "goals", "route": "GET /v1/state/goals", "readOnly": true, "description": "List State Kernel goals." },
+    { "name": "saveGoal", "route": "POST /v1/state/goals", "readOnly": false, "description": "Create or update a State Kernel goal." },
+    { "name": "focus", "route": "GET /v1/state/focus", "readOnly": true, "description": "Read the current State Kernel focus." },
+    { "name": "resources", "route": "GET /v1/state/resources", "readOnly": true, "description": "List active State Kernel resources." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/state.ts", "sdk/typescript/src/state-snapshot.ts", "sdk/typescript/src/state-actions.ts", "sdk/typescript/src/state-capabilities.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "snapshot": "yunque-client/state-snapshot#createStateSnapshotClient().get",
+        "actions": "yunque-client/state-actions#createStateActionsClient().list",
+        "capabilities": "yunque-client/state-capabilities#createStateCapabilitiesClient().get",
+        "goals": "yunque-client/state#createStateClient().goals",
+        "saveGoal": "yunque-client/state#createStateClient().saveGoal",
+        "focus": "yunque-client/state#createStateClient().focus",
+        "resources": "yunque-client/state#createStateClient().resources"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "snapshot": "yunque.State.Snapshot",
+        "actions": "yunque.State.Actions",
+        "capabilities": "yunque.State.Capabilities",
+        "goals": "yunque.State.Goals",
+        "saveGoal": "yunque.State.SaveGoal",
+        "focus": "yunque.State.Focus",
+        "resources": "yunque.State.Resources"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "snapshot": "yunque.state.snapshot",
+        "actions": "yunque.state.actions",
+        "capabilities": "yunque.state.capabilities",
+        "goals": "yunque.state.goals",
+        "saveGoal": "yunque.state.save_goal",
+        "focus": "yunque.state.focus",
+        "resources": "yunque.state.resources"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "snapshot": "StateClient::snapshot",
+        "actions": "StateClient::actions",
+        "capabilities": "StateClient::capabilities",
+        "goals": "StateClient::goals",
+        "saveGoal": "StateClient::save_goal",
+        "focus": "StateClient::focus",
+        "resources": "StateClient::resources"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}
