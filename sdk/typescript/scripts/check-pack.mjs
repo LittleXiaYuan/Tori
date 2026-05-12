@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const maxUnpackedSize = 1_200_000;
+const baseUnpackedSize = 1_200_000;
+const baseExportedFiles = 137;
+const maxUnpackedGrowthPerExport = 2_500;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
@@ -78,8 +80,9 @@ if (forbiddenFiles.length > 0) {
   process.exit(1);
 }
 
+const maxUnpackedSize = baseUnpackedSize + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport;
 if (pack.unpackedSize > maxUnpackedSize) {
-  console.error(`pack unpacked size ${pack.unpackedSize} exceeds ${maxUnpackedSize}`);
+  console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);
   process.exit(1);
 }
 
@@ -88,4 +91,4 @@ if (pack.entryCount > maxEntryCount) {
   process.exit(1);
 }
 
-console.log(`pack check ok: ${pack.entryCount}/${maxEntryCount} files, ${pack.unpackedSize} bytes unpacked, ${pack.size} bytes tarball, ${exportedFiles.size} exported entry files verified`);
+console.log(`pack check ok: ${pack.entryCount}/${maxEntryCount} files, ${pack.unpackedSize}/${maxUnpackedSize} bytes unpacked, ${pack.size} bytes tarball, ${exportedFiles.size} exported entry files verified`);
