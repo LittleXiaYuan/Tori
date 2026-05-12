@@ -431,6 +431,10 @@
       "types": "./src/reverie-observe.ts",
       "import": "./src/reverie-observe.ts"
     },
+    "./reverie-control": {
+      "types": "./src/reverie-control.ts",
+      "import": "./src/reverie-control.ts"
+    },
     "./federation": {
       "types": "./src/federation.ts",
       "import": "./src/federation.ts"
