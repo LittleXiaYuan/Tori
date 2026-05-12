@@ -1217,6 +1217,39 @@ setup = _SetupNamespace()
 
 
 
+
+# ── Discovery SDK (/v1/identity, /v1/embeddings, /v1/search) ──
+
+class _DiscoveryNamespace:
+    """Lightweight helpers for identity resolution, embeddings, and web search."""
+
+    def resolve_identity(self, channel: str, user_id: str, display_name: str = "") -> dict:
+        return _api_call("POST", "/v1/identity/resolve", {"channel": channel, "user_id": user_id, "display_name": display_name})
+
+    def identity_profiles(self) -> dict:
+        return _api_call("GET", "/v1/identity/profiles")
+
+    def embedding_providers(self) -> dict:
+        return _api_call("GET", "/v1/embeddings")
+
+    def embed(self, text: str, provider: str = "") -> dict:
+        return _api_call("POST", "/v1/embeddings", {"text": text, "provider": provider})
+
+    def search(self, q: str, limit: int = 0, provider: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {"q": q}
+        if limit > 0:
+            params["limit"] = str(limit)
+        if provider:
+            params["provider"] = provider
+        return _api_call("GET", f"/v1/search?{urlencode(params)}")
+
+    def search_providers(self) -> dict:
+        return _api_call("GET", "/v1/search/providers")
+
+
+discovery = _DiscoveryNamespace()
+
 # ── IDE Supervisor (/v1/ide) ──
 
 class _IDENamespace:
@@ -2851,6 +2884,7 @@ class AgentKit:
         self.federation = federation
         self.planner = planner
         self.ide = ide
+        self.discovery = discovery
         self.settings = settings
         self.system = system
         self.auth = auth

@@ -1405,6 +1405,7 @@ pub struct AgentKit {
     pub federation: FederationClient,
     pub planner: PlannerClient,
     pub ide: IDEClient,
+    pub discovery: DiscoveryClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1483,6 +1484,7 @@ impl AgentKit {
             federation: FederationClient::new(base_url.clone(), token.as_ref())?,
             planner: PlannerClient::new(base_url.clone(), token.as_ref())?,
             ide: IDEClient::new(base_url.clone(), token.as_ref())?,
+            discovery: DiscoveryClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1557,6 +1559,7 @@ impl AgentKit {
             federation: FederationClient::new_with_client(base_url.clone(), plugin_http.clone()),
             planner: PlannerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             ide: IDEClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            discovery: DiscoveryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5627,6 +5630,66 @@ pub struct IDEReviewRequest {
     pub language: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub mode: String,
+}
+
+
+/// Lightweight Discovery SDK client for identity resolution, embeddings, and web search.
+#[derive(Debug, Clone)]
+pub struct DiscoveryClient { base_url: String, http: reqwest::Client }
+
+pub type DiscoveryIdentityProfile = serde_json::Value;
+pub type DiscoveryIdentityProfilesResponse = serde_json::Value;
+pub type DiscoveryEmbeddingProvidersResponse = serde_json::Value;
+pub type DiscoveryEmbeddingResponse = serde_json::Value;
+pub type DiscoverySearchResponse = serde_json::Value;
+pub type DiscoverySearchProvidersResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct DiscoveryResolveIdentityRequest {
+    pub channel: String,
+    pub user_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub display_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct DiscoveryEmbedRequest {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub provider: String,
+}
+
+impl DiscoveryClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn resolve_identity(&self, request: &DiscoveryResolveIdentityRequest) -> Result<DiscoveryIdentityProfile, reqwest::Error> { self.post_json("/v1/identity/resolve", request).await }
+    pub async fn identity_profiles(&self) -> Result<DiscoveryIdentityProfilesResponse, reqwest::Error> { self.get_json("/v1/identity/profiles").await }
+    pub async fn embedding_providers(&self) -> Result<DiscoveryEmbeddingProvidersResponse, reqwest::Error> { self.get_json("/v1/embeddings").await }
+    pub async fn embed(&self, text: impl Into<String>, provider: impl Into<String>) -> Result<DiscoveryEmbeddingResponse, reqwest::Error> {
+        self.post_json("/v1/embeddings", &DiscoveryEmbedRequest { text: text.into(), provider: provider.into() }).await
+    }
+    pub async fn search(&self, q: &str, limit: i32, provider: &str) -> Result<DiscoverySearchResponse, reqwest::Error> {
+        self.get_json(&discovery_search_query(q, limit, provider)).await
+    }
+    pub async fn search_providers(&self) -> Result<DiscoverySearchProvidersResponse, reqwest::Error> { self.get_json("/v1/search/providers").await }
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where T: for<'de> Deserialize<'de>,
+    { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where B: Serialize + ?Sized, T: for<'de> Deserialize<'de>,
+    { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
+fn discovery_search_query(q: &str, limit: i32, provider: &str) -> String {
+    let mut pairs = vec![format!("q={}", url_encode_query_component(q))];
+    if limit > 0 { pairs.push(format!("limit={limit}")); }
+    if !provider.is_empty() { pairs.push(format!("provider={}", url_encode_query_component(provider))); }
+    format!("/v1/search?{}", pairs.join("&"))
 }
 
 /// Lightweight IDE SDK client for IDE supervisor status and code review.
@@ -9754,6 +9817,22 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn discovery_helpers_build_urls_and_payloads() {
+        let client = DiscoveryClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/identity/resolve"), "http://localhost:9090/v1/identity/resolve");
+        assert_eq!(client.url("/v1/embeddings"), "http://localhost:9090/v1/embeddings");
+        assert_eq!(client.url("/v1/search/providers"), "http://localhost:9090/v1/search/providers");
+        assert_eq!(discovery_search_query("planner", 3, "bing"), "/v1/search?q=planner&limit=3&provider=bing");
+        let identity = serde_json::to_value(DiscoveryResolveIdentityRequest { channel: "feishu".to_string(), user_id: "42".to_string(), display_name: "小羽".to_string() }).unwrap();
+        assert_eq!(identity["channel"], "feishu");
+        assert_eq!(identity["user_id"], "42");
+        let embed = serde_json::to_value(DiscoveryEmbedRequest { text: "云雀".to_string(), provider: "mock".to_string() }).unwrap();
+        assert_eq!(embed["text"], "云雀");
+        assert_eq!(embed["provider"], "mock");
+    }
 
     #[test]
     fn ide_helpers_build_urls_and_payloads() {

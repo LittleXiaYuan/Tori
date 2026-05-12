@@ -203,6 +203,62 @@ func TestSetupHelpers(t *testing.T) {
 
 
 
+
+func TestDiscoveryHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/identity/resolve":
+			var body DiscoveryResolveIdentityRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Channel != "feishu" || body.UserID != "42" { t.Fatalf("unexpected identity body: %+v", body) }
+			_, _ = w.Write([]byte(`{"unified_id":"u1","display_name":"小羽"}`))
+		case "/v1/identity/profiles":
+			_, _ = w.Write([]byte(`{"profiles":[{"unified_id":"u1"}]}`))
+		case "/v1/embeddings":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"providers":["mock"]}`))
+				return
+			}
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body["text"] != "云雀" || body["provider"] != "mock" { t.Fatalf("unexpected embed body: %+v", body) }
+			_, _ = w.Write([]byte(`{"embedding":[0.1,0.2],"dimensions":2}`))
+		case "/v1/search":
+			if r.URL.Query().Get("q") != "planner" || r.URL.Query().Get("limit") != "3" || r.URL.Query().Get("provider") != "bing" { t.Fatalf("unexpected search query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"results":[{"title":"云雀"}]}`))
+		case "/v1/search/providers":
+			_, _ = w.Write([]byte(`{"enabled":true,"providers":["bing"]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	profile, err := Discovery.ResolveIdentity(ctx, DiscoveryResolveIdentityRequest{Channel: "feishu", UserID: "42", DisplayName: "小羽"})
+	if err != nil { t.Fatal(err) }
+	profiles, err := Discovery.IdentityProfiles(ctx)
+	if err != nil { t.Fatal(err) }
+	embedProviders, err := Discovery.EmbeddingProviders(ctx)
+	if err != nil { t.Fatal(err) }
+	embedded, err := Discovery.Embed(ctx, "云雀", "mock")
+	if err != nil { t.Fatal(err) }
+	searched, err := Discovery.Search(ctx, "planner", 3, "bing")
+	if err != nil { t.Fatal(err) }
+	searchProviders, err := Discovery.SearchProviders(ctx)
+	if err != nil { t.Fatal(err) }
+	kit := NewAgentKit()
+
+	if profile["unified_id"] != "u1" || profiles["profiles"] == nil || embedProviders["providers"] == nil || embedded["dimensions"].(float64) != 2 || searched["results"] == nil || searchProviders["enabled"] != true || kit.Discovery != Discovery {
+		t.Fatalf("unexpected discovery results")
+	}
+	if len(seen) != 6 || seen[0] != "POST /v1/identity/resolve" || seen[4] != "GET /v1/search?limit=3&provider=bing&q=planner" || seen[5] != "GET /v1/search/providers" {
+		t.Fatalf("unexpected discovery requests: %v", seen)
+	}
+}
+
 func TestIDEHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

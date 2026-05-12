@@ -304,6 +304,67 @@ func filenameFromDisposition(disposition string) string {
 
 
 
+
+// ── Discovery SDK (/v1/identity, /v1/embeddings, /v1/search) ──
+
+// Discovery exposes identity resolution, embeddings, and web-search helpers for external scripts, plugins, and UI widgets.
+var Discovery = &discoveryNamespace{}
+
+type discoveryNamespace struct{}
+
+type DiscoveryIdentityProfile map[string]any
+type DiscoveryIdentityProfilesResponse map[string]any
+type DiscoveryEmbeddingProvidersResponse map[string]any
+type DiscoveryEmbeddingResponse map[string]any
+type DiscoverySearchResponse map[string]any
+type DiscoverySearchProvidersResponse map[string]any
+
+type DiscoveryResolveIdentityRequest struct {
+	Channel     string `json:"channel"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name,omitempty"`
+}
+
+func (d *discoveryNamespace) ResolveIdentity(ctx context.Context, req DiscoveryResolveIdentityRequest) (DiscoveryIdentityProfile, error) {
+	var out DiscoveryIdentityProfile
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/identity/resolve", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (d *discoveryNamespace) IdentityProfiles(ctx context.Context) (DiscoveryIdentityProfilesResponse, error) {
+	var out DiscoveryIdentityProfilesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/identity/profiles", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (d *discoveryNamespace) EmbeddingProviders(ctx context.Context) (DiscoveryEmbeddingProvidersResponse, error) {
+	var out DiscoveryEmbeddingProvidersResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/embeddings", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (d *discoveryNamespace) Embed(ctx context.Context, text, provider string) (DiscoveryEmbeddingResponse, error) {
+	var out DiscoveryEmbeddingResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/embeddings", map[string]any{"text": text, "provider": provider}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (d *discoveryNamespace) Search(ctx context.Context, q string, limit int, provider string) (DiscoverySearchResponse, error) {
+	values := url.Values{}
+	values.Set("q", q)
+	if limit > 0 { values.Set("limit", strconv.Itoa(limit)) }
+	if provider != "" { values.Set("provider", provider) }
+	var out DiscoverySearchResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/search?"+values.Encode(), nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (d *discoveryNamespace) SearchProviders(ctx context.Context) (DiscoverySearchProvidersResponse, error) {
+	var out DiscoverySearchProvidersResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/search/providers", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
 // ── IDE Supervisor (/v1/ide) ──
 
 // IDE exposes IDE supervisor status and code-review helpers for external editor plugins and automation scripts.
@@ -998,6 +1059,7 @@ type AgentKit struct {
 	Federation    *federationNamespace
 	Planner       *plannerNamespace
 	IDE           *ideNamespace
+	Discovery     *discoveryNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -5694,6 +5756,7 @@ func NewAgentKit() AgentKit {
 		Federation:    Federation,
 		Planner:       Planner,
 		IDE:           IDE,
+		Discovery:     Discovery,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,
