@@ -177,6 +177,7 @@ import { createDocumentsClient } from "yunque-client/documents";
 import { createDocumentTemplatesClient } from "yunque-client/document-templates";
 import { createDocumentGenerateClient } from "yunque-client/document-generate";
 import { createApprovalsClient } from "yunque-client/approvals";
+import { createApprovalDecisionsClient } from "yunque-client/approval-decisions";
 import { createApprovalQueueClient } from "yunque-client/approval-queue";
 import { createApprovalRulesClient } from "yunque-client/approval-rules";
 import { createTraceClient } from "yunque-client/trace";
@@ -1389,6 +1390,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/document-templates.ts` | Lightweight document template catalog facade without generation APIs |
 | `src/document-generate.ts` | Lightweight document generation and format helper facade without template catalog APIs |
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
+| `src/approval-decisions.ts` | Lightweight approval decision facade for approve/deny/decide without queue or rule reads |
 | `src/approval-queue.ts` | Lightweight approval queue and decision facade without full SDK import |
 | `src/approval-rules.ts` | Lightweight approval rule management facade without full SDK import |
 | `src/trace.ts` | Lightweight hand-written execution/audit trace inspection slice |

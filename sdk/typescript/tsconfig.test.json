@@ -102,6 +102,7 @@
     "src/document-templates.ts",
     "src/document-generate.ts",
     "src/approvals.ts",
+    "src/approval-decisions.ts",
     "src/approval-queue.ts",
     "src/approval-rules.ts",
     "src/trace.ts",
