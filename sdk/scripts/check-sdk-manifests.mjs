@@ -17,6 +17,7 @@ const checks = [
   ["Connectors SDK manifest", "sdk/scripts/check-connectors-sdk-manifest.mjs"],
   ["Notify SDK manifest", "sdk/scripts/check-notify-sdk-manifest.mjs"],
   ["Projects SDK manifest", "sdk/scripts/check-projects-sdk-manifest.mjs"],
+  ["Skill Market SDK manifest", "sdk/scripts/check-market-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

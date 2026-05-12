@@ -753,6 +753,56 @@ func TestConnectorsNamespaceManagesCatalogAuthAndActions(t *testing.T) {
 	}
 }
 
+func TestSkillMarketNamespaceSearchTopAndStats(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/market/search":
+			if r.URL.Query().Get("q") == "docx" {
+				_, _ = w.Write([]byte(`{"skills":[{"name":"doc_parse","version":"1.0.0","category":"data"}],"count":1}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"skills":[{"name":"web_search","version":"1.0.0"}]}`))
+		case "/v1/market/top":
+			if r.URL.Query().Get("n") != "3" || r.URL.Query().Get("by") != "rating" {
+				t.Fatalf("unexpected top query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"skills":[{"name":"code_gen","version":"2.1.0","rating":4.8}]}`))
+		case "/v1/market/stats":
+			_, _ = w.Write([]byte(`{"total":3,"categories":{"coding":1}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	found, err := SkillMarket.Search(context.Background(), "docx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := SkillMarket.Search(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, err := SkillMarket.Top(context.Background(), SkillMarketTopOptions{N: 3, By: "rating"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats, err := SkillMarket.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if found.Skills[0].Name != "doc_parse" || all.Skills[0].Name != "web_search" || top.Skills[0].Name != "code_gen" || stats["total"].(float64) != 3 || kit.Market != SkillMarket {
+		t.Fatalf("unexpected market results")
+	}
+	if len(seen) != 4 {
+		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestProjectsNamespaceManagesProjectWorkspaces(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

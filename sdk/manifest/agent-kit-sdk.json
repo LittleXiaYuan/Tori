@@ -22,6 +22,7 @@
     "connector-runtime",
     "notification-runtime",
     "project-workspaces",
+    "skill-market",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -82,6 +83,10 @@
       "description": "Access the lightweight host Projects workspace client or namespace."
     },
     {
+      "name": "market",
+      "description": "Access the lightweight host Skill Market client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -113,7 +118,8 @@
         "knowledge": "AgentKit.knowledge",
         "lora": "AgentKit.lora",
         "workflows": "AgentKit.workflows",
-        "projects": "AgentKit.projects"
+        "projects": "AgentKit.projects",
+        "market": "AgentKit.market"
       }
     },
     "go": {
@@ -142,7 +148,8 @@
         "knowledge": "AgentKit.KnowledgeKB",
         "lora": "AgentKit.LoRA",
         "workflows": "AgentKit.Workflows",
-        "projects": "AgentKit.Projects"
+        "projects": "AgentKit.Projects",
+        "market": "AgentKit.Market"
       }
     },
     "python": {
@@ -171,7 +178,8 @@
         "knowledge": "AgentKit.knowledge_base",
         "lora": "AgentKit.lora",
         "workflows": "AgentKit.workflows",
-        "projects": "AgentKit.projects"
+        "projects": "AgentKit.projects",
+        "market": "AgentKit.market"
       }
     },
     "rust": {
@@ -200,7 +208,8 @@
         "knowledge": "AgentKit::knowledge",
         "lora": "AgentKit::lora",
         "workflows": "AgentKit::workflows",
-        "projects": "AgentKit::projects"
+        "projects": "AgentKit::projects",
+        "market": "AgentKit::market"
       }
     }
   },

@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "domain": "skill-market",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque skill marketplace search, ranking, and stats under /v1/market/*.",
+  "principles": [
+    "Expose marketplace search, top ranking, and stats helpers as focused SDK slices instead of requiring the full platform.",
+    "Keep skill discovery directly callable from external projects, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Make Skill Market access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /v1/market/search",
+    "GET /v1/market/top",
+    "GET /v1/market/stats"
+  ],
+  "capabilities": [
+    { "name": "search", "route": "GET /v1/market/search", "readOnly": true, "description": "Search or list marketplace skills." },
+    { "name": "top", "route": "GET /v1/market/top", "readOnly": true, "description": "Read top marketplace skills by popularity or rating." },
+    { "name": "stats", "route": "GET /v1/market/stats", "readOnly": true, "description": "Read marketplace aggregate statistics." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/market.ts",
+        "sdk/typescript/src/market-search.ts",
+        "sdk/typescript/src/market-query.ts",
+        "sdk/typescript/src/market-top.ts",
+        "sdk/typescript/src/market-stats.ts"
+      ],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "search": "createSkillMarketClient().search",
+        "top": "createSkillMarketClient().top",
+        "stats": "createSkillMarketClient().stats"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "search": "yunque.SkillMarket.Search",
+        "top": "yunque.SkillMarket.Top",
+        "stats": "yunque.SkillMarket.Stats"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "search": "yunque.market.search",
+        "top": "yunque.market.top",
+        "stats": "yunque.market.stats"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "search": "SkillMarketClient::search",
+        "top": "SkillMarketClient::top",
+        "stats": "SkillMarketClient::stats"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

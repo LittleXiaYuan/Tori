@@ -1376,6 +1376,7 @@ pub struct AgentKit {
     pub connectors: ConnectorsClient,
     pub notify: NotifyClient,
     pub projects: ProjectsClient,
+    pub market: SkillMarketClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1413,6 +1414,7 @@ impl AgentKit {
             connectors: ConnectorsClient::new(base_url.clone(), token.as_ref())?,
             notify: NotifyClient::new(base_url.clone(), token.as_ref())?,
             projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
+            market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1440,6 +1442,7 @@ impl AgentKit {
             connectors: ConnectorsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             notify: NotifyClient::new_with_client(base_url.clone(), plugin_http.clone()),
             projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2070,6 +2073,162 @@ impl WorkflowClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Skill marketplace entry returned by `/v1/market/*`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SkillMarketSkill {
+    pub name: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub license: String,
+    #[serde(default)]
+    pub homepage: String,
+    #[serde(default)]
+    pub deprecated: bool,
+    #[serde(default)]
+    pub installs: i32,
+    #[serde(default)]
+    pub rating: f64,
+    #[serde(default)]
+    pub rating_count: i32,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub min_version: String,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SkillMarketSearchResponse {
+    #[serde(default)]
+    pub skills: Vec<SkillMarketSkill>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SkillMarketTopOptions {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub n: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub by: String,
+}
+
+pub type SkillMarketStatsResponse = serde_json::Map<String, serde_json::Value>;
+
+/// Small Rust helper over host `/v1/market/*` skill marketplace endpoints.
+#[derive(Debug, Clone)]
+pub struct SkillMarketClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl SkillMarketClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn search(
+        &self,
+        query: impl AsRef<str>,
+    ) -> Result<SkillMarketSearchResponse, reqwest::Error> {
+        let query = query.as_ref();
+        let path = if query.is_empty() {
+            "/v1/market/search".to_string()
+        } else {
+            format!("/v1/market/search?q={}", url_encode_query_component(query))
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn top(
+        &self,
+        options: &SkillMarketTopOptions,
+    ) -> Result<SkillMarketSearchResponse, reqwest::Error> {
+        let mut query: Vec<(&str, String)> = Vec::new();
+        if options.n > 0 {
+            query.push(("n", options.n.to_string()));
+        }
+        if !options.by.is_empty() {
+            query.push(("by", options.by.clone()));
+        }
+        let suffix = if query.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "?{}",
+                query
+                    .into_iter()
+                    .map(|(key, value)| format!("{key}={}", url_encode_query_component(&value)))
+                    .collect::<Vec<_>>()
+                    .join("&")
+            )
+        };
+        self.http
+            .get(self.url(&format!("/v1/market/top{suffix}")))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn stats(&self) -> Result<SkillMarketStatsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/market/stats"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
     }
 }
 
@@ -3620,6 +3779,10 @@ mod tests {
             "http://localhost:9090/v1/projects"
         );
         assert_eq!(
+            kit.market.url("/v1/market/stats"),
+            "http://localhost:9090/v1/market/stats"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -3843,6 +4006,23 @@ mod tests {
         assert_eq!(
             client.url("/api/connectors"),
             "http://localhost:9090/api/connectors"
+        );
+    }
+
+    #[test]
+    fn skill_market_types_deserialize_incremental_bodies() {
+        let found: SkillMarketSearchResponse = serde_json::from_str(
+            r#"{"skills":[{"name":"doc_parse","version":"1.0.0","category":"data","tags":["docx"]}],"count":1}"#,
+        )
+        .unwrap();
+        assert_eq!(found.count, 1);
+        assert_eq!(found.skills[0].name, "doc_parse");
+
+        let client =
+            SkillMarketClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/market/stats"),
+            "http://localhost:9090/v1/market/stats"
         );
     }
 
