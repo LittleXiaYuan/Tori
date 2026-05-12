@@ -318,6 +318,46 @@ class _KnowledgeBaseNamespace:
 knowledge_base = _KnowledgeBaseNamespace()
 
 
+
+# ── LoRA Training and Evolution (/v1/lora) ──
+
+class _LoRANamespace:
+    """Lightweight helpers for host local-brain LoRA lifecycle under /v1/lora/*."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/lora/status")
+
+    def history(self) -> dict:
+        return _api_call("GET", "/v1/lora/history")
+
+    def summary(self) -> dict:
+        return _api_call("GET", "/v1/lora/summary")
+
+    def preview(self, tenant_id: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'tenant_id': tenant_id})}" if tenant_id else ""
+        return _api_call("GET", f"/v1/lora/preview{suffix}")
+
+    def trigger(self, tenant_id: str | dict = "") -> dict:
+        body = dict(tenant_id) if isinstance(tenant_id, dict) else ({"tenant_id": tenant_id} if tenant_id else {})
+        return _api_call("POST", "/v1/lora/trigger", body)
+
+    def rollback(self) -> dict:
+        return _api_call("POST", "/v1/lora/rollback", {})
+
+    def evolution(self) -> dict:
+        return _api_call("GET", "/v1/lora/evolution")
+
+    def config(self) -> dict:
+        return _api_call("GET", "/v1/lora/config")
+
+    def update_config(self, config: dict) -> dict:
+        return _api_call("PUT", "/v1/lora/config", config)
+
+
+lora = _LoRANamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -838,6 +878,7 @@ class AgentKit:
         self.memory_core = memory_core
         self.graph = graph
         self.knowledge_base = knowledge_base
+        self.lora = lora
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

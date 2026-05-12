@@ -386,3 +386,17 @@ let found = knowledge.search(&KnowledgeSearchOptions { query: "增量 SDK".to_st
 let ingested = knowledge.ingest(&KnowledgeIngestRequest { name: "sdk-note".to_string(), content: "外部项目可直接调用 Knowledge Base".to_string(), ..Default::default() }).await?;
 println!("{:?} {} {:?}", stats.get("sources"), found.count, ingested.source.map(|s| s.id));
 ```
+
+### LoRA lifecycle helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `LoRAClient` 访问宿主 `/v1/lora/*` 本地脑训练生命周期能力。
+
+```rust
+use yunque_client::{LoRAClient, LoRAPreviewOptions, TriggerLoRARequest};
+
+let lora = LoRAClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let status = lora.status().await?;
+let preview = lora.preview(&LoRAPreviewOptions { tenant_id: "default".to_string() }).await?;
+let triggered = lora.trigger(&TriggerLoRARequest { tenant_id: "default".to_string() }).await?;
+println!("{:?} {:?} {:?}", status.get("active_model"), preview.get("preview"), triggered.get("status"));
+```

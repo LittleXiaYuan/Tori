@@ -163,6 +163,18 @@ ingested = yunque.knowledge_base.ingest("外部项目可直接调用 Knowledge B
 print(stats.get("sources"), found["count"], ingested["source"]["id"])
 ```
 
+
+### LoRA lifecycle 宿主训练进化切片
+
+Python 脚本、插件处理器或自动化任务可以用 `yunque.lora` 访问宿主 `/v1/lora/*` 本地脑训练生命周期能力。
+
+```python
+status = yunque.lora.status()
+preview = yunque.lora.preview("default")
+triggered = yunque.lora.trigger("default")
+print(status.get("active_model"), preview["preview"], triggered["status"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

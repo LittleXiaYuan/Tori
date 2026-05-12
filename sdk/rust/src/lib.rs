@@ -628,6 +628,27 @@ pub struct KnowledgeDeleteResponse {
     pub stats: KnowledgeStatsResponse,
 }
 
+pub type LoRAStatusResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRAHistoryResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRASummaryResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRAEvolutionResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRAConfigResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRARollbackResponse = serde_json::Map<String, serde_json::Value>;
+pub type TriggerLoRAResponse = serde_json::Map<String, serde_json::Value>;
+pub type LoRAConfig = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct LoRAPreviewOptions {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerLoRARequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+}
+
 /// Triggers v2 automation definition returned by `/v1/triggers/v2`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TriggerDef {
@@ -1072,6 +1093,7 @@ pub struct AgentKit {
     pub memory: MemoryClient,
     pub graph: GraphClient,
     pub knowledge: KnowledgeClient,
+    pub lora: LoRAClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1104,6 +1126,7 @@ impl AgentKit {
             memory: MemoryClient::new(base_url.clone(), token.as_ref())?,
             graph: GraphClient::new(base_url.clone(), token.as_ref())?,
             knowledge: KnowledgeClient::new(base_url.clone(), token.as_ref())?,
+            lora: LoRAClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1126,6 +1149,7 @@ impl AgentKit {
             memory: MemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             graph: GraphClient::new_with_client(base_url.clone(), plugin_http.clone()),
             knowledge: KnowledgeClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            lora: LoRAClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -1601,6 +1625,132 @@ impl KnowledgeClient {
         self.http
             .post(self.url("/v1/knowledge/import-repo"))
             .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over host `/v1/lora/*` local-brain training lifecycle endpoints.
+#[derive(Debug, Clone)]
+pub struct LoRAClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl LoRAClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn status(&self) -> Result<LoRAStatusResponse, reqwest::Error> {
+        self.get_map("/v1/lora/status").await
+    }
+
+    pub async fn history(&self) -> Result<LoRAHistoryResponse, reqwest::Error> {
+        self.get_map("/v1/lora/history").await
+    }
+
+    pub async fn summary(&self) -> Result<LoRASummaryResponse, reqwest::Error> {
+        self.get_map("/v1/lora/summary").await
+    }
+
+    pub async fn preview(
+        &self,
+        options: &LoRAPreviewOptions,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, reqwest::Error> {
+        let path = if options.tenant_id.is_empty() {
+            "/v1/lora/preview".to_string()
+        } else {
+            format!(
+                "/v1/lora/preview?tenant_id={}",
+                url_encode_query_component(&options.tenant_id)
+            )
+        };
+        self.get_map(&path).await
+    }
+
+    pub async fn trigger(
+        &self,
+        request: &TriggerLoRARequest,
+    ) -> Result<TriggerLoRAResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/lora/trigger"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn rollback(&self) -> Result<LoRARollbackResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/lora/rollback"))
+            .json(&serde_json::json!({}))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn evolution(&self) -> Result<LoRAEvolutionResponse, reqwest::Error> {
+        self.get_map("/v1/lora/evolution").await
+    }
+
+    pub async fn config(&self) -> Result<LoRAConfigResponse, reqwest::Error> {
+        self.get_map("/v1/lora/config").await
+    }
+
+    pub async fn update_config(
+        &self,
+        config: &LoRAConfig,
+    ) -> Result<LoRAConfigResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/lora/config"))
+            .json(config)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn get_map(
+        &self,
+        path: &str,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, reqwest::Error> {
+        self.http
+            .get(self.url(path))
             .send()
             .await?
             .error_for_status()?
@@ -2611,6 +2761,10 @@ mod tests {
             "http://localhost:9090/v1/knowledge/stats"
         );
         assert_eq!(
+            kit.lora.url("/v1/lora/status"),
+            "http://localhost:9090/v1/lora/status"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -2779,6 +2933,27 @@ mod tests {
         assert_eq!(
             client.url("/v1/knowledge/sources"),
             "http://localhost:9090/v1/knowledge/sources"
+        );
+    }
+
+    #[test]
+    fn lora_types_deserialize_incremental_bodies() {
+        let status: LoRAStatusResponse = serde_json::from_str(
+            r#"{"scheduler":{"status":"idle"},"active_model":"adapter-a","rolling_success_rate":0.8}"#,
+        )
+        .unwrap();
+        assert_eq!(status["active_model"], "adapter-a");
+
+        let trigger = TriggerLoRARequest {
+            tenant_id: "default".to_string(),
+        };
+        let value = serde_json::to_value(trigger).unwrap();
+        assert_eq!(value["tenant_id"], "default");
+
+        let client = LoRAClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/lora/status"),
+            "http://localhost:9090/v1/lora/status"
         );
     }
 
