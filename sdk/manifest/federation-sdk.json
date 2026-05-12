@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "domain": "federation",
+  "description": "Cross-language lightweight SDK for legacy federation hub reads and model-aware A2A OPP federation operations without importing the full platform client.",
+  "principles": [
+    "Expose federation discovery, delegation, capabilities, bridge stats, and broadcast as a focused SDK slice for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep legacy hub reads and model-aware A2A controls directly callable through existing authenticated gateway routes.",
+    "Make Federation access available through Agent Kit while preserving standalone composable facades and read/control/delegate TypeScript subpaths."
+  ],
+  "routes": [
+    "GET /v1/federation/peers",
+    "GET /v1/federation/stats",
+    "GET /v1/federation/capabilities",
+    "POST /v1/federation/capabilities",
+    "POST /v1/federation/discover",
+    "POST /v1/federation/delegate",
+    "GET /v1/federation/bridge/stats",
+    "POST /v1/federation/broadcast"
+  ],
+  "capabilities": [
+    {
+      "name": "peers",
+      "route": "GET /v1/federation/peers",
+      "readOnly": true,
+      "description": "Read legacy federation hub peers."
+    },
+    {
+      "name": "stats",
+      "route": "GET /v1/federation/stats",
+      "readOnly": true,
+      "description": "Read legacy federation hub statistics."
+    },
+    {
+      "name": "capabilities",
+      "route": "GET /v1/federation/capabilities",
+      "readOnly": true,
+      "description": "Read local and peer OPP capabilities."
+    },
+    {
+      "name": "updateCapabilities",
+      "route": "POST /v1/federation/capabilities",
+      "readOnly": false,
+      "description": "Update local OPP capabilities."
+    },
+    {
+      "name": "discover",
+      "route": "POST /v1/federation/discover",
+      "readOnly": false,
+      "description": "Discover peers by feature, adapter, intent, or model requirements."
+    },
+    {
+      "name": "delegate",
+      "route": "POST /v1/federation/delegate",
+      "readOnly": false,
+      "description": "Delegate work to a federated peer."
+    },
+    {
+      "name": "bridgeStats",
+      "route": "GET /v1/federation/bridge/stats",
+      "readOnly": true,
+      "description": "Read model-aware federation bridge statistics."
+    },
+    {
+      "name": "broadcast",
+      "route": "POST /v1/federation/broadcast",
+      "readOnly": false,
+      "description": "Broadcast local capabilities to known peers."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/federation.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "peers": "createFederationClient().peers",
+        "stats": "createFederationClient().stats",
+        "capabilities": "createFederationClient().capabilities",
+        "updateCapabilities": "createFederationClient().updateCapabilities",
+        "discover": "createFederationClient().discover",
+        "delegate": "createFederationClient().delegate",
+        "bridgeStats": "createFederationClient().bridgeStats",
+        "broadcast": "createFederationClient().broadcast"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "peers": "yunque.Federation.Peers",
+        "stats": "yunque.Federation.Stats",
+        "capabilities": "yunque.Federation.Capabilities",
+        "updateCapabilities": "yunque.Federation.UpdateCapabilities",
+        "discover": "yunque.Federation.Discover",
+        "delegate": "yunque.Federation.Delegate",
+        "bridgeStats": "yunque.Federation.BridgeStats",
+        "broadcast": "yunque.Federation.Broadcast"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "peers": "yunque.federation.peers",
+        "stats": "yunque.federation.stats",
+        "capabilities": "yunque.federation.capabilities",
+        "updateCapabilities": "yunque.federation.update_capabilities",
+        "discover": "yunque.federation.discover",
+        "delegate": "yunque.federation.delegate",
+        "bridgeStats": "yunque.federation.bridge_stats",
+        "broadcast": "yunque.federation.broadcast"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "peers": "FederationClient::peers",
+        "stats": "FederationClient::stats",
+        "capabilities": "FederationClient::capabilities",
+        "updateCapabilities": "FederationClient::update_capabilities",
+        "discover": "FederationClient::discover",
+        "delegate": "FederationClient::delegate",
+        "bridgeStats": "FederationClient::bridge_stats",
+        "broadcast": "FederationClient::broadcast"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

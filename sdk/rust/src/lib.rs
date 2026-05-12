@@ -1402,6 +1402,7 @@ pub struct AgentKit {
     pub speech: SpeechClient,
     pub setup: SetupClient,
     pub admin: AdminClient,
+    pub federation: FederationClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1477,6 +1478,7 @@ impl AgentKit {
             speech: SpeechClient::new(base_url.clone(), token.as_ref())?,
             setup: SetupClient::new(base_url.clone(), token.as_ref())?,
             admin: AdminClient::new(base_url.clone(), token.as_ref())?,
+            federation: FederationClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1548,6 +1550,7 @@ impl AgentKit {
             speech: SpeechClient::new_with_client(base_url.clone(), plugin_http.clone()),
             setup: SetupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             admin: AdminClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            federation: FederationClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5600,6 +5603,53 @@ impl SetupClient {
 }
 
 
+
+pub type FederationPeersResponse = serde_json::Value;
+pub type FederationStatsResponse = serde_json::Value;
+pub type FederationCapabilitiesResponse = serde_json::Value;
+pub type FederationStatusResponse = serde_json::Value;
+pub type FederationDiscoverResponse = serde_json::Value;
+pub type FederationDelegateResponse = serde_json::Value;
+pub type FederationBridgeStatsResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct FederationDiscoverRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub feature: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub adapter: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub intent: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub min_tier: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub features: Vec<String>,
+}
+
+/// Lightweight Federation SDK client for model-aware A2A federation and legacy federation hub reads.
+#[derive(Debug, Clone)]
+pub struct FederationClient { base_url: String, http: reqwest::Client }
+
+impl FederationClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn peers(&self) -> Result<FederationPeersResponse, reqwest::Error> { self.get_json("/v1/federation/peers").await }
+    pub async fn stats(&self) -> Result<FederationStatsResponse, reqwest::Error> { self.get_json("/v1/federation/stats").await }
+    pub async fn capabilities(&self) -> Result<FederationCapabilitiesResponse, reqwest::Error> { self.get_json("/v1/federation/capabilities").await }
+    pub async fn update_capabilities(&self, payload: &serde_json::Value) -> Result<FederationStatusResponse, reqwest::Error> { self.post_json("/v1/federation/capabilities", payload).await }
+    pub async fn discover(&self, request: &FederationDiscoverRequest) -> Result<FederationDiscoverResponse, reqwest::Error> { self.post_json("/v1/federation/discover", request).await }
+    pub async fn delegate(&self, payload: &serde_json::Value) -> Result<FederationDelegateResponse, reqwest::Error> { self.post_json("/v1/federation/delegate", payload).await }
+    pub async fn bridge_stats(&self) -> Result<FederationBridgeStatsResponse, reqwest::Error> { self.get_json("/v1/federation/bridge/stats").await }
+    pub async fn broadcast(&self) -> Result<FederationStatusResponse, reqwest::Error> { self.post_json("/v1/federation/broadcast", &serde_json::json!({})).await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type AdminDesktopConsoleResponse = serde_json::Value;
 pub type AdminDesktopAutostartResponse = serde_json::Value;
 pub type AdminTenantListResponse = serde_json::Value;
@@ -9594,6 +9644,22 @@ mod tests {
         assert_eq!(apply["overrides"]["sandbox_tier"], "local");
     }
 
+
+
+    #[test]
+    fn federation_helpers_build_urls_and_payloads() {
+        let client = FederationClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/federation/peers"), "http://localhost:9090/v1/federation/peers");
+        assert_eq!(client.url("/v1/federation/stats"), "http://localhost:9090/v1/federation/stats");
+        assert_eq!(client.url("/v1/federation/capabilities"), "http://localhost:9090/v1/federation/capabilities");
+        assert_eq!(client.url("/v1/federation/discover"), "http://localhost:9090/v1/federation/discover");
+        assert_eq!(client.url("/v1/federation/delegate"), "http://localhost:9090/v1/federation/delegate");
+        assert_eq!(client.url("/v1/federation/bridge/stats"), "http://localhost:9090/v1/federation/bridge/stats");
+        assert_eq!(client.url("/v1/federation/broadcast"), "http://localhost:9090/v1/federation/broadcast");
+        let request = serde_json::to_value(FederationDiscoverRequest { feature: "browser".to_string(), intent: "open page".to_string(), min_tier: "local".to_string(), features: vec!["browser".to_string()], ..Default::default() }).unwrap();
+        assert_eq!(request["feature"], "browser");
+        assert_eq!(request["features"][0], "browser");
+    }
 
     #[test]
     fn admin_helpers_build_urls_and_payloads() {

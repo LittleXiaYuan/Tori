@@ -301,6 +301,83 @@ func filenameFromDisposition(disposition string) string {
 }
 
 
+
+// ── Federation / A2A OPP (/v1/federation) ──
+
+// Federation exposes model-aware A2A federation helpers for external operator pages, CLIs, and sidecars.
+var Federation = &federationNamespace{}
+
+type federationNamespace struct{}
+
+type FederationPeersResponse map[string]any
+type FederationStatsResponse map[string]any
+type FederationCapabilitiesResponse map[string]any
+type FederationStatusResponse map[string]any
+type FederationDiscoverResponse map[string]any
+type FederationDelegateResponse map[string]any
+type FederationBridgeStatsResponse map[string]any
+
+type FederationCapabilityPayload map[string]any
+type FederationDelegatePayload map[string]any
+
+type FederationDiscoverRequest struct {
+	Feature  string   `json:"feature,omitempty"`
+	Adapter  string   `json:"adapter,omitempty"`
+	Intent   string   `json:"intent,omitempty"`
+	MinTier  string   `json:"min_tier,omitempty"`
+	Features []string `json:"features,omitempty"`
+}
+
+func (f *federationNamespace) Peers(ctx context.Context) (FederationPeersResponse, error) {
+	var out FederationPeersResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/peers", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) Stats(ctx context.Context) (FederationStatsResponse, error) {
+	var out FederationStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/stats", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) Capabilities(ctx context.Context) (FederationCapabilitiesResponse, error) {
+	var out FederationCapabilitiesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/capabilities", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) UpdateCapabilities(ctx context.Context, payload FederationCapabilityPayload) (FederationStatusResponse, error) {
+	var out FederationStatusResponse
+	if payload == nil { payload = FederationCapabilityPayload{} }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/capabilities", payload, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) Discover(ctx context.Context, req FederationDiscoverRequest) (FederationDiscoverResponse, error) {
+	var out FederationDiscoverResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/discover", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) Delegate(ctx context.Context, payload FederationDelegatePayload) (FederationDelegateResponse, error) {
+	var out FederationDelegateResponse
+	if payload == nil { payload = FederationDelegatePayload{} }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/delegate", payload, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) BridgeStats(ctx context.Context) (FederationBridgeStatsResponse, error) {
+	var out FederationBridgeStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/bridge/stats", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (f *federationNamespace) Broadcast(ctx context.Context) (FederationStatusResponse, error) {
+	var out FederationStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/broadcast", map[string]any{}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
 // ── Admin / Operator (/v1/desktop, /v1/tenants, /v1/nl-config) ──
 
 // Admin exposes desktop/operator helpers for external admin panels, CLIs, plugins, and automation scripts.
@@ -775,6 +852,7 @@ type AgentKit struct {
 	Speech        *speechNamespace
 	Setup         *setupNamespace
 	Admin         *adminNamespace
+	Federation    *federationNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -5468,6 +5546,7 @@ func NewAgentKit() AgentKit {
 		Speech:        Speech,
 		Setup:         Setup,
 		Admin:         Admin,
+		Federation:    Federation,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,
