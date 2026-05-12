@@ -679,6 +679,14 @@
       "types": "./src/scheduler.ts",
       "import": "./src/scheduler.ts"
     },
+    "./scheduler-read": {
+      "types": "./src/scheduler-read.ts",
+      "import": "./src/scheduler-read.ts"
+    },
+    "./scheduler-control": {
+      "types": "./src/scheduler-control.ts",
+      "import": "./src/scheduler-control.ts"
+    },
     "./upload": {
       "types": "./src/upload.ts",
       "import": "./src/upload.ts"
