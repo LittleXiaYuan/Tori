@@ -5227,6 +5227,7 @@ pub type DeleteTaskTemplateResponse = serde_json::Value;
 pub type TaskGap = serde_json::Value;
 pub type TaskGapStats = serde_json::Value;
 pub type ResolveTaskGapResponse = serde_json::Value;
+pub type TaskWorkingMemory = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TaskConstraints {
@@ -5383,6 +5384,10 @@ impl TasksClient {
 
     pub async fn resolve_gap(&self, id: impl AsRef<str>) -> Result<ResolveTaskGapResponse, reqwest::Error> {
         self.post_json("/v1/tasks/gaps/resolve", &serde_json::json!({"id": id.as_ref()})).await
+    }
+
+    pub async fn working_memory(&self, task_id: impl AsRef<str>) -> Result<TaskWorkingMemory, reqwest::Error> {
+        self.get_json(&format!("/v1/tasks/memory?id={}", url_encode_query_component(task_id.as_ref()))).await
     }
 
     async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
@@ -9103,6 +9108,12 @@ mod tests {
         );
         let gaps: Vec<TaskGap> = serde_json::from_str(r#"[{"id":"gap-1","gap_type":"skill_missing"}]"#).unwrap();
         assert_eq!(gaps[0]["gap_type"], "skill_missing");
+        assert_eq!(
+            client.url(&format!("/v1/tasks/memory?id={}", url_encode_query_component("task 1"))),
+            "http://localhost:9090/v1/tasks/memory?id=task+1"
+        );
+        let memory: TaskWorkingMemory = serde_json::from_str(r#"{"task_id":"task-1","next_action":"resume"}"#).unwrap();
+        assert_eq!(memory["next_action"], "resume");
     }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {

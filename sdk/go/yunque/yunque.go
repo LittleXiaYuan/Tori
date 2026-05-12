@@ -2004,6 +2004,7 @@ type DeleteTaskTemplateResponse map[string]any
 type TaskGap map[string]any
 type TaskGapStats map[string]any
 type ResolveTaskGapResponse map[string]any
+type TaskWorkingMemory map[string]any
 
 type TaskConstraints struct {
 	MaxSteps        int      `json:"max_steps,omitempty"`
@@ -2169,6 +2170,14 @@ func (t *tasksNamespace) GapStats(ctx context.Context) (TaskGapStats, error) {
 func (t *tasksNamespace) ResolveGap(ctx context.Context, id string) (ResolveTaskGapResponse, error) {
 	var out ResolveTaskGapResponse
 	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/gaps/resolve", map[string]string{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) WorkingMemory(ctx context.Context, taskID string) (TaskWorkingMemory, error) {
+	var out TaskWorkingMemory
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/memory?id="+url.QueryEscape(taskID), nil, &out); err != nil {
 		return nil, err
 	}
 	return nonNilMap(out), nil

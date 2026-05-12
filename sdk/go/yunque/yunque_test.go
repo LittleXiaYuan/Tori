@@ -220,6 +220,11 @@ func TestTasksHelpers(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
 			if body["id"] != "gap-1" { t.Fatalf("unexpected gap resolve body: %+v", body) }
 			_, _ = w.Write([]byte(`{"resolved":"gap-1"}`))
+		case "/v1/tasks/memory":
+			if r.URL.Query().Get("id") != "task-1" {
+				t.Fatalf("unexpected memory query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"task_id":"task-1","goal":"ship SDK","next_action":"resume"}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -252,8 +257,10 @@ func TestTasksHelpers(t *testing.T) {
 	if err != nil || stats["unresolved"].(float64) != 1 { t.Fatalf("gap stats = %+v, %v", stats, err) }
 	resolved, err := Tasks.ResolveGap(ctx, "gap-1")
 	if err != nil || resolved["resolved"] != "gap-1" { t.Fatalf("resolve gap = %+v, %v", resolved, err) }
+	memory, err := Tasks.WorkingMemory(ctx, "task-1")
+	if err != nil || memory["next_action"] != "resume" { t.Fatalf("working memory = %+v, %v", memory, err) }
 	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 13 { t.Fatalf("unexpected calls: %v", seen) }
+	if len(seen) != 14 { t.Fatalf("unexpected calls: %v", seen) }
 }
 
 func TestPermissionsHelpers(t *testing.T) {
