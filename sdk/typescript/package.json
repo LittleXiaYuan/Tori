@@ -79,6 +79,14 @@
       "types": "./src/events.ts",
       "import": "./src/events.ts"
     },
+    "./events-stream": {
+      "types": "./src/events-stream.ts",
+      "import": "./src/events-stream.ts"
+    },
+    "./events-parse": {
+      "types": "./src/events-parse.ts",
+      "import": "./src/events-parse.ts"
+    },
     "./realtime": {
       "types": "./src/realtime.ts",
       "import": "./src/realtime.ts"

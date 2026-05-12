@@ -34,6 +34,8 @@
     "src/cognis-workflows.ts",
     "src/cognis-bundles.ts",
     "src/events.ts",
+    "src/events-stream.ts",
+    "src/events-parse.ts",
     "src/realtime.ts",
     "src/webchat.ts",
     "src/conversations.ts",
