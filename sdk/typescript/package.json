@@ -419,6 +419,10 @@
       "types": "./src/heartbeat-observe.ts",
       "import": "./src/heartbeat-observe.ts"
     },
+    "./heartbeat-control": {
+      "types": "./src/heartbeat-control.ts",
+      "import": "./src/heartbeat-control.ts"
+    },
     "./reverie": {
       "types": "./src/reverie.ts",
       "import": "./src/reverie.ts"
@@ -659,14 +663,3 @@
   },
   "sideEffects": false
 }
-
-
-
-
-
-
-
-
-
-
-
