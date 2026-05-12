@@ -160,6 +160,7 @@ import { createBrowserOPPClient } from "yunque-client/browser-opp";
 import { createBrowserExtensionClient } from "yunque-client/browser-extension";
 import { createRuntimeClient } from "yunque-client/runtime";
 import { createRuntimeQueueClient } from "yunque-client/runtime-queue";
+import { createRuntimeEventsClient } from "yunque-client/runtime-events";
 import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
@@ -825,6 +826,15 @@ const runtimeQueue = createRuntimeQueueClient({
 const queues = await runtimeQueue.overview();
 console.log(queues.queues);
 
+const runtimeEvents = createRuntimeEventsClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+
+for await (const event of runtimeEvents.events()) {
+  console.log(event.type, event.data);
+}
+
 const runtime = createRuntimeClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -1154,7 +1164,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1253,6 +1263,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/browser-extension.ts` | Lightweight browser extension session/action/scenario facade without status, capture or OPP APIs |
 | `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
 | `src/runtime-queue.ts` | Lightweight runtime queue overview/session/cancel facade without event stream APIs |
+| `src/runtime-events.ts` | Lightweight runtime SSE event stream facade without session queue APIs |
 | `src/router.ts` | Lightweight hand-written smart-router stats and status slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |

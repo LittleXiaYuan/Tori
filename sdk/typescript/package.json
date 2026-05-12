@@ -283,6 +283,10 @@
       "types": "./src/runtime-queue.ts",
       "import": "./src/runtime-queue.ts"
     },
+    "./runtime-events": {
+      "types": "./src/runtime-events.ts",
+      "import": "./src/runtime-events.ts"
+    },
     "./router": {
       "types": "./src/router.ts",
       "import": "./src/router.ts"
