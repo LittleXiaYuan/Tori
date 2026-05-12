@@ -1002,6 +1002,40 @@ class _RBACNamespace:
 rbac = _RBACNamespace()
 
 
+
+# ── Auth (/v1/auth, /v1/token) ──
+
+class _AuthNamespace:
+    """Lightweight helpers for setup/auth status, password login/setup, token exchange, and Tori OAuth start URLs."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/auth/status")
+
+    def login(self, password: str, remember: bool = False) -> dict:
+        return _api_call("POST", "/v1/auth/login", {"password": password, "remember": remember})
+
+    def set_password(self, password: str, current: str = "") -> dict:
+        body = {"password": password}
+        if current:
+            body["current"] = current
+        return _api_call("POST", "/v1/auth/set-password", body)
+
+    def generate_token(self, role: str = "") -> dict:
+        body = {}
+        if role:
+            body["role"] = role
+        return _api_call("POST", "/v1/token", body)
+
+    def tori_oauth_url(self, tori_url: str = "") -> str:
+        from urllib.parse import urlencode
+        base = _API_BASE.rstrip("/") + "/v1/auth/oauth/tori"
+        if not tori_url:
+            return base
+        return f"{base}?{urlencode({'tori_url': tori_url})}"
+
+
+auth = _AuthNamespace()
+
 # ── Tasks (/v1/tasks) ──
 
 class _TasksNamespace:
@@ -2375,6 +2409,7 @@ class AgentKit:
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
+        self.auth = auth
         self.tasks = tasks
         self.task_templates = task_templates
         self.task_gaps = task_gaps

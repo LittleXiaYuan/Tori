@@ -10,6 +10,61 @@ import (
 	"testing"
 )
 
+
+func TestAuthHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/auth/status":
+			if r.Method != http.MethodGet { t.Fatalf("method = %s", r.Method) }
+			_, _ = w.Write([]byte(`{"password_set":true,"authenticated":true}`))
+		case "/v1/auth/login":
+			var body AuthLoginRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Password != "secret" || !body.Remember { t.Fatalf("unexpected login body: %+v", body) }
+			_, _ = w.Write([]byte(`{"token":"jwt-admin","expires_in":604800}`))
+		case "/v1/auth/set-password":
+			var body AuthSetPasswordRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Password != "new" || body.Current != "old" { t.Fatalf("unexpected password body: %+v", body) }
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/token":
+			var body GenerateTokenRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Role != "viewer" { t.Fatalf("unexpected token body: %+v", body) }
+			_, _ = w.Write([]byte(`{"token":"jwt-viewer","type":"Bearer"}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	status, err := Auth.Status(context.Background())
+	if err != nil { t.Fatal(err) }
+	login, err := Auth.Login(context.Background(), AuthLoginRequest{Password: "secret", Remember: true})
+	if err != nil { t.Fatal(err) }
+	changed, err := Auth.SetPassword(context.Background(), AuthSetPasswordRequest{Password: "new", Current: "old"})
+	if err != nil { t.Fatal(err) }
+	token, err := Auth.GenerateToken(context.Background(), GenerateTokenRequest{Role: "viewer"})
+	if err != nil { t.Fatal(err) }
+	if status["authenticated"] != true || login["token"] != "jwt-admin" || changed["status"] != "ok" || token["token"] != "jwt-viewer" {
+		t.Fatalf("unexpected auth responses: %+v %+v %+v %+v", status, login, changed, token)
+	}
+	if Auth.ToriOAuthURL("") != strings.TrimRight(apiBase, "/")+"/v1/auth/oauth/tori" {
+		t.Fatalf("unexpected tori URL: %s", Auth.ToriOAuthURL(""))
+	}
+	if !strings.Contains(Auth.ToriOAuthURL("https://tori.example"), "tori_url=https%3A%2F%2Ftori.example") {
+		t.Fatalf("unexpected encoded tori URL: %s", Auth.ToriOAuthURL("https://tori.example"))
+	}
+	if NewAgentKit().Auth != Auth {
+		t.Fatalf("agent kit should reuse Auth namespace")
+	}
+	if len(seen) != 4 {
+		t.Fatalf("expected 4 auth API calls, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestAPIErrorMessageParsesNestedGatewayError(t *testing.T) {
 	body := []byte(`{"error":{"code":"BAD_REQUEST","message":"unsupported recovery action"}}`)
 	got := apiErrorMessage(body)

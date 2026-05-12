@@ -1397,6 +1397,7 @@ pub struct AgentKit {
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
+    pub auth: AuthClient,
     pub tasks: TasksClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
@@ -1464,6 +1465,7 @@ impl AgentKit {
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
+            auth: AuthClient::new(base_url.clone(), token.as_ref())?,
             tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
@@ -1527,6 +1529,7 @@ impl AgentKit {
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5219,6 +5222,34 @@ fn filename_from_disposition(disposition: &str) -> String {
     String::new()
 }
 
+pub type AuthStatusResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuthLoginRequest {
+    pub password: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub remember: bool,
+}
+
+pub type AuthLoginResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuthSetPasswordRequest {
+    pub password: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub current: String,
+}
+
+pub type AuthMutationResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GenerateTokenRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub role: String,
+}
+
+pub type GenerateTokenResponse = serde_json::Map<String, serde_json::Value>;
+
 pub type Task = serde_json::Map<String, serde_json::Value>;
 pub type TaskActionResponse = serde_json::Value;
 pub type TaskTemplate = serde_json::Value;
@@ -5332,6 +5363,57 @@ pub struct PostTaskThreadMessageRequest {
 pub struct UpdateTaskThreadStateRequest {
     pub task_id: String,
     pub state: String,
+}
+
+/// Lightweight Auth SDK client for setup status, password login/setup, token exchange, and Tori OAuth start URLs.
+#[derive(Debug, Clone)]
+pub struct AuthClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl AuthClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); }
+        }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { base_url: trim_base_url(base_url.into()), http }
+    }
+
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+
+    pub async fn status(&self) -> Result<AuthStatusResponse, reqwest::Error> {
+        self.http.get(self.url("/v1/auth/status")).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn login(&self, request: &AuthLoginRequest) -> Result<AuthLoginResponse, reqwest::Error> {
+        self.http.post(self.url("/v1/auth/login")).json(request).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn set_password(&self, request: &AuthSetPasswordRequest) -> Result<AuthMutationResponse, reqwest::Error> {
+        self.http.post(self.url("/v1/auth/set-password")).json(request).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn generate_token(&self, request: &GenerateTokenRequest) -> Result<GenerateTokenResponse, reqwest::Error> {
+        self.http.post(self.url("/v1/token")).json(request).send().await?.error_for_status()?.json().await
+    }
+
+    pub fn tori_oauth_url(&self, tori_url: impl AsRef<str>) -> String {
+        let tori_url = tori_url.as_ref();
+        if tori_url.is_empty() {
+            self.url("/v1/auth/oauth/tori")
+        } else {
+            self.url(&format!("/v1/auth/oauth/tori?tori_url={}", url_encode_query_component(tori_url)))
+        }
+    }
 }
 
 /// Small Rust helper over task CRUD and lifecycle endpoints.
@@ -9118,6 +9200,29 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+
+    #[test]
+    fn auth_helpers_build_urls_and_payloads() {
+        let client = AuthClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/auth/status"), "http://localhost:9090/v1/auth/status");
+        assert_eq!(client.tori_oauth_url(""), "http://localhost:9090/v1/auth/oauth/tori");
+        assert_eq!(
+            client.tori_oauth_url("https://tori.example"),
+            "http://localhost:9090/v1/auth/oauth/tori?tori_url=https%3A%2F%2Ftori.example"
+        );
+        let login = serde_json::to_value(AuthLoginRequest { password: "secret".to_string(), remember: true }).unwrap();
+        assert_eq!(login["password"], "secret");
+        assert_eq!(login["remember"], true);
+        let set_password = serde_json::to_value(AuthSetPasswordRequest { password: "new".to_string(), current: "old".to_string() }).unwrap();
+        assert_eq!(set_password["current"], "old");
+        let request = serde_json::to_value(GenerateTokenRequest { role: "viewer".to_string() }).unwrap();
+        assert_eq!(request["role"], "viewer");
+        let status: AuthStatusResponse = serde_json::from_str(r#"{"password_set":true,"authenticated":true}"#).unwrap();
+        assert_eq!(status["authenticated"], serde_json::json!(true));
+        let token: GenerateTokenResponse = serde_json::from_str(r#"{"token":"jwt-viewer","type":"Bearer"}"#).unwrap();
+        assert_eq!(token["token"], serde_json::json!("jwt-viewer"));
     }
 
     #[test]
