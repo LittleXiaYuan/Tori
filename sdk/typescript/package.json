@@ -683,6 +683,10 @@
       "types": "./src/skillhub-install.ts",
       "import": "./src/skillhub-install.ts"
     },
+    "./skillhub-updates": {
+      "types": "./src/skillhub-updates.ts",
+      "import": "./src/skillhub-updates.ts"
+    },
     "./skillhub-policy": {
       "types": "./src/skillhub-policy.ts",
       "import": "./src/skillhub-policy.ts"
