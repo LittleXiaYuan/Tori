@@ -319,6 +319,8 @@
     "src/plugin-cron-control.ts",
     "src/plugin-send.ts",
     "src/plugin-extensions.ts",
+    "src/plugin-extensions-list.ts",
+    "src/plugin-extension-register.ts",
     "src/state.ts",
     "src/resource-state.ts",
     "src/focus-state.ts",

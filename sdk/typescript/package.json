@@ -1219,6 +1219,14 @@
       "types": "./src/plugin-extensions.ts",
       "import": "./src/plugin-extensions.ts"
     },
+    "./plugin-extensions-list": {
+      "types": "./src/plugin-extensions-list.ts",
+      "import": "./src/plugin-extensions-list.ts"
+    },
+    "./plugin-extension-register": {
+      "types": "./src/plugin-extension-register.ts",
+      "import": "./src/plugin-extension-register.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
