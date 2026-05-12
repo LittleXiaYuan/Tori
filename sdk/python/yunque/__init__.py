@@ -1150,6 +1150,18 @@ class _TaskThreadsNamespace:
 
 task_threads = _TaskThreadsNamespace()
 
+
+# ── Task Trace (/v1/trace/task/{task_id}) ──
+
+class _TaskTraceNamespace:
+    """Lightweight task-scoped execution trace helper."""
+
+    def get(self, task_id: str, raw: bool = False) -> dict:
+        return trace.by_task_id(task_id, raw=raw)
+
+
+task_trace = _TaskTraceNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2368,6 +2380,7 @@ class AgentKit:
         self.task_gaps = task_gaps
         self.task_memory = task_memory
         self.task_threads = task_threads
+        self.task_trace = task_trace
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

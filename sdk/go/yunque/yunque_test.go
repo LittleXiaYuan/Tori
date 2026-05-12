@@ -247,6 +247,11 @@ func TestTasksHelpers(t *testing.T) {
 				if body.TaskID != "task-1" || body.State != "paused" { t.Fatalf("unexpected thread state body: %+v", body) }
 				_, _ = w.Write([]byte(`{"status":"updated","task_id":"task-1","state":"paused"}`))
 			}
+		case "/v1/trace/task/task-1":
+			if r.URL.Query().Get("raw") != "true" {
+				t.Fatalf("unexpected trace query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"task_id":"task-1","count":1,"raw":true,"events":[{"id":"evt-1"}]}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -289,8 +294,10 @@ func TestTasksHelpers(t *testing.T) {
 	if err != nil || posted["status"] != "posted" { t.Fatalf("post thread = %+v, %v", posted, err) }
 	updated, err := Tasks.UpdateThreadState(ctx, UpdateTaskThreadStateRequest{TaskID: "task-1", State: "paused"})
 	if err != nil || updated["state"] != "paused" { t.Fatalf("update thread = %+v, %v", updated, err) }
+	trace, err := Tasks.Trace(ctx, "task-1", true)
+	if err != nil || trace.TaskID != "task-1" || !trace.Raw || len(trace.Events) != 1 { t.Fatalf("task trace = %+v, %v", trace, err) }
 	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 18 { t.Fatalf("unexpected calls: %v", seen) }
+	if len(seen) != 19 { t.Fatalf("unexpected calls: %v", seen) }
 }
 
 func TestPermissionsHelpers(t *testing.T) {

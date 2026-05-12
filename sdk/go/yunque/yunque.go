@@ -2008,6 +2008,7 @@ type TaskWorkingMemory map[string]any
 type TaskThreadsResponse map[string]any
 type TaskThreadResponse map[string]any
 type TaskThreadActionResponse map[string]any
+type TaskTraceResponse = TraceByTaskResponse
 
 type TaskConstraints struct {
 	MaxSteps        int      `json:"max_steps,omitempty"`
@@ -2239,6 +2240,10 @@ func (t *tasksNamespace) UpdateThreadState(ctx context.Context, req UpdateTaskTh
 		return nil, err
 	}
 	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Trace(ctx context.Context, taskID string, raw bool) (TaskTraceResponse, error) {
+	return Trace.ByTaskID(ctx, taskID, raw)
 }
 
 // ── Cost / Usage / Quota ──

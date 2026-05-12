@@ -5231,6 +5231,7 @@ pub type TaskWorkingMemory = serde_json::Value;
 pub type TaskThreadsResponse = serde_json::Value;
 pub type TaskThreadResponse = serde_json::Value;
 pub type TaskThreadActionResponse = serde_json::Value;
+pub type TaskTraceResponse = TraceByTaskResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TaskConstraints {
@@ -5438,6 +5439,11 @@ impl TasksClient {
 
     pub async fn update_thread_state(&self, request: &UpdateTaskThreadStateRequest) -> Result<TaskThreadActionResponse, reqwest::Error> {
         self.http.put(self.url("/v1/tasks/threads")).json(request).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn trace(&self, task_id: &str, raw: bool) -> Result<TaskTraceResponse, reqwest::Error> {
+        let trace = TraceClient::new_with_client(self.base_url.clone(), self.http.clone());
+        trace.by_task_id(task_id, raw).await
     }
 
     async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
@@ -9180,6 +9186,9 @@ mod tests {
         assert_eq!(post_thread["channel"]["channel_id"], "chat-1");
         let state = serde_json::to_value(UpdateTaskThreadStateRequest { task_id: "task-1".to_string(), state: "paused".to_string() }).unwrap();
         assert_eq!(state["state"], "paused");
+        let trace: TaskTraceResponse = serde_json::from_str(r#"{"task_id":"task-1","count":1,"raw":true,"events":[{"id":"evt-1"}]}"#).unwrap();
+        assert_eq!(trace.task_id, "task-1");
+        assert_eq!(trace.events[0]["id"], "evt-1");
     }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {
