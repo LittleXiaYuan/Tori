@@ -199,6 +199,41 @@ func TestSetupHelpers(t *testing.T) {
 	}
 }
 
+
+func TestAdminHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/desktop/console":
+			_, _ = w.Write([]byte(`{"console_hidden":` + fmt.Sprint(r.Method == http.MethodPost) + `}`))
+		case "/v1/desktop/autostart":
+			_, _ = w.Write([]byte(`{"autostart_enabled":` + fmt.Sprint(r.Method == http.MethodPost) + `}`))
+		case "/v1/tenants":
+			if r.Method == http.MethodPost { var body AdminCreateTenantRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Name != "team" { t.Fatalf("unexpected tenant body: %+v", body) }; _, _ = w.Write([]byte(`{"id":"t2","name":"team"}`)); return }
+			_, _ = w.Write([]byte(`{"tenants":[{"id":"t1","name":"default"}],"count":1}`))
+		case "/v1/nl-config", "/v1/nl-config/translate":
+			var body AdminNLConfigRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Text == "" { t.Fatalf("missing nl config text") }; _, _ = w.Write([]byte(`{"status":"ok","executed":` + fmt.Sprint(body.Execute) + `}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	consoleStatus, _ := Admin.ConsoleStatus(ctx)
+	consoleToggle, _ := Admin.ToggleConsole(ctx)
+	autostartStatus, _ := Admin.AutostartStatus(ctx)
+	autostartToggle, _ := Admin.ToggleAutostart(ctx)
+	tenants, _ := Admin.ListTenants(ctx)
+	created, _ := Admin.CreateTenant(ctx, "team")
+	translated, _ := Admin.NLConfigTranslate(ctx, "切换到 qwen")
+	executed, _ := Admin.NLConfig(ctx, "切换到 qwen", true)
+	if consoleStatus["console_hidden"] != false || consoleToggle["console_hidden"] != true || autostartStatus["autostart_enabled"] != false || autostartToggle["autostart_enabled"] != true || tenants["count"].(float64) != 1 || created["name"] != "team" || translated["executed"] != false || executed["executed"] != true || NewAgentKit().Admin != Admin {
+		t.Fatalf("unexpected admin results")
+	}
+	if len(seen) != 8 { t.Fatalf("expected 8 admin API calls, got %d: %v", len(seen), seen) }
+}
+
 func TestSettingsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
