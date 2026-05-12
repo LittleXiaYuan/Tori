@@ -293,27 +293,28 @@ func decodeMapResponse(resp map[string]any, target any) error {
 // Mission Parse, Scheduler, Triggers, and Plugin API Runtime helpers without linking to
 // platform internals or a broad generated client.
 type AgentKit struct {
-	State       *stateNamespace
-	Reflect     *reflectNamespace
-	Missions    *missionsNamespace
-	Scheduler   *schedulerNamespace
-	CronSystem  *cronSystemNamespace
-	Triggers    *triggersNamespace
-	MemoryCore  *memoryCoreNamespace
-	Graph       *graphNamespace
-	KnowledgeKB *knowledgeKBNamespace
-	LoRA        *loRANamespace
-	Workflows   *workflowsNamespace
-	Connectors  *connectorsNamespace
-	Notify      *notifyNamespace
-	Projects    *projectsNamespace
-	Market      *skillMarketNamespace
-	Dispatch    *dispatchNamespace
-	Plugin      *pluginRuntimeNamespace
-	Memory      *memoryNamespace
-	AgentMemory *agentMemoryNamespace
-	Knowledge   *knowledgeNamespace
-	Cron        *cronNamespace
+	State        *stateNamespace
+	Reflect      *reflectNamespace
+	Missions     *missionsNamespace
+	Scheduler    *schedulerNamespace
+	CronSystem   *cronSystemNamespace
+	Triggers     *triggersNamespace
+	MemoryCore   *memoryCoreNamespace
+	Graph        *graphNamespace
+	KnowledgeKB  *knowledgeKBNamespace
+	LoRA         *loRANamespace
+	Workflows    *workflowsNamespace
+	Connectors   *connectorsNamespace
+	Notify       *notifyNamespace
+	Projects     *projectsNamespace
+	Market       *skillMarketNamespace
+	Dispatch     *dispatchNamespace
+	Orchestrator *orchestratorNamespace
+	Plugin       *pluginRuntimeNamespace
+	Memory       *memoryNamespace
+	AgentMemory  *agentMemoryNamespace
+	Knowledge    *knowledgeNamespace
+	Cron         *cronNamespace
 }
 
 // Plugin groups top-level Plugin API Runtime helpers under one namespace for
@@ -1610,6 +1611,184 @@ func (d *dispatchNamespace) WorkerConfig(ctx context.Context, workerType string)
 	return out, nil
 }
 
+// ── IDE Worker Orchestrator ──
+
+// Orchestrator provides focused access to IDE worker daemon status, sessions, events, and policy APIs.
+var Orchestrator = &orchestratorNamespace{}
+
+type orchestratorNamespace struct{}
+
+type OrchestratorPolicy map[string]any
+
+type OrchestratorStatusResponse struct {
+	Running        bool               `json:"running"`
+	Adapters       []string           `json:"adapters"`
+	ActiveSessions int                `json:"active_sessions"`
+	Policy         OrchestratorPolicy `json:"policy,omitempty"`
+	EventCount     int                `json:"event_count,omitempty"`
+}
+
+type OrchestratorToggleResponse struct {
+	Status string `json:"status"`
+}
+
+type OrchestratorSession struct {
+	SessionID string         `json:"session_id"`
+	Adapter   string         `json:"adapter"`
+	TaskID    string         `json:"task_id"`
+	StartedAt string         `json:"started_at,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type OrchestratorSessionsResponse struct {
+	Sessions []OrchestratorSession `json:"sessions"`
+}
+
+type OrchestratorIDE struct {
+	Name      string         `json:"name,omitempty"`
+	Path      string         `json:"path,omitempty"`
+	Available bool           `json:"available,omitempty"`
+	Version   string         `json:"version,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type OrchestratorDetectResponse struct {
+	IDEs []OrchestratorIDE `json:"ides"`
+}
+
+type OrchestratorEvent struct {
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	TaskID    string         `json:"task_id,omitempty"`
+	WorkerID  string         `json:"worker_id,omitempty"`
+	SessionID string         `json:"session_id,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Meta      map[string]any `json:"meta,omitempty"`
+	Timestamp string         `json:"timestamp,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type OrchestratorEventsResponse struct {
+	Events []OrchestratorEvent `json:"events"`
+	Total  int                 `json:"total,omitempty"`
+}
+
+type OrchestratorTaskTimelineResponse struct {
+	TaskID string              `json:"task_id"`
+	Events []OrchestratorEvent `json:"events"`
+}
+
+type OrchestratorPolicyUpdateResponse struct {
+	Status string             `json:"status"`
+	Policy OrchestratorPolicy `json:"policy"`
+}
+
+type OrchestratorAdapterConfig struct {
+	AdapterName   string `json:"adapter_name"`
+	Binary        string `json:"binary"`
+	LaunchArgs    string `json:"launch_args,omitempty"`
+	MCPConfigPath string `json:"mcp_config_path"`
+	RulesFilePath string `json:"rules_file_path,omitempty"`
+	Lifecycle     string `json:"lifecycle,omitempty"`
+}
+
+type OrchestratorAdapterResponse struct {
+	Status    string `json:"status"`
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+}
+
+func (o *orchestratorNamespace) Status(ctx context.Context) (OrchestratorStatusResponse, error) {
+	var out OrchestratorStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/orchestrator/status", nil, &out); err != nil {
+		return OrchestratorStatusResponse{}, err
+	}
+	if out.Adapters == nil {
+		out.Adapters = []string{}
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) Toggle(ctx context.Context, action string) (OrchestratorToggleResponse, error) {
+	var out OrchestratorToggleResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/orchestrator/toggle", map[string]string{"action": action}, &out); err != nil {
+		return OrchestratorToggleResponse{}, err
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) Sessions(ctx context.Context) (OrchestratorSessionsResponse, error) {
+	var out OrchestratorSessionsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/orchestrator/sessions", nil, &out); err != nil {
+		return OrchestratorSessionsResponse{}, err
+	}
+	if out.Sessions == nil {
+		out.Sessions = []OrchestratorSession{}
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) DetectIDEs(ctx context.Context) (OrchestratorDetectResponse, error) {
+	var out OrchestratorDetectResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/orchestrator/detect", nil, &out); err != nil {
+		return OrchestratorDetectResponse{}, err
+	}
+	if out.IDEs == nil {
+		out.IDEs = []OrchestratorIDE{}
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) Events(ctx context.Context, limit int) (OrchestratorEventsResponse, error) {
+	path := "/v1/orchestrator/events"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	var out OrchestratorEventsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return OrchestratorEventsResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []OrchestratorEvent{}
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) TaskTimeline(ctx context.Context, taskID string) (OrchestratorTaskTimelineResponse, error) {
+	var out OrchestratorTaskTimelineResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/orchestrator/events/task?task_id="+url.QueryEscape(taskID), nil, &out); err != nil {
+		return OrchestratorTaskTimelineResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []OrchestratorEvent{}
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) Policy(ctx context.Context) (OrchestratorPolicy, error) {
+	var out OrchestratorPolicy
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/orchestrator/policy", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) UpdatePolicy(ctx context.Context, policy OrchestratorPolicy) (OrchestratorPolicyUpdateResponse, error) {
+	var out OrchestratorPolicyUpdateResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/orchestrator/policy", policy, &out); err != nil {
+		return OrchestratorPolicyUpdateResponse{}, err
+	}
+	return out, nil
+}
+
+func (o *orchestratorNamespace) AddAdapter(ctx context.Context, cfg OrchestratorAdapterConfig) (OrchestratorAdapterResponse, error) {
+	var out OrchestratorAdapterResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/orchestrator/adapters/add", cfg, &out); err != nil {
+		return OrchestratorAdapterResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -1845,27 +2024,28 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 // scheduler, cron, triggers, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
-		State:       State,
-		Reflect:     Reflect,
-		Missions:    Missions,
-		Scheduler:   Scheduler,
-		CronSystem:  CronSystem,
-		Triggers:    Triggers,
-		MemoryCore:  MemoryCore,
-		Graph:       Graph,
-		KnowledgeKB: KnowledgeKB,
-		LoRA:        LoRA,
-		Workflows:   Workflows,
-		Connectors:  Connectors,
-		Notify:      Notify,
-		Projects:    Projects,
-		Market:      SkillMarket,
-		Dispatch:    Dispatch,
-		Plugin:      Plugin,
-		Memory:      Memory,
-		AgentMemory: AgentMemory,
-		Knowledge:   Knowledge,
-		Cron:        Cron,
+		State:        State,
+		Reflect:      Reflect,
+		Missions:     Missions,
+		Scheduler:    Scheduler,
+		CronSystem:   CronSystem,
+		Triggers:     Triggers,
+		MemoryCore:   MemoryCore,
+		Graph:        Graph,
+		KnowledgeKB:  KnowledgeKB,
+		LoRA:         LoRA,
+		Workflows:    Workflows,
+		Connectors:   Connectors,
+		Notify:       Notify,
+		Projects:     Projects,
+		Market:       SkillMarket,
+		Dispatch:     Dispatch,
+		Orchestrator: Orchestrator,
+		Plugin:       Plugin,
+		Memory:       Memory,
+		AgentMemory:  AgentMemory,
+		Knowledge:    Knowledge,
+		Cron:         Cron,
 	}
 }
 

@@ -24,6 +24,7 @@
     "project-workspaces",
     "skill-market",
     "mcp-dispatch",
+    "ide-orchestrator",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -92,6 +93,10 @@
       "description": "Access the lightweight MCP Dispatch worker and queue client or namespace."
     },
     {
+      "name": "orchestrator",
+      "description": "Access the lightweight IDE worker Orchestrator daemon client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -125,7 +130,8 @@
         "workflows": "AgentKit.workflows",
         "projects": "AgentKit.projects",
         "market": "AgentKit.market",
-        "dispatch": "AgentKit.dispatch"
+        "dispatch": "AgentKit.dispatch",
+        "orchestrator": "AgentKit.orchestrator"
       }
     },
     "go": {
@@ -156,7 +162,8 @@
         "workflows": "AgentKit.Workflows",
         "projects": "AgentKit.Projects",
         "market": "AgentKit.Market",
-        "dispatch": "AgentKit.Dispatch"
+        "dispatch": "AgentKit.Dispatch",
+        "orchestrator": "AgentKit.Orchestrator"
       }
     },
     "python": {
@@ -187,7 +194,8 @@
         "workflows": "AgentKit.workflows",
         "projects": "AgentKit.projects",
         "market": "AgentKit.market",
-        "dispatch": "AgentKit.dispatch"
+        "dispatch": "AgentKit.dispatch",
+        "orchestrator": "AgentKit.orchestrator"
       }
     },
     "rust": {
@@ -218,7 +226,8 @@
         "workflows": "AgentKit::workflows",
         "projects": "AgentKit::projects",
         "market": "AgentKit::market",
-        "dispatch": "AgentKit::dispatch"
+        "dispatch": "AgentKit::dispatch",
+        "orchestrator": "AgentKit::orchestrator"
       }
     }
   },

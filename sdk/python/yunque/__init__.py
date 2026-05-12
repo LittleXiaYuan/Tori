@@ -513,6 +513,45 @@ class _DispatchNamespace:
 dispatch = _DispatchNamespace()
 
 
+# ── IDE Worker Orchestrator (/v1/orchestrator) ──
+
+class _OrchestratorNamespace:
+    """Lightweight helpers for IDE worker daemon status, sessions, events, and policy."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/orchestrator/status")
+
+    def toggle(self, action: str) -> dict:
+        return _api_call("POST", "/v1/orchestrator/toggle", {"action": action})
+
+    def sessions(self) -> dict:
+        return _api_call("GET", "/v1/orchestrator/sessions")
+
+    def detect_ides(self) -> dict:
+        return _api_call("GET", "/v1/orchestrator/detect")
+
+    def events(self, limit: int = 0) -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'limit': str(limit)})}" if limit > 0 else ""
+        return _api_call("GET", f"/v1/orchestrator/events{suffix}")
+
+    def task_timeline(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/orchestrator/events/task?{urlencode({'task_id': task_id})}")
+
+    def policy(self) -> dict:
+        return _api_call("GET", "/v1/orchestrator/policy")
+
+    def update_policy(self, policy: dict) -> dict:
+        return _api_call("PUT", "/v1/orchestrator/policy", policy)
+
+    def add_adapter(self, config: dict) -> dict:
+        return _api_call("POST", "/v1/orchestrator/adapters/add", config)
+
+
+orchestrator = _OrchestratorNamespace()
+
+
 # ── Skill Market (/v1/market) ──
 
 class _SkillMarketNamespace:
@@ -1105,6 +1144,7 @@ class AgentKit:
         self.projects = projects
         self.market = market
         self.dispatch = dispatch
+        self.orchestrator = orchestrator
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
