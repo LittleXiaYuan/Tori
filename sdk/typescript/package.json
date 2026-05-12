@@ -155,6 +155,26 @@
       "types": "./src/conversations-control.ts",
       "import": "./src/conversations-control.ts"
     },
+    "./conversation-sessions": {
+      "types": "./src/conversation-sessions.ts",
+      "import": "./src/conversation-sessions.ts"
+    },
+    "./conversation-messages": {
+      "types": "./src/conversation-messages.ts",
+      "import": "./src/conversation-messages.ts"
+    },
+    "./conversation-replay": {
+      "types": "./src/conversation-replay.ts",
+      "import": "./src/conversation-replay.ts"
+    },
+    "./conversation-message-control": {
+      "types": "./src/conversation-message-control.ts",
+      "import": "./src/conversation-message-control.ts"
+    },
+    "./conversation-manage": {
+      "types": "./src/conversation-manage.ts",
+      "import": "./src/conversation-manage.ts"
+    },
     "./subagents": {
       "types": "./src/subagents.ts",
       "import": "./src/subagents.ts"
