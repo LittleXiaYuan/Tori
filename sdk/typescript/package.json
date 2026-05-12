@@ -31,6 +31,10 @@
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
     },
+    "./chat-basic": {
+      "types": "./src/chat-basic.ts",
+      "import": "./src/chat-basic.ts"
+    },
     "./chat-stream": {
       "types": "./src/chat-stream.ts",
       "import": "./src/chat-stream.ts"
