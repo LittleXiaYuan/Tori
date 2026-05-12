@@ -259,6 +259,8 @@
     "src/plugin-reload.ts",
     "src/plugin-folder.ts",
     "src/plugin-files.ts",
+    "src/plugin-file-read.ts",
+    "src/plugin-file-save.ts",
     "src/plugin-crud.ts",
     "src/plugin-create.ts",
     "src/plugin-delete.ts",

@@ -979,6 +979,14 @@
       "types": "./src/plugin-files.ts",
       "import": "./src/plugin-files.ts"
     },
+    "./plugin-file-read": {
+      "types": "./src/plugin-file-read.ts",
+      "import": "./src/plugin-file-read.ts"
+    },
+    "./plugin-file-save": {
+      "types": "./src/plugin-file-save.ts",
+      "import": "./src/plugin-file-save.ts"
+    },
     "./plugin-crud": {
       "types": "./src/plugin-crud.ts",
       "import": "./src/plugin-crud.ts"
