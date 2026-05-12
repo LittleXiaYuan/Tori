@@ -331,6 +331,10 @@
       "types": "./src/persona.ts",
       "import": "./src/persona.ts"
     },
+    "./persona-state": {
+      "types": "./src/persona-state.ts",
+      "import": "./src/persona-state.ts"
+    },
     "./workflow": {
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"

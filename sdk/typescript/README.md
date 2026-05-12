@@ -172,6 +172,7 @@ import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
 import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
+import { createPersonaStateClient } from "yunque-client/persona-state";
 import { createWorkflowClient } from "yunque-client/workflow";
 import { createWorkflowDefinitionsClient } from "yunque-client/workflow-definitions";
 import { createWorkflowRunsClient } from "yunque-client/workflow-runs";
@@ -1220,7 +1221,7 @@ console.log(sandboxStatus.key_source);
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
-`/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
+`/ide`/`persona`/`persona-state`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
@@ -1330,6 +1331,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
+| `src/persona-state.ts` | Lightweight persona identity/soul state facade without skills or presets APIs |
 | `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
 | `src/workflow-definitions.ts` | Lightweight workflow definition management facade without full SDK import |
 | `src/workflow-runs.ts` | Lightweight workflow run and instance facade without full SDK import |
