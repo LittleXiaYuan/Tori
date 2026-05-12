@@ -1191,6 +1191,14 @@
       "types": "./src/plugin-knowledge.ts",
       "import": "./src/plugin-knowledge.ts"
     },
+    "./plugin-knowledge-search": {
+      "types": "./src/plugin-knowledge-search.ts",
+      "import": "./src/plugin-knowledge-search.ts"
+    },
+    "./plugin-knowledge-ingest": {
+      "types": "./src/plugin-knowledge-ingest.ts",
+      "import": "./src/plugin-knowledge-ingest.ts"
+    },
     "./plugin-cron": {
       "types": "./src/plugin-cron.ts",
       "import": "./src/plugin-cron.ts"

@@ -312,6 +312,8 @@
     "src/plugin-agent-memory-search.ts",
     "src/plugin-agent-memory-write.ts",
     "src/plugin-knowledge.ts",
+    "src/plugin-knowledge-search.ts",
+    "src/plugin-knowledge-ingest.ts",
     "src/plugin-cron.ts",
     "src/plugin-send.ts",
     "src/plugin-extensions.ts",
