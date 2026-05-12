@@ -267,6 +267,10 @@
       "types": "./src/browser-capture.ts",
       "import": "./src/browser-capture.ts"
     },
+    "./browser-opp": {
+      "types": "./src/browser-opp.ts",
+      "import": "./src/browser-opp.ts"
+    },
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
