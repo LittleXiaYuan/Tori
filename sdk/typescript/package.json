@@ -523,6 +523,10 @@
       "types": "./src/plugin-cron.ts",
       "import": "./src/plugin-cron.ts"
     },
+    "./plugin-send": {
+      "types": "./src/plugin-send.ts",
+      "import": "./src/plugin-send.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
