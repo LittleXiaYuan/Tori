@@ -51,7 +51,10 @@ jobs:
               - 'go.sum'
               - '.github/workflows/ci.yml'
             sdk:
-              - 'sdk/typescript/**'
+              - 'sdk/**'
+              - 'docs/plugins/sdk-*.md'
+              - 'docs/plugins/developing.md'
+              - 'docs/plugins/overview.md'
               - 'internal/controlplane/gateway/**'
               - '.github/workflows/ci.yml'
             web:
@@ -156,6 +159,9 @@ jobs:
 
       - name: TypeScript typecheck
         run: npm run typecheck
+
+      - name: State SDK manifest guard
+        run: npm run check:state-manifest
 
       - name: Package size guard
         run: npm run check:pack
