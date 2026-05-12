@@ -175,6 +175,18 @@ triggered = yunque.lora.trigger("default")
 print(status.get("active_model"), preview["preview"], triggered["status"])
 ```
 
+
+### Workflow orchestration 工作流编排切片
+
+Python 脚本、插件处理器或自动化任务可以用 `yunque.workflows` 调用宿主 `/v1/workflows*`。
+
+```python
+defs = yunque.workflows.list()
+run = yunque.workflows.run("wf_1", {"topic": "sdk"})
+instances = yunque.workflows.instances()
+print(defs["total"], run["instance_id"], instances["total"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

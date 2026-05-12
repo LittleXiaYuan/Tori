@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA lifecycle, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA lifecycle, Workflow orchestration, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + LoRA + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + LoRA + workflows + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -18,6 +18,7 @@
     "knowledge-graph",
     "knowledge-base",
     "lora-lifecycle",
+    "workflow-orchestration",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -62,6 +63,10 @@
       "description": "Access the lightweight host LoRA training and evolution lifecycle client or namespace."
     },
     {
+      "name": "workflows",
+      "description": "Access the lightweight host Workflow orchestration client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -89,7 +94,8 @@
         "memory": "AgentKit.memory",
         "graph": "AgentKit.graph",
         "knowledge": "AgentKit.knowledge",
-        "lora": "AgentKit.lora"
+        "lora": "AgentKit.lora",
+        "workflows": "AgentKit.workflows"
       }
     },
     "go": {
@@ -114,7 +120,8 @@
         "memory": "AgentKit.MemoryCore",
         "graph": "AgentKit.Graph",
         "knowledge": "AgentKit.KnowledgeKB",
-        "lora": "AgentKit.LoRA"
+        "lora": "AgentKit.LoRA",
+        "workflows": "AgentKit.Workflows"
       }
     },
     "python": {
@@ -139,7 +146,8 @@
         "memory": "AgentKit.memory_core",
         "graph": "AgentKit.graph",
         "knowledge": "AgentKit.knowledge_base",
-        "lora": "AgentKit.lora"
+        "lora": "AgentKit.lora",
+        "workflows": "AgentKit.workflows"
       }
     },
     "rust": {
@@ -164,7 +172,8 @@
         "memory": "AgentKit::memory",
         "graph": "AgentKit::graph",
         "knowledge": "AgentKit::knowledge",
-        "lora": "AgentKit::lora"
+        "lora": "AgentKit::lora",
+        "workflows": "AgentKit::workflows"
       }
     }
   },

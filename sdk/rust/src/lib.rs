@@ -628,6 +628,95 @@ pub struct KnowledgeDeleteResponse {
     pub stats: KnowledgeStatsResponse,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowDefinition {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub version: i32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edges: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowInstance {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub definition_id: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub variables: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    pub tenant_id: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowListResponse {
+    #[serde(default)]
+    pub workflows: Vec<WorkflowDefinition>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowInstancesResponse {
+    #[serde(default)]
+    pub instances: Vec<WorkflowInstance>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowRunRequest {
+    pub definition_id: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub variables: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowRunResponse {
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub instance_id: String,
+    #[serde(default)]
+    pub instance: WorkflowInstance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowCancelRequest {
+    pub instance_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowCancelResponse {
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub instance_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkflowDeleteResponse {
+    #[serde(default)]
+    pub deleted: String,
+}
+
 pub type LoRAStatusResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRAHistoryResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRASummaryResponse = serde_json::Map<String, serde_json::Value>;
@@ -1094,6 +1183,7 @@ pub struct AgentKit {
     pub graph: GraphClient,
     pub knowledge: KnowledgeClient,
     pub lora: LoRAClient,
+    pub workflows: WorkflowClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1127,6 +1217,7 @@ impl AgentKit {
             graph: GraphClient::new(base_url.clone(), token.as_ref())?,
             knowledge: KnowledgeClient::new(base_url.clone(), token.as_ref())?,
             lora: LoRAClient::new(base_url.clone(), token.as_ref())?,
+            workflows: WorkflowClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1150,6 +1241,7 @@ impl AgentKit {
             graph: GraphClient::new_with_client(base_url.clone(), plugin_http.clone()),
             knowledge: KnowledgeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             lora: LoRAClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            workflows: WorkflowClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -1624,6 +1716,152 @@ impl KnowledgeClient {
     ) -> Result<KnowledgeMutationResponse, reqwest::Error> {
         self.http
             .post(self.url("/v1/knowledge/import-repo"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over host `/v1/workflows*` DAG orchestration endpoints.
+#[derive(Debug, Clone)]
+pub struct WorkflowClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl WorkflowClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn list(&self) -> Result<WorkflowListResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/workflows"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn get(&self, id: impl AsRef<str>) -> Result<WorkflowDefinition, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/workflows?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn save(
+        &self,
+        definition: &WorkflowDefinition,
+    ) -> Result<WorkflowDefinition, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/workflows"))
+            .json(definition)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<WorkflowDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/workflows?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn run(
+        &self,
+        request: &WorkflowRunRequest,
+    ) -> Result<WorkflowRunResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/workflows/run"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn instances(&self) -> Result<WorkflowInstancesResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/workflows/instances"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn get_instance(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<WorkflowInstance, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/workflows/instances?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn cancel(
+        &self,
+        request: &WorkflowCancelRequest,
+    ) -> Result<WorkflowCancelResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/workflows/cancel"))
             .json(request)
             .send()
             .await?
@@ -2765,6 +3003,10 @@ mod tests {
             "http://localhost:9090/v1/lora/status"
         );
         assert_eq!(
+            kit.workflows.url("/v1/workflows"),
+            "http://localhost:9090/v1/workflows"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -2933,6 +3175,30 @@ mod tests {
         assert_eq!(
             client.url("/v1/knowledge/sources"),
             "http://localhost:9090/v1/knowledge/sources"
+        );
+    }
+
+    #[test]
+    fn workflow_types_deserialize_incremental_bodies() {
+        let list: WorkflowListResponse = serde_json::from_str(
+            r#"{"workflows":[{"id":"wf_1","name":"SDK flow","nodes":[{"id":"start"}]}],"total":1}"#,
+        )
+        .unwrap();
+        assert_eq!(list.total, 1);
+        assert_eq!(list.workflows[0].name, "SDK flow");
+
+        let request = WorkflowRunRequest {
+            definition_id: "wf_1".to_string(),
+            variables: serde_json::Map::new(),
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["definition_id"], "wf_1");
+
+        let client =
+            WorkflowClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/workflows"),
+            "http://localhost:9090/v1/workflows"
         );
     }
 

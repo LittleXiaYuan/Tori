@@ -268,6 +268,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"sources":2,"chunks":8}`))
 		case "/v1/lora/status":
 			_, _ = w.Write([]byte(`{"active_model":"adapter-a","rolling_success_rate":0.8}`))
+		case "/v1/workflows":
+			_, _ = w.Write([]byte(`{"workflows":[{"id":"wf_1","name":"SDK flow"}],"total":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -318,6 +320,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflowList, err := kit.Workflows.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -326,14 +332,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 12 {
-		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 13 {
+		t.Fatalf("expected 13 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -573,6 +579,95 @@ func TestKnowledgeKBStatsSearchSourcesAndMutations(t *testing.T) {
 	}
 	if stats["chunks"].(float64) != 8 || len(sources.Sources) != 1 || found.Count != 1 || ingested.Source.ID != "src_2" || updated.Source.Name != "inline-updated" || deleted.Deleted != "src_2" || len(importedURL.Sources) != 1 || importedRepo.Source.ID != "src_repo" {
 		t.Fatalf("unexpected knowledge results: stats=%+v sources=%+v found=%+v ingested=%+v updated=%+v deleted=%+v url=%+v repo=%+v", stats, sources, found, ingested, updated, deleted, importedURL, importedRepo)
+	}
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestWorkflowsNamespaceRunsDefinitionsAndInstances(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/workflows":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("id") == "wf_1" {
+					_, _ = w.Write([]byte(`{"id":"wf_1","name":"SDK flow"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"workflows":[{"id":"wf_1","name":"SDK flow"}],"total":1}`))
+			case http.MethodPost:
+				var body WorkflowDefinition
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Name != "SDK flow" {
+					t.Fatalf("unexpected workflow body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"id":"wf_1","name":"SDK flow"}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"deleted":"wf_1"}`))
+			}
+		case "/v1/workflows/run":
+			var body WorkflowRunRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.DefinitionID != "wf_1" {
+				t.Fatalf("unexpected run body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"accepted","instance_id":"inst_1","instance":{"id":"inst_1","definition_id":"wf_1","status":"pending"}}`))
+		case "/v1/workflows/instances":
+			if r.URL.Query().Get("id") == "inst_1" {
+				_, _ = w.Write([]byte(`{"id":"inst_1","definition_id":"wf_1","status":"running"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"instances":[{"id":"inst_1","definition_id":"wf_1","status":"running"}],"total":1}`))
+		case "/v1/workflows/cancel":
+			_, _ = w.Write([]byte(`{"status":"cancelling","instance_id":"inst_1"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	list, err := Workflows.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Workflows.Get(context.Background(), "wf_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := Workflows.Save(context.Background(), WorkflowDefinition{Name: "SDK flow"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := Workflows.Run(context.Background(), WorkflowRunRequest{DefinitionID: "wf_1", Variables: map[string]any{"topic": "sdk"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	instances, err := Workflows.Instances(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := Workflows.GetInstance(context.Background(), "inst_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := Workflows.Cancel(context.Background(), WorkflowCancelRequest{InstanceID: "inst_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Workflows.Delete(context.Background(), "wf_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if list.Total != 1 || got.Name != "SDK flow" || saved.ID != "wf_1" || run.InstanceID != "inst_1" || instances.Total != 1 || instance.Status != "running" || cancelled.Status != "cancelling" || deleted.Deleted != "wf_1" {
+		t.Fatalf("unexpected workflow results")
 	}
 	if len(seen) != 8 {
 		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)

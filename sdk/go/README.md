@@ -212,6 +212,18 @@ triggered, err := yunque.LoRA.Trigger(ctx, yunque.TriggerLoRARequest{TenantID: "
 fmt.Println(status["active_model"], preview["preview"], triggered["status"])
 ```
 
+
+### Workflow orchestration 工作流编排切片
+
+Go sidecar、CLI 或自动化二进制可以用 `yunque.Workflows` 访问宿主 `/v1/workflows*` DAG 工作流定义与实例能力。
+
+```go
+defs, err := yunque.Workflows.List(ctx)
+run, err := yunque.Workflows.Run(ctx, yunque.WorkflowRunRequest{DefinitionID: "wf_1", Variables: map[string]any{"topic": "sdk"}})
+instances, err := yunque.Workflows.Instances(ctx)
+fmt.Println(defs.Total, run.InstanceID, instances.Total)
+```
+
 ## Triggers 触发器自动化切片
 
 Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.Triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

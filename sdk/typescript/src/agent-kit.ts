@@ -10,6 +10,7 @@ import { createMemoryClient, type MemoryClient, type MemoryClientOptions } from 
 import { createGraphClient, type GraphClient, type GraphClientOptions } from "./graph.js";
 import { createKnowledgeClient, type KnowledgeClient, type KnowledgeClientOptions } from "./knowledge.js";
 import { createLoRAClient, type LoRAClient, type LoRAClientOptions } from "./lora.js";
+import { createWorkflowClient, type WorkflowClient, type WorkflowClientOptions } from "./workflow.js";
 
 export type AgentKitOptions = {
   baseUrl: string;
@@ -31,6 +32,7 @@ export type AgentKit = {
   graph: GraphClient;
   knowledge: KnowledgeClient;
   lora: LoRAClient;
+  workflows: WorkflowClient;
   plugin: PluginApiClient;
 };
 
@@ -47,7 +49,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions & WorkflowClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -67,10 +69,11 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     graph: createGraphClient(common),
     knowledge: createKnowledgeClient(common),
     lora: createLoRAClient(common),
+    workflows: createWorkflowClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient };
-export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient, createWorkflowClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions, WorkflowClient, WorkflowClientOptions };
 
