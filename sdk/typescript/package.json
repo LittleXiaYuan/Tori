@@ -43,6 +43,10 @@
       "types": "./src/cognis-observe.ts",
       "import": "./src/cognis-observe.ts"
     },
+    "./cognis-experience": {
+      "types": "./src/cognis-experience.ts",
+      "import": "./src/cognis-experience.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
