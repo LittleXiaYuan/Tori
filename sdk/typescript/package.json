@@ -139,6 +139,10 @@
       "types": "./src/task-templates.ts",
       "import": "./src/task-templates.ts"
     },
+    "./task-threads": {
+      "types": "./src/task-threads.ts",
+      "import": "./src/task-threads.ts"
+    },
     "./task-lifecycle": {
       "types": "./src/task-lifecycle.ts",
       "import": "./src/task-lifecycle.ts"
