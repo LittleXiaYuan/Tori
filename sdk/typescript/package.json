@@ -363,6 +363,10 @@
       "types": "./src/lora.ts",
       "import": "./src/lora.ts"
     },
+    "./lora-observe": {
+      "types": "./src/lora-observe.ts",
+      "import": "./src/lora-observe.ts"
+    },
     "./iterate": {
       "types": "./src/iterate.ts",
       "import": "./src/iterate.ts"
