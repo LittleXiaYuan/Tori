@@ -49,6 +49,7 @@
     "src/task-context.ts",
     "src/task-observe.ts",
     "src/task-templates.ts",
+    "src/task-threads.ts",
     "src/task-lifecycle.ts",
     "src/task-read.ts",
     "src/task-create.ts",
