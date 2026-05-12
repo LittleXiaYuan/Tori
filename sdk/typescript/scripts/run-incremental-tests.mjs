@@ -14,6 +14,15 @@ function listIncrementalSlices() {
     .sort();
 }
 
+function normalizeRequestedSlices(args) {
+  return args
+    .filter((arg) => arg !== "--")
+    .flatMap((arg) => arg.split(","))
+    .map((arg) => arg.trim())
+    .filter(Boolean)
+    .map((arg) => arg.replace(/^yunque-client\//, "").replace(/^src\//, "").replace(/\.test\.ts$|\.ts$|\.test$/g, ""));
+}
+
 function addJsExtensionToRelativeImports(source) {
   return source.replace(
     /(from\s+["'])(\.\/[^"']+)(["'])/g,
@@ -26,7 +35,17 @@ function addJsExtensionToRelativeImports(source) {
 
 rmSync(outDir, { recursive: true, force: true });
 
-const slices = listIncrementalSlices();
+const allSlices = listIncrementalSlices();
+const requestedSlices = normalizeRequestedSlices(process.argv.slice(2));
+const missingSlices = requestedSlices.filter((name) => !allSlices.includes(name));
+
+if (missingSlices.length > 0) {
+  console.error(`unknown incremental slice(s): ${missingSlices.join(", ")}`);
+  console.error(`available slices include: ${allSlices.slice(0, 20).join(", ")}${allSlices.length > 20 ? ", ..." : ""}`);
+  process.exit(1);
+}
+
+const slices = requestedSlices.length > 0 ? requestedSlices : allSlices;
 const sources = slices.flatMap((name) => [`${srcDir}/${name}.ts`, `${srcDir}/${name}.test.ts`]);
 
 const compile = spawnSync(
