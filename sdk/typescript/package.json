@@ -459,6 +459,10 @@
       "types": "./src/system-probes.ts",
       "import": "./src/system-probes.ts"
     },
+    "./system-ops": {
+      "types": "./src/system-ops.ts",
+      "import": "./src/system-ops.ts"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "import": "./src/settings.ts"
