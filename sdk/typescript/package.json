@@ -291,6 +291,22 @@
       "types": "./src/task-threads.ts",
       "import": "./src/task-threads.ts"
     },
+    "./task-gaps": {
+      "types": "./src/task-gaps.ts",
+      "import": "./src/task-gaps.ts"
+    },
+    "./task-memory": {
+      "types": "./src/task-memory.ts",
+      "import": "./src/task-memory.ts"
+    },
+    "./task-thread-read": {
+      "types": "./src/task-thread-read.ts",
+      "import": "./src/task-thread-read.ts"
+    },
+    "./task-thread-control": {
+      "types": "./src/task-thread-control.ts",
+      "import": "./src/task-thread-control.ts"
+    },
     "./task-lifecycle": {
       "types": "./src/task-lifecycle.ts",
       "import": "./src/task-lifecycle.ts"
