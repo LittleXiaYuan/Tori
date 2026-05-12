@@ -161,6 +161,77 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestSubagentsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/subagent":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("id") == "sa/1" {
+					_, _ = w.Write([]byte(`{"id":"sa/1","name":"reviewer"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"subagents":[{"id":"sa/1","name":"reviewer","parent_id":"task/1"}]}`))
+			case http.MethodPost:
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body["name"] != "planner" || body["parent_id"] != "task/1" {
+					t.Fatalf("unexpected spawn body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"id":"sa/2","name":"planner","skills":["plan"]}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"deleted":true}`))
+			default:
+				t.Fatalf("unexpected subagent method: %s", r.Method)
+			}
+		case "/v1/subagent/message":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["id"] != "sa/1" {
+				t.Fatalf("unexpected append body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	listed, err := Subagents.List(ctx, "task/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, err := Subagents.Get(ctx, "sa/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spawned, err := Subagents.Spawn(ctx, SpawnSubagentRequest{ParentID: "task/1", Name: "planner", Description: "计划拆解", Skills: []string{"plan"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	appended, err := Subagents.AppendMessages(ctx, "sa/1", []SubagentMessage{{"role": "user", "content": "继续"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Subagents.Destroy(ctx, "sa/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listed.Subagents[0].ID != "sa/1" || one.Name != "reviewer" || spawned.Skills[0] != "plan" || appended["ok"] != true || deleted["deleted"] != true || NewAgentKit().Subagents != Subagents {
+		t.Fatalf("unexpected subagent results: listed=%+v one=%+v spawned=%+v appended=%+v deleted=%+v", listed, one, spawned, appended, deleted)
+	}
+	if len(seen) != 5 || seen[0] != "GET /v1/subagent?parent_id=task%2F1" || seen[4] != "DELETE /v1/subagent?id=sa%2F1" {
+		t.Fatalf("unexpected subagent requests: %v", seen)
+	}
+}
+
 func TestRuntimeHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -684,6 +755,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"focus":"sdk"}`))
 		case "/v1/sessions/queue":
 			_, _ = w.Write([]byte(`{"queues":{"s1":1}}`))
+		case "/v1/subagent":
+			_, _ = w.Write([]byte(`{"subagents":[{"id":"sa-1","name":"reviewer"}]}`))
 		case "/v1/reflect/strategies":
 			if r.URL.Query().Get("tag") != "sdk" {
 				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
@@ -757,6 +830,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtimeQueues, err := kit.Runtime.Queues(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	subagentsList, err := kit.Subagents.List(context.Background(), "task-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,14 +941,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || runtimeQueues["queues"] == nil || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || runtimeQueues["queues"] == nil || subagentsList.Subagents[0].ID != "sa-1" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Subagents != Subagents || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 28 {
-		t.Fatalf("expected 28 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 29 {
+		t.Fatalf("expected 29 requests, got %d: %v", len(seen), seen)
 	}
 }
 

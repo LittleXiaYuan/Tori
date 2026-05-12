@@ -319,6 +319,7 @@ type AgentKit struct {
 	Heartbeat     *heartbeatNamespace
 	Events        *eventsNamespace
 	Runtime       *runtimeNamespace
+	Subagents     *subagentsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1834,6 +1835,9 @@ var Events = &eventsNamespace{}
 // Runtime provides focused access to session queue operations and runtime event streams.
 var Runtime = &runtimeNamespace{}
 
+// Subagents provides focused access to subagent spawn, listing, messaging, and deletion.
+var Subagents = &subagentsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2757,6 +2761,83 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Subagents ──
+
+type subagentsNamespace struct{}
+
+type SubagentMessage map[string]any
+type Subagent struct {
+	ID          string            `json:"id,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	ParentID    string            `json:"parent_id,omitempty"`
+	Messages    []SubagentMessage `json:"messages,omitempty"`
+	Skills      []string          `json:"skills,omitempty"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
+	CreatedAt   string            `json:"created_at,omitempty"`
+	UpdatedAt   string            `json:"updated_at,omitempty"`
+}
+
+type SubagentsResponse struct {
+	Subagents []Subagent `json:"subagents"`
+}
+
+type SpawnSubagentRequest struct {
+	ParentID    string   `json:"parent_id,omitempty"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Skills      []string `json:"skills,omitempty"`
+}
+
+type AppendSubagentMessagesResponse map[string]any
+type DeleteSubagentResponse map[string]any
+
+func (s *subagentsNamespace) List(ctx context.Context, parentID string) (SubagentsResponse, error) {
+	path := "/v1/subagent"
+	if parentID != "" {
+		path += "?parent_id=" + url.QueryEscape(parentID)
+	}
+	var out SubagentsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return SubagentsResponse{}, err
+	}
+	return out, nil
+}
+
+func (s *subagentsNamespace) Get(ctx context.Context, id string) (Subagent, error) {
+	var out Subagent
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/subagent?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return Subagent{}, err
+	}
+	return out, nil
+}
+
+func (s *subagentsNamespace) Spawn(ctx context.Context, req SpawnSubagentRequest) (Subagent, error) {
+	var out Subagent
+	body := map[string]any{"parent_id": req.ParentID, "name": req.Name, "description": req.Description, "skills": req.Skills}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/subagent", body, &out); err != nil {
+		return Subagent{}, err
+	}
+	return out, nil
+}
+
+func (s *subagentsNamespace) Destroy(ctx context.Context, id string) (DeleteSubagentResponse, error) {
+	var out DeleteSubagentResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/subagent?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *subagentsNamespace) AppendMessages(ctx context.Context, id string, messages []SubagentMessage) (AppendSubagentMessagesResponse, error) {
+	var out AppendSubagentMessagesResponse
+	body := map[string]any{"id": id, "messages": messages}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/subagent/message", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ── Runtime Operations ──
@@ -3734,6 +3815,7 @@ func NewAgentKit() AgentKit {
 		Heartbeat:     Heartbeat,
 		Events:        Events,
 		Runtime:       Runtime,
+		Subagents:     Subagents,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

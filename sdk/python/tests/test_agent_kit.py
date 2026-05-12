@@ -80,6 +80,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"connected": True, "state": "extension"}
             if path == "/v1/sessions/queue":
                 return {"queues": {"s1": 1}}
+            if path == "/v1/subagent?parent_id=task-1":
+                return {"subagents": [{"id": "sa-1", "name": "reviewer"}]}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -119,6 +121,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.files.list("artifacts")["files"][0]["name"], "report.md")
             self.assertTrue(kit.browser.status()["connected"])
             self.assertEqual(kit.runtime.queues()["queues"]["s1"], 1)
+            self.assertEqual(kit.subagents.list("task-1")["subagents"][0]["id"], "sa-1")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -153,6 +156,7 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.files, yunque.files)
         self.assertIs(kit.browser, yunque.browser)
         self.assertIs(kit.runtime, yunque.runtime)
+        self.assertIs(kit.subagents, yunque.subagents)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
         self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))
@@ -163,7 +167,8 @@ class AgentKitTest(unittest.TestCase):
         self.assertEqual(calls[26], ("GET", "/api/files?path=artifacts", None))
         self.assertEqual(calls[27], ("GET", "/v1/browser/status", None))
         self.assertEqual(calls[28], ("GET", "/v1/sessions/queue", None))
-        self.assertEqual(calls[29], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[29], ("GET", "/v1/subagent?parent_id=task-1", None))
+        self.assertEqual(calls[30], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:
