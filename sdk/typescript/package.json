@@ -311,6 +311,14 @@
       "types": "./src/provider-control.ts",
       "import": "./src/provider-control.ts"
     },
+    "./provider-mode": {
+      "types": "./src/provider-mode.ts",
+      "import": "./src/provider-mode.ts"
+    },
+    "./provider-session": {
+      "types": "./src/provider-session.ts",
+      "import": "./src/provider-session.ts"
+    },
     "./provider-health": {
       "types": "./src/provider-health.ts",
       "import": "./src/provider-health.ts"
@@ -318,6 +326,10 @@
     "./breaker": {
       "types": "./src/breaker.ts",
       "import": "./src/breaker.ts"
+    },
+    "./provider-breaker": {
+      "types": "./src/provider-breaker.ts",
+      "import": "./src/provider-breaker.ts"
     },
     "./models": {
       "types": "./src/models.ts",
