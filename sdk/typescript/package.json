@@ -1131,6 +1131,22 @@
       "types": "./src/graph-read.ts",
       "import": "./src/graph-read.ts"
     },
+    "./graph-entities": {
+      "types": "./src/graph-entities.ts",
+      "import": "./src/graph-entities.ts"
+    },
+    "./graph-relations": {
+      "types": "./src/graph-relations.ts",
+      "import": "./src/graph-relations.ts"
+    },
+    "./graph-context": {
+      "types": "./src/graph-context.ts",
+      "import": "./src/graph-context.ts"
+    },
+    "./graph-stats": {
+      "types": "./src/graph-stats.ts",
+      "import": "./src/graph-stats.ts"
+    },
     "./graph-write": {
       "types": "./src/graph-write.ts",
       "import": "./src/graph-write.ts"
