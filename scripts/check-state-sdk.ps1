@@ -1,6 +1,6 @@
-# Runs the focused cross-language State Kernel SDK validation suite.
-# This is intentionally narrower than full CI: it checks the SDK manifest,
-# TypeScript focused state slices, Go/Python/Rust state helpers, and docs build.
+# Runs the focused cross-language SDK validation suite.
+# This is intentionally narrower than full CI: it checks all SDK manifests,
+# TypeScript focused SDK slices, Go/Python/Rust SDK helpers, and docs gates.
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -24,7 +24,7 @@ Invoke-Step "SDK manifest suite" {
 Invoke-Step "TypeScript focused state slices" {
   Push-Location sdk\typescript
   try {
-    npm run check:state-manifest
+    npm run check:sdk-manifests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     node scripts\run-incremental-tests.mjs state-snapshot state-actions state-capabilities
   } finally {
