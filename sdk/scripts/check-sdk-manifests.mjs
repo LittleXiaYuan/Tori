@@ -11,6 +11,7 @@ const checks = [
   ["Triggers SDK manifest", "sdk/scripts/check-triggers-sdk-manifest.mjs"],
   ["Memory SDK manifest", "sdk/scripts/check-memory-sdk-manifest.mjs"],
   ["Graph SDK manifest", "sdk/scripts/check-graph-sdk-manifest.mjs"],
+  ["Knowledge SDK manifest", "sdk/scripts/check-knowledge-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

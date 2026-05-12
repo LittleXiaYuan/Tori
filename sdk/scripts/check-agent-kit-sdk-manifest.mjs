@@ -13,7 +13,7 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "plugin"];
+const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "knowledge", "plugin"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
@@ -54,7 +54,7 @@ for (const [language, config] of Object.entries(languages)) {
     }
   }
   const docs = (config.docs ?? []).map(readRepoFile).join("\n");
-  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Plugin"]) {
+  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Knowledge", "Plugin"]) {
     if (!docs.includes(token)) fail(`${language} docs missing Agent Kit token: ${token}`);
   }
 }

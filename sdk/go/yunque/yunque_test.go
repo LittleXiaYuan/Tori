@@ -264,6 +264,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"results":[{"key":"pref","value":"喜欢中文回复","layer":"mid"}],"count":1}`))
 		case "/v1/graph/stats":
 			_, _ = w.Write([]byte(`{"entities":2,"relations":1}`))
+		case "/v1/knowledge/stats":
+			_, _ = w.Write([]byte(`{"sources":2,"chunks":8}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -306,6 +308,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	kbStats, err := kit.KnowledgeKB.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -314,14 +320,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 10 {
-		t.Fatalf("expected 10 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 11 {
+		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -484,6 +490,86 @@ func TestGraphNamespaceReadsAndWrites(t *testing.T) {
 	}
 	if len(seen) != 7 {
 		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestKnowledgeKBStatsSearchSourcesAndMutations(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/knowledge/stats":
+			_, _ = w.Write([]byte(`{"sources":2,"chunks":8}`))
+		case "/v1/knowledge/sources":
+			_, _ = w.Write([]byte(`{"sources":[{"id":"src_1","name":"README.md","type":"file"}]}`))
+		case "/v1/knowledge/search":
+			if r.URL.Query().Get("q") != "SDK" || r.URL.Query().Get("n") != "3" {
+				t.Fatalf("unexpected search query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"chunks":[{"id":"c1","source_id":"src_1","content":"SDK slice","score":0.9}],"count":1}`))
+		case "/v1/knowledge/ingest":
+			var body KnowledgeIngestRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Content != "hello" {
+				t.Fatalf("unexpected ingest body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"source":{"id":"src_2","name":"inline"},"stats":{"sources":3}}`))
+		case "/v1/knowledge/source/update":
+			_, _ = w.Write([]byte(`{"source":{"id":"src_2","name":"inline-updated"},"stats":{"sources":3}}`))
+		case "/v1/knowledge/source":
+			if r.URL.Query().Get("id") != "src_2" {
+				t.Fatalf("unexpected delete query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"deleted":"src_2","stats":{"sources":2}}`))
+		case "/v1/knowledge/import-url":
+			_, _ = w.Write([]byte(`{"sources":[{"id":"src_url","name":"site"}],"stats":{"sources":3}}`))
+		case "/v1/knowledge/import-repo":
+			_, _ = w.Write([]byte(`{"source":{"id":"src_repo","name":"repo"},"stats":{"sources":4}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	stats, err := KnowledgeKB.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := KnowledgeKB.Sources(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := KnowledgeKB.Search(context.Background(), KnowledgeSearchOptions{Query: "SDK", Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ingested, err := KnowledgeKB.Ingest(context.Background(), KnowledgeIngestRequest{Name: "inline", Content: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := KnowledgeKB.UpdateSource(context.Background(), KnowledgeUpdateSourceRequest{ID: "src_2", Name: "inline-updated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := KnowledgeKB.DeleteSource(context.Background(), "src_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	importedURL, err := KnowledgeKB.ImportURL(context.Background(), KnowledgeImportURLRequest{URL: "https://example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	importedRepo, err := KnowledgeKB.ImportRepo(context.Background(), KnowledgeImportRepoRequest{Path: "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats["chunks"].(float64) != 8 || len(sources.Sources) != 1 || found.Count != 1 || ingested.Source.ID != "src_2" || updated.Source.Name != "inline-updated" || deleted.Deleted != "src_2" || len(importedURL.Sources) != 1 || importedRepo.Source.ID != "src_repo" {
+		t.Fatalf("unexpected knowledge results: stats=%+v sources=%+v found=%+v ingested=%+v updated=%+v deleted=%+v url=%+v repo=%+v", stats, sources, found, ingested, updated, deleted, importedURL, importedRepo)
+	}
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 

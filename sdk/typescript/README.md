@@ -64,9 +64,10 @@ const focus = await kit.state.focus();
 const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
 const found = await kit.memory.search({ query: "incremental SDK package", limit: 3 });
 const graphStats = await kit.graph.stats();
+const kbStats = await kit.knowledge.stats();
 const search = await kit.plugin.search("incremental SDK package", 5);
 
-console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, search.results.length);
+console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, kbStats.sources, search.results.length);
 ```
 
 ### Full generated client
@@ -2118,4 +2119,18 @@ const entities = await createGraphReadClient(options).entities("云雀");
 const entity = await graph.putEntity({ name: "云雀", type: "agent" });
 const context = await graph.contextByEntityId(entity.id!);
 console.log(entities.entities.length, context.context);
+```
+
+## Knowledge Base 宿主 RAG 知识库切片
+
+前端页面、插件 UI 或 Node.js 自动化可以用 `yunque-client/knowledge-search`、`knowledge-sources`、`knowledge-ingest`、`knowledge-import` 访问宿主 `/v1/knowledge/*` RAG 知识库。它不同于 `plugin-knowledge` 的插件运行时 helper。
+
+```ts
+import { createKnowledgeSearchClient } from "yunque-client/knowledge-search";
+import { createKnowledgeIngestClient } from "yunque-client/knowledge-ingest";
+
+const options = { baseUrl: "http://localhost:9090", token: "<jwt-or-plugin-token>" };
+const found = await createKnowledgeSearchClient(options).search("增量 SDK", { limit: 3 });
+const ingested = await createKnowledgeIngestClient(options).ingestText("外部项目可直接调用 Knowledge Base", { name: "sdk-note" });
+console.log(found.count, ingested.source?.id);
 ```

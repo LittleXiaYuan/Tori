@@ -491,6 +491,143 @@ pub struct GraphStatsResponse {
     pub relations: i32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeChunk {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub source_id: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub file: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub lang: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub score: f64,
+    #[serde(default)]
+    pub metadata: serde_json::Map<String, serde_json::Value>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeSource {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub trigger: String,
+    #[serde(default)]
+    pub chunks: i32,
+    #[serde(default)]
+    pub size: i64,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub metadata: serde_json::Map<String, serde_json::Value>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+pub type KnowledgeStatsResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeSearchOptions {
+    pub query: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub file: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub lang: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeSearchResponse {
+    #[serde(default)]
+    pub chunks: Vec<KnowledgeChunk>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeSourcesResponse {
+    #[serde(default)]
+    pub sources: Vec<KnowledgeSource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeIngestRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub trigger: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeUpdateSourceRequest {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub trigger: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeImportUrlRequest {
+    pub url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub crawl_children: bool,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub max_pages: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeImportRepoRequest {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub max_files: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeMutationResponse {
+    #[serde(default)]
+    pub source: Option<KnowledgeSource>,
+    #[serde(default)]
+    pub sources: Vec<KnowledgeSource>,
+    #[serde(default)]
+    pub stats: KnowledgeStatsResponse,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KnowledgeDeleteResponse {
+    #[serde(default)]
+    pub deleted: String,
+    #[serde(default)]
+    pub stats: KnowledgeStatsResponse,
+}
+
 /// Triggers v2 automation definition returned by `/v1/triggers/v2`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TriggerDef {
@@ -934,6 +1071,7 @@ pub struct AgentKit {
     pub triggers: TriggersClient,
     pub memory: MemoryClient,
     pub graph: GraphClient,
+    pub knowledge: KnowledgeClient,
     pub plugin: PluginApiClient,
 }
 
@@ -965,6 +1103,7 @@ impl AgentKit {
             triggers: TriggersClient::new(base_url.clone(), token.as_ref())?,
             memory: MemoryClient::new(base_url.clone(), token.as_ref())?,
             graph: GraphClient::new(base_url.clone(), token.as_ref())?,
+            knowledge: KnowledgeClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -986,6 +1125,7 @@ impl AgentKit {
             triggers: TriggersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             memory: MemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             graph: GraphClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            knowledge: KnowledgeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -1317,6 +1457,150 @@ impl GraphClient {
     pub async fn stats(&self) -> Result<GraphStatsResponse, reqwest::Error> {
         self.http
             .get(self.url("/v1/graph/stats"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over host `/v1/knowledge/*` RAG endpoints.
+#[derive(Debug, Clone)]
+pub struct KnowledgeClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl KnowledgeClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn stats(&self) -> Result<KnowledgeStatsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/knowledge/stats"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn sources(&self) -> Result<KnowledgeSourcesResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/knowledge/sources"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn search(
+        &self,
+        options: &KnowledgeSearchOptions,
+    ) -> Result<KnowledgeSearchResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&knowledge_search_query(options)))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn ingest(
+        &self,
+        request: &KnowledgeIngestRequest,
+    ) -> Result<KnowledgeMutationResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/knowledge/ingest"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update_source(
+        &self,
+        request: &KnowledgeUpdateSourceRequest,
+    ) -> Result<KnowledgeMutationResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/knowledge/source/update"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete_source(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<KnowledgeDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/knowledge/source?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn import_url(
+        &self,
+        request: &KnowledgeImportUrlRequest,
+    ) -> Result<KnowledgeMutationResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/knowledge/import-url"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn import_repo(
+        &self,
+        request: &KnowledgeImportRepoRequest,
+    ) -> Result<KnowledgeMutationResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/knowledge/import-repo"))
+            .json(request)
             .send()
             .await?
             .error_for_status()?
@@ -2108,6 +2392,26 @@ fn trigger_history_query(options: &TriggerHistoryOptions) -> String {
     }
 }
 
+fn knowledge_search_query(options: &KnowledgeSearchOptions) -> String {
+    let mut params = vec![format!("q={}", url_encode_query_component(&options.query))];
+    if options.limit > 0 {
+        params.push(format!("n={}", options.limit));
+    }
+    if !options.file.is_empty() {
+        params.push(format!(
+            "file={}",
+            url_encode_query_component(&options.file)
+        ));
+    }
+    if !options.lang.is_empty() {
+        params.push(format!(
+            "lang={}",
+            url_encode_query_component(&options.lang)
+        ));
+    }
+    format!("/v1/knowledge/search?{}", params.join("&"))
+}
+
 fn trim_base_url(base_url: String) -> String {
     base_url.trim_end_matches('/').to_string()
 }
@@ -2303,6 +2607,10 @@ mod tests {
             "http://localhost:9090/v1/graph/stats"
         );
         assert_eq!(
+            kit.knowledge.url("/v1/knowledge/stats"),
+            "http://localhost:9090/v1/knowledge/stats"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -2420,11 +2728,57 @@ mod tests {
 
     #[test]
     fn graph_client_trims_base_url() {
-        let client =
-            GraphClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        let client = GraphClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(
             client.url("/v1/graph/entities"),
             "http://localhost:9090/v1/graph/entities"
+        );
+    }
+
+    #[test]
+    fn knowledge_types_deserialize_incremental_bodies() {
+        let search: KnowledgeSearchResponse = serde_json::from_str(
+            r#"{"chunks":[{"id":"c1","source_id":"src_1","content":"SDK slice","score":0.9}],"count":1}"#,
+        )
+        .unwrap();
+        assert_eq!(search.count, 1);
+        assert_eq!(search.chunks[0].content, "SDK slice");
+
+        let sources: KnowledgeSourcesResponse = serde_json::from_str(
+            r#"{"sources":[{"id":"src_1","name":"README.md","type":"file"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(sources.sources[0].id, "src_1");
+
+        let mutation: KnowledgeMutationResponse = serde_json::from_str(
+            r#"{"source":{"id":"src_2","name":"inline"},"stats":{"sources":2}}"#,
+        )
+        .unwrap();
+        assert_eq!(mutation.source.unwrap().name, "inline");
+        assert_eq!(mutation.stats["sources"], serde_json::json!(2));
+    }
+
+    #[test]
+    fn knowledge_search_query_encodes_filters() {
+        let query = knowledge_search_query(&KnowledgeSearchOptions {
+            query: "增量 SDK".to_string(),
+            limit: 3,
+            file: "README.md".to_string(),
+            lang: "zh cn".to_string(),
+        });
+        assert_eq!(
+            query,
+            "/v1/knowledge/search?q=%E5%A2%9E%E9%87%8F+SDK&n=3&file=README.md&lang=zh+cn"
+        );
+    }
+
+    #[test]
+    fn knowledge_client_trims_base_url() {
+        let client =
+            KnowledgeClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/knowledge/sources"),
+            "http://localhost:9090/v1/knowledge/sources"
         );
     }
 

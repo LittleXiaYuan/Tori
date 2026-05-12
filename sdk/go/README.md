@@ -188,6 +188,18 @@ context, err := yunque.Graph.ContextByEntityID(ctx, entity.ID)
 fmt.Println(len(entities.Entities), context.Context)
 ```
 
+
+### Knowledge Base 宿主 RAG 知识库切片
+
+Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.KnowledgeKB` 访问宿主 `/v1/knowledge/*` RAG 知识库。它不同于 `yunque.Knowledge` 的插件运行时 knowledge helper。
+
+```go
+stats, err := yunque.KnowledgeKB.Stats(ctx)
+found, err := yunque.KnowledgeKB.Search(ctx, yunque.KnowledgeSearchOptions{Query: "增量 SDK", Limit: 3})
+ingested, err := yunque.KnowledgeKB.Ingest(ctx, yunque.KnowledgeIngestRequest{Name: "sdk-note", Content: "外部项目可直接调用 Knowledge Base"})
+fmt.Println(stats["sources"], found.Count, ingested.Source.ID)
+```
+
 ## Triggers 触发器自动化切片
 
 Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.Triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

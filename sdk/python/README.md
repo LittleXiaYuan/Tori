@@ -151,6 +151,18 @@ context = yunque.graph.context_by_entity_id(entity["id"])
 print(len(entities["entities"]), context["context"])
 ```
 
+
+### Knowledge Base 宿主 RAG 知识库切片
+
+Python 插件脚本或自动化任务可以用 `yunque.knowledge_base` 访问宿主 `/v1/knowledge/*` RAG 知识库。它不同于 `yunque.knowledge` 的插件运行时 knowledge helper。
+
+```python
+stats = yunque.knowledge_base.stats()
+found = yunque.knowledge_base.search("增量 SDK", limit=3)
+ingested = yunque.knowledge_base.ingest("外部项目可直接调用 Knowledge Base", name="sdk-note")
+print(stats.get("sources"), found["count"], ingested["source"]["id"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

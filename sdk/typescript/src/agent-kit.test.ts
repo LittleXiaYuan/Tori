@@ -23,6 +23,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/scheduler/jobs")) return jsonResponse({ jobs: [{ id: "job_1", name: "daily" }], count: 1 });
       if (value.endsWith("/v1/memory/search")) return jsonResponse({ results: [{ key: "pref", value: "喜欢中文" }], count: 1 });
       if (value.endsWith("/v1/graph/stats")) return jsonResponse({ entities: 2, relations: 1 });
+      if (value.endsWith("/v1/knowledge/stats")) return jsonResponse({ sources: 2, chunks: 8 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -34,13 +35,15 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.scheduler.jobs()).count, 1);
   assertEqual((await kit.memory.search({ query: "中文", limit: 1 })).count, 1);
   assertEqual((await kit.graph.stats()).entities, 2);
+  assertEqual((await kit.knowledge.stats()).sources, 2);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[3]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[4]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[5]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[6]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[6]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[7]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {
