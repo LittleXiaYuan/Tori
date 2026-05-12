@@ -272,6 +272,58 @@ class _Cron:
 cron = _Cron()
 
 
+# ── Reflection Experience ──
+
+class _ReflectNamespace:
+    """Lightweight helpers for the agent reflection/experience layer.
+
+    Reflection is exposed as a small SDK surface so external scripts can reuse
+    lessons and strategy hints without importing platform internals.
+    """
+
+    def experiences(self, *, q: str = "", source: str = "", category: str = "",
+                    outcome: str = "", tag: str = "", limit: int = 0) -> dict:
+        """List captured reflection experiences with optional filters."""
+        return _api_call("GET", f"/v1/reflect/experiences{_reflect_query(q, source, category, outcome, tag, limit)}")
+
+    def stats(self, *, source: str = "", category: str = "",
+              outcome: str = "", tag: str = "") -> dict:
+        """Return reflection experience counters for the same filter set."""
+        return _api_call("GET", f"/v1/reflect/experiences{_reflect_query('', source, category, outcome, tag, 0, stats=True)}")
+
+    def strategies(self, *, q: str = "", source: str = "", category: str = "",
+                   outcome: str = "", tag: str = "", limit: int = 0) -> str:
+        """Return compiled strategy hints derived from reflection experiences."""
+        resp = _api_call("GET", f"/v1/reflect/strategies{_reflect_query(q, source, category, outcome, tag, limit)}")
+        return resp.get("strategies", "")
+
+
+def _reflect_query(q: str = "", source: str = "", category: str = "",
+                   outcome: str = "", tag: str = "", limit: int = 0,
+                   stats: bool = False) -> str:
+    from urllib.parse import urlencode
+
+    params = {}
+    if q:
+        params["q"] = q
+    if source:
+        params["source"] = source
+    if category:
+        params["category"] = category
+    if outcome:
+        params["outcome"] = outcome
+    if tag:
+        params["tag"] = tag
+    if limit > 0:
+        params["limit"] = str(limit)
+    if stats:
+        params["stats"] = "true"
+    return f"?{urlencode(params)}" if params else ""
+
+
+reflect = _ReflectNamespace()
+
+
 # ── System Extension Registration ──
 # These let plugins ADD new system-level capabilities to the agent.
 # Like Magisk modules or Chrome extensions — you're extending the platform itself.
