@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "domain": "admin",
+  "description": "Cross-language lightweight SDK for desktop operator controls, tenant bootstrap, and natural-language configuration without importing the full platform client.",
+  "principles": [
+    "Expose admin/operator actions as a focused SDK slice for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep desktop console/autostart, tenant bootstrap, and natural-language configuration directly callable through existing authenticated gateway routes.",
+    "Make Admin access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/desktop/console",
+    "POST /v1/desktop/console",
+    "GET /v1/desktop/autostart",
+    "POST /v1/desktop/autostart",
+    "GET /v1/tenants",
+    "POST /v1/tenants",
+    "POST /v1/nl-config",
+    "POST /v1/nl-config/translate"
+  ],
+  "capabilities": [
+    {
+      "name": "consoleStatus",
+      "route": "GET /v1/desktop/console",
+      "readOnly": true,
+      "description": "Read desktop console visibility state."
+    },
+    {
+      "name": "toggleConsole",
+      "route": "POST /v1/desktop/console",
+      "readOnly": false,
+      "description": "Toggle desktop console visibility."
+    },
+    {
+      "name": "autostartStatus",
+      "route": "GET /v1/desktop/autostart",
+      "readOnly": true,
+      "description": "Read desktop autostart state."
+    },
+    {
+      "name": "toggleAutostart",
+      "route": "POST /v1/desktop/autostart",
+      "readOnly": false,
+      "description": "Toggle desktop autostart."
+    },
+    {
+      "name": "listTenants",
+      "route": "GET /v1/tenants",
+      "readOnly": true,
+      "description": "List configured tenants."
+    },
+    {
+      "name": "createTenant",
+      "route": "POST /v1/tenants",
+      "readOnly": false,
+      "description": "Create a tenant and return its bootstrap record."
+    },
+    {
+      "name": "nlConfig",
+      "route": "POST /v1/nl-config",
+      "readOnly": false,
+      "description": "Translate and optionally execute a natural-language configuration request."
+    },
+    {
+      "name": "nlConfigTranslate",
+      "route": "POST /v1/nl-config/translate",
+      "readOnly": true,
+      "description": "Translate a natural-language configuration request without execution."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/admin.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "consoleStatus": "createAdminClient().consoleStatus",
+        "toggleConsole": "createAdminClient().toggleConsole",
+        "autostartStatus": "createAdminClient().autostartStatus",
+        "toggleAutostart": "createAdminClient().toggleAutostart",
+        "listTenants": "createAdminClient().listTenants",
+        "createTenant": "createAdminClient().createTenant",
+        "nlConfig": "createAdminClient().nlConfig",
+        "nlConfigTranslate": "createAdminClient().nlConfigTranslate"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "consoleStatus": "yunque.Admin.ConsoleStatus",
+        "toggleConsole": "yunque.Admin.ToggleConsole",
+        "autostartStatus": "yunque.Admin.AutostartStatus",
+        "toggleAutostart": "yunque.Admin.ToggleAutostart",
+        "listTenants": "yunque.Admin.ListTenants",
+        "createTenant": "yunque.Admin.CreateTenant",
+        "nlConfig": "yunque.Admin.NLConfig",
+        "nlConfigTranslate": "yunque.Admin.NLConfigTranslate"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "consoleStatus": "yunque.admin.console_status",
+        "toggleConsole": "yunque.admin.toggle_console",
+        "autostartStatus": "yunque.admin.autostart_status",
+        "toggleAutostart": "yunque.admin.toggle_autostart",
+        "listTenants": "yunque.admin.list_tenants",
+        "createTenant": "yunque.admin.create_tenant",
+        "nlConfig": "yunque.admin.nl_config",
+        "nlConfigTranslate": "yunque.admin.nl_config_translate"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "consoleStatus": "AdminClient::console_status",
+        "toggleConsole": "AdminClient::toggle_console",
+        "autostartStatus": "AdminClient::autostart_status",
+        "toggleAutostart": "AdminClient::toggle_autostart",
+        "listTenants": "AdminClient::list_tenants",
+        "createTenant": "AdminClient::create_tenant",
+        "nlConfig": "AdminClient::nl_config",
+        "nlConfigTranslate": "AdminClient::nl_config_translate"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

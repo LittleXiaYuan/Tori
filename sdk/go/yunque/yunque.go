@@ -300,6 +300,77 @@ func filenameFromDisposition(disposition string) string {
 	return ""
 }
 
+
+// ── Admin / Operator (/v1/desktop, /v1/tenants, /v1/nl-config) ──
+
+// Admin exposes desktop/operator helpers for external admin panels, CLIs, plugins, and automation scripts.
+var Admin = &adminNamespace{}
+
+type adminNamespace struct{}
+
+type AdminDesktopConsoleResponse map[string]any
+type AdminDesktopAutostartResponse map[string]any
+type AdminTenantListResponse map[string]any
+type AdminTenantRecord map[string]any
+type AdminNLConfigResponse map[string]any
+
+type AdminCreateTenantRequest struct {
+	Name string `json:"name"`
+}
+
+type AdminNLConfigRequest struct {
+	Text    string `json:"text"`
+	Execute bool   `json:"execute"`
+}
+
+func (a *adminNamespace) ConsoleStatus(ctx context.Context) (AdminDesktopConsoleResponse, error) {
+	var out AdminDesktopConsoleResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/console", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) ToggleConsole(ctx context.Context) (AdminDesktopConsoleResponse, error) {
+	var out AdminDesktopConsoleResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/console", map[string]any{}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) AutostartStatus(ctx context.Context) (AdminDesktopAutostartResponse, error) {
+	var out AdminDesktopAutostartResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/autostart", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) ToggleAutostart(ctx context.Context) (AdminDesktopAutostartResponse, error) {
+	var out AdminDesktopAutostartResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/autostart", map[string]any{}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) ListTenants(ctx context.Context) (AdminTenantListResponse, error) {
+	var out AdminTenantListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tenants", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) CreateTenant(ctx context.Context, name string) (AdminTenantRecord, error) {
+	var out AdminTenantRecord
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tenants", AdminCreateTenantRequest{Name: name}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) NLConfig(ctx context.Context, text string, execute bool) (AdminNLConfigResponse, error) {
+	var out AdminNLConfigResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config", AdminNLConfigRequest{Text: text, Execute: execute}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (a *adminNamespace) NLConfigTranslate(ctx context.Context, text string) (AdminNLConfigResponse, error) {
+	var out AdminNLConfigResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config/translate", AdminNLConfigRequest{Text: text, Execute: false}, &out); err != nil { return nil, err }
+	return out, nil
+}
+
 // ── Settings (/api/settings, /v1/config/reload) ──
 
 // Settings exposes runtime configuration schema/config/check/reload helpers for external setup pages, CLIs, and automation scripts.
@@ -703,6 +774,7 @@ type AgentKit struct {
 	Tori          *toriNamespace
 	Speech        *speechNamespace
 	Setup         *setupNamespace
+	Admin         *adminNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -5395,6 +5467,7 @@ func NewAgentKit() AgentKit {
 		Tori:          Tori,
 		Speech:        Speech,
 		Setup:         Setup,
+		Admin:         Admin,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

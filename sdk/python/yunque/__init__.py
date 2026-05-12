@@ -1214,6 +1214,38 @@ class _SetupNamespace:
 
 setup = _SetupNamespace()
 
+# ── Admin / Operator controls (/v1/desktop, /v1/tenants, /v1/nl-config) ──
+
+class _AdminNamespace:
+    """Lightweight helpers for desktop controls, tenants, and natural-language configuration."""
+
+    def console_status(self) -> dict:
+        return _api_call("GET", "/v1/desktop/console")
+
+    def toggle_console(self) -> dict:
+        return _api_call("POST", "/v1/desktop/console", {})
+
+    def autostart_status(self) -> dict:
+        return _api_call("GET", "/v1/desktop/autostart")
+
+    def toggle_autostart(self) -> dict:
+        return _api_call("POST", "/v1/desktop/autostart", {})
+
+    def list_tenants(self) -> dict:
+        return _api_call("GET", "/v1/tenants")
+
+    def create_tenant(self, name: str) -> dict:
+        return _api_call("POST", "/v1/tenants", {"name": name})
+
+    def nl_config(self, text: str, execute: bool = True) -> dict:
+        return _api_call("POST", "/v1/nl-config", {"text": text, "execute": execute})
+
+    def nl_config_translate(self, text: str) -> dict:
+        return _api_call("POST", "/v1/nl-config/translate", {"text": text, "execute": False})
+
+
+admin = _AdminNamespace()
+
 # ── Settings (/api/settings, /v1/config/reload) ──
 
 class _SettingsNamespace:
@@ -2694,6 +2726,7 @@ class AgentKit:
         self.tori = tori
         self.speech = speech
         self.setup = setup
+        self.admin = admin
         self.settings = settings
         self.system = system
         self.auth = auth

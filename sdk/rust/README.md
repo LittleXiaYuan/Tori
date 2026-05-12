@@ -613,3 +613,7 @@ The lightweight System SDK exposes public health/readiness probes, version/SBOM 
 ### Auth SDK
 
 The lightweight Auth SDK exposes auth status, password login/setup, API-key-to-JWT token exchange, and Tori OAuth start URL helpers for external plugin UIs, front-end setup pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/auth/status`, `/v1/auth/login`, `/v1/auth/set-password`, `/v1/token`, and `/v1/auth/oauth/tori`.
+
+### Admin SDK
+
+The lightweight Admin SDK exposes operator controls for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It covers desktop console/autostart status and toggles, tenant listing/creation, and natural-language configuration via `/v1/desktop/console`, `/v1/desktop/autostart`, `/v1/tenants`, `/v1/nl-config`, and `/v1/nl-config/translate`. Agent Kit also exposes this surface as `kit.admin` / `kit.Admin` for one-stop operator automation.

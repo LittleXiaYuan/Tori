@@ -1401,6 +1401,7 @@ pub struct AgentKit {
     pub tori: ToriClient,
     pub speech: SpeechClient,
     pub setup: SetupClient,
+    pub admin: AdminClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1475,6 +1476,7 @@ impl AgentKit {
             tori: ToriClient::new(base_url.clone(), token.as_ref())?,
             speech: SpeechClient::new(base_url.clone(), token.as_ref())?,
             setup: SetupClient::new(base_url.clone(), token.as_ref())?,
+            admin: AdminClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1545,6 +1547,7 @@ impl AgentKit {
             tori: ToriClient::new_with_client(base_url.clone(), plugin_http.clone()),
             speech: SpeechClient::new_with_client(base_url.clone(), plugin_http.clone()),
             setup: SetupClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            admin: AdminClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5596,6 +5599,43 @@ impl SetupClient {
     async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
 }
 
+
+pub type AdminDesktopConsoleResponse = serde_json::Value;
+pub type AdminDesktopAutostartResponse = serde_json::Value;
+pub type AdminTenantListResponse = serde_json::Value;
+pub type AdminTenantRecord = serde_json::Value;
+pub type AdminNLConfigResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdminCreateTenantRequest { pub name: String }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdminNLConfigRequest { pub text: String, pub execute: bool }
+
+/// Lightweight Admin SDK client for desktop controls, tenants, and natural-language configuration.
+#[derive(Debug, Clone)]
+pub struct AdminClient { base_url: String, http: reqwest::Client }
+
+impl AdminClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn console_status(&self) -> Result<AdminDesktopConsoleResponse, reqwest::Error> { self.get_json("/v1/desktop/console").await }
+    pub async fn toggle_console(&self) -> Result<AdminDesktopConsoleResponse, reqwest::Error> { self.post_json("/v1/desktop/console", &serde_json::json!({})).await }
+    pub async fn autostart_status(&self) -> Result<AdminDesktopAutostartResponse, reqwest::Error> { self.get_json("/v1/desktop/autostart").await }
+    pub async fn toggle_autostart(&self) -> Result<AdminDesktopAutostartResponse, reqwest::Error> { self.post_json("/v1/desktop/autostart", &serde_json::json!({})).await }
+    pub async fn list_tenants(&self) -> Result<AdminTenantListResponse, reqwest::Error> { self.get_json("/v1/tenants").await }
+    pub async fn create_tenant(&self, name: impl Into<String>) -> Result<AdminTenantRecord, reqwest::Error> { self.post_json("/v1/tenants", &AdminCreateTenantRequest { name: name.into() }).await }
+    pub async fn nl_config(&self, text: impl Into<String>, execute: bool) -> Result<AdminNLConfigResponse, reqwest::Error> { self.post_json("/v1/nl-config", &AdminNLConfigRequest { text: text.into(), execute }).await }
+    pub async fn nl_config_translate(&self, text: impl Into<String>) -> Result<AdminNLConfigResponse, reqwest::Error> { self.post_json("/v1/nl-config/translate", &AdminNLConfigRequest { text: text.into(), execute: false }).await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type SettingsSchemaResponse = serde_json::Value;
 pub type SettingsConfigResponse = serde_json::Value;
 pub type SettingsUpdateResponse = serde_json::Value;
@@ -9552,6 +9592,22 @@ mod tests {
         let apply = serde_json::to_value(SetupApplyRequest { template_id: "local".to_string(), base_url: Some("http://127.0.0.1:11434".to_string()), model: Some("qwen".to_string()), api_key: None, overrides: Some(serde_json::json!({"sandbox_tier": "local"})) }).unwrap();
         assert_eq!(apply["template_id"], "local");
         assert_eq!(apply["overrides"]["sandbox_tier"], "local");
+    }
+
+
+    #[test]
+    fn admin_helpers_build_urls_and_payloads() {
+        let client = AdminClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/desktop/console"), "http://localhost:9090/v1/desktop/console");
+        assert_eq!(client.url("/v1/desktop/autostart"), "http://localhost:9090/v1/desktop/autostart");
+        assert_eq!(client.url("/v1/tenants"), "http://localhost:9090/v1/tenants");
+        assert_eq!(client.url("/v1/nl-config"), "http://localhost:9090/v1/nl-config");
+        assert_eq!(client.url("/v1/nl-config/translate"), "http://localhost:9090/v1/nl-config/translate");
+        let tenant = serde_json::to_value(AdminCreateTenantRequest { name: "team".to_string() }).unwrap();
+        assert_eq!(tenant["name"], "team");
+        let nl = serde_json::to_value(AdminNLConfigRequest { text: "切换到 qwen".to_string(), execute: false }).unwrap();
+        assert_eq!(nl["text"], "切换到 qwen");
+        assert_eq!(nl["execute"], false);
     }
 
     #[test]
