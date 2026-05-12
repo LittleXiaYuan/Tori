@@ -1031,6 +1031,14 @@
       "types": "./src/market-search.ts",
       "import": "./src/market-search.ts"
     },
+    "./market-query": {
+      "types": "./src/market-query.ts",
+      "import": "./src/market-query.ts"
+    },
+    "./market-top": {
+      "types": "./src/market-top.ts",
+      "import": "./src/market-top.ts"
+    },
     "./market-stats": {
       "types": "./src/market-stats.ts",
       "import": "./src/market-stats.ts"

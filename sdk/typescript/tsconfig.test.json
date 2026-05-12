@@ -272,6 +272,8 @@
     "src/project-write.ts",
     "src/market.ts",
     "src/market-search.ts",
+    "src/market-query.ts",
+    "src/market-top.ts",
     "src/market-stats.ts",
     "src/dispatch.ts",
     "src/dispatch-read.ts",
