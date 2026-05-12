@@ -791,6 +791,14 @@
       "types": "./src/settings-backup.ts",
       "import": "./src/settings-backup.ts"
     },
+    "./settings-schema": {
+      "types": "./src/settings-schema.ts",
+      "import": "./src/settings-schema.ts"
+    },
+    "./settings-runtime": {
+      "types": "./src/settings-runtime.ts",
+      "import": "./src/settings-runtime.ts"
+    },
     "./tori": {
       "types": "./src/tori.ts",
       "import": "./src/tori.ts"
