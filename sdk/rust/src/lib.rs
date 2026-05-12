@@ -1397,6 +1397,7 @@ pub struct AgentKit {
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
+    pub tasks: TasksClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1463,6 +1464,7 @@ impl AgentKit {
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
+            tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1525,6 +1527,7 @@ impl AgentKit {
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5216,6 +5219,98 @@ fn filename_from_disposition(disposition: &str) -> String {
     String::new()
 }
 
+pub type Task = serde_json::Map<String, serde_json::Value>;
+pub type TaskActionResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TaskConstraints {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub max_steps: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub timeout_sec: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub max_cost_usd: f64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub success_criteria: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub test_command: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub priority: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub risk_level: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub auto_approve: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CreateTaskRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub constraints: TaskConstraints,
+}
+
+/// Small Rust helper over task CRUD and lifecycle endpoints.
+#[derive(Debug, Clone)]
+pub struct TasksClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl TasksClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); }
+        }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { base_url: trim_base_url(base_url.into()), http }
+    }
+
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+
+    pub async fn list(&self) -> Result<Vec<Task>, reqwest::Error> { self.get_json("/v1/tasks").await }
+
+    pub async fn get(&self, id: impl AsRef<str>) -> Result<Task, reqwest::Error> {
+        self.get_json(&format!("/v1/tasks?id={}", url_encode_query_component(id.as_ref()))).await
+    }
+
+    pub async fn create(&self, request: &CreateTaskRequest) -> Result<Task, reqwest::Error> {
+        self.post_json("/v1/tasks", request).await
+    }
+
+    pub async fn run(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> { self.action("run", id.as_ref()).await }
+    pub async fn pause(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> { self.action("pause", id.as_ref()).await }
+    pub async fn resume(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> { self.action("resume", id.as_ref()).await }
+    pub async fn restart(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> { self.action("restart", id.as_ref()).await }
+    pub async fn cancel(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> { self.action("cancel", id.as_ref()).await }
+
+    pub async fn delete(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> {
+        self.http.delete(self.url(&format!("/v1/tasks?id={}", url_encode_query_component(id.as_ref())))).send().await?.error_for_status()?.json().await
+    }
+
+    async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
+        self.post_json(&format!("/v1/tasks/{action}"), &serde_json::json!({"id": id})).await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where T: for<'de> Deserialize<'de>,
+    { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where B: Serialize + ?Sized, T: for<'de> Deserialize<'de>,
+    { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type RBACPermission = serde_json::Map<String, serde_json::Value>;
 pub type RBACRole = serde_json::Map<String, serde_json::Value>;
 pub type RBACRolesResponse = serde_json::Value;
@@ -8877,6 +8972,25 @@ mod tests {
         );
     }
 
+    #[test]
+    fn tasks_helpers_build_urls_and_payloads() {
+        let client = TasksClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/tasks"), "http://localhost:9090/v1/tasks");
+        assert_eq!(
+            client.url(&format!("/v1/tasks?id={}", url_encode_query_component("task 1"))),
+            "http://localhost:9090/v1/tasks?id=task+1"
+        );
+        let request = serde_json::to_value(CreateTaskRequest {
+            title: "SDK".to_string(),
+            description: "ship lightweight tasks SDK".to_string(),
+            constraints: TaskConstraints { max_steps: 3, risk_level: "low".to_string(), ..Default::default() },
+        }).unwrap();
+        assert_eq!(request["description"], "ship lightweight tasks SDK");
+        assert_eq!(request["constraints"]["max_steps"], 3);
+        assert_eq!(request["constraints"]["risk_level"], "low");
+        let listed: Vec<Task> = serde_json::from_str(r#"[{"id":"task-1","status":"running"}]"#).unwrap();
+        assert_eq!(listed[0]["id"], "task-1");
+    }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {
         let client =
