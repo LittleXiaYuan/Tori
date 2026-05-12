@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "domain": "settings",
+  "description": "Cross-language lightweight SDK for settings schema/config reads, config updates, setup checks, hot config reload, and host directory detection without importing the full platform client.",
+  "principles": [
+    "Expose runtime configuration as a focused SDK slice for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep read/check/reload helpers directly callable through existing gateway routes without coupling to the admin console.",
+    "Make Settings access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /api/settings/schema",
+    "GET /api/settings/config",
+    "PUT /api/settings/config",
+    "GET /api/settings/check",
+    "POST /v1/config/reload",
+    "GET /api/settings/detect-dirs"
+  ],
+  "capabilities": [
+    {
+      "name": "schema",
+      "route": "GET /api/settings/schema",
+      "readOnly": true,
+      "description": "Read grouped settings schema for external setup/config UIs."
+    },
+    {
+      "name": "config",
+      "route": "GET /api/settings/config",
+      "readOnly": true,
+      "description": "Read sanitized runtime config values."
+    },
+    {
+      "name": "updateConfig",
+      "route": "PUT /api/settings/config",
+      "readOnly": false,
+      "description": "Update selected runtime configuration values."
+    },
+    {
+      "name": "check",
+      "route": "GET /api/settings/check",
+      "readOnly": true,
+      "description": "Check first-run/setup completeness."
+    },
+    {
+      "name": "reload",
+      "route": "POST /v1/config/reload",
+      "readOnly": false,
+      "description": "Hot-reload config into runtime providers where supported."
+    },
+    {
+      "name": "detectDirs",
+      "route": "GET /api/settings/detect-dirs",
+      "readOnly": true,
+      "description": "Discover host directories for setup pages and scripts."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/settings.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "schema": "createSettingsClient().schema",
+        "config": "createSettingsClient().config",
+        "updateConfig": "createSettingsClient().updateConfig",
+        "check": "createSettingsClient().check",
+        "reload": "createSettingsClient().reload",
+        "detectDirs": "createSettingsClient().detectDirs"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "schema": "yunque.Settings.Schema",
+        "config": "yunque.Settings.Config",
+        "updateConfig": "yunque.Settings.UpdateConfig",
+        "check": "yunque.Settings.Check",
+        "reload": "yunque.Settings.Reload",
+        "detectDirs": "yunque.Settings.DetectDirs"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "schema": "yunque.settings.schema",
+        "config": "yunque.settings.config",
+        "updateConfig": "yunque.settings.update_config",
+        "check": "yunque.settings.check",
+        "reload": "yunque.settings.reload",
+        "detectDirs": "yunque.settings.detect_dirs"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "schema": "SettingsClient::schema",
+        "config": "SettingsClient::config",
+        "updateConfig": "SettingsClient::update_config",
+        "check": "SettingsClient::check",
+        "reload": "SettingsClient::reload",
+        "detectDirs": "SettingsClient::detect_dirs"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
