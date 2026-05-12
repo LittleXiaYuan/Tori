@@ -559,6 +559,14 @@
       "types": "./src/files.ts",
       "import": "./src/files.ts"
     },
+    "./files-read": {
+      "types": "./src/files-read.ts",
+      "import": "./src/files-read.ts"
+    },
+    "./files-download": {
+      "types": "./src/files-download.ts",
+      "import": "./src/files-download.ts"
+    },
     "./cron": {
       "types": "./src/cron.ts",
       "import": "./src/cron.ts"
