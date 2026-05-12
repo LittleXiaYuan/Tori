@@ -228,6 +228,9 @@ import { createSpeechTTSClient } from "yunque-client/speech-tts";
 import { createSpeechSTTClient } from "yunque-client/speech-stt";
 import { createSpeechVoicesClient } from "yunque-client/speech-voices";
 import { createAdminClient } from "yunque-client/admin";
+import { createAdminDesktopClient } from "yunque-client/admin-desktop";
+import { createAdminTenantsClient } from "yunque-client/admin-tenants";
+import { createAdminConfigClient } from "yunque-client/admin-config";
 import { createFilesClient } from "yunque-client/files";
 import { createFilesReadClient } from "yunque-client/files-read";
 import { createFilesDownloadClient } from "yunque-client/files-download";
@@ -1408,6 +1411,9 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/speech-stt.ts` | Lightweight speech STT and stream URL facade without TTS, voices, or upload APIs |
 | `src/speech-voices.ts` | Lightweight speech voices catalog facade without TTS, STT, stream URL, or upload APIs |
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
+| `src/admin-desktop.ts` | Lightweight desktop console/autostart facade without tenant or NL config APIs |
+| `src/admin-tenants.ts` | Lightweight tenant list/create facade without desktop or NL config APIs |
+| `src/admin-config.ts` | Lightweight natural-language config facade without desktop or tenant APIs |
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `src/files-read.ts` | Lightweight artifact list/preview facade without download APIs |
 | `src/files-download.ts` | Lightweight artifact download facade without list/preview APIs |
