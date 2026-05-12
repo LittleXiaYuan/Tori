@@ -20,7 +20,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
-Reflection Experience, Mission Parse, and Plugin API Runtime. It reuses the same small
+Reflection Experience, Mission Parse, Scheduler, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -32,10 +32,11 @@ strategies, err := kit.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategy
     Limit: 5,
 })
 mission, err := kit.Missions.Parse(ctx, "每天八点总结昨天的任务")
+schedulerJobs, err := kit.Scheduler.Jobs(ctx)
 results, err := kit.Plugin.Search(ctx, "incremental SDK package", 5)
 err = kit.Memory.Set(ctx, "last_focus", focus)
 
-fmt.Println(focus, strategies, mission.Type, len(results))
+fmt.Println(focus, strategies, mission.Type, schedulerJobs.Count, len(results))
 ```
 
 ## Mission Parse helpers
@@ -47,6 +48,18 @@ depending on platform internals.
 ```go
 mission, err := yunque.Missions.Parse(ctx, "每天八点总结昨天的任务")
 fmt.Println(mission.Type, mission.Name, mission.Config["cron_expr"])
+```
+
+## Scheduler helpers
+
+Use `yunque.Scheduler` when an external Go sidecar, CLI, or automation binary
+needs to list, add, or remove prompt-based recurring jobs.
+
+```go
+jobs, err := yunque.Scheduler.Jobs(ctx)
+job, err := yunque.Scheduler.Add(ctx, "hourly", "检查任务", "1h")
+removed, err := yunque.Scheduler.Remove(ctx, job.ID)
+fmt.Println(jobs.Count, job.ID, removed.Status)
 ```
 
 ## State Kernel incremental helpers

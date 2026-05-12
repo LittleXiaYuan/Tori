@@ -290,12 +290,13 @@ func decodeMapResponse(resp map[string]any, target any) error {
 //
 // It is intentionally just a thin bundle over the existing lightweight
 // namespaces, so callers can reach State Kernel, Reflection Experience,
-// Mission Parse, and Plugin API Runtime helpers without linking to platform
-// internals or a broad generated client.
+// Mission Parse, Scheduler, and Plugin API Runtime helpers without linking to
+// platform internals or a broad generated client.
 type AgentKit struct {
 	State       *stateNamespace
 	Reflect     *reflectNamespace
 	Missions    *missionsNamespace
+	Scheduler   *schedulerNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -339,13 +340,73 @@ func (m *missionsNamespace) Parse(ctx context.Context, description string) (Miss
 	return out, nil
 }
 
+// ── Prompt Scheduler ──
+
+// Scheduler provides focused access to prompt-based recurring jobs.
+var Scheduler = &schedulerNamespace{}
+
+type schedulerNamespace struct{}
+
+// SchedulerJob is a prompt job managed by /v1/scheduler/*.
+type SchedulerJob struct {
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	TenantID string `json:"tenant_id,omitempty"`
+	Interval any    `json:"interval,omitempty"`
+	Prompt   string `json:"prompt,omitempty"`
+}
+
+// SchedulerJobsResponse is returned by /v1/scheduler/jobs.
+type SchedulerJobsResponse struct {
+	Jobs  []SchedulerJob `json:"jobs"`
+	Count int            `json:"count"`
+}
+
+// SchedulerRemoveResponse is returned by /v1/scheduler/remove.
+type SchedulerRemoveResponse struct {
+	Status string `json:"status"`
+}
+
+// Jobs lists prompt scheduler jobs.
+func (s *schedulerNamespace) Jobs(ctx context.Context) (SchedulerJobsResponse, error) {
+	var out SchedulerJobsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/scheduler/jobs", nil, &out); err != nil {
+		return SchedulerJobsResponse{}, err
+	}
+	if out.Jobs == nil {
+		out.Jobs = []SchedulerJob{}
+	}
+	return out, nil
+}
+
+// Add creates a recurring prompt scheduler job. Interval uses Go duration strings such as "1h".
+func (s *schedulerNamespace) Add(ctx context.Context, name, prompt, interval string) (SchedulerJob, error) {
+	var out SchedulerJob
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/scheduler/add", map[string]any{
+		"name": name, "prompt": prompt, "interval": interval,
+	}, &out); err != nil {
+		return SchedulerJob{}, err
+	}
+	return out, nil
+}
+
+// Remove deletes a prompt scheduler job by id.
+func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRemoveResponse, error) {
+	var out SchedulerRemoveResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/scheduler/remove", map[string]any{"id": id}, &out); err != nil {
+		return SchedulerRemoveResponse{}, err
+	}
+	return out, nil
+}
+
 // NewAgentKit returns a lightweight bundle of state, reflection, mission parse,
-// and plugin runtime helpers.
+// scheduler, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
 		State:       State,
 		Reflect:     Reflect,
 		Missions:    Missions,
+		Scheduler:   Scheduler,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

@@ -1,6 +1,7 @@
 /** Lightweight Agent Kit SDK bundle for external scripts and plugins. */
 import { createPluginApiClient, type PluginApiClient, type PluginApiClientOptions } from "./plugin-api.js";
 import { createReflectClient, type ReflectClient, type ReflectClientOptions } from "./reflect.js";
+import { createSchedulerClient, type SchedulerClient, type SchedulerClientOptions } from "./scheduler.js";
 import { createStateClient, type StateClient, type StateClientOptions } from "./state.js";
 import { createMissionsParseClient, type MissionsParseClient, type MissionsParseClientOptions } from "./missions-parse.js";
 
@@ -17,6 +18,7 @@ export type AgentKit = {
   state: StateClient;
   reflect: ReflectClient;
   missions: MissionsParseClient;
+  scheduler: SchedulerClient;
   plugin: PluginApiClient;
 };
 
@@ -33,7 +35,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -46,10 +48,11 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     state: createStateClient(common),
     reflect: createReflectClient(common),
     missions: createMissionsParseClient(common),
+    scheduler: createSchedulerClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createMissionsParseClient, createPluginApiClient, createReflectClient, createStateClient };
-export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, StateClient, StateClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createReflectClient, createSchedulerClient, createStateClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions };
 

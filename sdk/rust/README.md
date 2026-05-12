@@ -102,7 +102,7 @@ cargo check     # quick verification
 
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
-Experience, Mission Parse, and Plugin API Runtime. It composes the hand-written lightweight
+Experience, Mission Parse, Scheduler, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -123,9 +123,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..ReflectOptions::default()
     }).await?;
     let mission = kit.missions.parse("每天八点总结昨天的任务").await?;
+    let jobs = kit.scheduler.jobs().await?;
     let search = kit.plugin.search("incremental SDK package", 5).await?;
 
-    println!("{} {} {} {}", focus, strategies, mission.r#type, search.results.len());
+    println!("{} {} {} {} {}", focus, strategies, mission.r#type, jobs.count, search.results.len());
     Ok(())
 }
 ```
@@ -142,6 +143,25 @@ use yunque_client::MissionsClient;
 let missions = MissionsClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
 let mission = missions.parse("每天八点总结昨天的任务").await?;
 println!("{} {}", mission.r#type, mission.name);
+```
+
+## Lightweight Scheduler helper
+
+Use `SchedulerClient` when a Rust CLI, sidecar, plugin runner, or automation
+binary needs to list, add, or remove prompt-based recurring jobs.
+
+```rust
+use yunque_client::{SchedulerAddRequest, SchedulerClient};
+
+let scheduler = SchedulerClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let jobs = scheduler.jobs().await?;
+let job = scheduler.add(&SchedulerAddRequest {
+    name: "hourly".to_string(),
+    prompt: "检查任务".to_string(),
+    interval: "1h".to_string(),
+}).await?;
+let removed = scheduler.remove(&job.id).await?;
+println!("{} {} {}", jobs.count, job.id, removed.status);
 ```
 
 ## Lightweight State Kernel helper

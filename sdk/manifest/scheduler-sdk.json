@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "domain": "prompt-scheduler",
+  "description": "Cross-language lightweight SDK entrypoints for listing, adding, and removing prompt-based recurring scheduler jobs.",
+  "principles": [
+    "Expose prompt scheduler operations as reusable SDK capabilities instead of platform-internal dashboard actions.",
+    "Keep scheduler read and control helpers narrow so external pages, plugins, CLIs, and automation scripts can use them without importing the full generated client.",
+    "Separate read-only job listing from mutation-capable add/remove helpers where language packaging supports focused slices."
+  ],
+  "routes": [
+    "GET /v1/scheduler/jobs",
+    "POST /v1/scheduler/add",
+    "POST /v1/scheduler/remove"
+  ],
+  "capabilities": [
+    { "name": "jobs", "route": "GET /v1/scheduler/jobs", "readOnly": true, "description": "List prompt scheduler jobs." },
+    { "name": "add", "route": "POST /v1/scheduler/add", "readOnly": false, "description": "Add a recurring prompt scheduler job." },
+    { "name": "remove", "route": "POST /v1/scheduler/remove", "readOnly": false, "description": "Remove a prompt scheduler job by id." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/scheduler.ts", "sdk/typescript/src/scheduler-read.ts", "sdk/typescript/src/scheduler-control.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "jobs": "yunque-client/scheduler-read#createSchedulerReadClient().jobs",
+        "add": "yunque-client/scheduler-control#createSchedulerControlClient().add",
+        "remove": "yunque-client/scheduler-control#createSchedulerControlClient().remove"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "jobs": "yunque.Scheduler.Jobs",
+        "add": "yunque.Scheduler.Add",
+        "remove": "yunque.Scheduler.Remove"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "jobs": "yunque.scheduler.jobs",
+        "add": "yunque.scheduler.add",
+        "remove": "yunque.scheduler.remove"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "jobs": "SchedulerClient::jobs",
+        "add": "SchedulerClient::add",
+        "remove": "SchedulerClient::remove"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

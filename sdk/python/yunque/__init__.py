@@ -342,6 +342,31 @@ class _MissionsNamespace:
 missions = _MissionsNamespace()
 
 
+# ── Prompt Scheduler ──
+
+class _SchedulerNamespace:
+    """Lightweight helpers for prompt-based recurring scheduler jobs."""
+
+    def jobs(self) -> dict:
+        """List scheduler jobs from /v1/scheduler/jobs."""
+        return _api_call("GET", "/v1/scheduler/jobs")
+
+    def add(self, name: str, prompt: str, interval: str) -> dict:
+        """Add a recurring prompt job. Interval uses Go duration strings such as '1h'."""
+        return _api_call("POST", "/v1/scheduler/add", {
+            "name": name,
+            "prompt": prompt,
+            "interval": interval,
+        })
+
+    def remove(self, job_id: str) -> dict:
+        """Remove a scheduler job by id."""
+        return _api_call("POST", "/v1/scheduler/remove", {"id": job_id})
+
+
+scheduler = _SchedulerNamespace()
+
+
 # ── System Extension Registration ──
 # These let plugins ADD new system-level capabilities to the agent.
 # Like Magisk modules or Chrome extensions — you're extending the platform itself.
@@ -507,16 +532,17 @@ class AgentKit:
     """Small bundle of common SDK-first Yunque surfaces.
 
     Use this when an external Python script, plugin, or sidecar wants the State
-    Kernel, Reflection Experience, Mission Parse, and Plugin API Runtime helpers
-    from one object without depending on a generated full OpenAPI client. The
-    namespace objects are the same lightweight module-level helpers, so this
-    remains a zero-dependency incremental package.
+    Kernel, Reflection Experience, Mission Parse, Scheduler, and Plugin API
+    Runtime helpers from one object without depending on a generated full
+    OpenAPI client. The namespace objects are the same lightweight module-level
+    helpers, so this remains a zero-dependency incremental package.
     """
 
     def __init__(self):
         self.state = state
         self.reflect = reflect
         self.missions = missions
+        self.scheduler = scheduler
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
