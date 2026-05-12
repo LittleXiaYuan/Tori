@@ -555,6 +555,18 @@
       "types": "./src/admin.ts",
       "import": "./src/admin.ts"
     },
+    "./admin-desktop": {
+      "types": "./src/admin-desktop.ts",
+      "import": "./src/admin-desktop.ts"
+    },
+    "./admin-tenants": {
+      "types": "./src/admin-tenants.ts",
+      "import": "./src/admin-tenants.ts"
+    },
+    "./admin-config": {
+      "types": "./src/admin-config.ts",
+      "import": "./src/admin-config.ts"
+    },
     "./files": {
       "types": "./src/files.ts",
       "import": "./src/files.ts"
