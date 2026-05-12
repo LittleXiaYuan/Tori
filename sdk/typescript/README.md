@@ -334,6 +334,8 @@ import { createPluginUIClient } from "yunque-client/plugin-ui";
 import { createPluginReloadClient } from "yunque-client/plugin-reload";
 import { createPluginFolderClient } from "yunque-client/plugin-folder";
 import { createPluginFilesClient } from "yunque-client/plugin-files";
+import { createPluginFileReadClient } from "yunque-client/plugin-file-read";
+import { createPluginFileSaveClient } from "yunque-client/plugin-file-save";
 import { createPluginCrudClient } from "yunque-client/plugin-crud";
 import { createPluginCreateClient } from "yunque-client/plugin-create";
 import { createPluginDeleteClient } from "yunque-client/plugin-delete";
@@ -1361,6 +1363,18 @@ const pluginFiles = createPluginFilesClient({
 });
 await pluginFiles.files("demo");
 
+const pluginFileRead = createPluginFileReadClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await pluginFileRead.files("demo");
+
+const pluginFileSave = createPluginFileSaveClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+await pluginFileSave.saveFile("demo", "plugin.json", "{}");
+
 const pluginCrud = createPluginCrudClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
@@ -1848,6 +1862,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugin-reload.ts` | Lightweight plugin reload facade without toggle, UI or folder-open APIs |
 | `src/plugin-folder.ts` | Lightweight plugin folder-open facade without toggle, UI or reload APIs |
 | `src/plugin-files.ts` | Lightweight plugin file read/save facade without full SDK import |
+| `src/plugin-file-read.ts` | Lightweight plugin file read facade without save or other plugin APIs |
+| `src/plugin-file-save.ts` | Lightweight plugin file save facade without read or other plugin APIs |
 | `src/plugin-crud.ts` | Lightweight plugin create/delete facade without full SDK import |
 | `src/plugin-create.ts` | Lightweight plugin create facade without delete or other plugin APIs |
 | `src/plugin-delete.ts` | Lightweight plugin delete facade without create or other plugin APIs |
