@@ -201,6 +201,7 @@ import { createReverieControlClient } from "yunque-client/reverie-control";
 import { createFederationClient } from "yunque-client/federation";
 import { createFederationObserveClient } from "yunque-client/federation-observe";
 import { createFederationControlClient } from "yunque-client/federation-control";
+import { createFederationDelegateClient } from "yunque-client/federation-delegate";
 import { createSystemClient } from "yunque-client/system";
 import { createSettingsClient } from "yunque-client/settings";
 import { createToriClient } from "yunque-client/tori";
@@ -1349,6 +1350,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/federation.ts` | Lightweight hand-written federation peers, capabilities, discovery, delegation, and broadcast slice |
 | `src/federation-observe.ts` | Lightweight federation peers/stats/capabilities/bridge-stats facade without delegation or broadcast APIs |
 | `src/federation-control.ts` | Lightweight federation capabilities update/broadcast facade without discovery or delegation APIs |
+| `src/federation-delegate.ts` | Lightweight federation discover/delegate facade without status or broadcast APIs |
 | `src/system.ts` | Lightweight hand-written health, version, SBOM, metrics, cache, and module observability slice |
 | `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |
 | `src/tori.ts` | Lightweight hand-written Tori OAuth binding, status, health, and usage slice |
