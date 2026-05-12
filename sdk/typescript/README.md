@@ -156,6 +156,7 @@ import { createTaskTraceClient } from "yunque-client/task-trace";
 import { createBrowserClient } from "yunque-client/browser";
 import { createBrowserStatusClient } from "yunque-client/browser-status";
 import { createBrowserCaptureClient } from "yunque-client/browser-capture";
+import { createBrowserOPPClient } from "yunque-client/browser-opp";
 import { createRuntimeClient } from "yunque-client/runtime";
 import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
@@ -791,6 +792,12 @@ const browserCapture = createBrowserCaptureClient({
   apiKey: "<your-api-key>",
 });
 
+const browserOPP = createBrowserOPPClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const pendingBrowserApprovals = await browserOPP.pending();
+
 const browser = createBrowserClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
@@ -1134,7 +1141,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`runtime`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1229,6 +1236,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/browser.ts` | Lightweight hand-written browser extension automation and OPP slice |
 | `src/browser-status.ts` | Lightweight browser status/config/extension-status facade without automation or screenshot APIs |
 | `src/browser-capture.ts` | Lightweight browser screenshot/latest-screenshot/OCR facade without navigation or extension action APIs |
+| `src/browser-opp.ts` | Lightweight browser OPP pending/decision facade without navigation, capture or extension action APIs |
 | `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
 | `src/router.ts` | Lightweight hand-written smart-router stats and status slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |

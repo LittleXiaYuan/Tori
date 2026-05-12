@@ -81,6 +81,7 @@
     "src/browser.ts",
     "src/browser-status.ts",
     "src/browser-capture.ts",
+    "src/browser-opp.ts",
     "src/runtime.ts",
     "src/router.ts",
     "src/modes.ts",
