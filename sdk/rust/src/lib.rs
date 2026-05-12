@@ -119,6 +119,77 @@ pub struct StateGoalMutationResponse {
     pub status: String,
 }
 
+/// Filters for the reflection experience and strategy APIs.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReflectOptions {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub q: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub category: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub outcome: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tag: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+}
+
+/// Structured lesson captured by the Yunque reflection layer.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReflectExperience {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub source_id: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub outcome: String,
+    #[serde(default)]
+    pub lesson: String,
+    #[serde(default)]
+    pub context: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+/// Response returned by `/v1/reflect/experiences`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReflectExperiencesResponse {
+    #[serde(default)]
+    pub experiences: Vec<ReflectExperience>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+/// Counters returned by `/v1/reflect/experiences?stats=true`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReflectExperienceStats {
+    #[serde(default)]
+    pub total: i32,
+    #[serde(default)]
+    pub by_source: std::collections::BTreeMap<String, i32>,
+    #[serde(default)]
+    pub by_category: std::collections::BTreeMap<String, i32>,
+    #[serde(default)]
+    pub by_outcome: std::collections::BTreeMap<String, i32>,
+    #[serde(default)]
+    pub recent_7d: i32,
+}
+
+/// Response returned by `/v1/reflect/strategies`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReflectStrategiesResponse {
+    #[serde(default)]
+    pub strategies: String,
+}
+
 /// Small Rust helper over `/v1/state` and focused State Kernel routes.
 ///
 /// Use this when a sidecar, CLI, or plugin wants state-layer access without
@@ -239,8 +310,154 @@ impl StateClient {
     }
 }
 
+/// Small Rust helper over `/v1/reflect/experiences` and `/v1/reflect/strategies`.
+///
+/// Use this when a CLI, sidecar, plugin, or evaluation script wants to reuse
+/// agent lessons and strategy hints without coupling to the full generated
+/// OpenAPI surface.
+#[derive(Debug, Clone)]
+pub struct ReflectClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ReflectClient {
+    /// Create a ReflectClient using a bearer token.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    /// Create a ReflectClient with a caller-provided reqwest client.
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    /// List captured reflection experiences with optional filters.
+    pub async fn experiences(
+        &self,
+        options: &ReflectOptions,
+    ) -> Result<ReflectExperiencesResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/reflect/experiences{}",
+                reflect_query(options, false)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Return reflection counters for the same filter set.
+    pub async fn stats(
+        &self,
+        options: &ReflectOptions,
+    ) -> Result<ReflectExperienceStats, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/reflect/experiences{}",
+                reflect_query(options, true)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Return compiled strategy hints derived from reflection experiences.
+    pub async fn strategies(
+        &self,
+        options: &ReflectOptions,
+    ) -> Result<String, reqwest::Error> {
+        let response: ReflectStrategiesResponse = self
+            .http
+            .get(self.url(&format!(
+                "/v1/reflect/strategies{}",
+                reflect_query(options, false)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(response.strategies)
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
 fn trim_base_url(base_url: String) -> String {
     base_url.trim_end_matches('/').to_string()
+}
+
+fn reflect_query(options: &ReflectOptions, stats: bool) -> String {
+    let mut query: Vec<(&str, String)> = Vec::new();
+    if !options.q.is_empty() {
+        query.push(("q", options.q.clone()));
+    }
+    if !options.source.is_empty() {
+        query.push(("source", options.source.clone()));
+    }
+    if !options.category.is_empty() {
+        query.push(("category", options.category.clone()));
+    }
+    if !options.outcome.is_empty() {
+        query.push(("outcome", options.outcome.clone()));
+    }
+    if !options.tag.is_empty() {
+        query.push(("tag", options.tag.clone()));
+    }
+    if options.limit > 0 {
+        query.push(("limit", options.limit.to_string()));
+    }
+    if stats {
+        query.push(("stats", "true".to_string()));
+    }
+    if query.is_empty() {
+        return String::new();
+    }
+    let encoded = query
+        .into_iter()
+        .map(|(key, value)| format!("{key}={}", url_encode_query_component(&value)))
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("?{encoded}")
+}
+
+fn url_encode_query_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
+            b' ' => encoded.push('+'),
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 fn is_default<T>(value: &T) -> bool
@@ -279,5 +496,46 @@ mod tests {
     fn state_client_trims_base_url() {
         let client = StateClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.url("/v1/state"), "http://localhost:9090/v1/state");
+    }
+
+    #[test]
+    fn reflect_query_serializes_filters() {
+        let query = reflect_query(
+            &ReflectOptions {
+                q: "code review".to_string(),
+                source: "task".to_string(),
+                outcome: "partial".to_string(),
+                tag: "quality:9".to_string(),
+                limit: 5,
+                ..ReflectOptions::default()
+            },
+            false,
+        );
+        assert_eq!(
+            query,
+            "?q=code+review&source=task&outcome=partial&tag=quality%3A9&limit=5"
+        );
+    }
+
+    #[test]
+    fn reflect_stats_query_appends_stats_flag() {
+        let query = reflect_query(
+            &ReflectOptions {
+                tag: "quality:9".to_string(),
+                ..ReflectOptions::default()
+            },
+            true,
+        );
+        assert_eq!(query, "?tag=quality%3A9&stats=true");
+    }
+
+    #[test]
+    fn reflect_client_trims_base_url() {
+        let client =
+            ReflectClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/reflect/strategies"),
+            "http://localhost:9090/v1/reflect/strategies"
+        );
     }
 }
