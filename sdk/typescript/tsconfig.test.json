@@ -139,6 +139,7 @@
     "src/upload.ts",
     "src/graph.ts",
     "src/plugin-api.ts",
+    "src/plugin-llm.ts",
     "src/state.ts",
     "src/resource-state.ts",
     "src/focus-state.ts",
