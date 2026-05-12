@@ -63,6 +63,18 @@
       "types": "./src/cognis-observe.ts",
       "import": "./src/cognis-observe.ts"
     },
+    "./cognis-traces": {
+      "types": "./src/cognis-traces.ts",
+      "import": "./src/cognis-traces.ts"
+    },
+    "./cognis-health": {
+      "types": "./src/cognis-health.ts",
+      "import": "./src/cognis-health.ts"
+    },
+    "./cognis-alerts": {
+      "types": "./src/cognis-alerts.ts",
+      "import": "./src/cognis-alerts.ts"
+    },
     "./cognis-experience": {
       "types": "./src/cognis-experience.ts",
       "import": "./src/cognis-experience.ts"
