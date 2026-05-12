@@ -99,6 +99,8 @@
     "src/knowledge-search.ts",
     "src/knowledge-ingest.ts",
     "src/knowledge-sources.ts",
+    "src/knowledge-source-read.ts",
+    "src/knowledge-source-control.ts",
     "src/knowledge-import.ts",
     "src/knowledge-upload.ts",
     "src/providers.ts",

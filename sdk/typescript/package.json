@@ -339,6 +339,14 @@
       "types": "./src/knowledge-sources.ts",
       "import": "./src/knowledge-sources.ts"
     },
+    "./knowledge-source-read": {
+      "types": "./src/knowledge-source-read.ts",
+      "import": "./src/knowledge-source-read.ts"
+    },
+    "./knowledge-source-control": {
+      "types": "./src/knowledge-source-control.ts",
+      "import": "./src/knowledge-source-control.ts"
+    },
     "./knowledge-import": {
       "types": "./src/knowledge-import.ts",
       "import": "./src/knowledge-import.ts"
