@@ -1388,6 +1388,7 @@ pub struct AgentKit {
     pub events: EventsClient,
     pub runtime: RuntimeClient,
     pub subagents: SubagentsClient,
+    pub tools: ToolsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1445,6 +1446,7 @@ impl AgentKit {
             events: EventsClient::new(base_url.clone(), token.as_ref())?,
             runtime: RuntimeClient::new(base_url.clone(), token.as_ref())?,
             subagents: SubagentsClient::new(base_url.clone(), token.as_ref())?,
+            tools: ToolsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1495,6 +1497,7 @@ impl AgentKit {
             events: EventsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             runtime: RuntimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             subagents: SubagentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            tools: ToolsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3569,6 +3572,144 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ToolExecOptions {
+    #[serde(rename = "Command")]
+    pub command: String,
+    #[serde(default, rename = "Cwd", skip_serializing_if = "String::is_empty")]
+    pub cwd: String,
+    #[serde(default, rename = "Background", skip_serializing_if = "is_default")]
+    pub background: bool,
+    #[serde(default, rename = "TimeoutMs", skip_serializing_if = "is_default")]
+    pub timeout_ms: i64,
+    #[serde(default, rename = "YieldMs", skip_serializing_if = "is_default")]
+    pub yield_ms: i64,
+    #[serde(default, rename = "Env", skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<String>,
+}
+
+pub type ToolExecResult = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ToolProcessSession {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub exit_code: i32,
+    #[serde(default)]
+    pub started_at: String,
+    #[serde(default)]
+    pub ended_at: String,
+    #[serde(default)]
+    pub cwd: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ToolListResponse {
+    #[serde(default)]
+    pub sessions: Vec<ToolProcessSession>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ToolPollResponse {
+    #[serde(default)]
+    pub lines: Vec<String>,
+    #[serde(default)]
+    pub state: String,
+}
+
+pub type ToolKillResponse = serde_json::Value;
+
+/// Small Rust helper over `/v1/tools/*` controlled process execution endpoints.
+#[derive(Debug, Clone)]
+pub struct ToolsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ToolsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn exec(&self, options: &ToolExecOptions) -> Result<ToolExecResult, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/tools/exec"))
+            .json(options)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn list(&self) -> Result<ToolListResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/tools/list"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn poll(&self, id: &str) -> Result<ToolPollResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/tools/poll?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn kill(&self, id: &str) -> Result<ToolKillResponse, reqwest::Error> {
+        self.http
+            .post(self.url(&format!(
+                "/v1/tools/kill?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Subagent {
@@ -7331,6 +7472,10 @@ mod tests {
             "http://localhost:9090/v1/subagent"
         );
         assert_eq!(
+            kit.tools.url("/v1/tools/list"),
+            "http://localhost:9090/v1/tools/list"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -7653,6 +7798,38 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn tools_helpers_build_urls_and_payloads() {
+        let client = ToolsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/tools/list"),
+            "http://localhost:9090/v1/tools/list"
+        );
+        assert_eq!(
+            client.url(&format!(
+                "/v1/tools/poll?id={}",
+                url_encode_query_component("session 1")
+            )),
+            "http://localhost:9090/v1/tools/poll?id=session+1"
+        );
+        let opts = ToolExecOptions {
+            command: "echo ok".to_string(),
+            cwd: "work".to_string(),
+            timeout_ms: 1000,
+            env: vec!["A=B".to_string()],
+            ..ToolExecOptions::default()
+        };
+        let body = serde_json::to_value(&opts).unwrap();
+        assert_eq!(body["Command"], "echo ok");
+        assert_eq!(body["Cwd"], "work");
+        assert_eq!(body["TimeoutMs"], 1000);
+        let list: ToolListResponse = serde_json::from_str(
+            r#"{"sessions":[{"id":"s1","command":"npm test","state":"running"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(list.sessions[0].id, "s1");
     }
 
     #[test]

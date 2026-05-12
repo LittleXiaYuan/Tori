@@ -602,6 +602,29 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Tools process execution (/v1/tools/*) ──
+
+class _ToolsNamespace:
+    """Lightweight helpers for controlled tool process execution sessions."""
+
+    def exec(self, command: str, cwd: str = "", background: bool = False, timeout_ms: int = 0, yield_ms: int = 0, env: Optional[list[str]] = None) -> dict:
+        return _api_call("POST", "/v1/tools/exec", {"Command": command, "Cwd": cwd, "Background": background, "TimeoutMs": timeout_ms, "YieldMs": yield_ms, "Env": env or []})
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/tools/list")
+
+    def poll(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/tools/poll?{urlencode({'id': session_id})}")
+
+    def kill(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("POST", f"/v1/tools/kill?{urlencode({'id': session_id})}")
+
+
+tools = _ToolsNamespace()
+
 # ── Subagents (/v1/subagent) ──
 
 class _SubagentsNamespace:
@@ -1961,6 +1984,7 @@ class AgentKit:
         self.browser = browser
         self.runtime = runtime
         self.subagents = subagents
+        self.tools = tools
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

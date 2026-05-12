@@ -34,6 +34,7 @@
     "server-sent-events",
     "runtime-operations",
     "subagent-orchestration",
+    "tool-processes",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -150,6 +151,10 @@
       "description": "Access the lightweight Subagents client or namespace for spawn, list, message append, and deletion."
     },
     {
+      "name": "tools",
+      "description": "Access the lightweight Tools client or namespace for process execution sessions, listing, polling, and kill controls."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -226,6 +231,7 @@
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
         "subagents": "AgentKit.subagents",
+        "tools": "AgentKit.tools",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -275,6 +281,7 @@
         "events": "AgentKit.Events",
         "runtime": "AgentKit.Runtime",
         "subagents": "AgentKit.Subagents",
+        "tools": "AgentKit.Tools",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -324,6 +331,7 @@
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
         "subagents": "AgentKit.subagents",
+        "tools": "AgentKit.tools",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -373,6 +381,7 @@
         "events": "AgentKit::events",
         "runtime": "AgentKit::runtime",
         "subagents": "AgentKit::subagents",
+        "tools": "AgentKit::tools",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",
