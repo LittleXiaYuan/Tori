@@ -31,6 +31,10 @@
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
     },
+    "./chat-stream": {
+      "types": "./src/chat-stream.ts",
+      "import": "./src/chat-stream.ts"
+    },
     "./cognis": {
       "types": "./src/cognis.ts",
       "import": "./src/cognis.ts"
