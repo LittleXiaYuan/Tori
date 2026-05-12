@@ -188,6 +188,8 @@
     "src/scheduler-control.ts",
     "src/upload.ts",
     "src/graph.ts",
+    "src/graph-read.ts",
+    "src/graph-write.ts",
     "src/plugin-api.ts",
     "src/plugin-llm.ts",
     "src/plugin-search.ts",

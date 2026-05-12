@@ -263,6 +263,8 @@ import { createSchedulerReadClient } from "yunque-client/scheduler-read";
 import { createSchedulerControlClient } from "yunque-client/scheduler-control";
 import { createUploadClient } from "yunque-client/upload";
 import { createGraphClient } from "yunque-client/graph";
+import { createGraphReadClient } from "yunque-client/graph-read";
+import { createGraphWriteClient } from "yunque-client/graph-write";
 import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createPluginLLMClient } from "yunque-client/plugin-llm";
 import { createPluginSearchClient } from "yunque-client/plugin-search";
@@ -1439,6 +1441,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/scheduler-control.ts` | Lightweight prompt scheduler add/remove facade without list APIs |
 | `src/upload.ts` | Lightweight hand-written authenticated multipart upload and parsed-file metadata slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
+| `src/graph-read.ts` | Lightweight knowledge graph entities/relations/context/stats facade without write APIs |
+| `src/graph-write.ts` | Lightweight knowledge graph entity/relation write facade without read APIs |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
 | `src/plugin-llm.ts` | Lightweight plugin LLM completion facade without plugin search, memory, knowledge, cron or extension APIs |
 | `src/plugin-search.ts` | Lightweight plugin runtime search facade without LLM, memory, knowledge, cron or extension APIs |
