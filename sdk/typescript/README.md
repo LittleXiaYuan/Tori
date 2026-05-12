@@ -413,6 +413,9 @@ import { createPluginExtensionsClient } from "yunque-client/plugin-extensions";
 import { createPluginExtensionsListClient } from "yunque-client/plugin-extensions-list";
 import { createPluginExtensionRegisterClient } from "yunque-client/plugin-extension-register";
 import { createStateClient } from "yunque-client/state";
+import { createStateSnapshotClient } from "yunque-client/state-snapshot";
+import { createStateActionsClient } from "yunque-client/state-actions";
+import { createStateCapabilitiesClient } from "yunque-client/state-capabilities";
 import { createResourceStateClient } from "yunque-client/resource-state";
 import { createFocusStateClient } from "yunque-client/focus-state";
 import { createGoalStateClient } from "yunque-client/goal-state";
@@ -1598,6 +1601,25 @@ const state = createStateClient({
 const focus = await state.focus();
 console.log(focus.focus);
 
+const stateSnapshot = createStateSnapshotClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+const currentState = await stateSnapshot.get();
+console.log(currentState.goals.length, currentState.resources.length);
+
+const stateActions = createStateActionsClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+console.log((await stateActions.list())[0]?.action);
+
+const stateCapabilities = createStateCapabilitiesClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+});
+console.log((await stateCapabilities.get()).total_skills);
+
 const triggers = createTriggersClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
@@ -1997,6 +2019,9 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugin-extensions-list.ts` | Lightweight plugin extension list facade without registration or other plugin APIs |
 | `src/plugin-extension-register.ts` | Lightweight plugin extension registration facade without list or other plugin APIs |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
+| `src/state-snapshot.ts` | Lightweight typed state snapshot facade without goal/resource/focus mutation APIs |
+| `src/state-actions.ts` | Lightweight recent state actions facade without state mutation APIs |
+| `src/state-capabilities.ts` | Lightweight state capabilities facade without state mutation APIs |
 | `src/resource-state.ts` | Lightweight state resource list/track/release facade without full SDK import |
 | `src/focus-state.ts` | Lightweight state focus read/update facade without full SDK import |
 | `src/goal-state.ts` | Lightweight state goal list/save/delete facade without full SDK import |
