@@ -447,6 +447,10 @@
       "types": "./src/federation-control.ts",
       "import": "./src/federation-control.ts"
     },
+    "./federation-delegate": {
+      "types": "./src/federation-delegate.ts",
+      "import": "./src/federation-delegate.ts"
+    },
     "./system": {
       "types": "./src/system.ts",
       "import": "./src/system.ts"

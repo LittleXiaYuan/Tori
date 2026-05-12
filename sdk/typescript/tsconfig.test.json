@@ -126,6 +126,7 @@
     "src/federation.ts",
     "src/federation-observe.ts",
     "src/federation-control.ts",
+    "src/federation-delegate.ts",
     "src/system.ts",
     "src/settings.ts",
     "src/tori.ts",
