@@ -24,6 +24,7 @@
     "src/chat.ts",
     "src/cognis.ts",
     "src/cognis-registry.ts",
+    "src/cognis-observe.ts",
     "src/events.ts",
     "src/realtime.ts",
     "src/webchat.ts",
