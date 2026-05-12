@@ -98,6 +98,51 @@ def _api_call_raw(method: str, path: str, body: Any = None, timeout: int = 30) -
         raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
 
 
+def _api_call_bytes(method: str, path: str, body: Any = None, timeout: int = 30) -> bytes:
+    """Make an authenticated API call and return raw bytes."""
+    url = f"{_API_BASE}{path}"
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method)
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+    if _TOKEN:
+        req.add_header("Authorization", f"Bearer {_TOKEN}")
+    req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
+
+
+def _api_call_multipart(method: str, path: str, field_name: str, filename: str, data: bytes, timeout: int = 30) -> dict:
+    """Upload one file field as multipart/form-data and parse JSON response."""
+    boundary = "----yunque-sdk-boundary"
+    body = (
+        f"--{boundary}\r\n"
+        f"Content-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\n"
+        "Content-Type: application/zip\r\n\r\n"
+    ).encode("utf-8") + data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    req = urllib.request.Request(f"{_API_BASE}{path}", data=body, method=method)
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    if _TOKEN:
+        req.add_header("Authorization", f"Bearer {_TOKEN}")
+    req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
+
+
 # ── LLM ──
 
 def llm(prompt: str, user_input: str = "", model: str = "", temperature: float = 0.7) -> str:
@@ -1026,6 +1071,23 @@ class _RBACNamespace:
 rbac = _RBACNamespace()
 
 
+
+# ── Backup (/v1/backup) ──
+
+class _BackupNamespace:
+    """Lightweight helpers for backup info/export/import."""
+
+    def info(self) -> dict:
+        return _api_call("GET", "/v1/backup/info")
+
+    def export(self) -> bytes:
+        return _api_call_bytes("GET", "/v1/backup/export")
+
+    def import_zip(self, data: bytes, filename: str = "yunque-backup.zip") -> dict:
+        return _api_call_multipart("POST", "/v1/backup/import", "backup", filename, data)
+
+
+backup = _BackupNamespace()
 
 # ── Settings (/api/settings, /v1/config/reload) ──
 
@@ -2503,6 +2565,7 @@ class AgentKit:
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
+        self.backup = backup
         self.settings = settings
         self.system = system
         self.auth = auth

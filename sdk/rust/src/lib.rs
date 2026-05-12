@@ -1397,6 +1397,7 @@ pub struct AgentKit {
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
+    pub backup: BackupClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1467,6 +1468,7 @@ impl AgentKit {
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
+            backup: BackupClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1533,6 +1535,7 @@ impl AgentKit {
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            backup: BackupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5369,6 +5372,51 @@ pub struct PostTaskThreadMessageRequest {
 pub struct UpdateTaskThreadStateRequest {
     pub task_id: String,
     pub state: String,
+}
+
+pub type BackupInfoResponse = serde_json::Value;
+pub type BackupImportResponse = serde_json::Value;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackupExportResponse {
+    pub data: bytes::Bytes,
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+}
+
+/// Lightweight Backup SDK client for archive info/export/import helpers.
+#[derive(Debug, Clone)]
+pub struct BackupClient { base_url: String, http: reqwest::Client }
+
+impl BackupClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn info(&self) -> Result<BackupInfoResponse, reqwest::Error> { self.get_json("/v1/backup/info").await }
+    pub async fn export(&self) -> Result<BackupExportResponse, reqwest::Error> {
+        let response = self.http.get(self.url("/v1/backup/export")).send().await?.error_for_status()?;
+        let headers = response.headers().clone();
+        let filename = headers.get(reqwest::header::CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).and_then(filename_from_content_disposition);
+        let content_type = headers.get(reqwest::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(str::to_string);
+        let data = response.bytes().await?;
+        Ok(BackupExportResponse { data, filename, content_type })
+    }
+    pub async fn import_bytes(&self, data: Vec<u8>, filename: impl Into<String>) -> Result<BackupImportResponse, reqwest::Error> {
+        let part = reqwest::multipart::Part::bytes(data).file_name(filename.into()).mime_str("application/zip")?;
+        let form = reqwest::multipart::Form::new().part("backup", part);
+        self.http.post(self.url("/v1/backup/import")).multipart(form).send().await?.error_for_status()?.json().await
+    }
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error> where T: for<'de> Deserialize<'de>, { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+}
+
+fn filename_from_content_disposition(disposition: &str) -> Option<String> {
+    disposition.split(';').map(str::trim).find_map(|part| {
+        part.strip_prefix("filename=").map(|v| v.trim_matches('"').to_string())
+    })
 }
 
 pub type SettingsSchemaResponse = serde_json::Value;
@@ -9274,6 +9322,15 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn backup_helpers_build_urls() {
+        let client = BackupClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/backup/info"), "http://localhost:9090/v1/backup/info");
+        assert_eq!(client.url("/v1/backup/export"), "http://localhost:9090/v1/backup/export");
+        assert_eq!(client.url("/v1/backup/import"), "http://localhost:9090/v1/backup/import");
+        assert_eq!(filename_from_content_disposition("attachment; filename=\"backup.zip\""), Some("backup.zip".to_string()));
+    }
 
     #[test]
     fn settings_helpers_build_urls() {

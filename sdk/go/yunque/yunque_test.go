@@ -10,6 +10,44 @@ import (
 	"testing"
 )
 
+func TestBackupHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		switch r.URL.Path {
+		case "/v1/backup/info":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"file_count":1,"total_bytes":12}`))
+		case "/v1/backup/export":
+			w.Header().Set("Content-Type", "application/zip")
+			w.Header().Set("Content-Disposition", `attachment; filename="backup.zip"`)
+			_, _ = w.Write([]byte("zipdata"))
+		case "/v1/backup/import":
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := r.FormFile("backup"); err != nil {
+				t.Fatal(err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true,"restored":2}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	ctx := context.Background()
+	info, _ := Backup.Info(ctx)
+	exported, _ := Backup.Export(ctx)
+	imported, _ := Backup.Import(ctx, []byte("zipdata"), "restore.zip")
+	if info["file_count"].(float64) != 1 || string(exported.Data) != "zipdata" || exported.Filename != "backup.zip" || imported["restored"].(float64) != 2 || NewAgentKit().Backup != Backup {
+		t.Fatalf("unexpected backup results")
+	}
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 backup API calls, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestSettingsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +69,8 @@ func TestSettingsHelpers(t *testing.T) {
 				return
 			}
 			_, _ = w.Write([]byte(`{"values":{"LLM_MODEL":"qwen"}}`))
+		case "/v1/backup/info":
+			_, _ = w.Write([]byte(`{"file_count":1}`))
 		case "/api/settings/check":
 			_, _ = w.Write([]byte(`{"setup_needed":false}`))
 		case "/v1/config/reload":

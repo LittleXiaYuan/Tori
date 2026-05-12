@@ -360,6 +360,11 @@ The lightweight Emotion SDK exposes emotion history and emotion stickers for ext
 
 
 
+
+### Backup SDK
+
+The lightweight Backup SDK exposes backup archive info, ZIP export, and ZIP import/restore helpers for external operator UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/backup/info`, `/v1/backup/export`, and `/v1/backup/import`.
+
 ### Settings SDK
 
 The lightweight Settings SDK exposes settings schema/config reads, runtime config updates, setup checks, hot config reload, and host directory detection for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/api/settings/schema`, `/api/settings/config`, `/api/settings/check`, `/v1/config/reload`, and `/api/settings/detect-dirs`.
