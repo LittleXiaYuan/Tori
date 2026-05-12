@@ -1385,6 +1385,7 @@ pub struct AgentKit {
     pub cognis: CognisClient,
     pub trace: TraceClient,
     pub heartbeat: HeartbeatClient,
+    pub reverie: ReverieClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1431,6 +1432,7 @@ impl AgentKit {
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             trace: TraceClient::new(base_url.clone(), token.as_ref())?,
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
+            reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1470,6 +1472,7 @@ impl AgentKit {
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3369,6 +3372,189 @@ impl HeartbeatClient {
         };
         self.get_json(&format!("/v1/heartbeat/logs{}", suffix))
             .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+pub type ReverieThought = serde_json::Map<String, serde_json::Value>;
+pub type ReverieConfig = serde_json::Map<String, serde_json::Value>;
+pub type ReverieConfigResponse = serde_json::Value;
+pub type ReverieThinkResponse = serde_json::Value;
+pub type ReverieDeleteResponse = serde_json::Value;
+pub type ReverieActionsResponse = serde_json::Value;
+pub type ReverieTargetsResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReverieJournalResponse {
+    #[serde(default)]
+    pub thoughts: Vec<ReverieThought>,
+    #[serde(default)]
+    pub total: i32,
+    #[serde(default)]
+    pub limit: i32,
+    #[serde(default)]
+    pub offset: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReverieJournalQuery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub category: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub min_significance: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered: Option<bool>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub offset: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ReverieThinkRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub event_type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub trigger: String,
+}
+
+/// Small Rust helper over `/v1/reverie/*` proactive thought loop endpoints.
+#[derive(Debug, Clone)]
+pub struct ReverieClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ReverieClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn journal(
+        &self,
+        query: &ReverieJournalQuery,
+    ) -> Result<ReverieJournalResponse, reqwest::Error> {
+        let mut pairs = Vec::new();
+        if !query.category.is_empty() {
+            pairs.push(format!(
+                "category={}",
+                url_encode_query_component(&query.category)
+            ));
+        }
+        if query.min_significance > 0.0 {
+            pairs.push(format!("min_significance={}", query.min_significance));
+        }
+        if let Some(delivered) = query.delivered {
+            pairs.push(format!("delivered={delivered}"));
+        }
+        if query.limit > 0 {
+            pairs.push(format!("limit={}", query.limit));
+        }
+        if query.offset > 0 {
+            pairs.push(format!("offset={}", query.offset));
+        }
+        let suffix = if pairs.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", pairs.join("&"))
+        };
+        self.get_json(&format!("/v1/reverie/journal{}", suffix))
+            .await
+    }
+
+    pub async fn stats(&self) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json("/v1/reverie/stats").await
+    }
+
+    pub async fn config(&self) -> Result<ReverieConfigResponse, reqwest::Error> {
+        self.get_json("/v1/reverie/config").await
+    }
+
+    pub async fn update_config(
+        &self,
+        config: &ReverieConfig,
+    ) -> Result<ReverieConfigResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/reverie/config"))
+            .json(config)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn think(
+        &self,
+        request: &ReverieThinkRequest,
+    ) -> Result<ReverieThinkResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/reverie/think"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete_thought(&self, id: &str) -> Result<ReverieDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/reverie/thought?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn actions(&self) -> Result<ReverieActionsResponse, reqwest::Error> {
+        self.get_json("/v1/reverie/actions").await
+    }
+
+    pub async fn targets(&self) -> Result<ReverieTargetsResponse, reqwest::Error> {
+        self.get_json("/v1/reverie/targets").await
     }
 
     async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
@@ -5783,6 +5969,29 @@ mod tests {
         assert_eq!(
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
+        );
+    }
+
+    #[test]
+    fn reverie_types_serialize_incremental_bodies() {
+        let journal: ReverieJournalResponse =
+            serde_json::from_str(r#"{"thoughts":[{"id":"t1"}],"total":1,"limit":10,"offset":0}"#)
+                .unwrap();
+        assert_eq!(journal.total, 1);
+        assert_eq!(journal.thoughts[0]["id"], serde_json::json!("t1"));
+
+        let request = ReverieThinkRequest {
+            event_type: "task_completed".to_string(),
+            trigger: "sdk".to_string(),
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["event_type"], "task_completed");
+
+        let client =
+            ReverieClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/reverie/stats"),
+            "http://localhost:9090/v1/reverie/stats"
         );
     }
 

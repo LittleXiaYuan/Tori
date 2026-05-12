@@ -31,6 +31,7 @@
     "cognis",
     "execution-trace",
     "proactive-heartbeat",
+    "proactive-reverie",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -127,6 +128,10 @@
       "description": "Access the lightweight proactive Heartbeat lifecycle client or namespace."
     },
     {
+      "name": "reverie",
+      "description": "Access the lightweight Reverie proactive thought loop client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -167,7 +172,8 @@
         "providers": "AgentKit.providers",
         "cognis": "AgentKit.cognis",
         "trace": "AgentKit.trace",
-        "heartbeat": "AgentKit.heartbeat"
+        "heartbeat": "AgentKit.heartbeat",
+        "reverie": "AgentKit.reverie"
       }
     },
     "go": {
@@ -205,7 +211,8 @@
         "providers": "AgentKit.Providers",
         "cognis": "AgentKit.Cognis",
         "trace": "AgentKit.Trace",
-        "heartbeat": "AgentKit.Heartbeat"
+        "heartbeat": "AgentKit.Heartbeat",
+        "reverie": "AgentKit.Reverie"
       }
     },
     "python": {
@@ -243,7 +250,8 @@
         "providers": "AgentKit.providers",
         "cognis": "AgentKit.cognis",
         "trace": "AgentKit.trace",
-        "heartbeat": "AgentKit.heartbeat"
+        "heartbeat": "AgentKit.heartbeat",
+        "reverie": "AgentKit.reverie"
       }
     },
     "rust": {
@@ -281,7 +289,8 @@
         "providers": "AgentKit::providers",
         "cognis": "AgentKit::cognis",
         "trace": "AgentKit::trace",
-        "heartbeat": "AgentKit::heartbeat"
+        "heartbeat": "AgentKit::heartbeat",
+        "reverie": "AgentKit::reverie"
       }
     }
   },

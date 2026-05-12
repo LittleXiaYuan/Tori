@@ -64,6 +64,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"events": [{"trace_id": "tr-1"}], "count": 1}
             if path == "/v1/heartbeat":
                 return {"running": True}
+            if path == "/v1/reverie/stats":
+                return {"total": 2}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -93,6 +95,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.cognis.list()["cognis"][0]["id"], "reviewer")
             self.assertEqual(kit.trace.recent(limit=1)["events"][0]["trace_id"], "tr-1")
             self.assertTrue(kit.heartbeat.status()["running"])
+            self.assertEqual(kit.reverie.stats()["total"], 2)
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -117,9 +120,11 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.cognis, yunque.cognis)
         self.assertIs(kit.trace, yunque.trace)
         self.assertIs(kit.heartbeat, yunque.heartbeat)
+        self.assertIs(kit.reverie, yunque.reverie)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
-        self.assertEqual(calls[21], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))
+        self.assertEqual(calls[22], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

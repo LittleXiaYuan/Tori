@@ -38,6 +38,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/cognis")) return jsonResponse({ cognis: [{ id: "reviewer", name: "Code Reviewer" }], count: 1 });
       if (value.endsWith("/v1/trace/recent?limit=1")) return jsonResponse({ events: [{ trace_id: "tr-1" }], count: 1 });
       if (value.endsWith("/v1/heartbeat")) return jsonResponse({ running: true });
+      if (value.endsWith("/v1/reverie/stats")) return jsonResponse({ total: 2, delivered: 1 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -64,6 +65,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.cognis.list()).cognis?.[0]?.id, "reviewer");
   assertEqual((await kit.trace.recent({ limit: 1 })).events[0]?.trace_id, "tr-1");
   assertEqual((await kit.heartbeat.status()).running, true);
+  assertEqual((await kit.reverie.stats()).total, 2);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -85,7 +87,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[18]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[19]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[20]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[21]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[21]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[22]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

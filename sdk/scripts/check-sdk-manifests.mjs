@@ -26,6 +26,7 @@ const checks = [
   ["Cognis SDK manifest", "sdk/scripts/check-cognis-sdk-manifest.mjs"],
   ["Trace SDK manifest", "sdk/scripts/check-trace-sdk-manifest.mjs"],
   ["Heartbeat SDK manifest", "sdk/scripts/check-heartbeat-sdk-manifest.mjs"],
+  ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

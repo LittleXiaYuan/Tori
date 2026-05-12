@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "domain": "proactive-reverie",
+  "description": "Cross-language lightweight SDK entrypoints for Reverie proactive thought loop journal, stats, config, think, actions, and targets.",
+  "principles": [
+    "Expose proactive Reverie thought-loop operations as a focused SDK slice for external operator pages, plugins, CLIs, and automation scripts.",
+    "Keep journal, stats, config, think, delete, actions, and targets directly callable without importing the full platform client.",
+    "Make Reverie access available through Agent Kit without coupling callers to gateway internals."
+  ],
+  "routes": [
+    "GET /v1/reverie/journal",
+    "GET /v1/reverie/stats",
+    "GET /v1/reverie/config",
+    "PUT /v1/reverie/config",
+    "POST /v1/reverie/think",
+    "DELETE /v1/reverie/thought",
+    "GET /v1/reverie/actions",
+    "GET /v1/reverie/targets"
+  ],
+  "capabilities": [
+    { "name": "journal", "route": "GET /v1/reverie/journal", "readOnly": true, "description": "List proactive thoughts with filters and pagination." },
+    { "name": "stats", "route": "GET /v1/reverie/stats", "readOnly": true, "description": "Read proactive thought loop statistics." },
+    { "name": "config", "route": "GET /v1/reverie/config", "readOnly": true, "description": "Read Reverie configuration and running state." },
+    { "name": "updateConfig", "route": "PUT /v1/reverie/config", "readOnly": false, "description": "Update Reverie configuration." },
+    { "name": "think", "route": "POST /v1/reverie/think", "readOnly": false, "description": "Trigger one proactive think cycle." },
+    { "name": "deleteThought", "route": "DELETE /v1/reverie/thought", "readOnly": false, "description": "Delete one proactive thought by id." },
+    { "name": "actions", "route": "GET /v1/reverie/actions", "readOnly": true, "description": "Read recent Reverie action records." },
+    { "name": "targets", "route": "GET /v1/reverie/targets", "readOnly": true, "description": "Read available proactive delivery targets." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/reverie.ts", "sdk/typescript/src/reverie-observe.ts", "sdk/typescript/src/reverie-control.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "journal": "createReverieClient().journal",
+        "stats": "createReverieClient().stats",
+        "config": "createReverieClient().config",
+        "updateConfig": "createReverieClient().updateConfig",
+        "think": "createReverieClient().think",
+        "deleteThought": "createReverieClient().deleteThought",
+        "actions": "createReverieClient().actions",
+        "targets": "createReverieClient().targets"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "journal": "yunque.Reverie.Journal",
+        "stats": "yunque.Reverie.Stats",
+        "config": "yunque.Reverie.Config",
+        "updateConfig": "yunque.Reverie.UpdateConfig",
+        "think": "yunque.Reverie.Think",
+        "deleteThought": "yunque.Reverie.DeleteThought",
+        "actions": "yunque.Reverie.Actions",
+        "targets": "yunque.Reverie.Targets"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "journal": "yunque.reverie.journal",
+        "stats": "yunque.reverie.stats",
+        "config": "yunque.reverie.config",
+        "updateConfig": "yunque.reverie.update_config",
+        "think": "yunque.reverie.think",
+        "deleteThought": "yunque.reverie.delete_thought",
+        "actions": "yunque.reverie.actions",
+        "targets": "yunque.reverie.targets"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "journal": "ReverieClient::journal",
+        "stats": "ReverieClient::stats",
+        "config": "ReverieClient::config",
+        "updateConfig": "ReverieClient::update_config",
+        "think": "ReverieClient::think",
+        "deleteThought": "ReverieClient::delete_thought",
+        "actions": "ReverieClient::actions",
+        "targets": "ReverieClient::targets"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}
