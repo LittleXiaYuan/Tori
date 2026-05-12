@@ -280,6 +280,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"forks":[{"id":"fork_1","session_id":"s1","messages":[],"created_at":"2026-05-12T00:00:00Z"}]}`))
 		case "/v1/cost/summary":
 			_, _ = w.Write([]byte(`{"today_cost":0.12,"month_cost":1.5}`))
+		case "/api/providers":
+			_, _ = w.Write([]byte(`{"providers":[{"id":"deepseek","model":"deepseek-chat"}],"mode":"hybrid"}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -354,6 +356,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	providerList, err := kit.Providers.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -362,14 +368,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 18 {
-		t.Fatalf("expected 18 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 19 {
+		t.Fatalf("expected 19 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1630,6 +1636,100 @@ func TestCostHelpers(t *testing.T) {
 	}
 	if len(seen) != 9 {
 		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestProvidersHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/models":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"models":[{"id":"m1","model_id":"deepseek-chat"}]}`))
+				return
+			}
+			if r.Method == http.MethodDelete {
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"id":"m1","model_id":"deepseek-chat"}`))
+		case "/api/providers":
+			_, _ = w.Write([]byte(`{"providers":[{"id":"deepseek","model":"deepseek-chat"}],"mode":"hybrid"}`))
+		case "/api/providers/test", "/api/providers/enable", "/api/providers/disable", "/api/providers/switch-model", "/api/providers/session", "/api/providers/register", "/api/providers/delete", "/api/providers/local/discover", "/api/providers/local/register", "/api/providers/exec", "/api/breaker/reset":
+			_, _ = w.Write([]byte(`{"ok":true,"provider_id":"deepseek","exec_provider":"deepseek","reset_count":1}`))
+		case "/api/providers/mode":
+			_, _ = w.Write([]byte(`{"ok":true,"mode":"hybrid"}`))
+		case "/api/providers/presets":
+			_, _ = w.Write([]byte(`{"presets":[{"id":"deepseek"}]}`))
+		case "/api/providers/tori/discover":
+			_, _ = w.Write([]byte(`{"ok":true,"registered":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	models, err := Providers.Models(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := Providers.AddModel(context.Background(), ModelEntry{"id": "m1", "model_id": "deepseek-chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deletedModel, err := Providers.DeleteModel(context.Background(), "m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := Providers.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tested, err := Providers.Test(context.Background(), "deepseek")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = Providers.Enable(context.Background(), "deepseek")
+	_, _ = Providers.Disable(context.Background(), "deepseek")
+	_, _ = Providers.SwitchModel(context.Background(), "deepseek", "deepseek-chat")
+	_, _ = Providers.SetSession(context.Background(), ProviderSessionOverrideRequest{SessionID: "s1", ProviderID: "deepseek"})
+	mode, err := Providers.Mode(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = Providers.SetMode(context.Background(), "hybrid")
+	presets, err := Providers.Presets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	registered, err := Providers.Register(context.Background(), ProviderConfig{"preset_id": "deepseek"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = Providers.Delete(context.Background(), "deepseek")
+	_, _ = Providers.DiscoverLocal(context.Background(), LocalDiscoverRequest{BaseURL: "http://127.0.0.1:11434"})
+	_, _ = Providers.RegisterLocal(context.Background(), LocalRegisterRequest{BaseURL: "http://127.0.0.1:11434", Model: "qwen", Backend: "ollama"})
+	tori, err := Providers.DiscoverTori(context.Background(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec, err := Providers.Exec(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = Providers.SetExec(context.Background(), "deepseek")
+	reset, err := Providers.ResetBreakers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if models.Models[0]["id"] != "m1" || added["id"] != "m1" || deletedModel["status"] != "ok" || list.Providers[0]["id"] != "deepseek" || !tested["ok"].(bool) || mode["mode"] != "hybrid" || presets["presets"] == nil || registered["provider_id"] != "deepseek" || tori["registered"].(float64) != 1 || exec["exec_provider"] != "deepseek" || reset["reset_count"].(float64) != 1 || kit.Providers != Providers {
+		t.Fatalf("unexpected providers results")
+	}
+	if len(seen) != 20 {
+		t.Fatalf("expected 20 requests, got %d: %v", len(seen), seen)
 	}
 }
 

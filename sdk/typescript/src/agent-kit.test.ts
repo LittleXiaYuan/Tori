@@ -34,6 +34,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/orchestrator/status")) return jsonResponse({ running: true, adapters: ["cursor"], active_sessions: 1, event_count: 2, policy: { allow_auto_launch: true } });
       if (value.endsWith("/v1/fork/list?session_id=s1")) return jsonResponse({ forks: [{ id: "fork_1", session_id: "s1", messages: [], created_at: "2026-05-12T00:00:00Z" }] });
       if (value.endsWith("/v1/cost/summary")) return jsonResponse({ today_cost: 0.12, month_cost: 1.5 });
+      if (value.endsWith("/api/providers")) return jsonResponse({ providers: [{ id: "deepseek", model: "deepseek-chat" }], mode: "hybrid" });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -56,6 +57,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.orchestrator.status()).running, true);
   assertEqual((await kit.fork.list("s1")).forks[0]?.id, "fork_1");
   assertEqual((await kit.cost.summary()).today_cost, 0.12);
+  assertEqual((await kit.providers.listProviders()).providers[0]?.id, "deepseek");
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -73,7 +75,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[14]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[15]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[16]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[17]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[17]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[18]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

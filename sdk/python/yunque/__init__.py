@@ -595,6 +595,88 @@ class _ForkNamespace:
 fork = _ForkNamespace()
 
 
+# ── Providers / Models (/api/providers, /v1/models) ──
+
+class _ProvidersNamespace:
+    """Lightweight helpers for LLM provider registry, runtime mode, models, local discovery, and breaker reset."""
+
+    def models(self) -> dict:
+        return _api_call("GET", "/v1/models")
+
+    def add_model(self, model: dict) -> dict:
+        return _api_call("POST", "/v1/models", model)
+
+    def delete_model(self, model_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/models?{urlencode({'id': model_id})}")
+
+    def list(self) -> dict:
+        return _api_call("GET", "/api/providers")
+
+    def test(self, provider_id: str) -> dict:
+        return _api_call("POST", "/api/providers/test", {"id": provider_id})
+
+    def enable(self, provider_id: str) -> dict:
+        return _api_call("POST", "/api/providers/enable", {"id": provider_id})
+
+    def disable(self, provider_id: str) -> dict:
+        return _api_call("POST", "/api/providers/disable", {"id": provider_id})
+
+    def switch_model(self, provider_id: str, model: str) -> dict:
+        return _api_call("POST", "/api/providers/switch-model", {"id": provider_id, "model": model})
+
+    def set_session(self, session_id: str, provider_id: str = "") -> dict:
+        return _api_call("POST", "/api/providers/session", {"session_id": session_id, "provider_id": provider_id})
+
+    def mode(self) -> dict:
+        return _api_call("GET", "/api/providers/mode")
+
+    def set_mode(self, mode: str) -> dict:
+        return _api_call("POST", "/api/providers/mode", {"mode": mode})
+
+    def presets(self) -> dict:
+        return _api_call("GET", "/api/providers/presets")
+
+    def register(self, config: dict) -> dict:
+        return _api_call("POST", "/api/providers/register", config)
+
+    def delete(self, provider_id: str) -> dict:
+        return _api_call("POST", "/api/providers/delete", {"id": provider_id})
+
+    def discover_local(self, base_url: str | dict) -> dict:
+        body = dict(base_url) if isinstance(base_url, dict) else {"base_url": base_url}
+        return _api_call("POST", "/api/providers/local/discover", body)
+
+    def register_local(self, base_url: str | dict, *, model: str = "", tier: str = "", backend: str = "") -> dict:
+        if isinstance(base_url, dict):
+            body = dict(base_url)
+        else:
+            body = {"base_url": base_url}
+            if model:
+                body["model"] = model
+            if tier:
+                body["tier"] = tier
+            if backend:
+                body["backend"] = backend
+        return _api_call("POST", "/api/providers/local/register", body)
+
+    def discover_tori(self, auto_register: bool = False) -> dict:
+        suffix = "?auto_register=true" if auto_register else ""
+        return _api_call("POST", f"/api/providers/tori/discover{suffix}")
+
+    def exec(self) -> dict:
+        return _api_call("GET", "/api/providers/exec")
+
+    def set_exec(self, provider_id: str) -> dict:
+        return _api_call("POST", "/api/providers/exec", {"provider_id": provider_id})
+
+    def reset_breakers(self) -> dict:
+        return _api_call("POST", "/api/breaker/reset")
+
+
+providers = _ProvidersNamespace()
+
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1234,6 +1316,7 @@ class AgentKit:
         self.orchestrator = orchestrator
         self.fork = fork
         self.cost = cost
+        self.providers = providers
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

@@ -27,6 +27,7 @@
     "ide-orchestrator",
     "conversation-fork",
     "cost-usage-quota",
+    "llm-providers",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -107,6 +108,10 @@
       "description": "Access the lightweight Cost, Usage, and Quota governance client or namespace."
     },
     {
+      "name": "providers",
+      "description": "Access the lightweight LLM Providers, Models, runtime mode, session routing, and breaker client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -143,7 +148,8 @@
         "dispatch": "AgentKit.dispatch",
         "orchestrator": "AgentKit.orchestrator",
         "fork": "AgentKit.fork",
-        "cost": "AgentKit.cost"
+        "cost": "AgentKit.cost",
+        "providers": "AgentKit.providers"
       }
     },
     "go": {
@@ -177,7 +183,8 @@
         "dispatch": "AgentKit.Dispatch",
         "orchestrator": "AgentKit.Orchestrator",
         "fork": "AgentKit.Fork",
-        "cost": "AgentKit.Cost"
+        "cost": "AgentKit.Cost",
+        "providers": "AgentKit.Providers"
       }
     },
     "python": {
@@ -211,7 +218,8 @@
         "dispatch": "AgentKit.dispatch",
         "orchestrator": "AgentKit.orchestrator",
         "fork": "AgentKit.fork",
-        "cost": "AgentKit.cost"
+        "cost": "AgentKit.cost",
+        "providers": "AgentKit.providers"
       }
     },
     "rust": {
@@ -245,7 +253,8 @@
         "dispatch": "AgentKit::dispatch",
         "orchestrator": "AgentKit::orchestrator",
         "fork": "AgentKit::fork",
-        "cost": "AgentKit::cost"
+        "cost": "AgentKit::cost",
+        "providers": "AgentKit::providers"
       }
     }
   },
