@@ -48,6 +48,8 @@
     "src/conversations-read.ts",
     "src/conversations-control.ts",
     "src/subagents.ts",
+    "src/subagents-read.ts",
+    "src/subagents-control.ts",
     "src/bots.ts",
     "src/discovery.ts",
     "src/identity.ts",

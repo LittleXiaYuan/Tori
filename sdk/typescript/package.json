@@ -135,6 +135,14 @@
       "types": "./src/subagents.ts",
       "import": "./src/subagents.ts"
     },
+    "./subagents-read": {
+      "types": "./src/subagents-read.ts",
+      "import": "./src/subagents-read.ts"
+    },
+    "./subagents-control": {
+      "types": "./src/subagents-control.ts",
+      "import": "./src/subagents-control.ts"
+    },
     "./bots": {
       "types": "./src/bots.ts",
       "import": "./src/bots.ts"
