@@ -196,6 +196,7 @@ import { createHeartbeatClient } from "yunque-client/heartbeat";
 import { createHeartbeatObserveClient } from "yunque-client/heartbeat-observe";
 import { createHeartbeatControlClient } from "yunque-client/heartbeat-control";
 import { createReverieClient } from "yunque-client/reverie";
+import { createReverieObserveClient } from "yunque-client/reverie-observe";
 import { createFederationClient } from "yunque-client/federation";
 import { createSystemClient } from "yunque-client/system";
 import { createSettingsClient } from "yunque-client/settings";
@@ -1340,6 +1341,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/heartbeat-observe.ts` | Lightweight heartbeat status/logs facade without update or trigger APIs |
 | `src/heartbeat-control.ts` | Lightweight heartbeat update/trigger facade without status or logs APIs |
 | `src/reverie.ts` | Lightweight hand-written inner monologue and proactive thought slice |
+| `src/reverie-observe.ts` | Lightweight reverie journal/stats/config/actions/targets facade without write APIs |
 | `src/federation.ts` | Lightweight hand-written federation peers, capabilities, discovery, delegation, and broadcast slice |
 | `src/system.ts` | Lightweight hand-written health, version, SBOM, metrics, cache, and module observability slice |
 | `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |

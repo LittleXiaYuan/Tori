@@ -121,6 +121,7 @@
     "src/heartbeat-observe.ts",
     "src/heartbeat-control.ts",
     "src/reverie.ts",
+    "src/reverie-observe.ts",
     "src/federation.ts",
     "src/system.ts",
     "src/settings.ts",
