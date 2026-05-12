@@ -259,6 +259,8 @@ import { createDispatchClient } from "yunque-client/dispatch";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createForkClient } from "yunque-client/fork";
 import { createSchedulerClient } from "yunque-client/scheduler";
+import { createSchedulerReadClient } from "yunque-client/scheduler-read";
+import { createSchedulerControlClient } from "yunque-client/scheduler-control";
 import { createUploadClient } from "yunque-client/upload";
 import { createGraphClient } from "yunque-client/graph";
 import { createPluginApiClient } from "yunque-client/plugin-api";
@@ -1433,6 +1435,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
 | `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
+| `src/scheduler-read.ts` | Lightweight prompt scheduler job list facade without add/remove APIs |
+| `src/scheduler-control.ts` | Lightweight prompt scheduler add/remove facade without list APIs |
 | `src/upload.ts` | Lightweight hand-written authenticated multipart upload and parsed-file metadata slice |
 | `src/graph.ts` | Lightweight hand-written knowledge graph entity/relation/context/stats slice |
 | `src/plugin-api.ts` | Lightweight hand-written plugin runtime LLM/search/memory/knowledge/cron/extensions bridge slice |
