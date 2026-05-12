@@ -271,6 +271,10 @@
       "types": "./src/browser-opp.ts",
       "import": "./src/browser-opp.ts"
     },
+    "./browser-extension": {
+      "types": "./src/browser-extension.ts",
+      "import": "./src/browser-extension.ts"
+    },
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
