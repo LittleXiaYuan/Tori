@@ -527,6 +527,14 @@
       "types": "./src/runtime-events.ts",
       "import": "./src/runtime-events.ts"
     },
+    "./runtime-queue-read": {
+      "types": "./src/runtime-queue-read.ts",
+      "import": "./src/runtime-queue-read.ts"
+    },
+    "./runtime-queue-control": {
+      "types": "./src/runtime-queue-control.ts",
+      "import": "./src/runtime-queue-control.ts"
+    },
     "./router": {
       "types": "./src/router.ts",
       "import": "./src/router.ts"

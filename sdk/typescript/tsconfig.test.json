@@ -146,6 +146,8 @@
     "src/runtime.ts",
     "src/runtime-queue.ts",
     "src/runtime-events.ts",
+    "src/runtime-queue-read.ts",
+    "src/runtime-queue-control.ts",
     "src/router.ts",
     "src/modes.ts",
     "src/modes-observe.ts",
