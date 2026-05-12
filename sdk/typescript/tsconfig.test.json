@@ -236,7 +236,10 @@
     "src/triggers-read.ts",
     "src/triggers-control.ts",
     "src/missions.ts",
+    "src/missions-parse.ts",
     "src/reflect.ts",
+    "src/reflect-experiences.ts",
+    "src/reflect-strategies.ts",
     "src/tools.ts",
     "src/sandbox.ts",
     "src/**/*.test.ts"

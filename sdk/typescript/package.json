@@ -887,9 +887,21 @@
       "types": "./src/missions.ts",
       "import": "./src/missions.ts"
     },
+    "./missions-parse": {
+      "types": "./src/missions-parse.ts",
+      "import": "./src/missions-parse.ts"
+    },
     "./reflect": {
       "types": "./src/reflect.ts",
       "import": "./src/reflect.ts"
+    },
+    "./reflect-experiences": {
+      "types": "./src/reflect-experiences.ts",
+      "import": "./src/reflect-experiences.ts"
+    },
+    "./reflect-strategies": {
+      "types": "./src/reflect-strategies.ts",
+      "import": "./src/reflect-strategies.ts"
     },
     "./tools": {
       "types": "./src/tools.ts",
