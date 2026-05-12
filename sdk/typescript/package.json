@@ -1075,6 +1075,14 @@
       "types": "./src/orchestrator-read.ts",
       "import": "./src/orchestrator-read.ts"
     },
+    "./orchestrator-status": {
+      "types": "./src/orchestrator-status.ts",
+      "import": "./src/orchestrator-status.ts"
+    },
+    "./orchestrator-events": {
+      "types": "./src/orchestrator-events.ts",
+      "import": "./src/orchestrator-events.ts"
+    },
     "./orchestrator-control": {
       "types": "./src/orchestrator-control.ts",
       "import": "./src/orchestrator-control.ts"
