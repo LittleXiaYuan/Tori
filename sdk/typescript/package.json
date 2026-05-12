@@ -459,6 +459,22 @@
       "types": "./src/document-generate.ts",
       "import": "./src/document-generate.ts"
     },
+    "./document-docx": {
+      "types": "./src/document-docx.ts",
+      "import": "./src/document-docx.ts"
+    },
+    "./document-xlsx": {
+      "types": "./src/document-xlsx.ts",
+      "import": "./src/document-xlsx.ts"
+    },
+    "./document-pptx": {
+      "types": "./src/document-pptx.ts",
+      "import": "./src/document-pptx.ts"
+    },
+    "./document-html": {
+      "types": "./src/document-html.ts",
+      "import": "./src/document-html.ts"
+    },
     "./approvals": {
       "types": "./src/approvals.ts",
       "import": "./src/approvals.ts"
