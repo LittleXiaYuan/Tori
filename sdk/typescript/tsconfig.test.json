@@ -155,6 +155,8 @@
     "src/lora-config.ts",
     "src/iterate.ts",
     "src/iterate-review.ts",
+    "src/iterate-pending.ts",
+    "src/iterate-decisions.ts",
     "src/iterate-cycle.ts",
     "src/trust.ts",
     "src/trust-control.ts",
