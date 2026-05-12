@@ -48,7 +48,7 @@ console.log(reply);
 
 For external automation that needs the common SDK-first surfaces together, use
 `yunque-client/agent-kit`. It composes the hand-written State Kernel,
-Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, and Plugin API Runtime clients without importing the
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, and Plugin API Runtime clients without importing the
 generated all-in-one SDK.
 
 ```ts
@@ -64,10 +64,11 @@ const focus = await kit.state.focus();
 const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
 const found = await kit.memory.search({ query: "incremental SDK package", limit: 3 });
 const graphStats = await kit.graph.stats();
-const kbStats = await kit.knowledge / kit.lora.stats();
+const kbStats = await kit.knowledge.stats();
+const connectors = await kit.connectors.list();
 const search = await kit.plugin.search("incremental SDK package", 5);
 
-console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, kbStats.sources, search.results.length);
+console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, kbStats.sources, connectors.connectors.length, search.results.length);
 ```
 
 ### Full generated client
@@ -2137,3 +2138,5 @@ console.log(found.count, ingested.source?.id);
 
 
 Agent Kit also exposes `kit.workflows` for Workflow definition list/get/save/delete, run, instances, getInstance, and cancel helpers.
+
+Agent Kit also exposes `kit.connectors` for Connector catalog list/detail, connect/disconnect, and action execution helpers.

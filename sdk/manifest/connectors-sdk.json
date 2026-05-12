@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "domain": "connector-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque connector catalog, auth, and action execution under /api/connectors*.",
+  "principles": [
+    "Expose connector discovery, detail, connect, disconnect, and execute helpers as focused SDK slices instead of requiring the full platform.",
+    "Keep connector actions directly callable from external projects, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Make Connector runtime access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /api/connectors",
+    "GET /api/connectors/detail",
+    "POST /api/connectors/connect",
+    "POST /api/connectors/disconnect",
+    "POST /api/connectors/execute"
+  ],
+  "capabilities": [
+    { "name": "list", "route": "GET /api/connectors", "readOnly": true, "description": "List connector catalog entries and connection status." },
+    { "name": "detail", "route": "GET /api/connectors/detail", "readOnly": true, "description": "Read connector definition, supported status, actions, and current connection state." },
+    { "name": "connect", "route": "POST /api/connectors/connect", "readOnly": false, "description": "Connect a connector using a token or API key." },
+    { "name": "disconnect", "route": "POST /api/connectors/disconnect", "readOnly": false, "description": "Disconnect a connector." },
+    { "name": "execute", "route": "POST /api/connectors/execute", "readOnly": false, "description": "Execute a connector action with structured parameters." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/connectors.ts",
+        "sdk/typescript/src/connector-catalog.ts",
+        "sdk/typescript/src/connector-auth.ts",
+        "sdk/typescript/src/connector-actions.ts",
+        "sdk/typescript/src/connector-list.ts",
+        "sdk/typescript/src/connector-detail.ts",
+        "sdk/typescript/src/connector-connect.ts",
+        "sdk/typescript/src/connector-disconnect.ts"
+      ],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "list": "createConnectorsClient().list",
+        "detail": "createConnectorsClient().detail",
+        "connect": "createConnectorsClient().connect",
+        "disconnect": "createConnectorsClient().disconnect",
+        "execute": "createConnectorsClient().execute"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "list": "yunque.Connectors.List",
+        "detail": "yunque.Connectors.Detail",
+        "connect": "yunque.Connectors.Connect",
+        "disconnect": "yunque.Connectors.Disconnect",
+        "execute": "yunque.Connectors.Execute"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "list": "yunque.connectors.list",
+        "detail": "yunque.connectors.detail",
+        "connect": "yunque.connectors.connect",
+        "disconnect": "yunque.connectors.disconnect",
+        "execute": "yunque.connectors.execute"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "list": "ConnectorsClient::list",
+        "detail": "ConnectorsClient::detail",
+        "connect": "ConnectorsClient::connect",
+        "disconnect": "ConnectorsClient::disconnect",
+        "execute": "ConnectorsClient::execute"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

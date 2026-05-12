@@ -717,6 +717,125 @@ pub struct WorkflowDeleteResponse {
     pub deleted: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorView {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub icon: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub auth_type: String,
+    #[serde(default)]
+    pub beta: bool,
+    #[serde(default)]
+    pub supported: bool,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub user_info: String,
+    #[serde(default)]
+    pub error: String,
+    #[serde(default)]
+    pub action_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorAction {
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub params: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorDefinition {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub icon: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub auth_type: String,
+    #[serde(default)]
+    pub beta: bool,
+    #[serde(default)]
+    pub actions: Vec<ConnectorAction>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorListResponse {
+    #[serde(default)]
+    pub connectors: Vec<ConnectorView>,
+    #[serde(default)]
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorDetailResponse {
+    pub connector: ConnectorDefinition,
+    #[serde(default)]
+    pub supported: bool,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub user_info: String,
+    #[serde(default)]
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorConnectRequest {
+    pub connector_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub token: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub api_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorConnectResponse {
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub user_info: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorOkResponse {
+    #[serde(default)]
+    pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorExecuteRequest {
+    pub connector_id: String,
+    pub action_id: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub params: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConnectorExecuteResponse {
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub result: serde_json::Value,
+}
+
 pub type LoRAStatusResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRAHistoryResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRASummaryResponse = serde_json::Map<String, serde_json::Value>;
@@ -1184,6 +1303,7 @@ pub struct AgentKit {
     pub knowledge: KnowledgeClient,
     pub lora: LoRAClient,
     pub workflows: WorkflowClient,
+    pub connectors: ConnectorsClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1218,6 +1338,7 @@ impl AgentKit {
             knowledge: KnowledgeClient::new(base_url.clone(), token.as_ref())?,
             lora: LoRAClient::new(base_url.clone(), token.as_ref())?,
             workflows: WorkflowClient::new(base_url.clone(), token.as_ref())?,
+            connectors: ConnectorsClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1242,6 +1363,7 @@ impl AgentKit {
             knowledge: KnowledgeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             lora: LoRAClient::new_with_client(base_url.clone(), plugin_http.clone()),
             workflows: WorkflowClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            connectors: ConnectorsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -1862,6 +1984,119 @@ impl WorkflowClient {
     ) -> Result<WorkflowCancelResponse, reqwest::Error> {
         self.http
             .post(self.url("/v1/workflows/cancel"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over connector catalog, auth, and action execution endpoints.
+#[derive(Debug, Clone)]
+pub struct ConnectorsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ConnectorsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn list(&self) -> Result<ConnectorListResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/api/connectors"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn detail(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<ConnectorDetailResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/api/connectors/detail?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn connect(
+        &self,
+        request: &ConnectorConnectRequest,
+    ) -> Result<ConnectorConnectResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/connectors/connect"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn disconnect(
+        &self,
+        connector_id: impl AsRef<str>,
+    ) -> Result<ConnectorOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct DisconnectRequest<'a> {
+            connector_id: &'a str,
+        }
+        self.http
+            .post(self.url("/api/connectors/disconnect"))
+            .json(&DisconnectRequest {
+                connector_id: connector_id.as_ref(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn execute(
+        &self,
+        request: &ConnectorExecuteRequest,
+    ) -> Result<ConnectorExecuteResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/connectors/execute"))
             .json(request)
             .send()
             .await?
@@ -3007,6 +3242,10 @@ mod tests {
             "http://localhost:9090/v1/workflows"
         );
         assert_eq!(
+            kit.connectors.url("/api/connectors"),
+            "http://localhost:9090/api/connectors"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -3199,6 +3438,39 @@ mod tests {
         assert_eq!(
             client.url("/v1/workflows"),
             "http://localhost:9090/v1/workflows"
+        );
+    }
+
+    #[test]
+    fn connector_types_deserialize_incremental_bodies() {
+        let list: ConnectorListResponse = serde_json::from_str(
+            r#"{"connectors":[{"id":"github","name":"GitHub","supported":true,"status":"connected","action_count":2}]}"#,
+        )
+        .unwrap();
+        assert_eq!(list.connectors[0].id, "github");
+        assert_eq!(list.connectors[0].action_count, 2);
+
+        let detail: ConnectorDetailResponse = serde_json::from_str(
+            r#"{"connector":{"id":"github","name":"GitHub","actions":[{"id":"create_issue"}]},"supported":true,"status":"connected"}"#,
+        )
+        .unwrap();
+        assert_eq!(detail.connector.actions[0].id, "create_issue");
+
+        let request = ConnectorExecuteRequest {
+            connector_id: "github".to_string(),
+            action_id: "create_issue".to_string(),
+            params: serde_json::Map::new(),
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["connector_id"], "github");
+
+        let client = ConnectorsClient::new_with_client(
+            "http://localhost:9090/",
+            reqwest::Client::new(),
+        );
+        assert_eq!(
+            client.url("/api/connectors"),
+            "http://localhost:9090/api/connectors"
         );
     }
 

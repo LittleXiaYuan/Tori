@@ -20,7 +20,8 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
-Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime. It reuses the same small
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -33,10 +34,11 @@ strategies, err := kit.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategy
 })
 mission, err := kit.Missions.Parse(ctx, "每天八点总结昨天的任务")
 schedulerJobs, err := kit.Scheduler.Jobs(ctx)
+connectorList, err := kit.Connectors.List(ctx)
 results, err := kit.Plugin.Search(ctx, "incremental SDK package", 5)
 err = kit.Memory.Set(ctx, "last_focus", focus)
 
-fmt.Println(focus, strategies, mission.Type, schedulerJobs.Count, len(results))
+fmt.Println(focus, strategies, mission.Type, schedulerJobs.Count, len(connectorList.Connectors), len(results))
 ```
 
 ## Mission Parse helpers
@@ -222,6 +224,21 @@ defs, err := yunque.Workflows.List(ctx)
 run, err := yunque.Workflows.Run(ctx, yunque.WorkflowRunRequest{DefinitionID: "wf_1", Variables: map[string]any{"topic": "sdk"}})
 instances, err := yunque.Workflows.Instances(ctx)
 fmt.Println(defs.Total, run.InstanceID, instances.Total)
+```
+
+### Connectors runtime 连接器运行时切片
+
+Go sidecar、CLI 或自动化二进制可以用 `yunque.Connectors` 读取连接器目录、连接/断开外部服务并执行连接器动作。
+
+```go
+catalog, err := yunque.Connectors.List(ctx)
+detail, err := yunque.Connectors.Detail(ctx, "github")
+executed, err := yunque.Connectors.Execute(ctx, yunque.ConnectorExecuteRequest{
+    ConnectorID: "github",
+    ActionID:    "create_issue",
+    Params:      map[string]any{"title": "SDK"},
+})
+fmt.Println(len(catalog.Connectors), detail.Status, executed.OK)
 ```
 
 ## Triggers 触发器自动化切片

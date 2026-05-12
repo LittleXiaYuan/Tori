@@ -26,6 +26,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/knowledge/stats")) return jsonResponse({ sources: 2, chunks: 8 });
       if (value.endsWith("/v1/lora/status")) return jsonResponse({ active_model: "adapter-a", rolling_success_rate: 0.8 });
       if (value.endsWith("/v1/workflows")) return jsonResponse({ workflows: [{ id: "wf_1", name: "SDK flow" }], total: 1 });
+      if (value.endsWith("/api/connectors")) return jsonResponse({ connectors: [{ id: "github", name: "GitHub", supported: true, status: "connected" }] });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -40,6 +41,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.knowledge.stats()).sources, 2);
   assertEqual((await kit.lora.status()).active_model, "adapter-a");
   assertEqual((await kit.workflows.list()).total, 1);
+  assertEqual((await kit.connectors.list()).connectors[0]?.id, "github");
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -49,7 +51,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[6]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[7]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[8]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[9]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[9]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[10]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

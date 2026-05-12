@@ -102,7 +102,8 @@ cargo check     # quick verification
 
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
-Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime. It composes the hand-written lightweight
+Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -124,9 +125,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).await?;
     let mission = kit.missions.parse("每天八点总结昨天的任务").await?;
     let jobs = kit.scheduler.jobs().await?;
+    let connectors = kit.connectors.list().await?;
     let search = kit.plugin.search("incremental SDK package", 5).await?;
 
-    println!("{} {} {} {} {}", focus, strategies, mission.r#type, jobs.count, search.results.len());
+    println!("{} {} {} {} {} {}", focus, strategies, mission.r#type, jobs.count, connectors.connectors.len(), search.results.len());
     Ok(())
 }
 ```
@@ -412,4 +414,22 @@ let workflows = WorkflowClient::new("http://localhost:9090", "<plugin-or-api-tok
 let defs = workflows.list().await?;
 let run = workflows.run(&WorkflowRunRequest { definition_id: "wf_1".to_string(), variables: serde_json::Map::new() }).await?;
 println!("{} {}", defs.total, run.instance_id);
+```
+
+### Connectors runtime helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `ConnectorsClient` 访问宿主连接器目录、连接状态和动作执行能力。
+
+```rust
+use yunque_client::{ConnectorExecuteRequest, ConnectorsClient};
+
+let connectors = ConnectorsClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let catalog = connectors.list().await?;
+let detail = connectors.detail("github").await?;
+let executed = connectors.execute(&ConnectorExecuteRequest {
+    connector_id: "github".to_string(),
+    action_id: "create_issue".to_string(),
+    params: serde_json::Map::new(),
+}).await?;
+println!("{} {} {}", catalog.connectors.len(), detail.status, executed.ok);
 ```

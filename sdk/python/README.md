@@ -16,8 +16,9 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 ## Agent Kit bundle
 
 Use `create_agent_kit()` when an external script wants the common lightweight
-surfaces from one object: State Kernel, Reflection Experience, and Plugin API
-Runtime plus Mission Parse and Scheduler. It reuses the same module-level helpers and does not pull in a
+surfaces from one object: State Kernel, Reflection Experience, Mission Parse,
+Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base,
+LoRA, Workflow, Connector, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -29,10 +30,11 @@ focus = kit.state.focus()
 strategies = kit.reflect.strategies(tag="sdk", limit=5)
 mission = kit.missions.parse("每天八点总结昨天的任务")
 scheduler_jobs = kit.scheduler.jobs()
+connector_list = kit.connectors.list()
 results = kit.plugin.search("incremental SDK package", limit=5)
 
 kit.memory.set("last_focus", focus)
-print(focus, strategies, mission["type"], scheduler_jobs["count"], len(results))
+print(focus, strategies, mission["type"], scheduler_jobs["count"], len(connector_list["connectors"]), len(results))
 ```
 
 ## Mission Parse helpers
@@ -185,6 +187,17 @@ defs = yunque.workflows.list()
 run = yunque.workflows.run("wf_1", {"topic": "sdk"})
 instances = yunque.workflows.instances()
 print(defs["total"], run["instance_id"], instances["total"])
+```
+
+### Connectors runtime 连接器运行时切片
+
+Python 脚本、插件处理器或自动化任务可以用 `yunque.connectors` 读取连接器目录、连接/断开外部服务并执行连接器动作。
+
+```python
+catalog = yunque.connectors.list()
+detail = yunque.connectors.detail("github")
+result = yunque.connectors.execute("github", "create_issue", {"title": "SDK"})
+print(len(catalog["connectors"]), detail["status"], result["ok"])
 ```
 
 ## Triggers 触发器自动化切片

@@ -304,6 +304,7 @@ type AgentKit struct {
 	KnowledgeKB *knowledgeKBNamespace
 	LoRA        *loRANamespace
 	Workflows   *workflowsNamespace
+	Connectors  *connectorsNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1277,6 +1278,132 @@ func (w *workflowsNamespace) Cancel(ctx context.Context, req WorkflowCancelReque
 	return out, nil
 }
 
+// Connectors provides focused access to connector catalog, auth, and action execution APIs.
+var Connectors = &connectorsNamespace{}
+
+type connectorsNamespace struct{}
+
+type ConnectorStatus string
+
+type ConnectorView struct {
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Icon        string          `json:"icon,omitempty"`
+	Category    string          `json:"category,omitempty"`
+	AuthType    string          `json:"auth_type,omitempty"`
+	Beta        bool            `json:"beta,omitempty"`
+	Supported   bool            `json:"supported"`
+	Status      ConnectorStatus `json:"status"`
+	UserInfo    string          `json:"user_info,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	ActionCount int             `json:"action_count,omitempty"`
+}
+
+type ConnectorAction struct {
+	ID          string         `json:"id"`
+	Name        string         `json:"name,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Params      map[string]any `json:"params,omitempty"`
+}
+
+type ConnectorDefinition struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	Icon        string            `json:"icon,omitempty"`
+	Category    string            `json:"category,omitempty"`
+	AuthType    string            `json:"auth_type,omitempty"`
+	Beta        bool              `json:"beta,omitempty"`
+	Actions     []ConnectorAction `json:"actions,omitempty"`
+}
+
+type ConnectorListResponse struct {
+	Connectors []ConnectorView `json:"connectors"`
+	Error      string          `json:"error,omitempty"`
+}
+
+type ConnectorDetailResponse struct {
+	Connector ConnectorDefinition `json:"connector"`
+	Supported bool                `json:"supported"`
+	Status    ConnectorStatus     `json:"status"`
+	UserInfo  string              `json:"user_info,omitempty"`
+	Error     string              `json:"error,omitempty"`
+}
+
+type ConnectorConnectRequest struct {
+	ConnectorID string `json:"connector_id"`
+	Token       string `json:"token,omitempty"`
+	APIKey      string `json:"api_key,omitempty"`
+}
+
+type ConnectorConnectResponse struct {
+	OK       bool            `json:"ok"`
+	Status   ConnectorStatus `json:"status"`
+	UserInfo string          `json:"user_info,omitempty"`
+}
+
+type ConnectorOKResponse struct {
+	OK bool `json:"ok"`
+}
+
+type ConnectorExecuteRequest struct {
+	ConnectorID string         `json:"connector_id"`
+	ActionID    string         `json:"action_id"`
+	Params      map[string]any `json:"params,omitempty"`
+}
+
+type ConnectorExecuteResponse struct {
+	OK     bool `json:"ok"`
+	Result any  `json:"result,omitempty"`
+}
+
+func (c *connectorsNamespace) List(ctx context.Context) (ConnectorListResponse, error) {
+	var out ConnectorListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/connectors", nil, &out); err != nil {
+		return ConnectorListResponse{}, err
+	}
+	if out.Connectors == nil {
+		out.Connectors = []ConnectorView{}
+	}
+	return out, nil
+}
+
+func (c *connectorsNamespace) Detail(ctx context.Context, id string) (ConnectorDetailResponse, error) {
+	var out ConnectorDetailResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/connectors/detail?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return ConnectorDetailResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *connectorsNamespace) Connect(ctx context.Context, req ConnectorConnectRequest) (ConnectorConnectResponse, error) {
+	var out ConnectorConnectResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/connectors/connect", req, &out); err != nil {
+		return ConnectorConnectResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *connectorsNamespace) Disconnect(ctx context.Context, id string) (ConnectorOKResponse, error) {
+	var out ConnectorOKResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/connectors/disconnect", map[string]string{"connector_id": id}, &out); err != nil {
+		return ConnectorOKResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *connectorsNamespace) Execute(ctx context.Context, req ConnectorExecuteRequest) (ConnectorExecuteResponse, error) {
+	var out ConnectorExecuteResponse
+	if req.Params == nil {
+		req.Params = map[string]any{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/api/connectors/execute", req, &out); err != nil {
+		return ConnectorExecuteResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -1351,6 +1478,7 @@ func NewAgentKit() AgentKit {
 		KnowledgeKB: KnowledgeKB,
 		LoRA:        LoRA,
 		Workflows:   Workflows,
+		Connectors:  Connectors,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

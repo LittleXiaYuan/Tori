@@ -270,6 +270,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"active_model":"adapter-a","rolling_success_rate":0.8}`))
 		case "/v1/workflows":
 			_, _ = w.Write([]byte(`{"workflows":[{"id":"wf_1","name":"SDK flow"}],"total":1}`))
+		case "/api/connectors":
+			_, _ = w.Write([]byte(`{"connectors":[{"id":"github","name":"GitHub","supported":true,"status":"connected"}]}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -324,6 +326,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	connectorList, err := kit.Connectors.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -332,14 +338,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 13 {
-		t.Fatalf("expected 13 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 14 {
+		t.Fatalf("expected 14 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -671,6 +677,73 @@ func TestWorkflowsNamespaceRunsDefinitionsAndInstances(t *testing.T) {
 	}
 	if len(seen) != 8 {
 		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestConnectorsNamespaceManagesCatalogAuthAndActions(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/connectors":
+			_, _ = w.Write([]byte(`{"connectors":[{"id":"github","name":"GitHub","supported":true,"status":"disconnected","action_count":2}]}`))
+		case "/api/connectors/detail":
+			if r.URL.Query().Get("id") != "github" {
+				t.Fatalf("unexpected detail query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"connector":{"id":"github","name":"GitHub","actions":[{"id":"create_issue"}]},"supported":true,"status":"disconnected"}`))
+		case "/api/connectors/connect":
+			var body ConnectorConnectRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ConnectorID != "github" || body.Token != "oauth" {
+				t.Fatalf("unexpected connect body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true,"status":"connected","user_info":"octocat"}`))
+		case "/api/connectors/disconnect":
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/api/connectors/execute":
+			var body ConnectorExecuteRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ConnectorID != "github" || body.ActionID != "create_issue" || body.Params["title"] != "SDK" {
+				t.Fatalf("unexpected execute body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"issue":1}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	list, err := Connectors.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, err := Connectors.Detail(context.Background(), "github")
+	if err != nil {
+		t.Fatal(err)
+	}
+	connected, err := Connectors.Connect(context.Background(), ConnectorConnectRequest{ConnectorID: "github", Token: "oauth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disconnected, err := Connectors.Disconnect(context.Background(), "github")
+	if err != nil {
+		t.Fatal(err)
+	}
+	executed, err := Connectors.Execute(context.Background(), ConnectorExecuteRequest{ConnectorID: "github", ActionID: "create_issue", Params: map[string]any{"title": "SDK"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := executed.Result.(map[string]any)
+	if list.Connectors[0].ID != "github" || detail.Connector.Actions[0].ID != "create_issue" || connected.Status != "connected" || !disconnected.OK || result["issue"].(float64) != 1 {
+		t.Fatalf("unexpected connector results")
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
 	}
 }
 
