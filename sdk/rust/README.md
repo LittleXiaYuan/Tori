@@ -131,3 +131,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Lightweight Reflection Experience helper
+
+Use `ReflectClient` when an external Rust CLI, sidecar, or evaluation runner
+only needs agent lessons and strategy hints. This keeps reflection reuse as a
+small SDK slice instead of requiring callers to depend on the broad generated
+client surface.
+
+```rust
+use yunque_client::{ReflectClient, ReflectOptions};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let reflect = ReflectClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+
+    let options = ReflectOptions {
+        tag: "quality:9".to_string(),
+        limit: 5,
+        ..ReflectOptions::default()
+    };
+
+    let experiences = reflect.experiences(&options).await?;
+    let stats = reflect.stats(&options).await?;
+    let strategies = reflect.strategies(&options).await?;
+
+    println!("experiences: {}", experiences.total);
+    println!("recent_7d: {}", stats.recent_7d);
+    println!("{}", strategies);
+
+    Ok(())
+}
+```

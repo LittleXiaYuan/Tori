@@ -78,3 +78,25 @@ go run ./sdk/go/examples/state_snapshot
 
 The example prints a concise state summary as JSON, which is suitable for shell
 scripts, dashboards, and CI smoke checks.
+
+## Reflection Experience helpers
+
+Use `yunque.Reflect` when a plugin, sidecar, or automation tool wants to reuse
+agent lessons and strategy hints without importing platform internals.
+
+```go
+experiences, err := yunque.Reflect.Experiences(ctx, yunque.ReflectExperienceOptions{
+    Query: "code review",
+    Tag:   "quality:9",
+    Limit: 5,
+})
+
+stats, err := yunque.Reflect.Stats(ctx, yunque.ReflectExperienceOptions{
+    Tag: "quality:9",
+})
+
+strategies, err := yunque.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategyOptions{
+    Tag:   "quality:9",
+    Limit: 3,
+})
+```

@@ -21,12 +21,25 @@ Invoke-Step "State SDK manifest" {
   node sdk\scripts\check-state-sdk-manifest.mjs
 }
 
+Invoke-Step "Reflect SDK manifest" {
+  node sdk\scripts\check-reflect-sdk-manifest.mjs
+}
+
 Invoke-Step "TypeScript focused state slices" {
   Push-Location sdk\typescript
   try {
     npm run check:state-manifest
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     node scripts\run-incremental-tests.mjs state-snapshot state-actions state-capabilities
+  } finally {
+    Pop-Location
+  }
+}
+
+Invoke-Step "TypeScript focused reflect slices" {
+  Push-Location sdk\typescript
+  try {
+    node scripts\run-incremental-tests.mjs reflect reflect-experiences reflect-strategies
   } finally {
     Pop-Location
   }

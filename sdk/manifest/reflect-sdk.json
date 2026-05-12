@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "domain": "reflection-experience",
+  "description": "Cross-language lightweight SDK entrypoints for reusing Yunque reflection experiences, counters, and strategy hints.",
+  "principles": [
+    "Expose agent lessons and strategy hints as reusable SDK capabilities instead of platform-internal page data.",
+    "Keep experience list/stats and strategy context callable from scripts, plugins, sidecars, CLIs, and evaluation jobs.",
+    "Prefer focused helpers over importing full generated clients when callers only need reflection data."
+  ],
+  "routes": [
+    "GET /v1/reflect/experiences",
+    "GET /v1/reflect/strategies"
+  ],
+  "capabilities": [
+    { "name": "experiences", "route": "GET /v1/reflect/experiences", "readOnly": true, "description": "List reflection experiences with optional q/source/category/outcome/tag/limit filters." },
+    { "name": "stats", "route": "GET /v1/reflect/experiences", "readOnly": true, "description": "Summarize reflection experiences with the same filter set." },
+    { "name": "strategies", "route": "GET /v1/reflect/strategies", "readOnly": true, "description": "Read compiled strategy hints derived from matching experiences." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/reflect.ts", "sdk/typescript/src/reflect-experiences.ts", "sdk/typescript/src/reflect-strategies.ts", "sdk/typescript/src/missions.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "experiences": "yunque-client/reflect-experiences#createReflectExperiencesClient().list",
+        "stats": "yunque-client/reflect-experiences#createReflectExperiencesClient().stats",
+        "strategies": "yunque-client/reflect-strategies#createReflectStrategiesClient().strategies"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "experiences": "yunque.Reflect.Experiences",
+        "stats": "yunque.Reflect.Stats",
+        "strategies": "yunque.Reflect.StrategiesWithOptions"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "experiences": "yunque.reflect.experiences",
+        "stats": "yunque.reflect.stats",
+        "strategies": "yunque.reflect.strategies"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "experiences": "ReflectClient::experiences",
+        "stats": "ReflectClient::stats",
+        "strategies": "ReflectClient::strategies"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}
