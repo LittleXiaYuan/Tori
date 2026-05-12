@@ -6,6 +6,7 @@ const checks = [
   ["State SDK manifest", "sdk/scripts/check-state-sdk-manifest.mjs"],
   ["Reflect SDK manifest", "sdk/scripts/check-reflect-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
+  ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];
 
 for (const [name, script] of checks) {
