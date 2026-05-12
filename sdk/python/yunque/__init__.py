@@ -402,6 +402,39 @@ class _WorkflowsNamespace:
 workflows = _WorkflowsNamespace()
 
 
+# ── Connectors (/api/connectors) ──
+
+class _ConnectorsNamespace:
+    """Lightweight helpers for connector catalog, auth, and action execution."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/api/connectors")
+
+    def detail(self, connector_id: str) -> dict:
+        from urllib.parse import quote
+        return _api_call("GET", f"/api/connectors/detail?id={quote(connector_id)}")
+
+    def connect(self, connector_id: str, token: str = "", api_key: str = "") -> dict:
+        return _api_call("POST", "/api/connectors/connect", {
+            "connector_id": connector_id,
+            "token": token,
+            "api_key": api_key,
+        })
+
+    def disconnect(self, connector_id: str) -> dict:
+        return _api_call("POST", "/api/connectors/disconnect", {"connector_id": connector_id})
+
+    def execute(self, connector_id: str, action_id: str, params: Optional[dict] = None) -> dict:
+        return _api_call("POST", "/api/connectors/execute", {
+            "connector_id": connector_id,
+            "action_id": action_id,
+            "params": params or {},
+        })
+
+
+connectors = _ConnectorsNamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -924,6 +957,7 @@ class AgentKit:
         self.knowledge_base = knowledge_base
         self.lora = lora
         self.workflows = workflows
+        self.connectors = connectors
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
