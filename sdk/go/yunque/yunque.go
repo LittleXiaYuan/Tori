@@ -701,6 +701,7 @@ type AgentKit struct {
 	Permissions   *permissionsNamespace
 	Backup        *backupNamespace
 	Tori          *toriNamespace
+	Speech        *speechNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -4263,6 +4264,182 @@ func (t *toriNamespace) Usage(ctx context.Context) (ToriUsageResponse, error) {
 	return out, nil
 }
 
+// ── Speech / Upload (/v1/speech, /v1/upload) ──
+
+// Speech exposes lightweight text-to-speech, speech-to-text, voices, upload, and STT stream helpers.
+var Speech = &speechNamespace{}
+
+type speechNamespace struct{}
+
+type SpeechTTSRequest struct {
+	Text    string `json:"text"`
+	Voice   string `json:"voice,omitempty"`
+	Format  string `json:"format,omitempty"`
+	Emotion string `json:"emotion,omitempty"`
+}
+
+type SpeechAudioResponse struct {
+	Data        []byte
+	ContentType string
+}
+
+type SpeechSTTOptions struct {
+	Language      string
+	DetectEmotion bool
+	ContentType    string
+}
+
+type SpeechSTTResponse map[string]any
+type SpeechVoicesResponse map[string]any
+type UploadResponse map[string]any
+
+func (s *speechNamespace) TTS(ctx context.Context, reqBody SpeechTTSRequest) (SpeechAudioResponse, error) {
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return SpeechAudioResponse{}, fmt.Errorf("marshal: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"/v1/speech/tts", bytes.NewReader(data))
+	if err != nil {
+		return SpeechAudioResponse{}, fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return SpeechAudioResponse{}, fmt.Errorf("api call /v1/speech/tts: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
+	if err != nil {
+		return SpeechAudioResponse{}, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return SpeechAudioResponse{}, fmt.Errorf("api /v1/speech/tts HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
+	}
+	return SpeechAudioResponse{Data: body, ContentType: resp.Header.Get("Content-Type")}, nil
+}
+
+func (s *speechNamespace) STT(ctx context.Context, audio []byte, opts SpeechSTTOptions) (SpeechSTTResponse, error) {
+	apiPath := "/v1/speech/stt"
+	query := url.Values{}
+	if opts.Language != "" {
+		query.Set("language", opts.Language)
+	}
+	if opts.DetectEmotion {
+		query.Set("detect_emotion", "true")
+	}
+	if encoded := query.Encode(); encoded != "" {
+		apiPath += "?" + encoded
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+apiPath, bytes.NewReader(audio))
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	contentType := opts.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	req.Header.Set("Content-Type", contentType)
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("api call %s: %w", apiPath, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("api %s HTTP %d: %s", apiPath, resp.StatusCode, apiErrorMessage(body))
+	}
+	var out SpeechSTTResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out, nil
+}
+
+func (s *speechNamespace) Voices(ctx context.Context) (SpeechVoicesResponse, error) {
+	var out SpeechVoicesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/speech/voices", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *speechNamespace) Upload(ctx context.Context, data []byte, filename string) (UploadResponse, error) {
+	if filename == "" {
+		filename = "upload.bin"
+	}
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := part.Write(data); err != nil {
+		return nil, err
+	}
+	if err := mw.Close(); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"/v1/upload", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("api /v1/upload HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
+	}
+	var out UploadResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *speechNamespace) STTStreamURL(language string, detectEmotion bool) string {
+	u, err := url.Parse(apiBase)
+	if err != nil {
+		return apiBase + "/v1/speech/stt/stream"
+	}
+	if u.Scheme == "https" {
+		u.Scheme = "wss"
+	} else {
+		u.Scheme = "ws"
+	}
+	u.Path = strings.TrimRight(u.Path, "/") + "/v1/speech/stt/stream"
+	q := u.Query()
+	if language != "" {
+		q.Set("language", language)
+	}
+	if detectEmotion {
+		q.Set("detect_emotion", "true")
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 // ── Files ──
 
 type filesNamespace struct{}
@@ -5139,6 +5316,7 @@ func NewAgentKit() AgentKit {
 		Permissions:   Permissions,
 		Backup:        Backup,
 		Tori:          Tori,
+		Speech:        Speech,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

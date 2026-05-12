@@ -1399,6 +1399,7 @@ pub struct AgentKit {
     pub permissions: PermissionsClient,
     pub backup: BackupClient,
     pub tori: ToriClient,
+    pub speech: SpeechClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1471,6 +1472,7 @@ impl AgentKit {
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
             backup: BackupClient::new(base_url.clone(), token.as_ref())?,
             tori: ToriClient::new(base_url.clone(), token.as_ref())?,
+            speech: SpeechClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1539,6 +1541,7 @@ impl AgentKit {
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             backup: BackupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tori: ToriClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            speech: SpeechClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5451,6 +5454,89 @@ impl ToriClient {
     pub async fn unbind(&self) -> Result<ToriUnbindResponse, reqwest::Error> { self.http.post(self.url("/v1/tori/unbind")).json(&serde_json::json!({})).send().await?.error_for_status()?.json().await }
     pub async fn health(&self) -> Result<ToriHealthResponse, reqwest::Error> { self.get_json("/v1/tori/health").await }
     pub async fn usage(&self) -> Result<ToriUsageResponse, reqwest::Error> { self.get_json("/v1/tori/usage").await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SpeechTTSRequest {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emotion: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SpeechAudioResponse {
+    pub data: Vec<u8>,
+    pub content_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SpeechSTTOptions {
+    pub language: Option<String>,
+    pub detect_emotion: bool,
+    pub content_type: Option<String>,
+}
+
+pub type SpeechSTTResponse = serde_json::Value;
+pub type SpeechVoicesResponse = serde_json::Value;
+pub type UploadResponse = serde_json::Value;
+
+/// Lightweight Speech SDK client for TTS, STT, voice listing, upload, and STT stream URLs.
+#[derive(Debug, Clone)]
+pub struct SpeechClient { base_url: String, http: reqwest::Client }
+
+impl SpeechClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn tts(&self, request: &SpeechTTSRequest) -> Result<SpeechAudioResponse, reqwest::Error> {
+        let response = self.http.post(self.url("/v1/speech/tts")).json(request).send().await?.error_for_status()?;
+        let content_type = response.headers().get(reqwest::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(str::to_string);
+        let data = response.bytes().await?.to_vec();
+        Ok(SpeechAudioResponse { data, content_type })
+    }
+    pub async fn stt(&self, audio: Vec<u8>, options: &SpeechSTTOptions) -> Result<SpeechSTTResponse, reqwest::Error> {
+        let mut pairs = Vec::new();
+        if let Some(language) = options.language.as_deref().filter(|v| !v.is_empty()) {
+            pairs.push(format!("language={}", url_encode_query_component(language)));
+        }
+        if options.detect_emotion {
+            pairs.push("detect_emotion=true".to_string());
+        }
+        let suffix = if pairs.is_empty() { String::new() } else { format!("?{}", pairs.join("&")) };
+        let content_type = options.content_type.as_deref().unwrap_or("application/octet-stream");
+        self.http.post(self.url(&format!("/v1/speech/stt{suffix}"))).header(reqwest::header::CONTENT_TYPE, content_type).body(audio).send().await?.error_for_status()?.json().await
+    }
+    pub async fn voices(&self) -> Result<SpeechVoicesResponse, reqwest::Error> { self.get_json("/v1/speech/voices").await }
+    pub async fn upload(&self, data: Vec<u8>, filename: impl Into<String>) -> Result<UploadResponse, reqwest::Error> {
+        let part = reqwest::multipart::Part::bytes(data).file_name(filename.into());
+        let form = reqwest::multipart::Form::new().part("file", part);
+        self.http.post(self.url("/v1/upload")).multipart(form).send().await?.error_for_status()?.json().await
+    }
+    pub fn stt_stream_url(&self, options: &SpeechSTTOptions) -> String {
+        let mut base = self.base_url.clone();
+        if let Some(rest) = base.strip_prefix("https://") {
+            base = format!("wss://{rest}");
+        } else if let Some(rest) = base.strip_prefix("http://") {
+            base = format!("ws://{rest}");
+        }
+        let mut pairs = Vec::new();
+        if let Some(language) = options.language.as_deref().filter(|v| !v.is_empty()) {
+            pairs.push(format!("language={}", url_encode_query_component(language)));
+        }
+        if options.detect_emotion {
+            pairs.push("detect_emotion=true".to_string());
+        }
+        format!("{base}/v1/speech/stt/stream{}", if pairs.is_empty() { String::new() } else { format!("?{}", pairs.join("&")) })
+    }
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
 }
 
@@ -9377,6 +9463,22 @@ mod tests {
         assert_eq!(client.url("/v1/tori/usage"), "http://localhost:9090/v1/tori/usage");
         let bind = serde_json::to_value(ToriBindRequest { tori_url: Some("https://tori.example".to_string()) }).unwrap();
         assert_eq!(bind["tori_url"], "https://tori.example");
+    }
+
+    #[test]
+    fn speech_helpers_build_urls_and_payloads() {
+        let client = SpeechClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/speech/tts"), "http://localhost:9090/v1/speech/tts");
+        assert_eq!(client.url("/v1/speech/stt"), "http://localhost:9090/v1/speech/stt");
+        assert_eq!(client.url("/v1/speech/voices"), "http://localhost:9090/v1/speech/voices");
+        assert_eq!(client.url("/v1/upload"), "http://localhost:9090/v1/upload");
+        assert_eq!(
+            client.stt_stream_url(&SpeechSTTOptions { language: Some("zh".to_string()), detect_emotion: true, content_type: None }),
+            "ws://localhost:9090/v1/speech/stt/stream?language=zh&detect_emotion=true"
+        );
+        let tts = serde_json::to_value(SpeechTTSRequest { text: "你好".to_string(), voice: Some("v1".to_string()), format: Some("wav".to_string()), emotion: Some("happy".to_string()) }).unwrap();
+        assert_eq!(tts["text"], "你好");
+        assert_eq!(tts["format"], "wav");
     }
 
     #[test]

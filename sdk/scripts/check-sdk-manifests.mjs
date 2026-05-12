@@ -8,6 +8,7 @@ const checks = [
   ["Settings SDK manifest", "sdk/scripts/check-settings-sdk-manifest.mjs"],
   ["Backup SDK manifest", "sdk/scripts/check-backup-sdk-manifest.mjs"],
   ["Tori SDK manifest", "sdk/scripts/check-tori-sdk-manifest.mjs"],
+  ["Speech SDK manifest", "sdk/scripts/check-speech-sdk-manifest.mjs"],
   ["Tasks SDK manifest", "sdk/scripts/check-tasks-sdk-manifest.mjs"],
   ["Permissions SDK manifest", "sdk/scripts/check-permissions-sdk-manifest.mjs"],
   ["Reactions SDK manifest", "sdk/scripts/check-reactions-sdk-manifest.mjs"],

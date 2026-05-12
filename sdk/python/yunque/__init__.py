@@ -40,7 +40,7 @@ import os
 import urllib.request
 import urllib.error
 from typing import Any, Optional
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 __version__ = "0.1.0"
 
@@ -120,13 +120,13 @@ def _api_call_bytes(method: str, path: str, body: Any = None, timeout: int = 30)
         raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
 
 
-def _api_call_multipart(method: str, path: str, field_name: str, filename: str, data: bytes, timeout: int = 30) -> dict:
+def _api_call_multipart(method: str, path: str, field_name: str, filename: str, data: bytes, timeout: int = 30, content_type: str = "application/zip") -> dict:
     """Upload one file field as multipart/form-data and parse JSON response."""
     boundary = "----yunque-sdk-boundary"
     body = (
         f"--{boundary}\r\n"
         f"Content-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\n"
-        "Content-Type: application/zip\r\n\r\n"
+        f"Content-Type: {content_type}\r\n\r\n"
     ).encode("utf-8") + data + f"\r\n--{boundary}--\r\n".encode("utf-8")
     req = urllib.request.Request(f"{_API_BASE}{path}", data=body, method=method)
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
@@ -1114,6 +1114,65 @@ class _ToriNamespace:
 
 
 tori = _ToriNamespace()
+
+# ── Speech / Upload (/v1/speech, /v1/upload) ──
+
+class _SpeechNamespace:
+    """Lightweight helpers for speech TTS/STT, voices, uploads, and STT stream URLs."""
+
+    def tts(self, text: str, *, voice: str = "", format: str = "", emotion: str = "") -> bytes:
+        body = {"text": text}
+        if voice:
+            body["voice"] = voice
+        if format:
+            body["format"] = format
+        if emotion:
+            body["emotion"] = emotion
+        return _api_call_bytes("POST", "/v1/speech/tts", body)
+
+    def stt(self, audio: bytes, *, language: str = "", detect_emotion: bool = False, content_type: str = "application/octet-stream") -> dict:
+        query = []
+        if language:
+            query.append("language=" + quote_plus(language))
+        if detect_emotion:
+            query.append("detect_emotion=true")
+        path = "/v1/speech/stt" + (("?" + "&".join(query)) if query else "")
+        url = f"{_API_BASE}{path}"
+        req = urllib.request.Request(url, data=audio, method="POST")
+        req.add_header("Content-Type", content_type)
+        if _TOKEN:
+            req.add_header("Authorization", f"Bearer {_TOKEN}")
+        req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
+
+    def voices(self) -> dict:
+        return _api_call("GET", "/v1/speech/voices")
+
+    def upload(self, data: bytes, filename: str = "upload.bin", content_type: str = "application/octet-stream") -> dict:
+        return _api_call_multipart("POST", "/v1/upload", "file", filename, data, content_type=content_type)
+
+    def stt_stream_url(self, *, language: str = "", detect_emotion: bool = False) -> str:
+        base = _API_BASE.rstrip("/")
+        if base.startswith("https://"):
+            base = "wss://" + base[len("https://"):]
+        elif base.startswith("http://"):
+            base = "ws://" + base[len("http://"):]
+        query = []
+        if language:
+            query.append("language=" + quote_plus(language))
+        if detect_emotion:
+            query.append("detect_emotion=true")
+        return f"{base}/v1/speech/stt/stream" + (("?" + "&".join(query)) if query else "")
+
+
+speech = _SpeechNamespace()
 
 # ── Settings (/api/settings, /v1/config/reload) ──
 
@@ -2593,6 +2652,7 @@ class AgentKit:
         self.permissions = permissions
         self.backup = backup
         self.tori = tori
+        self.speech = speech
         self.settings = settings
         self.system = system
         self.auth = auth

@@ -54,6 +54,7 @@
     "browser-automation",
     "realtime-websocket",
     "tori-account",
+    "speech-runtime",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -202,6 +203,10 @@
       "description": "Access the lightweight Tori binding/status/health/usage client or namespace."
     },
     {
+      "name": "speech",
+      "description": "Access the lightweight Speech TTS/STT/voices/upload client or namespace."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -305,7 +310,8 @@
         "rbac": "AgentKit.rbac",
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
-        "tori": "AgentKit.tori"
+        "tori": "AgentKit.tori",
+        "speech": "AgentKit.speech"
       }
     },
     "go": {
@@ -366,7 +372,8 @@
         "rbac": "AgentKit.RBAC",
         "files": "AgentKit.Files",
         "browser": "AgentKit.Browser",
-        "tori": "AgentKit.Tori"
+        "tori": "AgentKit.Tori",
+        "speech": "AgentKit.Speech"
       }
     },
     "python": {
@@ -427,7 +434,8 @@
         "rbac": "AgentKit.rbac",
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
-        "tori": "AgentKit.tori"
+        "tori": "AgentKit.tori",
+        "speech": "AgentKit.speech"
       }
     },
     "rust": {
@@ -488,7 +496,8 @@
         "rbac": "AgentKit::rbac",
         "files": "AgentKit::files",
         "browser": "AgentKit::browser",
-        "tori": "AgentKit.tori"
+        "tori": "AgentKit.tori",
+        "speech": "AgentKit.speech"
       }
     }
   },

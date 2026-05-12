@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "domain": "speech",
+  "description": "Cross-language lightweight SDK for speech TTS/STT, voice listing, file upload, and STT stream URL helpers without importing the full platform client.",
+  "principles": [
+    "Expose speech and upload as a focused SDK slice for external voice UIs, desktop widgets, plugins, CLIs, sidecars, and automation scripts.",
+    "Keep TTS, STT, voices, upload, and stream URL construction directly callable through existing gateway routes.",
+    "Make Speech access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/speech/tts",
+    "POST /v1/speech/stt",
+    "GET /v1/speech/voices",
+    "GET /v1/speech/stt/stream",
+    "POST /v1/upload"
+  ],
+  "capabilities": [
+    {
+      "name": "tts",
+      "route": "POST /v1/speech/tts",
+      "readOnly": false,
+      "description": "Synthesize text into audio bytes."
+    },
+    {
+      "name": "stt",
+      "route": "POST /v1/speech/stt",
+      "readOnly": false,
+      "description": "Transcribe audio bytes into text, optionally with emotion detection."
+    },
+    {
+      "name": "voices",
+      "route": "GET /v1/speech/voices",
+      "readOnly": true,
+      "description": "List available speech voices and providers."
+    },
+    {
+      "name": "sttStreamUrl",
+      "route": "GET /v1/speech/stt/stream",
+      "readOnly": true,
+      "description": "Build the WebSocket URL for real-time STT streaming."
+    },
+    {
+      "name": "upload",
+      "route": "POST /v1/upload",
+      "readOnly": false,
+      "description": "Upload a file through the same lightweight speech/upload facade."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/speech.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "tts": "createSpeechClient().tts",
+        "stt": "createSpeechClient().stt",
+        "voices": "createSpeechClient().voices",
+        "sttStreamUrl": "createSpeechClient().sttStreamUrl",
+        "upload": "createSpeechClient().upload"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "tts": "yunque.Speech.TTS",
+        "stt": "yunque.Speech.STT",
+        "voices": "yunque.Speech.Voices",
+        "sttStreamUrl": "yunque.Speech.STTStreamURL",
+        "upload": "yunque.Speech.Upload"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "tts": "yunque.speech.tts",
+        "stt": "yunque.speech.stt",
+        "voices": "yunque.speech.voices",
+        "sttStreamUrl": "yunque.speech.stt_stream_url",
+        "upload": "yunque.speech.upload"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "tts": "SpeechClient::tts",
+        "stt": "SpeechClient::stt",
+        "voices": "SpeechClient::voices",
+        "sttStreamUrl": "SpeechClient::stt_stream_url",
+        "upload": "SpeechClient::upload"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
