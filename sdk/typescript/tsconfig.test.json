@@ -212,6 +212,8 @@
     "src/skillhub-catalog.ts",
     "src/skillhub-install.ts",
     "src/skillhub-updates.ts",
+    "src/skillhub-installed.ts",
+    "src/skillhub-versions.ts",
     "src/skillhub-policy.ts",
     "src/skills.ts",
     "src/plugins.ts",
