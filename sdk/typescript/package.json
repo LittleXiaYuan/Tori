@@ -263,6 +263,10 @@
       "types": "./src/browser-status.ts",
       "import": "./src/browser-status.ts"
     },
+    "./browser-capture": {
+      "types": "./src/browser-capture.ts",
+      "import": "./src/browser-capture.ts"
+    },
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
