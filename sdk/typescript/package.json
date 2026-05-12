@@ -351,6 +351,10 @@
       "types": "./src/cost-budget.ts",
       "import": "./src/cost-budget.ts"
     },
+    "./cost-observe": {
+      "types": "./src/cost-observe.ts",
+      "import": "./src/cost-observe.ts"
+    },
     "./usage": {
       "types": "./src/usage.ts",
       "import": "./src/usage.ts"
