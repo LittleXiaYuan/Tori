@@ -552,6 +552,49 @@ class _OrchestratorNamespace:
 orchestrator = _OrchestratorNamespace()
 
 
+# ── Conversation Forks (/v1/fork) ──
+
+class _ForkNamespace:
+    """Lightweight helpers for conversation root forks, branches, and branch lists."""
+
+    def root(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/fork?{urlencode({'session_id': session_id})}")
+
+    def get(self, fork_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/fork?{urlencode({'id': fork_id})}")
+
+    def create(self, session_id: str | dict, messages: Optional[list[dict]] = None) -> dict:
+        if isinstance(session_id, dict):
+            body = dict(session_id)
+        else:
+            body = {"session_id": session_id}
+            if messages is not None:
+                body["messages"] = messages
+        return _api_call("POST", "/v1/fork", body)
+
+    def remove(self, fork_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/fork?{urlencode({'id': fork_id})}")
+
+    def branch(self, fork_id: str | dict, at_index: int = 0, label: str = "") -> dict:
+        if isinstance(fork_id, dict):
+            body = dict(fork_id)
+        else:
+            body = {"fork_id": fork_id, "at_index": at_index}
+            if label:
+                body["label"] = label
+        return _api_call("POST", "/v1/fork/branch", body)
+
+    def list(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/fork/list?{urlencode({'session_id': session_id})}")
+
+
+fork = _ForkNamespace()
+
+
 # ── Skill Market (/v1/market) ──
 
 class _SkillMarketNamespace:
@@ -1145,6 +1188,7 @@ class AgentKit:
         self.market = market
         self.dispatch = dispatch
         self.orchestrator = orchestrator
+        self.fork = fork
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
