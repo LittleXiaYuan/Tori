@@ -111,6 +111,7 @@
     "src/iterate-review.ts",
     "src/iterate-cycle.ts",
     "src/trust.ts",
+    "src/trust-control.ts",
     "src/review.ts",
     "src/skillgrow.ts",
     "src/audit.ts",
