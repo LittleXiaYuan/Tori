@@ -258,6 +258,8 @@ import { createProjectsClient } from "yunque-client/projects";
 import { createProjectReadClient } from "yunque-client/project-read";
 import { createProjectWriteClient } from "yunque-client/project-write";
 import { createSkillMarketClient } from "yunque-client/market";
+import { createSkillMarketSearchClient } from "yunque-client/market-search";
+import { createSkillMarketStatsClient } from "yunque-client/market-stats";
 import { createDispatchClient } from "yunque-client/dispatch";
 import { createDispatchReadClient } from "yunque-client/dispatch-read";
 import { createDispatchControlClient } from "yunque-client/dispatch-control";
@@ -1250,7 +1252,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
-`/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`market-search`/`market-stats`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1445,6 +1447,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/project-read.ts` | Lightweight project list/detail read facade without full SDK import |
 | `src/project-write.ts` | Lightweight project create/update/remove facade without full SDK import |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
+| `src/market-search.ts` | Lightweight skill marketplace search/top facade without stats APIs |
+| `src/market-stats.ts` | Lightweight skill marketplace stats facade without search/top APIs |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
 | `src/dispatch-read.ts` | Lightweight dispatch worker/queue/config read facade without enqueue/remove APIs |
 | `src/dispatch-control.ts` | Lightweight dispatch enqueue/remove facade without worker registry reads |
