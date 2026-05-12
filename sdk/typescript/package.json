@@ -391,6 +391,14 @@
       "types": "./src/approval-queue.ts",
       "import": "./src/approval-queue.ts"
     },
+    "./approval-pending": {
+      "types": "./src/approval-pending.ts",
+      "import": "./src/approval-pending.ts"
+    },
+    "./approval-history": {
+      "types": "./src/approval-history.ts",
+      "import": "./src/approval-history.ts"
+    },
     "./approval-rules": {
       "types": "./src/approval-rules.ts",
       "import": "./src/approval-rules.ts"

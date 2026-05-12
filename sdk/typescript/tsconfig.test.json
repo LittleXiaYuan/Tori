@@ -112,6 +112,8 @@
     "src/approvals.ts",
     "src/approval-decisions.ts",
     "src/approval-queue.ts",
+    "src/approval-pending.ts",
+    "src/approval-history.ts",
     "src/approval-rules.ts",
     "src/trace.ts",
     "src/trace-events.ts",
