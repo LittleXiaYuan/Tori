@@ -8,7 +8,7 @@ const tests: Array<{ name: string; fn: () => Promise<void> | void }> = [];
 function test(name: string, fn: () => Promise<void> | void): void { tests.push({ name, fn }); }
 function jsonResponse(body: unknown, init?: ResponseInit): Response { return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" }, ...init }); }
 
-test("createAgentKit composes state reflect mission parse and plugin lightweight clients", async () => {
+test("createAgentKit composes state reflect mission parse scheduler and plugin lightweight clients", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const kit = createAgentKit({
     baseUrl: "http://localhost:9090/",
@@ -20,6 +20,7 @@ test("createAgentKit composes state reflect mission parse and plugin lightweight
       if (value.endsWith("/v1/state/focus")) return jsonResponse({ focus: "sdk" });
       if (value.includes("/v1/reflect/strategies")) return jsonResponse({ strategies: "- keep slices small" });
       if (value.endsWith("/v1/missions/parse")) return jsonResponse({ type: "cron", name: "每日总结", description: "每天总结", config: { cron_expr: "0 8 * * *" }, confidence: 0.9, explanation: "mentions daily schedule" });
+      if (value.endsWith("/v1/scheduler/jobs")) return jsonResponse({ jobs: [{ id: "job_1", name: "daily" }], count: 1 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -28,10 +29,12 @@ test("createAgentKit composes state reflect mission parse and plugin lightweight
   assertEqual((await kit.state.focus()).focus, "sdk");
   assert((await kit.reflect.strategies({ tag: "sdk" })).strategies.includes("slices"));
   assertEqual((await kit.missions.parse("每天八点总结昨天的任务")).type, "cron");
+  assertEqual((await kit.scheduler.jobs()).count, 1);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[3]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[3]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[4]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

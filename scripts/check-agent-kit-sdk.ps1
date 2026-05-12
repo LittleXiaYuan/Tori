@@ -25,29 +25,31 @@ Invoke-Step "SDK manifest suite" {
   node sdk\scripts\check-sdk-manifests.mjs
 }
 
-Invoke-Step "TypeScript Agent Kit and Mission Parse slices" {
+Invoke-Step "TypeScript Agent Kit, Mission Parse, and Scheduler slices" {
   Push-Location sdk\typescript
   try {
-    node scripts\run-incremental-tests.mjs agent-kit missions missions-parse
+    node scripts\run-incremental-tests.mjs agent-kit missions missions-parse scheduler scheduler-read scheduler-control
   } finally {
     Pop-Location
   }
 }
 
-Invoke-Step "Python Agent Kit and Mission Parse helpers" {
-  python -m unittest sdk.python.tests.test_agent_kit sdk.python.tests.test_missions -v
+Invoke-Step "Python Agent Kit, Mission Parse, and Scheduler helpers" {
+  python -m unittest sdk.python.tests.test_agent_kit sdk.python.tests.test_missions sdk.python.tests.test_scheduler -v
 }
 
-Invoke-Step "Go Agent Kit and Mission Parse helpers" {
-  go test ./sdk/go/yunque -run "AgentKit|Missions|PluginRuntimeNamespace" -count=1
+Invoke-Step "Go Agent Kit, Mission Parse, and Scheduler helpers" {
+  go test ./sdk/go/yunque -run "AgentKit|Missions|Scheduler|PluginRuntimeNamespace" -count=1
 }
 
-Invoke-Step "Rust Agent Kit and Mission Parse helpers" {
+Invoke-Step "Rust Agent Kit, Mission Parse, and Scheduler helpers" {
   cargo test --manifest-path sdk\rust\Cargo.toml agent_kit -q
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   cargo test --manifest-path sdk\rust\Cargo.toml mission -q
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   cargo test --manifest-path sdk\rust\Cargo.toml missions -q
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  cargo test --manifest-path sdk\rust\Cargo.toml scheduler -q
 }
 
 Invoke-Step "Docs SDK manifest gate" {

@@ -207,6 +207,45 @@ pub struct MissionParseResult {
     pub explanation: String,
 }
 
+/// Prompt scheduler job returned by `/v1/scheduler/*`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SchedulerJob {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub tenant_id: String,
+    #[serde(default)]
+    pub interval: serde_json::Value,
+    #[serde(default)]
+    pub prompt: String,
+}
+
+/// Response returned by `/v1/scheduler/jobs`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SchedulerJobsResponse {
+    #[serde(default)]
+    pub jobs: Vec<SchedulerJob>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+/// Request body for `/v1/scheduler/add`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SchedulerAddRequest {
+    pub name: String,
+    pub prompt: String,
+    pub interval: String,
+}
+
+/// Response returned by `/v1/scheduler/remove`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SchedulerRemoveResponse {
+    #[serde(default)]
+    pub status: String,
+}
+
 /// Message accepted by the Plugin API LLM endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct PluginLLMMessage {
@@ -551,6 +590,7 @@ pub struct AgentKit {
     pub state: StateClient,
     pub reflect: ReflectClient,
     pub missions: MissionsClient,
+    pub scheduler: SchedulerClient,
     pub plugin: PluginApiClient,
 }
 
@@ -577,6 +617,7 @@ impl AgentKit {
             state: StateClient::new(base_url.clone(), token.as_ref())?,
             reflect: ReflectClient::new(base_url.clone(), token.as_ref())?,
             missions: MissionsClient::new(base_url.clone(), token.as_ref())?,
+            scheduler: SchedulerClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -593,8 +634,92 @@ impl AgentKit {
             state: StateClient::new_with_client(base_url.clone(), state_http),
             reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http.clone()),
             missions: MissionsClient::new_with_client(base_url.clone(), reflect_http),
+            scheduler: SchedulerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
+    }
+}
+
+/// Small Rust helper over `/v1/scheduler/*`.
+///
+/// Use this when an external Rust CLI, sidecar, plugin runner, or automation
+/// binary wants to list, add, or remove prompt scheduler jobs without importing
+/// the generated all-in-one API surface.
+#[derive(Debug, Clone)]
+pub struct SchedulerClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl SchedulerClient {
+    /// Create a SchedulerClient using a bearer token.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    /// Create a SchedulerClient with a caller-provided reqwest client.
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    /// List prompt scheduler jobs.
+    pub async fn jobs(&self) -> Result<SchedulerJobsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/scheduler/jobs"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Add a recurring prompt scheduler job. Interval uses Go duration strings such as `1h`.
+    pub async fn add(&self, request: &SchedulerAddRequest) -> Result<SchedulerJob, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/scheduler/add"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Remove a prompt scheduler job by id.
+    pub async fn remove(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<SchedulerRemoveResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/scheduler/remove"))
+            .json(&serde_json::json!({ "id": id.as_ref() }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
     }
 }
 
@@ -1279,6 +1404,10 @@ mod tests {
             "http://localhost:9090/v1/missions/parse"
         );
         assert_eq!(
+            kit.scheduler.url("/v1/scheduler/jobs"),
+            "http://localhost:9090/v1/scheduler/jobs"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -1312,6 +1441,31 @@ mod tests {
         assert_eq!(
             client.url("/v1/missions/parse"),
             "http://localhost:9090/v1/missions/parse"
+        );
+    }
+
+    #[test]
+    fn scheduler_job_deserializes_incremental_body() {
+        let jobs: SchedulerJobsResponse = serde_json::from_str(
+            r#"{"jobs":[{"id":"job_1","name":"daily","tenant_id":"default","interval":60000000000,"prompt":"复盘"}],"count":1}"#,
+        )
+        .unwrap();
+        assert_eq!(jobs.count, 1);
+        assert_eq!(jobs.jobs[0].id, "job_1");
+        assert_eq!(jobs.jobs[0].interval, serde_json::json!(60000000000_i64));
+
+        let removed: SchedulerRemoveResponse =
+            serde_json::from_str(r#"{"status":"removed"}"#).unwrap();
+        assert_eq!(removed.status, "removed");
+    }
+
+    #[test]
+    fn scheduler_client_trims_base_url() {
+        let client =
+            SchedulerClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/scheduler/jobs"),
+            "http://localhost:9090/v1/scheduler/jobs"
         );
     }
 }

@@ -254,6 +254,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 				t.Fatalf("unexpected mission parse body: %+v", body)
 			}
 			_, _ = w.Write([]byte(`{"type":"cron","name":"每日总结","description":"每天总结昨天的任务","config":{"cron_expr":"0 8 * * *"},"confidence":0.9,"explanation":"mentions daily schedule"}`))
+		case "/v1/scheduler/jobs":
+			_, _ = w.Write([]byte(`{"jobs":[{"id":"job_1","name":"daily","interval":60000000000,"prompt":"复盘"}],"count":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -276,6 +278,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	jobs, err := kit.Scheduler.Jobs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -284,14 +290,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || len(results) != 1 || results[0].Title != "Agent Kit" {
-		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v results=%+v", focus, strategies, mission, results)
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 5 {
-		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -338,6 +344,62 @@ func TestPluginRuntimeNamespaceDelegatesExtensionRegistration(t *testing.T) {
 
 	if err := Plugin.RegisterProvider(context.Background(), "local", "http://localhost:11434/v1", "llama3"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSchedulerJobsAddAndRemove(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/scheduler/jobs":
+			if r.Method != http.MethodGet {
+				t.Fatalf("unexpected jobs method: %s", r.Method)
+			}
+			_, _ = w.Write([]byte(`{"jobs":[{"id":"job_1","name":"daily"}],"count":1}`))
+		case "/v1/scheduler/add":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected add method: %s", r.Method)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["name"] != "hourly" || body["prompt"] != "检查任务" || body["interval"] != "1h" {
+				t.Fatalf("unexpected add body: %+v", body)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":"job_2","name":"hourly","tenant_id":"default","interval":3600000000000,"prompt":"检查任务"}`))
+		case "/v1/scheduler/remove":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected remove method: %s", r.Method)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["id"] != "job_1" {
+				t.Fatalf("unexpected remove body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"removed"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	jobs, err := Scheduler.Jobs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := Scheduler.Add(context.Background(), "hourly", "检查任务", "1h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Scheduler.Remove(context.Background(), "job_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jobs.Count != 1 || added.ID != "job_2" || removed.Status != "removed" {
+		t.Fatalf("unexpected scheduler results: jobs=%+v added=%+v removed=%+v", jobs, added, removed)
 	}
 }
 

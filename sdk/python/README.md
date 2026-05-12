@@ -17,7 +17,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, and Plugin API
-Runtime plus Mission Parse. It reuses the same module-level helpers and does not pull in a
+Runtime plus Mission Parse and Scheduler. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -28,10 +28,11 @@ kit = yunque.create_agent_kit()
 focus = kit.state.focus()
 strategies = kit.reflect.strategies(tag="sdk", limit=5)
 mission = kit.missions.parse("每天八点总结昨天的任务")
+scheduler_jobs = kit.scheduler.jobs()
 results = kit.plugin.search("incremental SDK package", limit=5)
 
 kit.memory.set("last_focus", focus)
-print(focus, strategies, mission["type"], len(results))
+print(focus, strategies, mission["type"], scheduler_jobs["count"], len(results))
 ```
 
 ## Mission Parse helpers
@@ -43,6 +44,18 @@ importing the full platform client.
 ```python
 mission = yunque.missions.parse("每天八点总结昨天的任务")
 print(mission["type"], mission["name"], mission.get("config", {}))
+```
+
+## Scheduler helpers
+
+Use `yunque.scheduler` when an external script, plugin, or sidecar needs to
+list, add, or remove prompt-based recurring jobs.
+
+```python
+jobs = yunque.scheduler.jobs()
+job = yunque.scheduler.add("hourly", "检查任务", "1h")
+removed = yunque.scheduler.remove(job["id"])
+print(jobs["count"], job["id"], removed["status"])
 ```
 
 ## State Kernel helpers

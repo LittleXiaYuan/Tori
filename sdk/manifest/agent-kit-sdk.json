@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -11,12 +11,14 @@
     "state-kernel",
     "reflection-experience",
     "mission-parse",
+    "prompt-scheduler",
     "plugin-api-runtime"
   ],
   "capabilities": [
     { "name": "state", "description": "Access the lightweight State Kernel client or namespace." },
     { "name": "reflect", "description": "Access the lightweight Reflection Experience client or namespace." },
     { "name": "missions", "description": "Access the lightweight Mission Parse client or namespace." },
+    { "name": "scheduler", "description": "Access the lightweight Prompt Scheduler client or namespace." },
     { "name": "plugin", "description": "Access the lightweight Plugin API Runtime client or namespace." }
   ],
   "languages": {
@@ -29,6 +31,7 @@
         "state": "AgentKit.state",
         "reflect": "AgentKit.reflect",
         "missions": "AgentKit.missions",
+        "scheduler": "AgentKit.scheduler",
         "plugin": "AgentKit.plugin"
       }
     },
@@ -41,6 +44,7 @@
         "state": "AgentKit.State",
         "reflect": "AgentKit.Reflect",
         "missions": "AgentKit.Missions",
+        "scheduler": "AgentKit.Scheduler",
         "plugin": "AgentKit.Plugin"
       }
     },
@@ -53,6 +57,7 @@
         "state": "AgentKit.state",
         "reflect": "AgentKit.reflect",
         "missions": "AgentKit.missions",
+        "scheduler": "AgentKit.scheduler",
         "plugin": "AgentKit.plugin"
       }
     },
@@ -65,6 +70,7 @@
         "state": "AgentKit::state",
         "reflect": "AgentKit::reflect",
         "missions": "AgentKit::missions",
+        "scheduler": "AgentKit::scheduler",
         "plugin": "AgentKit::plugin"
       }
     }
