@@ -859,6 +859,14 @@
       "types": "./src/files-read.ts",
       "import": "./src/files-read.ts"
     },
+    "./files-list": {
+      "types": "./src/files-list.ts",
+      "import": "./src/files-list.ts"
+    },
+    "./files-preview": {
+      "types": "./src/files-preview.ts",
+      "import": "./src/files-preview.ts"
+    },
     "./files-download": {
       "types": "./src/files-download.ts",
       "import": "./src/files-download.ts"
