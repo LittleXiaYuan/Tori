@@ -325,6 +325,7 @@ type AgentKit struct {
 	Trust         *trustNamespace
 	Iterate       *iterateNamespace
 	Persona       *personaNamespace
+	Emotion       *emotionNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1858,6 +1859,9 @@ var Iterate = &iterateNamespace{}
 // Persona provides focused access to persona identity, skills, and presets.
 var Persona = &personaNamespace{}
 
+// Emotion provides focused access to emotion history and sticker mappings.
+var Emotion = &emotionNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2784,6 +2788,87 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 }
 
 // ── Persona identity, skills, and presets ──
+
+type emotionNamespace struct{}
+
+type EmotionHistoryOptions struct {
+	SessionID string
+	Limit     int
+	From      string
+	To        string
+}
+
+type EmotionHistoryResponse map[string]any
+type StickerMapResponse map[string]any
+type EmotionStatusResponse map[string]any
+
+type StickerSuggestion struct {
+	PackageID string `json:"package_id"`
+	StickerID string `json:"sticker_id"`
+}
+
+type RegisterStickersRequest struct {
+	Platform string              `json:"platform"`
+	Emotion  string              `json:"emotion"`
+	Stickers []StickerSuggestion `json:"stickers"`
+}
+
+type ClearStickersRequest struct {
+	Platform string `json:"platform"`
+	Emotion  string `json:"emotion"`
+}
+
+func emotionHistoryQuery(opts EmotionHistoryOptions) string {
+	q := url.Values{}
+	if opts.SessionID != "" {
+		q.Set("session_id", opts.SessionID)
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.From != "" {
+		q.Set("from", opts.From)
+	}
+	if opts.To != "" {
+		q.Set("to", opts.To)
+	}
+	if encoded := q.Encode(); encoded != "" {
+		return "?" + encoded
+	}
+	return ""
+}
+
+func (e *emotionNamespace) History(ctx context.Context, opts EmotionHistoryOptions) (EmotionHistoryResponse, error) {
+	var out EmotionHistoryResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/emotion/history"+emotionHistoryQuery(opts), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (e *emotionNamespace) Stickers(ctx context.Context) (StickerMapResponse, error) {
+	var out StickerMapResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/emotion/stickers", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (e *emotionNamespace) RegisterStickers(ctx context.Context, req RegisterStickersRequest) (EmotionStatusResponse, error) {
+	var out EmotionStatusResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/emotion/stickers", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (e *emotionNamespace) ClearStickers(ctx context.Context, req ClearStickersRequest) (EmotionStatusResponse, error) {
+	var out EmotionStatusResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/emotion/stickers", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 type personaNamespace struct{}
 
@@ -4249,6 +4334,7 @@ func NewAgentKit() AgentKit {
 		Trust:         Trust,
 		Iterate:       Iterate,
 		Persona:       Persona,
+		Emotion:       Emotion,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

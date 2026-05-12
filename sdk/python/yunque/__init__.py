@@ -607,6 +607,35 @@ conversations = _ConversationsNamespace()
 
 # ── Persona identity, skills, and presets (/v1/persona*) ──
 
+# ── Emotion runtime (/v1/emotion) ──
+
+class _EmotionNamespace:
+    """Lightweight helpers for emotion history and sticker mappings."""
+
+    def history(self, session_id: str = "", limit: int = 0, from_time: str = "", to_time: str = "") -> dict:
+        from urllib.parse import urlencode
+
+        query = {k: v for k, v in {
+            "session_id": session_id or None,
+            "limit": limit or None,
+            "from": from_time or None,
+            "to": to_time or None,
+        }.items() if v is not None}
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/v1/emotion/history{suffix}")
+
+    def stickers(self) -> dict:
+        return _api_call("GET", "/v1/emotion/stickers")
+
+    def register_stickers(self, platform: str, emotion: str, stickers: list[dict]) -> dict:
+        return _api_call("PUT", "/v1/emotion/stickers", {"platform": platform, "emotion": emotion, "stickers": stickers})
+
+    def clear_stickers(self, platform: str, emotion: str) -> dict:
+        return _api_call("DELETE", "/v1/emotion/stickers", {"platform": platform, "emotion": emotion})
+
+
+emotion = _EmotionNamespace()
+
 class _PersonaNamespace:
     """Lightweight helpers for persona identity, skills, and preset management."""
 
@@ -2116,6 +2145,7 @@ class AgentKit:
         self.trust = trust
         self.iterate = iterate
         self.persona = persona
+        self.emotion = emotion
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

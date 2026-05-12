@@ -39,6 +39,7 @@
     "trust-governance",
     "self-iteration",
     "persona-runtime",
+    "emotion-runtime",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -175,6 +176,10 @@
       "description": "Access the lightweight Persona client or namespace for persona identity, skills, presets, custom presets, and feature flags."
     },
     {
+      "name": "emotion",
+      "description": "Access the lightweight Emotion client or namespace for emotion history and sticker mappings."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -256,6 +261,7 @@
         "trust": "AgentKit.trust",
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
+        "emotion": "AgentKit.emotion",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -310,6 +316,7 @@
         "trust": "AgentKit.Trust",
         "iterate": "AgentKit.Iterate",
         "persona": "AgentKit.Persona",
+        "emotion": "AgentKit.Emotion",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -364,6 +371,7 @@
         "trust": "AgentKit.trust",
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
+        "emotion": "AgentKit.emotion",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -418,6 +426,7 @@
         "trust": "AgentKit::trust",
         "iterate": "AgentKit::iterate",
         "persona": "AgentKit::persona",
+        "emotion": "AgentKit::emotion",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

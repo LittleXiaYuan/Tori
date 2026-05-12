@@ -1393,6 +1393,7 @@ pub struct AgentKit {
     pub trust: TrustClient,
     pub iterate: IterateClient,
     pub persona: PersonaClient,
+    pub emotion: EmotionClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1455,6 +1456,7 @@ impl AgentKit {
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
+            emotion: EmotionClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1510,6 +1512,7 @@ impl AgentKit {
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            emotion: EmotionClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3584,6 +3587,154 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+pub type EmotionHistoryResponse = serde_json::Value;
+pub type StickerMapResponse = serde_json::Value;
+pub type EmotionStatusResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct EmotionHistoryQuery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub from: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct StickerSuggestion {
+    pub package_id: String,
+    pub sticker_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct RegisterStickersRequest {
+    pub platform: String,
+    pub emotion: String,
+    pub stickers: Vec<StickerSuggestion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ClearStickersRequest {
+    pub platform: String,
+    pub emotion: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct EmotionClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl EmotionClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn history(
+        &self,
+        query: &EmotionHistoryQuery,
+    ) -> Result<EmotionHistoryResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&("/v1/emotion/history".to_string() + &emotion_history_query(query))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn stickers(&self) -> Result<StickerMapResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/emotion/stickers"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn register_stickers(
+        &self,
+        request: &RegisterStickersRequest,
+    ) -> Result<EmotionStatusResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/emotion/stickers"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn clear_stickers(
+        &self,
+        request: &ClearStickersRequest,
+    ) -> Result<EmotionStatusResponse, reqwest::Error> {
+        self.http
+            .delete(self.url("/v1/emotion/stickers"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+fn emotion_history_query(query: &EmotionHistoryQuery) -> String {
+    let mut pairs = Vec::new();
+    if !query.session_id.is_empty() {
+        pairs.push(format!(
+            "session_id={}",
+            url_encode_query_component(&query.session_id)
+        ));
+    }
+    if query.limit > 0 {
+        pairs.push(format!("limit={}", query.limit));
+    }
+    if !query.from.is_empty() {
+        pairs.push(format!("from={}", url_encode_query_component(&query.from)));
+    }
+    if !query.to.is_empty() {
+        pairs.push(format!("to={}", url_encode_query_component(&query.to)));
+    }
+    if pairs.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", pairs.join("&"))
+    }
+}
 
 pub type PersonaStateResponse = serde_json::Value;
 pub type PersonaStatusResponse = serde_json::Value;
@@ -8127,6 +8278,10 @@ mod tests {
             "http://localhost:9090/v1/persona"
         );
         assert_eq!(
+            kit.emotion.url("/v1/emotion/history"),
+            "http://localhost:9090/v1/emotion/history"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -8449,6 +8604,41 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn emotion_helpers_build_urls_queries_and_payloads() {
+        let client =
+            EmotionClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/emotion/stickers"),
+            "http://localhost:9090/v1/emotion/stickers"
+        );
+        assert_eq!(
+            emotion_history_query(&EmotionHistoryQuery {
+                session_id: "s1".to_string(),
+                limit: 5,
+                from: "".to_string(),
+                to: "".to_string(),
+            }),
+            "?session_id=s1&limit=5"
+        );
+        let register = serde_json::to_value(RegisterStickersRequest {
+            platform: "wechat".to_string(),
+            emotion: "happy".to_string(),
+            stickers: vec![StickerSuggestion {
+                package_id: "p1".to_string(),
+                sticker_id: "s1".to_string(),
+            }],
+        })
+        .unwrap();
+        assert_eq!(register["stickers"][0]["sticker_id"], "s1");
+        let clear = serde_json::to_value(ClearStickersRequest {
+            platform: "wechat".to_string(),
+            emotion: "happy".to_string(),
+        })
+        .unwrap();
+        assert_eq!(clear["emotion"], "happy");
     }
 
     #[test]

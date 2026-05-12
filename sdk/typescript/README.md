@@ -2251,3 +2251,7 @@ Use the lightweight Iterate SDK for self-iteration proposal review from admin pa
 ### Persona SDK
 
 Use the lightweight Persona SDK when an external page, plugin UI, CLI, or automation script needs to read or adjust persona identity without importing the full platform client. `createPersonaClient` wraps `GET/PUT /v1/persona`, persona skills, persona presets, custom presets, and preset feature flags; `createAgentKit(...).persona` exposes the same persona identity, skills, and presets surface.
+
+### Emotion SDK
+
+The lightweight Emotion SDK exposes emotion history and emotion stickers for external plugin UIs, front-end admin pages, CLIs, and automation scripts. Use it to read `/v1/emotion/history`, export `/v1/emotion/stickers`, register sticker mappings, or clear stale mappings without pulling in the full platform backend.

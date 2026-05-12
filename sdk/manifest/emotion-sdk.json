@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "domain": "emotion-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for emotion history and sticker mappings without importing the full platform client.",
+  "principles": [
+    "Expose emotion history and sticker mappings as a focused SDK slice for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts.",
+    "Keep emotion reads and sticker mapping writes directly callable through existing authenticated /v1/emotion routes.",
+    "Make Emotion access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /v1/emotion/history",
+    "GET /v1/emotion/stickers",
+    "PUT /v1/emotion/stickers",
+    "DELETE /v1/emotion/stickers"
+  ],
+  "capabilities": [
+    {
+      "name": "history",
+      "route": "GET /v1/emotion/history",
+      "readOnly": true,
+      "description": "Read emotion history entries and summary."
+    },
+    {
+      "name": "stickers",
+      "route": "GET /v1/emotion/stickers",
+      "readOnly": true,
+      "description": "Export emotion sticker mappings."
+    },
+    {
+      "name": "registerStickers",
+      "route": "PUT /v1/emotion/stickers",
+      "readOnly": false,
+      "description": "Register sticker suggestions for one platform and emotion."
+    },
+    {
+      "name": "clearStickers",
+      "route": "DELETE /v1/emotion/stickers",
+      "readOnly": false,
+      "description": "Clear sticker mappings for one platform and emotion."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/emotion.ts",
+        "sdk/typescript/src/interactions.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "history": "createEmotionClient().history",
+        "stickers": "createEmotionClient().stickers",
+        "registerStickers": "createEmotionClient().registerStickers",
+        "clearStickers": "createEmotionClient().clearStickers"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "history": "yunque.Emotion.History",
+        "stickers": "yunque.Emotion.Stickers",
+        "registerStickers": "yunque.Emotion.RegisterStickers",
+        "clearStickers": "yunque.Emotion.ClearStickers"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "history": "yunque.emotion.history",
+        "stickers": "yunque.emotion.stickers",
+        "registerStickers": "yunque.emotion.register_stickers",
+        "clearStickers": "yunque.emotion.clear_stickers"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "history": "EmotionClient::history",
+        "stickers": "EmotionClient::stickers",
+        "registerStickers": "EmotionClient::register_stickers",
+        "clearStickers": "EmotionClient::clear_stickers"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
