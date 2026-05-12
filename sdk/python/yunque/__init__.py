@@ -482,3 +482,69 @@ class _StateNamespace:
 
 
 state = _StateNamespace()
+
+# ── Agent Kit bundle ──
+
+class AgentKit:
+    """Small bundle of common SDK-first Yunque surfaces.
+
+    Use this when an external Python script, plugin, or sidecar wants the State
+    Kernel, Reflection Experience, and Plugin API Runtime helpers from one
+    object without depending on a generated full OpenAPI client. The namespace
+    objects are the same lightweight module-level helpers, so this remains a
+    zero-dependency incremental package.
+    """
+
+    def __init__(self):
+        self.state = state
+        self.reflect = reflect
+        self.plugin = plugin
+        self.memory = memory
+        self.agent_memory = agent_memory
+        self.knowledge = knowledge
+        self.cron = cron
+
+
+class _PluginRuntimeNamespace:
+    """Grouped Plugin API Runtime helpers for AgentKit users."""
+
+    def llm(self, prompt: str, user_input: str = "", model: str = "", temperature: float = 0.7) -> str:
+        return llm(prompt, user_input, model, temperature)
+
+    def chat(self, messages: list[dict], temperature: float = 0.7, model: str = "") -> str:
+        return chat(messages, temperature, model)
+
+    def search(self, query: str, limit: int = 5) -> list[dict]:
+        return search(query, limit)
+
+    def send(self, channel_type: str, target: str, content: str, format: str = "markdown") -> bool:
+        return send(channel_type, target, content, format)
+
+    def register_provider(self, *args, **kwargs) -> dict:
+        return register_provider(*args, **kwargs)
+
+    def register_channel(self, *args, **kwargs) -> dict:
+        return register_channel(*args, **kwargs)
+
+    def register_search(self, *args, **kwargs) -> dict:
+        return register_search(*args, **kwargs)
+
+    def register_guardrail(self, *args, **kwargs) -> dict:
+        return register_guardrail(*args, **kwargs)
+
+    def register_embedding(self, *args, **kwargs) -> dict:
+        return register_embedding(*args, **kwargs)
+
+    def register_speech(self, *args, **kwargs) -> dict:
+        return register_speech(*args, **kwargs)
+
+    def list_extensions(self) -> list[dict]:
+        return list_extensions()
+
+
+plugin = _PluginRuntimeNamespace()
+
+def create_agent_kit() -> AgentKit:
+    """Return a lightweight bundle of state, reflection, and plugin runtime helpers."""
+    return AgentKit()
+

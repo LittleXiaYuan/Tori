@@ -12,6 +12,27 @@ $env:YUNQUE_PLUGIN_TOKEN = "<plugin-or-api-token>"
 $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 ```
 
+
+## Agent Kit bundle
+
+Use `create_agent_kit()` when an external script wants the common lightweight
+surfaces from one object: State Kernel, Reflection Experience, and Plugin API
+Runtime. It reuses the same module-level helpers and does not pull in a
+generated OpenAPI client.
+
+```python
+import yunque
+
+kit = yunque.create_agent_kit()
+
+focus = kit.state.focus()
+strategies = kit.reflect.strategies(tag="sdk", limit=5)
+results = kit.plugin.search("incremental SDK package", limit=5)
+
+kit.memory.set("last_focus", focus)
+print(focus, strategies, len(results))
+```
+
 ## State Kernel helpers
 
 ```python
