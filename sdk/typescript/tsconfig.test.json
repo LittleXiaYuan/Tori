@@ -212,6 +212,8 @@
     "src/settings.ts",
     "src/settings-config.ts",
     "src/settings-backup.ts",
+    "src/settings-schema.ts",
+    "src/settings-runtime.ts",
     "src/tori.ts",
     "src/tori-observe.ts",
     "src/tori-bind.ts",
