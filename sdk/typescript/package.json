@@ -367,6 +367,10 @@
       "types": "./src/lora-observe.ts",
       "import": "./src/lora-observe.ts"
     },
+    "./lora-control": {
+      "types": "./src/lora-control.ts",
+      "import": "./src/lora-control.ts"
+    },
     "./iterate": {
       "types": "./src/iterate.ts",
       "import": "./src/iterate.ts"
