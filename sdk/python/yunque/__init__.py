@@ -552,6 +552,50 @@ class _OrchestratorNamespace:
 orchestrator = _OrchestratorNamespace()
 
 
+
+# ── Conversations (/v1/conversations) ──
+
+class _ConversationsNamespace:
+    """Lightweight helpers for conversation sessions, messages, metadata, and replay."""
+
+    def list(self, *, archived: bool = False) -> dict:
+        suffix = "?archived=true" if archived else ""
+        return _api_call("GET", f"/v1/conversations{suffix}")
+
+    def messages(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/conversations/messages?{urlencode({'session_id': session_id})}")
+
+    def delete_messages(self, session_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/conversations/messages?{urlencode({'session_id': session_id})}")
+
+    def manage(self, session_id: str, **updates) -> dict:
+        return _api_call("PUT", "/v1/conversations/manage", {"session_id": session_id, **updates})
+
+    def rename(self, session_id: str, name: str) -> dict:
+        return self.manage(session_id, name=name)
+
+    def pin(self, session_id: str, pinned: bool = True) -> dict:
+        return self.manage(session_id, pinned=pinned)
+
+    def archive(self, session_id: str, archive: bool = True) -> dict:
+        return self.manage(session_id, archive=archive)
+
+    def replay(self, session_id: str, *, raw: bool = False, limit: Optional[int] = None, offset: Optional[int] = None) -> dict:
+        from urllib.parse import urlencode
+        params = {"session_id": session_id}
+        if raw:
+            params["raw"] = "true"
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        return _api_call("GET", f"/v1/conversations/replay?{urlencode(params)}")
+
+
+conversations = _ConversationsNamespace()
+
 # ── Conversation Forks (/v1/fork) ──
 
 class _ForkNamespace:
@@ -1689,6 +1733,7 @@ class AgentKit:
         self.reverie = reverie
         self.realtime = realtime
         self.chat = chat_sdk
+        self.conversations = conversations
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

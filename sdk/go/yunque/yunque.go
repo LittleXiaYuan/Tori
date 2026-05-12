@@ -294,38 +294,39 @@ func decodeMapResponse(resp map[string]any, target any) error {
 // Mission Parse, Scheduler, Triggers, and Plugin API Runtime helpers without linking to
 // platform internals or a broad generated client.
 type AgentKit struct {
-	State        *stateNamespace
-	Reflect      *reflectNamespace
-	Missions     *missionsNamespace
-	Scheduler    *schedulerNamespace
-	CronSystem   *cronSystemNamespace
-	Triggers     *triggersNamespace
-	MemoryCore   *memoryCoreNamespace
-	Graph        *graphNamespace
-	KnowledgeKB  *knowledgeKBNamespace
-	LoRA         *loRANamespace
-	Workflows    *workflowsNamespace
-	Connectors   *connectorsNamespace
-	Notify       *notifyNamespace
-	Projects     *projectsNamespace
-	Market       *skillMarketNamespace
-	Dispatch     *dispatchNamespace
-	Orchestrator *orchestratorNamespace
-	Fork         *forkNamespace
-	Cost         *costNamespace
-	Providers    *providersNamespace
-	Cognis       *cognisNamespace
-	Trace        *traceNamespace
-	Heartbeat    *heartbeatNamespace
-	Events       *eventsNamespace
-	Reverie      *reverieNamespace
-	Realtime     *realtimeNamespace
-	Chat         *chatNamespace
-	Plugin       *pluginRuntimeNamespace
-	Memory       *memoryNamespace
-	AgentMemory  *agentMemoryNamespace
-	Knowledge    *knowledgeNamespace
-	Cron         *cronNamespace
+	State         *stateNamespace
+	Reflect       *reflectNamespace
+	Missions      *missionsNamespace
+	Scheduler     *schedulerNamespace
+	CronSystem    *cronSystemNamespace
+	Triggers      *triggersNamespace
+	MemoryCore    *memoryCoreNamespace
+	Graph         *graphNamespace
+	KnowledgeKB   *knowledgeKBNamespace
+	LoRA          *loRANamespace
+	Workflows     *workflowsNamespace
+	Connectors    *connectorsNamespace
+	Notify        *notifyNamespace
+	Projects      *projectsNamespace
+	Market        *skillMarketNamespace
+	Dispatch      *dispatchNamespace
+	Orchestrator  *orchestratorNamespace
+	Fork          *forkNamespace
+	Cost          *costNamespace
+	Providers     *providersNamespace
+	Cognis        *cognisNamespace
+	Trace         *traceNamespace
+	Heartbeat     *heartbeatNamespace
+	Events        *eventsNamespace
+	Reverie       *reverieNamespace
+	Realtime      *realtimeNamespace
+	Chat          *chatNamespace
+	Conversations *conversationsNamespace
+	Plugin        *pluginRuntimeNamespace
+	Memory        *memoryNamespace
+	AgentMemory   *agentMemoryNamespace
+	Knowledge     *knowledgeNamespace
+	Cron          *cronNamespace
 }
 
 // Plugin groups top-level Plugin API Runtime helpers under one namespace for
@@ -1835,6 +1836,9 @@ var Realtime = &realtimeNamespace{}
 // ChatSDK provides focused access to /v1/chat, /v1/chat/stream, and /v1/chat/agentic.
 var ChatSDK = &chatNamespace{}
 
+// Conversations provides focused access to conversation sessions, messages, metadata, and replay.
+var Conversations = &conversationsNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2735,6 +2739,97 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Conversations ──
+
+type conversationsNamespace struct{}
+
+type ConversationMessage map[string]any
+type ConversationSession map[string]any
+type ConversationsResponse map[string]any
+type ConversationMessagesResponse map[string]any
+type ConversationDeleteResponse map[string]any
+type ManageConversationResponse map[string]any
+type ConversationReplayResponse map[string]any
+
+type ManageConversationRequest struct {
+	SessionID string  `json:"session_id"`
+	Name      *string `json:"name,omitempty"`
+	Pinned    *bool   `json:"pinned,omitempty"`
+	Archive   *bool   `json:"archive,omitempty"`
+}
+
+type ConversationReplayOptions struct {
+	Raw    bool
+	Limit  int
+	Offset int
+}
+
+func (c *conversationsNamespace) List(ctx context.Context, archived bool) (ConversationsResponse, error) {
+	path := "/v1/conversations"
+	if archived {
+		path += "?archived=true"
+	}
+	var out ConversationsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationsNamespace) Messages(ctx context.Context, sessionID string) (ConversationMessagesResponse, error) {
+	var out ConversationMessagesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/conversations/messages?session_id="+url.QueryEscape(sessionID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationsNamespace) DeleteMessages(ctx context.Context, sessionID string) (ConversationDeleteResponse, error) {
+	var out ConversationDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/conversations/messages?session_id="+url.QueryEscape(sessionID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationsNamespace) Manage(ctx context.Context, request ManageConversationRequest) (ManageConversationResponse, error) {
+	var out ManageConversationResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/conversations/manage", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationsNamespace) Rename(ctx context.Context, sessionID, name string) (ManageConversationResponse, error) {
+	return c.Manage(ctx, ManageConversationRequest{SessionID: sessionID, Name: &name})
+}
+
+func (c *conversationsNamespace) Pin(ctx context.Context, sessionID string, pinned bool) (ManageConversationResponse, error) {
+	return c.Manage(ctx, ManageConversationRequest{SessionID: sessionID, Pinned: &pinned})
+}
+
+func (c *conversationsNamespace) Archive(ctx context.Context, sessionID string, archive bool) (ManageConversationResponse, error) {
+	return c.Manage(ctx, ManageConversationRequest{SessionID: sessionID, Archive: &archive})
+}
+
+func (c *conversationsNamespace) Replay(ctx context.Context, sessionID string, opts ConversationReplayOptions) (ConversationReplayResponse, error) {
+	q := url.Values{"session_id": []string{sessionID}}
+	if opts.Raw {
+		q.Set("raw", "true")
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		q.Set("offset", strconv.Itoa(opts.Offset))
+	}
+	var out ConversationReplayResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/conversations/replay?"+q.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Chat Runtime ──
 
 type chatNamespace struct{}
@@ -3241,38 +3336,39 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 // scheduler, cron, triggers, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
-		State:        State,
-		Reflect:      Reflect,
-		Missions:     Missions,
-		Scheduler:    Scheduler,
-		CronSystem:   CronSystem,
-		Triggers:     Triggers,
-		MemoryCore:   MemoryCore,
-		Graph:        Graph,
-		KnowledgeKB:  KnowledgeKB,
-		LoRA:         LoRA,
-		Workflows:    Workflows,
-		Connectors:   Connectors,
-		Notify:       Notify,
-		Projects:     Projects,
-		Market:       SkillMarket,
-		Dispatch:     Dispatch,
-		Orchestrator: Orchestrator,
-		Fork:         Fork,
-		Cost:         Cost,
-		Providers:    Providers,
-		Cognis:       Cognis,
-		Trace:        Trace,
-		Heartbeat:    Heartbeat,
-		Events:       Events,
-		Reverie:      Reverie,
-		Realtime:     Realtime,
-		Chat:         ChatSDK,
-		Plugin:       Plugin,
-		Memory:       Memory,
-		AgentMemory:  AgentMemory,
-		Knowledge:    Knowledge,
-		Cron:         Cron,
+		State:         State,
+		Reflect:       Reflect,
+		Missions:      Missions,
+		Scheduler:     Scheduler,
+		CronSystem:    CronSystem,
+		Triggers:      Triggers,
+		MemoryCore:    MemoryCore,
+		Graph:         Graph,
+		KnowledgeKB:   KnowledgeKB,
+		LoRA:          LoRA,
+		Workflows:     Workflows,
+		Connectors:    Connectors,
+		Notify:        Notify,
+		Projects:      Projects,
+		Market:        SkillMarket,
+		Dispatch:      Dispatch,
+		Orchestrator:  Orchestrator,
+		Fork:          Fork,
+		Cost:          Cost,
+		Providers:     Providers,
+		Cognis:        Cognis,
+		Trace:         Trace,
+		Heartbeat:     Heartbeat,
+		Events:        Events,
+		Reverie:       Reverie,
+		Realtime:      Realtime,
+		Chat:          ChatSDK,
+		Conversations: Conversations,
+		Plugin:        Plugin,
+		Memory:        Memory,
+		AgentMemory:   AgentMemory,
+		Knowledge:     Knowledge,
+		Cron:          Cron,
 	}
 }
 
