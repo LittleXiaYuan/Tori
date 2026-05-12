@@ -315,6 +315,8 @@
     "src/plugin-knowledge-search.ts",
     "src/plugin-knowledge-ingest.ts",
     "src/plugin-cron.ts",
+    "src/plugin-cron-read.ts",
+    "src/plugin-cron-control.ts",
     "src/plugin-send.ts",
     "src/plugin-extensions.ts",
     "src/state.ts",

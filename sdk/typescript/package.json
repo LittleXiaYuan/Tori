@@ -1203,6 +1203,14 @@
       "types": "./src/plugin-cron.ts",
       "import": "./src/plugin-cron.ts"
     },
+    "./plugin-cron-read": {
+      "types": "./src/plugin-cron-read.ts",
+      "import": "./src/plugin-cron-read.ts"
+    },
+    "./plugin-cron-control": {
+      "types": "./src/plugin-cron-control.ts",
+      "import": "./src/plugin-cron-control.ts"
+    },
     "./plugin-send": {
       "types": "./src/plugin-send.ts",
       "import": "./src/plugin-send.ts"
