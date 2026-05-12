@@ -1382,6 +1382,7 @@ pub struct AgentKit {
     pub fork: ForkClient,
     pub cost: CostClient,
     pub providers: ProvidersClient,
+    pub cognis: CognisClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1425,6 +1426,7 @@ impl AgentKit {
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
             cost: CostClient::new(base_url.clone(), token.as_ref())?,
             providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
+            cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1461,6 +1463,7 @@ impl AgentKit {
             fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
             providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2792,6 +2795,304 @@ impl ProvidersClient {
             .await
     }
 
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+    async fn delete_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .delete(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+pub type CogniDeclaration = serde_json::Map<String, serde_json::Value>;
+pub type CogniListResponse = serde_json::Value;
+pub type CogniMutationResponse = serde_json::Value;
+pub type CogniTraceResponse = serde_json::Value;
+pub type CogniStatsResponse = serde_json::Value;
+pub type CogniHealthResponse = serde_json::Value;
+pub type CogniAlertsResponse = serde_json::Value;
+pub type CogniVerifyResponse = serde_json::Value;
+pub type CogniExperienceResponse = serde_json::Value;
+pub type CogniWorkflowRunRequest = serde_json::Map<String, serde_json::Value>;
+pub type CogniExperienceRecordRequest = serde_json::Map<String, serde_json::Value>;
+
+/// Small Rust helper over Cogni registry, trace, experience, evolution, and federation endpoints.
+#[derive(Debug, Clone)]
+pub struct CognisClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl CognisClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self) -> Result<CogniListResponse, reqwest::Error> {
+        self.get_json("/v1/cognis").await
+    }
+    pub async fn create(
+        &self,
+        declaration: &CogniDeclaration,
+    ) -> Result<CogniDeclaration, reqwest::Error> {
+        self.post_json("/v1/cognis", declaration).await
+    }
+    pub async fn get(&self, id: &str) -> Result<CogniDeclaration, reqwest::Error> {
+        self.get_json(&format!("/v1/cognis/{}", url_encode_query_component(id)))
+            .await
+    }
+    pub async fn remove(&self, id: &str) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.delete_json(&format!("/v1/cognis/{}", url_encode_query_component(id)))
+            .await
+    }
+    pub async fn enable(&self, id: &str) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_id(id, "enable", &serde_json::json!({})).await
+    }
+    pub async fn disable(&self, id: &str) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_id(id, "disable", &serde_json::json!({})).await
+    }
+    pub async fn reload(&self) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_json("/v1/cognis/reload", &serde_json::json!({}))
+            .await
+    }
+    pub async fn traces(&self, limit: i32) -> Result<CogniTraceResponse, reqwest::Error> {
+        let suffix = if limit > 0 {
+            format!("?limit={limit}")
+        } else {
+            String::new()
+        };
+        self.get_json(&format!("/v1/cognis/traces{}", suffix)).await
+    }
+    pub async fn trace(&self, id: &str, limit: i32) -> Result<CogniTraceResponse, reqwest::Error> {
+        let suffix = if limit > 0 {
+            format!("?limit={limit}")
+        } else {
+            String::new()
+        };
+        self.get_json(&format!(
+            "/v1/cognis/{}/trace{}",
+            url_encode_query_component(id),
+            suffix
+        ))
+        .await
+    }
+    pub async fn stats(&self) -> Result<CogniStatsResponse, reqwest::Error> {
+        self.get_json("/v1/cognis/stats").await
+    }
+    pub async fn health(&self, id: Option<&str>) -> Result<CogniHealthResponse, reqwest::Error> {
+        match id {
+            Some(id) if !id.is_empty() => {
+                self.get_json(&format!(
+                    "/v1/cognis/{}/health",
+                    url_encode_query_component(id)
+                ))
+                .await
+            }
+            _ => self.get_json("/v1/cognis/health").await,
+        }
+    }
+    pub async fn verify(&self, id: Option<&str>) -> Result<CogniVerifyResponse, reqwest::Error> {
+        match id {
+            Some(id) if !id.is_empty() => {
+                self.get_json(&format!(
+                    "/v1/cognis/{}/verify",
+                    url_encode_query_component(id)
+                ))
+                .await
+            }
+            _ => self.get_json("/v1/cognis/verify").await,
+        }
+    }
+    pub async fn alerts(&self) -> Result<CogniAlertsResponse, reqwest::Error> {
+        self.get_json("/v1/cognis/alerts").await
+    }
+    pub async fn scan_alerts(&self) -> Result<CogniAlertsResponse, reqwest::Error> {
+        self.post_json("/v1/cognis/alerts/scan", &serde_json::json!({}))
+            .await
+    }
+    pub async fn generate(
+        &self,
+        request: &serde_json::Value,
+    ) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_json("/v1/cognis/generate", request).await
+    }
+    pub async fn export_bundle(&self) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json("/v1/cognis/export").await
+    }
+    pub async fn import_bundle(
+        &self,
+        bundle: &serde_json::Value,
+    ) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_json("/v1/cognis/import", bundle).await
+    }
+    pub async fn workflows(&self, id: &str) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json(&format!(
+            "/v1/cognis/{}/workflows",
+            url_encode_query_component(id)
+        ))
+        .await
+    }
+    pub async fn run_workflow(
+        &self,
+        id: &str,
+        workflow: &str,
+        request: &CogniWorkflowRunRequest,
+    ) -> Result<serde_json::Value, reqwest::Error> {
+        self.post_json(
+            &format!(
+                "/v1/cognis/{}/workflow/{}",
+                url_encode_query_component(id),
+                url_encode_query_component(workflow)
+            ),
+            request,
+        )
+        .await
+    }
+    pub async fn experience(&self, id: &str) -> Result<CogniExperienceResponse, reqwest::Error> {
+        self.get_json(&format!(
+            "/v1/cognis/{}/experience",
+            url_encode_query_component(id)
+        ))
+        .await
+    }
+    pub async fn record_experience(
+        &self,
+        id: &str,
+        request: &CogniExperienceRecordRequest,
+    ) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_json(
+            &format!(
+                "/v1/cognis/{}/experience/record",
+                url_encode_query_component(id)
+            ),
+            request,
+        )
+        .await
+    }
+    pub async fn confirm_experience_pattern(
+        &self,
+        id: &str,
+        pattern_id: &str,
+    ) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_json(
+            &format!(
+                "/v1/cognis/{}/experience/patterns/{}/confirm",
+                url_encode_query_component(id),
+                url_encode_query_component(pattern_id)
+            ),
+            &serde_json::json!({}),
+        )
+        .await
+    }
+    pub async fn evolve(
+        &self,
+        id: &str,
+        request: &serde_json::Value,
+    ) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_id(id, "evolve", request).await
+    }
+    pub async fn evolution(&self, id: Option<&str>) -> Result<serde_json::Value, reqwest::Error> {
+        match id {
+            Some(id) if !id.is_empty() => {
+                self.get_json(&format!(
+                    "/v1/cognis/{}/evolution",
+                    url_encode_query_component(id)
+                ))
+                .await
+            }
+            _ => self.get_json("/v1/cognis/evolution").await,
+        }
+    }
+    pub async fn federation(&self) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json("/v1/cognis/federation").await
+    }
+    pub async fn federation_peers(&self) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json("/v1/cognis/federation/peers").await
+    }
+    pub async fn discover_federation(
+        &self,
+        request: &serde_json::Value,
+    ) -> Result<serde_json::Value, reqwest::Error> {
+        self.post_json("/v1/cognis/federation/discover", request)
+            .await
+    }
+    pub async fn expose(&self, id: &str) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_id(id, "expose", &serde_json::json!({})).await
+    }
+    pub async fn unexpose(&self, id: &str) -> Result<CogniMutationResponse, reqwest::Error> {
+        self.post_id(id, "unexpose", &serde_json::json!({})).await
+    }
+    pub async fn economics(&self) -> Result<serde_json::Value, reqwest::Error> {
+        self.get_json("/v1/cognis/economics").await
+    }
+    async fn post_id<B, T>(&self, id: &str, action: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.post_json(
+            &format!("/v1/cognis/{}/{}", url_encode_query_component(id), action),
+            body,
+        )
+        .await
+    }
     async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
     where
         T: for<'de> Deserialize<'de>,
@@ -4897,6 +5198,10 @@ mod tests {
             "http://localhost:9090/api/providers"
         );
         assert_eq!(
+            kit.cognis.url("/v1/cognis"),
+            "http://localhost:9090/v1/cognis"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -5174,6 +5479,13 @@ mod tests {
             client.url("/api/providers"),
             "http://localhost:9090/api/providers"
         );
+    }
+
+    #[test]
+    fn cognis_client_trims_base_url() {
+        let client =
+            CognisClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/cognis"), "http://localhost:9090/v1/cognis");
     }
 
     #[test]

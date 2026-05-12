@@ -282,6 +282,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"today_cost":0.12,"month_cost":1.5}`))
 		case "/api/providers":
 			_, _ = w.Write([]byte(`{"providers":[{"id":"deepseek","model":"deepseek-chat"}],"mode":"hybrid"}`))
+		case "/v1/cognis":
+			_, _ = w.Write([]byte(`{"cognis":[{"id":"reviewer","name":"Code Reviewer"}],"count":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -360,6 +362,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cogniList, err := kit.Cognis.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -368,14 +374,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 19 {
-		t.Fatalf("expected 19 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 20 {
+		t.Fatalf("expected 20 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1730,6 +1736,98 @@ func TestProvidersHelpers(t *testing.T) {
 	}
 	if len(seen) != 20 {
 		t.Fatalf("expected 20 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestCognisHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/cognis":
+			if r.Method == http.MethodPost {
+				_, _ = w.Write([]byte(`{"id":"reviewer","name":"Code Reviewer"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"cognis":[{"id":"reviewer"}],"count":1}`))
+		case "/v1/cognis/reviewer":
+			_, _ = w.Write([]byte(`{"id":"reviewer","enabled":true}`))
+		case "/v1/cognis/reviewer/enable", "/v1/cognis/reviewer/disable", "/v1/cognis/reload", "/v1/cognis/alerts/scan", "/v1/cognis/generate", "/v1/cognis/import", "/v1/cognis/reviewer/workflow/summarize", "/v1/cognis/reviewer/experience/record", "/v1/cognis/reviewer/experience/patterns/pat-1/confirm", "/v1/cognis/reviewer/evolve", "/v1/cognis/federation/discover", "/v1/cognis/reviewer/expose", "/v1/cognis/reviewer/unexpose":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/cognis/traces", "/v1/cognis/reviewer/trace":
+			_, _ = w.Write([]byte(`{"traces":[{"id":"t1"}],"count":1}`))
+		case "/v1/cognis/stats":
+			_, _ = w.Write([]byte(`{"activations":2}`))
+		case "/v1/cognis/health", "/v1/cognis/reviewer/health":
+			_, _ = w.Write([]byte(`{"healthy":true}`))
+		case "/v1/cognis/verify", "/v1/cognis/reviewer/verify":
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/v1/cognis/alerts":
+			_, _ = w.Write([]byte(`{"alerts":[],"count":0}`))
+		case "/v1/cognis/export":
+			_, _ = w.Write([]byte(`{"bundle":{"version":1}}`))
+		case "/v1/cognis/reviewer/workflows":
+			_, _ = w.Write([]byte(`{"workflows":["summarize"]}`))
+		case "/v1/cognis/reviewer/experience":
+			_, _ = w.Write([]byte(`{"enabled":true}`))
+		case "/v1/cognis/evolution", "/v1/cognis/reviewer/evolution":
+			_, _ = w.Write([]byte(`{"generation":2}`))
+		case "/v1/cognis/federation":
+			_, _ = w.Write([]byte(`{"enabled":true}`))
+		case "/v1/cognis/federation/peers":
+			_, _ = w.Write([]byte(`{"peers":[]}`))
+		case "/v1/cognis/economics":
+			_, _ = w.Write([]byte(`{"cost":0}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Cognis.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, _ := Cognis.Create(ctx, CogniDeclaration{"id": "reviewer"})
+	detail, _ := Cognis.Get(ctx, "reviewer")
+	removed, err := Cognis.Remove(ctx, "reviewer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled, _ := Cognis.Enable(ctx, "reviewer")
+	disabled, _ := Cognis.Disable(ctx, "reviewer")
+	reloaded, _ := Cognis.Reload(ctx)
+	traces, _ := Cognis.Traces(ctx, 5)
+	trace, _ := Cognis.Trace(ctx, "reviewer", 2)
+	stats, _ := Cognis.Stats(ctx)
+	health, _ := Cognis.Health(ctx, "reviewer")
+	verify, _ := Cognis.Verify(ctx, "")
+	alerts, _ := Cognis.Alerts(ctx)
+	scanned, _ := Cognis.ScanAlerts(ctx)
+	generated, _ := Cognis.Generate(ctx, map[string]any{"prompt": "make cogni"})
+	exported, _ := Cognis.ExportBundle(ctx)
+	imported, _ := Cognis.ImportBundle(ctx, map[string]any{"bundle": map[string]any{}})
+	workflows, _ := Cognis.Workflows(ctx, "reviewer")
+	ran, _ := Cognis.RunWorkflow(ctx, "reviewer", "summarize", CogniWorkflowRunRequest{"input": "x"})
+	experience, _ := Cognis.Experience(ctx, "reviewer")
+	recorded, _ := Cognis.RecordExperience(ctx, "reviewer", CogniExperienceRecordRequest{"type": "fact", "data": map[string]any{"fact": "x"}})
+	confirmed, _ := Cognis.ConfirmExperiencePattern(ctx, "reviewer", "pat-1")
+	evolved, _ := Cognis.Evolve(ctx, "reviewer", map[string]any{})
+	evolution, _ := Cognis.Evolution(ctx, "reviewer")
+	federation, _ := Cognis.Federation(ctx)
+	peers, _ := Cognis.FederationPeers(ctx)
+	discovered, _ := Cognis.DiscoverFederation(ctx, map[string]any{"query": "reviewer"})
+	exposed, _ := Cognis.Expose(ctx, "reviewer")
+	unexposed, _ := Cognis.Unexpose(ctx, "reviewer")
+	economics, _ := Cognis.Economics(ctx)
+	kit := NewAgentKit()
+
+	if list["count"].(float64) != 1 || created["id"] != "reviewer" || !detail["enabled"].(bool) || removed["id"] != "reviewer" || enabled["status"] != "ok" || disabled["status"] != "ok" || reloaded["status"] != "ok" || traces["count"].(float64) != 1 || trace["count"].(float64) != 1 || stats["activations"].(float64) != 2 || !health["healthy"].(bool) || !verify["ok"].(bool) || alerts["count"].(float64) != 0 || scanned["status"] != "ok" || generated["status"] != "ok" || exported["bundle"] == nil || imported["status"] != "ok" || workflows["workflows"] == nil || ran["status"] != "ok" || !experience["enabled"].(bool) || recorded["status"] != "ok" || confirmed["status"] != "ok" || evolved["status"] != "ok" || evolution["generation"].(float64) != 2 || !federation["enabled"].(bool) || peers["peers"] == nil || discovered["status"] != "ok" || exposed["status"] != "ok" || unexposed["status"] != "ok" || economics["cost"].(float64) != 0 || kit.Cognis != Cognis {
+		t.Fatalf("unexpected cognis results")
+	}
+	if len(seen) != 30 {
+		t.Fatalf("expected 30 requests, got %d: %v", len(seen), seen)
 	}
 }
 

@@ -28,6 +28,7 @@
     "conversation-fork",
     "cost-usage-quota",
     "llm-providers",
+    "cognis",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -112,6 +113,10 @@
       "description": "Access the lightweight LLM Providers, Models, runtime mode, session routing, and breaker client or namespace."
     },
     {
+      "name": "cognis",
+      "description": "Access the lightweight Cogni registry, observability, experience, evolution, and federation client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -149,7 +154,8 @@
         "orchestrator": "AgentKit.orchestrator",
         "fork": "AgentKit.fork",
         "cost": "AgentKit.cost",
-        "providers": "AgentKit.providers"
+        "providers": "AgentKit.providers",
+        "cognis": "AgentKit.cognis"
       }
     },
     "go": {
@@ -184,7 +190,8 @@
         "orchestrator": "AgentKit.Orchestrator",
         "fork": "AgentKit.Fork",
         "cost": "AgentKit.Cost",
-        "providers": "AgentKit.Providers"
+        "providers": "AgentKit.Providers",
+        "cognis": "AgentKit.Cognis"
       }
     },
     "python": {
@@ -219,7 +226,8 @@
         "orchestrator": "AgentKit.orchestrator",
         "fork": "AgentKit.fork",
         "cost": "AgentKit.cost",
-        "providers": "AgentKit.providers"
+        "providers": "AgentKit.providers",
+        "cognis": "AgentKit.cognis"
       }
     },
     "rust": {
@@ -254,7 +262,8 @@
         "orchestrator": "AgentKit::orchestrator",
         "fork": "AgentKit::fork",
         "cost": "AgentKit::cost",
-        "providers": "AgentKit::providers"
+        "providers": "AgentKit::providers",
+        "cognis": "AgentKit::cognis"
       }
     }
   },

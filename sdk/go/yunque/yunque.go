@@ -313,6 +313,7 @@ type AgentKit struct {
 	Fork         *forkNamespace
 	Cost         *costNamespace
 	Providers    *providersNamespace
+	Cognis       *cognisNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1803,6 +1804,10 @@ var Cost = &costNamespace{}
 // Providers provides focused access to LLM provider, model, mode, and breaker endpoints.
 var Providers = &providersNamespace{}
 
+// Cognis provides focused access to Cogni registry, observability, experience,
+// evolution, and federation endpoints.
+var Cognis = &cognisNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2234,6 +2239,279 @@ func (p *providersNamespace) ResetBreakers(ctx context.Context) (ProviderActionR
 	return nonNilMap(out), nil
 }
 
+// ── Cognis / Cognitive Kernel ──
+
+type cognisNamespace struct{}
+
+type CogniDeclaration map[string]any
+type CogniListResponse map[string]any
+type CogniMutationResponse map[string]any
+type CogniTraceResponse map[string]any
+type CogniStatsResponse map[string]any
+type CogniHealthResponse map[string]any
+type CogniAlertsResponse map[string]any
+type CogniVerifyResponse map[string]any
+type CogniExperienceResponse map[string]any
+type CogniWorkflowRunRequest map[string]any
+type CogniExperienceRecordRequest map[string]any
+
+func (c *cognisNamespace) List(ctx context.Context) (CogniListResponse, error) {
+	var out CogniListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Create(ctx context.Context, declaration CogniDeclaration) (CogniDeclaration, error) {
+	var out CogniDeclaration
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis", declaration, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Get(ctx context.Context, id string) (CogniDeclaration, error) {
+	var out CogniDeclaration
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/"+url.PathEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Remove(ctx context.Context, id string) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/cognis/"+url.PathEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Enable(ctx context.Context, id string) (CogniMutationResponse, error) {
+	return c.postID(ctx, id, "enable", nil)
+}
+
+func (c *cognisNamespace) Disable(ctx context.Context, id string) (CogniMutationResponse, error) {
+	return c.postID(ctx, id, "disable", nil)
+}
+
+func (c *cognisNamespace) Reload(ctx context.Context) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/reload", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Traces(ctx context.Context, limit int) (CogniTraceResponse, error) {
+	path := "/v1/cognis/traces"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	var out CogniTraceResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Trace(ctx context.Context, id string, limit int) (CogniTraceResponse, error) {
+	path := "/v1/cognis/" + url.PathEscape(id) + "/trace"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	var out CogniTraceResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Stats(ctx context.Context) (CogniStatsResponse, error) {
+	var out CogniStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Health(ctx context.Context, id string) (CogniHealthResponse, error) {
+	path := "/v1/cognis/health"
+	if id != "" {
+		path = "/v1/cognis/" + url.PathEscape(id) + "/health"
+	}
+	var out CogniHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Verify(ctx context.Context, id string) (CogniVerifyResponse, error) {
+	path := "/v1/cognis/verify"
+	if id != "" {
+		path = "/v1/cognis/" + url.PathEscape(id) + "/verify"
+	}
+	var out CogniVerifyResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Alerts(ctx context.Context) (CogniAlertsResponse, error) {
+	var out CogniAlertsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/alerts", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) ScanAlerts(ctx context.Context) (CogniAlertsResponse, error) {
+	var out CogniAlertsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/alerts/scan", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Generate(ctx context.Context, request map[string]any) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/generate", request, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) ExportBundle(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/export", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) ImportBundle(ctx context.Context, bundle map[string]any) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/import", bundle, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Workflows(ctx context.Context, id string) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/"+url.PathEscape(id)+"/workflows", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) RunWorkflow(ctx context.Context, id, workflow string, request CogniWorkflowRunRequest) (map[string]any, error) {
+	var out map[string]any
+	if request == nil {
+		request = CogniWorkflowRunRequest{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/"+url.PathEscape(id)+"/workflow/"+url.PathEscape(workflow), request, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Experience(ctx context.Context, id string) (CogniExperienceResponse, error) {
+	var out CogniExperienceResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/"+url.PathEscape(id)+"/experience", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) RecordExperience(ctx context.Context, id string, request CogniExperienceRecordRequest) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/"+url.PathEscape(id)+"/experience/record", request, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) ConfirmExperiencePattern(ctx context.Context, id, patternID string) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/"+url.PathEscape(id)+"/experience/patterns/"+url.PathEscape(patternID)+"/confirm", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Evolve(ctx context.Context, id string, request map[string]any) (CogniMutationResponse, error) {
+	return c.postID(ctx, id, "evolve", request)
+}
+
+func (c *cognisNamespace) Evolution(ctx context.Context, id string) (map[string]any, error) {
+	path := "/v1/cognis/evolution"
+	if id != "" {
+		path = "/v1/cognis/" + url.PathEscape(id) + "/evolution"
+	}
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Federation(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/federation", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) FederationPeers(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/federation/peers", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) DiscoverFederation(ctx context.Context, request map[string]any) (map[string]any, error) {
+	if request == nil {
+		request = map[string]any{}
+	}
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/federation/discover", request, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) Expose(ctx context.Context, id string) (CogniMutationResponse, error) {
+	return c.postID(ctx, id, "expose", nil)
+}
+
+func (c *cognisNamespace) Unexpose(ctx context.Context, id string) (CogniMutationResponse, error) {
+	return c.postID(ctx, id, "unexpose", nil)
+}
+
+func (c *cognisNamespace) Economics(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cognis/economics", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *cognisNamespace) postID(ctx context.Context, id, action string, body any) (CogniMutationResponse, error) {
+	var out CogniMutationResponse
+	if body == nil {
+		body = map[string]any{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cognis/"+url.PathEscape(id)+"/"+action, body, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -2489,6 +2767,7 @@ func NewAgentKit() AgentKit {
 		Fork:         Fork,
 		Cost:         Cost,
 		Providers:    Providers,
+		Cognis:       Cognis,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,

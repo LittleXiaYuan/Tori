@@ -18,7 +18,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, Mission Parse,
 Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base,
-LoRA, Workflow, Connector, Notify, Cost, Providers, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
+LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -252,6 +252,10 @@ Orchestrator SDK exposes lightweight IDE worker daemon helpers (`status`, `toggl
 ### Providers SDK
 
 Providers SDK exposes lightweight LLM provider and model helpers (`models`, `addModel`, `deleteModel`, `list`, `test`, `enable`, `disable`, `switchModel`, `setSession`, `mode`, `setMode`, `presets`, `register`, `delete`, `discoverLocal`, `registerLocal`, `discoverTori`, `exec`, `setExec`, `resetBreakers`) for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.providers` / `kit.Providers` for one-stop model configuration and runtime routing workflows.
+
+### Cognis SDK
+
+Cognis SDK exposes lightweight Cogni registry, trace, health, experience, evolution, workflow, bundle, and federation helpers (`list`, `create`, `traces`, `experience`, `evolve`, `federation`, `exportBundle`, `importBundle`) for external pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.cognis` / `kit.Cognis` for one-stop CogniKernel and multi-cogni automation workflows.
 
 ### Cost SDK
 

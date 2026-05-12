@@ -677,6 +677,112 @@ class _ProvidersNamespace:
 providers = _ProvidersNamespace()
 
 
+# ── Cognis / Cognitive Kernel (/v1/cognis) ──
+
+class _CognisNamespace:
+    """Lightweight helpers for Cogni registry, traces, experience, evolution, and federation."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/cognis")
+
+    def create(self, declaration: dict) -> dict:
+        return _api_call("POST", "/v1/cognis", declaration)
+
+    def get(self, cogni_id: str) -> dict:
+        return _api_call("GET", f"/v1/cognis/{cogni_id}")
+
+    def remove(self, cogni_id: str) -> dict:
+        return _api_call("DELETE", f"/v1/cognis/{cogni_id}")
+
+    def enable(self, cogni_id: str) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/enable")
+
+    def disable(self, cogni_id: str) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/disable")
+
+    def reload(self) -> dict:
+        return _api_call("POST", "/v1/cognis/reload")
+
+    def traces(self, limit: Optional[int] = None) -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'limit': limit})}" if limit is not None else ""
+        return _api_call("GET", f"/v1/cognis/traces{suffix}")
+
+    def trace(self, cogni_id: str, limit: Optional[int] = None) -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'limit': limit})}" if limit is not None else ""
+        return _api_call("GET", f"/v1/cognis/{cogni_id}/trace{suffix}")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/cognis/stats")
+
+    def health(self, cogni_id: str = "") -> dict:
+        path = f"/v1/cognis/{cogni_id}/health" if cogni_id else "/v1/cognis/health"
+        return _api_call("GET", path)
+
+    def verify(self, cogni_id: str = "") -> dict:
+        path = f"/v1/cognis/{cogni_id}/verify" if cogni_id else "/v1/cognis/verify"
+        return _api_call("GET", path)
+
+    def alerts(self) -> dict:
+        return _api_call("GET", "/v1/cognis/alerts")
+
+    def scan_alerts(self) -> dict:
+        return _api_call("POST", "/v1/cognis/alerts/scan")
+
+    def generate(self, request: dict) -> dict:
+        return _api_call("POST", "/v1/cognis/generate", request)
+
+    def export_bundle(self) -> dict:
+        return _api_call("GET", "/v1/cognis/export")
+
+    def import_bundle(self, bundle: dict) -> dict:
+        return _api_call("POST", "/v1/cognis/import", bundle)
+
+    def workflows(self, cogni_id: str) -> dict:
+        return _api_call("GET", f"/v1/cognis/{cogni_id}/workflows")
+
+    def run_workflow(self, cogni_id: str, workflow: str, request: Optional[dict] = None) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/workflow/{workflow}", request or {})
+
+    def experience(self, cogni_id: str) -> dict:
+        return _api_call("GET", f"/v1/cognis/{cogni_id}/experience")
+
+    def record_experience(self, cogni_id: str, record_type: str, data: dict) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/experience/record", {"type": record_type, "data": data})
+
+    def confirm_experience_pattern(self, cogni_id: str, pattern_id: str) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/experience/patterns/{pattern_id}/confirm")
+
+    def evolve(self, cogni_id: str, request: Optional[dict] = None) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/evolve", request or {})
+
+    def evolution(self, cogni_id: str = "") -> dict:
+        path = f"/v1/cognis/{cogni_id}/evolution" if cogni_id else "/v1/cognis/evolution"
+        return _api_call("GET", path)
+
+    def federation(self) -> dict:
+        return _api_call("GET", "/v1/cognis/federation")
+
+    def federation_peers(self) -> dict:
+        return _api_call("GET", "/v1/cognis/federation/peers")
+
+    def discover_federation(self, request: Optional[dict] = None) -> dict:
+        return _api_call("POST", "/v1/cognis/federation/discover", request or {})
+
+    def expose(self, cogni_id: str) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/expose")
+
+    def unexpose(self, cogni_id: str) -> dict:
+        return _api_call("POST", f"/v1/cognis/{cogni_id}/unexpose")
+
+    def economics(self) -> dict:
+        return _api_call("GET", "/v1/cognis/economics")
+
+
+cognis = _CognisNamespace()
+
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1317,6 +1423,7 @@ class AgentKit:
         self.fork = fork
         self.cost = cost
         self.providers = providers
+        self.cognis = cognis
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
