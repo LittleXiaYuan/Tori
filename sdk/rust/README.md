@@ -102,7 +102,7 @@ cargo check     # quick verification
 
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
-Experience, Mission Parse, Scheduler, and Plugin API Runtime. It composes the hand-written lightweight
+Experience, Mission Parse, Scheduler, Triggers, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -228,6 +228,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+```
+
+
+## Lightweight Triggers helper
+
+Use `TriggersClient` when a Rust CLI, sidecar, plugin runner, or automation binary needs Triggers v2 definitions, event emission, and recent trigger history without importing the generated all-in-one API surface.
+
+```rust
+use yunque_client::{TriggerDef, TriggerHistoryOptions, TriggerListOptions, TriggerPayload, TriggersClient};
+
+let triggers = TriggersClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let defs = triggers.list(&TriggerListOptions { status: "enabled".to_string(), ..Default::default() }).await?;
+let created = triggers.create(&TriggerDef {
+    name: "review done".to_string(),
+    tenant_id: "default".to_string(),
+    r#type: "event".to_string(),
+    actions: vec![serde_json::json!({"kind":"notify"})],
+    ..Default::default()
+}).await?;
+let emitted = triggers.emit(&TriggerPayload { event: "review.done".to_string(), ..Default::default() }).await?;
+let runs = triggers.runs(&TriggerHistoryOptions { trigger_id: created.id, limit: 10 }).await?;
+println!("{} {} {}", defs.total, emitted.status, runs.total);
 ```
 
 ## Lightweight Plugin API helper

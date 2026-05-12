@@ -246,6 +246,100 @@ pub struct SchedulerRemoveResponse {
     pub status: String,
 }
 
+/// Triggers v2 automation definition returned by `/v1/triggers/v2`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerDef {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub tenant_id: String,
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub actions: Vec<serde_json::Value>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Filters for Triggers v2 definitions.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerListOptions {
+    #[serde(default)]
+    pub tenant_id: String,
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default)]
+    pub status: String,
+}
+
+/// Response returned by `/v1/triggers/v2`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerListResponse {
+    #[serde(default)]
+    pub triggers: Vec<TriggerDef>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+/// Event payload accepted by `/v1/triggers/v2/emit`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerPayload {
+    pub event: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub data: serde_json::Map<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub timestamp: String,
+}
+
+/// Response returned by `/v1/triggers/v2/emit`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerEmitResponse {
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub event: String,
+}
+
+/// Response returned by `DELETE /v1/triggers/v2?id=...`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerDeleteResponse {
+    #[serde(default)]
+    pub deleted: String,
+}
+
+/// Filters for Triggers v2 runs and events.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerHistoryOptions {
+    #[serde(default)]
+    pub trigger_id: String,
+    #[serde(default)]
+    pub limit: i32,
+}
+
+/// Response returned by `/v1/triggers/v2/runs`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerRunsResponse {
+    #[serde(default)]
+    pub runs: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+/// Response returned by `/v1/triggers/v2/events`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TriggerEventsResponse {
+    #[serde(default)]
+    pub events: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub total: i32,
+}
+
 /// Message accepted by the Plugin API LLM endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct PluginLLMMessage {
@@ -591,6 +685,7 @@ pub struct AgentKit {
     pub reflect: ReflectClient,
     pub missions: MissionsClient,
     pub scheduler: SchedulerClient,
+    pub triggers: TriggersClient,
     pub plugin: PluginApiClient,
 }
 
@@ -618,6 +713,7 @@ impl AgentKit {
             reflect: ReflectClient::new(base_url.clone(), token.as_ref())?,
             missions: MissionsClient::new(base_url.clone(), token.as_ref())?,
             scheduler: SchedulerClient::new(base_url.clone(), token.as_ref())?,
+            triggers: TriggersClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -635,8 +731,166 @@ impl AgentKit {
             reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http.clone()),
             missions: MissionsClient::new_with_client(base_url.clone(), reflect_http),
             scheduler: SchedulerClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            triggers: TriggersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
+    }
+}
+
+/// Small Rust helper over `/v1/triggers/v2*` automation endpoints.
+///
+/// Use this when an external Rust CLI, sidecar, plugin runner, or automation
+/// binary wants trigger definitions, event emission, or recent trigger history
+/// without importing the generated all-in-one API surface.
+#[derive(Debug, Clone)]
+pub struct TriggersClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl TriggersClient {
+    /// Create a TriggersClient using a bearer token.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    /// Create a TriggersClient with a caller-provided reqwest client.
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    /// List Triggers v2 definitions.
+    pub async fn list(
+        &self,
+        options: &TriggerListOptions,
+    ) -> Result<TriggerListResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!("/v1/triggers/v2{}", trigger_list_query(options))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Get one Triggers v2 definition by id.
+    pub async fn get(&self, id: impl AsRef<str>) -> Result<TriggerDef, reqwest::Error> {
+        self.http
+            .get(self.url(&format!("/v1/triggers/v2?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Create a Triggers v2 definition.
+    pub async fn create(&self, definition: &TriggerDef) -> Result<TriggerDef, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/triggers/v2"))
+            .json(definition)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Update a Triggers v2 definition.
+    pub async fn update(&self, definition: &TriggerDef) -> Result<TriggerDef, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/triggers/v2"))
+            .json(definition)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Delete a Triggers v2 definition by id.
+    pub async fn delete(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<TriggerDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!("/v1/triggers/v2?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Emit an event to the Triggers v2 automation runtime.
+    pub async fn emit(
+        &self,
+        payload: &TriggerPayload,
+    ) -> Result<TriggerEmitResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/triggers/v2/emit"))
+            .json(payload)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// List recent trigger runs.
+    pub async fn runs(
+        &self,
+        options: &TriggerHistoryOptions,
+    ) -> Result<TriggerRunsResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/triggers/v2/runs{}",
+                trigger_history_query(options)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// List recent trigger events.
+    pub async fn events(
+        &self,
+        options: &TriggerHistoryOptions,
+    ) -> Result<TriggerEventsResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/triggers/v2/events{}",
+                trigger_history_query(options)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
     }
 }
 
@@ -1229,6 +1483,39 @@ impl PluginApiClient {
     }
 }
 
+fn trigger_list_query(options: &TriggerListOptions) -> String {
+    let mut params = Vec::new();
+    if !options.tenant_id.is_empty() {
+        params.push(format!("tenant_id={}", options.tenant_id));
+    }
+    if !options.r#type.is_empty() {
+        params.push(format!("type={}", options.r#type));
+    }
+    if !options.status.is_empty() {
+        params.push(format!("status={}", options.status));
+    }
+    if params.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", params.join("&"))
+    }
+}
+
+fn trigger_history_query(options: &TriggerHistoryOptions) -> String {
+    let mut params = Vec::new();
+    if !options.trigger_id.is_empty() {
+        params.push(format!("trigger_id={}", options.trigger_id));
+    }
+    if options.limit > 0 {
+        params.push(format!("limit={}", options.limit));
+    }
+    if params.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", params.join("&"))
+    }
+}
+
 fn trim_base_url(base_url: String) -> String {
     base_url.trim_end_matches('/').to_string()
 }
@@ -1408,6 +1695,10 @@ mod tests {
             "http://localhost:9090/v1/scheduler/jobs"
         );
         assert_eq!(
+            kit.triggers.url("/v1/triggers/v2"),
+            "http://localhost:9090/v1/triggers/v2"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -1466,6 +1757,49 @@ mod tests {
         assert_eq!(
             client.url("/v1/scheduler/jobs"),
             "http://localhost:9090/v1/scheduler/jobs"
+        );
+    }
+
+    #[test]
+    fn trigger_types_deserialize_incremental_bodies() {
+        let list: TriggerListResponse = serde_json::from_str(
+            r#"{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}],"source":"sdk"}],"total":1}"#,
+        )
+        .unwrap();
+        assert_eq!(list.total, 1);
+        assert_eq!(list.triggers[0].id, "tr_1");
+        assert_eq!(list.triggers[0].extra["source"], "sdk");
+
+        let emitted: TriggerEmitResponse =
+            serde_json::from_str(r#"{"status":"emitted","event":"review.done"}"#).unwrap();
+        assert_eq!(emitted.status, "emitted");
+
+        let deleted: TriggerDeleteResponse = serde_json::from_str(r#"{"deleted":"tr_1"}"#).unwrap();
+        assert_eq!(deleted.deleted, "tr_1");
+    }
+
+    #[test]
+    fn triggers_client_trims_base_url_and_queries() {
+        let client =
+            TriggersClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/triggers/v2"),
+            "http://localhost:9090/v1/triggers/v2"
+        );
+        assert_eq!(
+            trigger_list_query(&TriggerListOptions {
+                tenant_id: "default".to_string(),
+                r#type: "event".to_string(),
+                status: "enabled".to_string()
+            }),
+            "?tenant_id=default&type=event&status=enabled"
+        );
+        assert_eq!(
+            trigger_history_query(&TriggerHistoryOptions {
+                trigger_id: "tr_1".to_string(),
+                limit: 2
+            }),
+            "?trigger_id=tr_1&limit=2"
         );
     }
 }

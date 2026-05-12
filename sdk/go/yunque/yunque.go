@@ -290,13 +290,14 @@ func decodeMapResponse(resp map[string]any, target any) error {
 //
 // It is intentionally just a thin bundle over the existing lightweight
 // namespaces, so callers can reach State Kernel, Reflection Experience,
-// Mission Parse, Scheduler, and Plugin API Runtime helpers without linking to
+// Mission Parse, Scheduler, Triggers, and Plugin API Runtime helpers without linking to
 // platform internals or a broad generated client.
 type AgentKit struct {
 	State       *stateNamespace
 	Reflect     *reflectNamespace
 	Missions    *missionsNamespace
 	Scheduler   *schedulerNamespace
+	Triggers    *triggersNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -338,6 +339,187 @@ func (m *missionsNamespace) Parse(ctx context.Context, description string) (Miss
 		out.Config = map[string]any{}
 	}
 	return out, nil
+}
+
+// ── Trigger Automation ──
+
+// Triggers provides focused access to Triggers v2 automation definitions,
+// event emission, and recent trigger history.
+var Triggers = &triggersNamespace{}
+
+type triggersNamespace struct{}
+
+// TriggerDef is a Triggers v2 automation definition.
+type TriggerDef struct {
+	ID       string         `json:"id,omitempty"`
+	Name     string         `json:"name,omitempty"`
+	TenantID string         `json:"tenant_id,omitempty"`
+	Type     string         `json:"type,omitempty"`
+	Status   string         `json:"status,omitempty"`
+	Actions  []any          `json:"actions,omitempty"`
+	Extra    map[string]any `json:"-"`
+}
+
+// TriggerListOptions filters Triggers v2 definitions.
+type TriggerListOptions struct {
+	TenantID string
+	Type     string
+	Status   string
+}
+
+// TriggerListResponse is returned by /v1/triggers/v2.
+type TriggerListResponse struct {
+	Triggers []TriggerDef `json:"triggers"`
+	Total    int          `json:"total"`
+}
+
+// TriggerPayload is accepted by /v1/triggers/v2/emit.
+type TriggerPayload struct {
+	Event     string         `json:"event"`
+	Text      string         `json:"text,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
+	Timestamp time.Time      `json:"timestamp,omitempty"`
+}
+
+// TriggerEmitResponse is returned by /v1/triggers/v2/emit.
+type TriggerEmitResponse struct {
+	Status string `json:"status"`
+	Event  string `json:"event"`
+}
+
+// TriggerDeleteResponse is returned by DELETE /v1/triggers/v2?id=...
+type TriggerDeleteResponse struct {
+	Deleted string `json:"deleted"`
+}
+
+// TriggerHistoryOptions filters trigger runs and events.
+type TriggerHistoryOptions struct {
+	TriggerID string
+	Limit     int
+}
+
+// TriggerRunsResponse is returned by /v1/triggers/v2/runs.
+type TriggerRunsResponse struct {
+	Runs  []map[string]any `json:"runs"`
+	Total int              `json:"total"`
+}
+
+// TriggerEventsResponse is returned by /v1/triggers/v2/events.
+type TriggerEventsResponse struct {
+	Events []map[string]any `json:"events"`
+	Total  int              `json:"total"`
+}
+
+// List returns Triggers v2 definitions with optional tenant/type/status filters.
+func (t *triggersNamespace) List(ctx context.Context, opts TriggerListOptions) (TriggerListResponse, error) {
+	var out TriggerListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/triggers/v2"+triggerListQuery(opts), nil, &out); err != nil {
+		return TriggerListResponse{}, err
+	}
+	if out.Triggers == nil {
+		out.Triggers = []TriggerDef{}
+	}
+	return out, nil
+}
+
+// Get returns one Triggers v2 definition by id.
+func (t *triggersNamespace) Get(ctx context.Context, id string) (TriggerDef, error) {
+	var out TriggerDef
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/triggers/v2?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return TriggerDef{}, err
+	}
+	return out, nil
+}
+
+// Create creates a Triggers v2 definition.
+func (t *triggersNamespace) Create(ctx context.Context, def TriggerDef) (TriggerDef, error) {
+	var out TriggerDef
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/triggers/v2", def, &out); err != nil {
+		return TriggerDef{}, err
+	}
+	return out, nil
+}
+
+// Update updates a Triggers v2 definition.
+func (t *triggersNamespace) Update(ctx context.Context, def TriggerDef) (TriggerDef, error) {
+	var out TriggerDef
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/triggers/v2", def, &out); err != nil {
+		return TriggerDef{}, err
+	}
+	return out, nil
+}
+
+// Delete removes a Triggers v2 definition by id.
+func (t *triggersNamespace) Delete(ctx context.Context, id string) (TriggerDeleteResponse, error) {
+	var out TriggerDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/triggers/v2?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return TriggerDeleteResponse{}, err
+	}
+	return out, nil
+}
+
+// Emit sends an event to the Triggers v2 automation runtime.
+func (t *triggersNamespace) Emit(ctx context.Context, payload TriggerPayload) (TriggerEmitResponse, error) {
+	var out TriggerEmitResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/triggers/v2/emit", payload, &out); err != nil {
+		return TriggerEmitResponse{}, err
+	}
+	return out, nil
+}
+
+// Runs lists recent trigger runs.
+func (t *triggersNamespace) Runs(ctx context.Context, opts TriggerHistoryOptions) (TriggerRunsResponse, error) {
+	var out TriggerRunsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/triggers/v2/runs"+triggerHistoryQuery(opts), nil, &out); err != nil {
+		return TriggerRunsResponse{}, err
+	}
+	if out.Runs == nil {
+		out.Runs = []map[string]any{}
+	}
+	return out, nil
+}
+
+// Events lists recent trigger events.
+func (t *triggersNamespace) Events(ctx context.Context, opts TriggerHistoryOptions) (TriggerEventsResponse, error) {
+	var out TriggerEventsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/triggers/v2/events"+triggerHistoryQuery(opts), nil, &out); err != nil {
+		return TriggerEventsResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []map[string]any{}
+	}
+	return out, nil
+}
+
+func triggerListQuery(opts TriggerListOptions) string {
+	q := url.Values{}
+	if opts.TenantID != "" {
+		q.Set("tenant_id", opts.TenantID)
+	}
+	if opts.Type != "" {
+		q.Set("type", opts.Type)
+	}
+	if opts.Status != "" {
+		q.Set("status", opts.Status)
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
+}
+
+func triggerHistoryQuery(opts TriggerHistoryOptions) string {
+	q := url.Values{}
+	if opts.TriggerID != "" {
+		q.Set("trigger_id", opts.TriggerID)
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
 }
 
 // ── Prompt Scheduler ──
@@ -400,13 +582,14 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 }
 
 // NewAgentKit returns a lightweight bundle of state, reflection, mission parse,
-// scheduler, and plugin runtime helpers.
+// scheduler, triggers, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
 		State:       State,
 		Reflect:     Reflect,
 		Missions:    Missions,
 		Scheduler:   Scheduler,
+		Triggers:    Triggers,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

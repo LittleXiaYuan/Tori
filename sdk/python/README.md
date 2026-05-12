@@ -109,3 +109,21 @@ root:
 python sdk/python/examples/state_snapshot.py
 python sdk/python/examples/reflect_strategies.py
 ```
+
+
+## Triggers 触发器自动化切片
+
+Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。
+
+```python
+defs = yunque.triggers.list(status="enabled")
+created = yunque.triggers.create({
+    "name": "review done",
+    "tenant_id": "default",
+    "type": "event",
+    "actions": [{"kind": "notify"}],
+})
+yunque.triggers.emit("review.done", data={"task_id": "task_1"})
+runs = yunque.triggers.runs(trigger_id=created["id"], limit=10)
+print(defs["total"], runs["total"])
+```

@@ -20,7 +20,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
-Reflection Experience, Mission Parse, Scheduler, and Plugin API Runtime. It reuses the same small
+Reflection Experience, Mission Parse, Scheduler, Triggers, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -145,4 +145,22 @@ strategies, err := yunque.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrat
     Tag:   "quality:9",
     Limit: 3,
 })
+```
+
+
+### Triggers 触发器自动化切片
+
+Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.Triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。
+
+```go
+defs, err := yunque.Triggers.List(ctx, yunque.TriggerListOptions{Status: "enabled"})
+created, err := yunque.Triggers.Create(ctx, yunque.TriggerDef{
+    Name: "review done", TenantID: "default", Type: "event",
+    Actions: []any{map[string]any{"kind": "notify"}},
+})
+emitted, err := yunque.Triggers.Emit(ctx, yunque.TriggerPayload{
+    Event: "review.done", Data: map[string]any{"task_id": "task_1"},
+})
+runs, err := yunque.Triggers.Runs(ctx, yunque.TriggerHistoryOptions{TriggerID: created.ID, Limit: 10})
+fmt.Println(defs.Total, emitted.Status, runs.Total)
 ```

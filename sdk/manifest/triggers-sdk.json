@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "trigger-automation",
+  "description": "Cross-language lightweight SDK entrypoints for Triggers v2 definitions, event emission, and recent trigger history.",
+  "principles": [
+    "Expose trigger automation as reusable SDK capabilities instead of hiding it behind platform-internal pages.",
+    "Keep trigger read, control, emit, and history helpers narrow so external pages, plugins, CLIs, and automation scripts can compose only what they need.",
+    "Prefer Triggers v2 unified definitions for new SDK consumers while leaving legacy trigger routes to the TypeScript full slice."
+  ],
+  "routes": [
+    "GET /v1/triggers/v2",
+    "POST /v1/triggers/v2",
+    "PUT /v1/triggers/v2",
+    "DELETE /v1/triggers/v2",
+    "POST /v1/triggers/v2/emit",
+    "GET /v1/triggers/v2/runs",
+    "GET /v1/triggers/v2/events"
+  ],
+  "capabilities": [
+    { "name": "list", "route": "GET /v1/triggers/v2", "readOnly": true, "description": "List Triggers v2 definitions with optional filters." },
+    { "name": "get", "route": "GET /v1/triggers/v2", "readOnly": true, "description": "Get one Triggers v2 definition by id." },
+    { "name": "create", "route": "POST /v1/triggers/v2", "readOnly": false, "description": "Create a Triggers v2 definition." },
+    { "name": "update", "route": "PUT /v1/triggers/v2", "readOnly": false, "description": "Update a Triggers v2 definition." },
+    { "name": "delete", "route": "DELETE /v1/triggers/v2", "readOnly": false, "description": "Delete a Triggers v2 definition by id." },
+    { "name": "emit", "route": "POST /v1/triggers/v2/emit", "readOnly": false, "description": "Emit an event to the trigger runtime." },
+    { "name": "runs", "route": "GET /v1/triggers/v2/runs", "readOnly": true, "description": "List recent trigger runs." },
+    { "name": "events", "route": "GET /v1/triggers/v2/events", "readOnly": true, "description": "List recent trigger events." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/triggers.ts", "sdk/typescript/src/triggers-read.ts", "sdk/typescript/src/triggers-control.ts", "sdk/typescript/src/trigger-definitions.ts", "sdk/typescript/src/trigger-definition-control.ts", "sdk/typescript/src/trigger-history.ts", "sdk/typescript/src/trigger-emit.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "list": "yunque-client/triggers-read#createTriggersReadClient().list",
+        "get": "yunque-client/triggers-read#createTriggersReadClient().get",
+        "create": "yunque-client/triggers-control#createTriggersControlClient().create",
+        "update": "yunque-client/triggers-control#createTriggersControlClient().update",
+        "delete": "yunque-client/triggers-control#createTriggersControlClient().delete",
+        "emit": "yunque-client/trigger-emit#createTriggerEmitClient().emit",
+        "runs": "yunque-client/trigger-history#createTriggerHistoryClient().runs",
+        "events": "yunque-client/trigger-history#createTriggerHistoryClient().events"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "list": "yunque.Triggers.List",
+        "get": "yunque.Triggers.Get",
+        "create": "yunque.Triggers.Create",
+        "update": "yunque.Triggers.Update",
+        "delete": "yunque.Triggers.Delete",
+        "emit": "yunque.Triggers.Emit",
+        "runs": "yunque.Triggers.Runs",
+        "events": "yunque.Triggers.Events"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "list": "yunque.triggers.list",
+        "get": "yunque.triggers.get",
+        "create": "yunque.triggers.create",
+        "update": "yunque.triggers.update",
+        "delete": "yunque.triggers.delete",
+        "emit": "yunque.triggers.emit",
+        "runs": "yunque.triggers.runs",
+        "events": "yunque.triggers.events"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "list": "TriggersClient::list",
+        "get": "TriggersClient::get",
+        "create": "TriggersClient::create",
+        "update": "TriggersClient::update",
+        "delete": "TriggersClient::delete",
+        "emit": "TriggersClient::emit",
+        "runs": "TriggersClient::runs",
+        "events": "TriggersClient::events"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}
