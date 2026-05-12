@@ -35,6 +35,7 @@
     "runtime-operations",
     "subagent-orchestration",
     "tool-processes",
+    "audit-governance",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -155,6 +156,10 @@
       "description": "Access the lightweight Tools client or namespace for process execution sessions, listing, polling, and kill controls."
     },
     {
+      "name": "audit",
+      "description": "Access the lightweight Audit client or namespace for audit-chain tail, verification, stats, and task audit-trail reads."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -232,6 +237,7 @@
         "runtime": "AgentKit.runtime",
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
+        "audit": "AgentKit.audit",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -282,6 +288,7 @@
         "runtime": "AgentKit.Runtime",
         "subagents": "AgentKit.Subagents",
         "tools": "AgentKit.Tools",
+        "audit": "AgentKit.Audit",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -332,6 +339,7 @@
         "runtime": "AgentKit.runtime",
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
+        "audit": "AgentKit.audit",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -382,6 +390,7 @@
         "runtime": "AgentKit::runtime",
         "subagents": "AgentKit::subagents",
         "tools": "AgentKit::tools",
+        "audit": "AgentKit::audit",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

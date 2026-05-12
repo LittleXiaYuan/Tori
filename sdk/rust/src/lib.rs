@@ -1389,6 +1389,7 @@ pub struct AgentKit {
     pub runtime: RuntimeClient,
     pub subagents: SubagentsClient,
     pub tools: ToolsClient,
+    pub audit: AuditClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1447,6 +1448,7 @@ impl AgentKit {
             runtime: RuntimeClient::new(base_url.clone(), token.as_ref())?,
             subagents: SubagentsClient::new(base_url.clone(), token.as_ref())?,
             tools: ToolsClient::new(base_url.clone(), token.as_ref())?,
+            audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1498,6 +1500,7 @@ impl AgentKit {
             runtime: RuntimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             subagents: SubagentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tools: ToolsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3572,6 +3575,171 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuditTailQuery {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub n: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub actor: String,
+}
+
+pub type AuditRecord = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuditTailResponse {
+    #[serde(default)]
+    pub records: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub count: i32,
+    #[serde(default)]
+    pub error: String,
+}
+
+pub type AuditVerifyResponse = serde_json::Value;
+pub type AuditStatsResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuditTrailQuery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub date: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub r#type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AuditTrailResponse {
+    #[serde(default)]
+    pub entries: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+/// Small Rust helper over Merkle audit-chain and task audit-trail read endpoints.
+#[derive(Debug, Clone)]
+pub struct AuditClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl AuditClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn tail(&self, query: &AuditTailQuery) -> Result<AuditTailResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!("/v1/audit/tail{}", audit_tail_query(query))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn verify(&self) -> Result<AuditVerifyResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/audit/verify"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn stats(&self) -> Result<AuditStatsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/audit/stats"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn trail(
+        &self,
+        query: &AuditTrailQuery,
+    ) -> Result<AuditTrailResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!("/api/audit/trail{}", audit_trail_query(query))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+fn audit_tail_query(query: &AuditTailQuery) -> String {
+    let mut pairs = Vec::new();
+    if query.n > 0 {
+        pairs.push(format!("n={}", query.n));
+    }
+    if !query.r#type.is_empty() {
+        pairs.push(format!(
+            "type={}",
+            url_encode_query_component(&query.r#type)
+        ));
+    }
+    if !query.actor.is_empty() {
+        pairs.push(format!(
+            "actor={}",
+            url_encode_query_component(&query.actor)
+        ));
+    }
+    if pairs.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", pairs.join("&"))
+    }
+}
+
+fn audit_trail_query(query: &AuditTrailQuery) -> String {
+    let mut pairs = Vec::new();
+    if !query.date.is_empty() {
+        pairs.push(format!("date={}", url_encode_query_component(&query.date)));
+    }
+    if !query.r#type.is_empty() {
+        pairs.push(format!(
+            "type={}",
+            url_encode_query_component(&query.r#type)
+        ));
+    }
+    if pairs.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", pairs.join("&"))
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct ToolExecOptions {
@@ -7476,6 +7644,10 @@ mod tests {
             "http://localhost:9090/v1/tools/list"
         );
         assert_eq!(
+            kit.audit.url("/v1/audit/tail"),
+            "http://localhost:9090/v1/audit/tail"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -7798,6 +7970,34 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn audit_helpers_build_urls_and_types() {
+        let client = AuditClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/audit/tail"),
+            "http://localhost:9090/v1/audit/tail"
+        );
+        assert_eq!(
+            audit_tail_query(&AuditTailQuery {
+                n: 10,
+                r#type: "system event".to_string(),
+                actor: "tenant".to_string(),
+            }),
+            "?n=10&type=system+event&actor=tenant"
+        );
+        assert_eq!(
+            audit_trail_query(&AuditTrailQuery {
+                date: "2026-05-11".to_string(),
+                r#type: "nl_config".to_string(),
+            }),
+            "?date=2026-05-11&type=nl_config"
+        );
+        let tail: AuditTailResponse =
+            serde_json::from_str(r#"{"records":[{"id":"r1","type":"system"}],"count":1}"#).unwrap();
+        assert_eq!(tail.count, 1);
+        assert_eq!(tail.records[0]["id"], "r1");
     }
 
     #[test]

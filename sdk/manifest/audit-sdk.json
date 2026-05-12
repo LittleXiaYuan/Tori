@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "domain": "audit-governance",
+  "description": "Cross-language lightweight SDK entrypoints for Merkle audit-chain and task audit-trail reads without importing the full platform client.",
+  "principles": [
+    "Expose audit tail, verification, stats, and trail reads as a focused SDK slice for external compliance pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep audit access read-only and directly callable through the same authenticated routes used by the platform.",
+    "Make Audit access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /v1/audit/tail",
+    "GET /v1/audit/verify",
+    "GET /v1/audit/stats",
+    "GET /api/audit/trail"
+  ],
+  "capabilities": [
+    {
+      "name": "tail",
+      "route": "GET /v1/audit/tail",
+      "readOnly": true,
+      "description": "Read recent audit-chain records with optional filters."
+    },
+    {
+      "name": "verify",
+      "route": "GET /v1/audit/verify",
+      "readOnly": true,
+      "description": "Verify Merkle audit-chain continuity."
+    },
+    {
+      "name": "stats",
+      "route": "GET /v1/audit/stats",
+      "readOnly": true,
+      "description": "Read audit-chain aggregate stats."
+    },
+    {
+      "name": "trail",
+      "route": "GET /api/audit/trail",
+      "readOnly": true,
+      "description": "Read task audit-trail entries by date/type."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/audit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "tail": "createAuditClient().tail",
+        "verify": "createAuditClient().verify",
+        "stats": "createAuditClient().stats",
+        "trail": "createAuditClient().trail"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "tail": "yunque.Audit.Tail",
+        "verify": "yunque.Audit.Verify",
+        "stats": "yunque.Audit.Stats",
+        "trail": "yunque.Audit.Trail"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "tail": "yunque.audit.tail",
+        "verify": "yunque.audit.verify",
+        "stats": "yunque.audit.stats",
+        "trail": "yunque.audit.trail"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "tail": "AuditClient::tail",
+        "verify": "AuditClient::verify",
+        "stats": "AuditClient::stats",
+        "trail": "AuditClient::trail"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

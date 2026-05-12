@@ -35,6 +35,7 @@ import { createBrowserClient, type BrowserClient, type BrowserClientOptions } fr
 import { createRuntimeClient, type RuntimeClient, type RuntimeClientOptions } from "./runtime.js";
 import { createSubagentsClient, type SubagentsClient, type SubagentsClientOptions } from "./subagents.js";
 import { createToolsClient, type ToolsClient, type ToolsClientOptions } from "./tools.js";
+import { createAuditClient, type AuditClient, type AuditClientOptions } from "./audit.js";
 
 export type AgentKitOptions = {
   baseUrl: string;
@@ -81,6 +82,7 @@ export type AgentKit = {
   runtime: RuntimeClient;
   subagents: SubagentsClient;
   tools: ToolsClient;
+  audit: AuditClient;
   plugin: PluginApiClient;
 };
 
@@ -97,7 +99,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions & WorkflowClientOptions & ConnectorsClientOptions & NotifyClientOptions & ProjectsClientOptions & SkillMarketClientOptions & DispatchClientOptions & OrchestratorClientOptions & ForkClientOptions & CostClientOptions & ProvidersClientOptions & CognisClientOptions & TraceClientOptions & HeartbeatClientOptions & EventStreamClientOptions & ReverieClientOptions & RealtimeClientOptions & ChatClientOptions & ConversationsClientOptions & ApprovalsClientOptions & RBACClientOptions & FilesClientOptions & BrowserClientOptions & RuntimeClientOptions & SubagentsClientOptions & ToolsClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions & WorkflowClientOptions & ConnectorsClientOptions & NotifyClientOptions & ProjectsClientOptions & SkillMarketClientOptions & DispatchClientOptions & OrchestratorClientOptions & ForkClientOptions & CostClientOptions & ProvidersClientOptions & CognisClientOptions & TraceClientOptions & HeartbeatClientOptions & EventStreamClientOptions & ReverieClientOptions & RealtimeClientOptions & ChatClientOptions & ConversationsClientOptions & ApprovalsClientOptions & RBACClientOptions & FilesClientOptions & BrowserClientOptions & RuntimeClientOptions & SubagentsClientOptions & ToolsClientOptions & AuditClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -142,10 +144,11 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     runtime: createRuntimeClient(common),
     subagents: createSubagentsClient(common),
     tools: createToolsClient(common),
+    audit: createAuditClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient, createWorkflowClient, createConnectorsClient, createNotifyClient, createProjectsClient, createSkillMarketClient, createDispatchClient, createOrchestratorClient, createForkClient, createCostClient, createProvidersClient, createCognisClient, createTraceClient, createHeartbeatClient, createEventsClient, createReverieClient, createRealtimeClient, createChatClient, createConversationsClient, createApprovalsClient, createRBACClient, createFilesClient, createBrowserClient, createRuntimeClient, createSubagentsClient, createToolsClient };
-export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions, WorkflowClient, WorkflowClientOptions, ConnectorsClient, ConnectorsClientOptions, NotifyClient, NotifyClientOptions, ProjectsClient, ProjectsClientOptions, SkillMarketClient, SkillMarketClientOptions, DispatchClient, DispatchClientOptions, OrchestratorClient, OrchestratorClientOptions, ForkClient, ForkClientOptions, CostClient, CostClientOptions, ProvidersClient, ProvidersClientOptions, CognisClient, CognisClientOptions, TraceClient, TraceClientOptions, HeartbeatClient, HeartbeatClientOptions, EventsClient, EventStreamClientOptions, ReverieClient, ReverieClientOptions, RealtimeClient, RealtimeClientOptions, ChatClient, ChatClientOptions, ConversationsClient, ConversationsClientOptions, ApprovalsClient, ApprovalsClientOptions, RBACClient, RBACClientOptions, FilesClient, FilesClientOptions, BrowserClient, BrowserClientOptions, RuntimeClient, RuntimeClientOptions, SubagentsClient, SubagentsClientOptions, ToolsClient, ToolsClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient, createWorkflowClient, createConnectorsClient, createNotifyClient, createProjectsClient, createSkillMarketClient, createDispatchClient, createOrchestratorClient, createForkClient, createCostClient, createProvidersClient, createCognisClient, createTraceClient, createHeartbeatClient, createEventsClient, createReverieClient, createRealtimeClient, createChatClient, createConversationsClient, createApprovalsClient, createRBACClient, createFilesClient, createBrowserClient, createRuntimeClient, createSubagentsClient, createToolsClient, createAuditClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions, WorkflowClient, WorkflowClientOptions, ConnectorsClient, ConnectorsClientOptions, NotifyClient, NotifyClientOptions, ProjectsClient, ProjectsClientOptions, SkillMarketClient, SkillMarketClientOptions, DispatchClient, DispatchClientOptions, OrchestratorClient, OrchestratorClientOptions, ForkClient, ForkClientOptions, CostClient, CostClientOptions, ProvidersClient, ProvidersClientOptions, CognisClient, CognisClientOptions, TraceClient, TraceClientOptions, HeartbeatClient, HeartbeatClientOptions, EventsClient, EventStreamClientOptions, ReverieClient, ReverieClientOptions, RealtimeClient, RealtimeClientOptions, ChatClient, ChatClientOptions, ConversationsClient, ConversationsClientOptions, ApprovalsClient, ApprovalsClientOptions, RBACClient, RBACClientOptions, FilesClient, FilesClientOptions, BrowserClient, BrowserClientOptions, RuntimeClient, RuntimeClientOptions, SubagentsClient, SubagentsClientOptions, ToolsClient, ToolsClientOptions, AuditClient, AuditClientOptions };
 

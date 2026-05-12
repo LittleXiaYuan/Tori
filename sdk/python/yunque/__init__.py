@@ -603,6 +603,33 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Audit chain and trail (/v1/audit, /api/audit) ──
+
+class _AuditNamespace:
+    """Lightweight helpers for Merkle audit-chain and task audit-trail reads."""
+
+    def tail(self, n: int = 0, type: str = "", actor: str = "") -> dict:
+        from urllib.parse import urlencode
+        query = {k: v for k, v in {"n": n or None, "type": type or None, "actor": actor or None}.items() if v is not None}
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/v1/audit/tail{suffix}")
+
+    def verify(self) -> dict:
+        return _api_call("GET", "/v1/audit/verify")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/audit/stats")
+
+    def trail(self, date: str = "", type: str = "") -> dict:
+        from urllib.parse import urlencode
+        query = {k: v for k, v in {"date": date or None, "type": type or None}.items() if v is not None}
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/api/audit/trail{suffix}")
+
+
+audit = _AuditNamespace()
+
 # ── Tools process execution (/v1/tools/*) ──
 
 class _ToolsNamespace:
@@ -1985,6 +2012,7 @@ class AgentKit:
         self.runtime = runtime
         self.subagents = subagents
         self.tools = tools
+        self.audit = audit
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

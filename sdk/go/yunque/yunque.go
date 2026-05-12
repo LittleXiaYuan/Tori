@@ -321,6 +321,7 @@ type AgentKit struct {
 	Runtime       *runtimeNamespace
 	Subagents     *subagentsNamespace
 	Tools         *toolsNamespace
+	Audit         *auditNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1842,6 +1843,9 @@ var Subagents = &subagentsNamespace{}
 // Tools provides focused access to controlled tool process execution sessions.
 var Tools = &toolsNamespace{}
 
+// Audit provides focused access to Merkle audit chain and task audit trail reads.
+var Audit = &auditNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2765,6 +2769,100 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Audit Chain and Trail ──
+
+type auditNamespace struct{}
+
+type AuditTailOptions struct {
+	N     int
+	Type  string
+	Actor string
+}
+
+type AuditRecord map[string]any
+type AuditTailResponse struct {
+	Records []AuditRecord `json:"records"`
+	Count   int           `json:"count"`
+	Error   string        `json:"error,omitempty"`
+}
+
+type AuditVerifyResponse map[string]any
+type AuditStatsResponse map[string]any
+
+type AuditTrailOptions struct {
+	Date string
+	Type string
+}
+
+type AuditTrailEntry map[string]any
+type AuditTrailResponse struct {
+	Entries []AuditTrailEntry `json:"entries"`
+	Count   int               `json:"count"`
+}
+
+func auditTailQuery(opts AuditTailOptions) string {
+	q := url.Values{}
+	if opts.N > 0 {
+		q.Set("n", strconv.Itoa(opts.N))
+	}
+	if opts.Type != "" {
+		q.Set("type", opts.Type)
+	}
+	if opts.Actor != "" {
+		q.Set("actor", opts.Actor)
+	}
+	if encoded := q.Encode(); encoded != "" {
+		return "?" + encoded
+	}
+	return ""
+}
+
+func auditTrailQuery(opts AuditTrailOptions) string {
+	q := url.Values{}
+	if opts.Date != "" {
+		q.Set("date", opts.Date)
+	}
+	if opts.Type != "" {
+		q.Set("type", opts.Type)
+	}
+	if encoded := q.Encode(); encoded != "" {
+		return "?" + encoded
+	}
+	return ""
+}
+
+func (a *auditNamespace) Tail(ctx context.Context, opts AuditTailOptions) (AuditTailResponse, error) {
+	var out AuditTailResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/audit/tail"+auditTailQuery(opts), nil, &out); err != nil {
+		return AuditTailResponse{}, err
+	}
+	return out, nil
+}
+
+func (a *auditNamespace) Verify(ctx context.Context) (AuditVerifyResponse, error) {
+	var out AuditVerifyResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/audit/verify", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *auditNamespace) Stats(ctx context.Context) (AuditStatsResponse, error) {
+	var out AuditStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/audit/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *auditNamespace) Trail(ctx context.Context, opts AuditTrailOptions) (AuditTrailResponse, error) {
+	var out AuditTrailResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/audit/trail"+auditTrailQuery(opts), nil, &out); err != nil {
+		return AuditTrailResponse{}, err
+	}
+	return out, nil
 }
 
 // ── Tools Process Execution ──
@@ -3889,6 +3987,7 @@ func NewAgentKit() AgentKit {
 		Runtime:       Runtime,
 		Subagents:     Subagents,
 		Tools:         Tools,
+		Audit:         Audit,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
