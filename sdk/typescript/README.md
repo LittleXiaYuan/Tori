@@ -230,6 +230,8 @@ import { createSpeechVoicesClient } from "yunque-client/speech-voices";
 import { createAdminClient } from "yunque-client/admin";
 import { createFilesClient } from "yunque-client/files";
 import { createCronClient } from "yunque-client/cron";
+import { createCronReadClient } from "yunque-client/cron-read";
+import { createCronControlClient } from "yunque-client/cron-control";
 import { createSkillHubClient } from "yunque-client/skillhub";
 import { createSkillHubCatalogClient } from "yunque-client/skillhub-catalog";
 import { createSkillHubInstallClient } from "yunque-client/skillhub-install";
@@ -1400,6 +1402,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |
+| `src/cron-read.ts` | Lightweight cron job listing facade without scheduling or run-now APIs |
+| `src/cron-control.ts` | Lightweight cron add/remove/run-now facade without listing APIs |
 | `src/skillhub.ts` | Lightweight hand-written SkillHub search/install/update/policy slice |
 | `src/skillhub-catalog.ts` | Lightweight SkillHub search/trending/detail facade without full SDK import |
 | `src/skillhub-install.ts` | Lightweight SkillHub install/update/rollback lifecycle facade without full SDK import |

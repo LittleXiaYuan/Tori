@@ -155,6 +155,8 @@
     "src/admin.ts",
     "src/files.ts",
     "src/cron.ts",
+    "src/cron-read.ts",
+    "src/cron-control.ts",
     "src/skillhub.ts",
     "src/skillhub-catalog.ts",
     "src/skillhub-install.ts",
