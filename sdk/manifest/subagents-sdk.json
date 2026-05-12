@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "domain": "subagent-orchestration",
+  "description": "Cross-language lightweight SDK entrypoints for listing, spawning, messaging, and deleting subagents without importing the full platform client.",
+  "principles": [
+    "Expose subagent orchestration as a focused SDK slice for external operator pages, plugin UIs, CLIs, and automation scripts.",
+    "Keep spawn/list/message/delete helpers directly callable without coupling callers to platform internals.",
+    "Make Subagents access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /v1/subagent",
+    "GET /v1/subagent?id=...",
+    "POST /v1/subagent",
+    "DELETE /v1/subagent?id=...",
+    "POST /v1/subagent/message"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/subagent",
+      "readOnly": true,
+      "description": "List subagents, optionally scoped by parent_id."
+    },
+    {
+      "name": "get",
+      "route": "GET /v1/subagent?id=...",
+      "readOnly": true,
+      "description": "Read one subagent by id."
+    },
+    {
+      "name": "spawn",
+      "route": "POST /v1/subagent",
+      "readOnly": false,
+      "description": "Spawn a subagent with parent, name, description, and skills."
+    },
+    {
+      "name": "destroy",
+      "route": "DELETE /v1/subagent?id=...",
+      "readOnly": false,
+      "description": "Delete a subagent by id."
+    },
+    {
+      "name": "appendMessages",
+      "route": "POST /v1/subagent/message",
+      "readOnly": false,
+      "description": "Append messages to a subagent conversation."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/subagents.ts",
+        "sdk/typescript/src/subagents-read.ts",
+        "sdk/typescript/src/subagents-control.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createSubagentsClient().list",
+        "get": "createSubagentsClient().get",
+        "spawn": "createSubagentsClient().spawn",
+        "destroy": "createSubagentsClient().destroy",
+        "appendMessages": "createSubagentsClient().appendMessages"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Subagents.List",
+        "get": "yunque.Subagents.Get",
+        "spawn": "yunque.Subagents.Spawn",
+        "destroy": "yunque.Subagents.Destroy",
+        "appendMessages": "yunque.Subagents.AppendMessages"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.subagents.list",
+        "get": "yunque.subagents.get",
+        "spawn": "yunque.subagents.spawn",
+        "destroy": "yunque.subagents.destroy",
+        "appendMessages": "yunque.subagents.append_messages"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "SubagentsClient::list",
+        "get": "SubagentsClient::get",
+        "spawn": "SubagentsClient::spawn",
+        "destroy": "SubagentsClient::destroy",
+        "appendMessages": "SubagentsClient::append_messages"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

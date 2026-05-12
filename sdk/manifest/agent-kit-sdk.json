@@ -33,6 +33,7 @@
     "proactive-heartbeat",
     "server-sent-events",
     "runtime-operations",
+    "subagent-orchestration",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -145,6 +146,10 @@
       "description": "Access the lightweight Runtime operations client or namespace for session queue inspection/cancellation and runtime event streams."
     },
     {
+      "name": "subagents",
+      "description": "Access the lightweight Subagents client or namespace for spawn, list, message append, and deletion."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -220,6 +225,7 @@
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
+        "subagents": "AgentKit.subagents",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -268,6 +274,7 @@
         "heartbeat": "AgentKit.Heartbeat",
         "events": "AgentKit.Events",
         "runtime": "AgentKit.Runtime",
+        "subagents": "AgentKit.Subagents",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -316,6 +323,7 @@
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
+        "subagents": "AgentKit.subagents",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -364,6 +372,7 @@
         "heartbeat": "AgentKit::heartbeat",
         "events": "AgentKit::events",
         "runtime": "AgentKit::runtime",
+        "subagents": "AgentKit::subagents",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

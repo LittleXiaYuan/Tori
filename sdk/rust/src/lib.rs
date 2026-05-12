@@ -1387,6 +1387,7 @@ pub struct AgentKit {
     pub heartbeat: HeartbeatClient,
     pub events: EventsClient,
     pub runtime: RuntimeClient,
+    pub subagents: SubagentsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1443,6 +1444,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
             events: EventsClient::new(base_url.clone(), token.as_ref())?,
             runtime: RuntimeClient::new(base_url.clone(), token.as_ref())?,
+            subagents: SubagentsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1492,6 +1494,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
             events: EventsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             runtime: RuntimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            subagents: SubagentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3566,6 +3569,154 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct Subagent {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub parent_id: String,
+    #[serde(default)]
+    pub messages: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SubagentsResponse {
+    #[serde(default)]
+    pub subagents: Vec<Subagent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SpawnSubagentRequest {
+    #[serde(default)]
+    pub parent_id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub skills: Vec<String>,
+}
+
+pub type SubagentMessage = serde_json::Map<String, serde_json::Value>;
+pub type AppendSubagentMessagesResponse = serde_json::Value;
+pub type DeleteSubagentResponse = serde_json::Value;
+
+/// Small Rust helper over `/v1/subagent` and `/v1/subagent/message` endpoints.
+#[derive(Debug, Clone)]
+pub struct SubagentsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl SubagentsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self, parent_id: &str) -> Result<SubagentsResponse, reqwest::Error> {
+        let path = if parent_id.is_empty() {
+            "/v1/subagent".to_string()
+        } else {
+            format!(
+                "/v1/subagent?parent_id={}",
+                url_encode_query_component(parent_id)
+            )
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn get(&self, id: &str) -> Result<Subagent, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/subagent?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn spawn(&self, request: &SpawnSubagentRequest) -> Result<Subagent, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/subagent"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn destroy(&self, id: &str) -> Result<DeleteSubagentResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/subagent?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn append_messages(
+        &self,
+        id: &str,
+        messages: &[serde_json::Value],
+    ) -> Result<AppendSubagentMessagesResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/subagent/message"))
+            .json(&serde_json::json!({"id": id, "messages": messages}))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
 
 pub type RuntimeQueueTask = serde_json::Map<String, serde_json::Value>;
 pub type RuntimeQueueOverviewResponse = serde_json::Value;
@@ -7176,6 +7327,10 @@ mod tests {
             "http://localhost:9090/v1/sessions/queue"
         );
         assert_eq!(
+            kit.subagents.url("/v1/subagent"),
+            "http://localhost:9090/v1/subagent"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -7498,6 +7653,35 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn subagents_helpers_build_urls_and_types() {
+        let client =
+            SubagentsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/subagent"),
+            "http://localhost:9090/v1/subagent"
+        );
+        assert_eq!(
+            client.url(&format!(
+                "/v1/subagent?parent_id={}",
+                url_encode_query_component("task 1")
+            )),
+            "http://localhost:9090/v1/subagent?parent_id=task+1"
+        );
+        let listed: SubagentsResponse = serde_json::from_str(
+            r#"{"subagents":[{"id":"sa-1","name":"reviewer","skills":["review"]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(listed.subagents[0].id, "sa-1");
+        let spawned = SpawnSubagentRequest {
+            parent_id: "task-1".to_string(),
+            name: "planner".to_string(),
+            description: "计划拆解".to_string(),
+            skills: vec!["plan".to_string()],
+        };
+        assert_eq!(spawned.skills[0], "plan");
     }
 
     #[test]

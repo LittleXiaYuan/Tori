@@ -601,6 +601,35 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Subagents (/v1/subagent) ──
+
+class _SubagentsNamespace:
+    """Lightweight helpers for subagent listing, spawning, messaging, and deletion."""
+
+    def list(self, parent_id: str = "") -> dict:
+        if parent_id:
+            from urllib.parse import urlencode
+            return _api_call("GET", f"/v1/subagent?{urlencode({'parent_id': parent_id})}")
+        return _api_call("GET", "/v1/subagent")
+
+    def get(self, subagent_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/subagent?{urlencode({'id': subagent_id})}")
+
+    def spawn(self, name: str, parent_id: str = "", description: str = "", skills: Optional[list[str]] = None) -> dict:
+        return _api_call("POST", "/v1/subagent", {"parent_id": parent_id, "name": name, "description": description, "skills": skills or []})
+
+    def destroy(self, subagent_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/subagent?{urlencode({'id': subagent_id})}")
+
+    def append_messages(self, subagent_id: str, messages: list[dict]) -> dict:
+        return _api_call("POST", "/v1/subagent/message", {"id": subagent_id, "messages": messages})
+
+
+subagents = _SubagentsNamespace()
+
 # ── Runtime Queue and Events (/v1/sessions/queue, /v1/events/stream) ──
 
 class _RuntimeNamespace:
@@ -1931,6 +1960,7 @@ class AgentKit:
         self.files = files
         self.browser = browser
         self.runtime = runtime
+        self.subagents = subagents
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
