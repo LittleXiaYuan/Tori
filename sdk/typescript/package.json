@@ -607,6 +607,14 @@
       "types": "./src/audit-chain.ts",
       "import": "./src/audit-chain.ts"
     },
+    "./audit-tail": {
+      "types": "./src/audit-tail.ts",
+      "import": "./src/audit-tail.ts"
+    },
+    "./audit-verify": {
+      "types": "./src/audit-verify.ts",
+      "import": "./src/audit-verify.ts"
+    },
     "./audit-trail": {
       "types": "./src/audit-trail.ts",
       "import": "./src/audit-trail.ts"

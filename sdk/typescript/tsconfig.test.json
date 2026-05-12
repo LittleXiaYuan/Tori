@@ -166,6 +166,8 @@
     "src/skillgrow.ts",
     "src/audit.ts",
     "src/audit-chain.ts",
+    "src/audit-tail.ts",
+    "src/audit-verify.ts",
     "src/audit-trail.ts",
     "src/heartbeat.ts",
     "src/heartbeat-observe.ts",
