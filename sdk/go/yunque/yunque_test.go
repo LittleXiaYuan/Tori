@@ -147,6 +147,58 @@ func TestSpeechHelpers(t *testing.T) {
 	}
 }
 
+func TestSetupHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/setup/detect":
+			_, _ = w.Write([]byte(`{"has_docker":true,"has_ollama":true}`))
+		case "/v1/setup/health":
+			_, _ = w.Write([]byte(`{"providers":[{"id":"ollama","available":true}]}`))
+		case "/v1/setup/templates":
+			_, _ = w.Write([]byte(`{"templates":[{"id":"local"}],"count":1}`))
+		case "/v1/setup/test-provider":
+			var body SetupTestProviderRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.BaseURL != "http://127.0.0.1:11434" || body.Model != "qwen" {
+				t.Fatalf("unexpected setup provider body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/v1/setup/apply":
+			var body SetupApplyRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TemplateID != "local" || body.BaseURL == "" || body.Model == "" {
+				t.Fatalf("unexpected setup apply body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"applied","restart_required":true}`))
+		case "/v1/setup/install-component":
+			_, _ = w.Write([]byte(`{"success":true,"message":"installed"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	detect, _ := Setup.Detect(ctx)
+	health, _ := Setup.Health(ctx)
+	templates, _ := Setup.Templates(ctx)
+	tested, _ := Setup.TestProvider(ctx, SetupTestProviderRequest{BaseURL: "http://127.0.0.1:11434", Model: "qwen"})
+	applied, _ := Setup.Apply(ctx, SetupApplyRequest{TemplateID: "local", BaseURL: "http://127.0.0.1:11434", Model: "qwen", Overrides: map[string]any{"sandbox_tier": "local"}})
+	installed, _ := Setup.InstallComponent(ctx, "python_office")
+	if detect["has_docker"] != true || len(health["providers"].([]any)) != 1 || templates["count"].(float64) != 1 || tested["ok"] != true || applied["status"] != "applied" || installed["success"] != true || NewAgentKit().Setup != Setup {
+		t.Fatalf("unexpected setup results")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 setup API calls, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestSettingsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

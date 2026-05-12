@@ -1400,6 +1400,7 @@ pub struct AgentKit {
     pub backup: BackupClient,
     pub tori: ToriClient,
     pub speech: SpeechClient,
+    pub setup: SetupClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1473,6 +1474,7 @@ impl AgentKit {
             backup: BackupClient::new(base_url.clone(), token.as_ref())?,
             tori: ToriClient::new(base_url.clone(), token.as_ref())?,
             speech: SpeechClient::new(base_url.clone(), token.as_ref())?,
+            setup: SetupClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1542,6 +1544,7 @@ impl AgentKit {
             backup: BackupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tori: ToriClient::new_with_client(base_url.clone(), plugin_http.clone()),
             speech: SpeechClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            setup: SetupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5540,6 +5543,59 @@ impl SpeechClient {
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
 }
 
+pub type SetupDetectResponse = serde_json::Value;
+pub type SetupHealthResponse = serde_json::Value;
+pub type SetupTemplatesResponse = serde_json::Value;
+pub type SetupTestProviderResponse = serde_json::Value;
+pub type SetupApplyResponse = serde_json::Value;
+pub type SetupInstallComponentResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SetupTestProviderRequest {
+    pub base_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SetupApplyRequest {
+    pub template_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overrides: Option<serde_json::Value>,
+}
+
+/// Lightweight Setup SDK client for first-run detection, templates, provider tests, apply, and component install.
+#[derive(Debug, Clone)]
+pub struct SetupClient { base_url: String, http: reqwest::Client }
+
+impl SetupClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn detect(&self) -> Result<SetupDetectResponse, reqwest::Error> { self.get_json("/v1/setup/detect").await }
+    pub async fn health(&self) -> Result<SetupHealthResponse, reqwest::Error> { self.get_json("/v1/setup/health").await }
+    pub async fn templates(&self) -> Result<SetupTemplatesResponse, reqwest::Error> { self.get_json("/v1/setup/templates").await }
+    pub async fn test_provider(&self, request: &SetupTestProviderRequest) -> Result<SetupTestProviderResponse, reqwest::Error> { self.post_json("/v1/setup/test-provider", request).await }
+    pub async fn apply(&self, request: &SetupApplyRequest) -> Result<SetupApplyResponse, reqwest::Error> { self.post_json("/v1/setup/apply", request).await }
+    pub async fn install_component(&self, component_id: impl AsRef<str>) -> Result<SetupInstallComponentResponse, reqwest::Error> {
+        self.post_json("/v1/setup/install-component", &serde_json::json!({"component_id": component_id.as_ref()})).await
+    }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type SettingsSchemaResponse = serde_json::Value;
 pub type SettingsConfigResponse = serde_json::Value;
 pub type SettingsUpdateResponse = serde_json::Value;
@@ -9479,6 +9535,23 @@ mod tests {
         let tts = serde_json::to_value(SpeechTTSRequest { text: "你好".to_string(), voice: Some("v1".to_string()), format: Some("wav".to_string()), emotion: Some("happy".to_string()) }).unwrap();
         assert_eq!(tts["text"], "你好");
         assert_eq!(tts["format"], "wav");
+    }
+
+    #[test]
+    fn setup_helpers_build_urls_and_payloads() {
+        let client = SetupClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/setup/detect"), "http://localhost:9090/v1/setup/detect");
+        assert_eq!(client.url("/v1/setup/health"), "http://localhost:9090/v1/setup/health");
+        assert_eq!(client.url("/v1/setup/templates"), "http://localhost:9090/v1/setup/templates");
+        assert_eq!(client.url("/v1/setup/test-provider"), "http://localhost:9090/v1/setup/test-provider");
+        assert_eq!(client.url("/v1/setup/apply"), "http://localhost:9090/v1/setup/apply");
+        assert_eq!(client.url("/v1/setup/install-component"), "http://localhost:9090/v1/setup/install-component");
+        let provider = serde_json::to_value(SetupTestProviderRequest { base_url: "http://127.0.0.1:11434".to_string(), api_key: None, model: Some("qwen".to_string()) }).unwrap();
+        assert_eq!(provider["base_url"], "http://127.0.0.1:11434");
+        assert_eq!(provider["model"], "qwen");
+        let apply = serde_json::to_value(SetupApplyRequest { template_id: "local".to_string(), base_url: Some("http://127.0.0.1:11434".to_string()), model: Some("qwen".to_string()), api_key: None, overrides: Some(serde_json::json!({"sandbox_tier": "local"})) }).unwrap();
+        assert_eq!(apply["template_id"], "local");
+        assert_eq!(apply["overrides"]["sandbox_tier"], "local");
     }
 
     #[test]

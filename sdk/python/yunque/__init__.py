@@ -1174,6 +1174,46 @@ class _SpeechNamespace:
 
 speech = _SpeechNamespace()
 
+# ── Setup / Onboarding (/v1/setup) ──
+
+class _SetupNamespace:
+    """Lightweight helpers for first-run setup detection, templates, provider tests, apply, and component install."""
+
+    def detect(self) -> dict:
+        return _api_call("GET", "/v1/setup/detect")
+
+    def health(self) -> dict:
+        return _api_call("GET", "/v1/setup/health")
+
+    def templates(self) -> dict:
+        return _api_call("GET", "/v1/setup/templates")
+
+    def test_provider(self, base_url: str, api_key: str = "", model: str = "") -> dict:
+        body = {"base_url": base_url}
+        if api_key:
+            body["api_key"] = api_key
+        if model:
+            body["model"] = model
+        return _api_call("POST", "/v1/setup/test-provider", body)
+
+    def apply(self, template_id: str, *, api_key: str = "", base_url: str = "", model: str = "", overrides: dict | None = None) -> dict:
+        body: dict[str, Any] = {"template_id": template_id}
+        if api_key:
+            body["api_key"] = api_key
+        if base_url:
+            body["base_url"] = base_url
+        if model:
+            body["model"] = model
+        if overrides is not None:
+            body["overrides"] = overrides
+        return _api_call("POST", "/v1/setup/apply", body)
+
+    def install_component(self, component_id: str) -> dict:
+        return _api_call("POST", "/v1/setup/install-component", {"component_id": component_id})
+
+
+setup = _SetupNamespace()
+
 # ── Settings (/api/settings, /v1/config/reload) ──
 
 class _SettingsNamespace:
@@ -2653,6 +2693,7 @@ class AgentKit:
         self.backup = backup
         self.tori = tori
         self.speech = speech
+        self.setup = setup
         self.settings = settings
         self.system = system
         self.auth = auth

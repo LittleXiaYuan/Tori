@@ -702,6 +702,7 @@ type AgentKit struct {
 	Backup        *backupNamespace
 	Tori          *toriNamespace
 	Speech        *speechNamespace
+	Setup         *setupNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -4440,6 +4441,82 @@ func (s *speechNamespace) STTStreamURL(language string, detectEmotion bool) stri
 	return u.String()
 }
 
+// ── Setup / Onboarding (/v1/setup) ──
+
+// Setup exposes first-run setup detection, templates, provider test, apply, and component install helpers.
+var Setup = &setupNamespace{}
+
+type setupNamespace struct{}
+
+type SetupDetectResponse map[string]any
+type SetupHealthResponse map[string]any
+type SetupTemplatesResponse map[string]any
+type SetupTestProviderResponse map[string]any
+type SetupApplyResponse map[string]any
+type SetupInstallComponentResponse map[string]any
+
+type SetupTestProviderRequest struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key,omitempty"`
+	Model   string `json:"model,omitempty"`
+}
+
+type SetupApplyRequest struct {
+	TemplateID string         `json:"template_id"`
+	APIKey     string         `json:"api_key,omitempty"`
+	BaseURL    string         `json:"base_url,omitempty"`
+	Model      string         `json:"model,omitempty"`
+	Overrides  map[string]any `json:"overrides,omitempty"`
+}
+
+func (s *setupNamespace) Detect(ctx context.Context) (SetupDetectResponse, error) {
+	var out SetupDetectResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/setup/detect", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *setupNamespace) Health(ctx context.Context) (SetupHealthResponse, error) {
+	var out SetupHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/setup/health", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *setupNamespace) Templates(ctx context.Context) (SetupTemplatesResponse, error) {
+	var out SetupTemplatesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/setup/templates", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *setupNamespace) TestProvider(ctx context.Context, req SetupTestProviderRequest) (SetupTestProviderResponse, error) {
+	var out SetupTestProviderResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/setup/test-provider", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *setupNamespace) Apply(ctx context.Context, req SetupApplyRequest) (SetupApplyResponse, error) {
+	var out SetupApplyResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/setup/apply", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *setupNamespace) InstallComponent(ctx context.Context, componentID string) (SetupInstallComponentResponse, error) {
+	var out SetupInstallComponentResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/setup/install-component", map[string]any{"component_id": componentID}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Files ──
 
 type filesNamespace struct{}
@@ -5317,6 +5394,7 @@ func NewAgentKit() AgentKit {
 		Backup:        Backup,
 		Tori:          Tori,
 		Speech:        Speech,
+		Setup:         Setup,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

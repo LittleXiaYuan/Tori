@@ -55,6 +55,7 @@
     "realtime-websocket",
     "tori-account",
     "speech-runtime",
+    "first-run-setup",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -207,6 +208,10 @@
       "description": "Access the lightweight Speech TTS/STT/voices/upload client or namespace."
     },
     {
+      "name": "setup",
+      "description": "Access the lightweight Setup detection/templates/provider bootstrap client or namespace."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -311,7 +316,8 @@
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
         "tori": "AgentKit.tori",
-        "speech": "AgentKit.speech"
+        "speech": "AgentKit.speech",
+        "setup": "AgentKit.setup"
       }
     },
     "go": {
@@ -373,7 +379,8 @@
         "files": "AgentKit.Files",
         "browser": "AgentKit.Browser",
         "tori": "AgentKit.Tori",
-        "speech": "AgentKit.Speech"
+        "speech": "AgentKit.Speech",
+        "setup": "AgentKit.Setup"
       }
     },
     "python": {
@@ -435,7 +442,8 @@
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
         "tori": "AgentKit.tori",
-        "speech": "AgentKit.speech"
+        "speech": "AgentKit.speech",
+        "setup": "AgentKit.setup"
       }
     },
     "rust": {
@@ -497,7 +505,8 @@
         "files": "AgentKit::files",
         "browser": "AgentKit::browser",
         "tori": "AgentKit.tori",
-        "speech": "AgentKit.speech"
+        "speech": "AgentKit.speech",
+        "setup": "AgentKit.setup"
       }
     }
   },
