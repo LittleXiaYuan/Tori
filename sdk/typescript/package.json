@@ -695,6 +695,14 @@
       "types": "./src/graph.ts",
       "import": "./src/graph.ts"
     },
+    "./graph-read": {
+      "types": "./src/graph-read.ts",
+      "import": "./src/graph-read.ts"
+    },
+    "./graph-write": {
+      "types": "./src/graph-write.ts",
+      "import": "./src/graph-write.ts"
+    },
     "./plugin-api": {
       "types": "./src/plugin-api.ts",
       "import": "./src/plugin-api.ts"
