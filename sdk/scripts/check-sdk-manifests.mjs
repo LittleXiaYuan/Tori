@@ -20,6 +20,7 @@ const checks = [
   ["Skill Market SDK manifest", "sdk/scripts/check-market-sdk-manifest.mjs"],
   ["Dispatch SDK manifest", "sdk/scripts/check-dispatch-sdk-manifest.mjs"],
   ["Orchestrator SDK manifest", "sdk/scripts/check-orchestrator-sdk-manifest.mjs"],
+  ["Fork SDK manifest", "sdk/scripts/check-fork-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

@@ -25,6 +25,7 @@
     "skill-market",
     "mcp-dispatch",
     "ide-orchestrator",
+    "conversation-fork",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -97,6 +98,10 @@
       "description": "Access the lightweight IDE worker Orchestrator daemon client or namespace."
     },
     {
+      "name": "fork",
+      "description": "Access the lightweight conversation Fork tree client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -131,7 +136,8 @@
         "projects": "AgentKit.projects",
         "market": "AgentKit.market",
         "dispatch": "AgentKit.dispatch",
-        "orchestrator": "AgentKit.orchestrator"
+        "orchestrator": "AgentKit.orchestrator",
+        "fork": "AgentKit.fork"
       }
     },
     "go": {
@@ -163,7 +169,8 @@
         "projects": "AgentKit.Projects",
         "market": "AgentKit.Market",
         "dispatch": "AgentKit.Dispatch",
-        "orchestrator": "AgentKit.Orchestrator"
+        "orchestrator": "AgentKit.Orchestrator",
+        "fork": "AgentKit.Fork"
       }
     },
     "python": {
@@ -195,7 +202,8 @@
         "projects": "AgentKit.projects",
         "market": "AgentKit.market",
         "dispatch": "AgentKit.dispatch",
-        "orchestrator": "AgentKit.orchestrator"
+        "orchestrator": "AgentKit.orchestrator",
+        "fork": "AgentKit.fork"
       }
     },
     "rust": {
@@ -227,7 +235,8 @@
         "projects": "AgentKit::projects",
         "market": "AgentKit::market",
         "dispatch": "AgentKit::dispatch",
-        "orchestrator": "AgentKit::orchestrator"
+        "orchestrator": "AgentKit::orchestrator",
+        "fork": "AgentKit::fork"
       }
     }
   },

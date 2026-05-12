@@ -276,6 +276,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"channels":[{"id":"feishu-main","type":"feishu","name":"Feishu","enabled":true}]}`))
 		case "/v1/orchestrator/status":
 			_, _ = w.Write([]byte(`{"running":true,"adapters":["cursor"],"active_sessions":1}`))
+		case "/v1/fork/list":
+			_, _ = w.Write([]byte(`{"forks":[{"id":"fork_1","session_id":"s1","messages":[],"created_at":"2026-05-12T00:00:00Z"}]}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -342,6 +344,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	forkList, err := kit.Fork.List(context.Background(), "s1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -350,14 +356,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 16 {
-		t.Fatalf("expected 16 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 17 {
+		t.Fatalf("expected 17 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1453,6 +1459,76 @@ func TestOrchestratorHelpers(t *testing.T) {
 	}
 	if len(seen) != 9 {
 		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestForkHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/fork":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("session_id") == "s1" || r.URL.Query().Get("id") == "fork_1" {
+					_, _ = w.Write([]byte(`{"id":"fork_1","session_id":"s1","messages":[],"created_at":"2026-05-12T00:00:00Z"}`))
+					return
+				}
+			case http.MethodPost:
+				var body ForkCreateRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				_, _ = w.Write([]byte(`{"id":"fork_1","session_id":"s1","messages":[{"role":"user","content":"hi"}],"created_at":"2026-05-12T00:00:00Z"}`))
+				return
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"deleted":true}`))
+				return
+			}
+		case "/v1/fork/branch":
+			var body ForkBranchRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			_, _ = w.Write([]byte(`{"id":"fork_2","parent_id":"fork_1","session_id":"s1","label":"alt","messages":[],"created_at":"2026-05-12T00:00:00Z"}`))
+		case "/v1/fork/list":
+			_, _ = w.Write([]byte(`{"forks":[{"id":"fork_1","session_id":"s1","messages":[],"created_at":"2026-05-12T00:00:00Z"}]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	root, err := Fork.Root(context.Background(), "s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Fork.Get(context.Background(), "fork_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Fork.Create(context.Background(), ForkCreateRequest{SessionID: "s1", Messages: []ForkMessage{{Role: "user", Content: "hi"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Fork.Remove(context.Background(), "fork_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	branched, err := Fork.Branch(context.Background(), ForkBranchRequest{ForkID: "fork_1", AtIndex: 0, Label: "alt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := Fork.List(context.Background(), "s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if root["id"] != "fork_1" || got.ID != "fork_1" || len(created.Messages) != 1 || !removed.Deleted || branched.ParentID != "fork_1" || len(list.Forks) != 1 {
+		t.Fatalf("unexpected fork results")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 

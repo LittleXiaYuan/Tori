@@ -310,6 +310,7 @@ type AgentKit struct {
 	Market       *skillMarketNamespace
 	Dispatch     *dispatchNamespace
 	Orchestrator *orchestratorNamespace
+	Fork         *forkNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1789,6 +1790,102 @@ func (o *orchestratorNamespace) AddAdapter(ctx context.Context, cfg Orchestrator
 	return out, nil
 }
 
+// ── Conversation Forks ──
+
+// Fork provides focused access to conversation root forks, branches, and branch lists.
+var Fork = &forkNamespace{}
+
+type forkNamespace struct{}
+
+type ForkMessage struct {
+	Role      string         `json:"role"`
+	Content   string         `json:"content"`
+	Timestamp string         `json:"timestamp,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type ConversationFork struct {
+	ID        string        `json:"id"`
+	ParentID  string        `json:"parent_id,omitempty"`
+	SessionID string        `json:"session_id"`
+	Label     string        `json:"label,omitempty"`
+	Messages  []ForkMessage `json:"messages"`
+	CreatedAt string        `json:"created_at"`
+	Children  []string      `json:"children,omitempty"`
+}
+
+type ForkRootResponse map[string]any
+
+type ForkCreateRequest struct {
+	SessionID string        `json:"session_id"`
+	Messages  []ForkMessage `json:"messages,omitempty"`
+}
+
+type ForkBranchRequest struct {
+	ForkID  string `json:"fork_id"`
+	AtIndex int    `json:"at_index"`
+	Label   string `json:"label,omitempty"`
+}
+
+type ForkDeleteResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+type ForkListResponse struct {
+	Forks []ConversationFork `json:"forks"`
+}
+
+func (f *forkNamespace) Root(ctx context.Context, sessionID string) (ForkRootResponse, error) {
+	var out ForkRootResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/fork?session_id="+url.QueryEscape(sessionID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (f *forkNamespace) Get(ctx context.Context, id string) (ConversationFork, error) {
+	var out ConversationFork
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/fork?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return ConversationFork{}, err
+	}
+	return out, nil
+}
+
+func (f *forkNamespace) Create(ctx context.Context, req ForkCreateRequest) (ConversationFork, error) {
+	var out ConversationFork
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/fork", req, &out); err != nil {
+		return ConversationFork{}, err
+	}
+	return out, nil
+}
+
+func (f *forkNamespace) Remove(ctx context.Context, id string) (ForkDeleteResponse, error) {
+	var out ForkDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/fork?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return ForkDeleteResponse{}, err
+	}
+	return out, nil
+}
+
+func (f *forkNamespace) Branch(ctx context.Context, req ForkBranchRequest) (ConversationFork, error) {
+	var out ConversationFork
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/fork/branch", req, &out); err != nil {
+		return ConversationFork{}, err
+	}
+	return out, nil
+}
+
+func (f *forkNamespace) List(ctx context.Context, sessionID string) (ForkListResponse, error) {
+	var out ForkListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/fork/list?session_id="+url.QueryEscape(sessionID), nil, &out); err != nil {
+		return ForkListResponse{}, err
+	}
+	if out.Forks == nil {
+		out.Forks = []ConversationFork{}
+	}
+	return out, nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -2041,6 +2138,7 @@ func NewAgentKit() AgentKit {
 		Market:       SkillMarket,
 		Dispatch:     Dispatch,
 		Orchestrator: Orchestrator,
+		Fork:         Fork,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,

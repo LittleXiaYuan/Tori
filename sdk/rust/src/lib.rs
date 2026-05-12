@@ -1379,6 +1379,7 @@ pub struct AgentKit {
     pub market: SkillMarketClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
+    pub fork: ForkClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1419,6 +1420,7 @@ impl AgentKit {
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
+            fork: ForkClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1452,6 +1454,7 @@ impl AgentKit {
                 base_url.clone(),
                 plugin_http.clone(),
             ),
+            fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2525,6 +2528,174 @@ impl OrchestratorClient {
         self.http
             .post(self.url("/v1/orchestrator/adapters/add"))
             .json(config)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ForkMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub timestamp: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConversationFork {
+    pub id: String,
+    #[serde(default)]
+    pub parent_id: String,
+    pub session_id: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub messages: Vec<ForkMessage>,
+    pub created_at: String,
+    #[serde(default)]
+    pub children: Vec<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+pub type ForkRootResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ForkCreateRequest {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub messages: Vec<ForkMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ForkBranchRequest {
+    pub fork_id: String,
+    pub at_index: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ForkDeleteResponse {
+    pub deleted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ForkListResponse {
+    #[serde(default)]
+    pub forks: Vec<ConversationFork>,
+}
+
+/// Small Rust helper over host `/v1/fork*` conversation branch endpoints.
+#[derive(Debug, Clone)]
+pub struct ForkClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ForkClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn root(&self, session_id: &str) -> Result<ForkRootResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/fork?session_id={}",
+                url_encode_query_component(session_id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn get(&self, id: &str) -> Result<ConversationFork, reqwest::Error> {
+        self.http
+            .get(self.url(&format!("/v1/fork?id={}", url_encode_query_component(id))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn create(
+        &self,
+        request: &ForkCreateRequest,
+    ) -> Result<ConversationFork, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/fork"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn remove(&self, id: &str) -> Result<ForkDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!("/v1/fork?id={}", url_encode_query_component(id))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn branch(
+        &self,
+        request: &ForkBranchRequest,
+    ) -> Result<ConversationFork, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/fork/branch"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn list(&self, session_id: &str) -> Result<ForkListResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/fork/list?session_id={}",
+                url_encode_query_component(session_id)
+            )))
             .send()
             .await?
             .error_for_status()?
@@ -4493,6 +4664,28 @@ mod tests {
             client.url("/v1/workers"),
             "http://localhost:9090/v1/workers"
         );
+    }
+
+    #[test]
+    fn fork_types_deserialize_incremental_bodies() {
+        let list: ForkListResponse = serde_json::from_str(
+            r#"{"forks":[{"id":"fork_1","session_id":"s1","messages":[{"role":"user","content":"hi"}],"created_at":"2026-05-12T00:00:00Z"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(list.forks[0].id, "fork_1");
+        assert_eq!(list.forks[0].messages[0].content, "hi");
+
+        let request = ForkBranchRequest {
+            fork_id: "fork_1".to_string(),
+            at_index: 0,
+            label: "alt".to_string(),
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["fork_id"], "fork_1");
+        assert_eq!(value["label"], "alt");
+
+        let client = ForkClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/fork"), "http://localhost:9090/v1/fork");
     }
 
     #[test]

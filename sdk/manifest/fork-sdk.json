@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "domain": "conversation-fork",
+  "description": "Cross-language lightweight SDK entrypoints for conversation root fork read/create/delete, branch creation, and branch listing helpers under /v1/fork*.",
+  "principles": [
+    "Expose conversation fork tree access as focused SDK slices instead of requiring the full platform.",
+    "Keep alternate conversation paths directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make Fork access available through Agent Kit without coupling callers to backend internals."
+  ],
+  "routes": [
+    "GET /v1/fork",
+    "POST /v1/fork",
+    "DELETE /v1/fork",
+    "POST /v1/fork/branch",
+    "GET /v1/fork/list"
+  ],
+  "capabilities": [
+    {
+      "name": "root",
+      "route": "GET /v1/fork",
+      "readOnly": true,
+      "description": "Read the root fork for a session."
+    },
+    {
+      "name": "get",
+      "route": "GET /v1/fork",
+      "readOnly": true,
+      "description": "Read one fork by id."
+    },
+    {
+      "name": "create",
+      "route": "POST /v1/fork",
+      "readOnly": false,
+      "description": "Create or retrieve a root fork for a session."
+    },
+    {
+      "name": "remove",
+      "route": "DELETE /v1/fork",
+      "readOnly": false,
+      "description": "Delete a fork and its descendants."
+    },
+    {
+      "name": "branch",
+      "route": "POST /v1/fork/branch",
+      "readOnly": false,
+      "description": "Create a child branch from a fork at a message index."
+    },
+    {
+      "name": "list",
+      "route": "GET /v1/fork/list",
+      "readOnly": true,
+      "description": "List all forks for a session."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/fork.ts",
+        "sdk/typescript/src/fork-read.ts",
+        "sdk/typescript/src/fork-root.ts",
+        "sdk/typescript/src/fork-list.ts",
+        "sdk/typescript/src/fork-control.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "root": "createForkClient().root",
+        "get": "createForkClient().get",
+        "create": "createForkClient().create",
+        "remove": "createForkClient().remove",
+        "branch": "createForkClient().branch",
+        "list": "createForkClient().list"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "root": "yunque.Fork.Root",
+        "get": "yunque.Fork.Get",
+        "create": "yunque.Fork.Create",
+        "remove": "yunque.Fork.Remove",
+        "branch": "yunque.Fork.Branch",
+        "list": "yunque.Fork.List"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "root": "yunque.fork.root",
+        "get": "yunque.fork.get",
+        "create": "yunque.fork.create",
+        "remove": "yunque.fork.remove",
+        "branch": "yunque.fork.branch",
+        "list": "yunque.fork.list"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "root": "ForkClient::root",
+        "get": "ForkClient::get",
+        "create": "ForkClient::create",
+        "remove": "ForkClient::remove",
+        "branch": "ForkClient::branch",
+        "list": "ForkClient::list"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
