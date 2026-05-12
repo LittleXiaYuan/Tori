@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "domain": "mcp-dispatch",
+  "description": "Cross-language lightweight SDK entrypoints for external MCP worker registry, dispatch queue inspection, enqueue, and worker config helpers under /v1/workers* and /v1/dispatch/*.",
+  "principles": [
+    "Expose worker listing/detail/removal, queue inspection, enqueue, and worker config helpers as focused SDK slices instead of requiring the full platform.",
+    "Keep external worker orchestration directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make MCP Dispatch access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /v1/workers",
+    "GET /v1/workers/detail",
+    "POST /v1/workers/remove",
+    "GET /v1/dispatch/queue",
+    "POST /v1/dispatch/enqueue",
+    "GET /v1/workers/config"
+  ],
+  "capabilities": [
+    { "name": "workers", "route": "GET /v1/workers", "readOnly": true, "description": "List registered MCP workers." },
+    { "name": "worker", "route": "GET /v1/workers/detail", "readOnly": true, "description": "Read one registered worker by id." },
+    { "name": "removeWorker", "route": "POST /v1/workers/remove", "readOnly": false, "description": "Remove one registered worker." },
+    { "name": "queue", "route": "GET /v1/dispatch/queue", "readOnly": true, "description": "Read dispatch queue status." },
+    { "name": "enqueue", "route": "POST /v1/dispatch/enqueue", "readOnly": false, "description": "Enqueue a task id for external worker dispatch." },
+    { "name": "workerConfig", "route": "GET /v1/workers/config", "readOnly": true, "description": "Generate MCP worker configuration for a worker type." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/dispatch.ts",
+        "sdk/typescript/src/dispatch-read.ts",
+        "sdk/typescript/src/dispatch-workers.ts",
+        "sdk/typescript/src/dispatch-queue.ts",
+        "sdk/typescript/src/dispatch-worker-config.ts",
+        "sdk/typescript/src/dispatch-control.ts"
+      ],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "workers": "createDispatchClient().workers",
+        "worker": "createDispatchClient().worker",
+        "removeWorker": "createDispatchClient().removeWorker",
+        "queue": "createDispatchClient().queue",
+        "enqueue": "createDispatchClient().enqueue",
+        "workerConfig": "createDispatchClient().workerConfig"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "workers": "yunque.Dispatch.Workers",
+        "worker": "yunque.Dispatch.Worker",
+        "removeWorker": "yunque.Dispatch.RemoveWorker",
+        "queue": "yunque.Dispatch.Queue",
+        "enqueue": "yunque.Dispatch.Enqueue",
+        "workerConfig": "yunque.Dispatch.WorkerConfig"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "workers": "yunque.dispatch.workers",
+        "worker": "yunque.dispatch.worker",
+        "removeWorker": "yunque.dispatch.remove_worker",
+        "queue": "yunque.dispatch.queue",
+        "enqueue": "yunque.dispatch.enqueue",
+        "workerConfig": "yunque.dispatch.worker_config"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "workers": "DispatchClient::workers",
+        "worker": "DispatchClient::worker",
+        "removeWorker": "DispatchClient::remove_worker",
+        "queue": "DispatchClient::queue",
+        "enqueue": "DispatchClient::enqueue",
+        "workerConfig": "DispatchClient::worker_config"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

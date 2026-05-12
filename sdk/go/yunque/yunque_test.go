@@ -753,6 +753,83 @@ func TestConnectorsNamespaceManagesCatalogAuthAndActions(t *testing.T) {
 	}
 }
 
+func TestDispatchNamespaceManagesWorkersQueueAndConfig(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/workers":
+			_, _ = w.Write([]byte(`{"workers":[{"id":"w1","type":"cursor","capabilities":["coding"]}],"count":1}`))
+		case "/v1/workers/detail":
+			if r.URL.Query().Get("id") != "w1" {
+				t.Fatalf("unexpected worker detail query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"id":"w1","type":"cursor","capabilities":["coding"]}`))
+		case "/v1/workers/remove":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["id"] != "w1" {
+				t.Fatalf("unexpected remove body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"removed"}`))
+		case "/v1/dispatch/queue":
+			_, _ = w.Write([]byte(`{"message":"dispatch queue (use task system for now)"}`))
+		case "/v1/dispatch/enqueue":
+			var body DispatchEnqueueRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TaskID != "t1" || body.Priority != 10 || body.Capabilities[0] != "coding" {
+				t.Fatalf("unexpected enqueue body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"task_id":"t1","status":"enqueued"}`))
+		case "/v1/workers/config":
+			if r.URL.Query().Get("type") != "cursor" {
+				t.Fatalf("unexpected worker config query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"type":"cursor","mcp_config":"{}","instructions":"Register worker","server_url":"http://localhost:9090/mcp/v1"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	workers, err := Dispatch.Workers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker, err := Dispatch.Worker(context.Background(), "w1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Dispatch.RemoveWorker(context.Background(), "w1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue, err := Dispatch.Queue(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	enqueued, err := Dispatch.Enqueue(context.Background(), DispatchEnqueueRequest{TaskID: "t1", Capabilities: []string{"coding"}, Priority: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := Dispatch.WorkerConfig(context.Background(), "cursor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if workers.Count != 1 || worker.Type != "cursor" || removed.Status != "removed" || queue["message"] == "" || enqueued.Status != "enqueued" || config.Type != "cursor" || kit.Dispatch != Dispatch {
+		t.Fatalf("unexpected dispatch results")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestSkillMarketNamespaceSearchTopAndStats(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
