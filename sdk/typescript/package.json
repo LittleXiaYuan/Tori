@@ -407,6 +407,10 @@
       "types": "./src/audit-chain.ts",
       "import": "./src/audit-chain.ts"
     },
+    "./audit-trail": {
+      "types": "./src/audit-trail.ts",
+      "import": "./src/audit-trail.ts"
+    },
     "./heartbeat": {
       "types": "./src/heartbeat.ts",
       "import": "./src/heartbeat.ts"
