@@ -324,6 +324,7 @@ type AgentKit struct {
 	Conversations *conversationsNamespace
 	Approvals     *approvalsNamespace
 	RBAC          *rbacNamespace
+	Files         *filesNamespace
 	Plugin        *pluginRuntimeNamespace
 	Memory        *memoryNamespace
 	AgentMemory   *agentMemoryNamespace
@@ -1847,6 +1848,9 @@ var Approvals = &approvalsNamespace{}
 // RBAC provides focused access to roles, role bindings, and permission checks.
 var RBAC = &rbacNamespace{}
 
+// Files provides focused access to agent output file listing and previews.
+var Files = &filesNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2747,6 +2751,86 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Files ──
+
+type filesNamespace struct{}
+
+type FileEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	Size  int64  `json:"size"`
+	IsDir bool   `json:"is_dir"`
+}
+
+type FileListResponse struct {
+	Files []FileEntry `json:"files"`
+}
+
+type FilePreviewResponse map[string]any
+
+type FileDownloadResponse struct {
+	Content     []byte
+	Filename    string
+	ContentType string
+}
+
+func (f *filesNamespace) List(ctx context.Context, path string) (FileListResponse, error) {
+	apiPath := "/api/files"
+	if path != "" {
+		apiPath += "?path=" + url.QueryEscape(path)
+	}
+	var out FileListResponse
+	if err := apiCallInto(ctx, http.MethodGet, apiPath, nil, &out); err != nil {
+		return FileListResponse{}, err
+	}
+	return out, nil
+}
+
+func (f *filesNamespace) Preview(ctx context.Context, path string) (FilePreviewResponse, error) {
+	var out FilePreviewResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/files/preview?path="+url.QueryEscape(path), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (f *filesNamespace) Download(ctx context.Context, path string) (FileDownloadResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+"/api/files/download?path="+url.QueryEscape(path), nil)
+	if err != nil {
+		return FileDownloadResponse{}, err
+	}
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return FileDownloadResponse{}, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return FileDownloadResponse{}, err
+	}
+	if resp.StatusCode >= 400 {
+		return FileDownloadResponse{}, fmt.Errorf("api error %d: %s", resp.StatusCode, apiErrorMessage(data))
+	}
+	return FileDownloadResponse{Content: data, Filename: filenameFromDisposition(resp.Header.Get("Content-Disposition")), ContentType: resp.Header.Get("Content-Type")}, nil
+}
+
+func filenameFromDisposition(disposition string) string {
+	if disposition == "" {
+		return ""
+	}
+	for _, part := range strings.Split(disposition, ";") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(strings.ToLower(part), "filename=") {
+			return strings.Trim(strings.TrimPrefix(part, "filename="), `"`)
+		}
+	}
+	return ""
+}
+
 // ── RBAC ──
 
 type rbacNamespace struct{}
@@ -3549,6 +3633,7 @@ func NewAgentKit() AgentKit {
 		Conversations: Conversations,
 		Approvals:     Approvals,
 		RBAC:          RBAC,
+		Files:         Files,
 		Plugin:        Plugin,
 		Memory:        Memory,
 		AgentMemory:   AgentMemory,

@@ -161,6 +161,35 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestFilesHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/files":
+			fmt.Fprint(w, `{"files":[{"name":"report.md","path":"artifacts/report.md","size":12,"is_dir":false}]}`)
+		case "/api/files/preview":
+			fmt.Fprint(w, `{"name":"report.md","path":"artifacts/report.md","preview":"hello"}`)
+		case "/api/files/download":
+			w.Header().Set("Content-Disposition", `attachment; filename="report.md"`)
+			fmt.Fprint(w, `hello`)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	list, _ := Files.List(ctx, "artifacts")
+	preview, _ := Files.Preview(ctx, "artifacts/report.md")
+	down, _ := Files.Download(ctx, "artifacts/report.md")
+	if list.Files[0].Name != "report.md" || preview["preview"] != "hello" || string(down.Content) != "hello" || down.Filename != "report.md" || NewAgentKit().Files != Files {
+		t.Fatalf("unexpected files results")
+	}
+	if len(seen) != 3 || seen[0] != "GET /api/files?path=artifacts" || seen[1] != "GET /api/files/preview?path=artifacts%2Freport.md" || seen[2] != "GET /api/files/download?path=artifacts%2Freport.md" {
+		t.Fatalf("unexpected files requests: %v", seen)
+	}
+}
+
 func TestRBACHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -598,6 +627,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"approvals":[{"id":"ap1","status":"pending"}],"total":1}`))
 		case "/v1/rbac/my-roles":
 			_, _ = w.Write([]byte(`{"subject_id":"u1","roles":[{"id":"operator","name":"Operator","permissions":[]}],"total":1}`))
+		case "/api/files":
+			_, _ = w.Write([]byte(`{"files":[{"name":"report.md","path":"artifacts/report.md","size":12,"is_dir":false}]}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -700,6 +731,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fileList, err := kit.Files.List(context.Background(), "artifacts")
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -708,14 +743,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 25 {
-		t.Fatalf("expected 25 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 26 {
+		t.Fatalf("expected 26 requests, got %d: %v", len(seen), seen)
 	}
 }
 

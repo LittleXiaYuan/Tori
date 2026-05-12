@@ -598,6 +598,28 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Files (/api/files) ──
+
+class _FilesNamespace:
+    """Lightweight helpers for agent output file listing, previews, and downloads."""
+
+    def list(self, path: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'path': path})}" if path else ""
+        return _api_call("GET", f"/api/files{suffix}")
+
+    def preview(self, path: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/api/files/preview?{urlencode({'path': path})}")
+
+    def download(self, path: str):
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/api/files/download?{urlencode({'path': path})}")
+
+
+files = _FilesNamespace()
+
 # ── RBAC (/v1/rbac) ──
 
 class _RBACNamespace:
@@ -1825,6 +1847,7 @@ class AgentKit:
         self.conversations = conversations
         self.approvals = approvals
         self.rbac = rbac
+        self.files = files
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

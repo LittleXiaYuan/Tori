@@ -1392,6 +1392,7 @@ pub struct AgentKit {
     pub conversations: ConversationsClient,
     pub approvals: ApprovalsClient,
     pub rbac: RBACClient,
+    pub files: FilesClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1445,6 +1446,7 @@ impl AgentKit {
             conversations: ConversationsClient::new(base_url.clone(), token.as_ref())?,
             approvals: ApprovalsClient::new(base_url.clone(), token.as_ref())?,
             rbac: RBACClient::new(base_url.clone(), token.as_ref())?,
+            files: FilesClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1494,6 +1496,7 @@ impl AgentKit {
             ),
             approvals: ApprovalsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             rbac: RBACClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            files: FilesClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3553,6 +3556,142 @@ pub struct ConversationReplayOptions {
     pub limit: i32,
     #[serde(default, skip_serializing_if = "is_default")]
     pub offset: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    #[serde(default)]
+    pub size: i64,
+    #[serde(default)]
+    pub is_dir: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct FileListResponse {
+    #[serde(default)]
+    pub files: Vec<FileEntry>,
+}
+
+pub type FilePreviewResponse = serde_json::Value;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileDownloadResponse {
+    pub content: Vec<u8>,
+    pub filename: String,
+    pub content_type: String,
+}
+
+/// Small Rust helper over `/api/files*` agent output file listing, previews, and downloads.
+#[derive(Debug, Clone)]
+pub struct FilesClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl FilesClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        let bearer = format!("Bearer {}", token.as_ref());
+        headers.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&bearer).unwrap(),
+        );
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self, path: impl AsRef<str>) -> Result<FileListResponse, reqwest::Error> {
+        let path = path.as_ref();
+        let api_path = if path.is_empty() {
+            "/api/files".to_string()
+        } else {
+            format!("/api/files?path={}", encode_query_component(path))
+        };
+        self.get_json(&api_path).await
+    }
+
+    pub async fn preview(
+        &self,
+        path: impl AsRef<str>,
+    ) -> Result<FilePreviewResponse, reqwest::Error> {
+        self.get_json(&format!(
+            "/api/files/preview?path={}",
+            encode_query_component(path.as_ref())
+        ))
+        .await
+    }
+
+    pub async fn download(
+        &self,
+        path: impl AsRef<str>,
+    ) -> Result<FileDownloadResponse, reqwest::Error> {
+        let response = self
+            .http
+            .get(self.url(&format!(
+                "/api/files/download?path={}",
+                encode_query_component(path.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?;
+        let headers = response.headers().clone();
+        let content = response.bytes().await?.to_vec();
+        Ok(FileDownloadResponse {
+            content,
+            filename: filename_from_disposition(
+                headers
+                    .get(reqwest::header::CONTENT_DISPOSITION)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or(""),
+            ),
+            content_type: headers
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string(),
+        })
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+fn filename_from_disposition(disposition: &str) -> String {
+    for part in disposition.split(';') {
+        let trimmed = part.trim();
+        if let Some(value) = trimmed.strip_prefix("filename=") {
+            return value.trim_matches('"').to_string();
+        }
+    }
+    String::new()
 }
 
 pub type RBACPermission = serde_json::Map<String, serde_json::Value>;
@@ -6546,6 +6685,25 @@ mod tests {
         assert_eq!(
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
+        );
+    }
+
+    #[test]
+    fn files_helpers_build_urls_and_metadata() {
+        let client = FilesClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/api/files"), "http://localhost:9090/api/files");
+        let entry = FileEntry {
+            name: "report.md".to_string(),
+            path: "artifacts/report.md".to_string(),
+            size: 12,
+            is_dir: false,
+        };
+        let value = serde_json::to_value(entry).unwrap();
+        assert_eq!(value["name"], "report.md");
+        assert_eq!(value["is_dir"], false);
+        assert_eq!(
+            filename_from_disposition("attachment; filename=\"report.md\""),
+            "report.md"
         );
     }
 

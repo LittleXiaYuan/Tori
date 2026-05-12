@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "domain": "artifact-files",
+  "description": "Cross-language lightweight SDK entrypoints for /api/files listing, previews, and downloads without importing the full platform client.",
+  "principles": [
+    "Expose agent output files as a focused SDK slice for external artifact panes, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep list, preview, and download helpers directly callable without coupling callers to generated SDK internals.",
+    "Make Files access available through Agent Kit so chat, trace, and workflow outputs can be inspected from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /api/files",
+    "GET /api/files/preview",
+    "GET /api/files/download"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /api/files",
+      "readOnly": true,
+      "description": "List output files under an optional path."
+    },
+    {
+      "name": "preview",
+      "route": "GET /api/files/preview",
+      "readOnly": true,
+      "description": "Read a preview-safe representation of an output file."
+    },
+    {
+      "name": "download",
+      "route": "GET /api/files/download",
+      "readOnly": true,
+      "description": "Download an output file."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/files.ts",
+        "sdk/typescript/src/files-list.ts",
+        "sdk/typescript/src/files-read.ts",
+        "sdk/typescript/src/files-preview.ts",
+        "sdk/typescript/src/files-download.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createFilesClient().list",
+        "preview": "createFilesClient().preview",
+        "download": "createFilesClient().download"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Files.List",
+        "preview": "yunque.Files.Preview",
+        "download": "yunque.Files.Download"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.files.list",
+        "preview": "yunque.files.preview",
+        "download": "yunque.files.download"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "FilesClient::list",
+        "preview": "FilesClient::preview",
+        "download": "FilesClient::download"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
