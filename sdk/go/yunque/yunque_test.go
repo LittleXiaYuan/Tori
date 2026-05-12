@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -87,6 +88,62 @@ func TestToriHelpers(t *testing.T) {
 	}
 	if len(seen) != 5 {
 		t.Fatalf("expected 5 tori API calls, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestSpeechHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		switch r.URL.Path {
+		case "/v1/speech/tts":
+			var body SpeechTTSRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Text != "你好" || body.Voice != "v1" || body.Format != "wav" || body.Emotion != "happy" {
+				t.Fatalf("unexpected tts body: %+v", body)
+			}
+			w.Header().Set("Content-Type", "audio/wav")
+			_, _ = w.Write([]byte("audio"))
+		case "/v1/speech/stt":
+			if r.URL.Query().Get("language") != "en" || r.URL.Query().Get("detect_emotion") != "true" {
+				t.Fatalf("unexpected stt query: %s", r.URL.RawQuery)
+			}
+			audio, _ := io.ReadAll(r.Body)
+			if string(audio) != "audio" {
+				t.Fatalf("unexpected stt body: %q", string(audio))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello","emotion":{"label":"calm"}}`))
+		case "/v1/speech/voices":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"voices":[{"id":"v1"}],"providers":["mock"]}`))
+		case "/v1/upload":
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := r.FormFile("file"); err != nil {
+				t.Fatal(err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"filename":"note.txt","size":4}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	tts, _ := Speech.TTS(ctx, SpeechTTSRequest{Text: "你好", Voice: "v1", Format: "wav", Emotion: "happy"})
+	stt, _ := Speech.STT(ctx, []byte("audio"), SpeechSTTOptions{Language: "en", DetectEmotion: true})
+	voices, _ := Speech.Voices(ctx)
+	upload, _ := Speech.Upload(ctx, []byte("demo"), "note.txt")
+	streamURL := Speech.STTStreamURL("zh", true)
+	if string(tts.Data) != "audio" || tts.ContentType != "audio/wav" || stt["text"] != "hello" || voices["providers"].([]any)[0] != "mock" || upload["filename"] != "note.txt" || !strings.Contains(streamURL, "/v1/speech/stt/stream?") || NewAgentKit().Speech != Speech {
+		t.Fatalf("unexpected speech results")
+	}
+	if len(seen) != 4 {
+		t.Fatalf("expected 4 speech API calls, got %d: %v", len(seen), seen)
 	}
 }
 

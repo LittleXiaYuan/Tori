@@ -48,7 +48,7 @@ console.log(reply);
 
 For external automation that needs the common SDK-first surfaces together, use
 `yunque-client/agent-kit`. It composes the hand-written State Kernel,
-Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Events, Reverie, Tori, and Plugin API Runtime clients without importing the
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Events, Reverie, Tori, Speech, and Plugin API Runtime clients without importing the
 generated all-in-one SDK.
 
 ```ts
@@ -2276,6 +2276,10 @@ The lightweight Emotion SDK exposes emotion history and emotion stickers for ext
 
 
 
+
+### Speech SDK
+
+The lightweight Speech SDK exposes speech TTS, speech STT, voice/provider listing, STT stream URL construction, and file upload helpers for external voice UIs, desktop widgets, plugin pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/speech/tts`, `/v1/speech/stt`, `/v1/speech/voices`, `/v1/speech/stt/stream`, and `/v1/upload`.
 
 ### Tori SDK
 
