@@ -142,6 +142,7 @@
     "src/plugin-llm.ts",
     "src/plugin-search.ts",
     "src/plugin-memory.ts",
+    "src/plugin-agent-memory.ts",
     "src/state.ts",
     "src/resource-state.ts",
     "src/focus-state.ts",
