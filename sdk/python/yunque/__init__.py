@@ -1050,6 +1050,46 @@ class _TasksNamespace:
 
 tasks = _TasksNamespace()
 
+
+# ── Task Templates (/v1/tasks/templates) ──
+
+class _TaskTemplatesNamespace:
+    """Lightweight helpers for reusable task templates and instantiation."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/tasks/templates")
+
+    def get(self, template_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/tasks/templates?{urlencode({'id': template_id})}")
+
+    def create(self, template: dict | str, *, name: str = "", description: str = "", variables: Optional[list[dict]] = None, steps: Optional[list[dict]] = None, tags: Optional[list[str]] = None) -> dict:
+        if isinstance(template, dict):
+            body = dict(template)
+        else:
+            body = {"id": template}
+            if name:
+                body["name"] = name
+            if description:
+                body["description"] = description
+            if variables is not None:
+                body["variables"] = variables
+            if steps is not None:
+                body["steps"] = steps
+            if tags is not None:
+                body["tags"] = tags
+        return _api_call("POST", "/v1/tasks/templates", body)
+
+    def delete(self, template_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/tasks/templates?{urlencode({'id': template_id})}")
+
+    def instantiate(self, template_id: str, variables: Optional[dict[str, str]] = None) -> dict:
+        return _api_call("POST", "/v1/tasks/templates/instantiate", {"template_id": template_id, "variables": variables or {}})
+
+
+task_templates = _TaskTemplatesNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2264,6 +2304,7 @@ class AgentKit:
         self.reactions = reactions
         self.permissions = permissions
         self.tasks = tasks
+        self.task_templates = task_templates
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

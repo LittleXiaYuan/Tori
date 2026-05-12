@@ -185,6 +185,27 @@ func TestTasksHelpers(t *testing.T) {
 			}
 		case "/v1/tasks/run":
 			_, _ = w.Write([]byte(`{"status":"accepted","task_id":"task-1"}`))
+		case "/v1/tasks/templates":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("id") == "tpl-1" {
+					_, _ = w.Write([]byte(`{"id":"tpl-1","name":"Review"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"templates":[{"id":"tpl-1"}],"total":1}`))
+			case http.MethodPost:
+				var body CreateTaskTemplateRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.ID != "tpl-1" || body.Steps[0].Action != "review" { t.Fatalf("unexpected template body: %+v", body) }
+				_, _ = w.Write([]byte(`{"id":"tpl-1","name":"Review"}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"deleted":"tpl-1"}`))
+			}
+		case "/v1/tasks/templates/instantiate":
+			var body InstantiateTaskTemplateRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.TemplateID != "tpl-1" || body.Variables["repo"] != "yunque" { t.Fatalf("unexpected instantiate body: %+v", body) }
+			_, _ = w.Write([]byte(`{"id":"task-3","title":"Review"}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -201,8 +222,18 @@ func TestTasksHelpers(t *testing.T) {
 	if err != nil || run["status"] != "accepted" { t.Fatalf("run = %+v, %v", run, err) }
 	deleted, err := Tasks.Delete(ctx, "task-1")
 	if err != nil || deleted["deleted"] != "task-1" { t.Fatalf("delete = %+v, %v", deleted, err) }
+	templates, err := Tasks.Templates(ctx)
+	if err != nil || templates["total"].(float64) != 1 { t.Fatalf("templates = %+v, %v", templates, err) }
+	tpl, err := Tasks.Template(ctx, "tpl-1")
+	if err != nil || tpl["name"] != "Review" { t.Fatalf("template = %+v, %v", tpl, err) }
+	createdTpl, err := Tasks.CreateTemplate(ctx, CreateTaskTemplateRequest{ID: "tpl-1", Steps: []TaskTemplateStep{{Action: "review"}}})
+	if err != nil || createdTpl["id"] != "tpl-1" { t.Fatalf("create template = %+v, %v", createdTpl, err) }
+	instantiated, err := Tasks.InstantiateTemplate(ctx, "tpl-1", map[string]string{"repo": "yunque"})
+	if err != nil || instantiated["id"] != "task-3" { t.Fatalf("instantiate = %+v, %v", instantiated, err) }
+	deletedTpl, err := Tasks.DeleteTemplate(ctx, "tpl-1")
+	if err != nil || deletedTpl["deleted"] != "tpl-1" { t.Fatalf("delete template = %+v, %v", deletedTpl, err) }
 	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 5 { t.Fatalf("unexpected calls: %v", seen) }
+	if len(seen) != 10 { t.Fatalf("unexpected calls: %v", seen) }
 }
 
 func TestPermissionsHelpers(t *testing.T) {

@@ -1,11 +1,11 @@
 {
   "version": 1,
   "domain": "tasks-runtime",
-  "description": "Cross-language lightweight SDK for task CRUD and lifecycle operations over /v1/tasks without importing the full platform client.",
+  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, and reusable template operations over /v1/tasks without importing the full platform client.",
   "principles": [
     "Expose task orchestration as a focused SDK slice for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts.",
-    "Keep task reads, creation, lifecycle control, and deletion directly callable through existing authenticated task routes.",
-    "Make Tasks access available through Agent Kit while leaving deeper task templates, gaps, memory, threads, and traces as separate incremental slices."
+    "Keep task reads, creation, lifecycle control, deletion, and template instantiation directly callable through existing authenticated task routes.",
+    "Make Tasks access available through Agent Kit while leaving deeper task gaps, memory, threads, and traces as separate incremental slices."
   ],
   "routes": [
     "GET /v1/tasks",
@@ -16,7 +16,12 @@
     "POST /v1/tasks/resume",
     "POST /v1/tasks/restart",
     "POST /v1/tasks/cancel",
-    "DELETE /v1/tasks?id=..."
+    "DELETE /v1/tasks?id=...",
+    "GET /v1/tasks/templates",
+    "GET /v1/tasks/templates?id=...",
+    "POST /v1/tasks/templates",
+    "DELETE /v1/tasks/templates?id=...",
+    "POST /v1/tasks/templates/instantiate"
   ],
   "capabilities": [
     { "name": "list", "route": "GET /v1/tasks", "readOnly": true, "description": "List recent tasks visible to the current tenant." },
@@ -27,12 +32,17 @@
     { "name": "resume", "route": "POST /v1/tasks/resume", "readOnly": false, "description": "Resume a paused, interrupted, or failed task." },
     { "name": "restart", "route": "POST /v1/tasks/restart", "readOnly": false, "description": "Restart a resumable or terminal task." },
     { "name": "cancel", "route": "POST /v1/tasks/cancel", "readOnly": false, "description": "Cancel a running task." },
-    { "name": "delete", "route": "DELETE /v1/tasks?id=...", "readOnly": false, "description": "Delete a task by id." }
+    { "name": "delete", "route": "DELETE /v1/tasks?id=...", "readOnly": false, "description": "Delete a task by id." },
+    { "name": "templates", "route": "GET /v1/tasks/templates", "readOnly": true, "description": "List reusable task templates." },
+    { "name": "template", "route": "GET /v1/tasks/templates?id=...", "readOnly": true, "description": "Read one reusable task template by id." },
+    { "name": "createTemplate", "route": "POST /v1/tasks/templates", "readOnly": false, "description": "Create or update a reusable task template." },
+    { "name": "deleteTemplate", "route": "DELETE /v1/tasks/templates?id=...", "readOnly": false, "description": "Delete a reusable task template by id." },
+    { "name": "instantiateTemplate", "route": "POST /v1/tasks/templates/instantiate", "readOnly": false, "description": "Instantiate a reusable task template into a concrete task." }
   ],
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/tasks.ts"],
+      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-context.ts"],
       "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createTasksClient().list",
@@ -43,7 +53,12 @@
         "resume": "createTasksClient().resume",
         "restart": "createTasksClient().restart",
         "cancel": "createTasksClient().cancel",
-        "delete": "createTasksClient().delete"
+        "delete": "createTasksClient().delete",
+        "templates": "createTaskTemplatesClient().list",
+        "template": "createTaskTemplatesClient().get",
+        "createTemplate": "createTaskTemplatesClient().create",
+        "deleteTemplate": "createTaskTemplatesClient().delete",
+        "instantiateTemplate": "createTaskTemplatesClient().instantiate"
       }
     },
     "go": {
@@ -59,7 +74,12 @@
         "resume": "yunque.Tasks.Resume",
         "restart": "yunque.Tasks.Restart",
         "cancel": "yunque.Tasks.Cancel",
-        "delete": "yunque.Tasks.Delete"
+        "delete": "yunque.Tasks.Delete",
+        "templates": "yunque.Tasks.Templates",
+        "template": "yunque.Tasks.Template",
+        "createTemplate": "yunque.Tasks.CreateTemplate",
+        "deleteTemplate": "yunque.Tasks.DeleteTemplate",
+        "instantiateTemplate": "yunque.Tasks.InstantiateTemplate"
       }
     },
     "python": {
@@ -75,7 +95,12 @@
         "resume": "yunque.tasks.resume",
         "restart": "yunque.tasks.restart",
         "cancel": "yunque.tasks.cancel",
-        "delete": "yunque.tasks.delete"
+        "delete": "yunque.tasks.delete",
+        "templates": "yunque.task_templates.list",
+        "template": "yunque.task_templates.get",
+        "createTemplate": "yunque.task_templates.create",
+        "deleteTemplate": "yunque.task_templates.delete",
+        "instantiateTemplate": "yunque.task_templates.instantiate"
       }
     },
     "rust": {
@@ -91,7 +116,12 @@
         "resume": "TasksClient::resume",
         "restart": "TasksClient::restart",
         "cancel": "TasksClient::cancel",
-        "delete": "TasksClient::delete"
+        "delete": "TasksClient::delete",
+        "templates": "TasksClient::templates",
+        "template": "TasksClient::template",
+        "createTemplate": "TasksClient::create_template",
+        "deleteTemplate": "TasksClient::delete_template",
+        "instantiateTemplate": "TasksClient::instantiate_template"
       }
     }
   },
