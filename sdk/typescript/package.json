@@ -1051,6 +1051,18 @@
       "types": "./src/dispatch-read.ts",
       "import": "./src/dispatch-read.ts"
     },
+    "./dispatch-workers": {
+      "types": "./src/dispatch-workers.ts",
+      "import": "./src/dispatch-workers.ts"
+    },
+    "./dispatch-queue": {
+      "types": "./src/dispatch-queue.ts",
+      "import": "./src/dispatch-queue.ts"
+    },
+    "./dispatch-worker-config": {
+      "types": "./src/dispatch-worker-config.ts",
+      "import": "./src/dispatch-worker-config.ts"
+    },
     "./dispatch-control": {
       "types": "./src/dispatch-control.ts",
       "import": "./src/dispatch-control.ts"
