@@ -604,6 +604,33 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Trust governance (/api/trust, /api/review, /api/skillgrow) ──
+
+class _TrustNamespace:
+    """Lightweight helpers for trust scores, review gate status, and skill growth patterns."""
+
+    def scores(self) -> dict:
+        return _api_call("GET", "/api/trust/scores")
+
+    def reset(self, slug: str) -> dict:
+        return _api_call("POST", "/api/trust/reset", {"slug": slug})
+
+    def grant(self, slug: str) -> dict:
+        return _api_call("POST", "/api/trust/grant", {"slug": slug})
+
+    def grant_all(self) -> dict:
+        return self.grant("*")
+
+    def review_status(self) -> dict:
+        return _api_call("GET", "/api/review/status")
+
+    def skillgrow_patterns(self) -> dict:
+        return _api_call("GET", "/api/skillgrow/patterns")
+
+
+trust = _TrustNamespace()
+
 # ── Audit chain and trail (/v1/audit, /api/audit) ──
 
 class _AuditNamespace:
@@ -2013,6 +2040,7 @@ class AgentKit:
         self.subagents = subagents
         self.tools = tools
         self.audit = audit
+        self.trust = trust
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

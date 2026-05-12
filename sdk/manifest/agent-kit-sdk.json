@@ -36,6 +36,7 @@
     "subagent-orchestration",
     "tool-processes",
     "audit-governance",
+    "trust-governance",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -160,6 +161,10 @@
       "description": "Access the lightweight Audit client or namespace for audit-chain tail, verification, stats, and task audit-trail reads."
     },
     {
+      "name": "trust",
+      "description": "Access the lightweight Trust client or namespace for trust scores, review gate status, and skill-growth patterns."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -238,6 +243,7 @@
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
+        "trust": "AgentKit.trust",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -289,6 +295,7 @@
         "subagents": "AgentKit.Subagents",
         "tools": "AgentKit.Tools",
         "audit": "AgentKit.Audit",
+        "trust": "AgentKit.Trust",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -340,6 +347,7 @@
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
+        "trust": "AgentKit.trust",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -391,6 +399,7 @@
         "subagents": "AgentKit::subagents",
         "tools": "AgentKit::tools",
         "audit": "AgentKit::audit",
+        "trust": "AgentKit::trust",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

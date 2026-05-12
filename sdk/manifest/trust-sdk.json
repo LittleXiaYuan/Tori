@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "domain": "trust-governance",
+  "description": "Cross-language lightweight SDK entrypoints for trust scores, review-gate status, and skill-growth patterns without importing the full platform client.",
+  "principles": [
+    "Expose trust governance as a focused SDK slice for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep trust score reads and mutation helpers directly callable through the same authenticated governance routes.",
+    "Make Trust access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /api/trust/scores",
+    "POST /api/trust/reset",
+    "POST /api/trust/grant",
+    "GET /api/review/status",
+    "GET /api/skillgrow/patterns"
+  ],
+  "capabilities": [
+    {
+      "name": "scores",
+      "route": "GET /api/trust/scores",
+      "readOnly": true,
+      "description": "Read current skill trust scores."
+    },
+    {
+      "name": "reset",
+      "route": "POST /api/trust/reset",
+      "readOnly": false,
+      "description": "Reset trust for one skill slug."
+    },
+    {
+      "name": "grant",
+      "route": "POST /api/trust/grant",
+      "readOnly": false,
+      "description": "Grant trust for one skill slug."
+    },
+    {
+      "name": "grantAll",
+      "route": "POST /api/trust/grant",
+      "readOnly": false,
+      "description": "Grant trust to all skills using slug *."
+    },
+    {
+      "name": "reviewStatus",
+      "route": "GET /api/review/status",
+      "readOnly": true,
+      "description": "Read review gate/trust/distillation enablement status."
+    },
+    {
+      "name": "skillGrowPatterns",
+      "route": "GET /api/skillgrow/patterns",
+      "readOnly": true,
+      "description": "Read detected skill-growth patterns."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/trust.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "scores": "createTrustClient().scores",
+        "reset": "createTrustClient().reset",
+        "grant": "createTrustClient().grant",
+        "grantAll": "createTrustClient().grantAll",
+        "reviewStatus": "createTrustClient().reviewStatus",
+        "skillGrowPatterns": "createTrustClient().skillGrowPatterns"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "scores": "yunque.Trust.Scores",
+        "reset": "yunque.Trust.Reset",
+        "grant": "yunque.Trust.Grant",
+        "grantAll": "yunque.Trust.GrantAll",
+        "reviewStatus": "yunque.Trust.ReviewStatus",
+        "skillGrowPatterns": "yunque.Trust.SkillGrowPatterns"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "scores": "yunque.trust.scores",
+        "reset": "yunque.trust.reset",
+        "grant": "yunque.trust.grant",
+        "grantAll": "yunque.trust.grant_all",
+        "reviewStatus": "yunque.trust.review_status",
+        "skillGrowPatterns": "yunque.trust.skillgrow_patterns"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "scores": "TrustClient::scores",
+        "reset": "TrustClient::reset",
+        "grant": "TrustClient::grant",
+        "grantAll": "TrustClient::grant_all",
+        "reviewStatus": "TrustClient::review_status",
+        "skillGrowPatterns": "TrustClient::skillgrow_patterns"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
