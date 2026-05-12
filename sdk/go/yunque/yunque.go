@@ -1998,6 +1998,9 @@ type tasksNamespace struct{}
 
 type Task map[string]any
 type TaskActionResponse map[string]any
+type TaskTemplate map[string]any
+type TaskTemplatesResponse map[string]any
+type DeleteTaskTemplateResponse map[string]any
 
 type TaskConstraints struct {
 	MaxSteps        int      `json:"max_steps,omitempty"`
@@ -2015,6 +2018,34 @@ type CreateTaskRequest struct {
 	Title       string          `json:"title,omitempty"`
 	Description string          `json:"description"`
 	Constraints TaskConstraints `json:"constraints,omitempty"`
+}
+
+type TaskTemplateVariable struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Default     string `json:"default,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+}
+
+type TaskTemplateStep struct {
+	Action    string         `json:"action"`
+	SkillName string         `json:"skill_name,omitempty"`
+	Args      map[string]any `json:"args,omitempty"`
+	Group     int            `json:"group,omitempty"`
+}
+
+type CreateTaskTemplateRequest struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Variables   []TaskTemplateVariable `json:"variables,omitempty"`
+	Steps       []TaskTemplateStep     `json:"steps,omitempty"`
+	Tags        []string               `json:"tags,omitempty"`
+}
+
+type InstantiateTaskTemplateRequest struct {
+	TemplateID string            `json:"template_id"`
+	Variables  map[string]string `json:"variables,omitempty"`
 }
 
 func (t *tasksNamespace) List(ctx context.Context) ([]Task, error) {
@@ -2061,6 +2092,49 @@ func (t *tasksNamespace) Delete(ctx context.Context, id string) (TaskActionRespo
 func (t *tasksNamespace) action(ctx context.Context, action, id string) (TaskActionResponse, error) {
 	var out TaskActionResponse
 	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/"+action, map[string]string{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Templates(ctx context.Context) (TaskTemplatesResponse, error) {
+	var out TaskTemplatesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/templates", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Template(ctx context.Context, id string) (TaskTemplate, error) {
+	var out TaskTemplate
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/templates?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) CreateTemplate(ctx context.Context, req CreateTaskTemplateRequest) (TaskTemplate, error) {
+	var out TaskTemplate
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/templates", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) DeleteTemplate(ctx context.Context, id string) (DeleteTaskTemplateResponse, error) {
+	var out DeleteTaskTemplateResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/tasks/templates?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) InstantiateTemplate(ctx context.Context, templateID string, variables map[string]string) (Task, error) {
+	if variables == nil {
+		variables = map[string]string{}
+	}
+	var out Task
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/templates/instantiate", InstantiateTaskTemplateRequest{TemplateID: templateID, Variables: variables}, &out); err != nil {
 		return nil, err
 	}
 	return nonNilMap(out), nil

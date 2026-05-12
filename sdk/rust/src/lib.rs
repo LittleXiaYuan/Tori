@@ -5221,6 +5221,9 @@ fn filename_from_disposition(disposition: &str) -> String {
 
 pub type Task = serde_json::Map<String, serde_json::Value>;
 pub type TaskActionResponse = serde_json::Value;
+pub type TaskTemplate = serde_json::Value;
+pub type TaskTemplatesResponse = serde_json::Value;
+pub type DeleteTaskTemplateResponse = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TaskConstraints {
@@ -5251,6 +5254,50 @@ pub struct CreateTaskRequest {
     pub description: String,
     #[serde(default, skip_serializing_if = "is_default")]
     pub constraints: TaskConstraints,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TaskTemplateVariable {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub default: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TaskTemplateStep {
+    pub action: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub skill_name: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub args: serde_json::Map<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub group: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CreateTaskTemplateRequest {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<TaskTemplateVariable>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<TaskTemplateStep>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct InstantiateTaskTemplateRequest {
+    pub template_id: String,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub variables: std::collections::BTreeMap<String, String>,
 }
 
 /// Small Rust helper over task CRUD and lifecycle endpoints.
@@ -5296,6 +5343,26 @@ impl TasksClient {
 
     pub async fn delete(&self, id: impl AsRef<str>) -> Result<TaskActionResponse, reqwest::Error> {
         self.http.delete(self.url(&format!("/v1/tasks?id={}", url_encode_query_component(id.as_ref())))).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn templates(&self) -> Result<TaskTemplatesResponse, reqwest::Error> {
+        self.get_json("/v1/tasks/templates").await
+    }
+
+    pub async fn template(&self, id: impl AsRef<str>) -> Result<TaskTemplate, reqwest::Error> {
+        self.get_json(&format!("/v1/tasks/templates?id={}", url_encode_query_component(id.as_ref()))).await
+    }
+
+    pub async fn create_template(&self, request: &CreateTaskTemplateRequest) -> Result<TaskTemplate, reqwest::Error> {
+        self.post_json("/v1/tasks/templates", request).await
+    }
+
+    pub async fn delete_template(&self, id: impl AsRef<str>) -> Result<DeleteTaskTemplateResponse, reqwest::Error> {
+        self.http.delete(self.url(&format!("/v1/tasks/templates?id={}", url_encode_query_component(id.as_ref())))).send().await?.error_for_status()?.json().await
+    }
+
+    pub async fn instantiate_template(&self, request: &InstantiateTaskTemplateRequest) -> Result<Task, reqwest::Error> {
+        self.post_json("/v1/tasks/templates/instantiate", request).await
     }
 
     async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
@@ -8990,6 +9057,26 @@ mod tests {
         assert_eq!(request["constraints"]["risk_level"], "low");
         let listed: Vec<Task> = serde_json::from_str(r#"[{"id":"task-1","status":"running"}]"#).unwrap();
         assert_eq!(listed[0]["id"], "task-1");
+        assert_eq!(
+            client.url(&format!("/v1/tasks/templates?id={}", url_encode_query_component("tpl 1"))),
+            "http://localhost:9090/v1/tasks/templates?id=tpl+1"
+        );
+        let template = serde_json::to_value(CreateTaskTemplateRequest {
+            id: "tpl-1".to_string(),
+            name: "Review".to_string(),
+            steps: vec![TaskTemplateStep { action: "review".to_string(), skill_name: "code".to_string(), ..Default::default() }],
+            variables: vec![TaskTemplateVariable { name: "repo".to_string(), required: true, ..Default::default() }],
+            ..Default::default()
+        }).unwrap();
+        assert_eq!(template["id"], "tpl-1");
+        assert_eq!(template["steps"][0]["action"], "review");
+        assert_eq!(template["variables"][0]["required"], true);
+        let instantiate = serde_json::to_value(InstantiateTaskTemplateRequest {
+            template_id: "tpl-1".to_string(),
+            variables: std::collections::BTreeMap::from([("repo".to_string(), "yunque".to_string())]),
+        }).unwrap();
+        assert_eq!(instantiate["template_id"], "tpl-1");
+        assert_eq!(instantiate["variables"]["repo"], "yunque");
     }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {
