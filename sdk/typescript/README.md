@@ -260,6 +260,10 @@ import { createLoRAStatusClient } from "yunque-client/lora-status";
 import { createLoRAHistoryClient } from "yunque-client/lora-history";
 import { createLoRAControlClient } from "yunque-client/lora-control";
 import { createLoRAConfigClient } from "yunque-client/lora-config";
+import { createLoRAPreviewClient } from "yunque-client/lora-preview";
+import { createLoRAEvolutionClient } from "yunque-client/lora-evolution";
+import { createLoRATriggerClient } from "yunque-client/lora-trigger";
+import { createLoRARollbackClient } from "yunque-client/lora-rollback";
 import { createIterateClient } from "yunque-client/iterate";
 import { createIterateReviewClient } from "yunque-client/iterate-review";
 import { createIteratePendingClient } from "yunque-client/iterate-pending";
@@ -1230,6 +1234,30 @@ if (preview.preview.ready) {
   await lora.trigger({ tenant_id: "default" });
 }
 
+const loraPreview = createLoRAPreviewClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+console.log((await loraPreview.preview({ tenant_id: "default" })).preview.ready);
+
+const loraEvolution = createLoRAEvolutionClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+console.log(await loraEvolution.evolution());
+
+const loraTrigger = createLoRATriggerClient({
+  baseUrl: "http://localhost:9090",
+  token: "<admin-jwt>",
+});
+await loraTrigger.trigger({ tenant_id: "default" });
+
+const loraRollback = createLoRARollbackClient({
+  baseUrl: "http://localhost:9090",
+  token: "<admin-jwt>",
+});
+await loraRollback.rollback();
+
 const iterate = createIterateClient({
   baseUrl: "http://localhost:9090",
   token: "<your-jwt>",
@@ -1618,7 +1646,7 @@ console.log(sandboxStatus.key_source);
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
-`/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
+`/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`lora-preview`/`lora-evolution`/`lora-trigger`/`lora-rollback`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`plugin-toggle`/`plugin-ui`/`plugin-reload`/`plugin-folder`/`connectors`/`connector-catalog`/`connector-auth`/`connector-actions`/`connector-list`/`connector-detail`/`connector-connect`/`connector-disconnect`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-knowledge-search`/`plugin-knowledge-ingest`/`plugin-cron`/`plugin-cron-read`/`plugin-cron-control`/`plugin-send`/`plugin-extensions`/`plugin-extensions-list`/`plugin-extension-register`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
@@ -1816,6 +1844,10 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/lora-history.ts` | Lightweight LoRA history/summary facade without status, preview, training or config mutation APIs |
 | `src/lora-control.ts` | Lightweight LoRA trigger/rollback/config facade without status/history/summary/evolution APIs |
 | `src/lora-config.ts` | Lightweight LoRA config read/update facade without status, history, trigger or rollback APIs |
+| `src/lora-preview.ts` | Lightweight LoRA preview-only facade without status/history/training/config APIs |
+| `src/lora-evolution.ts` | Lightweight LoRA evolution-state facade without preview/history/training/config APIs |
+| `src/lora-trigger.ts` | Lightweight LoRA trigger-only facade without rollback/read/config APIs |
+| `src/lora-rollback.ts` | Lightweight LoRA rollback-only facade without trigger/read/config APIs |
 | `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |
 | `src/iterate-review.ts` | Lightweight self-iteration proposal list/approve/reject facade without cycle trigger/status APIs |
 | `src/iterate-pending.ts` | Lightweight pending self-iteration proposal facade without approve/reject or cycle APIs |

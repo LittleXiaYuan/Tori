@@ -683,6 +683,22 @@
       "types": "./src/lora-config.ts",
       "import": "./src/lora-config.ts"
     },
+    "./lora-preview": {
+      "types": "./src/lora-preview.ts",
+      "import": "./src/lora-preview.ts"
+    },
+    "./lora-evolution": {
+      "types": "./src/lora-evolution.ts",
+      "import": "./src/lora-evolution.ts"
+    },
+    "./lora-trigger": {
+      "types": "./src/lora-trigger.ts",
+      "import": "./src/lora-trigger.ts"
+    },
+    "./lora-rollback": {
+      "types": "./src/lora-rollback.ts",
+      "import": "./src/lora-rollback.ts"
+    },
     "./iterate": {
       "types": "./src/iterate.ts",
       "import": "./src/iterate.ts"
