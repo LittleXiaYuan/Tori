@@ -675,6 +675,14 @@
       "types": "./src/market.ts",
       "import": "./src/market.ts"
     },
+    "./market-search": {
+      "types": "./src/market-search.ts",
+      "import": "./src/market-search.ts"
+    },
+    "./market-stats": {
+      "types": "./src/market-stats.ts",
+      "import": "./src/market-stats.ts"
+    },
     "./dispatch": {
       "types": "./src/dispatch.ts",
       "import": "./src/dispatch.ts"

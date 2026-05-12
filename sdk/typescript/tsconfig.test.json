@@ -183,6 +183,8 @@
     "src/project-read.ts",
     "src/project-write.ts",
     "src/market.ts",
+    "src/market-search.ts",
+    "src/market-stats.ts",
     "src/dispatch.ts",
     "src/dispatch-read.ts",
     "src/dispatch-control.ts",
