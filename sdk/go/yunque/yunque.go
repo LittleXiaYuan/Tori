@@ -307,6 +307,7 @@ type AgentKit struct {
 	Connectors  *connectorsNamespace
 	Notify      *notifyNamespace
 	Projects    *projectsNamespace
+	Market      *skillMarketNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1507,6 +1508,90 @@ func (n *notifyNamespace) Share(ctx context.Context, req NotifyShareRequest) (No
 	return out, nil
 }
 
+// ── Skill Market ──
+
+// SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
+var SkillMarket = &skillMarketNamespace{}
+
+type skillMarketNamespace struct{}
+
+type SkillMarketSkill struct {
+	Name         string         `json:"name"`
+	Version      string         `json:"version"`
+	Description  string         `json:"description,omitempty"`
+	Author       string         `json:"author,omitempty"`
+	Category     string         `json:"category,omitempty"`
+	Tags         []string       `json:"tags,omitempty"`
+	License      string         `json:"license,omitempty"`
+	Homepage     string         `json:"homepage,omitempty"`
+	Deprecated   bool           `json:"deprecated,omitempty"`
+	Installs     int            `json:"installs,omitempty"`
+	Rating       float64        `json:"rating,omitempty"`
+	RatingCount  int            `json:"rating_count,omitempty"`
+	CreatedAt    string         `json:"created_at,omitempty"`
+	UpdatedAt    string         `json:"updated_at,omitempty"`
+	MinVersion   string         `json:"min_version,omitempty"`
+	Dependencies []string       `json:"dependencies,omitempty"`
+	Extra        map[string]any `json:"-"`
+}
+
+type SkillMarketSearchResponse struct {
+	Skills []SkillMarketSkill `json:"skills"`
+	Count  int                `json:"count,omitempty"`
+}
+
+type SkillMarketTopOptions struct {
+	N  int
+	By string
+}
+
+type SkillMarketStatsResponse map[string]any
+
+func (m *skillMarketNamespace) Search(ctx context.Context, query string) (SkillMarketSearchResponse, error) {
+	path := "/v1/market/search"
+	if query != "" {
+		path += "?q=" + url.QueryEscape(query)
+	}
+	var out SkillMarketSearchResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return SkillMarketSearchResponse{}, err
+	}
+	if out.Skills == nil {
+		out.Skills = []SkillMarketSkill{}
+	}
+	return out, nil
+}
+
+func (m *skillMarketNamespace) Top(ctx context.Context, opts SkillMarketTopOptions) (SkillMarketSearchResponse, error) {
+	q := url.Values{}
+	if opts.N > 0 {
+		q.Set("n", strconv.Itoa(opts.N))
+	}
+	if opts.By != "" {
+		q.Set("by", opts.By)
+	}
+	path := "/v1/market/top"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	var out SkillMarketSearchResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return SkillMarketSearchResponse{}, err
+	}
+	if out.Skills == nil {
+		out.Skills = []SkillMarketSkill{}
+	}
+	return out, nil
+}
+
+func (m *skillMarketNamespace) Stats(ctx context.Context) (SkillMarketStatsResponse, error) {
+	var out SkillMarketStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/market/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Projects ──
 
 // Projects provides focused access to project workspace CRUD APIs.
@@ -1672,6 +1757,7 @@ func NewAgentKit() AgentKit {
 		Connectors:  Connectors,
 		Notify:      Notify,
 		Projects:    Projects,
+		Market:      SkillMarket,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

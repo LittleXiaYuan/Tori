@@ -475,6 +475,33 @@ class _NotifyNamespace:
 notify = _NotifyNamespace()
 
 
+# ── Skill Market (/v1/market) ──
+
+class _SkillMarketNamespace:
+    """Lightweight helpers for skill marketplace search, ranking, and stats."""
+
+    def search(self, query: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'q': query})}" if query else ""
+        return _api_call("GET", f"/v1/market/search{suffix}")
+
+    def top(self, *, n: int = 0, by: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if n > 0:
+            params["n"] = str(n)
+        if by:
+            params["by"] = by
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/market/top{suffix}")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/market/stats")
+
+
+market = _SkillMarketNamespace()
+
+
 # ── Projects (/v1/projects) ──
 
 class _ProjectsNamespace:
@@ -1038,6 +1065,7 @@ class AgentKit:
         self.connectors = connectors
         self.notify = notify
         self.projects = projects
+        self.market = market
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
