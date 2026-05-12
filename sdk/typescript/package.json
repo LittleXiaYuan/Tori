@@ -439,6 +439,10 @@
       "types": "./src/federation.ts",
       "import": "./src/federation.ts"
     },
+    "./federation-observe": {
+      "types": "./src/federation-observe.ts",
+      "import": "./src/federation-observe.ts"
+    },
     "./system": {
       "types": "./src/system.ts",
       "import": "./src/system.ts"
