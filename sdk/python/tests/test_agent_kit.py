@@ -58,6 +58,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"today_cost": 0.12, "month_cost": 1.5}
             if path == "/api/providers":
                 return {"providers": [{"id": "deepseek", "model": "deepseek-chat"}], "mode": "hybrid"}
+            if path == "/v1/cognis":
+                return {"cognis": [{"id": "reviewer", "name": "Code Reviewer"}], "count": 1}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -84,6 +86,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.fork.list("s1")["forks"][0]["id"], "fork_1")
             self.assertEqual(kit.cost.summary()["today_cost"], 0.12)
             self.assertEqual(kit.providers.list()["providers"][0]["id"], "deepseek")
+            self.assertEqual(kit.cognis.list()["cognis"][0]["id"], "reviewer")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -105,9 +108,10 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.fork, yunque.fork)
         self.assertIs(kit.cost, yunque.cost)
         self.assertIs(kit.providers, yunque.providers)
+        self.assertIs(kit.cognis, yunque.cognis)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
-        self.assertEqual(calls[18], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[19], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

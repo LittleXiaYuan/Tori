@@ -1,0 +1,412 @@
+{
+  "version": 1,
+  "domain": "cognis",
+  "description": "Cross-language lightweight SDK entrypoints for Cogni registry, observability, experience recording, evolution, bundle import/export, workflows, and federation helpers.",
+  "principles": [
+    "Expose CogniKernel and multi-cogni capabilities as focused SDK slices instead of hiding them inside platform pages.",
+    "Keep Cogni registry, traces, experience, evolution, and federation directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make Cognis access available through Agent Kit without coupling callers to backend internals."
+  ],
+  "routes": [
+    "GET /v1/cognis",
+    "POST /v1/cognis",
+    "GET /v1/cognis/{id}",
+    "DELETE /v1/cognis/{id}",
+    "POST /v1/cognis/{id}/enable",
+    "POST /v1/cognis/{id}/disable",
+    "POST /v1/cognis/reload",
+    "GET /v1/cognis/traces",
+    "GET /v1/cognis/{id}/trace",
+    "GET /v1/cognis/stats",
+    "GET /v1/cognis/health",
+    "GET /v1/cognis/{id}/health",
+    "GET /v1/cognis/verify",
+    "GET /v1/cognis/{id}/verify",
+    "GET /v1/cognis/alerts",
+    "POST /v1/cognis/alerts/scan",
+    "POST /v1/cognis/generate",
+    "GET /v1/cognis/export",
+    "POST /v1/cognis/import",
+    "GET /v1/cognis/{id}/workflows",
+    "POST /v1/cognis/{id}/workflow/{name}",
+    "GET /v1/cognis/{id}/experience",
+    "POST /v1/cognis/{id}/experience/record",
+    "POST /v1/cognis/{id}/experience/patterns/{patternId}/confirm",
+    "POST /v1/cognis/{id}/evolve",
+    "GET /v1/cognis/evolution",
+    "GET /v1/cognis/{id}/evolution",
+    "GET /v1/cognis/federation",
+    "GET /v1/cognis/federation/peers",
+    "POST /v1/cognis/federation/discover",
+    "POST /v1/cognis/{id}/expose",
+    "POST /v1/cognis/{id}/unexpose",
+    "GET /v1/cognis/economics"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for list."
+    },
+    {
+      "name": "create",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for create."
+    },
+    {
+      "name": "get",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for get."
+    },
+    {
+      "name": "remove",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for remove."
+    },
+    {
+      "name": "enable",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for enable."
+    },
+    {
+      "name": "disable",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for disable."
+    },
+    {
+      "name": "reload",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for reload."
+    },
+    {
+      "name": "traces",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for traces."
+    },
+    {
+      "name": "trace",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for trace."
+    },
+    {
+      "name": "stats",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for stats."
+    },
+    {
+      "name": "health",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for health."
+    },
+    {
+      "name": "verify",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for verify."
+    },
+    {
+      "name": "alerts",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for alerts."
+    },
+    {
+      "name": "scanAlerts",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for scanAlerts."
+    },
+    {
+      "name": "generate",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for generate."
+    },
+    {
+      "name": "exportBundle",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for exportBundle."
+    },
+    {
+      "name": "importBundle",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for importBundle."
+    },
+    {
+      "name": "workflows",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for workflows."
+    },
+    {
+      "name": "runWorkflow",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for runWorkflow."
+    },
+    {
+      "name": "experience",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for experience."
+    },
+    {
+      "name": "recordExperience",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for recordExperience."
+    },
+    {
+      "name": "confirmExperiencePattern",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for confirmExperiencePattern."
+    },
+    {
+      "name": "evolve",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for evolve."
+    },
+    {
+      "name": "evolution",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for evolution."
+    },
+    {
+      "name": "federation",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for federation."
+    },
+    {
+      "name": "federationPeers",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for federationPeers."
+    },
+    {
+      "name": "discoverFederation",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for discoverFederation."
+    },
+    {
+      "name": "expose",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for expose."
+    },
+    {
+      "name": "unexpose",
+      "route": "/v1/cognis",
+      "readOnly": false,
+      "description": "Cognis SDK helper for unexpose."
+    },
+    {
+      "name": "economics",
+      "route": "/v1/cognis",
+      "readOnly": true,
+      "description": "Cognis SDK helper for economics."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/cognis.ts",
+        "sdk/typescript/src/cognis-registry.ts",
+        "sdk/typescript/src/cognis-observe.ts",
+        "sdk/typescript/src/cognis-traces.ts",
+        "sdk/typescript/src/cognis-health.ts",
+        "sdk/typescript/src/cognis-alerts.ts",
+        "sdk/typescript/src/cognis-experience.ts",
+        "sdk/typescript/src/cognis-evolution.ts",
+        "sdk/typescript/src/cognis-federation.ts",
+        "sdk/typescript/src/cognis-workflows.ts",
+        "sdk/typescript/src/cognis-bundles.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createCognisClient().list",
+        "create": "createCognisClient().create",
+        "get": "createCognisClient().get",
+        "remove": "createCognisClient().remove",
+        "enable": "createCognisClient().enable",
+        "disable": "createCognisClient().disable",
+        "reload": "createCognisClient().reload",
+        "traces": "createCognisClient().traces",
+        "trace": "createCognisClient().trace",
+        "stats": "createCognisClient().stats",
+        "health": "createCognisClient().health",
+        "verify": "createCognisClient().verify",
+        "alerts": "createCognisClient().alerts",
+        "scanAlerts": "createCognisClient().scanAlerts",
+        "generate": "createCognisClient().generate",
+        "exportBundle": "createCognisClient().exportBundle",
+        "importBundle": "createCognisClient().importBundle",
+        "workflows": "createCognisClient().workflows",
+        "runWorkflow": "createCognisClient().runWorkflow",
+        "experience": "createCognisClient().experience",
+        "recordExperience": "createCognisClient().recordExperience",
+        "confirmExperiencePattern": "createCognisClient().confirmExperiencePattern",
+        "evolve": "createCognisClient().evolve",
+        "evolution": "createCognisClient().evolution",
+        "federation": "createCognisClient().federation",
+        "federationPeers": "createCognisClient().federationPeers",
+        "discoverFederation": "createCognisClient().discoverFederation",
+        "expose": "createCognisClient().expose",
+        "unexpose": "createCognisClient().unexpose",
+        "economics": "createCognisClient().economics"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Cognis.List",
+        "create": "yunque.Cognis.Create",
+        "get": "yunque.Cognis.Get",
+        "remove": "yunque.Cognis.Remove",
+        "enable": "yunque.Cognis.Enable",
+        "disable": "yunque.Cognis.Disable",
+        "reload": "yunque.Cognis.Reload",
+        "traces": "yunque.Cognis.Traces",
+        "trace": "yunque.Cognis.Trace",
+        "stats": "yunque.Cognis.Stats",
+        "health": "yunque.Cognis.Health",
+        "verify": "yunque.Cognis.Verify",
+        "alerts": "yunque.Cognis.Alerts",
+        "scanAlerts": "yunque.Cognis.ScanAlerts",
+        "generate": "yunque.Cognis.Generate",
+        "exportBundle": "yunque.Cognis.ExportBundle",
+        "importBundle": "yunque.Cognis.ImportBundle",
+        "workflows": "yunque.Cognis.Workflows",
+        "runWorkflow": "yunque.Cognis.RunWorkflow",
+        "experience": "yunque.Cognis.Experience",
+        "recordExperience": "yunque.Cognis.RecordExperience",
+        "confirmExperiencePattern": "yunque.Cognis.ConfirmExperiencePattern",
+        "evolve": "yunque.Cognis.Evolve",
+        "evolution": "yunque.Cognis.Evolution",
+        "federation": "yunque.Cognis.Federation",
+        "federationPeers": "yunque.Cognis.FederationPeers",
+        "discoverFederation": "yunque.Cognis.DiscoverFederation",
+        "expose": "yunque.Cognis.Expose",
+        "unexpose": "yunque.Cognis.Unexpose",
+        "economics": "yunque.Cognis.Economics"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.cognis.list",
+        "create": "yunque.cognis.create",
+        "get": "yunque.cognis.get",
+        "remove": "yunque.cognis.remove",
+        "enable": "yunque.cognis.enable",
+        "disable": "yunque.cognis.disable",
+        "reload": "yunque.cognis.reload",
+        "traces": "yunque.cognis.traces",
+        "trace": "yunque.cognis.trace",
+        "stats": "yunque.cognis.stats",
+        "health": "yunque.cognis.health",
+        "verify": "yunque.cognis.verify",
+        "alerts": "yunque.cognis.alerts",
+        "scanAlerts": "yunque.cognis.scan_alerts",
+        "generate": "yunque.cognis.generate",
+        "exportBundle": "yunque.cognis.export_bundle",
+        "importBundle": "yunque.cognis.import_bundle",
+        "workflows": "yunque.cognis.workflows",
+        "runWorkflow": "yunque.cognis.run_workflow",
+        "experience": "yunque.cognis.experience",
+        "recordExperience": "yunque.cognis.record_experience",
+        "confirmExperiencePattern": "yunque.cognis.confirm_experience_pattern",
+        "evolve": "yunque.cognis.evolve",
+        "evolution": "yunque.cognis.evolution",
+        "federation": "yunque.cognis.federation",
+        "federationPeers": "yunque.cognis.federation_peers",
+        "discoverFederation": "yunque.cognis.discover_federation",
+        "expose": "yunque.cognis.expose",
+        "unexpose": "yunque.cognis.unexpose",
+        "economics": "yunque.cognis.economics"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "CognisClient::list",
+        "create": "CognisClient::create",
+        "get": "CognisClient::get",
+        "remove": "CognisClient::remove",
+        "enable": "CognisClient::enable",
+        "disable": "CognisClient::disable",
+        "reload": "CognisClient::reload",
+        "traces": "CognisClient::traces",
+        "trace": "CognisClient::trace",
+        "stats": "CognisClient::stats",
+        "health": "CognisClient::health",
+        "verify": "CognisClient::verify",
+        "alerts": "CognisClient::alerts",
+        "scanAlerts": "CognisClient::scan_alerts",
+        "generate": "CognisClient::generate",
+        "exportBundle": "CognisClient::export_bundle",
+        "importBundle": "CognisClient::import_bundle",
+        "workflows": "CognisClient::workflows",
+        "runWorkflow": "CognisClient::run_workflow",
+        "experience": "CognisClient::experience",
+        "recordExperience": "CognisClient::record_experience",
+        "confirmExperiencePattern": "CognisClient::confirm_experience_pattern",
+        "evolve": "CognisClient::evolve",
+        "evolution": "CognisClient::evolution",
+        "federation": "CognisClient::federation",
+        "federationPeers": "CognisClient::federation_peers",
+        "discoverFederation": "CognisClient::discover_federation",
+        "expose": "CognisClient::expose",
+        "unexpose": "CognisClient::unexpose",
+        "economics": "CognisClient::economics"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

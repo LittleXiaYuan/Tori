@@ -20,6 +20,7 @@ import { createOrchestratorClient, type OrchestratorClient, type OrchestratorCli
 import { createForkClient, type ForkClient, type ForkClientOptions } from "./fork.js";
 import { createCostClient, type CostClient, type CostClientOptions } from "./cost.js";
 import { createProvidersClient, type ProvidersClient, type ProvidersClientOptions } from "./providers.js";
+import { createCognisClient, type CognisClient, type CognisClientOptions } from "./cognis.js";
 
 export type AgentKitOptions = {
   baseUrl: string;
@@ -51,6 +52,7 @@ export type AgentKit = {
   fork: ForkClient;
   cost: CostClient;
   providers: ProvidersClient;
+  cognis: CognisClient;
   plugin: PluginApiClient;
 };
 
@@ -67,7 +69,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions & WorkflowClientOptions & ConnectorsClientOptions & NotifyClientOptions & ProjectsClientOptions & SkillMarketClientOptions & DispatchClientOptions & OrchestratorClientOptions & ForkClientOptions & CostClientOptions & ProvidersClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions & MemoryClientOptions & GraphClientOptions & KnowledgeClientOptions & LoRAClientOptions & WorkflowClientOptions & ConnectorsClientOptions & NotifyClientOptions & ProjectsClientOptions & SkillMarketClientOptions & DispatchClientOptions & OrchestratorClientOptions & ForkClientOptions & CostClientOptions & ProvidersClientOptions & CognisClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -97,10 +99,11 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     fork: createForkClient(common),
     cost: createCostClient(common),
     providers: createProvidersClient(common),
+    cognis: createCognisClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient, createWorkflowClient, createConnectorsClient, createNotifyClient, createProjectsClient, createSkillMarketClient, createDispatchClient, createOrchestratorClient, createForkClient, createCostClient, createProvidersClient };
-export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions, WorkflowClient, WorkflowClientOptions, ConnectorsClient, ConnectorsClientOptions, NotifyClient, NotifyClientOptions, ProjectsClient, ProjectsClientOptions, SkillMarketClient, SkillMarketClientOptions, DispatchClient, DispatchClientOptions, OrchestratorClient, OrchestratorClientOptions, ForkClient, ForkClientOptions, CostClient, CostClientOptions, ProvidersClient, ProvidersClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient, createMemoryClient, createGraphClient, createKnowledgeClient, createLoRAClient, createWorkflowClient, createConnectorsClient, createNotifyClient, createProjectsClient, createSkillMarketClient, createDispatchClient, createOrchestratorClient, createForkClient, createCostClient, createProvidersClient, createCognisClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions, MemoryClient, MemoryClientOptions, GraphClient, GraphClientOptions, KnowledgeClient, KnowledgeClientOptions, LoRAClient, LoRAClientOptions, WorkflowClient, WorkflowClientOptions, ConnectorsClient, ConnectorsClientOptions, NotifyClient, NotifyClientOptions, ProjectsClient, ProjectsClientOptions, SkillMarketClient, SkillMarketClientOptions, DispatchClient, DispatchClientOptions, OrchestratorClient, OrchestratorClientOptions, ForkClient, ForkClientOptions, CostClient, CostClientOptions, ProvidersClient, ProvidersClientOptions, CognisClient, CognisClientOptions };
 
