@@ -98,6 +98,7 @@
     "src/ide.ts",
     "src/persona.ts",
     "src/persona-state.ts",
+    "src/persona-skills.ts",
     "src/workflow.ts",
     "src/workflow-definitions.ts",
     "src/workflow-runs.ts",
