@@ -98,6 +98,37 @@ cargo check     # quick verification
   is path-only. Hand-edit `docs/openapi.yaml` request/response bodies, then
   rebuild.
 
+## Lightweight Agent Kit helper
+
+Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
+wants the common SDK-first surfaces from one object: State Kernel, Reflection
+Experience, and Plugin API Runtime. It composes the hand-written lightweight
+clients and does not import the generated all-in-one API surface.
+
+```rust
+use yunque_client::{AgentKit, ReflectOptions};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let kit = AgentKit::new_with_plugin_token(
+        "http://localhost:9090",
+        "<plugin-or-api-token>",
+        "<plugin-token>",
+    )?;
+
+    let focus = kit.state.focus().await?;
+    let strategies = kit.reflect.strategies(&ReflectOptions {
+        tag: "sdk".to_string(),
+        limit: 5,
+        ..ReflectOptions::default()
+    }).await?;
+    let search = kit.plugin.search("incremental SDK package", 5).await?;
+
+    println!("{} {} {}", focus, strategies, search.results.len());
+    Ok(())
+}
+```
+
 ## Lightweight State Kernel helper
 
 The generated client offers broad OpenAPI coverage. For sidecars, CLIs, plugins,

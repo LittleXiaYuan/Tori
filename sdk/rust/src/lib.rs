@@ -504,10 +504,7 @@ impl ReflectClient {
     }
 
     /// Return compiled strategy hints derived from reflection experiences.
-    pub async fn strategies(
-        &self,
-        options: &ReflectOptions,
-    ) -> Result<String, reqwest::Error> {
+    pub async fn strategies(&self, options: &ReflectOptions) -> Result<String, reqwest::Error> {
         let response: ReflectStrategiesResponse = self
             .http
             .get(self.url(&format!(
@@ -524,6 +521,60 @@ impl ReflectClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Lightweight bundle of common SDK-first Rust clients.
+///
+/// Use this when a Rust CLI, sidecar, plugin runner, or automation binary wants
+/// State Kernel, Reflection Experience, and Plugin API Runtime access from one
+/// small entrypoint without coupling to the generated OpenAPI client surface.
+#[derive(Debug, Clone)]
+pub struct AgentKit {
+    pub state: StateClient,
+    pub reflect: ReflectClient,
+    pub plugin: PluginApiClient,
+}
+
+impl AgentKit {
+    /// Create an AgentKit where the same bearer token is used for state,
+    /// reflection, and plugin runtime calls.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let base_url = base_url.into();
+        let token = token.as_ref().to_string();
+        Self::new_with_plugin_token(base_url, token.clone(), token)
+    }
+
+    /// Create an AgentKit with separate API and plugin runtime bearer tokens.
+    pub fn new_with_plugin_token(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+        plugin_token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let base_url = base_url.into();
+        Ok(Self {
+            state: StateClient::new(base_url.clone(), token.as_ref())?,
+            reflect: ReflectClient::new(base_url.clone(), token.as_ref())?,
+            plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
+        })
+    }
+
+    /// Create an AgentKit with caller-provided reqwest clients.
+    pub fn new_with_clients(
+        base_url: impl Into<String>,
+        state_http: reqwest::Client,
+        reflect_http: reqwest::Client,
+        plugin_http: reqwest::Client,
+    ) -> Self {
+        let base_url = base_url.into();
+        Self {
+            state: StateClient::new_with_client(base_url.clone(), state_http),
+            reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http),
+            plugin: PluginApiClient::new_with_client(base_url, plugin_http),
+        }
     }
 }
 
@@ -886,7 +937,8 @@ impl PluginApiClient {
         &self,
         config: &serde_json::Value,
     ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
-        self.post_json("/v1/plugin-api/register/provider", config).await
+        self.post_json("/v1/plugin-api/register/provider", config)
+            .await
     }
 
     /// Register a plugin-provided channel adapter.
@@ -894,7 +946,8 @@ impl PluginApiClient {
         &self,
         config: &serde_json::Value,
     ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
-        self.post_json("/v1/plugin-api/register/channel", config).await
+        self.post_json("/v1/plugin-api/register/channel", config)
+            .await
     }
 
     /// Register a plugin-provided search engine.
@@ -902,7 +955,8 @@ impl PluginApiClient {
         &self,
         config: &serde_json::Value,
     ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
-        self.post_json("/v1/plugin-api/register/search", config).await
+        self.post_json("/v1/plugin-api/register/search", config)
+            .await
     }
 
     /// Register a plugin-provided guardrail.
@@ -928,7 +982,8 @@ impl PluginApiClient {
         &self,
         config: &serde_json::Value,
     ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
-        self.post_json("/v1/plugin-api/register/speech", config).await
+        self.post_json("/v1/plugin-api/register/speech", config)
+            .await
     }
 
     /// List plugin-contributed system extensions.
@@ -1124,5 +1179,35 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn agent_kit_groups_lightweight_clients() {
+        let kit = AgentKit::new_with_clients(
+            "http://localhost:9090/",
+            reqwest::Client::new(),
+            reqwest::Client::new(),
+            reqwest::Client::new(),
+        );
+        assert_eq!(kit.state.url("/v1/state"), "http://localhost:9090/v1/state");
+        assert_eq!(
+            kit.reflect.url("/v1/reflect/strategies"),
+            "http://localhost:9090/v1/reflect/strategies"
+        );
+        assert_eq!(
+            kit.plugin.url("/v1/plugin-api/search"),
+            "http://localhost:9090/v1/plugin-api/search"
+        );
+    }
+
+    #[test]
+    fn agent_kit_accepts_shared_or_separate_tokens() {
+        assert!(AgentKit::new("http://localhost:9090", "shared-token").is_ok());
+        assert!(AgentKit::new_with_plugin_token(
+            "http://localhost:9090",
+            "api-token",
+            "plugin-token"
+        )
+        .is_ok());
     }
 }
