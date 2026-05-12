@@ -225,6 +225,28 @@ func TestTasksHelpers(t *testing.T) {
 				t.Fatalf("unexpected memory query: %s", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"task_id":"task-1","goal":"ship SDK","next_action":"resume"}`))
+		case "/v1/tasks/threads":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("id") == "task-1" {
+					_, _ = w.Write([]byte(`{"task_id":"task-1","info":{"state":"open"},"messages":[{"role":"user","content":"hi"}]}`))
+					return
+				}
+				if r.URL.Query().Get("state") != "open" {
+					t.Fatalf("unexpected threads query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"threads":[{"task_id":"task-1","state":"open"}],"total":1}`))
+			case http.MethodPost:
+				var body PostTaskThreadMessageRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.TaskID != "task-1" || body.Content != "hi" || body.Channel.ChannelID != "chat-1" { t.Fatalf("unexpected thread post body: %+v", body) }
+				_, _ = w.Write([]byte(`{"status":"posted","task_id":"task-1"}`))
+			case http.MethodPut:
+				var body UpdateTaskThreadStateRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.TaskID != "task-1" || body.State != "paused" { t.Fatalf("unexpected thread state body: %+v", body) }
+				_, _ = w.Write([]byte(`{"status":"updated","task_id":"task-1","state":"paused"}`))
+			}
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -259,8 +281,16 @@ func TestTasksHelpers(t *testing.T) {
 	if err != nil || resolved["resolved"] != "gap-1" { t.Fatalf("resolve gap = %+v, %v", resolved, err) }
 	memory, err := Tasks.WorkingMemory(ctx, "task-1")
 	if err != nil || memory["next_action"] != "resume" { t.Fatalf("working memory = %+v, %v", memory, err) }
+	threads, err := Tasks.Threads(ctx, "open")
+	if err != nil || threads["total"].(float64) != 1 { t.Fatalf("threads = %+v, %v", threads, err) }
+	thread, err := Tasks.Thread(ctx, "task-1")
+	if err != nil || thread["task_id"] != "task-1" { t.Fatalf("thread = %+v, %v", thread, err) }
+	posted, err := Tasks.PostThreadMessage(ctx, PostTaskThreadMessageRequest{TaskID: "task-1", Content: "hi", Channel: &TaskChannelBinding{ChannelType: "feishu", ChannelID: "chat-1"}})
+	if err != nil || posted["status"] != "posted" { t.Fatalf("post thread = %+v, %v", posted, err) }
+	updated, err := Tasks.UpdateThreadState(ctx, UpdateTaskThreadStateRequest{TaskID: "task-1", State: "paused"})
+	if err != nil || updated["state"] != "paused" { t.Fatalf("update thread = %+v, %v", updated, err) }
 	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 14 { t.Fatalf("unexpected calls: %v", seen) }
+	if len(seen) != 18 { t.Fatalf("unexpected calls: %v", seen) }
 }
 
 func TestPermissionsHelpers(t *testing.T) {

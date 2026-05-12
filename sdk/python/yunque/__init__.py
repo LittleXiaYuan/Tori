@@ -1123,6 +1123,33 @@ class _TaskMemoryNamespace:
 
 task_memory = _TaskMemoryNamespace()
 
+
+# ── Task Threads (/v1/tasks/threads) ──
+
+class _TaskThreadsNamespace:
+    """Lightweight helpers for task-scoped conversation threads."""
+
+    def list(self, state: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'state': state})}" if state else ""
+        return _api_call("GET", f"/v1/tasks/threads{suffix}")
+
+    def get(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/tasks/threads?{urlencode({'id': task_id})}")
+
+    def post_message(self, task_id: str, content: str, channel: Optional[dict] = None) -> dict:
+        body = {"task_id": task_id, "content": content}
+        if channel is not None:
+            body["channel"] = channel
+        return _api_call("POST", "/v1/tasks/threads", body)
+
+    def update_state(self, task_id: str, state: str) -> dict:
+        return _api_call("PUT", "/v1/tasks/threads", {"task_id": task_id, "state": state})
+
+
+task_threads = _TaskThreadsNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2340,6 +2367,7 @@ class AgentKit:
         self.task_templates = task_templates
         self.task_gaps = task_gaps
         self.task_memory = task_memory
+        self.task_threads = task_threads
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
