@@ -2001,6 +2001,9 @@ type TaskActionResponse map[string]any
 type TaskTemplate map[string]any
 type TaskTemplatesResponse map[string]any
 type DeleteTaskTemplateResponse map[string]any
+type TaskGap map[string]any
+type TaskGapStats map[string]any
+type ResolveTaskGapResponse map[string]any
 
 type TaskConstraints struct {
 	MaxSteps        int      `json:"max_steps,omitempty"`
@@ -2135,6 +2138,37 @@ func (t *tasksNamespace) InstantiateTemplate(ctx context.Context, templateID str
 	}
 	var out Task
 	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/templates/instantiate", InstantiateTaskTemplateRequest{TemplateID: templateID, Variables: variables}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Gaps(ctx context.Context, gapType string) ([]TaskGap, error) {
+	path := "/v1/tasks/gaps"
+	if gapType != "" {
+		path += "?type=" + url.QueryEscape(gapType)
+	}
+	var out []TaskGap
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []TaskGap{}
+	}
+	return out, nil
+}
+
+func (t *tasksNamespace) GapStats(ctx context.Context) (TaskGapStats, error) {
+	var out TaskGapStats
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/gaps?stats=true", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) ResolveGap(ctx context.Context, id string) (ResolveTaskGapResponse, error) {
+	var out ResolveTaskGapResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/gaps/resolve", map[string]string{"id": id}, &out); err != nil {
 		return nil, err
 	}
 	return nonNilMap(out), nil
