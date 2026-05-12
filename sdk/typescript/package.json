@@ -335,6 +335,10 @@
       "types": "./src/persona-state.ts",
       "import": "./src/persona-state.ts"
     },
+    "./persona-skills": {
+      "types": "./src/persona-skills.ts",
+      "import": "./src/persona-skills.ts"
+    },
     "./workflow": {
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"
