@@ -275,6 +275,10 @@
       "types": "./src/document-templates.ts",
       "import": "./src/document-templates.ts"
     },
+    "./document-generate": {
+      "types": "./src/document-generate.ts",
+      "import": "./src/document-generate.ts"
+    },
     "./approvals": {
       "types": "./src/approvals.ts",
       "import": "./src/approvals.ts"
