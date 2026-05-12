@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "domain": "notification-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque notification channel management, test dispatch, and share dispatch under /api/notify*.",
+  "principles": [
+    "Expose notification channels, add/remove/toggle/test, and share helpers as focused SDK slices instead of requiring the full platform.",
+    "Keep notification dispatch directly callable from external projects, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Make Notification runtime access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /api/notify/channels",
+    "POST /api/notify/add",
+    "POST /api/notify/remove",
+    "POST /api/notify/toggle",
+    "POST /api/notify/test",
+    "POST /api/notify/share"
+  ],
+  "capabilities": [
+    { "name": "channels", "route": "GET /api/notify/channels", "readOnly": true, "description": "List notification channels." },
+    { "name": "addChannel", "route": "POST /api/notify/add", "readOnly": false, "description": "Add a notification channel." },
+    { "name": "removeChannel", "route": "POST /api/notify/remove", "readOnly": false, "description": "Remove a notification channel." },
+    { "name": "toggleChannel", "route": "POST /api/notify/toggle", "readOnly": false, "description": "Enable or disable a notification channel." },
+    { "name": "testChannel", "route": "POST /api/notify/test", "readOnly": false, "description": "Send a test event to a notification channel." },
+    { "name": "share", "route": "POST /api/notify/share", "readOnly": false, "description": "Share chat/task artifacts to a notification channel." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/notify.ts",
+        "sdk/typescript/src/notify-share.ts",
+        "sdk/typescript/src/notify-channels.ts",
+        "sdk/typescript/src/notify-channel-read.ts",
+        "sdk/typescript/src/notify-channel-control.ts"
+      ],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "channels": "createNotifyClient().channels",
+        "addChannel": "createNotifyClient().addChannel",
+        "removeChannel": "createNotifyClient().removeChannel",
+        "toggleChannel": "createNotifyClient().toggleChannel",
+        "testChannel": "createNotifyClient().testChannel",
+        "share": "createNotifyClient().share"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "channels": "yunque.Notify.Channels",
+        "addChannel": "yunque.Notify.AddChannel",
+        "removeChannel": "yunque.Notify.RemoveChannel",
+        "toggleChannel": "yunque.Notify.ToggleChannel",
+        "testChannel": "yunque.Notify.TestChannel",
+        "share": "yunque.Notify.Share"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "channels": "yunque.notify.channels",
+        "addChannel": "yunque.notify.add_channel",
+        "removeChannel": "yunque.notify.remove_channel",
+        "toggleChannel": "yunque.notify.toggle_channel",
+        "testChannel": "yunque.notify.test_channel",
+        "share": "yunque.notify.share"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "channels": "NotifyClient::channels",
+        "addChannel": "NotifyClient::add_channel",
+        "removeChannel": "NotifyClient::remove_channel",
+        "toggleChannel": "NotifyClient::toggle_channel",
+        "testChannel": "NotifyClient::test_channel",
+        "share": "NotifyClient::share"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

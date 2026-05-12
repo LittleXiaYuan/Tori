@@ -435,6 +435,46 @@ class _ConnectorsNamespace:
 connectors = _ConnectorsNamespace()
 
 
+# ── Notify (/api/notify) ──
+
+class _NotifyNamespace:
+    """Lightweight helpers for notification channels, tests, and share dispatch."""
+
+    def channels(self) -> dict:
+        return _api_call("GET", "/api/notify/channels")
+
+    def add_channel(self, channel: dict) -> dict:
+        return _api_call("POST", "/api/notify/add", channel)
+
+    def remove_channel(self, channel_id: str) -> dict:
+        from urllib.parse import quote
+        return _api_call("POST", f"/api/notify/remove?id={quote(channel_id)}")
+
+    def toggle_channel(self, channel_id: str, enabled: bool) -> dict:
+        return _api_call("POST", "/api/notify/toggle", {"id": channel_id, "enabled": enabled})
+
+    def test_channel(self, channel_id: str) -> dict:
+        return _api_call("POST", "/api/notify/test", {"id": channel_id})
+
+    def share(self, channel_id: str | dict, title: str = "", message: str = "", session_id: str = "", task_id: str = "", url: str = "", files: Optional[list] = None) -> dict:
+        if isinstance(channel_id, dict):
+            body = dict(channel_id)
+        else:
+            body = {
+                "channel_id": channel_id,
+                "title": title,
+                "message": message,
+                "session_id": session_id,
+                "task_id": task_id,
+                "url": url,
+                "files": files or [],
+            }
+        return _api_call("POST", "/api/notify/share", body)
+
+
+notify = _NotifyNamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -958,6 +998,7 @@ class AgentKit:
         self.lora = lora
         self.workflows = workflows
         self.connectors = connectors
+        self.notify = notify
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
