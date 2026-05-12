@@ -387,3 +387,46 @@ def info() -> dict:
         "sdk_version": __version__,
         "authenticated": bool(_TOKEN),
     }
+
+# ── State Kernel (lightweight state layer) ──
+
+class _StateNamespace:
+    """Typed-enough helpers for the agent State Kernel.
+
+    This namespace is intentionally small: external plugins, Python scripts, and
+    sidecars can read/write the state layer without importing the generated full
+    OpenAPI client or platform internals.
+    """
+
+    def snapshot(self) -> dict:
+        """Return the full State Kernel snapshot from /v1/state."""
+        return _api_call("GET", "/v1/state")
+
+    def actions(self) -> list[dict]:
+        """Return recent action records from the State Kernel snapshot."""
+        return self.snapshot().get("recent_actions") or []
+
+    def capabilities(self) -> dict:
+        """Return capability summary from the State Kernel snapshot."""
+        return self.snapshot().get("capabilities") or {}
+
+    def goals(self) -> list[dict]:
+        """List goals tracked by the State Kernel."""
+        result = _api_call("GET", "/v1/state/goals")
+        return result if isinstance(result, list) else []
+
+    def save_goal(self, goal: dict) -> dict:
+        """Create or update a State Kernel goal."""
+        return _api_call("POST", "/v1/state/goals", goal)
+
+    def focus(self) -> str:
+        """Return the current focus string."""
+        return _api_call("GET", "/v1/state/focus").get("focus", "")
+
+    def resources(self) -> list[dict]:
+        """List active resources tracked by the State Kernel."""
+        result = _api_call("GET", "/v1/state/resources")
+        return result if isinstance(result, list) else []
+
+
+state = _StateNamespace()
