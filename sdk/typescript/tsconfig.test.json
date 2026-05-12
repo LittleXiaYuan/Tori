@@ -79,6 +79,7 @@
     "src/trace-events.ts",
     "src/task-trace.ts",
     "src/browser.ts",
+    "src/browser-status.ts",
     "src/runtime.ts",
     "src/router.ts",
     "src/modes.ts",

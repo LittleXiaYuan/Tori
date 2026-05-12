@@ -154,6 +154,7 @@ import { createTraceClient } from "yunque-client/trace";
 import { createTraceEventsClient } from "yunque-client/trace-events";
 import { createTaskTraceClient } from "yunque-client/task-trace";
 import { createBrowserClient } from "yunque-client/browser";
+import { createBrowserStatusClient } from "yunque-client/browser-status";
 import { createRuntimeClient } from "yunque-client/runtime";
 import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
@@ -778,13 +779,18 @@ const trace = createTraceClient({
 const recentEvents = await trace.recent({ limit: 20 });
 console.log(recentEvents.events);
 
+const browserStatusClient = createBrowserStatusClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+const browserHealth = await browserStatusClient.status();
+
 const browser = createBrowserClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
 
-const browserStatus = await browser.status();
-if (browserStatus.connected) {
+if (browserHealth.connected) {
   await browser.navigate("https://example.com");
   const pageText = await browser.ocr();
   console.log(pageText.text);
@@ -1122,7 +1128,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`runtime`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1215,6 +1221,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/trace-events.ts` | Lightweight trace recent/by-trace-id facade without full SDK import |
 | `src/task-trace.ts` | Lightweight task trace read facade without full SDK import |
 | `src/browser.ts` | Lightweight hand-written browser extension automation and OPP slice |
+| `src/browser-status.ts` | Lightweight browser status/config/extension-status facade without automation or screenshot APIs |
 | `src/runtime.ts` | Lightweight hand-written session queue and events stream slice |
 | `src/router.ts` | Lightweight hand-written smart-router stats and status slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |

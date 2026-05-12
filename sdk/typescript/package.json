@@ -259,6 +259,10 @@
       "types": "./src/browser.ts",
       "import": "./src/browser.ts"
     },
+    "./browser-status": {
+      "types": "./src/browser-status.ts",
+      "import": "./src/browser-status.ts"
+    },
     "./runtime": {
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
