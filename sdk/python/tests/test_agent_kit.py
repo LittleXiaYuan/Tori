@@ -100,6 +100,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"status": "ok"}
             if path == "/v1/rbac/check":
                 return {"allowed": True, "subject_id": "u1", "resource": "knowledge", "action": "read"}
+            if path == "/v1/backup/info":
+                return {"file_count": 1}
             if path == "/api/settings/check":
                 return {"setup_needed": False}
             if path == "/healthz":
@@ -157,6 +159,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.instructions.list(category="style")["instructions"][0]["instruction_id"], "ins-1")
             self.assertEqual(kit.reactions.react("wechat", "u1", "m1", emoji="👍")["status"], "ok")
             self.assertEqual(kit.permissions.check("knowledge", "read", subject_id="u1")["allowed"], True)
+            self.assertEqual(kit.backup.info()["file_count"], 1)
             self.assertEqual(kit.settings.check()["setup_needed"], False)
             self.assertEqual(kit.system.health()["status"], "ok")
             self.assertTrue(kit.auth.status()["authenticated"])
@@ -205,6 +208,7 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.instructions, yunque.instructions)
         self.assertIs(kit.reactions, yunque.reactions)
         self.assertIs(kit.permissions, yunque.permissions)
+        self.assertIs(kit.backup, yunque.backup)
         self.assertIs(kit.settings, yunque.settings)
         self.assertIs(kit.system, yunque.system)
         self.assertIs(kit.auth, yunque.auth)
@@ -229,11 +233,12 @@ class AgentKitTest(unittest.TestCase):
         self.assertEqual(calls[36], ("GET", "/v1/instructions?category=style", None))
         self.assertEqual(calls[37], ("POST", "/v1/react", {"channel_type": "wechat", "target": "u1", "message_id": "m1", "emoji": "👍"}))
         self.assertEqual(calls[38], ("POST", "/v1/rbac/check", {"resource": "knowledge", "action": "read", "subject_id": "u1"}))
-        self.assertEqual(calls[39], ("GET", "/api/settings/check", None))
-        self.assertEqual(calls[40], ("GET", "/healthz", None))
-        self.assertEqual(calls[41], ("GET", "/v1/auth/status", None))
-        self.assertEqual(calls[42], ("GET", "/v1/tasks?id=task-1", None))
-        self.assertEqual(calls[43], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[39], ("GET", "/v1/backup/info", None))
+        self.assertEqual(calls[40], ("GET", "/api/settings/check", None))
+        self.assertEqual(calls[41], ("GET", "/healthz", None))
+        self.assertEqual(calls[42], ("GET", "/v1/auth/status", None))
+        self.assertEqual(calls[43], ("GET", "/v1/tasks?id=task-1", None))
+        self.assertEqual(calls[44], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

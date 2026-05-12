@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -189,6 +190,111 @@ func errorMessageFromJSON(value any) string {
 				}
 				return msg
 			}
+		}
+	}
+	return ""
+}
+
+// ── Backup (/v1/backup) ──
+
+// Backup exposes archive info/export/import helpers for external backup tools and operator scripts.
+var Backup = &backupNamespace{}
+
+type backupNamespace struct{}
+
+type BackupInfoResponse map[string]any
+type BackupImportResponse map[string]any
+
+type BackupExportResponse struct {
+	Data        []byte
+	Filename    string
+	ContentType string
+}
+
+func (b *backupNamespace) Info(ctx context.Context) (BackupInfoResponse, error) {
+	var out BackupInfoResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/backup/info", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (b *backupNamespace) Export(ctx context.Context) (BackupExportResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+"/v1/backup/export", nil)
+	if err != nil {
+		return BackupExportResponse{}, fmt.Errorf("new request: %w", err)
+	}
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return BackupExportResponse{}, fmt.Errorf("api call /v1/backup/export: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<20))
+	if err != nil {
+		return BackupExportResponse{}, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return BackupExportResponse{}, fmt.Errorf("api /v1/backup/export HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
+	}
+	return BackupExportResponse{Data: body, Filename: filenameFromDisposition(resp.Header.Get("Content-Disposition")), ContentType: resp.Header.Get("Content-Type")}, nil
+}
+
+func (b *backupNamespace) Import(ctx context.Context, data []byte, filename string) (BackupImportResponse, error) {
+	if filename == "" {
+		filename = "yunque-backup.zip"
+	}
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("backup", filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := part.Write(data); err != nil {
+		return nil, err
+	}
+	if err := mw.Close(); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"/v1/backup/import", &buf)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("api call /v1/backup/import: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("api /v1/backup/import HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
+	}
+	var out BackupImportResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out, nil
+}
+
+func filenameFromDisposition(disposition string) string {
+	if disposition == "" {
+		return ""
+	}
+	for _, part := range strings.Split(disposition, ";") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(strings.ToLower(part), "filename=") {
+			return strings.Trim(strings.TrimPrefix(part, "filename="), "\"")
 		}
 	}
 	return ""
@@ -593,6 +699,7 @@ type AgentKit struct {
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
+	Backup        *backupNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -4165,19 +4272,6 @@ func (f *filesNamespace) Download(ctx context.Context, path string) (FileDownloa
 	return FileDownloadResponse{Content: data, Filename: filenameFromDisposition(resp.Header.Get("Content-Disposition")), ContentType: resp.Header.Get("Content-Type")}, nil
 }
 
-func filenameFromDisposition(disposition string) string {
-	if disposition == "" {
-		return ""
-	}
-	for _, part := range strings.Split(disposition, ";") {
-		part = strings.TrimSpace(part)
-		if strings.HasPrefix(strings.ToLower(part), "filename=") {
-			return strings.Trim(strings.TrimPrefix(part, "filename="), `"`)
-		}
-	}
-	return ""
-}
-
 // ── RBAC ──
 
 type rbacNamespace struct{}
@@ -4985,6 +5079,7 @@ func NewAgentKit() AgentKit {
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
+		Backup:        Backup,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "backup",
+  "description": "Cross-language lightweight SDK for backup archive info, export, and import without importing the full platform client.",
+  "principles": [
+    "Expose backup and restore as a focused SDK slice for external operator UIs, CLIs, sidecars, and automation scripts.",
+    "Keep archive info/export/import directly callable through existing gateway routes.",
+    "Make Backup access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/backup/info",
+    "GET /v1/backup/export",
+    "POST /v1/backup/import"
+  ],
+  "capabilities": [
+    {
+      "name": "info",
+      "route": "GET /v1/backup/info",
+      "readOnly": true,
+      "description": "Read backup coverage and size metadata."
+    },
+    {
+      "name": "export",
+      "route": "GET /v1/backup/export",
+      "readOnly": true,
+      "description": "Download a backup ZIP archive."
+    },
+    {
+      "name": "import",
+      "route": "POST /v1/backup/import",
+      "readOnly": false,
+      "description": "Upload and restore a backup ZIP archive."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/backup.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "info": "createBackupClient().info",
+        "export": "createBackupClient().export",
+        "import": "createBackupClient().import"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "info": "yunque.Backup.Info",
+        "export": "yunque.Backup.Export",
+        "import": "yunque.Backup.Import"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "info": "yunque.backup.info",
+        "export": "yunque.backup.export",
+        "import": "yunque.backup.import_zip"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "info": "BackupClient::info",
+        "export": "BackupClient::export",
+        "import": "BackupClient::import_bytes"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
