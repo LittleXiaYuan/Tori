@@ -311,7 +311,10 @@ import { createTriggersLegacyClient } from "yunque-client/triggers-legacy";
 import { createTriggersReadClient } from "yunque-client/triggers-read";
 import { createTriggersControlClient } from "yunque-client/triggers-control";
 import { createMissionsClient } from "yunque-client/missions";
+import { createMissionsParseClient } from "yunque-client/missions-parse";
 import { createReflectClient } from "yunque-client/reflect";
+import { createReflectExperiencesClient } from "yunque-client/reflect-experiences";
+import { createReflectStrategiesClient } from "yunque-client/reflect-strategies";
 import { createToolsClient } from "yunque-client/tools";
 import { createSandboxClient } from "yunque-client/sandbox";
 
@@ -1520,7 +1523,10 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/triggers-read.ts` | Lightweight v2 trigger list/get/runs/events facade without mutation APIs |
 | `src/triggers-control.ts` | Lightweight v2 trigger create/update/delete/emit facade without read/history APIs |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
+| `src/missions-parse.ts` | Lightweight mission natural-language parse facade without reflection APIs |
 | `src/reflect.ts` | Lightweight reflect-only facade over experiences, stats, and strategy context |
+| `src/reflect-experiences.ts` | Lightweight reflection experience list/stats facade without mission parse or strategy APIs |
+| `src/reflect-strategies.ts` | Lightweight reflection strategy context facade without experience list/stats APIs |
 | `src/tools.ts` | Lightweight hand-written guarded process execution sessions list/poll/kill slice |
 | `src/sandbox.ts` | Lightweight hand-written sandbox exec, cloud probe, and desktop lifecycle slice |
 | `openapi-ts.config.ts` | Generator configuration |
