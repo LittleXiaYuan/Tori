@@ -375,6 +375,10 @@
       "types": "./src/iterate.ts",
       "import": "./src/iterate.ts"
     },
+    "./iterate-review": {
+      "types": "./src/iterate-review.ts",
+      "import": "./src/iterate-review.ts"
+    },
     "./trust": {
       "types": "./src/trust.ts",
       "import": "./src/trust.ts"
