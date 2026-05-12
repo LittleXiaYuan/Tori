@@ -1090,6 +1090,26 @@ class _TaskTemplatesNamespace:
 
 task_templates = _TaskTemplatesNamespace()
 
+
+# ── Task Gaps (/v1/tasks/gaps) ──
+
+class _TaskGapsNamespace:
+    """Lightweight helpers for task capability gaps and resolution."""
+
+    def list(self, gap_type: str = "") -> list:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'type': gap_type})}" if gap_type else ""
+        return _api_call("GET", f"/v1/tasks/gaps{suffix}")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/tasks/gaps?stats=true")
+
+    def resolve(self, gap_id: str) -> dict:
+        return _api_call("POST", "/v1/tasks/gaps/resolve", {"id": gap_id})
+
+
+task_gaps = _TaskGapsNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2305,6 +2325,7 @@ class AgentKit:
         self.permissions = permissions
         self.tasks = tasks
         self.task_templates = task_templates
+        self.task_gaps = task_gaps
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

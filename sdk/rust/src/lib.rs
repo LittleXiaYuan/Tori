@@ -5224,6 +5224,9 @@ pub type TaskActionResponse = serde_json::Value;
 pub type TaskTemplate = serde_json::Value;
 pub type TaskTemplatesResponse = serde_json::Value;
 pub type DeleteTaskTemplateResponse = serde_json::Value;
+pub type TaskGap = serde_json::Value;
+pub type TaskGapStats = serde_json::Value;
+pub type ResolveTaskGapResponse = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TaskConstraints {
@@ -5363,6 +5366,23 @@ impl TasksClient {
 
     pub async fn instantiate_template(&self, request: &InstantiateTaskTemplateRequest) -> Result<Task, reqwest::Error> {
         self.post_json("/v1/tasks/templates/instantiate", request).await
+    }
+
+    pub async fn gaps(&self, gap_type: impl AsRef<str>) -> Result<Vec<TaskGap>, reqwest::Error> {
+        let gap_type = gap_type.as_ref();
+        if gap_type.is_empty() {
+            self.get_json("/v1/tasks/gaps").await
+        } else {
+            self.get_json(&format!("/v1/tasks/gaps?type={}", url_encode_query_component(gap_type))).await
+        }
+    }
+
+    pub async fn gap_stats(&self) -> Result<TaskGapStats, reqwest::Error> {
+        self.get_json("/v1/tasks/gaps?stats=true").await
+    }
+
+    pub async fn resolve_gap(&self, id: impl AsRef<str>) -> Result<ResolveTaskGapResponse, reqwest::Error> {
+        self.post_json("/v1/tasks/gaps/resolve", &serde_json::json!({"id": id.as_ref()})).await
     }
 
     async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
@@ -9077,6 +9097,12 @@ mod tests {
         }).unwrap();
         assert_eq!(instantiate["template_id"], "tpl-1");
         assert_eq!(instantiate["variables"]["repo"], "yunque");
+        assert_eq!(
+            client.url(&format!("/v1/tasks/gaps?type={}", url_encode_query_component("skill missing"))),
+            "http://localhost:9090/v1/tasks/gaps?type=skill+missing"
+        );
+        let gaps: Vec<TaskGap> = serde_json::from_str(r#"[{"id":"gap-1","gap_type":"skill_missing"}]"#).unwrap();
+        assert_eq!(gaps[0]["gap_type"], "skill_missing");
     }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {

@@ -37,6 +37,12 @@ class TasksTest(unittest.TestCase):
                 return {"id": "tpl-1", "name": "Review"} if method == "GET" else {"deleted": "tpl-1"}
             if path == "/v1/tasks/templates/instantiate":
                 return {"id": "task-3", "template_id": body["template_id"], "variables": body["variables"]}
+            if path == "/v1/tasks/gaps?type=skill_missing":
+                return [{"id": "gap-1", "gap_type": "skill_missing"}]
+            if path == "/v1/tasks/gaps?stats=true":
+                return {"total": 2, "unresolved": 1}
+            if path == "/v1/tasks/gaps/resolve":
+                return {"resolved": body["id"]}
             raise AssertionError(f"unexpected call: {method} {path}")
 
         with patch.object(yunque, "_api_call", side_effect=fake_api_call):
@@ -50,12 +56,17 @@ class TasksTest(unittest.TestCase):
             self.assertEqual(yunque.task_templates.create("tpl-1", name="Review", steps=[{"action": "review"}])["id"], "tpl-1")
             self.assertEqual(yunque.task_templates.instantiate("tpl-1", {"repo": "yunque"})["id"], "task-3")
             self.assertEqual(yunque.task_templates.delete("tpl-1")["deleted"], "tpl-1")
+            self.assertEqual(yunque.task_gaps.list("skill_missing")[0]["id"], "gap-1")
+            self.assertEqual(yunque.task_gaps.stats()["unresolved"], 1)
+            self.assertEqual(yunque.task_gaps.resolve("gap-1")["resolved"], "gap-1")
 
         self.assertEqual(calls[0], ("GET", "/v1/tasks", None))
         self.assertEqual(calls[2], ("POST", "/v1/tasks", {"description": "ship SDK", "title": "SDK", "constraints": {"max_steps": 3}}))
         self.assertEqual(calls[3], ("POST", "/v1/tasks/run", {"id": "task-1"}))
         self.assertEqual(calls[7], ("POST", "/v1/tasks/templates", {"id": "tpl-1", "name": "Review", "steps": [{"action": "review"}]}))
         self.assertEqual(calls[8], ("POST", "/v1/tasks/templates/instantiate", {"template_id": "tpl-1", "variables": {"repo": "yunque"}}))
+        self.assertEqual(calls[10], ("GET", "/v1/tasks/gaps?type=skill_missing", None))
+        self.assertEqual(calls[12], ("POST", "/v1/tasks/gaps/resolve", {"id": "gap-1"}))
 
 
 if __name__ == "__main__":

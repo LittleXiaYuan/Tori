@@ -206,6 +206,20 @@ func TestTasksHelpers(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
 			if body.TemplateID != "tpl-1" || body.Variables["repo"] != "yunque" { t.Fatalf("unexpected instantiate body: %+v", body) }
 			_, _ = w.Write([]byte(`{"id":"task-3","title":"Review"}`))
+		case "/v1/tasks/gaps":
+			if r.URL.Query().Get("stats") == "true" {
+				_, _ = w.Write([]byte(`{"total":2,"unresolved":1}`))
+				return
+			}
+			if r.URL.Query().Get("type") != "skill_missing" {
+				t.Fatalf("unexpected gap query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`[{"id":"gap-1","gap_type":"skill_missing"}]`))
+		case "/v1/tasks/gaps/resolve":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body["id"] != "gap-1" { t.Fatalf("unexpected gap resolve body: %+v", body) }
+			_, _ = w.Write([]byte(`{"resolved":"gap-1"}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -232,8 +246,14 @@ func TestTasksHelpers(t *testing.T) {
 	if err != nil || instantiated["id"] != "task-3" { t.Fatalf("instantiate = %+v, %v", instantiated, err) }
 	deletedTpl, err := Tasks.DeleteTemplate(ctx, "tpl-1")
 	if err != nil || deletedTpl["deleted"] != "tpl-1" { t.Fatalf("delete template = %+v, %v", deletedTpl, err) }
+	gaps, err := Tasks.Gaps(ctx, "skill_missing")
+	if err != nil || gaps[0]["id"] != "gap-1" { t.Fatalf("gaps = %+v, %v", gaps, err) }
+	stats, err := Tasks.GapStats(ctx)
+	if err != nil || stats["unresolved"].(float64) != 1 { t.Fatalf("gap stats = %+v, %v", stats, err) }
+	resolved, err := Tasks.ResolveGap(ctx, "gap-1")
+	if err != nil || resolved["resolved"] != "gap-1" { t.Fatalf("resolve gap = %+v, %v", resolved, err) }
 	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 10 { t.Fatalf("unexpected calls: %v", seen) }
+	if len(seen) != 13 { t.Fatalf("unexpected calls: %v", seen) }
 }
 
 func TestPermissionsHelpers(t *testing.T) {
