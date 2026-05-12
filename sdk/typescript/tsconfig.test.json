@@ -21,6 +21,8 @@
     "src/airi.ts",
     "src/planner-recovery.ts",
     "src/planner.ts",
+    "src/planner-read.ts",
+    "src/planner-control.ts",
     "src/chat.ts",
     "src/chat-basic.ts",
     "src/chat-agentic.ts",

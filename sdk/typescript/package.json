@@ -27,6 +27,14 @@
       "types": "./src/planner.ts",
       "import": "./src/planner.ts"
     },
+    "./planner-read": {
+      "types": "./src/planner-read.ts",
+      "import": "./src/planner-read.ts"
+    },
+    "./planner-control": {
+      "types": "./src/planner-control.ts",
+      "import": "./src/planner-control.ts"
+    },
     "./chat": {
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
