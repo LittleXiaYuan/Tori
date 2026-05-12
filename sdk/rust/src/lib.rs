@@ -1391,6 +1391,7 @@ pub struct AgentKit {
     pub chat: ChatClient,
     pub conversations: ConversationsClient,
     pub approvals: ApprovalsClient,
+    pub rbac: RBACClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1443,6 +1444,7 @@ impl AgentKit {
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
             conversations: ConversationsClient::new(base_url.clone(), token.as_ref())?,
             approvals: ApprovalsClient::new(base_url.clone(), token.as_ref())?,
+            rbac: RBACClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1491,6 +1493,7 @@ impl AgentKit {
                 plugin_http.clone(),
             ),
             approvals: ApprovalsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            rbac: RBACClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3550,6 +3553,153 @@ pub struct ConversationReplayOptions {
     pub limit: i32,
     #[serde(default, skip_serializing_if = "is_default")]
     pub offset: i32,
+}
+
+pub type RBACPermission = serde_json::Map<String, serde_json::Value>;
+pub type RBACRole = serde_json::Map<String, serde_json::Value>;
+pub type RBACRolesResponse = serde_json::Value;
+pub type RBACDeletedResponse = serde_json::Value;
+pub type RBACRoleBindingResponse = serde_json::Value;
+pub type RBACCheckResponse = serde_json::Value;
+pub type RBACMyRolesResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct RBACRoleBindingRequest {
+    pub subject_id: String,
+    pub role_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct RBACCheckRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub subject_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+    pub resource: String,
+    pub action: String,
+}
+
+/// Small Rust helper over `/v1/rbac*` roles, bindings, and permission checks.
+#[derive(Debug, Clone)]
+pub struct RBACClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl RBACClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        let bearer = format!("Bearer {}", token.as_ref());
+        headers.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&bearer).unwrap(),
+        );
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn roles(&self) -> Result<RBACRolesResponse, reqwest::Error> {
+        self.get_json("/v1/rbac/roles").await
+    }
+
+    pub async fn create_role(&self, role: RBACRole) -> Result<RBACRole, reqwest::Error> {
+        self.post_json("/v1/rbac/roles", &role).await
+    }
+
+    pub async fn delete_role(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<RBACDeletedResponse, reqwest::Error> {
+        self.delete_json(&format!(
+            "/v1/rbac/roles?id={}",
+            encode_query_component(id.as_ref())
+        ))
+        .await
+    }
+
+    pub async fn assign_role(
+        &self,
+        request: RBACRoleBindingRequest,
+    ) -> Result<RBACRoleBindingResponse, reqwest::Error> {
+        self.post_json("/v1/rbac/assign", &request).await
+    }
+
+    pub async fn revoke_role(
+        &self,
+        request: RBACRoleBindingRequest,
+    ) -> Result<RBACRoleBindingResponse, reqwest::Error> {
+        self.post_json("/v1/rbac/revoke", &request).await
+    }
+
+    pub async fn check(
+        &self,
+        request: RBACCheckRequest,
+    ) -> Result<RBACCheckResponse, reqwest::Error> {
+        self.post_json("/v1/rbac/check", &request).await
+    }
+
+    pub async fn my_roles(&self) -> Result<RBACMyRolesResponse, reqwest::Error> {
+        self.get_json("/v1/rbac/my-roles").await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn delete_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .delete(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 pub type ApprovalRequest = serde_json::Map<String, serde_json::Value>;
@@ -6397,6 +6547,38 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn rbac_helpers_build_urls_and_requests() {
+        let client = RBACClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/rbac/roles"),
+            "http://localhost:9090/v1/rbac/roles"
+        );
+        let binding = RBACRoleBindingRequest {
+            subject_id: "u1".to_string(),
+            role_id: "operator".to_string(),
+            tenant_id: String::new(),
+        };
+        let value = serde_json::to_value(binding).unwrap();
+        assert_eq!(value["subject_id"], "u1");
+        assert!(value.get("tenant_id").is_none());
+        let check = RBACCheckRequest {
+            subject_id: "u1".to_string(),
+            resource: "tasks".to_string(),
+            action: "write".to_string(),
+            ..Default::default()
+        };
+        let check_value = serde_json::to_value(check).unwrap();
+        assert_eq!(check_value["resource"], "tasks");
+        assert_eq!(check_value["action"], "write");
+        let mut role = RBACRole::new();
+        role.insert(
+            "id".to_string(),
+            serde_json::Value::String("operator".to_string()),
+        );
+        assert_eq!(role["id"], "operator");
     }
 
     #[test]
