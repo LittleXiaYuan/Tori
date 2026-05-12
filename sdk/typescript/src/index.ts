@@ -9,3 +9,4 @@ export * from './setup';
 export * from './admin';
 export * from './federation';
 export * from './ide';
+export * from './discovery';

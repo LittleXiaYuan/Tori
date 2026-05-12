@@ -629,3 +629,7 @@ The lightweight Planner SDK exposes Planner Recovery helpers for external task r
 ### IDE SDK
 
 The lightweight IDE SDK exposes IDE supervisor status and structured code review helpers for editor plugins, external review panes, CLIs, sidecars, and automation scripts without importing the full platform client. It covers `/v1/ide/status` and `/v1/ide/review`, including full, quick, and diff review helper methods. Agent Kit also exposes this surface as `kit.ide` / `kit.IDE` for one-stop editor automation.
+
+### Discovery SDK
+
+The lightweight Discovery SDK exposes identity, embeddings, and search as a reusable incremental package surface for external projects, plugin UIs, front-end pages, CLIs, sidecars, and automation scripts. It maps directly to `POST /v1/identity/resolve`, `GET /v1/identity/profiles`, `GET/POST /v1/embeddings`, `GET /v1/search`, and `GET /v1/search/providers`, so callers can resolve identities, list profiles, inspect embedding providers, embed text, search the web, and list search providers without coupling to the full 云雀 platform. Agent Kit also exposes this surface as `kit.discovery` / `kit.Discovery`.

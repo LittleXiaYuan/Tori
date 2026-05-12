@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "discovery",
+  "description": "Cross-language lightweight SDK for identity resolution, embeddings, and web search without importing the full platform client.",
+  "principles": [
+    "Expose identity, embeddings, and search as a focused SDK slice for external projects, plugin UIs, front-end pages, CLIs, sidecars, and automation scripts.",
+    "Keep discovery reads and mutations directly callable through existing authenticated gateway routes.",
+    "Make discovery access available through Agent Kit while preserving standalone TypeScript discovery helpers."
+  ],
+  "routes": [
+    "POST /v1/identity/resolve",
+    "GET /v1/identity/profiles",
+    "GET /v1/embeddings",
+    "POST /v1/embeddings",
+    "GET /v1/search",
+    "GET /v1/search/providers"
+  ],
+  "capabilities": [
+    { "name": "resolveIdentity", "route": "POST /v1/identity/resolve", "readOnly": false, "description": "Resolve a channel/user pair into a unified identity profile." },
+    { "name": "identityProfiles", "route": "GET /v1/identity/profiles", "readOnly": true, "description": "List known unified identity profiles." },
+    { "name": "embeddingProviders", "route": "GET /v1/embeddings", "readOnly": true, "description": "List configured embedding providers." },
+    { "name": "embed", "route": "POST /v1/embeddings", "readOnly": false, "description": "Generate an embedding vector for text." },
+    { "name": "search", "route": "GET /v1/search", "readOnly": true, "description": "Run a web search through the configured provider." },
+    { "name": "searchProviders", "route": "GET /v1/search/providers", "readOnly": true, "description": "List configured web-search providers." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/discovery.ts", "sdk/typescript/src/agent-kit.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "resolveIdentity": "createDiscoveryClient().resolveIdentity",
+        "identityProfiles": "createDiscoveryClient().identityProfiles",
+        "embeddingProviders": "createDiscoveryClient().embeddingProviders",
+        "embed": "createDiscoveryClient().embed",
+        "search": "createDiscoveryClient().search",
+        "searchProviders": "createDiscoveryClient().searchProviders"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "resolveIdentity": "yunque.Discovery.ResolveIdentity",
+        "identityProfiles": "yunque.Discovery.IdentityProfiles",
+        "embeddingProviders": "yunque.Discovery.EmbeddingProviders",
+        "embed": "yunque.Discovery.Embed",
+        "search": "yunque.Discovery.Search",
+        "searchProviders": "yunque.Discovery.SearchProviders"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "resolveIdentity": "yunque.discovery.resolve_identity",
+        "identityProfiles": "yunque.discovery.identity_profiles",
+        "embeddingProviders": "yunque.discovery.embedding_providers",
+        "embed": "yunque.discovery.embed",
+        "search": "yunque.discovery.search",
+        "searchProviders": "yunque.discovery.search_providers"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "resolveIdentity": "DiscoveryClient::resolve_identity",
+        "identityProfiles": "DiscoveryClient::identity_profiles",
+        "embeddingProviders": "DiscoveryClient::embedding_providers",
+        "embed": "DiscoveryClient::embed",
+        "search": "DiscoveryClient::search",
+        "searchProviders": "DiscoveryClient::search_providers"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

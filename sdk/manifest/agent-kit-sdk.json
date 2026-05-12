@@ -60,7 +60,8 @@
     "a2a-federation",
     "planner-recovery",
     "ide-supervisor",
-    "plugin-api-runtime"
+    "plugin-api-runtime",
+    "discovery"
   ],
   "capabilities": [
     {
@@ -232,6 +233,10 @@
       "description": "Access the lightweight IDE supervisor client or namespace for status and structured code review."
     },
     {
+      "name": "discovery",
+      "description": "Identity, embeddings, and search helpers from the Discovery SDK."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -341,7 +346,8 @@
         "admin": "AgentKit.admin",
         "federation": "AgentKit.federation",
         "planner": "AgentKit.planner",
-        "ide": "AgentKit.ide"
+        "ide": "AgentKit.ide",
+        "discovery": "createAgentKit().discovery"
       }
     },
     "go": {
@@ -408,7 +414,8 @@
         "admin": "AgentKit.Admin",
         "federation": "AgentKit.Federation",
         "planner": "AgentKit.Planner",
-        "ide": "AgentKit.IDE"
+        "ide": "AgentKit.IDE",
+        "discovery": "NewAgentKit().Discovery"
       }
     },
     "python": {
@@ -475,7 +482,8 @@
         "admin": "AgentKit.admin",
         "federation": "AgentKit.federation",
         "planner": "AgentKit.planner",
-        "ide": "AgentKit.ide"
+        "ide": "AgentKit.ide",
+        "discovery": "create_agent_kit().discovery"
       }
     },
     "rust": {
@@ -542,7 +550,8 @@
         "admin": "AgentKit::admin",
         "federation": "AgentKit::federation",
         "planner": "AgentKit::planner",
-        "ide": "AgentKit::ide"
+        "ide": "AgentKit::ide",
+        "discovery": "AgentKit::discovery"
       }
     }
   },

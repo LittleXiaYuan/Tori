@@ -110,6 +110,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"password_set": True, "authenticated": True}
             if path == "/v1/tasks?id=task-1":
                 return {"id": "task-1", "status": "running"}
+            if path == "/v1/search?q=agent&limit=1":
+                return {"results": [{"title": "Discovery"}]}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -164,6 +166,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.system.health()["status"], "ok")
             self.assertTrue(kit.auth.status()["authenticated"])
             self.assertEqual(kit.tasks.get("task-1")["status"], "running")
+            self.assertEqual(kit.discovery.search("agent", limit=1)["results"][0]["title"], "Discovery")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -213,6 +216,7 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.system, yunque.system)
         self.assertIs(kit.auth, yunque.auth)
         self.assertIs(kit.tasks, yunque.tasks)
+        self.assertIs(kit.discovery, yunque.discovery)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
         self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))
@@ -238,7 +242,8 @@ class AgentKitTest(unittest.TestCase):
         self.assertEqual(calls[41], ("GET", "/healthz", None))
         self.assertEqual(calls[42], ("GET", "/v1/auth/status", None))
         self.assertEqual(calls[43], ("GET", "/v1/tasks?id=task-1", None))
-        self.assertEqual(calls[44], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[44], ("GET", "/v1/search?q=agent&limit=1", None))
+        self.assertEqual(calls[45], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:
