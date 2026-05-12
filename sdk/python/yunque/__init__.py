@@ -597,6 +597,48 @@ class _ConversationsNamespace:
 conversations = _ConversationsNamespace()
 
 
+
+# ── RBAC (/v1/rbac) ──
+
+class _RBACNamespace:
+    """Lightweight helpers for role-based access control roles, bindings, and checks."""
+
+    def roles(self) -> dict:
+        return _api_call("GET", "/v1/rbac/roles")
+
+    def create_role(self, role: dict) -> dict:
+        return _api_call("POST", "/v1/rbac/roles", role)
+
+    def delete_role(self, role_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/rbac/roles?{urlencode({'id': role_id})}")
+
+    def assign_role(self, subject_id: str, role_id: str, tenant_id: str = "") -> dict:
+        body = {"subject_id": subject_id, "role_id": role_id}
+        if tenant_id:
+            body["tenant_id"] = tenant_id
+        return _api_call("POST", "/v1/rbac/assign", body)
+
+    def revoke_role(self, subject_id: str, role_id: str, tenant_id: str = "") -> dict:
+        body = {"subject_id": subject_id, "role_id": role_id}
+        if tenant_id:
+            body["tenant_id"] = tenant_id
+        return _api_call("POST", "/v1/rbac/revoke", body)
+
+    def check(self, resource: str, action: str, *, subject_id: str = "", tenant_id: str = "") -> dict:
+        body = {"resource": resource, "action": action}
+        if subject_id:
+            body["subject_id"] = subject_id
+        if tenant_id:
+            body["tenant_id"] = tenant_id
+        return _api_call("POST", "/v1/rbac/check", body)
+
+    def my_roles(self) -> dict:
+        return _api_call("GET", "/v1/rbac/my-roles")
+
+
+rbac = _RBACNamespace()
+
 # ── Approvals (/v1/approvals) ──
 
 class _ApprovalsNamespace:
@@ -1782,6 +1824,7 @@ class AgentKit:
         self.chat = chat_sdk
         self.conversations = conversations
         self.approvals = approvals
+        self.rbac = rbac
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

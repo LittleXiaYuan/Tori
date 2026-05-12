@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "domain": "rbac-governance",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/rbac roles, role bindings, permission checks, and current-subject role reads without importing the full platform client.",
+  "principles": [
+    "Expose RBAC governance as a focused SDK slice for external admin pages, plugin UIs, CLIs, sidecars, and automation guard scripts.",
+    "Keep role CRUD, binding updates, permission checks, and my-roles reads directly callable without coupling callers to generated SDK internals.",
+    "Make RBAC access available through Agent Kit so approval, plugin, and automation workflows can compose permission-aware controls from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/rbac/roles",
+    "POST /v1/rbac/roles",
+    "DELETE /v1/rbac/roles",
+    "POST /v1/rbac/assign",
+    "POST /v1/rbac/revoke",
+    "POST /v1/rbac/check",
+    "GET /v1/rbac/my-roles"
+  ],
+  "capabilities": [
+    {
+      "name": "roles",
+      "route": "GET /v1/rbac/roles",
+      "readOnly": true,
+      "description": "List roles."
+    },
+    {
+      "name": "createRole",
+      "route": "POST /v1/rbac/roles",
+      "readOnly": false,
+      "description": "Create a custom role."
+    },
+    {
+      "name": "deleteRole",
+      "route": "DELETE /v1/rbac/roles",
+      "readOnly": false,
+      "description": "Delete a custom role by id."
+    },
+    {
+      "name": "assignRole",
+      "route": "POST /v1/rbac/assign",
+      "readOnly": false,
+      "description": "Assign a role to a subject."
+    },
+    {
+      "name": "revokeRole",
+      "route": "POST /v1/rbac/revoke",
+      "readOnly": false,
+      "description": "Revoke a role from a subject."
+    },
+    {
+      "name": "check",
+      "route": "POST /v1/rbac/check",
+      "readOnly": true,
+      "description": "Check whether a subject may perform an action on a resource."
+    },
+    {
+      "name": "myRoles",
+      "route": "GET /v1/rbac/my-roles",
+      "readOnly": true,
+      "description": "Read roles assigned to the current subject."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/rbac.ts",
+        "sdk/typescript/src/roles.ts",
+        "sdk/typescript/src/role-bindings.ts",
+        "sdk/typescript/src/permissions.ts",
+        "sdk/typescript/src/my-roles.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "roles": "createRBACClient().roles",
+        "createRole": "createRBACClient().createRole",
+        "deleteRole": "createRBACClient().deleteRole",
+        "assignRole": "createRBACClient().assignRole",
+        "revokeRole": "createRBACClient().revokeRole",
+        "check": "createRBACClient().check",
+        "myRoles": "createRBACClient().myRoles"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "roles": "yunque.RBAC.Roles",
+        "createRole": "yunque.RBAC.CreateRole",
+        "deleteRole": "yunque.RBAC.DeleteRole",
+        "assignRole": "yunque.RBAC.AssignRole",
+        "revokeRole": "yunque.RBAC.RevokeRole",
+        "check": "yunque.RBAC.Check",
+        "myRoles": "yunque.RBAC.MyRoles"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "roles": "yunque.rbac.roles",
+        "createRole": "yunque.rbac.create_role",
+        "deleteRole": "yunque.rbac.delete_role",
+        "assignRole": "yunque.rbac.assign_role",
+        "revokeRole": "yunque.rbac.revoke_role",
+        "check": "yunque.rbac.check",
+        "myRoles": "yunque.rbac.my_roles"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "roles": "RBACClient::roles",
+        "createRole": "RBACClient::create_role",
+        "deleteRole": "RBACClient::delete_role",
+        "assignRole": "RBACClient::assign_role",
+        "revokeRole": "RBACClient::revoke_role",
+        "check": "RBACClient::check",
+        "myRoles": "RBACClient::my_roles"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

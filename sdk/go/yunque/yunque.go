@@ -323,6 +323,7 @@ type AgentKit struct {
 	Chat          *chatNamespace
 	Conversations *conversationsNamespace
 	Approvals     *approvalsNamespace
+	RBAC          *rbacNamespace
 	Plugin        *pluginRuntimeNamespace
 	Memory        *memoryNamespace
 	AgentMemory   *agentMemoryNamespace
@@ -1843,6 +1844,9 @@ var Conversations = &conversationsNamespace{}
 // Approvals provides focused access to human-in-the-loop approval queues and rules.
 var Approvals = &approvalsNamespace{}
 
+// RBAC provides focused access to roles, role bindings, and permission checks.
+var RBAC = &rbacNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2743,6 +2747,87 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── RBAC ──
+
+type rbacNamespace struct{}
+
+type RBACPermission map[string]any
+type RBACRole map[string]any
+type RBACRolesResponse map[string]any
+type RBACDeletedResponse map[string]any
+type RBACRoleBindingResponse map[string]any
+type RBACCheckResponse map[string]any
+type RBACMyRolesResponse map[string]any
+
+type RBACRoleBindingRequest struct {
+	SubjectID string `json:"subject_id"`
+	RoleID    string `json:"role_id"`
+	TenantID  string `json:"tenant_id,omitempty"`
+}
+
+type RBACCheckRequest struct {
+	SubjectID string `json:"subject_id,omitempty"`
+	TenantID  string `json:"tenant_id,omitempty"`
+	Resource  string `json:"resource"`
+	Action    string `json:"action"`
+}
+
+func (r *rbacNamespace) Roles(ctx context.Context) (RBACRolesResponse, error) {
+	var out RBACRolesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/rbac/roles", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) CreateRole(ctx context.Context, role RBACRole) (RBACRole, error) {
+	var out RBACRole
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/rbac/roles", role, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) DeleteRole(ctx context.Context, id string) (RBACDeletedResponse, error) {
+	var out RBACDeletedResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/rbac/roles?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) AssignRole(ctx context.Context, request RBACRoleBindingRequest) (RBACRoleBindingResponse, error) {
+	var out RBACRoleBindingResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/rbac/assign", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) RevokeRole(ctx context.Context, request RBACRoleBindingRequest) (RBACRoleBindingResponse, error) {
+	var out RBACRoleBindingResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/rbac/revoke", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) Check(ctx context.Context, request RBACCheckRequest) (RBACCheckResponse, error) {
+	var out RBACCheckResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/rbac/check", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *rbacNamespace) MyRoles(ctx context.Context) (RBACMyRolesResponse, error) {
+	var out RBACMyRolesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/rbac/my-roles", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Approvals ──
 
 type approvalsNamespace struct{}
@@ -3463,6 +3548,7 @@ func NewAgentKit() AgentKit {
 		Chat:          ChatSDK,
 		Conversations: Conversations,
 		Approvals:     Approvals,
+		RBAC:          RBAC,
 		Plugin:        Plugin,
 		Memory:        Memory,
 		AgentMemory:   AgentMemory,

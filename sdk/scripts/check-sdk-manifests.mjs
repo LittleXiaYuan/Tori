@@ -32,6 +32,7 @@ const checks = [
   ["Chat SDK manifest", "sdk/scripts/check-chat-sdk-manifest.mjs"],
   ["Conversations SDK manifest", "sdk/scripts/check-conversations-sdk-manifest.mjs"],
   ["Approvals SDK manifest", "sdk/scripts/check-approvals-sdk-manifest.mjs"],
+  ["RBAC SDK manifest", "sdk/scripts/check-rbac-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

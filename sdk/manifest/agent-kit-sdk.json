@@ -36,6 +36,7 @@
     "chat-runtime",
     "conversation-sessions",
     "human-approvals",
+    "rbac-governance",
     "realtime-websocket",
     "plugin-api-runtime"
   ],
@@ -153,6 +154,10 @@
       "description": "Access the lightweight Approvals client or namespace for human-in-the-loop queues, decisions, and rules."
     },
     {
+      "name": "rbac",
+      "description": "Access the lightweight RBAC client or namespace for roles, role bindings, permission checks, and my-roles reads."
+    },
+    {
       "name": "realtime",
       "description": "Access the lightweight Realtime WebSocket chat client or namespace."
     },
@@ -203,7 +208,8 @@
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
         "conversations": "AgentKit.conversations",
-        "approvals": "AgentKit.approvals"
+        "approvals": "AgentKit.approvals",
+        "rbac": "AgentKit.rbac"
       }
     },
     "go": {
@@ -247,7 +253,8 @@
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
         "conversations": "AgentKit.Conversations",
-        "approvals": "AgentKit.Approvals"
+        "approvals": "AgentKit.Approvals",
+        "rbac": "AgentKit.RBAC"
       }
     },
     "python": {
@@ -291,7 +298,8 @@
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
         "conversations": "AgentKit.conversations",
-        "approvals": "AgentKit.approvals"
+        "approvals": "AgentKit.approvals",
+        "rbac": "AgentKit.rbac"
       }
     },
     "rust": {
@@ -335,7 +343,8 @@
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",
         "conversations": "AgentKit::conversations",
-        "approvals": "AgentKit::approvals"
+        "approvals": "AgentKit::approvals",
+        "rbac": "AgentKit::rbac"
       }
     }
   },
