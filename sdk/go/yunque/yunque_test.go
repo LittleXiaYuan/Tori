@@ -160,6 +160,39 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestRealtimeHelpers(t *testing.T) {
+	oldBase, oldToken := apiBase, pluginToken
+	apiBase, pluginToken = "https://agent.example/", "plugin-token"
+	defer func() { apiBase, pluginToken = oldBase, oldToken }()
+
+	url := Realtime.WSURL(map[string]string{"tenant": "t1", "empty": ""})
+	if url != "wss://agent.example/v1/ws?access_token=plugin-token&tenant=t1" && url != "wss://agent.example/v1/ws?tenant=t1&access_token=plugin-token" {
+		t.Fatalf("unexpected websocket URL: %s", url)
+	}
+	ping := Realtime.Ping(map[string]any{"trace_id": "tr-1"})
+	if ping["type"] != "ping" || ping["trace_id"] != "tr-1" {
+		t.Fatalf("unexpected ping: %+v", ping)
+	}
+	chat := Realtime.Chat("你好", "s1", map[string]any{"locale": "zh-CN"})
+	encoded, err := Realtime.Serialize(chat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := Realtime.Parse(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed["type"] != "chat" || parsed["content"] != "你好" || parsed["session"] != "s1" {
+		t.Fatalf("unexpected parsed chat: %+v", parsed)
+	}
+	if _, err := Realtime.Parse("[]"); err == nil {
+		t.Fatalf("expected arrays to be rejected")
+	}
+	if NewAgentKit().Realtime != Realtime {
+		t.Fatalf("agent kit should reuse Realtime namespace")
+	}
+}
+
 func TestReverieHelpers(t *testing.T) {
 	delivered := false
 	var seen []string

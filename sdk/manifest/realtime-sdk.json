@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "domain": "realtime-websocket",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/ws realtime chat URL construction, connection helpers, and ping/chat message serialization without importing the full platform client.",
+  "principles": [
+    "Expose realtime chat wiring as a focused SDK slice for external chat panes, desktop widgets, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep WebSocket URL construction and message helpers directly callable without coupling callers to generated SDK internals.",
+    "Make Realtime access available through Agent Kit for one-stop lightweight interactive workflows."
+  ],
+  "routes": ["GET /v1/ws"],
+  "capabilities": [
+    { "name": "wsUrl", "route": "GET /v1/ws", "readOnly": true, "description": "Build an authenticated websocket URL for /v1/ws." },
+    { "name": "connect", "route": "GET /v1/ws", "readOnly": false, "description": "Connect to the realtime websocket when the language/runtime has a WebSocket implementation." },
+    { "name": "ping", "route": "local message", "readOnly": true, "description": "Create a ping message payload." },
+    { "name": "chat", "route": "local message", "readOnly": true, "description": "Create a chat message payload." },
+    { "name": "serialize", "route": "local serialize", "readOnly": true, "description": "Serialize outbound realtime messages." },
+    { "name": "parse", "route": "local parse", "readOnly": true, "description": "Parse inbound realtime message objects." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/realtime.ts", "sdk/typescript/src/realtime-connect.ts", "sdk/typescript/src/realtime-messages.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": { "wsUrl": "createRealtimeClient().wsUrl", "connect": "createRealtimeClient().connect", "ping": "createRealtimeClient().ping", "chat": "createRealtimeClient().chat", "serialize": "createRealtimeClient().send", "parse": "createRealtimeClient().parse" }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": { "wsUrl": "yunque.Realtime.WSURL", "connect": "yunque.Realtime.WSURL", "ping": "yunque.Realtime.Ping", "chat": "yunque.Realtime.Chat", "serialize": "yunque.Realtime.Serialize", "parse": "yunque.Realtime.Parse" }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": { "wsUrl": "yunque.realtime.ws_url", "connect": "yunque.realtime.ws_url", "ping": "yunque.realtime.ping", "chat": "yunque.realtime.chat", "serialize": "yunque.realtime.serialize", "parse": "yunque.realtime.parse" }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": { "wsUrl": "RealtimeClient::ws_url", "connect": "RealtimeClient::ws_url", "ping": "RealtimeClient::ping", "chat": "RealtimeClient::chat", "serialize": "RealtimeClient::serialize", "parse": "RealtimeClient::parse" }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

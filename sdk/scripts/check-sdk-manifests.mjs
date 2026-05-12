@@ -28,6 +28,7 @@ const checks = [
   ["Heartbeat SDK manifest", "sdk/scripts/check-heartbeat-sdk-manifest.mjs"],
   ["Events SDK manifest", "sdk/scripts/check-events-sdk-manifest.mjs"],
   ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
+  ["Realtime SDK manifest", "sdk/scripts/check-realtime-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

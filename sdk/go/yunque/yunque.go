@@ -319,6 +319,7 @@ type AgentKit struct {
 	Heartbeat    *heartbeatNamespace
 	Events       *eventsNamespace
 	Reverie      *reverieNamespace
+	Realtime     *realtimeNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1827,6 +1828,9 @@ var Events = &eventsNamespace{}
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
 
+// Realtime provides focused access to /v1/ws URL construction and message helpers.
+var Realtime = &realtimeNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2727,6 +2731,74 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Realtime WebSocket Chat ──
+
+type realtimeNamespace struct{}
+
+type RealtimeMessage map[string]any
+
+func (r *realtimeNamespace) WSURL(query map[string]string) string {
+	u, err := url.Parse(strings.TrimRight(apiBase, "/") + "/v1/ws")
+	if err != nil {
+		return strings.TrimRight(apiBase, "/") + "/v1/ws"
+	}
+	switch u.Scheme {
+	case "http":
+		u.Scheme = "ws"
+	case "https":
+		u.Scheme = "wss"
+	}
+	q := u.Query()
+	for k, v := range query {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	if q.Get("key") == "" && q.Get("api_key") == "" && q.Get("token") == "" && q.Get("access_token") == "" && pluginToken != "" {
+		q.Set("access_token", pluginToken)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func (r *realtimeNamespace) Ping(extra map[string]any) RealtimeMessage {
+	message := RealtimeMessage{"type": "ping"}
+	for k, v := range extra {
+		message[k] = v
+	}
+	return message
+}
+
+func (r *realtimeNamespace) Chat(content, session string, extra map[string]any) RealtimeMessage {
+	message := RealtimeMessage{"type": "chat", "content": content}
+	if session != "" {
+		message["session"] = session
+	}
+	for k, v := range extra {
+		message[k] = v
+	}
+	return message
+}
+
+func (r *realtimeNamespace) Serialize(message RealtimeMessage) (string, error) {
+	data, err := json.Marshal(message)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (r *realtimeNamespace) Parse(data string) (RealtimeMessage, error) {
+	var message RealtimeMessage
+	if err := json.Unmarshal([]byte(data), &message); err != nil {
+		return nil, err
+	}
+	if message == nil {
+		return nil, fmt.Errorf("realtime message must be an object")
+	}
+	return message, nil
+}
+
 // ── Reverie Proactive Thought Loop ──
 
 type reverieNamespace struct{}
@@ -3103,6 +3175,7 @@ func NewAgentKit() AgentKit {
 		Heartbeat:    Heartbeat,
 		Events:       Events,
 		Reverie:      Reverie,
+		Realtime:     Realtime,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,
