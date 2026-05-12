@@ -667,6 +667,14 @@
       "types": "./src/dispatch.ts",
       "import": "./src/dispatch.ts"
     },
+    "./dispatch-read": {
+      "types": "./src/dispatch-read.ts",
+      "import": "./src/dispatch-read.ts"
+    },
+    "./dispatch-control": {
+      "types": "./src/dispatch-control.ts",
+      "import": "./src/dispatch-control.ts"
+    },
     "./orchestrator": {
       "types": "./src/orchestrator.ts",
       "import": "./src/orchestrator.ts"

@@ -256,6 +256,8 @@ import { createProjectReadClient } from "yunque-client/project-read";
 import { createProjectWriteClient } from "yunque-client/project-write";
 import { createSkillMarketClient } from "yunque-client/market";
 import { createDispatchClient } from "yunque-client/dispatch";
+import { createDispatchReadClient } from "yunque-client/dispatch-read";
+import { createDispatchControlClient } from "yunque-client/dispatch-control";
 import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createForkClient } from "yunque-client/fork";
 import { createSchedulerClient } from "yunque-client/scheduler";
@@ -1434,6 +1436,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/project-write.ts` | Lightweight project create/update/remove facade without full SDK import |
 | `src/market.ts` | Lightweight hand-written skill marketplace search, ranking, and stats slice |
 | `src/dispatch.ts` | Lightweight hand-written MCP dispatch worker, queue, and config slice |
+| `src/dispatch-read.ts` | Lightweight dispatch worker/queue/config read facade without enqueue/remove APIs |
+| `src/dispatch-control.ts` | Lightweight dispatch enqueue/remove facade without worker registry reads |
 | `src/orchestrator.ts` | Lightweight hand-written IDE worker orchestrator daemon, session, event, and policy slice |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
 | `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
