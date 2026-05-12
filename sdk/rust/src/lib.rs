@@ -1389,6 +1389,7 @@ pub struct AgentKit {
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
+    pub conversations: ConversationsClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1439,6 +1440,7 @@ impl AgentKit {
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
+            conversations: ConversationsClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1482,6 +1484,10 @@ impl AgentKit {
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            conversations: ConversationsClient::new_with_client(
+                base_url.clone(),
+                plugin_http.clone(),
+            ),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3512,6 +3518,206 @@ pub fn parse_sse_events(text: &str) -> Vec<EventStreamMessage> {
             })
         })
         .collect()
+}
+
+pub type ConversationSession = serde_json::Map<String, serde_json::Value>;
+pub type ConversationMessage = serde_json::Map<String, serde_json::Value>;
+pub type ConversationsResponse = serde_json::Value;
+pub type ConversationMessagesResponse = serde_json::Value;
+pub type ConversationDeleteResponse = serde_json::Value;
+pub type ManageConversationResponse = serde_json::Value;
+pub type ConversationReplayResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ManageConversationRequest {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ConversationReplayOptions {
+    #[serde(default)]
+    pub raw: bool,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub offset: i32,
+}
+
+/// Small Rust helper over `/v1/conversations*` session, message, metadata, and replay endpoints.
+#[derive(Debug, Clone)]
+pub struct ConversationsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ConversationsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self, archived: bool) -> Result<ConversationsResponse, reqwest::Error> {
+        let path = if archived {
+            "/v1/conversations?archived=true"
+        } else {
+            "/v1/conversations"
+        };
+        self.get_json(path).await
+    }
+
+    pub async fn messages(
+        &self,
+        session_id: &str,
+    ) -> Result<ConversationMessagesResponse, reqwest::Error> {
+        self.get_json(&format!(
+            "/v1/conversations/messages?session_id={}",
+            url_encode_query_component(session_id)
+        ))
+        .await
+    }
+
+    pub async fn delete_messages(
+        &self,
+        session_id: &str,
+    ) -> Result<ConversationDeleteResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/conversations/messages?session_id={}",
+                url_encode_query_component(session_id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn manage(
+        &self,
+        request: &ManageConversationRequest,
+    ) -> Result<ManageConversationResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/conversations/manage"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn rename(
+        &self,
+        session_id: &str,
+        name: &str,
+    ) -> Result<ManageConversationResponse, reqwest::Error> {
+        self.manage(&ManageConversationRequest {
+            session_id: session_id.to_string(),
+            name: name.to_string(),
+            ..Default::default()
+        })
+        .await
+    }
+
+    pub async fn pin(
+        &self,
+        session_id: &str,
+        pinned: bool,
+    ) -> Result<ManageConversationResponse, reqwest::Error> {
+        self.manage(&ManageConversationRequest {
+            session_id: session_id.to_string(),
+            pinned: Some(pinned),
+            ..Default::default()
+        })
+        .await
+    }
+
+    pub async fn archive(
+        &self,
+        session_id: &str,
+        archive: bool,
+    ) -> Result<ManageConversationResponse, reqwest::Error> {
+        self.manage(&ManageConversationRequest {
+            session_id: session_id.to_string(),
+            archive: Some(archive),
+            ..Default::default()
+        })
+        .await
+    }
+
+    pub async fn replay(
+        &self,
+        session_id: &str,
+        opts: ConversationReplayOptions,
+    ) -> Result<ConversationReplayResponse, reqwest::Error> {
+        let mut query = vec![("session_id".to_string(), session_id.to_string())];
+        if opts.raw {
+            query.push(("raw".to_string(), "true".to_string()));
+        }
+        if opts.limit > 0 {
+            query.push(("limit".to_string(), opts.limit.to_string()));
+        }
+        if opts.offset > 0 {
+            query.push(("offset".to_string(), opts.offset.to_string()));
+        }
+        let encoded = query
+            .into_iter()
+            .map(|(k, v)| {
+                format!(
+                    "{}={}",
+                    url_encode_query_component(&k),
+                    url_encode_query_component(&v)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("&");
+        self.get_json(&format!("/v1/conversations/replay?{encoded}"))
+            .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -6000,6 +6206,33 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn conversations_helpers_build_urls_and_requests() {
+        let client =
+            ConversationsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/conversations"),
+            "http://localhost:9090/v1/conversations"
+        );
+        let manage = ManageConversationRequest {
+            session_id: "s1".to_string(),
+            name: "新的会话".to_string(),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(manage).unwrap();
+        assert_eq!(value["session_id"], "s1");
+        assert_eq!(value["name"], "新的会话");
+        assert!(value.get("pinned").is_none());
+        let opts = ConversationReplayOptions {
+            raw: true,
+            limit: 10,
+            offset: 2,
+        };
+        let opts_value = serde_json::to_value(opts).unwrap();
+        assert_eq!(opts_value["raw"], true);
+        assert_eq!(opts_value["limit"], 10);
     }
 
     #[test]

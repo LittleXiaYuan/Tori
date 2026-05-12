@@ -34,6 +34,7 @@
     "server-sent-events",
     "proactive-reverie",
     "chat-runtime",
+    "conversation-sessions",
     "realtime-websocket",
     "plugin-api-runtime"
   ],
@@ -143,6 +144,10 @@
       "description": "Access the lightweight Chat runtime client or namespace for /v1/chat, /v1/chat/stream, and /v1/chat/agentic."
     },
     {
+      "name": "conversations",
+      "description": "Access the lightweight Conversations client or namespace for session lists, messages, metadata management, and replay."
+    },
+    {
       "name": "realtime",
       "description": "Access the lightweight Realtime WebSocket chat client or namespace."
     },
@@ -191,7 +196,8 @@
         "events": "AgentKit.events",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
-        "chat": "AgentKit.chat"
+        "chat": "AgentKit.chat",
+        "conversations": "AgentKit.conversations"
       }
     },
     "go": {
@@ -233,7 +239,8 @@
         "events": "AgentKit.Events",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
-        "chat": "AgentKit.Chat"
+        "chat": "AgentKit.Chat",
+        "conversations": "AgentKit.Conversations"
       }
     },
     "python": {
@@ -275,7 +282,8 @@
         "events": "AgentKit.events",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
-        "chat": "AgentKit.chat"
+        "chat": "AgentKit.chat",
+        "conversations": "AgentKit.conversations"
       }
     },
     "rust": {
@@ -317,7 +325,8 @@
         "events": "AgentKit::events",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
-        "chat": "AgentKit::chat"
+        "chat": "AgentKit::chat",
+        "conversations": "AgentKit::conversations"
       }
     }
   },

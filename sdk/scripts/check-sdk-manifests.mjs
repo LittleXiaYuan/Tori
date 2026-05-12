@@ -30,6 +30,7 @@ const checks = [
   ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
   ["Realtime SDK manifest", "sdk/scripts/check-realtime-sdk-manifest.mjs"],
   ["Chat SDK manifest", "sdk/scripts/check-chat-sdk-manifest.mjs"],
+  ["Conversations SDK manifest", "sdk/scripts/check-conversations-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

@@ -160,6 +160,67 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestConversationsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/conversations":
+			if r.URL.Query().Get("archived") != "true" {
+				t.Fatalf("unexpected conversations query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"sessions":[{"id":"s1"}],"count":1}`))
+		case "/v1/conversations/messages":
+			if r.URL.Query().Get("session_id") != "s1" {
+				t.Fatalf("unexpected messages query: %s", r.URL.RawQuery)
+			}
+			if r.Method == http.MethodDelete {
+				_, _ = w.Write([]byte(`{"status":"deleted"}`))
+			} else {
+				_, _ = w.Write([]byte(`{"messages":[{"role":"user","content":"hi"}],"count":1}`))
+			}
+		case "/v1/conversations/manage":
+			_, _ = w.Write([]byte(`{"status":"updated","session":{"id":"s1"}}`))
+		case "/v1/conversations/replay":
+			if r.URL.Query().Get("raw") != "true" || r.URL.Query().Get("limit") != "10" {
+				t.Fatalf("unexpected replay query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"session_id":"s1","turns":[],"total_turns":0}`))
+		default:
+			t.Fatalf("unexpected request: %s", r.URL.Path)
+		}
+	})
+
+	if _, err := Conversations.List(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.Messages(context.Background(), "s1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.DeleteMessages(context.Background(), "s1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.Rename(context.Background(), "s1", "新的会话"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.Pin(context.Background(), "s1", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.Archive(context.Background(), "s1", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Conversations.Replay(context.Background(), "s1", ConversationReplayOptions{Raw: true, Limit: 10, Offset: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if NewAgentKit().Conversations != Conversations {
+		t.Fatalf("agent kit should reuse Conversations namespace")
+	}
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestChatHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

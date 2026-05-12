@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "domain": "conversation-sessions",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/conversations session lists, message reads/deletes, metadata management, and replay timelines without importing the full platform client.",
+  "principles": [
+    "Expose conversation history and replay as a focused SDK slice for external chat panes, audit tools, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep session list, message read/delete, metadata update, and replay helpers directly callable without coupling callers to generated SDK internals.",
+    "Make Conversations access available through Agent Kit so chat, realtime, and history workflows compose from one lightweight bundle."
+  ],
+  "routes": ["GET /v1/conversations", "GET /v1/conversations/messages", "DELETE /v1/conversations/messages", "PUT /v1/conversations/manage", "GET /v1/conversations/replay"],
+  "capabilities": [
+    { "name": "list", "route": "GET /v1/conversations", "readOnly": true, "description": "List visible or archived conversation sessions." },
+    { "name": "messages", "route": "GET /v1/conversations/messages", "readOnly": true, "description": "Read visible messages for a session." },
+    { "name": "deleteMessages", "route": "DELETE /v1/conversations/messages", "readOnly": false, "description": "Delete conversation messages for a session." },
+    { "name": "manage", "route": "PUT /v1/conversations/manage", "readOnly": false, "description": "Rename, pin, or archive a conversation." },
+    { "name": "replay", "route": "GET /v1/conversations/replay", "readOnly": true, "description": "Read a replay-safe conversation timeline." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/conversations.ts", "sdk/typescript/src/conversation-sessions.ts", "sdk/typescript/src/conversation-messages.ts", "sdk/typescript/src/conversation-manage.ts", "sdk/typescript/src/conversation-replay.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": { "list": "createConversationsClient().list", "messages": "createConversationsClient().messages", "deleteMessages": "createConversationsClient().deleteMessages", "manage": "createConversationsClient().manage", "replay": "createConversationsClient().replay" }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": { "list": "yunque.Conversations.List", "messages": "yunque.Conversations.Messages", "deleteMessages": "yunque.Conversations.DeleteMessages", "manage": "yunque.Conversations.Manage", "replay": "yunque.Conversations.Replay" }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": { "list": "yunque.conversations.list", "messages": "yunque.conversations.messages", "deleteMessages": "yunque.conversations.delete_messages", "manage": "yunque.conversations.manage", "replay": "yunque.conversations.replay" }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": { "list": "ConversationsClient::list", "messages": "ConversationsClient::messages", "deleteMessages": "ConversationsClient::delete_messages", "manage": "ConversationsClient::manage", "replay": "ConversationsClient::replay" }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}
