@@ -507,6 +507,10 @@
       "types": "./src/plugin-search.ts",
       "import": "./src/plugin-search.ts"
     },
+    "./plugin-memory": {
+      "types": "./src/plugin-memory.ts",
+      "import": "./src/plugin-memory.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
