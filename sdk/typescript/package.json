@@ -1167,6 +1167,14 @@
       "types": "./src/plugin-memory.ts",
       "import": "./src/plugin-memory.ts"
     },
+    "./plugin-memory-read": {
+      "types": "./src/plugin-memory-read.ts",
+      "import": "./src/plugin-memory-read.ts"
+    },
+    "./plugin-memory-write": {
+      "types": "./src/plugin-memory-write.ts",
+      "import": "./src/plugin-memory-write.ts"
+    },
     "./plugin-agent-memory": {
       "types": "./src/plugin-agent-memory.ts",
       "import": "./src/plugin-agent-memory.ts"
