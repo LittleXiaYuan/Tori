@@ -111,6 +111,14 @@
       "types": "./src/webchat.ts",
       "import": "./src/webchat.ts"
     },
+    "./webchat-widget": {
+      "types": "./src/webchat-widget.ts",
+      "import": "./src/webchat-widget.ts"
+    },
+    "./webchat-embed": {
+      "types": "./src/webchat-embed.ts",
+      "import": "./src/webchat-embed.ts"
+    },
     "./conversations": {
       "types": "./src/conversations.ts",
       "import": "./src/conversations.ts"
