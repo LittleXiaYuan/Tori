@@ -5,3 +5,4 @@ export * from './settings';
 export * from './backup';
 export * from './tori';
 export * from './speech';
+export * from './setup';

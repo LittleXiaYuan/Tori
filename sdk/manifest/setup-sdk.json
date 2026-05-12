@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "domain": "setup",
+  "description": "Cross-language lightweight SDK for first-run setup detection, templates, provider tests, apply, and component installation without importing the full platform client.",
+  "principles": [
+    "Expose first-run setup and provider bootstrap as a focused SDK slice for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep environment detection, template listing, provider test, apply, and optional component install directly callable through existing gateway routes.",
+    "Make Setup access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/setup/detect",
+    "GET /v1/setup/health",
+    "GET /v1/setup/templates",
+    "POST /v1/setup/test-provider",
+    "POST /v1/setup/apply",
+    "POST /v1/setup/install-component"
+  ],
+  "capabilities": [
+    {
+      "name": "detect",
+      "route": "GET /v1/setup/detect",
+      "readOnly": true,
+      "description": "Detect local environment and provider availability."
+    },
+    {
+      "name": "health",
+      "route": "GET /v1/setup/health",
+      "readOnly": true,
+      "description": "Check configured provider health."
+    },
+    {
+      "name": "templates",
+      "route": "GET /v1/setup/templates",
+      "readOnly": true,
+      "description": "List built-in setup scenario templates."
+    },
+    {
+      "name": "testProvider",
+      "route": "POST /v1/setup/test-provider",
+      "readOnly": false,
+      "description": "Test a provider connection from the backend."
+    },
+    {
+      "name": "apply",
+      "route": "POST /v1/setup/apply",
+      "readOnly": false,
+      "description": "Apply a setup template and persist generated configuration."
+    },
+    {
+      "name": "installComponent",
+      "route": "POST /v1/setup/install-component",
+      "readOnly": false,
+      "description": "Install an optional setup component."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/setup.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "detect": "createSetupClient().detect",
+        "health": "createSetupClient().health",
+        "templates": "createSetupClient().templates",
+        "testProvider": "createSetupClient().testProvider",
+        "apply": "createSetupClient().apply",
+        "installComponent": "createSetupClient().installComponent"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "detect": "yunque.Setup.Detect",
+        "health": "yunque.Setup.Health",
+        "templates": "yunque.Setup.Templates",
+        "testProvider": "yunque.Setup.TestProvider",
+        "apply": "yunque.Setup.Apply",
+        "installComponent": "yunque.Setup.InstallComponent"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "detect": "yunque.setup.detect",
+        "health": "yunque.setup.health",
+        "templates": "yunque.setup.templates",
+        "testProvider": "yunque.setup.test_provider",
+        "apply": "yunque.setup.apply",
+        "installComponent": "yunque.setup.install_component"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "detect": "SetupClient::detect",
+        "health": "SetupClient::health",
+        "templates": "SetupClient::templates",
+        "testProvider": "SetupClient::test_provider",
+        "apply": "SetupClient::apply",
+        "installComponent": "SetupClient::install_component"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
