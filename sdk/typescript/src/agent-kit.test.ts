@@ -70,6 +70,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   const [event] = await collect(kit.events.stream<{ client_id: string }>());
   assertEqual(event.data?.client_id, "sse-1");
   assertEqual((await kit.reverie.stats()).total, 2);
+  assert(kit.realtime.wsUrl().startsWith("ws://localhost:9090/v1/ws?access_token=jwt-token"));
+  assertEqual(kit.realtime.parse(JSON.stringify(kit.realtime.chat("你好", { session: "s1" }))).session, "s1");
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");

@@ -1387,6 +1387,7 @@ pub struct AgentKit {
     pub heartbeat: HeartbeatClient,
     pub events: EventsClient,
     pub reverie: ReverieClient,
+    pub realtime: RealtimeClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1435,6 +1436,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
             events: EventsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
+            realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1476,6 +1478,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
             events: EventsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3506,6 +3509,165 @@ pub fn parse_sse_events(text: &str) -> Vec<EventStreamMessage> {
             })
         })
         .collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct RealtimeMessage {
+    #[serde(rename = "type")]
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub session: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Small Rust helper over `/v1/ws` realtime WebSocket chat integration.
+#[derive(Debug, Clone)]
+pub struct RealtimeClient {
+    base_url: String,
+    token: String,
+    api_key: String,
+    http: reqwest::Client,
+}
+
+impl RealtimeClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self {
+            base_url: trim_base_url(base_url.into()),
+            token: token.to_string(),
+            api_key: String::new(),
+            http,
+        })
+    }
+
+    pub fn new_with_api_key(
+        base_url: impl Into<String>,
+        api_key: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        Ok(Self {
+            base_url: trim_base_url(base_url.into()),
+            token: String::new(),
+            api_key: api_key.as_ref().to_string(),
+            http: reqwest::Client::new(),
+        })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            token: String::new(),
+            api_key: String::new(),
+            http,
+        }
+    }
+
+    pub fn ws_url(&self) -> String {
+        self.ws_url_with_query(&[])
+    }
+
+    pub fn ws_url_with_query(&self, query: &[(&str, &str)]) -> String {
+        let mut base = self.base_url.clone();
+        if let Some(rest) = base.strip_prefix("http://") {
+            base = format!("ws://{rest}");
+        } else if let Some(rest) = base.strip_prefix("https://") {
+            base = format!("wss://{rest}");
+        }
+        let mut params: Vec<(String, String)> = query
+            .iter()
+            .filter(|(_, value)| !value.is_empty())
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect();
+        if !params
+            .iter()
+            .any(|(key, _)| matches!(key.as_str(), "key" | "api_key" | "token" | "access_token"))
+        {
+            if !self.api_key.is_empty() {
+                params.push(("api_key".to_string(), self.api_key.clone()));
+            } else if !self.token.is_empty() {
+                params.push(("access_token".to_string(), self.token.clone()));
+            }
+        }
+        if params.is_empty() {
+            return format!("{base}/v1/ws");
+        }
+        let encoded = params
+            .into_iter()
+            .map(|(key, value)| {
+                format!(
+                    "{}={}",
+                    encode_query_component(&key),
+                    encode_query_component(&value)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("&");
+        format!("{base}/v1/ws?{encoded}")
+    }
+
+    pub fn ping(&self, extra: serde_json::Map<String, serde_json::Value>) -> RealtimeMessage {
+        RealtimeMessage {
+            r#type: "ping".to_string(),
+            extra,
+            ..Default::default()
+        }
+    }
+
+    pub fn chat(
+        &self,
+        content: impl Into<String>,
+        session: impl Into<String>,
+        extra: serde_json::Map<String, serde_json::Value>,
+    ) -> RealtimeMessage {
+        RealtimeMessage {
+            r#type: "chat".to_string(),
+            content: content.into(),
+            session: session.into(),
+            extra,
+        }
+    }
+
+    pub fn serialize(&self, message: &RealtimeMessage) -> Result<String, serde_json::Error> {
+        serde_json::to_string(message)
+    }
+
+    pub fn parse(&self, text: &str) -> Result<RealtimeMessage, serde_json::Error> {
+        serde_json::from_str(text)
+    }
+
+    pub fn http_client(&self) -> &reqwest::Client {
+        &self.http
+    }
+}
+
+fn encode_query_component(value: &str) -> String {
+    let mut out = String::new();
+    for b in value.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 pub type ReverieThought = serde_json::Map<String, serde_json::Value>;
@@ -5676,6 +5838,24 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn realtime_helpers_build_urls_and_messages() {
+        let client = RealtimeClient::new("http://localhost:9090/", "token-1").unwrap();
+        assert_eq!(
+            client.ws_url_with_query(&[("tenant", "t1")]),
+            "ws://localhost:9090/v1/ws?tenant=t1&access_token=token-1"
+        );
+        let chat = client.chat("你好", "s1", serde_json::Map::new());
+        let encoded = client.serialize(&chat).unwrap();
+        let parsed = client.parse(&encoded).unwrap();
+        assert_eq!(parsed.r#type, "chat");
+        assert_eq!(parsed.content, "你好");
+        assert_eq!(parsed.session, "s1");
+        let ping = client.ping(serde_json::Map::new());
+        assert_eq!(ping.r#type, "ping");
+        assert!(client.parse("[]").is_err());
     }
 
     #[test]

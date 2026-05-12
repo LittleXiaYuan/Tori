@@ -952,6 +952,51 @@ class _ReverieNamespace:
 
 reverie = _ReverieNamespace()
 
+# ── Realtime WebSocket Chat (/v1/ws) ──
+
+class _RealtimeNamespace:
+    """Lightweight helpers for /v1/ws URL construction and ping/chat messages."""
+
+    def ws_url(self, *, token: str = "", api_key: str = "", query: Optional[dict] = None) -> str:
+        from urllib.parse import urlencode, urlparse, urlunparse
+
+        parsed = urlparse(_API_BASE.rstrip("/") + "/v1/ws")
+        scheme = {"http": "ws", "https": "wss"}.get(parsed.scheme, parsed.scheme)
+        if scheme not in ("ws", "wss"):
+            raise ValueError(f"Unsupported realtime base URL protocol: {parsed.scheme}")
+        params = {str(k): v for k, v in (query or {}).items() if v is not None and v != ""}
+        if not any(k in params for k in ("key", "api_key", "token", "access_token")):
+            selected_api_key = api_key or os.environ.get("YUNQUE_API_KEY", "")
+            selected_token = token or _TOKEN
+            if selected_api_key:
+                params["api_key"] = selected_api_key
+            elif selected_token:
+                params["access_token"] = selected_token
+        return urlunparse((scheme, parsed.netloc, parsed.path, "", urlencode(params), ""))
+
+    def ping(self, **extra) -> dict:
+        return {"type": "ping", **extra}
+
+    def chat(self, content: str, *, session: str = "", **extra) -> dict:
+        message = {"type": "chat", "content": content, **extra}
+        if session:
+            message["session"] = session
+        return message
+
+    def serialize(self, message: dict) -> str:
+        return json.dumps(message, ensure_ascii=False)
+
+    def parse(self, data: str | bytes) -> dict:
+        if isinstance(data, bytes):
+            data = data.decode("utf-8")
+        parsed = json.loads(data)
+        if not isinstance(parsed, dict):
+            raise ValueError("Realtime message must be an object")
+        return parsed
+
+
+realtime = _RealtimeNamespace()
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1597,6 +1642,7 @@ class AgentKit:
         self.heartbeat = heartbeat
         self.events = events
         self.reverie = reverie
+        self.realtime = realtime
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

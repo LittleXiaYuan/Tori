@@ -97,6 +97,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertTrue(kit.heartbeat.status()["running"])
             self.assertEqual(kit.events.parse("event: connected\ndata: {\"ok\":true}\n\n")[0]["data"]["ok"], True)
             self.assertEqual(kit.reverie.stats()["total"], 2)
+            self.assertEqual(kit.realtime.parse(kit.realtime.serialize(kit.realtime.chat("你好", session="s1")))["session"], "s1")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -123,6 +124,7 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.heartbeat, yunque.heartbeat)
         self.assertIs(kit.events, yunque.events)
         self.assertIs(kit.reverie, yunque.reverie)
+        self.assertIs(kit.realtime, yunque.realtime)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
         self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))

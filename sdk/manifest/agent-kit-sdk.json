@@ -33,6 +33,7 @@
     "proactive-heartbeat",
     "server-sent-events",
     "proactive-reverie",
+    "realtime-websocket",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -137,6 +138,10 @@
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
     {
+      "name": "realtime",
+      "description": "Access the lightweight Realtime WebSocket chat client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -179,7 +184,9 @@
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
-        "reverie": "AgentKit.reverie"
+        "reverie": "AgentKit.reverie",
+        "realtime": "AgentKit.realtime",
+        "realtime": "AgentKit.realtime"
       }
     },
     "go": {
@@ -219,7 +226,8 @@
         "trace": "AgentKit.Trace",
         "heartbeat": "AgentKit.Heartbeat",
         "events": "AgentKit.Events",
-        "reverie": "AgentKit.Reverie"
+        "reverie": "AgentKit.Reverie",
+        "realtime": "AgentKit.Realtime"
       }
     },
     "python": {
@@ -259,7 +267,8 @@
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
-        "reverie": "AgentKit.reverie"
+        "reverie": "AgentKit.reverie",
+        "realtime": "AgentKit.realtime"
       }
     },
     "rust": {
@@ -299,7 +308,8 @@
         "trace": "AgentKit::trace",
         "heartbeat": "AgentKit::heartbeat",
         "events": "AgentKit::events",
-        "reverie": "AgentKit::reverie"
+        "reverie": "AgentKit::reverie",
+        "realtime": "AgentKit::realtime"
       }
     }
   },
