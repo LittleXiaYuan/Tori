@@ -176,6 +176,7 @@ import { createWorkflowClient } from "yunque-client/workflow";
 import { createWorkflowDefinitionsClient } from "yunque-client/workflow-definitions";
 import { createWorkflowRunsClient } from "yunque-client/workflow-runs";
 import { createCostClient } from "yunque-client/cost";
+import { createCostBudgetClient } from "yunque-client/cost-budget";
 import { createUsageClient } from "yunque-client/usage";
 import { createLoRAClient } from "yunque-client/lora";
 import { createIterateClient } from "yunque-client/iterate";
@@ -1195,7 +1196,7 @@ console.log(sandboxStatus.key_source);
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
-`/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
+`/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
@@ -1309,6 +1310,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/workflow-definitions.ts` | Lightweight workflow definition management facade without full SDK import |
 | `src/workflow-runs.ts` | Lightweight workflow run and instance facade without full SDK import |
 | `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
+| `src/cost-budget.ts` | Lightweight cost summary/budget/alerts facade without task cost, usage or quota APIs |
 | `src/usage.ts` | Lightweight usage/quota facade for `/v1/usage` and `/v1/quota` without full SDK import |
 | `src/lora.ts` | Lightweight hand-written LoRA training and evolution lifecycle slice |
 | `src/iterate.ts` | Lightweight hand-written self-iteration proposal approval slice |

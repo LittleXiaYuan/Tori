@@ -101,6 +101,7 @@
     "src/workflow-definitions.ts",
     "src/workflow-runs.ts",
     "src/cost.ts",
+    "src/cost-budget.ts",
     "src/usage.ts",
     "src/lora.ts",
     "src/iterate.ts",
