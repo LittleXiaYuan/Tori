@@ -283,6 +283,8 @@
     "src/dispatch-control.ts",
     "src/orchestrator.ts",
     "src/orchestrator-read.ts",
+    "src/orchestrator-status.ts",
+    "src/orchestrator-events.ts",
     "src/orchestrator-control.ts",
     "src/fork.ts",
     "src/fork-read.ts",
