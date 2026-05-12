@@ -387,6 +387,10 @@
       "types": "./src/trust.ts",
       "import": "./src/trust.ts"
     },
+    "./trust-control": {
+      "types": "./src/trust-control.ts",
+      "import": "./src/trust-control.ts"
+    },
     "./review": {
       "types": "./src/review.ts",
       "import": "./src/review.ts"
