@@ -503,6 +503,10 @@
       "types": "./src/plugin-llm.ts",
       "import": "./src/plugin-llm.ts"
     },
+    "./plugin-search": {
+      "types": "./src/plugin-search.ts",
+      "import": "./src/plugin-search.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
