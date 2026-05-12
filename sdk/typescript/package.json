@@ -55,6 +55,10 @@
       "types": "./src/cognis-federation.ts",
       "import": "./src/cognis-federation.ts"
     },
+    "./cognis-workflows": {
+      "types": "./src/cognis-workflows.ts",
+      "import": "./src/cognis-workflows.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"

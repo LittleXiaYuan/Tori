@@ -103,6 +103,7 @@ import { createCognisObserveClient } from "yunque-client/cognis-observe";
 import { createCognisExperienceClient } from "yunque-client/cognis-experience";
 import { createCognisEvolutionClient } from "yunque-client/cognis-evolution";
 import { createCognisFederationClient } from "yunque-client/cognis-federation";
+import { createCognisWorkflowsClient } from "yunque-client/cognis-workflows";
 import { createEventsClient } from "yunque-client/events";
 import { createRealtimeClient } from "yunque-client/realtime";
 import { createWebChatClient } from "yunque-client/webchat";
@@ -1191,7 +1192,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -1234,6 +1235,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/cognis-experience.ts` | Lightweight Cogni experience read/record/confirm facade without registry, trace or evolution APIs |
 | `src/cognis-evolution.ts` | Lightweight Cogni evolve/status facade without registry, trace, experience or federation APIs |
 | `src/cognis-federation.ts` | Lightweight Cogni federation status/peers/discover/expose/economics facade without registry, trace, experience or workflow APIs |
+| `src/cognis-workflows.ts` | Lightweight Cogni workflows list/run facade without registry, trace, experience, evolution or federation APIs |
 | `src/events.ts` | Lightweight hand-written SSE event stream slice for task/workflow/approval live updates |
 | `src/realtime.ts` | Lightweight hand-written `/v1/ws` URL, connect, ping/chat message helper slice |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
