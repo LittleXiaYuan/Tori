@@ -57,6 +57,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/emotion/history?session_id=s1&limit=1")) return jsonResponse({ entries: [{ emotion: "happy" }], total: 1 });
       if (value.endsWith("/v1/instructions?category=style")) return jsonResponse({ instructions: [{ instruction_id: "ins-1", content: "保持简洁" }], total: 1 });
       if (value.endsWith("/v1/react")) return jsonResponse({ status: "ok" });
+      if (value.endsWith("/v1/rbac/check")) return jsonResponse({ allowed: true, subject_id: "u1", resource: "knowledge", action: "read" });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -104,6 +105,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.emotion.history({ sessionId: "s1", limit: 1 })).entries[0]?.emotion, "happy");
   assertEqual((await kit.instructions.list("style")).instructions[0]?.instruction_id, "ins-1");
   assertEqual((await kit.reactions.react({ channel_type: "wechat", target: "u1", message_id: "m1", emoji: "👍" })).status, "ok");
+  assertEqual((await kit.permissions.check({ subject_id: "u1", resource: "knowledge", action: "read" })).allowed, true);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -143,7 +145,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[36]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[37]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[38]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[39]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[39]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[40]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

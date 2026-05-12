@@ -161,6 +161,46 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestPermissionsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/rbac/check":
+			var body RBACCheckRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Resource != "knowledge" || body.Action != "read" {
+				t.Fatalf("unexpected permission body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"allowed":true,"subject_id":"u1"}`))
+		case "/v1/rbac/my-roles":
+			_, _ = w.Write([]byte(`{"subject_id":"u1","roles":[{"id":"viewer"}],"total":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	checked, err := Permissions.Check(ctx, RBACCheckRequest{SubjectID: "u1", Resource: "knowledge", Action: "read"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roles, err := Permissions.MyRoles(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if checked["allowed"] != true || roles["total"].(float64) != 1 || NewAgentKit().Permissions != Permissions {
+		t.Fatalf("unexpected permissions results")
+	}
+	if len(seen) != 2 || seen[0] != "POST /v1/rbac/check" || seen[1] != "GET /v1/rbac/my-roles" {
+		t.Fatalf("unexpected permissions requests: %v", seen)
+	}
+}
+
 func TestReactionsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

@@ -98,6 +98,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"instructions": [{"instruction_id": "ins-1", "content": "保持简洁"}], "total": 1}
             if path == "/v1/react":
                 return {"status": "ok"}
+            if path == "/v1/rbac/check":
+                return {"allowed": True, "subject_id": "u1", "resource": "knowledge", "action": "read"}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -146,6 +148,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.emotion.history(session_id="s1", limit=1)["entries"][0]["emotion"], "happy")
             self.assertEqual(kit.instructions.list(category="style")["instructions"][0]["instruction_id"], "ins-1")
             self.assertEqual(kit.reactions.react("wechat", "u1", "m1", emoji="👍")["status"], "ok")
+            self.assertEqual(kit.permissions.check("knowledge", "read", subject_id="u1")["allowed"], True)
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -189,6 +192,7 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.emotion, yunque.emotion)
         self.assertIs(kit.instructions, yunque.instructions)
         self.assertIs(kit.reactions, yunque.reactions)
+        self.assertIs(kit.permissions, yunque.permissions)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
         self.assertEqual(calls[21], ("GET", "/v1/reverie/stats", None))
@@ -208,7 +212,8 @@ class AgentKitTest(unittest.TestCase):
         self.assertEqual(calls[35], ("GET", "/v1/emotion/history?session_id=s1&limit=1", None))
         self.assertEqual(calls[36], ("GET", "/v1/instructions?category=style", None))
         self.assertEqual(calls[37], ("POST", "/v1/react", {"channel_type": "wechat", "target": "u1", "message_id": "m1", "emoji": "👍"}))
-        self.assertEqual(calls[38], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[38], ("POST", "/v1/rbac/check", {"resource": "knowledge", "action": "read", "subject_id": "u1"}))
+        self.assertEqual(calls[39], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

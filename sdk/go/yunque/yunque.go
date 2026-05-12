@@ -328,6 +328,7 @@ type AgentKit struct {
 	Emotion       *emotionNamespace
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
+	Permissions   *permissionsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1870,6 +1871,9 @@ var Instructions = &instructionsNamespace{}
 // Reactions provides focused access to emoji reactions and sticker sending.
 var Reactions = &reactionsNamespace{}
 
+// Permissions provides focused access to permission checks and current roles.
+var Permissions = &permissionsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2796,6 +2800,16 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 }
 
 // ── Persona identity, skills, and presets ──
+
+type permissionsNamespace struct{}
+
+func (p *permissionsNamespace) Check(ctx context.Context, request RBACCheckRequest) (RBACCheckResponse, error) {
+	return RBAC.Check(ctx, request)
+}
+
+func (p *permissionsNamespace) MyRoles(ctx context.Context) (RBACMyRolesResponse, error) {
+	return RBAC.MyRoles(ctx)
+}
 
 type reactionsNamespace struct{}
 
@@ -4437,6 +4451,7 @@ func NewAgentKit() AgentKit {
 		Emotion:       Emotion,
 		Instructions:  Instructions,
 		Reactions:     Reactions,
+		Permissions:   Permissions,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
