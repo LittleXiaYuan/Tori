@@ -201,6 +201,45 @@ func TestSetupHelpers(t *testing.T) {
 
 
 
+
+func TestPlannerHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/planner/checkpoints":
+			if r.URL.Query().Get("plan_id") != "plan-1" || r.URL.Query().Get("include_snapshot") != "true" { t.Fatalf("unexpected checkpoints query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"checkpoints":[{"plan_id":"plan-1"}],"count":1}`))
+		case "/v1/planner/checkpoints/recover":
+			_, _ = w.Write([]byte(`{"action":"retry_failed","plan_id":"plan-1"}`))
+		case "/v1/planner/checkpoints/resume":
+			_, _ = w.Write([]byte(`{"status":"accepted","task_id":"task-1"}`))
+		case "/v1/planner/checkpoints/resume-plan":
+			_, _ = w.Write([]byte(`{"status":"accepted","plan_id":"plan-1","job_id":"job-1"}`))
+		case "/v1/planner/checkpoints/resume-plan/jobs":
+			if r.URL.Query().Get("job_id") != "job-1" { t.Fatalf("unexpected job query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"running"}}`))
+		case "/v1/planner/execution-state":
+			if r.URL.Query().Get("action") != "retry_failed" { t.Fatalf("unexpected state query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"plan_id":"plan-1","next_action":"retry_failed"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	checkpoints, _ := Planner.ListCheckpoints(ctx, PlannerCheckpointQuery{Limit: 5, PlanID: "plan-1", IncludeSnapshot: true})
+	recovered, _ := Planner.RecoverCheckpoint(ctx, PlannerRecoveryRequest{PlanID: "plan-1", Action: "retry_failed"})
+	resumedTask, _ := Planner.ResumeCheckpointTask(ctx, PlannerResumeTaskRequest{PlanID: "plan-1", Action: "continue", Run: false})
+	resumedPlan, _ := Planner.ResumeCheckpointPlan(ctx, PlannerResumePlanRequest{PlanID: "plan-1", Action: "continue", Async: true})
+	job, _ := Planner.GetResumePlanJob(ctx, PlannerResumePlanJobQuery{JobID: "job-1"})
+	state, _ := Planner.ExecutionState(ctx, PlannerExecutionStateQuery{PlanID: "plan-1", Action: "retry_failed"})
+	if checkpoints["count"].(float64) != 1 || recovered["action"] != "retry_failed" || resumedTask["status"] != "accepted" || resumedPlan["job_id"] != "job-1" || job["job"] == nil || state["next_action"] != "retry_failed" || NewAgentKit().Planner != Planner {
+		t.Fatalf("unexpected planner results")
+	}
+	if len(seen) != 6 { t.Fatalf("expected 6 planner API calls, got %d: %v", len(seen), seen) }
+}
+
 func TestFederationHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

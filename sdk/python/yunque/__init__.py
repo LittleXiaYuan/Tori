@@ -1215,6 +1215,55 @@ class _SetupNamespace:
 setup = _SetupNamespace()
 
 
+
+# ── Planner Recovery (/v1/planner) ──
+
+class _PlannerNamespace:
+    """Lightweight helpers for planner checkpoint recovery and execution-state inspection."""
+
+    def list_checkpoints(self, *, limit: int = 0, plan_id: str = "", include_snapshot: bool = False) -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if limit > 0:
+            params["limit"] = str(limit)
+        if plan_id:
+            params["plan_id"] = plan_id
+        if include_snapshot:
+            params["include_snapshot"] = "true"
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/planner/checkpoints{suffix}")
+
+    def recover_checkpoint(self, plan_id: str, action: str = "continue") -> dict:
+        return _api_call("POST", "/v1/planner/checkpoints/recover", {"plan_id": plan_id, "action": action})
+
+    def resume_checkpoint_task(self, plan_id: str, action: str = "continue", run: bool = True) -> dict:
+        return _api_call("POST", "/v1/planner/checkpoints/resume", {"plan_id": plan_id, "action": action, "run": run})
+
+    def resume_checkpoint_plan(self, plan_id: str, action: str = "continue", async_: bool = False) -> dict:
+        return _api_call("POST", "/v1/planner/checkpoints/resume-plan", {"plan_id": plan_id, "action": action, "async": async_})
+
+    def get_resume_plan_job(self, *, job_id: str = "", id: str = "", plan_id: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if job_id:
+            params["job_id"] = job_id
+        if id:
+            params["id"] = id
+        if plan_id:
+            params["plan_id"] = plan_id
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/planner/checkpoints/resume-plan/jobs{suffix}")
+
+    def execution_state(self, plan_id: str, action: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {"plan_id": plan_id}
+        if action:
+            params["action"] = action
+        return _api_call("GET", f"/v1/planner/execution-state?{urlencode(params)}")
+
+
+planner = _PlannerNamespace()
+
 # ── Federation / A2A OPP (/v1/federation) ──
 
 class _FederationNamespace:
@@ -2761,6 +2810,7 @@ class AgentKit:
         self.setup = setup
         self.admin = admin
         self.federation = federation
+        self.planner = planner
         self.settings = settings
         self.system = system
         self.auth = auth
