@@ -223,6 +223,10 @@
       "types": "./src/setup-provider.ts",
       "import": "./src/setup-provider.ts"
     },
+    "./setup-install": {
+      "types": "./src/setup-install.ts",
+      "import": "./src/setup-install.ts"
+    },
     "./documents": {
       "types": "./src/documents.ts",
       "import": "./src/documents.ts"
