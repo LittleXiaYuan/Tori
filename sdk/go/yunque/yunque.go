@@ -71,18 +71,26 @@ func PluginDir() string { return pluginDir }
 // ── API Call ──
 
 func apiCall(ctx context.Context, method, path string, body any) (map[string]any, error) {
+	var result map[string]any
+	if err := apiCallInto(ctx, method, path, body, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func apiCallInto(ctx context.Context, method, path string, body any, target any) error {
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("marshal: %w", err)
+			return fmt.Errorf("marshal: %w", err)
 		}
 		reqBody = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, apiBase+path, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("new request: %w", err)
+		return fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if pluginToken != "" {
@@ -92,23 +100,22 @@ func apiCall(ctx context.Context, method, path string, body any) (map[string]any
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("api call %s: %w", path, err)
+		return fmt.Errorf("api call %s: %w", path, err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("api %s HTTP %d: %s", path, resp.StatusCode, apiErrorMessage(respBody))
+		return fmt.Errorf("api %s HTTP %d: %s", path, resp.StatusCode, apiErrorMessage(respBody))
 	}
 
-	var result map[string]any
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := json.Unmarshal(respBody, target); err != nil {
+		return fmt.Errorf("decode response: %w", err)
 	}
-	return result, nil
+	return nil
 }
 
 func apiErrorMessage(body []byte) string {
@@ -274,6 +281,169 @@ func decodeMapResponse(resp map[string]any, target any) error {
 		return err
 	}
 	return json.Unmarshal(raw, target)
+}
+
+// ── State Kernel ──
+
+// State provides typed access to the lightweight State Kernel snapshot API.
+//
+// These helpers are intentionally small so plugins, CLIs, and sidecar services can
+// consume the agent's current goals/resources/focus/capabilities without importing
+// the full platform surface.
+var State = &stateNamespace{}
+
+type stateNamespace struct{}
+
+// StateGoal is a goal tracked by the State Kernel.
+type StateGoal struct {
+	ID          string    `json:"id,omitempty"`
+	Title       string    `json:"title"`
+	Description string    `json:"description,omitempty"`
+	Priority    int       `json:"priority,omitempty"`
+	Status      string    `json:"status,omitempty"`
+	Progress    float64   `json:"progress,omitempty"`
+	ParentGoal  string    `json:"parent_goal,omitempty"`
+	SubGoals    []string  `json:"sub_goals,omitempty"`
+	TaskIDs     []string  `json:"task_ids,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+}
+
+// StateResource is a resource currently tracked by the State Kernel.
+type StateResource struct {
+	ID        string            `json:"id,omitempty"`
+	Type      string            `json:"type,omitempty"`
+	Path      string            `json:"path"`
+	Status    string            `json:"status,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	TrackedAt time.Time         `json:"tracked_at,omitempty"`
+}
+
+// StateActionRecord is a recent action recorded by the State Kernel.
+type StateActionRecord struct {
+	Timestamp time.Time `json:"timestamp,omitempty"`
+	Action    string    `json:"action"`
+	Result    string    `json:"result,omitempty"`
+	Success   bool      `json:"success"`
+}
+
+// StateCapabilities summarizes currently available and missing capabilities.
+type StateCapabilities struct {
+	TotalSkills    int      `json:"total_skills,omitempty"`
+	DynamicSkills  []string `json:"dynamic_skills,omitempty"`
+	UnresolvedGaps int      `json:"unresolved_gaps,omitempty"`
+	RecentGaps     []string `json:"recent_gaps,omitempty"`
+}
+
+// StateSnapshot is the full structured State Kernel snapshot.
+type StateSnapshot struct {
+	Goals         []StateGoal         `json:"goals"`
+	Resources     []StateResource     `json:"resources"`
+	Focus         string              `json:"focus,omitempty"`
+	Topics        []string            `json:"topics,omitempty"`
+	RecentActions []StateActionRecord `json:"recent_actions,omitempty"`
+	Capabilities  StateCapabilities   `json:"capabilities,omitempty"`
+	UpdatedAt     time.Time           `json:"updated_at,omitempty"`
+}
+
+// StateGoalMutationResponse is returned by goal create/update/delete operations.
+type StateGoalMutationResponse struct {
+	ID     string `json:"id,omitempty"`
+	Status string `json:"status"`
+}
+
+// StateFocusResponse is returned by /v1/state/focus.
+type StateFocusResponse struct {
+	Focus string `json:"focus"`
+}
+
+// StateResourceMutationResponse is returned by resource track/release operations.
+type StateResourceMutationResponse struct {
+	Status string `json:"status"`
+}
+
+// Snapshot returns the full State Kernel snapshot from /v1/state.
+func (s *stateNamespace) Snapshot(ctx context.Context) (StateSnapshot, error) {
+	resp, err := apiCall(ctx, "GET", "/v1/state", nil)
+	if err != nil {
+		return StateSnapshot{}, err
+	}
+	var out StateSnapshot
+	if err := decodeMapResponse(resp, &out); err != nil {
+		return StateSnapshot{}, err
+	}
+	return out, nil
+}
+
+// Actions returns recent State Kernel action records from the snapshot.
+func (s *stateNamespace) Actions(ctx context.Context) ([]StateActionRecord, error) {
+	snap, err := s.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if snap.RecentActions == nil {
+		return []StateActionRecord{}, nil
+	}
+	return snap.RecentActions, nil
+}
+
+// Capabilities returns the State Kernel capabilities section from the snapshot.
+func (s *stateNamespace) Capabilities(ctx context.Context) (StateCapabilities, error) {
+	snap, err := s.Snapshot(ctx)
+	if err != nil {
+		return StateCapabilities{}, err
+	}
+	return snap.Capabilities, nil
+}
+
+// Goals lists goals tracked by the State Kernel.
+func (s *stateNamespace) Goals(ctx context.Context) ([]StateGoal, error) {
+	var out []StateGoal
+	if err := apiCallInto(ctx, "GET", "/v1/state/goals", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return []StateGoal{}, nil
+	}
+	return out, nil
+}
+
+// SaveGoal creates or updates a State Kernel goal.
+func (s *stateNamespace) SaveGoal(ctx context.Context, goal StateGoal) (StateGoalMutationResponse, error) {
+	resp, err := apiCall(ctx, "POST", "/v1/state/goals", goal)
+	if err != nil {
+		return StateGoalMutationResponse{}, err
+	}
+	var out StateGoalMutationResponse
+	if err := decodeMapResponse(resp, &out); err != nil {
+		return StateGoalMutationResponse{}, err
+	}
+	return out, nil
+}
+
+// Focus returns the current State Kernel focus string.
+func (s *stateNamespace) Focus(ctx context.Context) (string, error) {
+	resp, err := apiCall(ctx, "GET", "/v1/state/focus", nil)
+	if err != nil {
+		return "", err
+	}
+	var out StateFocusResponse
+	if err := decodeMapResponse(resp, &out); err != nil {
+		return "", err
+	}
+	return out.Focus, nil
+}
+
+// Resources lists active resources tracked by the State Kernel.
+func (s *stateNamespace) Resources(ctx context.Context) ([]StateResource, error) {
+	var out []StateResource
+	if err := apiCallInto(ctx, "GET", "/v1/state/resources", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return []StateResource{}, nil
+	}
+	return out, nil
 }
 
 // ── LLM ──
