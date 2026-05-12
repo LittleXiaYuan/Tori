@@ -242,6 +242,50 @@ pub struct PluginOkResponse {
 /// Response returned by `/v1/plugin-api/send`.
 pub type PluginSendResponse = PluginOkResponse;
 
+/// Response returned by `/v1/plugin-api/memory/get`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginMemoryValueResponse {
+    #[serde(default)]
+    pub value: String,
+}
+
+/// Response returned by `/v1/plugin-api/memory/list`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginMemoryListResponse {
+    #[serde(default)]
+    pub entries: serde_json::Value,
+}
+
+/// Response returned by `/v1/plugin-api/memory/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginMemorySearchResponse {
+    #[serde(default)]
+    pub results: Vec<String>,
+}
+
+/// Response returned by `/v1/plugin-api/knowledge/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginKnowledgeSearchResponse {
+    #[serde(default)]
+    pub results: Vec<serde_json::Value>,
+}
+
+/// Response returned by `/v1/plugin-api/cron/add`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginCronAddResponse {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub status: String,
+}
+
+/// Response returned by `/v1/plugin-api/cron/list`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginCronListResponse {
+    #[serde(default)]
+    pub jobs: Vec<serde_json::Value>,
+}
+
 /// Small Rust helper over `/v1/state` and focused State Kernel routes.
 ///
 /// Use this when a sidecar, CLI, or plugin wants state-layer access without
@@ -462,7 +506,7 @@ impl ReflectClient {
 
 /// Small Rust helper over the core `/v1/plugin-api/*` runtime capabilities.
 ///
-/// Use this when a Rust CLI, sidecar, or plugin runner only needs LLM/search/send
+/// Use this when a Rust CLI, sidecar, or plugin runner only needs runtime
 /// calls without coupling to the full generated OpenAPI client.
 #[derive(Debug, Clone)]
 pub struct PluginApiClient {
@@ -563,6 +607,227 @@ impl PluginApiClient {
                 content: content.as_ref(),
                 format: format.as_ref(),
             })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Read plugin-private memory.
+    pub async fn memory_get(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<PluginMemoryValueResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct KeyRequest<'a> {
+            key: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/memory/get",
+            &KeyRequest { key: key.as_ref() },
+        )
+        .await
+    }
+
+    /// Write plugin-private memory.
+    pub async fn memory_set(
+        &self,
+        key: impl AsRef<str>,
+        value: impl AsRef<str>,
+    ) -> Result<PluginOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct MemorySetRequest<'a> {
+            key: &'a str,
+            value: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/memory/set",
+            &MemorySetRequest {
+                key: key.as_ref(),
+                value: value.as_ref(),
+            },
+        )
+        .await
+    }
+
+    /// Delete plugin-private memory.
+    pub async fn memory_delete(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<PluginOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct KeyRequest<'a> {
+            key: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/memory/delete",
+            &KeyRequest { key: key.as_ref() },
+        )
+        .await
+    }
+
+    /// List plugin-private memory entries.
+    pub async fn memory_list(
+        &self,
+        prefix: impl AsRef<str>,
+    ) -> Result<PluginMemoryListResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct MemoryListRequest<'a> {
+            #[serde(skip_serializing_if = "str::is_empty")]
+            prefix: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/memory/list",
+            &MemoryListRequest {
+                prefix: prefix.as_ref(),
+            },
+        )
+        .await
+    }
+
+    /// Search plugin-private memory.
+    pub async fn memory_search(
+        &self,
+        query: impl AsRef<str>,
+        limit: i32,
+    ) -> Result<PluginMemorySearchResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct MemorySearchRequest<'a> {
+            query: &'a str,
+            #[serde(skip_serializing_if = "is_default")]
+            limit: i32,
+        }
+        self.post_json(
+            "/v1/plugin-api/memory/search",
+            &MemorySearchRequest {
+                query: query.as_ref(),
+                limit,
+            },
+        )
+        .await
+    }
+
+    /// Search the agent knowledge base.
+    pub async fn knowledge_search(
+        &self,
+        query: impl AsRef<str>,
+        limit: i32,
+    ) -> Result<PluginKnowledgeSearchResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct KnowledgeSearchRequest<'a> {
+            query: &'a str,
+            #[serde(skip_serializing_if = "is_default")]
+            limit: i32,
+        }
+        self.post_json(
+            "/v1/plugin-api/knowledge/search",
+            &KnowledgeSearchRequest {
+                query: query.as_ref(),
+                limit,
+            },
+        )
+        .await
+    }
+
+    /// Ingest content into the agent knowledge base.
+    pub async fn knowledge_ingest(
+        &self,
+        content: impl AsRef<str>,
+        source: impl AsRef<str>,
+        filename: impl AsRef<str>,
+    ) -> Result<PluginOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct KnowledgeIngestRequest<'a> {
+            content: &'a str,
+            #[serde(skip_serializing_if = "str::is_empty")]
+            source: &'a str,
+            #[serde(skip_serializing_if = "str::is_empty")]
+            filename: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/knowledge/ingest",
+            &KnowledgeIngestRequest {
+                content: content.as_ref(),
+                source: source.as_ref(),
+                filename: filename.as_ref(),
+            },
+        )
+        .await
+    }
+
+    /// Create a plugin-owned scheduled task.
+    pub async fn cron_add(
+        &self,
+        name: impl AsRef<str>,
+        expression: impl AsRef<str>,
+        message: impl AsRef<str>,
+    ) -> Result<PluginCronAddResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct CronAddRequest<'a> {
+            name: &'a str,
+            expression: &'a str,
+            #[serde(skip_serializing_if = "str::is_empty")]
+            message: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/cron/add",
+            &CronAddRequest {
+                name: name.as_ref(),
+                expression: expression.as_ref(),
+                message: message.as_ref(),
+            },
+        )
+        .await
+    }
+
+    /// Remove a plugin-owned scheduled task.
+    pub async fn cron_remove(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<PluginOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct CronRemoveRequest<'a> {
+            id: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/cron/remove",
+            &CronRemoveRequest { id: id.as_ref() },
+        )
+        .await
+    }
+
+    /// List plugin-owned scheduled tasks.
+    pub async fn cron_list(
+        &self,
+        plugin: impl AsRef<str>,
+    ) -> Result<PluginCronListResponse, reqwest::Error> {
+        let plugin = plugin.as_ref();
+        let path = if plugin.is_empty() {
+            "/v1/plugin-api/cron/list".to_string()
+        } else {
+            format!(
+                "/v1/plugin-api/cron/list?plugin={}",
+                url_encode_query_component(plugin)
+            )
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
             .send()
             .await?
             .error_for_status()?
