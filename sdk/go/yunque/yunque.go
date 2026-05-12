@@ -323,6 +323,7 @@ type AgentKit struct {
 	Tools         *toolsNamespace
 	Audit         *auditNamespace
 	Trust         *trustNamespace
+	Iterate       *iterateNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1850,6 +1851,9 @@ var Audit = &auditNamespace{}
 // Trust provides focused access to trust scores, review gate status, and skill growth patterns.
 var Trust = &trustNamespace{}
 
+// Iterate provides focused access to self-iteration proposal review and manual cycles.
+var Iterate = &iterateNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2776,6 +2780,76 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 }
 
 // ── Trust Governance ──
+
+type iterateNamespace struct{}
+
+type IterateProposalsOptions struct {
+	Status string
+}
+
+type IterateProposal map[string]any
+type IterateProposalsResponse map[string]any
+type IterateDecisionRequest struct {
+	ID string `json:"id"`
+}
+type IterateDecisionResponse map[string]any
+type IterateTriggerResponse map[string]any
+type IterateStatusResponse map[string]any
+
+func iterateProposalsQuery(opts IterateProposalsOptions) string {
+	q := url.Values{}
+	if opts.Status != "" {
+		q.Set("status", opts.Status)
+	}
+	if encoded := q.Encode(); encoded != "" {
+		return "?" + encoded
+	}
+	return ""
+}
+
+func (i *iterateNamespace) Proposals(ctx context.Context, opts IterateProposalsOptions) (IterateProposalsResponse, error) {
+	var out IterateProposalsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/iterate/proposals"+iterateProposalsQuery(opts), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *iterateNamespace) PendingProposals(ctx context.Context) (IterateProposalsResponse, error) {
+	return i.Proposals(ctx, IterateProposalsOptions{Status: "pending"})
+}
+
+func (i *iterateNamespace) Approve(ctx context.Context, id string) (IterateDecisionResponse, error) {
+	var out IterateDecisionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/iterate/approve", IterateDecisionRequest{ID: id}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *iterateNamespace) Reject(ctx context.Context, id string) (IterateDecisionResponse, error) {
+	var out IterateDecisionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/iterate/reject", IterateDecisionRequest{ID: id}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *iterateNamespace) Trigger(ctx context.Context) (IterateTriggerResponse, error) {
+	var out IterateTriggerResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/iterate/trigger", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *iterateNamespace) Status(ctx context.Context) (IterateStatusResponse, error) {
+	var out IterateStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/iterate/status", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 type trustNamespace struct{}
 
@@ -4049,6 +4123,7 @@ func NewAgentKit() AgentKit {
 		Tools:         Tools,
 		Audit:         Audit,
 		Trust:         Trust,
+		Iterate:       Iterate,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

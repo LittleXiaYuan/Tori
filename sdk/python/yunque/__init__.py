@@ -631,6 +631,36 @@ class _TrustNamespace:
 
 trust = _TrustNamespace()
 
+# ── Self-iteration governance (/api/iterate/*) ──
+
+class _IterateNamespace:
+    """Lightweight helpers for self-iteration proposal review and manual cycles."""
+
+    def proposals(self, status: str = "") -> dict:
+        from urllib.parse import urlencode
+
+        query = {"status": status} if status else {}
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/api/iterate/proposals{suffix}")
+
+    def pending_proposals(self) -> dict:
+        return self.proposals(status="pending")
+
+    def approve(self, proposal_id: str) -> dict:
+        return _api_call("POST", "/api/iterate/approve", {"id": proposal_id})
+
+    def reject(self, proposal_id: str) -> dict:
+        return _api_call("POST", "/api/iterate/reject", {"id": proposal_id})
+
+    def trigger(self) -> dict:
+        return _api_call("POST", "/api/iterate/trigger", {})
+
+    def status(self) -> dict:
+        return _api_call("GET", "/api/iterate/status")
+
+
+iterate = _IterateNamespace()
+
 # ── Audit chain and trail (/v1/audit, /api/audit) ──
 
 class _AuditNamespace:
@@ -2041,6 +2071,7 @@ class AgentKit:
         self.tools = tools
         self.audit = audit
         self.trust = trust
+        self.iterate = iterate
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
