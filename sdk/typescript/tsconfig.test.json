@@ -101,6 +101,7 @@
     "src/router.ts",
     "src/modes.ts",
     "src/modes-observe.ts",
+    "src/modes-control.ts",
     "src/ide.ts",
     "src/persona.ts",
     "src/persona-state.ts",

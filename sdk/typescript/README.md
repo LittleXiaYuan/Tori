@@ -176,6 +176,7 @@ import { createRuntimeEventsClient } from "yunque-client/runtime-events";
 import { createRouterClient } from "yunque-client/router";
 import { createModesClient } from "yunque-client/modes";
 import { createModesObserveClient } from "yunque-client/modes-observe";
+import { createModesControlClient } from "yunque-client/modes-control";
 import { createIDEClient } from "yunque-client/ide";
 import { createPersonaClient } from "yunque-client/persona";
 import { createPersonaStateClient } from "yunque-client/persona-state";
@@ -1343,6 +1344,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/router.ts` | Lightweight hand-written smart-router stats and status slice |
 | `src/modes.ts` | Lightweight hand-written persona mode listing/switching slice |
 | `src/modes-observe.ts` | Lightweight persona modes list/current facade without switching APIs |
+| `src/modes-control.ts` | Lightweight persona mode switching facade without list/current observe APIs |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
 | `src/persona-state.ts` | Lightweight persona identity/soul state facade without skills or presets APIs |
