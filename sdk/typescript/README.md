@@ -219,6 +219,7 @@ import { createPluginSearchClient } from "yunque-client/plugin-search";
 import { createPluginMemoryClient } from "yunque-client/plugin-memory";
 import { createPluginAgentMemoryClient } from "yunque-client/plugin-agent-memory";
 import { createPluginKnowledgeClient } from "yunque-client/plugin-knowledge";
+import { createPluginCronClient } from "yunque-client/plugin-cron";
 import { createStateClient } from "yunque-client/state";
 import { createResourceStateClient } from "yunque-client/resource-state";
 import { createFocusStateClient } from "yunque-client/focus-state";
@@ -1186,7 +1187,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1342,6 +1343,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugin-memory.ts` | Lightweight plugin KV memory facade without LLM, search, agent memory, knowledge, cron or extension APIs |
 | `src/plugin-agent-memory.ts` | Lightweight plugin access to host Agent memory search/add without plugin KV, knowledge, cron or extension APIs |
 | `src/plugin-knowledge.ts` | Lightweight plugin knowledge search/ingest facade without LLM, memory or cron APIs |
+| `src/plugin-cron.ts` | Lightweight plugin cron add/remove/list facade without LLM, memory, knowledge or extension APIs |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
 | `src/resource-state.ts` | Lightweight state resource list/track/release facade without full SDK import |
 | `src/focus-state.ts` | Lightweight state focus read/update facade without full SDK import |

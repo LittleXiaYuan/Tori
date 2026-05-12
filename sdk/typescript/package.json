@@ -519,6 +519,10 @@
       "types": "./src/plugin-knowledge.ts",
       "import": "./src/plugin-knowledge.ts"
     },
+    "./plugin-cron": {
+      "types": "./src/plugin-cron.ts",
+      "import": "./src/plugin-cron.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"

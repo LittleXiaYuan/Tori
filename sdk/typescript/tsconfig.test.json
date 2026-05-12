@@ -144,6 +144,7 @@
     "src/plugin-memory.ts",
     "src/plugin-agent-memory.ts",
     "src/plugin-knowledge.ts",
+    "src/plugin-cron.ts",
     "src/state.ts",
     "src/resource-state.ts",
     "src/focus-state.ts",
