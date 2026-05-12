@@ -29,6 +29,7 @@
     "cost-usage-quota",
     "llm-providers",
     "cognis",
+    "execution-trace",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -117,6 +118,10 @@
       "description": "Access the lightweight Cogni registry, observability, experience, evolution, and federation client or namespace."
     },
     {
+      "name": "trace",
+      "description": "Access the lightweight execution and audit Trace client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -155,7 +160,8 @@
         "fork": "AgentKit.fork",
         "cost": "AgentKit.cost",
         "providers": "AgentKit.providers",
-        "cognis": "AgentKit.cognis"
+        "cognis": "AgentKit.cognis",
+        "trace": "AgentKit.trace"
       }
     },
     "go": {
@@ -191,7 +197,8 @@
         "fork": "AgentKit.Fork",
         "cost": "AgentKit.Cost",
         "providers": "AgentKit.Providers",
-        "cognis": "AgentKit.Cognis"
+        "cognis": "AgentKit.Cognis",
+        "trace": "AgentKit.Trace"
       }
     },
     "python": {
@@ -227,7 +234,8 @@
         "fork": "AgentKit.fork",
         "cost": "AgentKit.cost",
         "providers": "AgentKit.providers",
-        "cognis": "AgentKit.cognis"
+        "cognis": "AgentKit.cognis",
+        "trace": "AgentKit.trace"
       }
     },
     "rust": {
@@ -263,7 +271,8 @@
         "fork": "AgentKit::fork",
         "cost": "AgentKit::cost",
         "providers": "AgentKit::providers",
-        "cognis": "AgentKit::cognis"
+        "cognis": "AgentKit::cognis",
+        "trace": "AgentKit::trace"
       }
     }
   },

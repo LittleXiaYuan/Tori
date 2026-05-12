@@ -284,6 +284,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"providers":[{"id":"deepseek","model":"deepseek-chat"}],"mode":"hybrid"}`))
 		case "/v1/cognis":
 			_, _ = w.Write([]byte(`{"cognis":[{"id":"reviewer","name":"Code Reviewer"}],"count":1}`))
+		case "/v1/trace/recent":
+			_, _ = w.Write([]byte(`{"events":[{"trace_id":"tr-1"}],"count":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -366,6 +368,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	traceRecent, err := kit.Trace.Recent(context.Background(), TraceRecentOptions{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -374,14 +380,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 20 {
-		t.Fatalf("expected 20 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 21 {
+		t.Fatalf("expected 21 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1828,6 +1834,46 @@ func TestCognisHelpers(t *testing.T) {
 	}
 	if len(seen) != 30 {
 		t.Fatalf("expected 30 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestTraceHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/trace/recent":
+			_, _ = w.Write([]byte(`{"events":[{"trace_id":"tr/1"}],"count":1}`))
+		case "/v1/trace/tr/1":
+			_, _ = w.Write([]byte(`{"trace_id":"tr/1","events":[{"trace_id":"tr/1"}],"count":1,"raw":true}`))
+		case "/v1/trace/task/task/1":
+			_, _ = w.Write([]byte(`{"task_id":"task/1","events":[{"task_id":"task/1"}],"count":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	recent, err := Trace.Recent(ctx, TraceRecentOptions{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTrace, err := Trace.ByTraceID(ctx, "tr/1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTask, err := Trace.ByTaskID(ctx, "task/1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if recent.Count != 1 || byTrace.TraceID != "tr/1" || !byTrace.Raw || byTask.TaskID != "task/1" || kit.Trace != Trace {
+		t.Fatalf("unexpected trace results")
+	}
+	if len(seen) != 3 || seen[0] != "GET /v1/trace/recent?limit=10" || seen[1] != "GET /v1/trace/tr%2F1?raw=true" || seen[2] != "GET /v1/trace/task/task%2F1" {
+		t.Fatalf("unexpected trace requests: %v", seen)
 	}
 }
 

@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "domain": "execution-trace",
+  "description": "Cross-language lightweight SDK entrypoints for execution/audit trace reads by recent events, trace id, and task id.",
+  "principles": [
+    "Expose trace inspection as a focused SDK slice for external debugging, replay, and observability tools.",
+    "Keep trace reads directly callable from frontends, plugins, CLIs, sidecars, and automation scripts without importing the full generated platform client.",
+    "Make Trace access available through Agent Kit without coupling callers to gateway internals."
+  ],
+  "routes": [
+    "GET /v1/trace/recent",
+    "GET /v1/trace/{trace_id}",
+    "GET /v1/trace/task/{task_id}"
+  ],
+  "capabilities": [
+    {
+      "name": "recent",
+      "route": "GET /v1/trace/recent",
+      "readOnly": true,
+      "description": "Read recent execution/audit events."
+    },
+    {
+      "name": "byTraceId",
+      "route": "GET /v1/trace/{trace_id}",
+      "readOnly": true,
+      "description": "Read events for one trace id."
+    },
+    {
+      "name": "byTaskId",
+      "route": "GET /v1/trace/task/{task_id}",
+      "readOnly": true,
+      "description": "Read events for one task id."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/trace.ts",
+        "sdk/typescript/src/trace-recent.ts",
+        "sdk/typescript/src/trace-events.ts",
+        "sdk/typescript/src/trace-by-id.ts",
+        "sdk/typescript/src/task-trace.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "recent": "createTraceClient().recent",
+        "byTraceId": "createTraceClient().byTraceId",
+        "byTaskId": "createTraceClient().byTaskId"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "recent": "yunque.Trace.Recent",
+        "byTraceId": "yunque.Trace.ByTraceID",
+        "byTaskId": "yunque.Trace.ByTaskID"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "recent": "yunque.trace.recent",
+        "byTraceId": "yunque.trace.by_trace_id",
+        "byTaskId": "yunque.trace.by_task_id"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "recent": "TraceClient::recent",
+        "byTraceId": "TraceClient::by_trace_id",
+        "byTaskId": "TraceClient::by_task_id"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
