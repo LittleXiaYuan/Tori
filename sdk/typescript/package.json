@@ -519,9 +519,21 @@
       "types": "./src/lora-observe.ts",
       "import": "./src/lora-observe.ts"
     },
+    "./lora-status": {
+      "types": "./src/lora-status.ts",
+      "import": "./src/lora-status.ts"
+    },
+    "./lora-history": {
+      "types": "./src/lora-history.ts",
+      "import": "./src/lora-history.ts"
+    },
     "./lora-control": {
       "types": "./src/lora-control.ts",
       "import": "./src/lora-control.ts"
+    },
+    "./lora-config": {
+      "types": "./src/lora-config.ts",
+      "import": "./src/lora-config.ts"
     },
     "./iterate": {
       "types": "./src/iterate.ts",
