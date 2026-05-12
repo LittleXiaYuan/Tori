@@ -212,6 +212,7 @@ import { createToriClient } from "yunque-client/tori";
 import { createToriObserveClient } from "yunque-client/tori-observe";
 import { createToriBindClient } from "yunque-client/tori-bind";
 import { createSpeechClient } from "yunque-client/speech";
+import { createSpeechTTSClient } from "yunque-client/speech-tts";
 import { createAdminClient } from "yunque-client/admin";
 import { createFilesClient } from "yunque-client/files";
 import { createCronClient } from "yunque-client/cron";
@@ -1367,6 +1368,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/tori-observe.ts` | Lightweight Tori status/health/usage facade without bind or unbind APIs |
 | `src/tori-bind.ts` | Lightweight Tori bind/unbind facade without status, health, or usage APIs |
 | `src/speech.ts` | Lightweight hand-written speech TTS/STT, STT stream URL, voices, and file upload slice |
+| `src/speech-tts.ts` | Lightweight speech TTS facade without STT, voices, stream URL, or upload APIs |
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |

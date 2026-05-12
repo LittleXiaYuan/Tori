@@ -491,6 +491,10 @@
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
     },
+    "./speech-tts": {
+      "types": "./src/speech-tts.ts",
+      "import": "./src/speech-tts.ts"
+    },
     "./admin": {
       "types": "./src/admin.ts",
       "import": "./src/admin.ts"
