@@ -329,6 +329,7 @@ type AgentKit struct {
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
+	Tasks         *tasksNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1874,6 +1875,9 @@ var Reactions = &reactionsNamespace{}
 // Permissions provides focused access to permission checks and current roles.
 var Permissions = &permissionsNamespace{}
 
+// Tasks provides focused access to task CRUD and lifecycle APIs.
+var Tasks = &tasksNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -1988,6 +1992,78 @@ func (f *forkNamespace) List(ctx context.Context, sessionID string) (ForkListRes
 		out.Forks = []ConversationFork{}
 	}
 	return out, nil
+}
+
+type tasksNamespace struct{}
+
+type Task map[string]any
+type TaskActionResponse map[string]any
+
+type TaskConstraints struct {
+	MaxSteps        int      `json:"max_steps,omitempty"`
+	TimeoutSec      int      `json:"timeout_sec,omitempty"`
+	MaxCostUSD      float64  `json:"max_cost_usd,omitempty"`
+	SuccessCriteria string   `json:"success_criteria,omitempty"`
+	TestCommand     string   `json:"test_command,omitempty"`
+	Priority        string   `json:"priority,omitempty"`
+	RiskLevel       string   `json:"risk_level,omitempty"`
+	AutoApprove     bool     `json:"auto_approve,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+}
+
+type CreateTaskRequest struct {
+	Title       string          `json:"title,omitempty"`
+	Description string          `json:"description"`
+	Constraints TaskConstraints `json:"constraints,omitempty"`
+}
+
+func (t *tasksNamespace) List(ctx context.Context) ([]Task, error) {
+	var out []Task
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []Task{}
+	}
+	return out, nil
+}
+
+func (t *tasksNamespace) Get(ctx context.Context, id string) (Task, error) {
+	var out Task
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Create(ctx context.Context, req CreateTaskRequest) (Task, error) {
+	var out Task
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Run(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "run", id) }
+func (t *tasksNamespace) Pause(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "pause", id) }
+func (t *tasksNamespace) Resume(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "resume", id) }
+func (t *tasksNamespace) Restart(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "restart", id) }
+func (t *tasksNamespace) Cancel(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "cancel", id) }
+
+func (t *tasksNamespace) Delete(ctx context.Context, id string) (TaskActionResponse, error) {
+	var out TaskActionResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/tasks?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) action(ctx context.Context, action, id string) (TaskActionResponse, error) {
+	var out TaskActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/"+action, map[string]string{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
 }
 
 // ── Cost / Usage / Quota ──
@@ -4452,6 +4528,7 @@ func NewAgentKit() AgentKit {
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
+		Tasks:         Tasks,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

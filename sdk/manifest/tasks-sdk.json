@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "domain": "tasks-runtime",
+  "description": "Cross-language lightweight SDK for task CRUD and lifecycle operations over /v1/tasks without importing the full platform client.",
+  "principles": [
+    "Expose task orchestration as a focused SDK slice for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts.",
+    "Keep task reads, creation, lifecycle control, and deletion directly callable through existing authenticated task routes.",
+    "Make Tasks access available through Agent Kit while leaving deeper task templates, gaps, memory, threads, and traces as separate incremental slices."
+  ],
+  "routes": [
+    "GET /v1/tasks",
+    "GET /v1/tasks?id=...",
+    "POST /v1/tasks",
+    "POST /v1/tasks/run",
+    "POST /v1/tasks/pause",
+    "POST /v1/tasks/resume",
+    "POST /v1/tasks/restart",
+    "POST /v1/tasks/cancel",
+    "DELETE /v1/tasks?id=..."
+  ],
+  "capabilities": [
+    { "name": "list", "route": "GET /v1/tasks", "readOnly": true, "description": "List recent tasks visible to the current tenant." },
+    { "name": "get", "route": "GET /v1/tasks?id=...", "readOnly": true, "description": "Read one task by id." },
+    { "name": "create", "route": "POST /v1/tasks", "readOnly": false, "description": "Create a task from a description and optional constraints." },
+    { "name": "run", "route": "POST /v1/tasks/run", "readOnly": false, "description": "Start a task." },
+    { "name": "pause", "route": "POST /v1/tasks/pause", "readOnly": false, "description": "Pause a running task." },
+    { "name": "resume", "route": "POST /v1/tasks/resume", "readOnly": false, "description": "Resume a paused, interrupted, or failed task." },
+    { "name": "restart", "route": "POST /v1/tasks/restart", "readOnly": false, "description": "Restart a resumable or terminal task." },
+    { "name": "cancel", "route": "POST /v1/tasks/cancel", "readOnly": false, "description": "Cancel a running task." },
+    { "name": "delete", "route": "DELETE /v1/tasks?id=...", "readOnly": false, "description": "Delete a task by id." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/tasks.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "list": "createTasksClient().list",
+        "get": "createTasksClient().get",
+        "create": "createTasksClient().create",
+        "run": "createTasksClient().run",
+        "pause": "createTasksClient().pause",
+        "resume": "createTasksClient().resume",
+        "restart": "createTasksClient().restart",
+        "cancel": "createTasksClient().cancel",
+        "delete": "createTasksClient().delete"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "list": "yunque.Tasks.List",
+        "get": "yunque.Tasks.Get",
+        "create": "yunque.Tasks.Create",
+        "run": "yunque.Tasks.Run",
+        "pause": "yunque.Tasks.Pause",
+        "resume": "yunque.Tasks.Resume",
+        "restart": "yunque.Tasks.Restart",
+        "cancel": "yunque.Tasks.Cancel",
+        "delete": "yunque.Tasks.Delete"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "list": "yunque.tasks.list",
+        "get": "yunque.tasks.get",
+        "create": "yunque.tasks.create",
+        "run": "yunque.tasks.run",
+        "pause": "yunque.tasks.pause",
+        "resume": "yunque.tasks.resume",
+        "restart": "yunque.tasks.restart",
+        "cancel": "yunque.tasks.cancel",
+        "delete": "yunque.tasks.delete"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "list": "TasksClient::list",
+        "get": "TasksClient::get",
+        "create": "TasksClient::create",
+        "run": "TasksClient::run",
+        "pause": "TasksClient::pause",
+        "resume": "TasksClient::resume",
+        "restart": "TasksClient::restart",
+        "cancel": "TasksClient::cancel",
+        "delete": "TasksClient::delete"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

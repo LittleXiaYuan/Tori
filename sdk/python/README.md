@@ -339,6 +339,9 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 
 
 
+### Tasks SDK
+
+The lightweight Tasks SDK exposes task CRUD and lifecycle helpers for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts. Use it to list, read, create, run, pause, resume, restart, cancel, and delete `/v1/tasks` records without importing the full platform client or coupling to the backend console.
 ### Permissions SDK
 
 The lightweight Permissions SDK exposes permission checks and current-role reads for external plugin UIs, front-end pages, CLIs, sidecars, and automation guard scripts. Use it to call `/v1/rbac/check` and `/v1/rbac/my-roles` without pulling in the broader RBAC governance client.

@@ -43,6 +43,7 @@
     "user-instructions",
     "reactions-runtime",
     "permissions-facade",
+    "tasks-runtime",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -195,6 +196,10 @@
       "description": "Access the lightweight Permissions client or namespace for permission checks and current-role reads."
     },
     {
+      "name": "tasks",
+      "description": "Access the lightweight Tasks client or namespace for task CRUD and lifecycle operations."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -280,6 +285,8 @@
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
         "permissions": "AgentKit.permissions",
+        "tasks": "AgentKit.Tasks",
+        "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -338,6 +345,8 @@
         "instructions": "AgentKit.Instructions",
         "reactions": "AgentKit.Reactions",
         "permissions": "AgentKit.Permissions",
+        "tasks": "AgentKit.Tasks",
+        "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -396,6 +405,8 @@
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
         "permissions": "AgentKit.permissions",
+        "tasks": "AgentKit.Tasks",
+        "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -454,6 +465,7 @@
         "instructions": "AgentKit::instructions",
         "reactions": "AgentKit::reactions",
         "permissions": "AgentKit::permissions",
+        "tasks": "AgentKit::tasks",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

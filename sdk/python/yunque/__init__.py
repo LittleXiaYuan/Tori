@@ -1002,6 +1002,54 @@ class _RBACNamespace:
 rbac = _RBACNamespace()
 
 
+# ── Tasks (/v1/tasks) ──
+
+class _TasksNamespace:
+    """Lightweight helpers for task CRUD and lifecycle under /v1/tasks."""
+
+    def list(self) -> list:
+        return _api_call("GET", "/v1/tasks")
+
+    def get(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/tasks?{urlencode({'id': task_id})}")
+
+    def create(self, description: str | dict, *, title: str = "", constraints: Optional[dict] = None) -> dict:
+        if isinstance(description, dict):
+            body = dict(description)
+        else:
+            body = {"description": description}
+            if title:
+                body["title"] = title
+            if constraints is not None:
+                body["constraints"] = constraints
+        return _api_call("POST", "/v1/tasks", body)
+
+    def run(self, task_id: str) -> dict:
+        return self._action("run", task_id)
+
+    def pause(self, task_id: str) -> dict:
+        return self._action("pause", task_id)
+
+    def resume(self, task_id: str) -> dict:
+        return self._action("resume", task_id)
+
+    def restart(self, task_id: str) -> dict:
+        return self._action("restart", task_id)
+
+    def cancel(self, task_id: str) -> dict:
+        return self._action("cancel", task_id)
+
+    def delete(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/tasks?{urlencode({'id': task_id})}")
+
+    def _action(self, action: str, task_id: str) -> dict:
+        return _api_call("POST", f"/v1/tasks/{action}", {"id": task_id})
+
+
+tasks = _TasksNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2215,6 +2263,7 @@ class AgentKit:
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
+        self.tasks = tasks
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

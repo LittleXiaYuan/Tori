@@ -161,6 +161,50 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestTasksHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/tasks":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("id") == "task-1" {
+					_, _ = w.Write([]byte(`{"id":"task-1","status":"running"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`[{"id":"task-1"}]`))
+			case http.MethodPost:
+				var body CreateTaskRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.Description != "ship SDK" || body.Constraints.MaxSteps != 3 { t.Fatalf("unexpected task body: %+v", body) }
+				_, _ = w.Write([]byte(`{"id":"task-2","description":"ship SDK"}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"deleted":"task-1"}`))
+			}
+		case "/v1/tasks/run":
+			_, _ = w.Write([]byte(`{"status":"accepted","task_id":"task-1"}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Tasks.List(ctx)
+	if err != nil || len(list) != 1 { t.Fatalf("list = %+v, %v", list, err) }
+	got, err := Tasks.Get(ctx, "task-1")
+	if err != nil || got["status"] != "running" { t.Fatalf("get = %+v, %v", got, err) }
+	created, err := Tasks.Create(ctx, CreateTaskRequest{Description: "ship SDK", Constraints: TaskConstraints{MaxSteps: 3}})
+	if err != nil || created["id"] != "task-2" { t.Fatalf("create = %+v, %v", created, err) }
+	run, err := Tasks.Run(ctx, "task-1")
+	if err != nil || run["status"] != "accepted" { t.Fatalf("run = %+v, %v", run, err) }
+	deleted, err := Tasks.Delete(ctx, "task-1")
+	if err != nil || deleted["deleted"] != "task-1" { t.Fatalf("delete = %+v, %v", deleted, err) }
+	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
+	if len(seen) != 5 { t.Fatalf("unexpected calls: %v", seen) }
+}
+
 func TestPermissionsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
