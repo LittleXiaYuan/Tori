@@ -220,6 +220,10 @@ import { createPersonaPresetsClient } from "yunque-client/persona-presets";
 import { createWorkflowClient } from "yunque-client/workflow";
 import { createWorkflowDefinitionsClient } from "yunque-client/workflow-definitions";
 import { createWorkflowRunsClient } from "yunque-client/workflow-runs";
+import { createWorkflowReadClient } from "yunque-client/workflow-read";
+import { createWorkflowWriteClient } from "yunque-client/workflow-write";
+import { createWorkflowRunClient } from "yunque-client/workflow-run";
+import { createWorkflowInstancesClient } from "yunque-client/workflow-instances";
 import { createCostClient } from "yunque-client/cost";
 import { createCostBudgetClient } from "yunque-client/cost-budget";
 import { createCostAlertsClient } from "yunque-client/cost-alerts";
@@ -1306,7 +1310,7 @@ console.log(sandboxStatus.key_source);
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`/`modes-observe`
-`/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
+`/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`market-search`/`market-stats`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
@@ -1464,6 +1468,10 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/workflow.ts` | Lightweight hand-written workflow definition/instance execution slice |
 | `src/workflow-definitions.ts` | Lightweight workflow definition management facade without full SDK import |
 | `src/workflow-runs.ts` | Lightweight workflow run and instance facade without full SDK import |
+| `src/workflow-read.ts` | Lightweight workflow definition read facade without save/delete or run APIs |
+| `src/workflow-write.ts` | Lightweight workflow definition save/delete facade without read or run APIs |
+| `src/workflow-run.ts` | Lightweight workflow run/cancel facade without definition or instance read APIs |
+| `src/workflow-instances.ts` | Lightweight workflow instance list/get facade without run/cancel APIs |
 | `src/cost.ts` | Lightweight hand-written cost, usage and quota slice |
 | `src/cost-budget.ts` | Lightweight cost summary/budget/alerts facade without task cost, usage or quota APIs |
 | `src/cost-alerts.ts` | Lightweight cost alerts facade without summary, budget, task cost, usage or quota APIs |
