@@ -159,6 +159,18 @@
       "types": "./src/discovery.ts",
       "import": "./src/discovery.ts"
     },
+    "./discovery-identity": {
+      "types": "./src/discovery-identity.ts",
+      "import": "./src/discovery-identity.ts"
+    },
+    "./discovery-embeddings": {
+      "types": "./src/discovery-embeddings.ts",
+      "import": "./src/discovery-embeddings.ts"
+    },
+    "./discovery-search": {
+      "types": "./src/discovery-search.ts",
+      "import": "./src/discovery-search.ts"
+    },
     "./identity": {
       "types": "./src/identity.ts",
       "import": "./src/identity.ts"

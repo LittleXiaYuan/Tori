@@ -129,6 +129,9 @@ import { createBotsClient } from "yunque-client/bots";
 import { createBotsReadClient } from "yunque-client/bots-read";
 import { createBotsControlClient } from "yunque-client/bots-control";
 import { createDiscoveryClient } from "yunque-client/discovery";
+import { createDiscoveryIdentityClient } from "yunque-client/discovery-identity";
+import { createDiscoveryEmbeddingsClient } from "yunque-client/discovery-embeddings";
+import { createDiscoverySearchClient } from "yunque-client/discovery-search";
 import { createIdentityClient } from "yunque-client/identity";
 import { createEmbeddingsClient } from "yunque-client/embeddings";
 import { createSearchClient } from "yunque-client/search";
@@ -1263,7 +1266,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`market-search`/`market-stats`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -1332,6 +1335,9 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/bots-read.ts` | Lightweight bot/inbox/channel-group read facade without create/update/delete APIs |
 | `src/bots-control.ts` | Lightweight bot and inbox mutation facade without bot/inbox/channel read APIs |
 | `src/discovery.ts` | Lightweight hand-written identity, embeddings, and web search discovery slice |
+| `src/discovery-identity.ts` | Lightweight identity resolution/profile facade without embeddings or search APIs |
+| `src/discovery-embeddings.ts` | Lightweight embedding provider/embed facade without identity or search APIs |
+| `src/discovery-search.ts` | Lightweight web search/provider facade without identity or embedding APIs |
 | `src/identity.ts` | Lightweight identity resolve/profile facade for `/v1/identity/*` without full SDK import |
 | `src/embeddings.ts` | Lightweight embeddings providers/embed facade for `/v1/embeddings` without full SDK import |
 | `src/search.ts` | Lightweight search facade for `/v1/search` and `/v1/search/providers` without full SDK import |
