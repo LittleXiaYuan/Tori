@@ -1089,6 +1089,32 @@ class _BackupNamespace:
 
 backup = _BackupNamespace()
 
+# ── Tori Integration (/v1/tori) ──
+
+class _ToriNamespace:
+    """Lightweight helpers for Tori account binding, status, health, and usage."""
+
+    def bind(self, tori_url: str | None = None) -> dict:
+        body = {}
+        if tori_url:
+            body["tori_url"] = tori_url
+        return _api_call("POST", "/v1/tori/bind", body)
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/tori/status")
+
+    def unbind(self) -> dict:
+        return _api_call("POST", "/v1/tori/unbind", {})
+
+    def health(self) -> dict:
+        return _api_call("GET", "/v1/tori/health")
+
+    def usage(self) -> dict:
+        return _api_call("GET", "/v1/tori/usage")
+
+
+tori = _ToriNamespace()
+
 # ── Settings (/api/settings, /v1/config/reload) ──
 
 class _SettingsNamespace:
@@ -2566,6 +2592,7 @@ class AgentKit:
         self.reactions = reactions
         self.permissions = permissions
         self.backup = backup
+        self.tori = tori
         self.settings = settings
         self.system = system
         self.auth = auth

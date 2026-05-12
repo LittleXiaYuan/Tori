@@ -700,6 +700,7 @@ type AgentKit struct {
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
 	Backup        *backupNamespace
+	Tori          *toriNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -4205,6 +4206,63 @@ func (b *browserNamespace) RunScenario(ctx context.Context, scenarioID string) (
 	return apiCall(ctx, http.MethodPost, "/api/browser/ext/scenarios/run", map[string]any{"scenario_id": scenarioID})
 }
 
+// ── Tori Integration (/v1/tori) ──
+
+// Tori exposes lightweight account binding, status, health, and usage helpers.
+var Tori = &toriNamespace{}
+
+type toriNamespace struct{}
+
+type ToriBindRequest struct {
+	ToriURL string `json:"tori_url,omitempty"`
+}
+
+type ToriBindResponse map[string]any
+type ToriStatusResponse map[string]any
+type ToriUnbindResponse map[string]any
+type ToriHealthResponse map[string]any
+type ToriUsageResponse map[string]any
+
+func (t *toriNamespace) Bind(ctx context.Context, req ToriBindRequest) (ToriBindResponse, error) {
+	var out ToriBindResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tori/bind", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *toriNamespace) Status(ctx context.Context) (ToriStatusResponse, error) {
+	var out ToriStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tori/status", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *toriNamespace) Unbind(ctx context.Context) (ToriUnbindResponse, error) {
+	var out ToriUnbindResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tori/unbind", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *toriNamespace) Health(ctx context.Context) (ToriHealthResponse, error) {
+	var out ToriHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tori/health", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *toriNamespace) Usage(ctx context.Context) (ToriUsageResponse, error) {
+	var out ToriUsageResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tori/usage", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Files ──
 
 type filesNamespace struct{}
@@ -5080,6 +5138,7 @@ func NewAgentKit() AgentKit {
 		Reactions:     Reactions,
 		Permissions:   Permissions,
 		Backup:        Backup,
+		Tori:          Tori,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

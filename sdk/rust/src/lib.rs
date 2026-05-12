@@ -1398,6 +1398,7 @@ pub struct AgentKit {
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
     pub backup: BackupClient,
+    pub tori: ToriClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1469,6 +1470,7 @@ impl AgentKit {
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
             backup: BackupClient::new(base_url.clone(), token.as_ref())?,
+            tori: ToriClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1536,6 +1538,7 @@ impl AgentKit {
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             backup: BackupClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            tori: ToriClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5417,6 +5420,38 @@ fn filename_from_content_disposition(disposition: &str) -> Option<String> {
     disposition.split(';').map(str::trim).find_map(|part| {
         part.strip_prefix("filename=").map(|v| v.trim_matches('"').to_string())
     })
+}
+
+pub type ToriBindResponse = serde_json::Value;
+pub type ToriStatusResponse = serde_json::Value;
+pub type ToriUnbindResponse = serde_json::Value;
+pub type ToriHealthResponse = serde_json::Value;
+pub type ToriUsageResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToriBindRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tori_url: Option<String>,
+}
+
+/// Lightweight Tori SDK client for account binding, status, health, and usage helpers.
+#[derive(Debug, Clone)]
+pub struct ToriClient { base_url: String, http: reqwest::Client }
+
+impl ToriClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn bind(&self, request: &ToriBindRequest) -> Result<ToriBindResponse, reqwest::Error> { self.http.post(self.url("/v1/tori/bind")).json(request).send().await?.error_for_status()?.json().await }
+    pub async fn status(&self) -> Result<ToriStatusResponse, reqwest::Error> { self.get_json("/v1/tori/status").await }
+    pub async fn unbind(&self) -> Result<ToriUnbindResponse, reqwest::Error> { self.http.post(self.url("/v1/tori/unbind")).json(&serde_json::json!({})).send().await?.error_for_status()?.json().await }
+    pub async fn health(&self) -> Result<ToriHealthResponse, reqwest::Error> { self.get_json("/v1/tori/health").await }
+    pub async fn usage(&self) -> Result<ToriUsageResponse, reqwest::Error> { self.get_json("/v1/tori/usage").await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
 }
 
 pub type SettingsSchemaResponse = serde_json::Value;
@@ -9330,6 +9365,18 @@ mod tests {
         assert_eq!(client.url("/v1/backup/export"), "http://localhost:9090/v1/backup/export");
         assert_eq!(client.url("/v1/backup/import"), "http://localhost:9090/v1/backup/import");
         assert_eq!(filename_from_content_disposition("attachment; filename=\"backup.zip\""), Some("backup.zip".to_string()));
+    }
+
+    #[test]
+    fn tori_helpers_build_urls_and_payloads() {
+        let client = ToriClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/tori/bind"), "http://localhost:9090/v1/tori/bind");
+        assert_eq!(client.url("/v1/tori/status"), "http://localhost:9090/v1/tori/status");
+        assert_eq!(client.url("/v1/tori/unbind"), "http://localhost:9090/v1/tori/unbind");
+        assert_eq!(client.url("/v1/tori/health"), "http://localhost:9090/v1/tori/health");
+        assert_eq!(client.url("/v1/tori/usage"), "http://localhost:9090/v1/tori/usage");
+        let bind = serde_json::to_value(ToriBindRequest { tori_url: Some("https://tori.example".to_string()) }).unwrap();
+        assert_eq!(bind["tori_url"], "https://tori.example");
     }
 
     #[test]

@@ -48,6 +48,48 @@ func TestBackupHelpers(t *testing.T) {
 	}
 }
 
+func TestToriHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/tori/bind":
+			var body ToriBindRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ToriURL != "https://tori.example" {
+				t.Fatalf("unexpected bind body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"pending","authorize_url":"https://tori.example/oauth"}`))
+		case "/v1/tori/status":
+			_, _ = w.Write([]byte(`{"bound":true,"username":"alice"}`))
+		case "/v1/tori/unbind":
+			_, _ = w.Write([]byte(`{"status":"unbound"}`))
+		case "/v1/tori/health":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/tori/usage":
+			_, _ = w.Write([]byte(`{"total_tokens":12}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	bind, _ := Tori.Bind(ctx, ToriBindRequest{ToriURL: "https://tori.example"})
+	status, _ := Tori.Status(ctx)
+	unbind, _ := Tori.Unbind(ctx)
+	health, _ := Tori.Health(ctx)
+	usage, _ := Tori.Usage(ctx)
+	if bind["status"] != "pending" || status["bound"] != true || unbind["status"] != "unbound" || health["status"] != "ok" || usage["total_tokens"].(float64) != 12 || NewAgentKit().Tori != Tori {
+		t.Fatalf("unexpected tori results")
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 tori API calls, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestSettingsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

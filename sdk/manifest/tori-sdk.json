@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "domain": "tori",
+  "description": "Cross-language lightweight SDK for Tori account binding, status, health, and usage without importing the full platform client.",
+  "principles": [
+    "Expose Tori binding and observability as a focused SDK slice for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep account bind/status/unbind/health/usage directly callable through existing gateway routes.",
+    "Make Tori access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/tori/bind",
+    "GET /v1/tori/status",
+    "POST /v1/tori/unbind",
+    "GET /v1/tori/health",
+    "GET /v1/tori/usage"
+  ],
+  "capabilities": [
+    {
+      "name": "bind",
+      "route": "POST /v1/tori/bind",
+      "readOnly": false,
+      "description": "Start the Tori OAuth2 account binding flow."
+    },
+    {
+      "name": "status",
+      "route": "GET /v1/tori/status",
+      "readOnly": true,
+      "description": "Read current Tori binding status."
+    },
+    {
+      "name": "unbind",
+      "route": "POST /v1/tori/unbind",
+      "readOnly": false,
+      "description": "Remove the current Tori account binding."
+    },
+    {
+      "name": "health",
+      "route": "GET /v1/tori/health",
+      "readOnly": true,
+      "description": "Check bound Tori instance health."
+    },
+    {
+      "name": "usage",
+      "route": "GET /v1/tori/usage",
+      "readOnly": true,
+      "description": "Read usage summary from the bound Tori instance."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/tori.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "bind": "createToriClient().bind",
+        "status": "createToriClient().status",
+        "unbind": "createToriClient().unbind",
+        "health": "createToriClient().health",
+        "usage": "createToriClient().usage"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "bind": "yunque.Tori.Bind",
+        "status": "yunque.Tori.Status",
+        "unbind": "yunque.Tori.Unbind",
+        "health": "yunque.Tori.Health",
+        "usage": "yunque.Tori.Usage"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "bind": "yunque.tori.bind",
+        "status": "yunque.tori.status",
+        "unbind": "yunque.tori.unbind",
+        "health": "yunque.tori.health",
+        "usage": "yunque.tori.usage"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "bind": "ToriClient::bind",
+        "status": "ToriClient::status",
+        "unbind": "ToriClient::unbind",
+        "health": "ToriClient::health",
+        "usage": "ToriClient::usage"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

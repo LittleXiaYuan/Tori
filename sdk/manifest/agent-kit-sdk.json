@@ -53,6 +53,7 @@
     "artifact-files",
     "browser-automation",
     "realtime-websocket",
+    "tori-account",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -197,6 +198,10 @@
       "description": "Access the lightweight Permissions client or namespace for permission checks and current-role reads."
     },
     {
+      "name": "tori",
+      "description": "Access the lightweight Tori binding/status/health/usage client or namespace."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -299,7 +304,8 @@
         "approvals": "AgentKit.approvals",
         "rbac": "AgentKit.rbac",
         "files": "AgentKit.files",
-        "browser": "AgentKit.browser"
+        "browser": "AgentKit.browser",
+        "tori": "AgentKit.tori"
       }
     },
     "go": {
@@ -359,7 +365,8 @@
         "approvals": "AgentKit.Approvals",
         "rbac": "AgentKit.RBAC",
         "files": "AgentKit.Files",
-        "browser": "AgentKit.Browser"
+        "browser": "AgentKit.Browser",
+        "tori": "AgentKit.Tori"
       }
     },
     "python": {
@@ -419,7 +426,8 @@
         "approvals": "AgentKit.approvals",
         "rbac": "AgentKit.rbac",
         "files": "AgentKit.files",
-        "browser": "AgentKit.browser"
+        "browser": "AgentKit.browser",
+        "tori": "AgentKit.tori"
       }
     },
     "rust": {
@@ -479,7 +487,8 @@
         "approvals": "AgentKit::approvals",
         "rbac": "AgentKit::rbac",
         "files": "AgentKit::files",
-        "browser": "AgentKit::browser"
+        "browser": "AgentKit::browser",
+        "tori": "AgentKit.tori"
       }
     }
   },
