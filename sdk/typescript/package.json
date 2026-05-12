@@ -351,6 +351,10 @@
       "types": "./src/approvals.ts",
       "import": "./src/approvals.ts"
     },
+    "./approval-decisions": {
+      "types": "./src/approval-decisions.ts",
+      "import": "./src/approval-decisions.ts"
+    },
     "./approval-queue": {
       "types": "./src/approval-queue.ts",
       "import": "./src/approval-queue.ts"
