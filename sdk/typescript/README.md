@@ -48,7 +48,7 @@ console.log(reply);
 
 For external automation that needs the common SDK-first surfaces together, use
 `yunque-client/agent-kit`. It composes the hand-written State Kernel,
-Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, and Plugin API Runtime clients without importing the
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, and Plugin API Runtime clients without importing the
 generated all-in-one SDK.
 
 ```ts
@@ -2164,6 +2164,10 @@ Dispatch SDK exposes lightweight MCP worker and queue helpers (`workers`, `worke
 
 Orchestrator SDK exposes lightweight IDE worker daemon helpers (`status`, `toggle`, `sessions`, `detectIDEs`, `events`, `taskTimeline`, `policy`, `updatePolicy`, `addAdapter`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.orchestrator` / `kit.Orchestrator` for one-stop IDE worker orchestration.
 
+
+### Cost SDK
+
+Cost SDK exposes lightweight cost governance helpers (`summary`, `setBudget`, `task`, `taskTimeline`, `breakdown`, `history`, `alerts`, `usage`, `setQuota`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.cost` / `kit.Cost` for one-stop budget, usage, quota, and cost observability workflows.
 
 ### Fork SDK
 

@@ -26,6 +26,7 @@
     "mcp-dispatch",
     "ide-orchestrator",
     "conversation-fork",
+    "cost-usage-quota",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -102,6 +103,10 @@
       "description": "Access the lightweight conversation Fork tree client or namespace."
     },
     {
+      "name": "cost",
+      "description": "Access the lightweight Cost, Usage, and Quota governance client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -137,7 +142,8 @@
         "market": "AgentKit.market",
         "dispatch": "AgentKit.dispatch",
         "orchestrator": "AgentKit.orchestrator",
-        "fork": "AgentKit.fork"
+        "fork": "AgentKit.fork",
+        "cost": "AgentKit.cost"
       }
     },
     "go": {
@@ -170,7 +176,8 @@
         "market": "AgentKit.Market",
         "dispatch": "AgentKit.Dispatch",
         "orchestrator": "AgentKit.Orchestrator",
-        "fork": "AgentKit.Fork"
+        "fork": "AgentKit.Fork",
+        "cost": "AgentKit.Cost"
       }
     },
     "python": {
@@ -203,7 +210,8 @@
         "market": "AgentKit.market",
         "dispatch": "AgentKit.dispatch",
         "orchestrator": "AgentKit.orchestrator",
-        "fork": "AgentKit.fork"
+        "fork": "AgentKit.fork",
+        "cost": "AgentKit.cost"
       }
     },
     "rust": {
@@ -236,7 +244,8 @@
         "market": "AgentKit::market",
         "dispatch": "AgentKit::dispatch",
         "orchestrator": "AgentKit::orchestrator",
-        "fork": "AgentKit::fork"
+        "fork": "AgentKit::fork",
+        "cost": "AgentKit::cost"
       }
     }
   },

@@ -18,7 +18,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, Mission Parse,
 Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base,
-LoRA, Workflow, Connector, Notify, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
+LoRA, Workflow, Connector, Notify, Cost, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -248,6 +248,10 @@ Dispatch SDK exposes lightweight MCP worker and queue helpers (`workers`, `worke
 
 Orchestrator SDK exposes lightweight IDE worker daemon helpers (`status`, `toggle`, `sessions`, `detectIDEs`, `events`, `taskTimeline`, `policy`, `updatePolicy`, `addAdapter`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.orchestrator` / `kit.Orchestrator` for one-stop IDE worker orchestration.
 
+
+### Cost SDK
+
+Cost SDK exposes lightweight cost governance helpers (`summary`, `setBudget`, `task`, `taskTimeline`, `breakdown`, `history`, `alerts`, `usage`, `setQuota`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.cost` / `kit.Cost` for one-stop budget, usage, quota, and cost observability workflows.
 
 ### Fork SDK
 

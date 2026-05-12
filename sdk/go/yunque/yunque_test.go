@@ -278,6 +278,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"running":true,"adapters":["cursor"],"active_sessions":1}`))
 		case "/v1/fork/list":
 			_, _ = w.Write([]byte(`{"forks":[{"id":"fork_1","session_id":"s1","messages":[],"created_at":"2026-05-12T00:00:00Z"}]}`))
+		case "/v1/cost/summary":
+			_, _ = w.Write([]byte(`{"today_cost":0.12,"month_cost":1.5}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -348,6 +350,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	costSummary, err := kit.Cost.Summary(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -356,14 +362,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 17 {
-		t.Fatalf("expected 17 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 18 {
+		t.Fatalf("expected 18 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1529,6 +1535,101 @@ func TestForkHelpers(t *testing.T) {
 	}
 	if len(seen) != 6 {
 		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestCostHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/cost/summary":
+			_, _ = w.Write([]byte(`{"today_cost":0.12,"month_cost":1.5}`))
+		case "/v1/cost/budget":
+			var body CostBudget
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["daily_limit_usd"].(float64) != 1 {
+				t.Fatalf("unexpected budget body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/v1/cost/task":
+			if r.URL.Query().Get("id") != "task/1" {
+				t.Fatalf("unexpected task query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"total_cost_usd":0.2}`))
+		case "/v1/cost/task/timeline":
+			_, _ = w.Write([]byte(`{"records":[]}`))
+		case "/v1/cost/breakdown":
+			_, _ = w.Write([]byte(`{"by_provider":[]}`))
+		case "/v1/cost/history":
+			if r.URL.Query().Get("page") != "2" || r.URL.Query().Get("model") != "gpt-test" {
+				t.Fatalf("unexpected history query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"records":[],"page":2}`))
+		case "/v1/cost/alerts":
+			_, _ = w.Write([]byte(`{"alerts":[]}`))
+		case "/v1/usage":
+			_, _ = w.Write([]byte(`{"tenant_id":"tenant-1"}`))
+		case "/v1/quota":
+			var body SetQuotaRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TenantID != "tenant-1" || body.Quota["max_chat_calls"].(float64) != 10 {
+				t.Fatalf("unexpected quota body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	summary, err := Cost.Summary(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err := Cost.SetBudget(context.Background(), CostBudget{"daily_limit_usd": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err := Cost.Task(context.Background(), "task/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	timeline, err := Cost.TaskTimeline(context.Background(), "task/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	breakdown, err := Cost.Breakdown(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, err := Cost.History(context.Background(), CostHistoryOptions{Page: 2, Limit: 25, Model: "gpt-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alerts, err := Cost.Alerts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	usage, err := Cost.Usage(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	quota, err := Cost.SetQuota(context.Background(), SetQuotaRequest{TenantID: "tenant-1", Quota: map[string]any{"max_chat_calls": 10}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if summary["today_cost"].(float64) != 0.12 || !budget["ok"].(bool) || task["total_cost_usd"].(float64) != 0.2 || timeline["records"] == nil || breakdown["by_provider"] == nil || history["page"].(float64) != 2 || alerts["alerts"] == nil || usage["tenant_id"] != "tenant-1" || quota["status"] != "ok" || kit.Cost != Cost {
+		t.Fatalf("unexpected cost results")
+	}
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 
