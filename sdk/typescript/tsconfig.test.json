@@ -118,6 +118,7 @@
     "src/audit-chain.ts",
     "src/audit-trail.ts",
     "src/heartbeat.ts",
+    "src/heartbeat-observe.ts",
     "src/reverie.ts",
     "src/federation.ts",
     "src/system.ts",
