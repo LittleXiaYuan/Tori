@@ -40,6 +40,7 @@ import os
 import urllib.request
 import urllib.error
 from typing import Any, Optional
+from urllib.parse import quote
 
 __version__ = "0.1.0"
 
@@ -67,6 +68,29 @@ def _api_call(method: str, path: str, body: Any = None, timeout: int = 30) -> di
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Yunque API connection error: {e.reason}") from e
+
+
+def _api_call_raw(method: str, path: str, body: Any = None, timeout: int = 30) -> str:
+    """Make an authenticated API call and return the raw response text."""
+    url = f"{_API_BASE}{path}"
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    if _TOKEN:
+        req.add_header("Authorization", f"Bearer {_TOKEN}")
+    req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Yunque API error {e.code}: {error_body}") from e
@@ -1002,6 +1026,50 @@ class _RBACNamespace:
 rbac = _RBACNamespace()
 
 
+
+# ── System / Observability (/healthz, /v1/system, /v1/metrics) ──
+
+class _SystemNamespace:
+    """Lightweight health, readiness, version, metrics, cache, module, and SBOM helpers."""
+
+    def health(self) -> dict:
+        return _api_call("GET", "/healthz")
+
+    def livez(self) -> dict:
+        return _api_call("GET", "/livez")
+
+    def readyz(self) -> dict:
+        return _api_call("GET", "/readyz")
+
+    def cognitive_health(self) -> dict:
+        return _api_call("GET", "/healthz/cognitive")
+
+    def version(self) -> dict:
+        return _api_call("GET", "/v1/version")
+
+    def info(self) -> dict:
+        return _api_call("GET", "/v1/system/info")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/system/stats")
+
+    def metrics(self) -> dict:
+        return _api_call("GET", "/v1/metrics")
+
+    def metrics_prometheus(self) -> str:
+        return _api_call_raw("GET", "/v1/metrics/prometheus")
+
+    def cache_stats(self) -> dict:
+        return _api_call("GET", "/v1/cache/stats")
+
+    def modules(self) -> dict:
+        return _api_call("GET", "/v1/modules")
+
+    def sbom(self) -> dict:
+        return _api_call("GET", "/sbom")
+
+
+system = _SystemNamespace()
 
 # ── Auth (/v1/auth, /v1/token) ──
 
@@ -2409,6 +2477,7 @@ class AgentKit:
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
+        self.system = system
         self.auth = auth
         self.tasks = tasks
         self.task_templates = task_templates
