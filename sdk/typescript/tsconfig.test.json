@@ -128,6 +128,7 @@
     "src/federation-control.ts",
     "src/federation-delegate.ts",
     "src/system.ts",
+    "src/system-probes.ts",
     "src/settings.ts",
     "src/tori.ts",
     "src/speech.ts",
