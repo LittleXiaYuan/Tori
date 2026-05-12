@@ -1071,6 +1071,22 @@
       "types": "./src/triggers-control.ts",
       "import": "./src/triggers-control.ts"
     },
+    "./trigger-definitions": {
+      "types": "./src/trigger-definitions.ts",
+      "import": "./src/trigger-definitions.ts"
+    },
+    "./trigger-definition-control": {
+      "types": "./src/trigger-definition-control.ts",
+      "import": "./src/trigger-definition-control.ts"
+    },
+    "./trigger-history": {
+      "types": "./src/trigger-history.ts",
+      "import": "./src/trigger-history.ts"
+    },
+    "./trigger-emit": {
+      "types": "./src/trigger-emit.ts",
+      "import": "./src/trigger-emit.ts"
+    },
     "./missions": {
       "types": "./src/missions.ts",
       "import": "./src/missions.ts"
