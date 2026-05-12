@@ -445,3 +445,7 @@ The lightweight Federation SDK exposes model-aware A2A federation helpers for ex
 ### Planner SDK
 
 The lightweight Planner SDK exposes Planner Recovery helpers for external task recovery pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It covers checkpoint listing, recovery prompt generation, task resume, direct resume-plan execution, async resume-plan job lookup, and execution-state inspection through `/v1/planner/checkpoints`, `/v1/planner/checkpoints/recover`, `/v1/planner/checkpoints/resume`, `/v1/planner/checkpoints/resume-plan`, `/v1/planner/checkpoints/resume-plan/jobs`, and `/v1/planner/execution-state`. Agent Kit also exposes this surface as `kit.planner` / `kit.Planner` for one-stop recovery automation.
+
+### IDE SDK
+
+The lightweight IDE SDK exposes IDE supervisor status and structured code review helpers for editor plugins, external review panes, CLIs, sidecars, and automation scripts without importing the full platform client. It covers `/v1/ide/status` and `/v1/ide/review`, including full, quick, and diff review helper methods. Agent Kit also exposes this surface as `kit.ide` / `kit.IDE` for one-stop editor automation.

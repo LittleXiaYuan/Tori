@@ -1404,6 +1404,7 @@ pub struct AgentKit {
     pub admin: AdminClient,
     pub federation: FederationClient,
     pub planner: PlannerClient,
+    pub ide: IDEClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1481,6 +1482,7 @@ impl AgentKit {
             admin: AdminClient::new(base_url.clone(), token.as_ref())?,
             federation: FederationClient::new(base_url.clone(), token.as_ref())?,
             planner: PlannerClient::new(base_url.clone(), token.as_ref())?,
+            ide: IDEClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1554,6 +1556,7 @@ impl AgentKit {
             admin: AdminClient::new_with_client(base_url.clone(), plugin_http.clone()),
             federation: FederationClient::new_with_client(base_url.clone(), plugin_http.clone()),
             planner: PlannerClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            ide: IDEClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5607,6 +5610,45 @@ impl SetupClient {
 
 
 
+
+
+pub type IDEStatusResponse = serde_json::Value;
+pub type IDEReviewResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct IDEReviewRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub file_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub diff: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub language: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mode: String,
+}
+
+/// Lightweight IDE SDK client for IDE supervisor status and code review.
+#[derive(Debug, Clone)]
+pub struct IDEClient { base_url: String, http: reqwest::Client }
+
+impl IDEClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn status(&self) -> Result<IDEStatusResponse, reqwest::Error> { self.get_json("/v1/ide/status").await }
+    pub async fn review(&self, request: &IDEReviewRequest) -> Result<IDEReviewResponse, reqwest::Error> { self.post_json("/v1/ide/review", request).await }
+    pub async fn review_diff(&self, diff: impl Into<String>, file_path: impl Into<String>, language: impl Into<String>) -> Result<IDEReviewResponse, reqwest::Error> { self.review(&IDEReviewRequest { diff: diff.into(), file_path: file_path.into(), language: language.into(), mode: "diff".to_string(), ..Default::default() }).await }
+    pub async fn review_quick(&self, content: impl Into<String>, file_path: impl Into<String>, language: impl Into<String>) -> Result<IDEReviewResponse, reqwest::Error> { self.review(&IDEReviewRequest { content: content.into(), file_path: file_path.into(), language: language.into(), mode: "quick".to_string(), ..Default::default() }).await }
+    pub async fn review_full(&self, content: impl Into<String>, file_path: impl Into<String>, language: impl Into<String>) -> Result<IDEReviewResponse, reqwest::Error> { self.review(&IDEReviewRequest { content: content.into(), file_path: file_path.into(), language: language.into(), mode: "full".to_string(), ..Default::default() }).await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
 
 pub type PlannerCheckpointsResponse = serde_json::Value;
 pub type PlannerRecoveryResponse = serde_json::Value;
@@ -9711,6 +9753,20 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn ide_helpers_build_urls_and_payloads() {
+        let client = IDEClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/ide/status"), "http://localhost:9090/v1/ide/status");
+        assert_eq!(client.url("/v1/ide/review"), "http://localhost:9090/v1/ide/review");
+        let full = serde_json::to_value(IDEReviewRequest { file_path: "main.go".to_string(), content: "package main".to_string(), language: "go".to_string(), mode: "full".to_string(), ..Default::default() }).unwrap();
+        assert_eq!(full["file_path"], "main.go");
+        assert_eq!(full["mode"], "full");
+        let diff = serde_json::to_value(IDEReviewRequest { file_path: "main.go".to_string(), diff: "+fmt.Println(1)".to_string(), language: "go".to_string(), mode: "diff".to_string(), ..Default::default() }).unwrap();
+        assert_eq!(diff["diff"], "+fmt.Println(1)");
+        assert_eq!(diff["mode"], "diff");
+    }
 
     #[test]
     fn planner_helpers_build_urls_and_payloads() {

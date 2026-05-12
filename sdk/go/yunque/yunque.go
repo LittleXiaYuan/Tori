@@ -303,6 +303,49 @@ func filenameFromDisposition(disposition string) string {
 
 
 
+
+// ── IDE Supervisor (/v1/ide) ──
+
+// IDE exposes IDE supervisor status and code-review helpers for external editor plugins and automation scripts.
+var IDE = &ideNamespace{}
+
+type ideNamespace struct{}
+
+type IDEStatusResponse map[string]any
+type IDEReviewResponse map[string]any
+
+type IDEReviewRequest struct {
+	FilePath string `json:"file_path,omitempty"`
+	Content  string `json:"content,omitempty"`
+	Diff     string `json:"diff,omitempty"`
+	Language string `json:"language,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+}
+
+func (i *ideNamespace) Status(ctx context.Context) (IDEStatusResponse, error) {
+	var out IDEStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/ide/status", nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (i *ideNamespace) Review(ctx context.Context, req IDEReviewRequest) (IDEReviewResponse, error) {
+	var out IDEReviewResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/ide/review", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (i *ideNamespace) ReviewDiff(ctx context.Context, diff, filePath, language string) (IDEReviewResponse, error) {
+	return i.Review(ctx, IDEReviewRequest{Diff: diff, FilePath: filePath, Language: language, Mode: "diff"})
+}
+
+func (i *ideNamespace) ReviewQuick(ctx context.Context, content, filePath, language string) (IDEReviewResponse, error) {
+	return i.Review(ctx, IDEReviewRequest{Content: content, FilePath: filePath, Language: language, Mode: "quick"})
+}
+
+func (i *ideNamespace) ReviewFull(ctx context.Context, content, filePath, language string) (IDEReviewResponse, error) {
+	return i.Review(ctx, IDEReviewRequest{Content: content, FilePath: filePath, Language: language, Mode: "full"})
+}
+
 // ── Planner Recovery (/v1/planner) ──
 
 // Planner exposes checkpoint recovery and execution-state helpers for external operator pages, CLIs, and automation scripts.
@@ -954,6 +997,7 @@ type AgentKit struct {
 	Admin         *adminNamespace
 	Federation    *federationNamespace
 	Planner       *plannerNamespace
+	IDE           *ideNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -5649,6 +5693,7 @@ func NewAgentKit() AgentKit {
 		Admin:         Admin,
 		Federation:    Federation,
 		Planner:       Planner,
+		IDE:           IDE,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

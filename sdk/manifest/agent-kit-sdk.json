@@ -59,6 +59,7 @@
     "admin-operator",
     "a2a-federation",
     "planner-recovery",
+    "ide-supervisor",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -227,6 +228,10 @@
       "description": "Access the lightweight Planner recovery client or namespace for checkpoints, resume-plan jobs, and execution-state inspection."
     },
     {
+      "name": "ide",
+      "description": "Access the lightweight IDE supervisor client or namespace for status and structured code review."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -335,7 +340,8 @@
         "setup": "AgentKit.setup",
         "admin": "AgentKit.admin",
         "federation": "AgentKit.federation",
-        "planner": "AgentKit.planner"
+        "planner": "AgentKit.planner",
+        "ide": "AgentKit.ide"
       }
     },
     "go": {
@@ -401,7 +407,8 @@
         "setup": "AgentKit.Setup",
         "admin": "AgentKit.Admin",
         "federation": "AgentKit.Federation",
-        "planner": "AgentKit.Planner"
+        "planner": "AgentKit.Planner",
+        "ide": "AgentKit.IDE"
       }
     },
     "python": {
@@ -467,7 +474,8 @@
         "setup": "AgentKit.setup",
         "admin": "AgentKit.admin",
         "federation": "AgentKit.federation",
-        "planner": "AgentKit.planner"
+        "planner": "AgentKit.planner",
+        "ide": "AgentKit.ide"
       }
     },
     "rust": {
@@ -533,7 +541,8 @@
         "setup": "AgentKit.setup",
         "admin": "AgentKit::admin",
         "federation": "AgentKit::federation",
-        "planner": "AgentKit::planner"
+        "planner": "AgentKit::planner",
+        "ide": "AgentKit::ide"
       }
     }
   },
