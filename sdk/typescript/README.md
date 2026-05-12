@@ -229,6 +229,8 @@ import { createSpeechSTTClient } from "yunque-client/speech-stt";
 import { createSpeechVoicesClient } from "yunque-client/speech-voices";
 import { createAdminClient } from "yunque-client/admin";
 import { createFilesClient } from "yunque-client/files";
+import { createFilesReadClient } from "yunque-client/files-read";
+import { createFilesDownloadClient } from "yunque-client/files-download";
 import { createCronClient } from "yunque-client/cron";
 import { createCronReadClient } from "yunque-client/cron-read";
 import { createCronControlClient } from "yunque-client/cron-control";
@@ -1401,6 +1403,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/speech-voices.ts` | Lightweight speech voices catalog facade without TTS, STT, stream URL, or upload APIs |
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
 | `src/files.ts` | Lightweight hand-written artifact file listing, preview, and download slice |
+| `src/files-read.ts` | Lightweight artifact list/preview facade without download APIs |
+| `src/files-download.ts` | Lightweight artifact download facade without list/preview APIs |
 | `src/cron.ts` | Lightweight hand-written cron job scheduling and run-now slice |
 | `src/cron-read.ts` | Lightweight cron job listing facade without scheduling or run-now APIs |
 | `src/cron-control.ts` | Lightweight cron add/remove/run-now facade without listing APIs |

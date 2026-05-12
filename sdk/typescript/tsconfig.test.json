@@ -154,6 +154,8 @@
     "src/speech-voices.ts",
     "src/admin.ts",
     "src/files.ts",
+    "src/files-read.ts",
+    "src/files-download.ts",
     "src/cron.ts",
     "src/cron-read.ts",
     "src/cron-control.ts",
