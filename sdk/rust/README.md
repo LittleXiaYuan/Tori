@@ -163,3 +163,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Lightweight Plugin API helper
+
+Use `PluginApiClient` when a Rust CLI, sidecar, or plugin runner only needs the
+core plugin runtime capabilities: LLM, search, and channel send. This keeps
+simple automations away from the broad generated OpenAPI surface.
+
+```rust
+use yunque_client::{PluginApiClient, PluginLLMMessage, PluginLLMRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let plugin = PluginApiClient::new("http://localhost:9090", "<plugin-token>")?;
+
+    let reply = plugin.llm(&PluginLLMRequest {
+        messages: vec![PluginLLMMessage {
+            role: "user".to_string(),
+            content: "Summarize the current SDK status".to_string(),
+        }],
+        ..PluginLLMRequest::default()
+    }).await?;
+
+    let results = plugin.search("Yunque SDK", 5).await?;
+    let sent = plugin.send("telegram", "chat-id", &reply.reply, "markdown").await?;
+
+    Ok(())
+}
+```
