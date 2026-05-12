@@ -181,6 +181,8 @@
     "src/project-write.ts",
     "src/market.ts",
     "src/dispatch.ts",
+    "src/dispatch-read.ts",
+    "src/dispatch-control.ts",
     "src/orchestrator.ts",
     "src/fork.ts",
     "src/scheduler.ts",
