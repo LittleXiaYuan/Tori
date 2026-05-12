@@ -99,6 +99,7 @@
     "src/persona.ts",
     "src/persona-state.ts",
     "src/persona-skills.ts",
+    "src/persona-presets.ts",
     "src/workflow.ts",
     "src/workflow-definitions.ts",
     "src/workflow-runs.ts",

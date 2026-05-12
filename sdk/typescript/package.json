@@ -339,6 +339,10 @@
       "types": "./src/persona-skills.ts",
       "import": "./src/persona-skills.ts"
     },
+    "./persona-presets": {
+      "types": "./src/persona-presets.ts",
+      "import": "./src/persona-presets.ts"
+    },
     "./workflow": {
       "types": "./src/workflow.ts",
       "import": "./src/workflow.ts"
