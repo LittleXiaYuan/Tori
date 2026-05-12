@@ -39,6 +39,8 @@
     "src/events-stream.ts",
     "src/events-parse.ts",
     "src/realtime.ts",
+    "src/realtime-connect.ts",
+    "src/realtime-messages.ts",
     "src/webchat.ts",
     "src/conversations.ts",
     "src/subagents.ts",

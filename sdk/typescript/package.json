@@ -99,6 +99,14 @@
       "types": "./src/realtime.ts",
       "import": "./src/realtime.ts"
     },
+    "./realtime-connect": {
+      "types": "./src/realtime-connect.ts",
+      "import": "./src/realtime-connect.ts"
+    },
+    "./realtime-messages": {
+      "types": "./src/realtime-messages.ts",
+      "import": "./src/realtime-messages.ts"
+    },
     "./webchat": {
       "types": "./src/webchat.ts",
       "import": "./src/webchat.ts"
