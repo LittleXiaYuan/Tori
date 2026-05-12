@@ -166,9 +166,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Lightweight Plugin API helper
 
-Use `PluginApiClient` when a Rust CLI, sidecar, or plugin runner only needs the
-core plugin runtime capabilities: LLM, search, and channel send. This keeps
-simple automations away from the broad generated OpenAPI surface.
+Use `PluginApiClient` when a Rust CLI, sidecar, or plugin runner only needs a
+focused plugin runtime slice: LLM, search, channel send, plugin-private memory,
+knowledge search/ingest, and plugin-owned cron jobs. This keeps simple
+automations away from the broad generated OpenAPI surface.
 
 ```rust
 use yunque_client::{PluginApiClient, PluginLLMMessage, PluginLLMRequest};
@@ -186,7 +187,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).await?;
 
     let results = plugin.search("Yunque SDK", 5).await?;
-    let sent = plugin.send("telegram", "chat-id", &reply.reply, "markdown").await?;
+    plugin.memory_set("sdk:last_summary", &reply.reply).await?;
+    let note = plugin.memory_get("sdk:last_summary").await?;
+    let knowledge = plugin.knowledge_search("incremental SDK package", 5).await?;
+    let job = plugin.cron_add(
+        "weekly-sdk-summary",
+        "0 9 * * MON",
+        "Summarize SDK manifest drift",
+    ).await?;
+    let sent = plugin.send("telegram", "chat-id", &note.value, "markdown").await?;
 
     Ok(())
 }

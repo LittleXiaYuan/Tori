@@ -154,7 +154,17 @@
       "entrypoints": {
         "llm": "PluginApiClient::llm",
         "search": "PluginApiClient::search",
-        "send": "PluginApiClient::send"
+        "send": "PluginApiClient::send",
+        "memoryGet": "PluginApiClient::memory_get",
+        "memorySet": "PluginApiClient::memory_set",
+        "memoryDelete": "PluginApiClient::memory_delete",
+        "memoryList": "PluginApiClient::memory_list",
+        "memorySearch": "PluginApiClient::memory_search",
+        "knowledgeSearch": "PluginApiClient::knowledge_search",
+        "knowledgeIngest": "PluginApiClient::knowledge_ingest",
+        "cronAdd": "PluginApiClient::cron_add",
+        "cronRemove": "PluginApiClient::cron_remove",
+        "cronList": "PluginApiClient::cron_list"
       }
     }
   },
