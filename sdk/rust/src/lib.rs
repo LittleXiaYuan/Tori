@@ -1378,6 +1378,7 @@ pub struct AgentKit {
     pub projects: ProjectsClient,
     pub market: SkillMarketClient,
     pub dispatch: DispatchClient,
+    pub orchestrator: OrchestratorClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1417,6 +1418,7 @@ impl AgentKit {
             projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
+            orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1446,6 +1448,10 @@ impl AgentKit {
             projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            orchestrator: OrchestratorClient::new_with_client(
+                base_url.clone(),
+                plugin_http.clone(),
+            ),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2246,6 +2252,279 @@ impl DispatchClient {
         };
         self.http
             .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+/// Policy map returned by `/v1/orchestrator/policy`.
+pub type OrchestratorPolicy = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorStatusResponse {
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub adapters: Vec<String>,
+    #[serde(default)]
+    pub active_sessions: i32,
+    #[serde(default)]
+    pub policy: OrchestratorPolicy,
+    #[serde(default)]
+    pub event_count: i32,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorToggleResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorSession {
+    pub session_id: String,
+    pub adapter: String,
+    pub task_id: String,
+    #[serde(default)]
+    pub started_at: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorSessionsResponse {
+    #[serde(default)]
+    pub sessions: Vec<OrchestratorSession>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorIDE {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub available: bool,
+    #[serde(default)]
+    pub version: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorDetectResponse {
+    #[serde(default)]
+    pub ides: Vec<OrchestratorIDE>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorEvent {
+    pub id: String,
+    pub r#type: String,
+    #[serde(default)]
+    pub task_id: String,
+    #[serde(default)]
+    pub worker_id: String,
+    #[serde(default)]
+    pub session_id: String,
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub meta: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    pub timestamp: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorEventsResponse {
+    #[serde(default)]
+    pub events: Vec<OrchestratorEvent>,
+    #[serde(default)]
+    pub total: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorTaskTimelineResponse {
+    pub task_id: String,
+    #[serde(default)]
+    pub events: Vec<OrchestratorEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorPolicyUpdateResponse {
+    pub status: String,
+    #[serde(default)]
+    pub policy: OrchestratorPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorAdapterConfig {
+    pub adapter_name: String,
+    pub binary: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub launch_args: String,
+    pub mcp_config_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub rules_file_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub lifecycle: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct OrchestratorAdapterResponse {
+    pub status: String,
+    pub name: String,
+    #[serde(default)]
+    pub available: bool,
+}
+
+/// Small Rust helper over host `/v1/orchestrator/*` IDE worker daemon endpoints.
+#[derive(Debug, Clone)]
+pub struct OrchestratorClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl OrchestratorClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn status(&self) -> Result<OrchestratorStatusResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/orchestrator/status"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn toggle(&self, action: &str) -> Result<OrchestratorToggleResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/orchestrator/toggle"))
+            .json(&serde_json::json!({ "action": action }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn sessions(&self) -> Result<OrchestratorSessionsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/orchestrator/sessions"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn detect_ides(&self) -> Result<OrchestratorDetectResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/orchestrator/detect"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn events(&self, limit: i32) -> Result<OrchestratorEventsResponse, reqwest::Error> {
+        let path = if limit > 0 {
+            format!("/v1/orchestrator/events?limit={limit}")
+        } else {
+            "/v1/orchestrator/events".to_string()
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn task_timeline(
+        &self,
+        task_id: &str,
+    ) -> Result<OrchestratorTaskTimelineResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/orchestrator/events/task?task_id={}",
+                url_encode_query_component(task_id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn policy(&self) -> Result<OrchestratorPolicy, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/orchestrator/policy"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update_policy(
+        &self,
+        policy: &OrchestratorPolicy,
+    ) -> Result<OrchestratorPolicyUpdateResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/orchestrator/policy"))
+            .json(policy)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add_adapter(
+        &self,
+        config: &OrchestratorAdapterConfig,
+    ) -> Result<OrchestratorAdapterResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/orchestrator/adapters/add"))
+            .json(config)
             .send()
             .await?
             .error_for_status()?
@@ -4213,6 +4492,42 @@ mod tests {
         assert_eq!(
             client.url("/v1/workers"),
             "http://localhost:9090/v1/workers"
+        );
+    }
+
+    #[test]
+    fn orchestrator_types_deserialize_incremental_bodies() {
+        let status: OrchestratorStatusResponse = serde_json::from_str(
+            r#"{"running":true,"adapters":["cursor"],"active_sessions":1,"event_count":2,"policy":{"allow_auto_launch":true}}"#,
+        )
+        .unwrap();
+        assert!(status.running);
+        assert_eq!(status.adapters[0], "cursor");
+        assert_eq!(status.policy["allow_auto_launch"], serde_json::json!(true));
+
+        let events: OrchestratorEventsResponse = serde_json::from_str(
+            r#"{"events":[{"id":"e1","type":"task_assigned","task_id":"t1","message":"assigned"}],"total":1}"#,
+        )
+        .unwrap();
+        assert_eq!(events.total, 1);
+        assert_eq!(events.events[0].r#type, "task_assigned");
+
+        let adapter = OrchestratorAdapterConfig {
+            adapter_name: "custom".to_string(),
+            binary: "worker.exe".to_string(),
+            mcp_config_path: "mcp.json".to_string(),
+            lifecycle: "persistent".to_string(),
+            ..OrchestratorAdapterConfig::default()
+        };
+        let value = serde_json::to_value(adapter).unwrap();
+        assert_eq!(value["adapter_name"], "custom");
+        assert!(value.get("launch_args").is_none());
+
+        let client =
+            OrchestratorClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/orchestrator/status"),
+            "http://localhost:9090/v1/orchestrator/status"
         );
     }
 

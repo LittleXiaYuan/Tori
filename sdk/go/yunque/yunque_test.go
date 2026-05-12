@@ -274,6 +274,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"connectors":[{"id":"github","name":"GitHub","supported":true,"status":"connected"}]}`))
 		case "/api/notify/channels":
 			_, _ = w.Write([]byte(`{"channels":[{"id":"feishu-main","type":"feishu","name":"Feishu","enabled":true}]}`))
+		case "/v1/orchestrator/status":
+			_, _ = w.Write([]byte(`{"running":true,"adapters":["cursor"],"active_sessions":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -336,6 +338,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	orchStatus, err := kit.Orchestrator.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -344,14 +350,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 15 {
-		t.Fatalf("expected 15 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 16 {
+		t.Fatalf("expected 16 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1347,6 +1353,106 @@ func TestTriggersListEmitHistoryAndControl(t *testing.T) {
 	}
 	if len(seen) != 8 {
 		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestOrchestratorHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/orchestrator/status":
+			_, _ = w.Write([]byte(`{"running":true,"adapters":["cursor"],"active_sessions":1,"event_count":2}`))
+		case "/v1/orchestrator/toggle":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["action"] != "start" {
+				t.Fatalf("unexpected action: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"started"}`))
+		case "/v1/orchestrator/sessions":
+			_, _ = w.Write([]byte(`{"sessions":[{"session_id":"s1","adapter":"cursor","task_id":"t1"}]}`))
+		case "/v1/orchestrator/detect":
+			_, _ = w.Write([]byte(`{"ides":[{"name":"Cursor","available":true}]}`))
+		case "/v1/orchestrator/events":
+			if r.URL.Query().Get("limit") != "2" {
+				t.Fatalf("unexpected events query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"events":[{"id":"e1","type":"task_assigned","task_id":"t1","message":"assigned"}],"total":1}`))
+		case "/v1/orchestrator/events/task":
+			if r.URL.Query().Get("task_id") != "t1" {
+				t.Fatalf("unexpected timeline query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"task_id":"t1","events":[{"id":"e1","type":"task_assigned"}]}`))
+		case "/v1/orchestrator/policy":
+			if r.Method == http.MethodPut {
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				_, _ = w.Write([]byte(`{"status":"updated","policy":{"allow_auto_launch":true}}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"allow_auto_launch":false}`))
+		case "/v1/orchestrator/adapters/add":
+			var body OrchestratorAdapterConfig
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.AdapterName != "custom" {
+				t.Fatalf("unexpected adapter body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"registered","name":"custom","available":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	status, err := Orchestrator.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	toggled, err := Orchestrator.Toggle(context.Background(), "start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := Orchestrator.Sessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ides, err := Orchestrator.DetectIDEs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := Orchestrator.Events(context.Background(), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	timeline, err := Orchestrator.TaskTimeline(context.Background(), "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := Orchestrator.Policy(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Orchestrator.UpdatePolicy(context.Background(), OrchestratorPolicy{"allow_auto_launch": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter, err := Orchestrator.AddAdapter(context.Background(), OrchestratorAdapterConfig{AdapterName: "custom", Binary: "worker.exe", MCPConfigPath: "mcp.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !status.Running || toggled.Status != "started" || sessions.Sessions[0].Adapter != "cursor" || ides.IDEs[0].Name != "Cursor" || events.Total != 1 || timeline.TaskID != "t1" || policy["allow_auto_launch"] != false || updated.Policy["allow_auto_launch"] != true || adapter.Name != "custom" {
+		t.Fatalf("unexpected orchestrator results")
+	}
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 

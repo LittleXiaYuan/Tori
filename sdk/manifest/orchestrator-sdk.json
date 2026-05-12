@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "domain": "ide-orchestrator",
+  "description": "Cross-language lightweight SDK entrypoints for external IDE worker daemon status, session inspection, IDE detection, event timeline, policy, and adapter registration helpers under /v1/orchestrator/*.",
+  "principles": [
+    "Expose orchestrator daemon status, sessions, IDE detection, events, policy, and adapter control as focused SDK slices instead of requiring the full platform.",
+    "Keep external IDE/CLI worker orchestration directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make IDE worker Orchestrator access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /v1/orchestrator/status",
+    "POST /v1/orchestrator/toggle",
+    "GET /v1/orchestrator/sessions",
+    "GET /v1/orchestrator/detect",
+    "GET /v1/orchestrator/events",
+    "GET /v1/orchestrator/events/task",
+    "GET /v1/orchestrator/policy",
+    "PUT /v1/orchestrator/policy",
+    "POST /v1/orchestrator/adapters/add"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/orchestrator/status",
+      "readOnly": true,
+      "description": "Read orchestrator daemon status, adapters, active sessions, event count, and policy summary."
+    },
+    {
+      "name": "toggle",
+      "route": "POST /v1/orchestrator/toggle",
+      "readOnly": false,
+      "description": "Start or stop the orchestrator daemon."
+    },
+    {
+      "name": "sessions",
+      "route": "GET /v1/orchestrator/sessions",
+      "readOnly": true,
+      "description": "List active IDE worker sessions."
+    },
+    {
+      "name": "detectIDEs",
+      "route": "GET /v1/orchestrator/detect",
+      "readOnly": true,
+      "description": "Detect available IDE worker adapters on the host."
+    },
+    {
+      "name": "events",
+      "route": "GET /v1/orchestrator/events",
+      "readOnly": true,
+      "description": "Read recent orchestrator events."
+    },
+    {
+      "name": "taskTimeline",
+      "route": "GET /v1/orchestrator/events/task",
+      "readOnly": true,
+      "description": "Read orchestrator event timeline for one task."
+    },
+    {
+      "name": "policy",
+      "route": "GET /v1/orchestrator/policy",
+      "readOnly": true,
+      "description": "Read orchestrator daemon policy."
+    },
+    {
+      "name": "updatePolicy",
+      "route": "PUT /v1/orchestrator/policy",
+      "readOnly": false,
+      "description": "Update orchestrator daemon policy."
+    },
+    {
+      "name": "addAdapter",
+      "route": "POST /v1/orchestrator/adapters/add",
+      "readOnly": false,
+      "description": "Register a custom IDE worker adapter."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/orchestrator.ts",
+        "sdk/typescript/src/orchestrator-read.ts",
+        "sdk/typescript/src/orchestrator-status.ts",
+        "sdk/typescript/src/orchestrator-events.ts",
+        "sdk/typescript/src/orchestrator-control.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createOrchestratorClient().status",
+        "toggle": "createOrchestratorClient().toggle",
+        "sessions": "createOrchestratorClient().sessions",
+        "detectIDEs": "createOrchestratorClient().detectIDEs",
+        "events": "createOrchestratorClient().events",
+        "taskTimeline": "createOrchestratorClient().taskTimeline",
+        "policy": "createOrchestratorClient().policy",
+        "updatePolicy": "createOrchestratorClient().updatePolicy",
+        "addAdapter": "createOrchestratorClient().addAdapter"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.Orchestrator.Status",
+        "toggle": "yunque.Orchestrator.Toggle",
+        "sessions": "yunque.Orchestrator.Sessions",
+        "detectIDEs": "yunque.Orchestrator.DetectIDEs",
+        "events": "yunque.Orchestrator.Events",
+        "taskTimeline": "yunque.Orchestrator.TaskTimeline",
+        "policy": "yunque.Orchestrator.Policy",
+        "updatePolicy": "yunque.Orchestrator.UpdatePolicy",
+        "addAdapter": "yunque.Orchestrator.AddAdapter"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.orchestrator.status",
+        "toggle": "yunque.orchestrator.toggle",
+        "sessions": "yunque.orchestrator.sessions",
+        "detectIDEs": "yunque.orchestrator.detect_ides",
+        "events": "yunque.orchestrator.events",
+        "taskTimeline": "yunque.orchestrator.task_timeline",
+        "policy": "yunque.orchestrator.policy",
+        "updatePolicy": "yunque.orchestrator.update_policy",
+        "addAdapter": "yunque.orchestrator.add_adapter"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "OrchestratorClient::status",
+        "toggle": "OrchestratorClient::toggle",
+        "sessions": "OrchestratorClient::sessions",
+        "detectIDEs": "OrchestratorClient::detect_ides",
+        "events": "OrchestratorClient::events",
+        "taskTimeline": "OrchestratorClient::task_timeline",
+        "policy": "OrchestratorClient::policy",
+        "updatePolicy": "OrchestratorClient::update_policy",
+        "addAdapter": "OrchestratorClient::add_adapter"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
