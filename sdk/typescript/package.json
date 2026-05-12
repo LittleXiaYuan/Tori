@@ -959,6 +959,18 @@
       "types": "./src/plugin-control.ts",
       "import": "./src/plugin-control.ts"
     },
+    "./plugin-ui": {
+      "types": "./src/plugin-ui.ts",
+      "import": "./src/plugin-ui.ts"
+    },
+    "./plugin-reload": {
+      "types": "./src/plugin-reload.ts",
+      "import": "./src/plugin-reload.ts"
+    },
+    "./plugin-folder": {
+      "types": "./src/plugin-folder.ts",
+      "import": "./src/plugin-folder.ts"
+    },
     "./plugin-files": {
       "types": "./src/plugin-files.ts",
       "import": "./src/plugin-files.ts"
