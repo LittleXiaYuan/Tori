@@ -29,6 +29,7 @@
     "src/cognis-evolution.ts",
     "src/cognis-federation.ts",
     "src/cognis-workflows.ts",
+    "src/cognis-bundles.ts",
     "src/events.ts",
     "src/realtime.ts",
     "src/webchat.ts",

@@ -59,6 +59,10 @@
       "types": "./src/cognis-workflows.ts",
       "import": "./src/cognis-workflows.ts"
     },
+    "./cognis-bundles": {
+      "types": "./src/cognis-bundles.ts",
+      "import": "./src/cognis-bundles.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
