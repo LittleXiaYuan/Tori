@@ -187,6 +187,8 @@
     "src/dispatch-read.ts",
     "src/dispatch-control.ts",
     "src/orchestrator.ts",
+    "src/orchestrator-read.ts",
+    "src/orchestrator-control.ts",
     "src/fork.ts",
     "src/scheduler.ts",
     "src/scheduler-read.ts",

@@ -691,6 +691,14 @@
       "types": "./src/orchestrator.ts",
       "import": "./src/orchestrator.ts"
     },
+    "./orchestrator-read": {
+      "types": "./src/orchestrator-read.ts",
+      "import": "./src/orchestrator-read.ts"
+    },
+    "./orchestrator-control": {
+      "types": "./src/orchestrator-control.ts",
+      "import": "./src/orchestrator-control.ts"
+    },
     "./fork": {
       "types": "./src/fork.ts",
       "import": "./src/fork.ts"
