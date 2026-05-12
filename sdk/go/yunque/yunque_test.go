@@ -143,6 +143,70 @@ func TestStateSnapshotActionsAndCapabilities(t *testing.T) {
 	}
 }
 
+func TestReverieHelpers(t *testing.T) {
+	delivered := false
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/reverie/journal":
+			if r.URL.Query().Get("category") != "task" || r.URL.Query().Get("delivered") != "false" {
+				t.Fatalf("unexpected journal query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"thoughts":[{"id":"t1"}],"total":1,"limit":10,"offset":0}`))
+		case "/v1/reverie/stats":
+			_, _ = w.Write([]byte(`{"total":2}`))
+		case "/v1/reverie/config":
+			if r.Method == http.MethodPut {
+				_, _ = w.Write([]byte(`{"config":{"enabled":false}}`))
+			} else {
+				_, _ = w.Write([]byte(`{"config":{"enabled":true}}`))
+			}
+		case "/v1/reverie/think":
+			_, _ = w.Write([]byte(`{"thought":{"id":"t2"}}`))
+		case "/v1/reverie/thought":
+			_, _ = w.Write([]byte(`{"deleted":true,"id":"t1"}`))
+		case "/v1/reverie/actions":
+			_, _ = w.Write([]byte(`{"actions":[{"id":"a1"}],"total":1}`))
+		case "/v1/reverie/targets":
+			_, _ = w.Write([]byte(`{"targets":[{"channel":"feishu"}],"count":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	journal, err := Reverie.Journal(context.Background(), ReverieJournalOptions{Category: "task", Delivered: &delivered, Limit: 10})
+	if err != nil || journal.Total != 1 || journal.Thoughts[0]["id"] != "t1" {
+		t.Fatalf("unexpected journal: %+v err=%v", journal, err)
+	}
+	stats, err := Reverie.Stats(context.Background())
+	if err != nil || stats["total"].(float64) != 2 {
+		t.Fatalf("unexpected stats: %+v err=%v", stats, err)
+	}
+	if _, err := Reverie.Config(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Reverie.UpdateConfig(context.Background(), ReverieConfig{"enabled": false}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Reverie.Think(context.Background(), ReverieThinkRequest{EventType: "task_completed", Trigger: "sdk"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Reverie.DeleteThought(context.Background(), "t1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Reverie.Actions(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Reverie.Targets(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestStateFocusedHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -288,6 +352,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"events":[{"trace_id":"tr-1"}],"count":1}`))
 		case "/v1/heartbeat":
 			_, _ = w.Write([]byte(`{"running":true}`))
+		case "/v1/reverie/stats":
+			_, _ = w.Write([]byte(`{"total":2}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -378,6 +444,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	reverieStats, err := kit.Reverie.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -386,14 +456,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Reverie != Reverie || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 22 {
-		t.Fatalf("expected 22 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 23 {
+		t.Fatalf("expected 23 requests, got %d: %v", len(seen), seen)
 	}
 }
 

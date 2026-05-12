@@ -841,6 +841,58 @@ class _HeartbeatNamespace:
 heartbeat = _HeartbeatNamespace()
 
 
+
+# ── Reverie Proactive Thought Loop (/v1/reverie) ──
+
+class _ReverieNamespace:
+    """Lightweight helpers for Reverie journal, stats, config, think, actions, and targets."""
+
+    def journal(self, category: Optional[str] = None, min_significance: Optional[float] = None, delivered: Optional[bool] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> dict:
+        from urllib.parse import urlencode
+        query: dict[str, Any] = {}
+        if category:
+            query["category"] = category
+        if min_significance is not None:
+            query["min_significance"] = min_significance
+        if delivered is not None:
+            query["delivered"] = str(delivered).lower()
+        if limit is not None:
+            query["limit"] = limit
+        if offset is not None:
+            query["offset"] = offset
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/v1/reverie/journal{suffix}")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/reverie/stats")
+
+    def config(self) -> dict:
+        return _api_call("GET", "/v1/reverie/config")
+
+    def update_config(self, config: dict) -> dict:
+        return _api_call("PUT", "/v1/reverie/config", config)
+
+    def think(self, event_type: str = "", trigger: str = "") -> dict:
+        body: dict[str, Any] = {}
+        if event_type:
+            body["event_type"] = event_type
+        if trigger:
+            body["trigger"] = trigger
+        return _api_call("POST", "/v1/reverie/think", body)
+
+    def delete_thought(self, thought_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/reverie/thought?{urlencode({'id': thought_id})}")
+
+    def actions(self) -> dict:
+        return _api_call("GET", "/v1/reverie/actions")
+
+    def targets(self) -> dict:
+        return _api_call("GET", "/v1/reverie/targets")
+
+
+reverie = _ReverieNamespace()
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1484,6 +1536,7 @@ class AgentKit:
         self.cognis = cognis
         self.trace = trace
         self.heartbeat = heartbeat
+        self.reverie = reverie
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

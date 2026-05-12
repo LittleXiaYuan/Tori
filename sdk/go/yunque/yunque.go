@@ -316,6 +316,7 @@ type AgentKit struct {
 	Cognis       *cognisNamespace
 	Trace        *traceNamespace
 	Heartbeat    *heartbeatNamespace
+	Reverie      *reverieNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1817,6 +1818,10 @@ var Trace = &traceNamespace{}
 // controls, trigger, and logs.
 var Heartbeat = &heartbeatNamespace{}
 
+// Reverie provides focused access to proactive thought loop journal, stats,
+// configuration, manual think, actions, and targets.
+var Reverie = &reverieNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2651,6 +2656,122 @@ func (h *heartbeatNamespace) Logs(ctx context.Context, limit int) ([]HeartbeatLo
 	return out, nil
 }
 
+// ── Reverie Proactive Thought Loop ──
+
+type reverieNamespace struct{}
+
+type ReverieThought map[string]any
+type ReverieJournalResponse struct {
+	Thoughts []ReverieThought `json:"thoughts"`
+	Total    int              `json:"total"`
+	Limit    int              `json:"limit"`
+	Offset   int              `json:"offset"`
+}
+type ReverieJournalOptions struct {
+	Category        string
+	MinSignificance float64
+	Delivered       *bool
+	Limit           int
+	Offset          int
+}
+type ReverieConfig map[string]any
+type ReverieConfigResponse map[string]any
+type ReverieThinkRequest struct {
+	EventType string `json:"event_type,omitempty"`
+	Trigger   string `json:"trigger,omitempty"`
+}
+type ReverieThinkResponse map[string]any
+type ReverieDeleteResponse map[string]any
+type ReverieActionsResponse map[string]any
+type ReverieTargetsResponse map[string]any
+
+func (r *reverieNamespace) Journal(ctx context.Context, opts ReverieJournalOptions) (ReverieJournalResponse, error) {
+	q := url.Values{}
+	if opts.Category != "" {
+		q.Set("category", opts.Category)
+	}
+	if opts.MinSignificance > 0 {
+		q.Set("min_significance", strconv.FormatFloat(opts.MinSignificance, 'f', -1, 64))
+	}
+	if opts.Delivered != nil {
+		q.Set("delivered", strconv.FormatBool(*opts.Delivered))
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		q.Set("offset", strconv.Itoa(opts.Offset))
+	}
+	path := "/v1/reverie/journal"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	var out ReverieJournalResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return ReverieJournalResponse{}, err
+	}
+	if out.Thoughts == nil {
+		out.Thoughts = []ReverieThought{}
+	}
+	return out, nil
+}
+
+func (r *reverieNamespace) Stats(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/reverie/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) Config(ctx context.Context) (ReverieConfigResponse, error) {
+	var out ReverieConfigResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/reverie/config", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) UpdateConfig(ctx context.Context, config ReverieConfig) (ReverieConfigResponse, error) {
+	var out ReverieConfigResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/reverie/config", config, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) Think(ctx context.Context, req ReverieThinkRequest) (ReverieThinkResponse, error) {
+	var out ReverieThinkResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/reverie/think", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) DeleteThought(ctx context.Context, id string) (ReverieDeleteResponse, error) {
+	var out ReverieDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/reverie/thought?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) Actions(ctx context.Context) (ReverieActionsResponse, error) {
+	var out ReverieActionsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/reverie/actions", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (r *reverieNamespace) Targets(ctx context.Context) (ReverieTargetsResponse, error) {
+	var out ReverieTargetsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/reverie/targets", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -2909,6 +3030,7 @@ func NewAgentKit() AgentKit {
 		Cognis:       Cognis,
 		Trace:        Trace,
 		Heartbeat:    Heartbeat,
+		Reverie:      Reverie,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,
