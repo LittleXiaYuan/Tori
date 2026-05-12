@@ -194,6 +194,63 @@ func errorMessageFromJSON(value any) string {
 	return ""
 }
 
+// ── Settings (/api/settings, /v1/config/reload) ──
+
+// Settings exposes runtime configuration schema/config/check/reload helpers for external setup pages, CLIs, and automation scripts.
+var Settings = &settingsNamespace{}
+
+type settingsNamespace struct{}
+
+type SettingsSchemaResponse map[string]any
+type SettingsConfigResponse map[string]any
+type SettingsUpdateResponse map[string]any
+type SettingsCheckResponse map[string]any
+type SettingsReloadResponse map[string]any
+type SettingsDetectDirsResponse map[string]any
+
+func (s *settingsNamespace) Schema(ctx context.Context) (SettingsSchemaResponse, error) {
+	var out SettingsSchemaResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/settings/schema", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *settingsNamespace) Config(ctx context.Context) (SettingsConfigResponse, error) {
+	var out SettingsConfigResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/settings/config", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *settingsNamespace) UpdateConfig(ctx context.Context, values map[string]string) (SettingsUpdateResponse, error) {
+	var out SettingsUpdateResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/api/settings/config", map[string]any{"values": values}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *settingsNamespace) Check(ctx context.Context) (SettingsCheckResponse, error) {
+	var out SettingsCheckResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/settings/check", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *settingsNamespace) Reload(ctx context.Context) (SettingsReloadResponse, error) {
+	var out SettingsReloadResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/config/reload", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *settingsNamespace) DetectDirs(ctx context.Context) (SettingsDetectDirsResponse, error) {
+	var out SettingsDetectDirsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/settings/detect-dirs", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── System / Observability (/healthz, /v1/system, /v1/metrics) ──
 
 // System exposes health/readiness probes, version/SBOM metadata, metrics,
@@ -536,6 +593,7 @@ type AgentKit struct {
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
+	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
 	Tasks         *tasksNamespace
@@ -4927,6 +4985,7 @@ func NewAgentKit() AgentKit {
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
+		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,
 		Tasks:         Tasks,

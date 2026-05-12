@@ -10,6 +10,53 @@ import (
 	"testing"
 )
 
+func TestSettingsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/settings/schema":
+			_, _ = w.Write([]byte(`{"groups":[{"id":"llm"}]}`))
+		case "/api/settings/config":
+			if r.Method == http.MethodPut {
+				var body map[string]map[string]string
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body["values"]["LLM_MODEL"] != "deepseek" {
+					t.Fatalf("unexpected settings body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"success":true,"restart_required":true}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"values":{"LLM_MODEL":"qwen"}}`))
+		case "/api/settings/check":
+			_, _ = w.Write([]byte(`{"setup_needed":false}`))
+		case "/v1/config/reload":
+			_, _ = w.Write([]byte(`{"success":true,"reloaded":["smart"]}`))
+		case "/api/settings/detect-dirs":
+			_, _ = w.Write([]byte(`{"dirs":{"documents":"C:/Users/A/Documents"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	ctx := context.Background()
+	schema, _ := Settings.Schema(ctx)
+	config, _ := Settings.Config(ctx)
+	updated, _ := Settings.UpdateConfig(ctx, map[string]string{"LLM_MODEL": "deepseek"})
+	check, _ := Settings.Check(ctx)
+	reloaded, _ := Settings.Reload(ctx)
+	dirs, _ := Settings.DetectDirs(ctx)
+	if schema["groups"] == nil || config["values"] == nil || updated["success"] != true || check["setup_needed"] != false || reloaded["success"] != true || dirs["dirs"] == nil || NewAgentKit().Settings != Settings {
+		t.Fatalf("unexpected settings results")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 settings API calls, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestSystemHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

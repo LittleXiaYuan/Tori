@@ -1027,6 +1027,32 @@ rbac = _RBACNamespace()
 
 
 
+# ── Settings (/api/settings, /v1/config/reload) ──
+
+class _SettingsNamespace:
+    """Lightweight helpers for runtime settings schema/config/check/reload/directory detection."""
+
+    def schema(self) -> dict:
+        return _api_call("GET", "/api/settings/schema")
+
+    def config(self) -> dict:
+        return _api_call("GET", "/api/settings/config")
+
+    def update_config(self, values: dict) -> dict:
+        return _api_call("PUT", "/api/settings/config", {"values": values})
+
+    def check(self) -> dict:
+        return _api_call("GET", "/api/settings/check")
+
+    def reload(self) -> dict:
+        return _api_call("POST", "/v1/config/reload", {})
+
+    def detect_dirs(self) -> dict:
+        return _api_call("GET", "/api/settings/detect-dirs")
+
+
+settings = _SettingsNamespace()
+
 # ── System / Observability (/healthz, /v1/system, /v1/metrics) ──
 
 class _SystemNamespace:
@@ -2477,6 +2503,7 @@ class AgentKit:
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
+        self.settings = settings
         self.system = system
         self.auth = auth
         self.tasks = tasks

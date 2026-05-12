@@ -1397,6 +1397,7 @@ pub struct AgentKit {
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
+    pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
     pub tasks: TasksClient,
@@ -1466,6 +1467,7 @@ impl AgentKit {
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
+            settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
             tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
@@ -1531,6 +1533,7 @@ impl AgentKit {
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5366,6 +5369,34 @@ pub struct PostTaskThreadMessageRequest {
 pub struct UpdateTaskThreadStateRequest {
     pub task_id: String,
     pub state: String,
+}
+
+pub type SettingsSchemaResponse = serde_json::Value;
+pub type SettingsConfigResponse = serde_json::Value;
+pub type SettingsUpdateResponse = serde_json::Value;
+pub type SettingsCheckResponse = serde_json::Value;
+pub type SettingsReloadResponse = serde_json::Value;
+pub type SettingsDetectDirsResponse = serde_json::Value;
+
+/// Lightweight Settings SDK client for runtime configuration schema/config/check/reload/directory detection.
+#[derive(Debug, Clone)]
+pub struct SettingsClient { base_url: String, http: reqwest::Client }
+
+impl SettingsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn schema(&self) -> Result<SettingsSchemaResponse, reqwest::Error> { self.get_json("/api/settings/schema").await }
+    pub async fn config(&self) -> Result<SettingsConfigResponse, reqwest::Error> { self.get_json("/api/settings/config").await }
+    pub async fn update_config(&self, values: serde_json::Value) -> Result<SettingsUpdateResponse, reqwest::Error> { self.http.put(self.url("/api/settings/config")).json(&serde_json::json!({"values": values})).send().await?.error_for_status()?.json().await }
+    pub async fn check(&self) -> Result<SettingsCheckResponse, reqwest::Error> { self.get_json("/api/settings/check").await }
+    pub async fn reload(&self) -> Result<SettingsReloadResponse, reqwest::Error> { self.http.post(self.url("/v1/config/reload")).json(&serde_json::json!({})).send().await?.error_for_status()?.json().await }
+    pub async fn detect_dirs(&self) -> Result<SettingsDetectDirsResponse, reqwest::Error> { self.get_json("/api/settings/detect-dirs").await }
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error> where T: for<'de> Deserialize<'de>, { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
 }
 
 pub type SystemHealthResponse = serde_json::Value;
@@ -9243,6 +9274,15 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn settings_helpers_build_urls() {
+        let client = SettingsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/api/settings/schema"), "http://localhost:9090/api/settings/schema");
+        assert_eq!(client.url("/api/settings/config"), "http://localhost:9090/api/settings/config");
+        assert_eq!(client.url("/v1/config/reload"), "http://localhost:9090/v1/config/reload");
+        assert_eq!(client.url("/api/settings/detect-dirs"), "http://localhost:9090/api/settings/detect-dirs");
+    }
 
     #[test]
     fn system_helpers_build_urls() {
