@@ -812,6 +812,35 @@ class _TraceNamespace:
 trace = _TraceNamespace()
 
 
+# ── Proactive Heartbeat Lifecycle (/v1/heartbeat) ──
+
+class _HeartbeatNamespace:
+    """Lightweight helpers for proactive lifecycle heartbeat status, control, trigger, and logs."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/heartbeat")
+
+    def update(self, enabled: Optional[bool] = None, interval_minutes: Optional[int] = None) -> dict:
+        body: dict[str, Any] = {}
+        if enabled is not None:
+            body["enabled"] = enabled
+        if interval_minutes is not None:
+            body["interval_minutes"] = interval_minutes
+        return _api_call("PUT", "/v1/heartbeat", body)
+
+    def trigger(self) -> dict:
+        return _api_call("POST", "/v1/heartbeat/trigger", {})
+
+    def logs(self, limit: Optional[int] = None) -> list[dict]:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'limit': limit})}" if limit is not None else ""
+        result = _api_call("GET", f"/v1/heartbeat/logs{suffix}")
+        return result if isinstance(result, list) else []
+
+
+heartbeat = _HeartbeatNamespace()
+
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1454,6 +1483,7 @@ class AgentKit:
         self.providers = providers
         self.cognis = cognis
         self.trace = trace
+        self.heartbeat = heartbeat
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

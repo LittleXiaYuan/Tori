@@ -30,6 +30,7 @@
     "llm-providers",
     "cognis",
     "execution-trace",
+    "proactive-heartbeat",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -122,6 +123,10 @@
       "description": "Access the lightweight execution and audit Trace client or namespace."
     },
     {
+      "name": "heartbeat",
+      "description": "Access the lightweight proactive Heartbeat lifecycle client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -161,7 +166,8 @@
         "cost": "AgentKit.cost",
         "providers": "AgentKit.providers",
         "cognis": "AgentKit.cognis",
-        "trace": "AgentKit.trace"
+        "trace": "AgentKit.trace",
+        "heartbeat": "AgentKit.heartbeat"
       }
     },
     "go": {
@@ -198,7 +204,8 @@
         "cost": "AgentKit.Cost",
         "providers": "AgentKit.Providers",
         "cognis": "AgentKit.Cognis",
-        "trace": "AgentKit.Trace"
+        "trace": "AgentKit.Trace",
+        "heartbeat": "AgentKit.Heartbeat"
       }
     },
     "python": {
@@ -235,7 +242,8 @@
         "cost": "AgentKit.cost",
         "providers": "AgentKit.providers",
         "cognis": "AgentKit.cognis",
-        "trace": "AgentKit.trace"
+        "trace": "AgentKit.trace",
+        "heartbeat": "AgentKit.heartbeat"
       }
     },
     "rust": {
@@ -272,7 +280,8 @@
         "cost": "AgentKit::cost",
         "providers": "AgentKit::providers",
         "cognis": "AgentKit::cognis",
-        "trace": "AgentKit::trace"
+        "trace": "AgentKit::trace",
+        "heartbeat": "AgentKit::heartbeat"
       }
     }
   },

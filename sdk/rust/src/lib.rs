@@ -1384,6 +1384,7 @@ pub struct AgentKit {
     pub providers: ProvidersClient,
     pub cognis: CognisClient,
     pub trace: TraceClient,
+    pub heartbeat: HeartbeatClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1429,6 +1430,7 @@ impl AgentKit {
             providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             trace: TraceClient::new(base_url.clone(), token.as_ref())?,
+            heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1467,6 +1469,7 @@ impl AgentKit {
             providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3263,6 +3266,109 @@ impl TraceClient {
             suffix
         ))
         .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+pub type HeartbeatStatusResponse = serde_json::Value;
+pub type HeartbeatUpdateResponse = serde_json::Value;
+pub type HeartbeatLogEntry = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct HeartbeatUpdateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interval_minutes: Option<i32>,
+}
+
+/// Small Rust helper over `/v1/heartbeat*` proactive lifecycle endpoints.
+#[derive(Debug, Clone)]
+pub struct HeartbeatClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl HeartbeatClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn status(&self) -> Result<HeartbeatStatusResponse, reqwest::Error> {
+        self.get_json("/v1/heartbeat").await
+    }
+
+    pub async fn update(
+        &self,
+        request: &HeartbeatUpdateRequest,
+    ) -> Result<HeartbeatUpdateResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/heartbeat"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn trigger(&self) -> Result<HeartbeatLogEntry, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/heartbeat/trigger"))
+            .json(&serde_json::json!({}))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn logs(&self, limit: i32) -> Result<Vec<HeartbeatLogEntry>, reqwest::Error> {
+        let suffix = if limit > 0 {
+            format!("?limit={limit}")
+        } else {
+            String::new()
+        };
+        self.get_json(&format!("/v1/heartbeat/logs{}", suffix))
+            .await
     }
 
     async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
@@ -5352,6 +5458,10 @@ mod tests {
             "http://localhost:9090/v1/trace/recent"
         );
         assert_eq!(
+            kit.heartbeat.url("/v1/heartbeat"),
+            "http://localhost:9090/v1/heartbeat"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -5655,6 +5765,24 @@ mod tests {
         assert_eq!(
             client.url("/v1/trace/recent"),
             "http://localhost:9090/v1/trace/recent"
+        );
+    }
+
+    #[test]
+    fn heartbeat_types_serialize_incremental_body() {
+        let request = HeartbeatUpdateRequest {
+            enabled: Some(true),
+            interval_minutes: Some(30),
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["enabled"], true);
+        assert_eq!(value["interval_minutes"], 30);
+
+        let client =
+            HeartbeatClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/heartbeat"),
+            "http://localhost:9090/v1/heartbeat"
         );
     }
 

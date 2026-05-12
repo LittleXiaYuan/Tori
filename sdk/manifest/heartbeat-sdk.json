@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "domain": "proactive-heartbeat",
+  "description": "Cross-language lightweight SDK entrypoints for proactive lifecycle heartbeat status, control, manual trigger, and logs.",
+  "principles": [
+    "Expose proactive lifecycle heartbeat controls as a focused SDK slice for external operators and automation scripts.",
+    "Keep status, update, trigger, and logs directly callable without importing the full platform client.",
+    "Make Heartbeat access available through Agent Kit without coupling callers to gateway internals."
+  ],
+  "routes": [
+    "GET /v1/heartbeat",
+    "PUT /v1/heartbeat",
+    "POST /v1/heartbeat/trigger",
+    "GET /v1/heartbeat/logs"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/heartbeat",
+      "readOnly": true,
+      "description": "Read heartbeat running status."
+    },
+    {
+      "name": "update",
+      "route": "PUT /v1/heartbeat",
+      "readOnly": false,
+      "description": "Update heartbeat enabled state or interval."
+    },
+    {
+      "name": "trigger",
+      "route": "POST /v1/heartbeat/trigger",
+      "readOnly": false,
+      "description": "Trigger one heartbeat run immediately."
+    },
+    {
+      "name": "logs",
+      "route": "GET /v1/heartbeat/logs",
+      "readOnly": true,
+      "description": "Read recent heartbeat logs."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/heartbeat.ts",
+        "sdk/typescript/src/heartbeat-observe.ts",
+        "sdk/typescript/src/heartbeat-control.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createHeartbeatClient().status",
+        "update": "createHeartbeatClient().update",
+        "trigger": "createHeartbeatClient().trigger",
+        "logs": "createHeartbeatClient().logs"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.Heartbeat.Status",
+        "update": "yunque.Heartbeat.Update",
+        "trigger": "yunque.Heartbeat.Trigger",
+        "logs": "yunque.Heartbeat.Logs"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.heartbeat.status",
+        "update": "yunque.heartbeat.update",
+        "trigger": "yunque.heartbeat.trigger",
+        "logs": "yunque.heartbeat.logs"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "HeartbeatClient::status",
+        "update": "HeartbeatClient::update",
+        "trigger": "HeartbeatClient::trigger",
+        "logs": "HeartbeatClient::logs"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
