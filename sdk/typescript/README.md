@@ -307,6 +307,9 @@ import { createResourceStateClient } from "yunque-client/resource-state";
 import { createFocusStateClient } from "yunque-client/focus-state";
 import { createGoalStateClient } from "yunque-client/goal-state";
 import { createTriggersClient } from "yunque-client/triggers";
+import { createTriggersLegacyClient } from "yunque-client/triggers-legacy";
+import { createTriggersReadClient } from "yunque-client/triggers-read";
+import { createTriggersControlClient } from "yunque-client/triggers-control";
 import { createMissionsClient } from "yunque-client/missions";
 import { createReflectClient } from "yunque-client/reflect";
 import { createToolsClient } from "yunque-client/tools";
@@ -1513,6 +1516,9 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/focus-state.ts` | Lightweight state focus read/update facade without full SDK import |
 | `src/goal-state.ts` | Lightweight state goal list/save/delete facade without full SDK import |
 | `src/triggers.ts` | Lightweight hand-written legacy and v2 trigger CRUD, emit, runs, and events slice |
+| `src/triggers-legacy.ts` | Lightweight legacy trigger list/get/create/delete/emit facade without v2 APIs |
+| `src/triggers-read.ts` | Lightweight v2 trigger list/get/runs/events facade without mutation APIs |
+| `src/triggers-control.ts` | Lightweight v2 trigger create/update/delete/emit facade without read/history APIs |
 | `src/missions.ts` | Lightweight hand-written mission parsing and reflection experiences/strategies slice |
 | `src/reflect.ts` | Lightweight reflect-only facade over experiences, stats, and strategy context |
 | `src/tools.ts` | Lightweight hand-written guarded process execution sessions list/poll/kill slice |
