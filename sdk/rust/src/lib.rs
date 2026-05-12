@@ -1385,6 +1385,7 @@ pub struct AgentKit {
     pub cognis: CognisClient,
     pub trace: TraceClient,
     pub heartbeat: HeartbeatClient,
+    pub events: EventsClient,
     pub reverie: ReverieClient,
     pub plugin: PluginApiClient,
 }
@@ -1432,6 +1433,7 @@ impl AgentKit {
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             trace: TraceClient::new(base_url.clone(), token.as_ref())?,
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
+            events: EventsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
@@ -1472,6 +1474,7 @@ impl AgentKit {
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            events: EventsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
@@ -3386,6 +3389,123 @@ impl HeartbeatClient {
             .json()
             .await
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct EventStreamMessage {
+    pub event: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub retry: i32,
+    pub raw: String,
+}
+
+/// Small Rust helper over `/v1/events/stream` Server-Sent Events integration.
+#[derive(Debug, Clone)]
+pub struct EventsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl EventsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub fn stream_url(&self) -> String {
+        self.url("/v1/events/stream")
+    }
+
+    pub async fn stream_text(&self) -> Result<String, reqwest::Error> {
+        self.http
+            .get(self.stream_url())
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await
+    }
+
+    pub fn parse(&self, text: &str) -> Vec<EventStreamMessage> {
+        parse_sse_events(text)
+    }
+}
+
+pub fn parse_sse_events(text: &str) -> Vec<EventStreamMessage> {
+    text.replace("\r\n", "\n")
+        .split("\n\n")
+        .filter_map(|raw| {
+            if raw.trim().is_empty() {
+                return None;
+            }
+            let mut event = "message".to_string();
+            let mut data = Vec::new();
+            let mut id = String::new();
+            let mut retry = 0;
+            for line in raw.lines() {
+                if line.is_empty() || line.starts_with(':') {
+                    continue;
+                }
+                let (field, value) = line.split_once(':').unwrap_or((line, ""));
+                let value = value.strip_prefix(' ').unwrap_or(value);
+                match field {
+                    "event" => event = value.to_string(),
+                    "data" => data.push(value.to_string()),
+                    "id" => id = value.to_string(),
+                    "retry" => retry = value.parse().unwrap_or(0),
+                    _ => {}
+                }
+            }
+            if event == "message" && data.is_empty() && id.is_empty() && retry == 0 {
+                return None;
+            }
+            let data = if data.is_empty() {
+                None
+            } else {
+                let payload = data.join("\n");
+                Some(
+                    serde_json::from_str(&payload)
+                        .unwrap_or_else(|_| serde_json::Value::String(payload)),
+                )
+            };
+            Some(EventStreamMessage {
+                event,
+                data,
+                id,
+                retry,
+                raw: raw.to_string(),
+            })
+        })
+        .collect()
 }
 
 pub type ReverieThought = serde_json::Map<String, serde_json::Value>;
@@ -5970,6 +6090,23 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn events_parse_sse_frames() {
+        let client =
+            EventsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.stream_url(),
+            "http://localhost:9090/v1/events/stream"
+        );
+        let messages = client.parse("event: connected\nid: evt-1\ndata: {\"client_id\":\"sse-1\"}\n\ndata: plain\nretry: 1500\n\n");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].event, "connected");
+        assert_eq!(messages[0].id, "evt-1");
+        assert_eq!(messages[0].data.as_ref().unwrap()["client_id"], "sse-1");
+        assert_eq!(messages[1].data, Some(serde_json::json!("plain")));
+        assert_eq!(messages[1].retry, 1500);
     }
 
     #[test]

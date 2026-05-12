@@ -31,6 +31,7 @@
     "cognis",
     "execution-trace",
     "proactive-heartbeat",
+    "server-sent-events",
     "proactive-reverie",
     "plugin-api-runtime"
   ],
@@ -128,6 +129,10 @@
       "description": "Access the lightweight proactive Heartbeat lifecycle client or namespace."
     },
     {
+      "name": "events",
+      "description": "Access the lightweight Server-Sent Events stream client or namespace."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -173,6 +178,7 @@
         "cognis": "AgentKit.cognis",
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
+        "events": "AgentKit.events",
         "reverie": "AgentKit.reverie"
       }
     },
@@ -212,6 +218,7 @@
         "cognis": "AgentKit.Cognis",
         "trace": "AgentKit.Trace",
         "heartbeat": "AgentKit.Heartbeat",
+        "events": "AgentKit.Events",
         "reverie": "AgentKit.Reverie"
       }
     },
@@ -251,6 +258,7 @@
         "cognis": "AgentKit.cognis",
         "trace": "AgentKit.trace",
         "heartbeat": "AgentKit.heartbeat",
+        "events": "AgentKit.events",
         "reverie": "AgentKit.reverie"
       }
     },
@@ -290,6 +298,7 @@
         "cognis": "AgentKit::cognis",
         "trace": "AgentKit::trace",
         "heartbeat": "AgentKit::heartbeat",
+        "events": "AgentKit::events",
         "reverie": "AgentKit::reverie"
       }
     }

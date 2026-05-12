@@ -842,6 +842,65 @@ heartbeat = _HeartbeatNamespace()
 
 
 
+
+# ── Events SSE Stream (/v1/events/stream) ──
+
+class _EventsNamespace:
+    """Lightweight helpers for Server-Sent Events stream parsing and raw connections."""
+
+    def stream_url(self) -> str:
+        return f"{_API_BASE}/v1/events/stream"
+
+    def headers(self) -> dict:
+        headers = {"Accept": "text/event-stream", "X-Plugin-Name": _PLUGIN_NAME}
+        if _TOKEN:
+            headers["Authorization"] = f"Bearer {_TOKEN}"
+        return headers
+
+    def parse(self, text: str) -> list[dict]:
+        events: list[dict] = []
+        for raw in text.replace("\r\n", "\n").split("\n\n"):
+            if not raw.strip():
+                continue
+            event = "message"
+            data: list[str] = []
+            event_id = ""
+            retry: Optional[int] = None
+            for line in raw.split("\n"):
+                if not line or line.startswith(":"):
+                    continue
+                field, _, value = line.partition(":")
+                value = value[1:] if value.startswith(" ") else value
+                if field == "event":
+                    event = value
+                elif field == "data":
+                    data.append(value)
+                elif field == "id":
+                    event_id = value
+                elif field == "retry":
+                    try:
+                        retry = int(value)
+                    except ValueError:
+                        retry = None
+            if event == "message" and not data and not event_id and retry is None:
+                continue
+            payload: Any = "\n".join(data) if data else None
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    pass
+            item = {"event": event, "data": payload, "raw": raw}
+            if event_id:
+                item["id"] = event_id
+            if retry is not None:
+                item["retry"] = retry
+            events.append(item)
+        return events
+
+
+events = _EventsNamespace()
+
 # ── Reverie Proactive Thought Loop (/v1/reverie) ──
 
 class _ReverieNamespace:
@@ -1536,6 +1595,7 @@ class AgentKit:
         self.cognis = cognis
         self.trace = trace
         self.heartbeat = heartbeat
+        self.events = events
         self.reverie = reverie
         self.plugin = plugin
         self.memory = memory

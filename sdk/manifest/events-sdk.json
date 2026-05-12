@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "domain": "server-sent-events",
+  "description": "Cross-language lightweight SDK entrypoints for consuming and parsing /v1/events/stream Server-Sent Events without importing the full platform client.",
+  "principles": [
+    "Expose live task, workflow, approval, and runtime event streams as a focused SDK slice for external pages, plugins, CLIs, and sidecars.",
+    "Keep SSE stream URL construction and frame parsing directly callable without coupling callers to generated SDK internals.",
+    "Make Events access available through Agent Kit for one-stop lightweight observability workflows."
+  ],
+  "routes": ["GET /v1/events/stream"],
+  "capabilities": [
+    { "name": "stream", "route": "GET /v1/events/stream", "readOnly": true, "description": "Connect to the authenticated SSE event stream." },
+    { "name": "parse", "route": "local parse", "readOnly": true, "description": "Parse SSE frames into event messages for tests, CLIs, and adapters." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/events.ts", "sdk/typescript/src/events-stream.ts", "sdk/typescript/src/events-parse.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": { "stream": "createEventsClient().stream", "parse": "createEventsClient().parseStream" }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": { "stream": "yunque.Events.StreamURL", "parse": "yunque.Events.Parse" }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": { "stream": "yunque.events.stream_url", "parse": "yunque.events.parse" }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": { "stream": "EventsClient::stream_url", "parse": "EventsClient::parse" }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

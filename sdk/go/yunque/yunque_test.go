@@ -143,6 +143,23 @@ func TestStateSnapshotActionsAndCapabilities(t *testing.T) {
 	}
 }
 
+func TestEventsHelpers(t *testing.T) {
+	messages := Events.Parse("event: connected\nid: evt-1\ndata: {\"client_id\":\"sse-1\"}\n\n: ignored\n\ndata: plain\nretry: 1500\n\n")
+	if Events.StreamURL() != strings.TrimRight(apiBase, "/")+"/v1/events/stream" {
+		t.Fatalf("unexpected stream URL: %s", Events.StreamURL())
+	}
+	if len(messages) != 2 || messages[0].Event != "connected" || messages[0].ID != "evt-1" {
+		t.Fatalf("unexpected messages: %+v", messages)
+	}
+	payload, ok := messages[0].Data.(map[string]any)
+	if !ok || payload["client_id"] != "sse-1" || messages[1].Data != "plain" || messages[1].Retry != 1500 {
+		t.Fatalf("unexpected event payloads: %+v", messages)
+	}
+	if NewAgentKit().Events != Events {
+		t.Fatalf("agent kit should reuse Events namespace")
+	}
+}
+
 func TestReverieHelpers(t *testing.T) {
 	delivered := false
 	var seen []string
@@ -459,7 +476,7 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Reverie != Reverie || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
 	if len(seen) != 23 {

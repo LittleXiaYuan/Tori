@@ -30,6 +30,7 @@
 package yunque
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -316,6 +317,7 @@ type AgentKit struct {
 	Cognis       *cognisNamespace
 	Trace        *traceNamespace
 	Heartbeat    *heartbeatNamespace
+	Events       *eventsNamespace
 	Reverie      *reverieNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
@@ -1818,6 +1820,9 @@ var Trace = &traceNamespace{}
 // controls, trigger, and logs.
 var Heartbeat = &heartbeatNamespace{}
 
+// Events provides focused access to Server-Sent Events stream helpers.
+var Events = &eventsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2656,6 +2661,72 @@ func (h *heartbeatNamespace) Logs(ctx context.Context, limit int) ([]HeartbeatLo
 	return out, nil
 }
 
+// ── Events SSE Stream ──
+
+type eventsNamespace struct{}
+
+type EventStreamMessage struct {
+	Event string `json:"event"`
+	Data  any    `json:"data,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Retry int    `json:"retry,omitempty"`
+	Raw   string `json:"raw"`
+}
+
+func (e *eventsNamespace) StreamURL() string {
+	return strings.TrimRight(apiBase, "/") + "/v1/events/stream"
+}
+
+func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	frames := strings.Split(text, "\n\n")
+	out := make([]EventStreamMessage, 0, len(frames))
+	for _, raw := range frames {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		msg := EventStreamMessage{Event: "message", Raw: raw}
+		var data []string
+		scanner := bufio.NewScanner(strings.NewReader(raw))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" || strings.HasPrefix(line, ":") {
+				continue
+			}
+			field, value, found := strings.Cut(line, ":")
+			if found && strings.HasPrefix(value, " ") {
+				value = strings.TrimPrefix(value, " ")
+			}
+			switch field {
+			case "event":
+				msg.Event = value
+			case "data":
+				data = append(data, value)
+			case "id":
+				msg.ID = value
+			case "retry":
+				if retry, err := strconv.Atoi(value); err == nil {
+					msg.Retry = retry
+				}
+			}
+		}
+		if msg.Event == "message" && len(data) == 0 && msg.ID == "" && msg.Retry == 0 {
+			continue
+		}
+		if len(data) > 0 {
+			payload := strings.Join(data, "\n")
+			var parsed any
+			if err := json.Unmarshal([]byte(payload), &parsed); err == nil {
+				msg.Data = parsed
+			} else {
+				msg.Data = payload
+			}
+		}
+		out = append(out, msg)
+	}
+	return out
+}
+
 // ── Reverie Proactive Thought Loop ──
 
 type reverieNamespace struct{}
@@ -3030,6 +3101,7 @@ func NewAgentKit() AgentKit {
 		Cognis:       Cognis,
 		Trace:        Trace,
 		Heartbeat:    Heartbeat,
+		Events:       Events,
 		Reverie:      Reverie,
 		Plugin:       Plugin,
 		Memory:       Memory,
