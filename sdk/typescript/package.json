@@ -279,6 +279,10 @@
       "types": "./src/runtime.ts",
       "import": "./src/runtime.ts"
     },
+    "./runtime-queue": {
+      "types": "./src/runtime-queue.ts",
+      "import": "./src/runtime-queue.ts"
+    },
     "./router": {
       "types": "./src/router.ts",
       "import": "./src/router.ts"
