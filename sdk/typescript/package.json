@@ -35,6 +35,18 @@
       "types": "./src/planner-control.ts",
       "import": "./src/planner-control.ts"
     },
+    "./planner-checkpoints": {
+      "types": "./src/planner-checkpoints.ts",
+      "import": "./src/planner-checkpoints.ts"
+    },
+    "./planner-resume": {
+      "types": "./src/planner-resume.ts",
+      "import": "./src/planner-resume.ts"
+    },
+    "./planner-execution-state": {
+      "types": "./src/planner-execution-state.ts",
+      "import": "./src/planner-execution-state.ts"
+    },
     "./chat": {
       "types": "./src/chat.ts",
       "import": "./src/chat.ts"
