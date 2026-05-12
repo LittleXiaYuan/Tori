@@ -211,6 +211,10 @@
       "types": "./src/setup.ts",
       "import": "./src/setup.ts"
     },
+    "./setup-detect": {
+      "types": "./src/setup-detect.ts",
+      "import": "./src/setup-detect.ts"
+    },
     "./documents": {
       "types": "./src/documents.ts",
       "import": "./src/documents.ts"
