@@ -358,3 +358,17 @@ let found = memory.search(&MemorySearchRequest { query: "用户偏好".to_string
 let added = memory.add(&MemoryAddRequest { value: "用户偏好中文回复".to_string(), layer: "mid".to_string(), source: "sdk".to_string(), ..Default::default() }).await?;
 println!("{:?} {} {}", stats.get("mid"), found.count, added.status);
 ```
+
+### Knowledge Graph helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `GraphClient` 访问宿主 `/v1/graph/*` 知识图谱层，读取/维护实体、关系和图谱上下文。
+
+```rust
+use yunque_client::{GraphClient, GraphEntity};
+
+let graph = GraphClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let entities = graph.entities("云雀").await?;
+let entity = graph.put_entity(&GraphEntity { name: "云雀".to_string(), r#type: "agent".to_string(), ..Default::default() }).await?;
+let context = graph.context_by_entity_id(&entity.id).await?;
+println!("{} {}", entities.entities.len(), context.context);
+```

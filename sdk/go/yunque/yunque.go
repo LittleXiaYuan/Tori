@@ -300,6 +300,7 @@ type AgentKit struct {
 	CronSystem  *cronSystemNamespace
 	Triggers    *triggersNamespace
 	MemoryCore  *memoryCoreNamespace
+	Graph       *graphNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -720,6 +721,135 @@ func (m *memoryCoreNamespace) Compact(ctx context.Context, req MemoryCompactRequ
 	return out, nil
 }
 
+// ── Knowledge Graph ──
+
+// Graph provides focused access to the host /v1/graph/* knowledge graph API.
+var Graph = &graphNamespace{}
+
+type graphNamespace struct{}
+
+type GraphEntity struct {
+	ID         string            `json:"id,omitempty"`
+	Name       string            `json:"name"`
+	Type       string            `json:"type,omitempty"`
+	Properties map[string]string `json:"properties,omitempty"`
+	CreatedAt  string            `json:"created_at,omitempty"`
+	UpdatedAt  string            `json:"updated_at,omitempty"`
+	Mentions   int               `json:"mentions,omitempty"`
+	Extra      map[string]any    `json:"-"`
+}
+
+type GraphRelation struct {
+	ID        string         `json:"id,omitempty"`
+	FromID    string         `json:"from_id"`
+	ToID      string         `json:"to_id"`
+	Type      string         `json:"type"`
+	Weight    float64        `json:"weight,omitempty"`
+	Context   string         `json:"context,omitempty"`
+	CreatedAt string         `json:"created_at,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type GraphEntitiesResponse struct {
+	Entities []GraphEntity `json:"entities"`
+}
+
+type GraphRelationsResponse struct {
+	Relations []GraphRelation `json:"relations"`
+}
+
+type GraphDeleteEntityResponse struct {
+	OK bool `json:"ok"`
+}
+
+type GraphContextResponse struct {
+	Context   string           `json:"context"`
+	Neighbors []map[string]any `json:"neighbors,omitempty"`
+}
+
+type GraphStatsResponse struct {
+	Entities  int `json:"entities"`
+	Relations int `json:"relations"`
+}
+
+func (g *graphNamespace) Entities(ctx context.Context, query string) (GraphEntitiesResponse, error) {
+	path := "/v1/graph/entities"
+	if query != "" {
+		path += "?q=" + url.QueryEscape(query)
+	}
+	var out GraphEntitiesResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return GraphEntitiesResponse{}, err
+	}
+	if out.Entities == nil {
+		out.Entities = []GraphEntity{}
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) PutEntity(ctx context.Context, entity GraphEntity) (GraphEntity, error) {
+	var out GraphEntity
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/graph/entities", entity, &out); err != nil {
+		return GraphEntity{}, err
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) DeleteEntity(ctx context.Context, id string) (GraphDeleteEntityResponse, error) {
+	var out GraphDeleteEntityResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/graph/entities?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return GraphDeleteEntityResponse{}, err
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) Relations(ctx context.Context, entityID string) (GraphRelationsResponse, error) {
+	path := "/v1/graph/relations"
+	if entityID != "" {
+		path += "?entity_id=" + url.QueryEscape(entityID)
+	}
+	var out GraphRelationsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return GraphRelationsResponse{}, err
+	}
+	if out.Relations == nil {
+		out.Relations = []GraphRelation{}
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) PutRelation(ctx context.Context, relation GraphRelation) (GraphRelation, error) {
+	var out GraphRelation
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/graph/relations", relation, &out); err != nil {
+		return GraphRelation{}, err
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) ContextByEntityID(ctx context.Context, entityID string) (GraphContextResponse, error) {
+	var out GraphContextResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/graph/context?entity_id="+url.QueryEscape(entityID), nil, &out); err != nil {
+		return GraphContextResponse{}, err
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) ContextByName(ctx context.Context, name string) (GraphContextResponse, error) {
+	var out GraphContextResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/graph/context?name="+url.QueryEscape(name), nil, &out); err != nil {
+		return GraphContextResponse{}, err
+	}
+	return out, nil
+}
+
+func (g *graphNamespace) Stats(ctx context.Context) (GraphStatsResponse, error) {
+	var out GraphStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/graph/stats", nil, &out); err != nil {
+		return GraphStatsResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -790,6 +920,7 @@ func NewAgentKit() AgentKit {
 		CronSystem:  CronSystem,
 		Triggers:    Triggers,
 		MemoryCore:  MemoryCore,
+		Graph:       Graph,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

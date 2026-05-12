@@ -63,9 +63,10 @@ const kit = createAgentKit({
 const focus = await kit.state.focus();
 const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
 const found = await kit.memory.search({ query: "incremental SDK package", limit: 3 });
+const graphStats = await kit.graph.stats();
 const search = await kit.plugin.search("incremental SDK package", 5);
 
-console.log(focus.focus, strategies.strategies, found.count, search.results.length);
+console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, search.results.length);
 ```
 
 ### Full generated client
@@ -2101,4 +2102,20 @@ const options = { baseUrl: "http://localhost:9090", token: "<jwt-or-plugin-token
 const found = await createMemorySearchClient(options).search("用户偏好", { limit: 3 });
 const added = await createMemoryAddClient(options).remember("用户偏好中文回复", { layer: "mid", source: "sdk" });
 console.log(found.count, added.status);
+```
+
+## Knowledge Graph 知识图谱切片
+
+前端页面、插件 UI 或 Node.js 自动化可以用 `yunque-client/graph-read`、`graph-entities`、`graph-relations`、`graph-context`、`graph-stats` 访问宿主 `/v1/graph/*` 知识图谱层。
+
+```ts
+import { createGraphReadClient } from "yunque-client/graph-read";
+import { createGraphClient } from "yunque-client/graph";
+
+const options = { baseUrl: "http://localhost:9090", token: "<jwt-or-plugin-token>" };
+const graph = createGraphClient(options);
+const entities = await createGraphReadClient(options).entities("云雀");
+const entity = await graph.putEntity({ name: "云雀", type: "agent" });
+const context = await graph.contextByEntityId(entity.id!);
+console.log(entities.entities.length, context.context);
 ```

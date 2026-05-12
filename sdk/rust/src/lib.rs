@@ -421,6 +421,76 @@ pub struct MemoryCompactRequest {
 
 pub type MemoryCompactResponse = serde_json::Map<String, serde_json::Value>;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphEntity {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub properties: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub mentions: i32,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphRelation {
+    #[serde(default)]
+    pub id: String,
+    pub from_id: String,
+    pub to_id: String,
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub weight: f64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub context: String,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphEntitiesResponse {
+    #[serde(default)]
+    pub entities: Vec<GraphEntity>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphRelationsResponse {
+    #[serde(default)]
+    pub relations: Vec<GraphRelation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphDeleteEntityResponse {
+    #[serde(default)]
+    pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphContextResponse {
+    #[serde(default)]
+    pub context: String,
+    #[serde(default)]
+    pub neighbors: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct GraphStatsResponse {
+    #[serde(default)]
+    pub entities: i32,
+    #[serde(default)]
+    pub relations: i32,
+}
+
 /// Triggers v2 automation definition returned by `/v1/triggers/v2`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TriggerDef {
@@ -863,6 +933,7 @@ pub struct AgentKit {
     pub cron: CronClient,
     pub triggers: TriggersClient,
     pub memory: MemoryClient,
+    pub graph: GraphClient,
     pub plugin: PluginApiClient,
 }
 
@@ -893,6 +964,7 @@ impl AgentKit {
             cron: CronClient::new(base_url.clone(), token.as_ref())?,
             triggers: TriggersClient::new(base_url.clone(), token.as_ref())?,
             memory: MemoryClient::new(base_url.clone(), token.as_ref())?,
+            graph: GraphClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -913,6 +985,7 @@ impl AgentKit {
             cron: CronClient::new_with_client(base_url.clone(), plugin_http.clone()),
             triggers: TriggersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             memory: MemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            graph: GraphClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -1081,6 +1154,169 @@ impl MemoryClient {
         self.http
             .post(self.url("/v1/memory/compact"))
             .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over host `/v1/graph/*` knowledge graph endpoints.
+#[derive(Debug, Clone)]
+pub struct GraphClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl GraphClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn entities(
+        &self,
+        query: impl AsRef<str>,
+    ) -> Result<GraphEntitiesResponse, reqwest::Error> {
+        let query = query.as_ref();
+        let path = if query.is_empty() {
+            "/v1/graph/entities".to_string()
+        } else {
+            format!("/v1/graph/entities?q={}", url_encode_query_component(query))
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn put_entity(&self, entity: &GraphEntity) -> Result<GraphEntity, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/graph/entities"))
+            .json(entity)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete_entity(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<GraphDeleteEntityResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/graph/entities?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn relations(
+        &self,
+        entity_id: impl AsRef<str>,
+    ) -> Result<GraphRelationsResponse, reqwest::Error> {
+        let entity_id = entity_id.as_ref();
+        let path = if entity_id.is_empty() {
+            "/v1/graph/relations".to_string()
+        } else {
+            format!(
+                "/v1/graph/relations?entity_id={}",
+                url_encode_query_component(entity_id)
+            )
+        };
+        self.http
+            .get(self.url(&path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn put_relation(
+        &self,
+        relation: &GraphRelation,
+    ) -> Result<GraphRelation, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/graph/relations"))
+            .json(relation)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn context_by_entity_id(
+        &self,
+        entity_id: impl AsRef<str>,
+    ) -> Result<GraphContextResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/graph/context?entity_id={}",
+                url_encode_query_component(entity_id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn context_by_name(
+        &self,
+        name: impl AsRef<str>,
+    ) -> Result<GraphContextResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/graph/context?name={}",
+                url_encode_query_component(name.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn stats(&self) -> Result<GraphStatsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/graph/stats"))
             .send()
             .await?
             .error_for_status()?
@@ -2063,6 +2299,10 @@ mod tests {
             "http://localhost:9090/v1/memory/search"
         );
         assert_eq!(
+            kit.graph.url("/v1/graph/stats"),
+            "http://localhost:9090/v1/graph/stats"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -2152,6 +2392,39 @@ mod tests {
         assert_eq!(
             client.url("/v1/memory/stats"),
             "http://localhost:9090/v1/memory/stats"
+        );
+    }
+
+    #[test]
+    fn graph_types_deserialize_incremental_bodies() {
+        let entities: GraphEntitiesResponse =
+            serde_json::from_str(r#"{"entities":[{"id":"e1","name":"云雀","type":"agent"}]}"#)
+                .unwrap();
+        assert_eq!(entities.entities[0].name, "云雀");
+        assert_eq!(entities.entities[0].r#type, "agent");
+
+        let relation = GraphRelation {
+            from_id: "e1".to_string(),
+            to_id: "e2".to_string(),
+            r#type: "uses".to_string(),
+            ..GraphRelation::default()
+        };
+        let value = serde_json::to_value(relation).unwrap();
+        assert_eq!(value["from_id"], "e1");
+        assert_eq!(value["type"], "uses");
+
+        let stats: GraphStatsResponse =
+            serde_json::from_str(r#"{"entities":2,"relations":1}"#).unwrap();
+        assert_eq!(stats.entities, 2);
+    }
+
+    #[test]
+    fn graph_client_trims_base_url() {
+        let client =
+            GraphClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/graph/entities"),
+            "http://localhost:9090/v1/graph/entities"
         );
     }
 

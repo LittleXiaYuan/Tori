@@ -32,6 +32,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"triggers": [{"id": "tr_1"}], "total": 1}
             if path == "/v1/memory/search":
                 return {"results": [{"key": "pref", "value": "喜欢中文"}], "count": 1}
+            if path == "/v1/graph/stats":
+                return {"entities": 2, "relations": 1}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -45,6 +47,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(len(kit.cron_system.list()["jobs"]), 1)
             self.assertEqual(kit.triggers.list(status="enabled")["total"], 1)
             self.assertEqual(kit.memory_core.search("中文", limit=1)["count"], 1)
+            self.assertEqual(kit.graph.stats()["entities"], 2)
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -53,9 +56,10 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.cron_system, yunque.cron_system)
         self.assertIs(kit.triggers, yunque.triggers)
         self.assertIs(kit.memory_core, yunque.memory_core)
+        self.assertIs(kit.graph, yunque.graph)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
-        self.assertEqual(calls[5], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[6], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

@@ -357,6 +357,54 @@ class _MemoryCoreNamespace:
 memory_core = _MemoryCoreNamespace()
 
 
+# ── Knowledge Graph (/v1/graph) ──
+
+class _GraphNamespace:
+    """Lightweight helpers for the host knowledge graph under /v1/graph/*."""
+
+    def entities(self, query: str = "") -> dict:
+        """List or search graph entities."""
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'q': query})}" if query else ""
+        return _api_call("GET", f"/v1/graph/entities{suffix}")
+
+    def put_entity(self, entity: dict) -> dict:
+        """Create or update a graph entity."""
+        return _api_call("POST", "/v1/graph/entities", entity)
+
+    def delete_entity(self, entity_id: str) -> dict:
+        """Delete a graph entity by id."""
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/graph/entities?{urlencode({'id': entity_id})}")
+
+    def relations(self, entity_id: str = "") -> dict:
+        """List all relations or relations for one entity."""
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'entity_id': entity_id})}" if entity_id else ""
+        return _api_call("GET", f"/v1/graph/relations{suffix}")
+
+    def put_relation(self, relation: dict) -> dict:
+        """Create or update a graph relation."""
+        return _api_call("POST", "/v1/graph/relations", relation)
+
+    def context_by_entity_id(self, entity_id: str) -> dict:
+        """Return context and neighbors for an entity id."""
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/graph/context?{urlencode({'entity_id': entity_id})}")
+
+    def context_by_name(self, name: str) -> dict:
+        """Return context and neighbors for an entity name."""
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/graph/context?{urlencode({'name': name})}")
+
+    def stats(self) -> dict:
+        """Return graph entity/relation counters."""
+        return _api_call("GET", "/v1/graph/stats")
+
+
+graph = _GraphNamespace()
+
+
 # ── Reflection Experience ──
 
 class _ReflectNamespace:
@@ -705,6 +753,7 @@ class AgentKit:
         self.cron_system = cron_system
         self.triggers = triggers
         self.memory_core = memory_core
+        self.graph = graph
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
