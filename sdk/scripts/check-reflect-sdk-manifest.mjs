@@ -13,9 +13,13 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
+const requiredCapabilities = ["experiences", "stats", "strategies"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
-for (const required of ["experiences", "stats", "strategies"]) {
+for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
+}
+for (const actual of capabilityNames) {
+  if (!requiredCapabilities.includes(actual)) fail(`manifest has unexpected capability: ${actual}`);
 }
 
 const gatewayRoutes = readRepoFile("internal/controlplane/gateway/routes_tasks.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_reasoning.go");
@@ -26,7 +30,15 @@ for (const route of manifest.routes ?? []) {
 
 for (const [language, config] of Object.entries(manifest.languages ?? {})) {
   const combinedSource = (config.implementationFiles ?? []).map(readRepoFile).join("\n");
+  for (const capability of requiredCapabilities) {
+    if (!config.entrypoints?.[capability]) {
+      fail(`${language} entrypoints missing required reflection capability: ${capability}`);
+    }
+  }
   for (const [capability, symbol] of Object.entries(config.entrypoints ?? {})) {
+    if (!capabilityNames.has(capability)) {
+      fail(`${language} entrypoint references unknown capability: ${capability}`);
+    }
     const raw = symbol.split("#").pop().replace(/\(\).*$/, "");
     const alternatives = [raw, raw.replace(/^.*\./, ""), raw.replace(/^.*::/, "")];
     if (!alternatives.some((candidate) => candidate && combinedSource.includes(candidate))) {
