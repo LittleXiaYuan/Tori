@@ -190,6 +190,58 @@ pub struct ReflectStrategiesResponse {
     pub strategies: String,
 }
 
+/// Message accepted by the Plugin API LLM endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginLLMMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Request body for `/v1/plugin-api/llm`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginLLMRequest {
+    pub messages: Vec<PluginLLMMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
+}
+
+/// Response returned by `/v1/plugin-api/llm`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginLLMResponse {
+    #[serde(default)]
+    pub reply: String,
+}
+
+/// Search result returned by `/v1/plugin-api/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginSearchResult {
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub snippet: String,
+}
+
+/// Response returned by `/v1/plugin-api/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginSearchResponse {
+    #[serde(default)]
+    pub results: Vec<PluginSearchResult>,
+}
+
+/// Generic `{ ok: bool }` response used by Plugin API mutation helpers.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginOkResponse {
+    #[serde(default)]
+    pub ok: bool,
+}
+
+/// Response returned by `/v1/plugin-api/send`.
+pub type PluginSendResponse = PluginOkResponse;
+
 /// Small Rust helper over `/v1/state` and focused State Kernel routes.
 ///
 /// Use this when a sidecar, CLI, or plugin wants state-layer access without
@@ -408,6 +460,121 @@ impl ReflectClient {
     }
 }
 
+/// Small Rust helper over the core `/v1/plugin-api/*` runtime capabilities.
+///
+/// Use this when a Rust CLI, sidecar, or plugin runner only needs LLM/search/send
+/// calls without coupling to the full generated OpenAPI client.
+#[derive(Debug, Clone)]
+pub struct PluginApiClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl PluginApiClient {
+    /// Create a PluginApiClient using a plugin-scoped bearer token.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    /// Create a PluginApiClient with a caller-provided reqwest client.
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    /// Call the configured LLM through `/v1/plugin-api/llm`.
+    pub async fn llm(
+        &self,
+        request: &PluginLLMRequest,
+    ) -> Result<PluginLLMResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/plugin-api/llm"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Search through configured providers via `/v1/plugin-api/search`.
+    pub async fn search(
+        &self,
+        query: impl AsRef<str>,
+        limit: i32,
+    ) -> Result<PluginSearchResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct SearchRequest<'a> {
+            query: &'a str,
+            #[serde(skip_serializing_if = "is_default")]
+            limit: i32,
+        }
+        self.http
+            .post(self.url("/v1/plugin-api/search"))
+            .json(&SearchRequest {
+                query: query.as_ref(),
+                limit,
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Send a channel message via `/v1/plugin-api/send`.
+    pub async fn send(
+        &self,
+        channel: impl AsRef<str>,
+        target: impl AsRef<str>,
+        content: impl AsRef<str>,
+        format: impl AsRef<str>,
+    ) -> Result<PluginSendResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct SendRequest<'a> {
+            channel: &'a str,
+            target: &'a str,
+            content: &'a str,
+            #[serde(skip_serializing_if = "str::is_empty")]
+            format: &'a str,
+        }
+        self.http
+            .post(self.url("/v1/plugin-api/send"))
+            .json(&SendRequest {
+                channel: channel.as_ref(),
+                target: target.as_ref(),
+                content: content.as_ref(),
+                format: format.as_ref(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
 fn trim_base_url(base_url: String) -> String {
     base_url.trim_end_matches('/').to_string()
 }
@@ -536,6 +703,32 @@ mod tests {
         assert_eq!(
             client.url("/v1/reflect/strategies"),
             "http://localhost:9090/v1/reflect/strategies"
+        );
+    }
+
+    #[test]
+    fn plugin_llm_request_serializes_incremental_body() {
+        let request = PluginLLMRequest {
+            messages: vec![PluginLLMMessage {
+                role: "user".to_string(),
+                content: "hello".to_string(),
+            }],
+            model: "test-model".to_string(),
+            ..PluginLLMRequest::default()
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["messages"][0]["role"], "user");
+        assert_eq!(value["model"], "test-model");
+        assert!(value.get("temperature").is_none());
+    }
+
+    #[test]
+    fn plugin_api_client_trims_base_url() {
+        let client =
+            PluginApiClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/plugin-api/llm"),
+            "http://localhost:9090/v1/plugin-api/llm"
         );
     }
 }

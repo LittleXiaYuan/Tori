@@ -146,6 +146,16 @@
         "registerSpeech": "yunque.register_speech",
         "extensions": "yunque.list_extensions"
       }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "llm": "PluginApiClient::llm",
+        "search": "PluginApiClient::search",
+        "send": "PluginApiClient::send"
+      }
     }
   },
   "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
