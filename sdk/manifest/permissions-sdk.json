@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "permissions-facade",
+  "description": "Cross-language lightweight SDK facade for permission checks and current-subject role reads over /v1/rbac without importing the full platform client.",
+  "principles": [
+    "Expose permission checks as a focused SDK slice for external plugin UIs, front-end pages, CLIs, sidecars, and automation guard scripts.",
+    "Keep check and my-roles reads directly callable through existing authenticated RBAC routes.",
+    "Make Permissions access available through Agent Kit while leaving the broader RBAC governance SDK intact."
+  ],
+  "routes": [
+    "POST /v1/rbac/check",
+    "GET /v1/rbac/my-roles"
+  ],
+  "capabilities": [
+    {
+      "name": "check",
+      "route": "POST /v1/rbac/check",
+      "readOnly": true,
+      "description": "Check whether a subject may perform an action on a resource."
+    },
+    {
+      "name": "myRoles",
+      "route": "GET /v1/rbac/my-roles",
+      "readOnly": true,
+      "description": "Read roles assigned to the current subject."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/permissions.ts",
+        "sdk/typescript/src/rbac.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "check": "createPermissionsClient().check",
+        "myRoles": "createPermissionsClient().myRoles"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "check": "yunque.Permissions.Check",
+        "myRoles": "yunque.Permissions.MyRoles"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "check": "yunque.permissions.check",
+        "myRoles": "yunque.permissions.my_roles"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "check": "PermissionsClient::check",
+        "myRoles": "PermissionsClient::my_roles"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

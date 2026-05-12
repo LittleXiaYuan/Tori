@@ -1396,6 +1396,7 @@ pub struct AgentKit {
     pub emotion: EmotionClient,
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
+    pub permissions: PermissionsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1461,6 +1462,7 @@ impl AgentKit {
             emotion: EmotionClient::new(base_url.clone(), token.as_ref())?,
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
+            permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1522,6 +1524,7 @@ impl AgentKit {
                 plugin_http.clone(),
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5218,6 +5221,45 @@ pub type RBACRole = serde_json::Map<String, serde_json::Value>;
 pub type RBACRolesResponse = serde_json::Value;
 pub type RBACDeletedResponse = serde_json::Value;
 pub type RBACRoleBindingResponse = serde_json::Value;
+
+/// Small Rust facade over RBAC permission checks and current-role reads.
+#[derive(Debug, Clone)]
+pub struct PermissionsClient {
+    rbac: RBACClient,
+}
+
+impl PermissionsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        Ok(Self {
+            rbac: RBACClient::new(base_url, token)?,
+        })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            rbac: RBACClient::new_with_client(base_url, http),
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        self.rbac.url(path)
+    }
+
+    pub async fn check(
+        &self,
+        request: RBACCheckRequest,
+    ) -> Result<RBACCheckResponse, reqwest::Error> {
+        self.rbac.check(request).await
+    }
+
+    pub async fn my_roles(&self) -> Result<RBACMyRolesResponse, reqwest::Error> {
+        self.rbac.my_roles().await
+    }
+}
+
 pub type RBACCheckResponse = serde_json::Value;
 pub type RBACMyRolesResponse = serde_json::Value;
 
@@ -8507,6 +8549,10 @@ mod tests {
             "http://localhost:9090/v1/react"
         );
         assert_eq!(
+            kit.permissions.url("/v1/rbac/check"),
+            "http://localhost:9090/v1/rbac/check"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -8829,6 +8875,29 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn permissions_helpers_build_urls_and_payloads() {
+        let client =
+            PermissionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/rbac/check"),
+            "http://localhost:9090/v1/rbac/check"
+        );
+        assert_eq!(
+            client.url("/v1/rbac/my-roles"),
+            "http://localhost:9090/v1/rbac/my-roles"
+        );
+        let check = serde_json::to_value(RBACCheckRequest {
+            subject_id: "u1".to_string(),
+            resource: "knowledge".to_string(),
+            action: "read".to_string(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(check["resource"], "knowledge");
+        assert_eq!(check["action"], "read");
     }
 
     #[test]

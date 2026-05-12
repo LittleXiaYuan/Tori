@@ -1001,6 +1001,21 @@ class _RBACNamespace:
 
 rbac = _RBACNamespace()
 
+
+# ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
+
+class _PermissionsNamespace:
+    """Lightweight permission-check facade over the RBAC slice."""
+
+    def check(self, resource: str, action: str, *, subject_id: str = "", tenant_id: str = "") -> dict:
+        return rbac.check(resource, action, subject_id=subject_id, tenant_id=tenant_id)
+
+    def my_roles(self) -> dict:
+        return rbac.my_roles()
+
+
+permissions = _PermissionsNamespace()
+
 # ── Approvals (/v1/approvals) ──
 
 class _ApprovalsNamespace:
@@ -2199,6 +2214,7 @@ class AgentKit:
         self.emotion = emotion
         self.instructions = instructions
         self.reactions = reactions
+        self.permissions = permissions
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
