@@ -27,6 +27,9 @@ const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.n
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
 }
+for (const actual of capabilityNames) {
+  if (!requiredCapabilities.includes(actual)) fail(`manifest has unexpected capability: ${actual}`);
+}
 
 const gatewayRoutes = readRepoFile("internal/controlplane/gateway/handlers_plugins.go");
 for (const route of manifest.routes ?? []) {
@@ -47,6 +50,9 @@ function symbolAlternatives(symbol) {
 for (const [language, config] of Object.entries(manifest.languages ?? {})) {
   const combinedSource = (config.implementationFiles ?? []).map(readRepoFile).join("\n");
   for (const [capability, symbol] of Object.entries(config.entrypoints ?? {})) {
+    if (!capabilityNames.has(capability)) {
+      fail(`${language} entrypoint references unknown capability: ${capability}`);
+    }
     if (!symbolAlternatives(symbol).some((candidate) => combinedSource.includes(candidate))) {
       fail(`${language} implementation missing entrypoint for ${capability}: ${symbol}`);
     }
@@ -55,6 +61,42 @@ for (const [language, config] of Object.entries(manifest.languages ?? {})) {
     const text = readRepoFile(doc);
     if (!/plugin|Plugin|插件|SDK/.test(text)) {
       fail(`${language} doc ${doc} does not mention plugin SDK helpers`);
+    }
+  }
+}
+
+const rust = manifest.languages?.rust;
+if (!rust) {
+  fail("manifest missing rust SDK language section");
+} else {
+  const rustEntrypoints = rust.entrypoints ?? {};
+  const rustSource = (rust.implementationFiles ?? []).map(readRepoFile).join("\n");
+  for (const capability of requiredCapabilities) {
+    const symbol = rustEntrypoints[capability];
+    if (!symbol) {
+      fail(`rust entrypoints missing required Plugin API capability: ${capability}`);
+      continue;
+    }
+    const method = symbol.replace(/^.*::/, "");
+    const methodPattern = new RegExp(`pub\\s+async\\s+fn\\s+${method}\\s*\\(`);
+    if (!methodPattern.test(rustSource)) {
+      fail(`rust PluginApiClient missing public async method for ${capability}: ${method}`);
+    }
+  }
+  const rustDocs = (rust.docs ?? []).map(readRepoFile).join("\n");
+  for (const token of [
+    "agent_memory_search",
+    "agent_memory_add",
+    "register_provider",
+    "register_channel",
+    "register_search",
+    "register_guardrail",
+    "register_embedding",
+    "register_speech",
+    "extensions",
+  ]) {
+    if (!rustDocs.includes(token)) {
+      fail(`rust docs missing PluginApiClient method mention: ${token}`);
     }
   }
 }

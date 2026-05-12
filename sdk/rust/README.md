@@ -191,12 +191,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     plugin.memory_set("sdk:last_summary", &reply.reply).await?;
     let note = plugin.memory_get("sdk:last_summary").await?;
     let context = plugin.agent_memory_search("SDK roadmap", 5).await?;
+    plugin.agent_memory_add("Rust PluginApiClient covered Plugin API Runtime", "sdk-rust").await?;
     let knowledge = plugin.knowledge_search("incremental SDK package", 5).await?;
     let job = plugin.cron_add(
         "weekly-sdk-summary",
         "0 9 * * MON",
         "Summarize SDK manifest drift",
     ).await?;
+    let provider = plugin.register_provider(&serde_json::json!({
+        "id": "local-llm",
+        "base_url": "http://localhost:11434/v1",
+        "model": "llama3",
+        "type": "chat"
+    })).await?;
+    let channel = plugin.register_channel(&serde_json::json!({
+        "name": "webhook",
+        "webhook_url": "http://localhost:8080/hook",
+        "send_endpoint": "http://localhost:8080/send"
+    })).await?;
+    let search = plugin.register_search(&serde_json::json!({
+        "name": "docs-search",
+        "base_url": "http://localhost:7700"
+    })).await?;
+    let guardrail = plugin.register_guardrail(&serde_json::json!({
+        "name": "internal-policy",
+        "description": "Block internal-only snippets",
+        "phase": "both",
+        "keywords": ["internal-only"]
+    })).await?;
+    let embedding = plugin.register_embedding(&serde_json::json!({
+        "name": "local-embedding",
+        "base_url": "http://localhost:11434/v1",
+        "model": "nomic-embed-text",
+        "dimensions": 768
+    })).await?;
+    let speech = plugin.register_speech(&serde_json::json!({
+        "name": "local-tts",
+        "type": "tts",
+        "base_url": "http://localhost:5002",
+        "model": "default"
+    })).await?;
     let extensions = plugin.extensions().await?;
     let sent = plugin.send("telegram", "chat-id", &note.value, "markdown").await?;
 
