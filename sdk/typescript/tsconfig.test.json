@@ -135,6 +135,7 @@
     "src/settings-backup.ts",
     "src/tori.ts",
     "src/tori-observe.ts",
+    "src/tori-bind.ts",
     "src/speech.ts",
     "src/admin.ts",
     "src/files.ts",
