@@ -286,6 +286,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"cognis":[{"id":"reviewer","name":"Code Reviewer"}],"count":1}`))
 		case "/v1/trace/recent":
 			_, _ = w.Write([]byte(`{"events":[{"trace_id":"tr-1"}],"count":1}`))
+		case "/v1/heartbeat":
+			_, _ = w.Write([]byte(`{"running":true}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -372,6 +374,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	heartbeatStatus, err := kit.Heartbeat.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -380,14 +386,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 21 {
-		t.Fatalf("expected 21 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 22 {
+		t.Fatalf("expected 22 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -1874,6 +1880,56 @@ func TestTraceHelpers(t *testing.T) {
 	}
 	if len(seen) != 3 || seen[0] != "GET /v1/trace/recent?limit=10" || seen[1] != "GET /v1/trace/tr%2F1?raw=true" || seen[2] != "GET /v1/trace/task/task%2F1" {
 		t.Fatalf("unexpected trace requests: %v", seen)
+	}
+}
+
+func TestHeartbeatHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/heartbeat":
+			if r.Method == http.MethodPut {
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"running":true}`))
+		case "/v1/heartbeat/trigger":
+			_, _ = w.Write([]byte(`{"id":"hb1","summary":"checked"}`))
+		case "/v1/heartbeat/logs":
+			_, _ = w.Write([]byte(`[{"id":"hb1"},{"id":"hb2"}]`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	status, err := Heartbeat.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled := true
+	interval := 30
+	updated, err := Heartbeat.Update(ctx, HeartbeatUpdateRequest{Enabled: &enabled, IntervalMinutes: &interval})
+	if err != nil {
+		t.Fatal(err)
+	}
+	triggered, err := Heartbeat.Trigger(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs, err := Heartbeat.Logs(ctx, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if !status["running"].(bool) || updated["status"] != "ok" || triggered["id"] != "hb1" || len(logs) != 2 || kit.Heartbeat != Heartbeat {
+		t.Fatalf("unexpected heartbeat results")
+	}
+	if len(seen) != 4 || seen[0] != "GET /v1/heartbeat" || seen[1] != "PUT /v1/heartbeat" || seen[2] != "POST /v1/heartbeat/trigger" || seen[3] != "GET /v1/heartbeat/logs?limit=2" {
+		t.Fatalf("unexpected heartbeat requests: %v", seen)
 	}
 }
 

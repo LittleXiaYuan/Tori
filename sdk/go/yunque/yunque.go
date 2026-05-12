@@ -315,6 +315,7 @@ type AgentKit struct {
 	Providers    *providersNamespace
 	Cognis       *cognisNamespace
 	Trace        *traceNamespace
+	Heartbeat    *heartbeatNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1812,6 +1813,10 @@ var Cognis = &cognisNamespace{}
 // Trace provides focused access to execution/audit trace reads.
 var Trace = &traceNamespace{}
 
+// Heartbeat provides focused access to proactive lifecycle heartbeat status,
+// controls, trigger, and logs.
+var Heartbeat = &heartbeatNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2595,6 +2600,57 @@ func (t *traceNamespace) ByTaskID(ctx context.Context, taskID string, raw bool) 
 	return out, nil
 }
 
+// ── Proactive Heartbeat Lifecycle ──
+
+type heartbeatNamespace struct{}
+
+type HeartbeatStatusResponse map[string]any
+type HeartbeatUpdateRequest struct {
+	Enabled         *bool `json:"enabled,omitempty"`
+	IntervalMinutes *int  `json:"interval_minutes,omitempty"`
+}
+type HeartbeatUpdateResponse map[string]any
+type HeartbeatLogEntry map[string]any
+
+func (h *heartbeatNamespace) Status(ctx context.Context) (HeartbeatStatusResponse, error) {
+	var out HeartbeatStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/heartbeat", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (h *heartbeatNamespace) Update(ctx context.Context, req HeartbeatUpdateRequest) (HeartbeatUpdateResponse, error) {
+	var out HeartbeatUpdateResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/heartbeat", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (h *heartbeatNamespace) Trigger(ctx context.Context) (HeartbeatLogEntry, error) {
+	var out HeartbeatLogEntry
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/heartbeat/trigger", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (h *heartbeatNamespace) Logs(ctx context.Context, limit int) ([]HeartbeatLogEntry, error) {
+	path := "/v1/heartbeat/logs"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	var out []HeartbeatLogEntry
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []HeartbeatLogEntry{}
+	}
+	return out, nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -2852,6 +2908,7 @@ func NewAgentKit() AgentKit {
 		Providers:    Providers,
 		Cognis:       Cognis,
 		Trace:        Trace,
+		Heartbeat:    Heartbeat,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,

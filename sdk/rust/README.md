@@ -103,7 +103,7 @@ cargo check     # quick verification
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
 Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
-Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, and Plugin API Runtime. It composes the hand-written lightweight
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -485,6 +485,10 @@ Cognis SDK exposes lightweight Cogni registry, trace, health, experience, evolut
 ### Trace SDK
 
 Trace SDK exposes lightweight execution/audit trace helpers (`recent`, `byTraceId`, `byTaskId`) for external debugging pages, replay tools, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.trace` / `kit.Trace` for one-stop observability and replay workflows.
+
+### Heartbeat SDK
+
+Heartbeat SDK exposes lightweight proactive lifecycle helpers (`status`, `update`, `trigger`, `logs`) for external operator pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.heartbeat` / `kit.Heartbeat` for one-stop lifecycle supervision workflows.
 
 ### Cost SDK
 
