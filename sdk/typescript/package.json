@@ -503,9 +503,21 @@
       "types": "./src/cost-budget.ts",
       "import": "./src/cost-budget.ts"
     },
+    "./cost-alerts": {
+      "types": "./src/cost-alerts.ts",
+      "import": "./src/cost-alerts.ts"
+    },
     "./cost-observe": {
       "types": "./src/cost-observe.ts",
       "import": "./src/cost-observe.ts"
+    },
+    "./cost-task": {
+      "types": "./src/cost-task.ts",
+      "import": "./src/cost-task.ts"
+    },
+    "./cost-history": {
+      "types": "./src/cost-history.ts",
+      "import": "./src/cost-history.ts"
     },
     "./usage": {
       "types": "./src/usage.ts",
