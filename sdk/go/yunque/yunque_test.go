@@ -161,6 +161,80 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestPersonaHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/persona":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"identity":"Tori","soul":"careful","skills":[{"name":"review"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/persona/skills":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"skills":[{"name":"review"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/persona/presets":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"presets":[{"id":"default","name":"Default"}],"active":"default"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"ok","active":"studio"}`))
+		case "/v1/persona/presets/custom", "/v1/persona/presets/features":
+			_, _ = w.Write([]byte(`{"status":"ok","id":"studio"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	state, err := Persona.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Persona.Update(ctx, UpdatePersonaRequest{Identity: "Tori", Soul: "careful"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	skills, err := Persona.Skills(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.AddSkill(ctx, AddPersonaSkillRequest{Name: "review", Description: "Review", Content: "review code"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.DeleteSkill(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	presets, err := Persona.Presets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.SwitchPreset(ctx, "studio"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.AddCustomPreset(ctx, AddCustomPersonaPresetRequest{"id": "studio", "name": "Studio"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.UpdatePresetFeatures(ctx, UpdatePersonaPresetFeaturesRequest{ID: "studio", Features: map[string]bool{"emotion": true}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Persona.DeleteCustomPreset(ctx, "studio"); err != nil {
+		t.Fatal(err)
+	}
+	if state["identity"] != "Tori" || updated["status"] != "ok" || skills["skills"] == nil || presets["active"] != "default" || NewAgentKit().Persona != Persona {
+		t.Fatalf("unexpected persona results: state=%+v updated=%+v skills=%+v presets=%+v", state, updated, skills, presets)
+	}
+	if len(seen) != 10 || seen[0] != "GET /v1/persona" || seen[9] != "DELETE /v1/persona/presets/custom" {
+		t.Fatalf("unexpected persona requests: %v", seen)
+	}
+}
+
 func TestIterateHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

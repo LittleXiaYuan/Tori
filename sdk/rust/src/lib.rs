@@ -1392,6 +1392,7 @@ pub struct AgentKit {
     pub audit: AuditClient,
     pub trust: TrustClient,
     pub iterate: IterateClient,
+    pub persona: PersonaClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1453,6 +1454,7 @@ impl AgentKit {
             audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
+            persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1507,6 +1509,7 @@ impl AgentKit {
             audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3581,6 +3584,225 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+pub type PersonaStateResponse = serde_json::Value;
+pub type PersonaStatusResponse = serde_json::Value;
+pub type PersonaSkillsResponse = serde_json::Value;
+pub type PersonaPresetsResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct UpdatePersonaRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub identity: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub soul: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AddPersonaSkillRequest {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PersonaNameRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PersonaPresetIdRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct AddCustomPersonaPresetRequest {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tone: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub style: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub greeting: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub system_note: String,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub features: std::collections::BTreeMap<String, bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct UpdatePersonaPresetFeaturesRequest {
+    pub id: String,
+    pub features: std::collections::BTreeMap<String, bool>,
+}
+
+/// Small Rust helper over persona identity, skills, and preset endpoints.
+#[derive(Debug, Clone)]
+pub struct PersonaClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl PersonaClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn get(&self) -> Result<PersonaStateResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/persona"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update(
+        &self,
+        request: &UpdatePersonaRequest,
+    ) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/persona"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn skills(&self) -> Result<PersonaSkillsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/persona/skills"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add_skill(
+        &self,
+        request: &AddPersonaSkillRequest,
+    ) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/persona/skills"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete_skill(&self, name: &str) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .delete(self.url("/v1/persona/skills"))
+            .json(&PersonaNameRequest {
+                name: name.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn presets(&self) -> Result<PersonaPresetsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/persona/presets"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn switch_preset(&self, id: &str) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/persona/presets"))
+            .json(&PersonaPresetIdRequest { id: id.to_string() })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add_custom_preset(
+        &self,
+        request: &AddCustomPersonaPresetRequest,
+    ) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/persona/presets/custom"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete_custom_preset(
+        &self,
+        id: &str,
+    ) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .delete(self.url("/v1/persona/presets/custom"))
+            .json(&PersonaPresetIdRequest { id: id.to_string() })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update_preset_features(
+        &self,
+        request: &UpdatePersonaPresetFeaturesRequest,
+    ) -> Result<PersonaStatusResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/persona/presets/features"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
 
 pub type IterateProposalsResponse = serde_json::Value;
 pub type IterateDecisionResponse = serde_json::Value;
@@ -7901,6 +8123,10 @@ mod tests {
             "http://localhost:9090/api/iterate/status"
         );
         assert_eq!(
+            kit.persona.url("/v1/persona"),
+            "http://localhost:9090/v1/persona"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -8223,6 +8449,42 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn persona_helpers_build_urls_and_payloads() {
+        let client =
+            PersonaClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/persona"),
+            "http://localhost:9090/v1/persona"
+        );
+        let update = serde_json::to_value(UpdatePersonaRequest {
+            identity: "Tori".to_string(),
+            soul: "careful".to_string(),
+        })
+        .unwrap();
+        assert_eq!(update["identity"], "Tori");
+        let skill = serde_json::to_value(AddPersonaSkillRequest {
+            name: "review".to_string(),
+            description: "Review".to_string(),
+            content: "review code".to_string(),
+        })
+        .unwrap();
+        assert_eq!(skill["name"], "review");
+        let state: serde_json::Value = serde_json::from_str(
+            r#"{"identity":"Tori","soul":"careful","skills":[{"name":"review"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(state["skills"][0]["name"], "review");
+        let mut features = std::collections::BTreeMap::new();
+        features.insert("emotion".to_string(), true);
+        let preset = serde_json::to_value(UpdatePersonaPresetFeaturesRequest {
+            id: "studio".to_string(),
+            features,
+        })
+        .unwrap();
+        assert_eq!(preset["features"]["emotion"], true);
     }
 
     #[test]

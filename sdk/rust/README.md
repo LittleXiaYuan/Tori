@@ -557,3 +557,6 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Iterate SDK
 
 `IterateClient` is the Rust lightweight self-iteration SDK slice. It wraps proposal review and manual cycles through `proposals`, `pending_proposals`, `approve`, `reject`, `trigger`, and `status` over `/api/iterate/proposals`, `/api/iterate/approve`, `/api/iterate/reject`, `/api/iterate/trigger`, and `/api/iterate/status`; `AgentKit::new(...).iterate` composes it with the other incremental clients.
+### Persona SDK
+
+`PersonaClient` is the Rust lightweight persona SDK slice. It wraps persona identity reads/updates, persona skills, persona presets, custom preset management, and feature flags through `/v1/persona*`; `AgentKit::new(...).persona` composes it with the other incremental clients.

@@ -377,3 +377,6 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Iterate SDK
 
 `yunque.Iterate` keeps self-iteration proposal review available to Go sidecars and CLIs without a generated platform client. Use `Proposals`, `PendingProposals`, `Approve`, `Reject`, `Trigger`, and `Status` for `/api/iterate/proposals`, approval/rejection, manual cycle triggering, and status reads; `NewAgentKit().Iterate` points to the same lightweight namespace.
+### Persona SDK
+
+`yunque.Persona` keeps persona identity, persona skills, persona presets, custom presets, and preset feature flags available to Go sidecars and CLIs without a generated platform client. `NewAgentKit().Persona` points to the same lightweight namespace for `/v1/persona*` operations.

@@ -332,3 +332,6 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Iterate SDK
 
 `yunque.iterate` exposes the self-iteration proposal review loop as a small incremental SDK slice: `proposals()`, `pending_proposals()`, `approve(id)`, `reject(id)`, `trigger()`, and `status()` call `/api/iterate/proposals`, `/api/iterate/approve`, `/api/iterate/reject`, `/api/iterate/trigger`, and `/api/iterate/status`. `create_agent_kit().iterate` reuses the same helpers for scripts and plugins.
+### Persona SDK
+
+`yunque.persona` exposes persona identity, soul, skills, and presets as a small incremental SDK slice. Use `get()`, `update()`, `skills()`, `add_skill()`, `delete_skill()`, `presets()`, `switch_preset()`, `add_custom_preset()`, `delete_custom_preset()`, and `update_preset_features()` over `/v1/persona*`; `create_agent_kit().persona` reuses the same helpers.
