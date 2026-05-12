@@ -102,7 +102,7 @@ cargo check     # quick verification
 
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
-Experience, Mission Parse, Scheduler, Triggers, and Plugin API Runtime. It composes the hand-written lightweight
+Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -230,6 +230,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+
+
+## Lightweight Cron System helper
+
+Use `CronClient` when a Rust CLI, sidecar, plugin runner, or automation binary needs host `/v1/cron/*` scheduled task access without importing the generated all-in-one API surface. This is separate from `PluginApiClient::cron_*`, which manages plugin-owned runtime cron jobs.
+
+```rust
+use yunque_client::{CronAddRequest, CronClient, CronPayload, CronSchedule};
+
+let cron = CronClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let jobs = cron.list().await?;
+let added = cron.add(&CronAddRequest {
+    name: "nightly".to_string(),
+    schedule: CronSchedule { r#type: "cron".to_string(), cron_expr: "0 2 * * *".to_string(), timezone: "Asia/Shanghai".to_string(), ..Default::default() },
+    payload: CronPayload { kind: "systemEvent".to_string(), ..Default::default() },
+}).await?;
+let run = cron.run(&added.job.id).await?;
+println!("{} {} {}", jobs.jobs.len(), added.job.id, run.run.status);
+```
 
 ## Lightweight Triggers helper
 

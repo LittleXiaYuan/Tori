@@ -26,6 +26,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"focus": "sdk"}
             if path.startswith("/v1/reflect/strategies"):
                 return {"strategies": "- keep SDK slices small"}
+            if path == "/v1/cron/list":
+                return {"jobs": [{"id": "job_1"}]}
             if path == "/v1/triggers/v2?status=enabled":
                 return {"triggers": [{"id": "tr_1"}], "total": 1}
             if path == "/v1/plugin-api/search":
@@ -38,16 +40,18 @@ class AgentKitTest(unittest.TestCase):
         with patch.object(yunque, "_api_call", side_effect=fake_api_call):
             self.assertEqual(kit.state.focus(), "sdk")
             self.assertIn("SDK slices", kit.reflect.strategies(tag="sdk"))
+            self.assertEqual(len(kit.cron_system.list()["jobs"]), 1)
             self.assertEqual(kit.triggers.list(status="enabled")["total"], 1)
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
         self.assertIs(kit.state, yunque.state)
         self.assertIs(kit.reflect, yunque.reflect)
+        self.assertIs(kit.cron_system, yunque.cron_system)
         self.assertIs(kit.triggers, yunque.triggers)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
-        self.assertEqual(calls[3], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[4], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

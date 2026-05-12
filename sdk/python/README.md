@@ -111,6 +111,22 @@ python sdk/python/examples/reflect_strategies.py
 ```
 
 
+
+## Cron System 主机计划任务切片
+
+Python 插件脚本或自动化任务可以用 `yunque.cron_system` 管理主机级 `/v1/cron/*` 计划任务。它不同于 `yunque.cron` 的插件自有定时任务。
+
+```python
+jobs = yunque.cron_system.list()
+added = yunque.cron_system.add(
+    "nightly",
+    {"type": "cron", "cron_expr": "0 2 * * *", "timezone": "Asia/Shanghai"},
+    {"kind": "systemEvent", "data": {"event": "nightly"}},
+)
+run = yunque.cron_system.run(added["job"]["id"])
+print(len(jobs["jobs"]), run["run"]["status"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。
