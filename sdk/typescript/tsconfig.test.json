@@ -42,6 +42,8 @@
     "src/realtime-connect.ts",
     "src/realtime-messages.ts",
     "src/webchat.ts",
+    "src/webchat-widget.ts",
+    "src/webchat-embed.ts",
     "src/conversations.ts",
     "src/subagents.ts",
     "src/bots.ts",
