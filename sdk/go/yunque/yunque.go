@@ -324,6 +324,7 @@ type AgentKit struct {
 	Audit         *auditNamespace
 	Trust         *trustNamespace
 	Iterate       *iterateNamespace
+	Persona       *personaNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1854,6 +1855,9 @@ var Trust = &trustNamespace{}
 // Iterate provides focused access to self-iteration proposal review and manual cycles.
 var Iterate = &iterateNamespace{}
 
+// Persona provides focused access to persona identity, skills, and presets.
+var Persona = &personaNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2777,6 +2781,126 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Persona identity, skills, and presets ──
+
+type personaNamespace struct{}
+
+type PersonaSkill map[string]any
+type PersonaStateResponse map[string]any
+type PersonaStatusResponse map[string]any
+type PersonaSkillsResponse map[string]any
+type PersonaPresetsResponse map[string]any
+
+type UpdatePersonaRequest struct {
+	Identity string `json:"identity,omitempty"`
+	Soul     string `json:"soul,omitempty"`
+}
+
+type AddPersonaSkillRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Content     string `json:"content,omitempty"`
+}
+
+type DeletePersonaSkillRequest struct {
+	Name string `json:"name"`
+}
+
+type SwitchPersonaPresetRequest struct {
+	ID string `json:"id"`
+}
+
+type AddCustomPersonaPresetRequest map[string]any
+
+type DeleteCustomPersonaPresetRequest struct {
+	ID string `json:"id"`
+}
+
+type UpdatePersonaPresetFeaturesRequest struct {
+	ID       string          `json:"id"`
+	Features map[string]bool `json:"features"`
+}
+
+func (p *personaNamespace) Get(ctx context.Context) (PersonaStateResponse, error) {
+	var out PersonaStateResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/persona", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) Update(ctx context.Context, req UpdatePersonaRequest) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/persona", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) Skills(ctx context.Context) (PersonaSkillsResponse, error) {
+	var out PersonaSkillsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/persona/skills", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) AddSkill(ctx context.Context, req AddPersonaSkillRequest) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/skills", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) DeleteSkill(ctx context.Context, name string) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/persona/skills", DeletePersonaSkillRequest{Name: name}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) Presets(ctx context.Context) (PersonaPresetsResponse, error) {
+	var out PersonaPresetsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/persona/presets", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) SwitchPreset(ctx context.Context, id string) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/presets", SwitchPersonaPresetRequest{ID: id}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) AddCustomPreset(ctx context.Context, req AddCustomPersonaPresetRequest) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/presets/custom", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) DeleteCustomPreset(ctx context.Context, id string) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/persona/presets/custom", DeleteCustomPersonaPresetRequest{ID: id}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *personaNamespace) UpdatePresetFeatures(ctx context.Context, req UpdatePersonaPresetFeaturesRequest) (PersonaStatusResponse, error) {
+	var out PersonaStatusResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/persona/presets/features", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ── Trust Governance ──
@@ -4124,6 +4248,7 @@ func NewAgentKit() AgentKit {
 		Audit:         Audit,
 		Trust:         Trust,
 		Iterate:       Iterate,
+		Persona:       Persona,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

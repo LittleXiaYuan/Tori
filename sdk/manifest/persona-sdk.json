@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "domain": "persona-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for persona identity, soul, skills, presets, and feature flags without importing the full platform client.",
+  "principles": [
+    "Expose persona configuration as a focused SDK slice for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep identity, skill, preset, and feature-flag operations directly callable through existing authenticated persona routes.",
+    "Make Persona access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /v1/persona",
+    "PUT /v1/persona",
+    "GET /v1/persona/skills",
+    "POST /v1/persona/skills",
+    "DELETE /v1/persona/skills",
+    "GET /v1/persona/presets",
+    "POST /v1/persona/presets",
+    "POST /v1/persona/presets/custom",
+    "DELETE /v1/persona/presets/custom",
+    "PUT /v1/persona/presets/features"
+  ],
+  "capabilities": [
+    {
+      "name": "get",
+      "route": "GET /v1/persona",
+      "readOnly": true,
+      "description": "Read persona identity, soul, and skills."
+    },
+    {
+      "name": "update",
+      "route": "PUT /v1/persona",
+      "readOnly": false,
+      "description": "Update persona identity or soul."
+    },
+    {
+      "name": "skills",
+      "route": "GET /v1/persona/skills",
+      "readOnly": true,
+      "description": "List persona skills."
+    },
+    {
+      "name": "addSkill",
+      "route": "POST /v1/persona/skills",
+      "readOnly": false,
+      "description": "Add one persona skill."
+    },
+    {
+      "name": "deleteSkill",
+      "route": "DELETE /v1/persona/skills",
+      "readOnly": false,
+      "description": "Delete one persona skill."
+    },
+    {
+      "name": "presets",
+      "route": "GET /v1/persona/presets",
+      "readOnly": true,
+      "description": "List persona presets and active preset."
+    },
+    {
+      "name": "switchPreset",
+      "route": "POST /v1/persona/presets",
+      "readOnly": false,
+      "description": "Switch active persona preset."
+    },
+    {
+      "name": "addCustomPreset",
+      "route": "POST /v1/persona/presets/custom",
+      "readOnly": false,
+      "description": "Add one custom persona preset."
+    },
+    {
+      "name": "deleteCustomPreset",
+      "route": "DELETE /v1/persona/presets/custom",
+      "readOnly": false,
+      "description": "Delete one custom persona preset."
+    },
+    {
+      "name": "updatePresetFeatures",
+      "route": "PUT /v1/persona/presets/features",
+      "readOnly": false,
+      "description": "Update feature flags for a persona preset."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/persona.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "get": "createPersonaClient().get",
+        "update": "createPersonaClient().update",
+        "skills": "createPersonaClient().skills",
+        "addSkill": "createPersonaClient().addSkill",
+        "deleteSkill": "createPersonaClient().deleteSkill",
+        "presets": "createPersonaClient().presets",
+        "switchPreset": "createPersonaClient().switchPreset",
+        "addCustomPreset": "createPersonaClient().addCustomPreset",
+        "deleteCustomPreset": "createPersonaClient().deleteCustomPreset",
+        "updatePresetFeatures": "createPersonaClient().updatePresetFeatures"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "get": "yunque.Persona.Get",
+        "update": "yunque.Persona.Update",
+        "skills": "yunque.Persona.Skills",
+        "addSkill": "yunque.Persona.AddSkill",
+        "deleteSkill": "yunque.Persona.DeleteSkill",
+        "presets": "yunque.Persona.Presets",
+        "switchPreset": "yunque.Persona.SwitchPreset",
+        "addCustomPreset": "yunque.Persona.AddCustomPreset",
+        "deleteCustomPreset": "yunque.Persona.DeleteCustomPreset",
+        "updatePresetFeatures": "yunque.Persona.UpdatePresetFeatures"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "get": "yunque.persona.get",
+        "update": "yunque.persona.update",
+        "skills": "yunque.persona.skills",
+        "addSkill": "yunque.persona.add_skill",
+        "deleteSkill": "yunque.persona.delete_skill",
+        "presets": "yunque.persona.presets",
+        "switchPreset": "yunque.persona.switch_preset",
+        "addCustomPreset": "yunque.persona.add_custom_preset",
+        "deleteCustomPreset": "yunque.persona.delete_custom_preset",
+        "updatePresetFeatures": "yunque.persona.update_preset_features"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "get": "PersonaClient::get",
+        "update": "PersonaClient::update",
+        "skills": "PersonaClient::skills",
+        "addSkill": "PersonaClient::add_skill",
+        "deleteSkill": "PersonaClient::delete_skill",
+        "presets": "PersonaClient::presets",
+        "switchPreset": "PersonaClient::switch_preset",
+        "addCustomPreset": "PersonaClient::add_custom_preset",
+        "deleteCustomPreset": "PersonaClient::delete_custom_preset",
+        "updatePresetFeatures": "PersonaClient::update_preset_features"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

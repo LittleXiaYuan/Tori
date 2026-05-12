@@ -605,6 +605,49 @@ conversations = _ConversationsNamespace()
 
 
 
+# ── Persona identity, skills, and presets (/v1/persona*) ──
+
+class _PersonaNamespace:
+    """Lightweight helpers for persona identity, skills, and preset management."""
+
+    def get(self) -> dict:
+        return _api_call("GET", "/v1/persona")
+
+    def update(self, identity: str = "", soul: str = "") -> dict:
+        body: dict[str, str] = {}
+        if identity:
+            body["identity"] = identity
+        if soul:
+            body["soul"] = soul
+        return _api_call("PUT", "/v1/persona", body)
+
+    def skills(self) -> dict:
+        return _api_call("GET", "/v1/persona/skills")
+
+    def add_skill(self, name: str, description: str = "", content: str = "") -> dict:
+        return _api_call("POST", "/v1/persona/skills", {"name": name, "description": description, "content": content})
+
+    def delete_skill(self, name: str) -> dict:
+        return _api_call("DELETE", "/v1/persona/skills", {"name": name})
+
+    def presets(self) -> dict:
+        return _api_call("GET", "/v1/persona/presets")
+
+    def switch_preset(self, preset_id: str) -> dict:
+        return _api_call("POST", "/v1/persona/presets", {"id": preset_id})
+
+    def add_custom_preset(self, preset: dict) -> dict:
+        return _api_call("POST", "/v1/persona/presets/custom", preset)
+
+    def delete_custom_preset(self, preset_id: str) -> dict:
+        return _api_call("DELETE", "/v1/persona/presets/custom", {"id": preset_id})
+
+    def update_preset_features(self, preset_id: str, features: dict[str, bool]) -> dict:
+        return _api_call("PUT", "/v1/persona/presets/features", {"id": preset_id, "features": features})
+
+
+persona = _PersonaNamespace()
+
 # ── Trust governance (/api/trust, /api/review, /api/skillgrow) ──
 
 class _TrustNamespace:
@@ -2072,6 +2115,7 @@ class AgentKit:
         self.audit = audit
         self.trust = trust
         self.iterate = iterate
+        self.persona = persona
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

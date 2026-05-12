@@ -38,6 +38,7 @@
     "audit-governance",
     "trust-governance",
     "self-iteration",
+    "persona-runtime",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -170,6 +171,10 @@
       "description": "Access the lightweight Iterate client or namespace for self-iteration proposal review, approval/rejection, manual cycle triggering, and status reads."
     },
     {
+      "name": "persona",
+      "description": "Access the lightweight Persona client or namespace for persona identity, skills, presets, custom presets, and feature flags."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -250,6 +255,7 @@
         "audit": "AgentKit.audit",
         "trust": "AgentKit.trust",
         "iterate": "AgentKit.iterate",
+        "persona": "AgentKit.persona",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -303,6 +309,7 @@
         "audit": "AgentKit.Audit",
         "trust": "AgentKit.Trust",
         "iterate": "AgentKit.Iterate",
+        "persona": "AgentKit.Persona",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -356,6 +363,7 @@
         "audit": "AgentKit.audit",
         "trust": "AgentKit.trust",
         "iterate": "AgentKit.iterate",
+        "persona": "AgentKit.persona",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -409,6 +417,7 @@
         "audit": "AgentKit::audit",
         "trust": "AgentKit::trust",
         "iterate": "AgentKit::iterate",
+        "persona": "AgentKit::persona",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

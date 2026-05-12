@@ -2248,3 +2248,6 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Iterate SDK
 
 Use the lightweight Iterate SDK for self-iteration proposal review from admin pages, plugins, CLIs, or automation scripts without importing the full platform client. It wraps `GET /api/iterate/proposals`, `POST /api/iterate/approve`, `POST /api/iterate/reject`, `POST /api/iterate/trigger`, and `GET /api/iterate/status`; `createAgentKit(...).iterate.pendingProposals()` exposes the same proposal review surface.
+### Persona SDK
+
+Use the lightweight Persona SDK when an external page, plugin UI, CLI, or automation script needs to read or adjust persona identity without importing the full platform client. `createPersonaClient` wraps `GET/PUT /v1/persona`, persona skills, persona presets, custom presets, and preset feature flags; `createAgentKit(...).persona` exposes the same persona identity, skills, and presets surface.
