@@ -515,6 +515,10 @@
       "types": "./src/plugin-agent-memory.ts",
       "import": "./src/plugin-agent-memory.ts"
     },
+    "./plugin-knowledge": {
+      "types": "./src/plugin-knowledge.ts",
+      "import": "./src/plugin-knowledge.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
