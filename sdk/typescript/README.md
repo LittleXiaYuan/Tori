@@ -145,6 +145,7 @@ import { createSetupClient } from "yunque-client/setup";
 import { createSetupDetectClient } from "yunque-client/setup-detect";
 import { createSetupTemplatesClient } from "yunque-client/setup-templates";
 import { createSetupProviderClient } from "yunque-client/setup-provider";
+import { createSetupInstallClient } from "yunque-client/setup-install";
 import { createDocumentsClient } from "yunque-client/documents";
 import { createApprovalsClient } from "yunque-client/approvals";
 import { createApprovalQueueClient } from "yunque-client/approval-queue";
@@ -712,10 +713,11 @@ await setupProvider.apply({
   model: "deepseek-chat",
 });
 
-const setup = createSetupClient({
+const setupInstall = createSetupInstallClient({
   baseUrl: "http://localhost:9090",
   apiKey: "<your-api-key>",
 });
+await setupInstall.install("python_office");
 
 const documents = createDocumentsClient({
   baseUrl: "http://localhost:9090",
@@ -1120,7 +1122,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`runtime`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`runtime`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
 `/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1204,6 +1206,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/setup-detect.ts` | Lightweight setup detect/health facade without setup write or install APIs |
 | `src/setup-templates.ts` | Lightweight setup template catalog facade without setup write or install APIs |
 | `src/setup-provider.ts` | Lightweight setup provider test/apply facade without detect, template catalog or install APIs |
+| `src/setup-install.ts` | Lightweight setup component install and SSE progress facade without detect, templates or provider apply APIs |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
 | `src/approval-queue.ts` | Lightweight approval queue and decision facade without full SDK import |
