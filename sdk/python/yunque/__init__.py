@@ -783,6 +783,35 @@ class _CognisNamespace:
 cognis = _CognisNamespace()
 
 
+# ── Execution Trace / Audit Replay (/v1/trace) ──
+
+class _TraceNamespace:
+    """Lightweight helpers for recent, trace-id, and task-id execution trace reads."""
+
+    def recent(self, limit: Optional[int] = None, raw: bool = False) -> dict:
+        from urllib.parse import urlencode
+        query = {}
+        if limit is not None:
+            query["limit"] = limit
+        if raw:
+            query["raw"] = "true"
+        suffix = f"?{urlencode(query)}" if query else ""
+        return _api_call("GET", f"/v1/trace/recent{suffix}")
+
+    def by_trace_id(self, trace_id: str, raw: bool = False) -> dict:
+        from urllib.parse import quote, urlencode
+        suffix = f"?{urlencode({'raw': 'true'})}" if raw else ""
+        return _api_call("GET", f"/v1/trace/{quote(trace_id, safe='')}{suffix}")
+
+    def by_task_id(self, task_id: str, raw: bool = False) -> dict:
+        from urllib.parse import quote, urlencode
+        suffix = f"?{urlencode({'raw': 'true'})}" if raw else ""
+        return _api_call("GET", f"/v1/trace/task/{quote(task_id, safe='')}{suffix}")
+
+
+trace = _TraceNamespace()
+
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1424,6 +1453,7 @@ class AgentKit:
         self.cost = cost
         self.providers = providers
         self.cognis = cognis
+        self.trace = trace
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

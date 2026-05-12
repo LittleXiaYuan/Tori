@@ -1383,6 +1383,7 @@ pub struct AgentKit {
     pub cost: CostClient,
     pub providers: ProvidersClient,
     pub cognis: CognisClient,
+    pub trace: TraceClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1427,6 +1428,7 @@ impl AgentKit {
             cost: CostClient::new(base_url.clone(), token.as_ref())?,
             providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
+            trace: TraceClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1464,6 +1466,7 @@ impl AgentKit {
             cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
             providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3125,6 +3128,149 @@ impl CognisClient {
     {
         self.http
             .delete(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+pub type TraceEvent = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TraceEventsResponse {
+    #[serde(default)]
+    pub count: i32,
+    #[serde(default)]
+    pub raw: bool,
+    #[serde(default)]
+    pub events: Vec<TraceEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TraceByIdResponse {
+    #[serde(default)]
+    pub trace_id: String,
+    #[serde(default)]
+    pub count: i32,
+    #[serde(default)]
+    pub raw: bool,
+    #[serde(default)]
+    pub events: Vec<TraceEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TraceByTaskResponse {
+    #[serde(default)]
+    pub task_id: String,
+    #[serde(default)]
+    pub count: i32,
+    #[serde(default)]
+    pub raw: bool,
+    #[serde(default)]
+    pub events: Vec<TraceEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TraceRecentQuery {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub raw: bool,
+}
+
+/// Small Rust helper over `/v1/trace/*` execution/audit trace read endpoints.
+#[derive(Debug, Clone)]
+pub struct TraceClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl TraceClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn recent(
+        &self,
+        query: &TraceRecentQuery,
+    ) -> Result<TraceEventsResponse, reqwest::Error> {
+        let mut pairs = Vec::new();
+        if query.limit > 0 {
+            pairs.push(format!("limit={}", query.limit));
+        }
+        if query.raw {
+            pairs.push("raw=true".to_string());
+        }
+        let suffix = if pairs.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", pairs.join("&"))
+        };
+        self.get_json(&format!("/v1/trace/recent{}", suffix)).await
+    }
+
+    pub async fn by_trace_id(
+        &self,
+        trace_id: &str,
+        raw: bool,
+    ) -> Result<TraceByIdResponse, reqwest::Error> {
+        let suffix = if raw { "?raw=true" } else { "" };
+        self.get_json(&format!(
+            "/v1/trace/{}{}",
+            url_encode_query_component(trace_id),
+            suffix
+        ))
+        .await
+    }
+
+    pub async fn by_task_id(
+        &self,
+        task_id: &str,
+        raw: bool,
+    ) -> Result<TraceByTaskResponse, reqwest::Error> {
+        let suffix = if raw { "?raw=true" } else { "" };
+        self.get_json(&format!(
+            "/v1/trace/task/{}{}",
+            url_encode_query_component(task_id),
+            suffix
+        ))
+        .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
             .send()
             .await?
             .error_for_status()?
@@ -5202,6 +5348,10 @@ mod tests {
             "http://localhost:9090/v1/cognis"
         );
         assert_eq!(
+            kit.trace.url("/v1/trace/recent"),
+            "http://localhost:9090/v1/trace/recent"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -5486,6 +5636,26 @@ mod tests {
         let client =
             CognisClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.url("/v1/cognis"), "http://localhost:9090/v1/cognis");
+    }
+
+    #[test]
+    fn trace_types_deserialize_incremental_bodies() {
+        let recent: TraceEventsResponse =
+            serde_json::from_str(r#"{"events":[{"trace_id":"tr-1"}],"count":1}"#).unwrap();
+        assert_eq!(recent.count, 1);
+        assert_eq!(recent.events[0]["trace_id"], "tr-1");
+
+        let by_trace: TraceByIdResponse =
+            serde_json::from_str(r#"{"trace_id":"tr/1","events":[],"count":0,"raw":true}"#)
+                .unwrap();
+        assert_eq!(by_trace.trace_id, "tr/1");
+        assert!(by_trace.raw);
+
+        let client = TraceClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/trace/recent"),
+            "http://localhost:9090/v1/trace/recent"
+        );
     }
 
     #[test]

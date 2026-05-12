@@ -314,6 +314,7 @@ type AgentKit struct {
 	Cost         *costNamespace
 	Providers    *providersNamespace
 	Cognis       *cognisNamespace
+	Trace        *traceNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1808,6 +1809,9 @@ var Providers = &providersNamespace{}
 // evolution, and federation endpoints.
 var Cognis = &cognisNamespace{}
 
+// Trace provides focused access to execution/audit trace reads.
+var Trace = &traceNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2512,6 +2516,85 @@ func (c *cognisNamespace) postID(ctx context.Context, id, action string, body an
 	return nonNilMap(out), nil
 }
 
+// ── Execution Trace / Audit Replay ──
+
+type traceNamespace struct{}
+
+type TraceEvent map[string]any
+type TraceEventsResponse struct {
+	Count  int          `json:"count"`
+	Raw    bool         `json:"raw,omitempty"`
+	Events []TraceEvent `json:"events"`
+}
+type TraceByIDResponse struct {
+	TraceID string       `json:"trace_id"`
+	Count   int          `json:"count"`
+	Raw     bool         `json:"raw,omitempty"`
+	Events  []TraceEvent `json:"events"`
+}
+type TraceByTaskResponse struct {
+	TaskID string       `json:"task_id"`
+	Count  int          `json:"count"`
+	Raw    bool         `json:"raw,omitempty"`
+	Events []TraceEvent `json:"events"`
+}
+type TraceRecentOptions struct {
+	Limit int
+	Raw   bool
+}
+
+func (t *traceNamespace) Recent(ctx context.Context, opts TraceRecentOptions) (TraceEventsResponse, error) {
+	q := url.Values{}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Raw {
+		q.Set("raw", "true")
+	}
+	path := "/v1/trace/recent"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	var out TraceEventsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return TraceEventsResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []TraceEvent{}
+	}
+	return out, nil
+}
+
+func (t *traceNamespace) ByTraceID(ctx context.Context, traceID string, raw bool) (TraceByIDResponse, error) {
+	path := "/v1/trace/" + url.PathEscape(traceID)
+	if raw {
+		path += "?raw=true"
+	}
+	var out TraceByIDResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return TraceByIDResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []TraceEvent{}
+	}
+	return out, nil
+}
+
+func (t *traceNamespace) ByTaskID(ctx context.Context, taskID string, raw bool) (TraceByTaskResponse, error) {
+	path := "/v1/trace/task/" + url.PathEscape(taskID)
+	if raw {
+		path += "?raw=true"
+	}
+	var out TraceByTaskResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return TraceByTaskResponse{}, err
+	}
+	if out.Events == nil {
+		out.Events = []TraceEvent{}
+	}
+	return out, nil
+}
+
 // ── Skill Market ──
 
 // SkillMarket provides focused access to skill marketplace search, ranking, and stats APIs.
@@ -2768,6 +2851,7 @@ func NewAgentKit() AgentKit {
 		Cost:         Cost,
 		Providers:    Providers,
 		Cognis:       Cognis,
+		Trace:        Trace,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,
