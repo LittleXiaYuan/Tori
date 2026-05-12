@@ -97,3 +97,37 @@ cargo check     # quick verification
 - **Body schemas** are mostly `serde_json::Value` placeholders since the spec
   is path-only. Hand-edit `docs/openapi.yaml` request/response bodies, then
   rebuild.
+
+## Lightweight State Kernel helper
+
+The generated client offers broad OpenAPI coverage. For sidecars, CLIs, plugins,
+or dashboards that only need the agent state layer, use the hand-written
+`StateClient` instead. It avoids coupling callers to the large generated method
+surface and mirrors the incremental helpers in the TypeScript, Go, and Python SDKs.
+
+```rust
+use yunque_client::{StateClient, StateGoal};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let state = StateClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+
+    let snapshot = state.snapshot().await?;
+    println!("focus: {}", snapshot.focus);
+    println!("goals: {}", snapshot.goals.len());
+    println!("skills: {}", snapshot.capabilities.total_skills);
+
+    let actions = state.actions().await?;
+    let caps = state.capabilities().await?;
+    let focus = state.focus().await?;
+    let resources = state.resources().await?;
+
+    let saved = state.save_goal(&StateGoal {
+        title: "Ship a Rust SDK state slice".to_string(),
+        priority: 2,
+        ..StateGoal::default()
+    }).await?;
+
+    Ok(())
+}
+```
