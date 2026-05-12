@@ -343,6 +343,10 @@
       "types": "./src/modes.ts",
       "import": "./src/modes.ts"
     },
+    "./modes-observe": {
+      "types": "./src/modes-observe.ts",
+      "import": "./src/modes-observe.ts"
+    },
     "./ide": {
       "types": "./src/ide.ts",
       "import": "./src/ide.ts"

@@ -100,6 +100,7 @@
     "src/runtime-events.ts",
     "src/router.ts",
     "src/modes.ts",
+    "src/modes-observe.ts",
     "src/ide.ts",
     "src/persona.ts",
     "src/persona-state.ts",
