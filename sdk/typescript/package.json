@@ -199,6 +199,22 @@
       "types": "./src/bots-control.ts",
       "import": "./src/bots-control.ts"
     },
+    "./bots-list": {
+      "types": "./src/bots-list.ts",
+      "import": "./src/bots-list.ts"
+    },
+    "./bots-detail": {
+      "types": "./src/bots-detail.ts",
+      "import": "./src/bots-detail.ts"
+    },
+    "./bots-inbox": {
+      "types": "./src/bots-inbox.ts",
+      "import": "./src/bots-inbox.ts"
+    },
+    "./bots-channels": {
+      "types": "./src/bots-channels.ts",
+      "import": "./src/bots-channels.ts"
+    },
     "./discovery": {
       "types": "./src/discovery.ts",
       "import": "./src/discovery.ts"
