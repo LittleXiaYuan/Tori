@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const checks = [
+  ["Auth SDK manifest", "sdk/scripts/check-auth-sdk-manifest.mjs"],
   ["Tasks SDK manifest", "sdk/scripts/check-tasks-sdk-manifest.mjs"],
   ["Permissions SDK manifest", "sdk/scripts/check-permissions-sdk-manifest.mjs"],
   ["Reactions SDK manifest", "sdk/scripts/check-reactions-sdk-manifest.mjs"],

@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "domain": "auth",
+  "description": "Cross-language lightweight SDK for setup/auth status, password login/setup, API-key-to-JWT token exchange, and Tori OAuth start URL helpers without importing the full platform client.",
+  "principles": [
+    "Expose authentication bootstrap and token exchange as a focused SDK slice for external plugin UIs, front-end setup pages, CLIs, sidecars, and automation scripts.",
+    "Keep setup status, password login, first-run password setup, API-key-to-JWT exchange, and Tori OAuth start URLs directly callable through existing gateway routes.",
+    "Make Auth access available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/auth/status",
+    "POST /v1/auth/login",
+    "POST /v1/auth/set-password",
+    "POST /v1/token",
+    "GET /v1/auth/oauth/tori"
+  ],
+  "capabilities": [
+    { "name": "status", "route": "GET /v1/auth/status", "readOnly": true, "description": "Read setup/authentication status for setup pages and scripts." },
+    { "name": "login", "route": "POST /v1/auth/login", "readOnly": false, "description": "Password login for setup pages and lightweight clients." },
+    { "name": "setPassword", "route": "POST /v1/auth/set-password", "readOnly": false, "description": "Set or rotate the admin password." },
+    { "name": "generateToken", "route": "POST /v1/token", "readOnly": false, "description": "Exchange an API key or bearer credential for a short-lived JWT." },
+    { "name": "toriOAuthUrl", "route": "GET /v1/auth/oauth/tori", "readOnly": true, "description": "Build the Tori OAuth start URL for external UI redirects." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/auth.ts", "sdk/typescript/src/agent-kit.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "status": "createAuthClient().status",
+        "login": "createAuthClient().login",
+        "setPassword": "createAuthClient().setPassword",
+        "generateToken": "createAuthClient().generateToken",
+        "toriOAuthUrl": "createAuthClient().toriOAuthUrl"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "status": "yunque.Auth.Status",
+        "login": "yunque.Auth.Login",
+        "setPassword": "yunque.Auth.SetPassword",
+        "generateToken": "yunque.Auth.GenerateToken",
+        "toriOAuthUrl": "yunque.Auth.ToriOAuthURL"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "status": "yunque.auth.status",
+        "login": "yunque.auth.login",
+        "setPassword": "yunque.auth.set_password",
+        "generateToken": "yunque.auth.generate_token",
+        "toriOAuthUrl": "yunque.auth.tori_oauth_url"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "status": "AuthClient::status",
+        "login": "AuthClient::login",
+        "setPassword": "AuthClient::set_password",
+        "generateToken": "AuthClient::generate_token",
+        "toriOAuthUrl": "AuthClient::tori_oauth_url"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

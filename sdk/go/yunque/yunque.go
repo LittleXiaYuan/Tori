@@ -158,6 +158,78 @@ func errorMessageFromJSON(value any) string {
 	return ""
 }
 
+
+// ── Auth (/v1/auth, /v1/token) ──
+
+// Auth exposes setup/auth status, password login/setup, token exchange, and Tori OAuth helpers.
+var Auth = &authNamespace{}
+
+type authNamespace struct{}
+
+type AuthStatusResponse map[string]any
+
+type AuthLoginRequest struct {
+	Password string `json:"password"`
+	Remember bool   `json:"remember,omitempty"`
+}
+
+type AuthLoginResponse map[string]any
+
+type AuthSetPasswordRequest struct {
+	Password string `json:"password"`
+	Current  string `json:"current,omitempty"`
+}
+
+type AuthMutationResponse map[string]any
+
+type GenerateTokenRequest struct {
+	Role string `json:"role,omitempty"`
+}
+
+type GenerateTokenResponse map[string]any
+
+func (a *authNamespace) Status(ctx context.Context) (AuthStatusResponse, error) {
+	var out AuthStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/auth/status", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *authNamespace) Login(ctx context.Context, req AuthLoginRequest) (AuthLoginResponse, error) {
+	var out AuthLoginResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/auth/login", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *authNamespace) SetPassword(ctx context.Context, req AuthSetPasswordRequest) (AuthMutationResponse, error) {
+	var out AuthMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/auth/set-password", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *authNamespace) GenerateToken(ctx context.Context, req GenerateTokenRequest) (GenerateTokenResponse, error) {
+	var out GenerateTokenResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/token", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *authNamespace) ToriOAuthURL(toriURL string) string {
+	base := strings.TrimRight(apiBase, "/") + "/v1/auth/oauth/tori"
+	if toriURL == "" {
+		return base
+	}
+	q := url.Values{}
+	q.Set("tori_url", toriURL)
+	return base + "?" + q.Encode()
+}
+
 // ── Reflection Experience ──
 
 // Reflect provides access to the lightweight reflection experience API.
@@ -329,6 +401,7 @@ type AgentKit struct {
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
+	Auth          *authNamespace
 	Tasks         *tasksNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
@@ -4708,6 +4781,7 @@ func NewAgentKit() AgentKit {
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
+		Auth:          Auth,
 		Tasks:         Tasks,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
