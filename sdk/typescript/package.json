@@ -479,6 +479,10 @@
       "types": "./src/tori.ts",
       "import": "./src/tori.ts"
     },
+    "./tori-observe": {
+      "types": "./src/tori-observe.ts",
+      "import": "./src/tori-observe.ts"
+    },
     "./speech": {
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
