@@ -392,3 +392,7 @@ The lightweight Auth SDK exposes auth status, password login/setup, API-key-to-J
 ### Admin SDK
 
 The lightweight Admin SDK exposes operator controls for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It covers desktop console/autostart status and toggles, tenant listing/creation, and natural-language configuration via `/v1/desktop/console`, `/v1/desktop/autostart`, `/v1/tenants`, `/v1/nl-config`, and `/v1/nl-config/translate`. Agent Kit also exposes this surface as `kit.admin` / `kit.Admin` for one-stop operator automation.
+
+### Federation SDK
+
+The lightweight Federation SDK exposes model-aware A2A federation helpers for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It covers legacy peer/stat reads, OPP capability reads and updates, peer discovery, task delegation, bridge stats, and capability broadcast through `/v1/federation/peers`, `/v1/federation/stats`, `/v1/federation/capabilities`, `/v1/federation/discover`, `/v1/federation/delegate`, `/v1/federation/bridge/stats`, and `/v1/federation/broadcast`. Agent Kit also exposes this surface as `kit.federation` / `kit.Federation` for one-stop A2A federation automation.

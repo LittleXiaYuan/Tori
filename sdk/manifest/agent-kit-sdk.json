@@ -57,6 +57,7 @@
     "speech-runtime",
     "first-run-setup",
     "admin-operator",
+    "a2a-federation",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -217,6 +218,10 @@
       "description": "Access the lightweight Admin operator client or namespace for desktop controls, tenants, and natural-language configuration."
     },
     {
+      "name": "federation",
+      "description": "Access the lightweight Federation client or namespace for A2A capabilities, discovery, delegation, bridge stats, broadcast, and legacy hub reads."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -323,7 +328,8 @@
         "tori": "AgentKit.tori",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
-        "admin": "AgentKit.admin"
+        "admin": "AgentKit.admin",
+        "federation": "AgentKit.federation"
       }
     },
     "go": {
@@ -387,7 +393,8 @@
         "tori": "AgentKit.Tori",
         "speech": "AgentKit.Speech",
         "setup": "AgentKit.Setup",
-        "admin": "AgentKit.Admin"
+        "admin": "AgentKit.Admin",
+        "federation": "AgentKit.Federation"
       }
     },
     "python": {
@@ -451,7 +458,8 @@
         "tori": "AgentKit.tori",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
-        "admin": "AgentKit.admin"
+        "admin": "AgentKit.admin",
+        "federation": "AgentKit.federation"
       }
     },
     "rust": {
@@ -515,7 +523,8 @@
         "tori": "AgentKit.tori",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
-        "admin": "AgentKit::admin"
+        "admin": "AgentKit::admin",
+        "federation": "AgentKit::federation"
       }
     }
   },

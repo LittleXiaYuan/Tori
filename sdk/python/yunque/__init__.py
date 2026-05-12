@@ -1214,6 +1214,39 @@ class _SetupNamespace:
 
 setup = _SetupNamespace()
 
+
+# ── Federation / A2A OPP (/v1/federation) ──
+
+class _FederationNamespace:
+    """Lightweight helpers for model-aware A2A federation and legacy federation hub reads."""
+
+    def peers(self) -> dict:
+        return _api_call("GET", "/v1/federation/peers")
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/federation/stats")
+
+    def capabilities(self) -> dict:
+        return _api_call("GET", "/v1/federation/capabilities")
+
+    def update_capabilities(self, payload: dict) -> dict:
+        return _api_call("POST", "/v1/federation/capabilities", payload)
+
+    def discover(self, request: Optional[dict] = None) -> dict:
+        return _api_call("POST", "/v1/federation/discover", request or {})
+
+    def delegate(self, payload: dict) -> dict:
+        return _api_call("POST", "/v1/federation/delegate", payload)
+
+    def bridge_stats(self) -> dict:
+        return _api_call("GET", "/v1/federation/bridge/stats")
+
+    def broadcast(self) -> dict:
+        return _api_call("POST", "/v1/federation/broadcast", {})
+
+
+federation = _FederationNamespace()
+
 # ── Admin / Operator controls (/v1/desktop, /v1/tenants, /v1/nl-config) ──
 
 class _AdminNamespace:
@@ -2727,6 +2760,7 @@ class AgentKit:
         self.speech = speech
         self.setup = setup
         self.admin = admin
+        self.federation = federation
         self.settings = settings
         self.system = system
         self.auth = auth

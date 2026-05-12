@@ -7,3 +7,4 @@ export * from './tori';
 export * from './speech';
 export * from './setup';
 export * from './admin';
+export * from './federation';

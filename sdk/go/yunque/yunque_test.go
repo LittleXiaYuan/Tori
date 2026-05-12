@@ -200,6 +200,47 @@ func TestSetupHelpers(t *testing.T) {
 }
 
 
+
+func TestFederationHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/federation/peers":
+			_, _ = w.Write([]byte(`{"local_id":"agent-local","peers":[{"id":"peer-a"}]}`))
+		case "/v1/federation/stats":
+			_, _ = w.Write([]byte(`{"peers":1,"messages":2}`))
+		case "/v1/federation/capabilities":
+			if r.Method == http.MethodPost { _, _ = w.Write([]byte(`{"status":"updated"}`)); return }
+			_, _ = w.Write([]byte(`{"local":{"agent_id":"agent-a"},"peers":[]}`))
+		case "/v1/federation/discover":
+			var body FederationDiscoverRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Feature != "browser" { t.Fatalf("unexpected discover body: %+v", body) }; _, _ = w.Write([]byte(`{"results":[{"peer_id":"p1"}],"count":1}`))
+		case "/v1/federation/delegate":
+			_, _ = w.Write([]byte(`{"status":"delegated","result":{"task_id":"t1"}}`))
+		case "/v1/federation/bridge/stats":
+			_, _ = w.Write([]byte(`{"configured":true,"peers":2}`))
+		case "/v1/federation/broadcast":
+			_, _ = w.Write([]byte(`{"status":"broadcasted"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	peers, _ := Federation.Peers(ctx)
+	stats, _ := Federation.Stats(ctx)
+	caps, _ := Federation.Capabilities(ctx)
+	updated, _ := Federation.UpdateCapabilities(ctx, FederationCapabilityPayload{"agent_id": "agent-a"})
+	found, _ := Federation.Discover(ctx, FederationDiscoverRequest{Feature: "browser"})
+	delegated, _ := Federation.Delegate(ctx, FederationDelegatePayload{"peer_id": "p1"})
+	bridge, _ := Federation.BridgeStats(ctx)
+	broadcast, _ := Federation.Broadcast(ctx)
+	if peers["local_id"] != "agent-local" || stats["messages"].(float64) != 2 || caps["local"] == nil || updated["status"] != "updated" || found["count"].(float64) != 1 || delegated["status"] != "delegated" || bridge["configured"] != true || broadcast["status"] != "broadcasted" || NewAgentKit().Federation != Federation {
+		t.Fatalf("unexpected federation results")
+	}
+	if len(seen) != 8 { t.Fatalf("expected 8 federation API calls, got %d: %v", len(seen), seen) }
+}
+
 func TestAdminHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
