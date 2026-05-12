@@ -10,6 +10,51 @@ import (
 	"testing"
 )
 
+func TestSystemHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		if r.URL.Path == "/v1/metrics/prometheus" {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("yunque_requests_total 12\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/healthz", "/livez", "/readyz", "/healthz/cognitive", "/v1/version", "/v1/system/info", "/v1/system/stats", "/v1/metrics", "/v1/cache/stats", "/v1/modules", "/sbom":
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"ok","path":%q,"modules":[]}`, r.URL.Path)))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	ctx := context.Background()
+	health, err := System.Health(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	livez, _ := System.Livez(ctx)
+	readyz, _ := System.Readyz(ctx)
+	cognitive, _ := System.CognitiveHealth(ctx)
+	version, _ := System.Version(ctx)
+	info, _ := System.Info(ctx)
+	stats, _ := System.Stats(ctx)
+	metrics, _ := System.Metrics(ctx)
+	prometheus, _ := System.MetricsPrometheus(ctx)
+	cache, _ := System.CacheStats(ctx)
+	modules, _ := System.Modules(ctx)
+	sbom, _ := System.SBOM(ctx)
+
+	if health["path"] != "/healthz" || livez["path"] != "/livez" || readyz["path"] != "/readyz" || cognitive["path"] != "/healthz/cognitive" || version["path"] != "/v1/version" || info["path"] != "/v1/system/info" || stats["path"] != "/v1/system/stats" || metrics["path"] != "/v1/metrics" || cache["path"] != "/v1/cache/stats" || modules["path"] != "/v1/modules" || sbom["path"] != "/sbom" || !strings.Contains(prometheus, "yunque_requests_total") {
+		t.Fatalf("unexpected system responses")
+	}
+	if NewAgentKit().System != System {
+		t.Fatalf("agent kit should reuse System namespace")
+	}
+	if len(seen) != 12 {
+		t.Fatalf("expected 12 system API calls, got %d: %v", len(seen), seen)
+	}
+}
 
 func TestAuthHelpers(t *testing.T) {
 	var seen []string
@@ -18,22 +63,36 @@ func TestAuthHelpers(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/v1/auth/status":
-			if r.Method != http.MethodGet { t.Fatalf("method = %s", r.Method) }
+			if r.Method != http.MethodGet {
+				t.Fatalf("method = %s", r.Method)
+			}
 			_, _ = w.Write([]byte(`{"password_set":true,"authenticated":true}`))
 		case "/v1/auth/login":
 			var body AuthLoginRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Password != "secret" || !body.Remember { t.Fatalf("unexpected login body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Password != "secret" || !body.Remember {
+				t.Fatalf("unexpected login body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"token":"jwt-admin","expires_in":604800}`))
 		case "/v1/auth/set-password":
 			var body AuthSetPasswordRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Password != "new" || body.Current != "old" { t.Fatalf("unexpected password body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Password != "new" || body.Current != "old" {
+				t.Fatalf("unexpected password body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
 		case "/v1/token":
 			var body GenerateTokenRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Role != "viewer" { t.Fatalf("unexpected token body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Role != "viewer" {
+				t.Fatalf("unexpected token body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"token":"jwt-viewer","type":"Bearer"}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -41,13 +100,21 @@ func TestAuthHelpers(t *testing.T) {
 	})
 
 	status, err := Auth.Status(context.Background())
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	login, err := Auth.Login(context.Background(), AuthLoginRequest{Password: "secret", Remember: true})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	changed, err := Auth.SetPassword(context.Background(), AuthSetPasswordRequest{Password: "new", Current: "old"})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	token, err := Auth.GenerateToken(context.Background(), GenerateTokenRequest{Role: "viewer"})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if status["authenticated"] != true || login["token"] != "jwt-admin" || changed["status"] != "ok" || token["token"] != "jwt-viewer" {
 		t.Fatalf("unexpected auth responses: %+v %+v %+v %+v", status, login, changed, token)
 	}
@@ -232,8 +299,12 @@ func TestTasksHelpers(t *testing.T) {
 				_, _ = w.Write([]byte(`[{"id":"task-1"}]`))
 			case http.MethodPost:
 				var body CreateTaskRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.Description != "ship SDK" || body.Constraints.MaxSteps != 3 { t.Fatalf("unexpected task body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Description != "ship SDK" || body.Constraints.MaxSteps != 3 {
+					t.Fatalf("unexpected task body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"id":"task-2","description":"ship SDK"}`))
 			case http.MethodDelete:
 				_, _ = w.Write([]byte(`{"deleted":"task-1"}`))
@@ -250,16 +321,24 @@ func TestTasksHelpers(t *testing.T) {
 				_, _ = w.Write([]byte(`{"templates":[{"id":"tpl-1"}],"total":1}`))
 			case http.MethodPost:
 				var body CreateTaskTemplateRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.ID != "tpl-1" || body.Steps[0].Action != "review" { t.Fatalf("unexpected template body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.ID != "tpl-1" || body.Steps[0].Action != "review" {
+					t.Fatalf("unexpected template body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"id":"tpl-1","name":"Review"}`))
 			case http.MethodDelete:
 				_, _ = w.Write([]byte(`{"deleted":"tpl-1"}`))
 			}
 		case "/v1/tasks/templates/instantiate":
 			var body InstantiateTaskTemplateRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.TemplateID != "tpl-1" || body.Variables["repo"] != "yunque" { t.Fatalf("unexpected instantiate body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TemplateID != "tpl-1" || body.Variables["repo"] != "yunque" {
+				t.Fatalf("unexpected instantiate body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"id":"task-3","title":"Review"}`))
 		case "/v1/tasks/gaps":
 			if r.URL.Query().Get("stats") == "true" {
@@ -272,8 +351,12 @@ func TestTasksHelpers(t *testing.T) {
 			_, _ = w.Write([]byte(`[{"id":"gap-1","gap_type":"skill_missing"}]`))
 		case "/v1/tasks/gaps/resolve":
 			var body map[string]string
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body["id"] != "gap-1" { t.Fatalf("unexpected gap resolve body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["id"] != "gap-1" {
+				t.Fatalf("unexpected gap resolve body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"resolved":"gap-1"}`))
 		case "/v1/tasks/memory":
 			if r.URL.Query().Get("id") != "task-1" {
@@ -293,13 +376,21 @@ func TestTasksHelpers(t *testing.T) {
 				_, _ = w.Write([]byte(`{"threads":[{"task_id":"task-1","state":"open"}],"total":1}`))
 			case http.MethodPost:
 				var body PostTaskThreadMessageRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.TaskID != "task-1" || body.Content != "hi" || body.Channel.ChannelID != "chat-1" { t.Fatalf("unexpected thread post body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.TaskID != "task-1" || body.Content != "hi" || body.Channel.ChannelID != "chat-1" {
+					t.Fatalf("unexpected thread post body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"status":"posted","task_id":"task-1"}`))
 			case http.MethodPut:
 				var body UpdateTaskThreadStateRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.TaskID != "task-1" || body.State != "paused" { t.Fatalf("unexpected thread state body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.TaskID != "task-1" || body.State != "paused" {
+					t.Fatalf("unexpected thread state body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"status":"updated","task_id":"task-1","state":"paused"}`))
 			}
 		case "/v1/trace/task/task-1":
@@ -314,45 +405,87 @@ func TestTasksHelpers(t *testing.T) {
 
 	ctx := context.Background()
 	list, err := Tasks.List(ctx)
-	if err != nil || len(list) != 1 { t.Fatalf("list = %+v, %v", list, err) }
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list = %+v, %v", list, err)
+	}
 	got, err := Tasks.Get(ctx, "task-1")
-	if err != nil || got["status"] != "running" { t.Fatalf("get = %+v, %v", got, err) }
+	if err != nil || got["status"] != "running" {
+		t.Fatalf("get = %+v, %v", got, err)
+	}
 	created, err := Tasks.Create(ctx, CreateTaskRequest{Description: "ship SDK", Constraints: TaskConstraints{MaxSteps: 3}})
-	if err != nil || created["id"] != "task-2" { t.Fatalf("create = %+v, %v", created, err) }
+	if err != nil || created["id"] != "task-2" {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
 	run, err := Tasks.Run(ctx, "task-1")
-	if err != nil || run["status"] != "accepted" { t.Fatalf("run = %+v, %v", run, err) }
+	if err != nil || run["status"] != "accepted" {
+		t.Fatalf("run = %+v, %v", run, err)
+	}
 	deleted, err := Tasks.Delete(ctx, "task-1")
-	if err != nil || deleted["deleted"] != "task-1" { t.Fatalf("delete = %+v, %v", deleted, err) }
+	if err != nil || deleted["deleted"] != "task-1" {
+		t.Fatalf("delete = %+v, %v", deleted, err)
+	}
 	templates, err := Tasks.Templates(ctx)
-	if err != nil || templates["total"].(float64) != 1 { t.Fatalf("templates = %+v, %v", templates, err) }
+	if err != nil || templates["total"].(float64) != 1 {
+		t.Fatalf("templates = %+v, %v", templates, err)
+	}
 	tpl, err := Tasks.Template(ctx, "tpl-1")
-	if err != nil || tpl["name"] != "Review" { t.Fatalf("template = %+v, %v", tpl, err) }
+	if err != nil || tpl["name"] != "Review" {
+		t.Fatalf("template = %+v, %v", tpl, err)
+	}
 	createdTpl, err := Tasks.CreateTemplate(ctx, CreateTaskTemplateRequest{ID: "tpl-1", Steps: []TaskTemplateStep{{Action: "review"}}})
-	if err != nil || createdTpl["id"] != "tpl-1" { t.Fatalf("create template = %+v, %v", createdTpl, err) }
+	if err != nil || createdTpl["id"] != "tpl-1" {
+		t.Fatalf("create template = %+v, %v", createdTpl, err)
+	}
 	instantiated, err := Tasks.InstantiateTemplate(ctx, "tpl-1", map[string]string{"repo": "yunque"})
-	if err != nil || instantiated["id"] != "task-3" { t.Fatalf("instantiate = %+v, %v", instantiated, err) }
+	if err != nil || instantiated["id"] != "task-3" {
+		t.Fatalf("instantiate = %+v, %v", instantiated, err)
+	}
 	deletedTpl, err := Tasks.DeleteTemplate(ctx, "tpl-1")
-	if err != nil || deletedTpl["deleted"] != "tpl-1" { t.Fatalf("delete template = %+v, %v", deletedTpl, err) }
+	if err != nil || deletedTpl["deleted"] != "tpl-1" {
+		t.Fatalf("delete template = %+v, %v", deletedTpl, err)
+	}
 	gaps, err := Tasks.Gaps(ctx, "skill_missing")
-	if err != nil || gaps[0]["id"] != "gap-1" { t.Fatalf("gaps = %+v, %v", gaps, err) }
+	if err != nil || gaps[0]["id"] != "gap-1" {
+		t.Fatalf("gaps = %+v, %v", gaps, err)
+	}
 	stats, err := Tasks.GapStats(ctx)
-	if err != nil || stats["unresolved"].(float64) != 1 { t.Fatalf("gap stats = %+v, %v", stats, err) }
+	if err != nil || stats["unresolved"].(float64) != 1 {
+		t.Fatalf("gap stats = %+v, %v", stats, err)
+	}
 	resolved, err := Tasks.ResolveGap(ctx, "gap-1")
-	if err != nil || resolved["resolved"] != "gap-1" { t.Fatalf("resolve gap = %+v, %v", resolved, err) }
+	if err != nil || resolved["resolved"] != "gap-1" {
+		t.Fatalf("resolve gap = %+v, %v", resolved, err)
+	}
 	memory, err := Tasks.WorkingMemory(ctx, "task-1")
-	if err != nil || memory["next_action"] != "resume" { t.Fatalf("working memory = %+v, %v", memory, err) }
+	if err != nil || memory["next_action"] != "resume" {
+		t.Fatalf("working memory = %+v, %v", memory, err)
+	}
 	threads, err := Tasks.Threads(ctx, "open")
-	if err != nil || threads["total"].(float64) != 1 { t.Fatalf("threads = %+v, %v", threads, err) }
+	if err != nil || threads["total"].(float64) != 1 {
+		t.Fatalf("threads = %+v, %v", threads, err)
+	}
 	thread, err := Tasks.Thread(ctx, "task-1")
-	if err != nil || thread["task_id"] != "task-1" { t.Fatalf("thread = %+v, %v", thread, err) }
+	if err != nil || thread["task_id"] != "task-1" {
+		t.Fatalf("thread = %+v, %v", thread, err)
+	}
 	posted, err := Tasks.PostThreadMessage(ctx, PostTaskThreadMessageRequest{TaskID: "task-1", Content: "hi", Channel: &TaskChannelBinding{ChannelType: "feishu", ChannelID: "chat-1"}})
-	if err != nil || posted["status"] != "posted" { t.Fatalf("post thread = %+v, %v", posted, err) }
+	if err != nil || posted["status"] != "posted" {
+		t.Fatalf("post thread = %+v, %v", posted, err)
+	}
 	updated, err := Tasks.UpdateThreadState(ctx, UpdateTaskThreadStateRequest{TaskID: "task-1", State: "paused"})
-	if err != nil || updated["state"] != "paused" { t.Fatalf("update thread = %+v, %v", updated, err) }
+	if err != nil || updated["state"] != "paused" {
+		t.Fatalf("update thread = %+v, %v", updated, err)
+	}
 	trace, err := Tasks.Trace(ctx, "task-1", true)
-	if err != nil || trace.TaskID != "task-1" || !trace.Raw || len(trace.Events) != 1 { t.Fatalf("task trace = %+v, %v", trace, err) }
-	if NewAgentKit().Tasks != Tasks { t.Fatalf("agent kit should reuse Tasks namespace") }
-	if len(seen) != 19 { t.Fatalf("unexpected calls: %v", seen) }
+	if err != nil || trace.TaskID != "task-1" || !trace.Raw || len(trace.Events) != 1 {
+		t.Fatalf("task trace = %+v, %v", trace, err)
+	}
+	if NewAgentKit().Tasks != Tasks {
+		t.Fatalf("agent kit should reuse Tasks namespace")
+	}
+	if len(seen) != 19 {
+		t.Fatalf("unexpected calls: %v", seen)
+	}
 }
 
 func TestPermissionsHelpers(t *testing.T) {

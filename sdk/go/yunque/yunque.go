@@ -119,6 +119,42 @@ func apiCallInto(ctx context.Context, method, path string, body any, target any)
 	return nil
 }
 
+func apiCallText(ctx context.Context, method, path string, body any) (string, error) {
+	var reqBody io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return "", fmt.Errorf("marshal: %w", err)
+		}
+		reqBody = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, apiBase+path, reqBody)
+	if err != nil {
+		return "", fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("api call %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("api %s HTTP %d: %s", path, resp.StatusCode, apiErrorMessage(respBody))
+	}
+	return string(respBody), nil
+}
+
 func apiErrorMessage(body []byte) string {
 	text := strings.TrimSpace(string(body))
 	if text == "" {
@@ -158,6 +194,105 @@ func errorMessageFromJSON(value any) string {
 	return ""
 }
 
+// ── System / Observability (/healthz, /v1/system, /v1/metrics) ──
+
+// System exposes health/readiness probes, version/SBOM metadata, metrics,
+// cache stats, and module observability for external monitors and scripts.
+var System = &systemNamespace{}
+
+type systemNamespace struct{}
+
+type SystemHealthResponse map[string]any
+type SystemReadinessResponse map[string]any
+type SystemCognitiveHealthResponse map[string]any
+type SystemVersionResponse map[string]any
+type SystemInfoResponse map[string]any
+type SystemStatsResponse map[string]any
+type SystemMetricsResponse map[string]any
+type SystemCacheStatsResponse map[string]any
+type SystemModulesResponse map[string]any
+type SystemSBOMResponse map[string]any
+
+func (s *systemNamespace) Health(ctx context.Context) (SystemHealthResponse, error) {
+	var out SystemHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/healthz", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Livez(ctx context.Context) (SystemHealthResponse, error) {
+	var out SystemHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/livez", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Readyz(ctx context.Context) (SystemReadinessResponse, error) {
+	var out SystemReadinessResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/readyz", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) CognitiveHealth(ctx context.Context) (SystemCognitiveHealthResponse, error) {
+	var out SystemCognitiveHealthResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/healthz/cognitive", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Version(ctx context.Context) (SystemVersionResponse, error) {
+	var out SystemVersionResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/version", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Info(ctx context.Context) (SystemInfoResponse, error) {
+	var out SystemInfoResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/system/info", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Stats(ctx context.Context) (SystemStatsResponse, error) {
+	var out SystemStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/system/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Metrics(ctx context.Context) (SystemMetricsResponse, error) {
+	var out SystemMetricsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/metrics", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) MetricsPrometheus(ctx context.Context) (string, error) {
+	return apiCallText(ctx, http.MethodGet, "/v1/metrics/prometheus", nil)
+}
+func (s *systemNamespace) CacheStats(ctx context.Context) (SystemCacheStatsResponse, error) {
+	var out SystemCacheStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cache/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) Modules(ctx context.Context) (SystemModulesResponse, error) {
+	var out SystemModulesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/modules", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *systemNamespace) SBOM(ctx context.Context) (SystemSBOMResponse, error) {
+	var out SystemSBOMResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/sbom", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // ── Auth (/v1/auth, /v1/token) ──
 
@@ -401,6 +536,7 @@ type AgentKit struct {
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
+	System        *systemNamespace
 	Auth          *authNamespace
 	Tasks         *tasksNamespace
 	Reverie       *reverieNamespace
@@ -2175,11 +2311,21 @@ func (t *tasksNamespace) Create(ctx context.Context, req CreateTaskRequest) (Tas
 	return nonNilMap(out), nil
 }
 
-func (t *tasksNamespace) Run(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "run", id) }
-func (t *tasksNamespace) Pause(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "pause", id) }
-func (t *tasksNamespace) Resume(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "resume", id) }
-func (t *tasksNamespace) Restart(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "restart", id) }
-func (t *tasksNamespace) Cancel(ctx context.Context, id string) (TaskActionResponse, error) { return t.action(ctx, "cancel", id) }
+func (t *tasksNamespace) Run(ctx context.Context, id string) (TaskActionResponse, error) {
+	return t.action(ctx, "run", id)
+}
+func (t *tasksNamespace) Pause(ctx context.Context, id string) (TaskActionResponse, error) {
+	return t.action(ctx, "pause", id)
+}
+func (t *tasksNamespace) Resume(ctx context.Context, id string) (TaskActionResponse, error) {
+	return t.action(ctx, "resume", id)
+}
+func (t *tasksNamespace) Restart(ctx context.Context, id string) (TaskActionResponse, error) {
+	return t.action(ctx, "restart", id)
+}
+func (t *tasksNamespace) Cancel(ctx context.Context, id string) (TaskActionResponse, error) {
+	return t.action(ctx, "cancel", id)
+}
 
 func (t *tasksNamespace) Delete(ctx context.Context, id string) (TaskActionResponse, error) {
 	var out TaskActionResponse
@@ -4781,6 +4927,7 @@ func NewAgentKit() AgentKit {
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
+		System:        System,
 		Auth:          Auth,
 		Tasks:         Tasks,
 		Reverie:       Reverie,

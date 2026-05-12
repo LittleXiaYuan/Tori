@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "domain": "system",
+  "description": "Cross-language lightweight SDK for public health/readiness probes, version/SBOM metadata, authenticated system info/stats, metrics, cache stats, and module observability without importing the full platform client.",
+  "principles": [
+    "Expose deployment and operations observability as a focused SDK slice for monitors, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep public probes and authenticated operational reads directly callable through existing gateway routes.",
+    "Make System observability available through Agent Kit while preserving standalone composable facades."
+  ],
+  "routes": [
+    "GET /healthz",
+    "GET /livez",
+    "GET /readyz",
+    "GET /healthz/cognitive",
+    "GET /v1/version",
+    "GET /v1/system/info",
+    "GET /v1/system/stats",
+    "GET /v1/metrics",
+    "GET /v1/metrics/prometheus",
+    "GET /v1/cache/stats",
+    "GET /v1/modules",
+    "GET /sbom"
+  ],
+  "capabilities": [
+    {
+      "name": "health",
+      "route": "GET /healthz",
+      "readOnly": true,
+      "description": "Read the backward-compatible process health probe."
+    },
+    {
+      "name": "livez",
+      "route": "GET /livez",
+      "readOnly": true,
+      "description": "Read liveness for deployment monitors."
+    },
+    {
+      "name": "readyz",
+      "route": "GET /readyz",
+      "readOnly": true,
+      "description": "Read readiness and subsystem checks."
+    },
+    {
+      "name": "cognitiveHealth",
+      "route": "GET /healthz/cognitive",
+      "readOnly": true,
+      "description": "Read deep cognitive subsystem health."
+    },
+    {
+      "name": "version",
+      "route": "GET /v1/version",
+      "readOnly": true,
+      "description": "Read build and version metadata."
+    },
+    {
+      "name": "info",
+      "route": "GET /v1/system/info",
+      "readOnly": true,
+      "description": "Read authenticated system info."
+    },
+    {
+      "name": "stats",
+      "route": "GET /v1/system/stats",
+      "readOnly": true,
+      "description": "Read authenticated aggregate system stats."
+    },
+    {
+      "name": "metrics",
+      "route": "GET /v1/metrics",
+      "readOnly": true,
+      "description": "Read JSON metrics."
+    },
+    {
+      "name": "metricsPrometheus",
+      "route": "GET /v1/metrics/prometheus",
+      "readOnly": true,
+      "description": "Read Prometheus text exposition."
+    },
+    {
+      "name": "cacheStats",
+      "route": "GET /v1/cache/stats",
+      "readOnly": true,
+      "description": "Read cache observability stats."
+    },
+    {
+      "name": "modules",
+      "route": "GET /v1/modules",
+      "readOnly": true,
+      "description": "Read module profile and module status."
+    },
+    {
+      "name": "sbom",
+      "route": "GET /sbom",
+      "readOnly": true,
+      "description": "Read embedded CycloneDX SBOM metadata."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/system.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "health": "createSystemClient().health",
+        "livez": "createSystemClient().livez",
+        "readyz": "createSystemClient().readyz",
+        "cognitiveHealth": "createSystemClient().cognitiveHealth",
+        "version": "createSystemClient().version",
+        "info": "createSystemClient().systemInfo",
+        "stats": "createSystemClient().systemStats",
+        "metrics": "createSystemClient().metrics",
+        "metricsPrometheus": "createSystemClient().metricsPrometheus",
+        "cacheStats": "createSystemClient().cacheStats",
+        "modules": "createSystemClient().modules",
+        "sbom": "createSystemClient().sbom"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "health": "yunque.System.Health",
+        "livez": "yunque.System.Livez",
+        "readyz": "yunque.System.Readyz",
+        "cognitiveHealth": "yunque.System.CognitiveHealth",
+        "version": "yunque.System.Version",
+        "info": "yunque.System.Info",
+        "stats": "yunque.System.Stats",
+        "metrics": "yunque.System.Metrics",
+        "metricsPrometheus": "yunque.System.MetricsPrometheus",
+        "cacheStats": "yunque.System.CacheStats",
+        "modules": "yunque.System.Modules",
+        "sbom": "yunque.System.SBOM"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "health": "yunque.system.health",
+        "livez": "yunque.system.livez",
+        "readyz": "yunque.system.readyz",
+        "cognitiveHealth": "yunque.system.cognitive_health",
+        "version": "yunque.system.version",
+        "info": "yunque.system.info",
+        "stats": "yunque.system.stats",
+        "metrics": "yunque.system.metrics",
+        "metricsPrometheus": "yunque.system.metrics_prometheus",
+        "cacheStats": "yunque.system.cache_stats",
+        "modules": "yunque.system.modules",
+        "sbom": "yunque.system.sbom"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "health": "SystemClient::health",
+        "livez": "SystemClient::livez",
+        "readyz": "SystemClient::readyz",
+        "cognitiveHealth": "SystemClient::cognitive_health",
+        "version": "SystemClient::version",
+        "info": "SystemClient::system_info",
+        "stats": "SystemClient::system_stats",
+        "metrics": "SystemClient::metrics",
+        "metricsPrometheus": "SystemClient::metrics_prometheus",
+        "cacheStats": "SystemClient::cache_stats",
+        "modules": "SystemClient::modules",
+        "sbom": "SystemClient::sbom"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

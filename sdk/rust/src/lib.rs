@@ -1397,6 +1397,7 @@ pub struct AgentKit {
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
+    pub system: SystemClient,
     pub auth: AuthClient,
     pub tasks: TasksClient,
     pub reverie: ReverieClient,
@@ -1465,6 +1466,7 @@ impl AgentKit {
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
+            system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
             tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
@@ -1529,6 +1531,7 @@ impl AgentKit {
             ),
             reactions: ReactionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5363,6 +5366,44 @@ pub struct PostTaskThreadMessageRequest {
 pub struct UpdateTaskThreadStateRequest {
     pub task_id: String,
     pub state: String,
+}
+
+pub type SystemHealthResponse = serde_json::Value;
+pub type SystemReadinessResponse = serde_json::Value;
+pub type SystemCognitiveHealthResponse = serde_json::Value;
+pub type SystemVersionResponse = serde_json::Value;
+pub type SystemInfoResponse = serde_json::Value;
+pub type SystemStatsResponse = serde_json::Value;
+pub type SystemMetricsResponse = serde_json::Value;
+pub type SystemCacheStatsResponse = serde_json::Value;
+pub type SystemModulesResponse = serde_json::Value;
+pub type SystemSBOMResponse = serde_json::Value;
+
+/// Lightweight System SDK client for health, readiness, version, metrics, cache, modules, and SBOM observability.
+#[derive(Debug, Clone)]
+pub struct SystemClient { base_url: String, http: reqwest::Client }
+
+impl SystemClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn health(&self) -> Result<SystemHealthResponse, reqwest::Error> { self.get_json("/healthz").await }
+    pub async fn livez(&self) -> Result<SystemHealthResponse, reqwest::Error> { self.get_json("/livez").await }
+    pub async fn readyz(&self) -> Result<SystemReadinessResponse, reqwest::Error> { self.get_json("/readyz").await }
+    pub async fn cognitive_health(&self) -> Result<SystemCognitiveHealthResponse, reqwest::Error> { self.get_json("/healthz/cognitive").await }
+    pub async fn version(&self) -> Result<SystemVersionResponse, reqwest::Error> { self.get_json("/v1/version").await }
+    pub async fn system_info(&self) -> Result<SystemInfoResponse, reqwest::Error> { self.get_json("/v1/system/info").await }
+    pub async fn system_stats(&self) -> Result<SystemStatsResponse, reqwest::Error> { self.get_json("/v1/system/stats").await }
+    pub async fn metrics(&self) -> Result<SystemMetricsResponse, reqwest::Error> { self.get_json("/v1/metrics").await }
+    pub async fn metrics_prometheus(&self) -> Result<String, reqwest::Error> { self.http.get(self.url("/v1/metrics/prometheus")).send().await?.error_for_status()?.text().await }
+    pub async fn cache_stats(&self) -> Result<SystemCacheStatsResponse, reqwest::Error> { self.get_json("/v1/cache/stats").await }
+    pub async fn modules(&self) -> Result<SystemModulesResponse, reqwest::Error> { self.get_json("/v1/modules").await }
+    pub async fn sbom(&self) -> Result<SystemSBOMResponse, reqwest::Error> { self.get_json("/sbom").await }
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error> where T: for<'de> Deserialize<'de>, { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
 }
 
 /// Lightweight Auth SDK client for setup status, password login/setup, token exchange, and Tori OAuth start URLs.
@@ -9202,6 +9243,15 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn system_helpers_build_urls() {
+        let client = SystemClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/healthz"), "http://localhost:9090/healthz");
+        assert_eq!(client.url("/v1/system/info"), "http://localhost:9090/v1/system/info");
+        assert_eq!(client.url("/v1/metrics/prometheus"), "http://localhost:9090/v1/metrics/prometheus");
+        assert_eq!(client.url("/sbom"), "http://localhost:9090/sbom");
+    }
 
     #[test]
     fn auth_helpers_build_urls_and_payloads() {
