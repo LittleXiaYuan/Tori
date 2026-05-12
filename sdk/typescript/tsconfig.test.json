@@ -190,6 +190,8 @@
     "src/orchestrator-read.ts",
     "src/orchestrator-control.ts",
     "src/fork.ts",
+    "src/fork-read.ts",
+    "src/fork-control.ts",
     "src/scheduler.ts",
     "src/scheduler-read.ts",
     "src/scheduler-control.ts",

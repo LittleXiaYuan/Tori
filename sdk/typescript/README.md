@@ -265,6 +265,8 @@ import { createOrchestratorClient } from "yunque-client/orchestrator";
 import { createOrchestratorReadClient } from "yunque-client/orchestrator-read";
 import { createOrchestratorControlClient } from "yunque-client/orchestrator-control";
 import { createForkClient } from "yunque-client/fork";
+import { createForkReadClient } from "yunque-client/fork-read";
+import { createForkControlClient } from "yunque-client/fork-control";
 import { createSchedulerClient } from "yunque-client/scheduler";
 import { createSchedulerReadClient } from "yunque-client/scheduler-read";
 import { createSchedulerControlClient } from "yunque-client/scheduler-control";
@@ -1450,6 +1452,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/orchestrator-read.ts` | Lightweight orchestrator status/session/detect/event/policy read facade without control APIs |
 | `src/orchestrator-control.ts` | Lightweight orchestrator toggle/policy-update/adapter-control facade without read APIs |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
+| `src/fork-read.ts` | Lightweight conversation fork root/get/list facade without create/branch/delete APIs |
+| `src/fork-control.ts` | Lightweight conversation fork create/branch/delete facade without read APIs |
 | `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
 | `src/scheduler-read.ts` | Lightweight prompt scheduler job list facade without add/remove APIs |
 | `src/scheduler-control.ts` | Lightweight prompt scheduler add/remove facade without list APIs |

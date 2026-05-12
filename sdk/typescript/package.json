@@ -703,6 +703,14 @@
       "types": "./src/fork.ts",
       "import": "./src/fork.ts"
     },
+    "./fork-read": {
+      "types": "./src/fork-read.ts",
+      "import": "./src/fork-read.ts"
+    },
+    "./fork-control": {
+      "types": "./src/fork-control.ts",
+      "import": "./src/fork-control.ts"
+    },
     "./scheduler": {
       "types": "./src/scheduler.ts",
       "import": "./src/scheduler.ts"
