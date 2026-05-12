@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "domain": "memory-kernel",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque host recall memory under /v1/memory/*.",
+  "principles": [
+    "Expose the Agent memory layer as focused SDK slices instead of forcing callers through the full platform UI.",
+    "Keep host Memory Kernel helpers separate from plugin-private memory KV helpers.",
+    "Let external projects, plugin UIs, CLIs, sidecars, and automation scripts read/write recall memory directly."
+  ],
+  "routes": [
+    "GET /v1/memory/stats",
+    "POST /v1/memory/search",
+    "POST /v1/memory/add",
+    "POST /v1/memory/compact"
+  ],
+  "capabilities": [
+    { "name": "stats", "route": "GET /v1/memory/stats", "readOnly": true, "description": "Read memory layer counters and statistics." },
+    { "name": "search", "route": "POST /v1/memory/search", "readOnly": true, "description": "Search host recall memory." },
+    { "name": "add", "route": "POST /v1/memory/add", "readOnly": false, "description": "Add a fact to host recall memory." },
+    { "name": "compact", "route": "POST /v1/memory/compact", "readOnly": false, "description": "Run memory compaction with optional target/decay hints." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/memory.ts", "sdk/typescript/src/memory-stats.ts", "sdk/typescript/src/memory-search.ts", "sdk/typescript/src/memory-add.ts", "sdk/typescript/src/memory-compact.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "stats": "yunque-client/memory-stats#createMemoryStatsClient().stats",
+        "search": "yunque-client/memory-search#createMemorySearchClient().search",
+        "add": "yunque-client/memory-add#createMemoryAddClient().add",
+        "compact": "yunque-client/memory#createMemoryClient().compact"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "stats": "yunque.MemoryCore.Stats",
+        "search": "yunque.MemoryCore.Search",
+        "add": "yunque.MemoryCore.Add",
+        "compact": "yunque.MemoryCore.Compact"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "stats": "yunque.memory_core.stats",
+        "search": "yunque.memory_core.search",
+        "add": "yunque.memory_core.add",
+        "compact": "yunque.memory_core.compact"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "stats": "MemoryClient::stats",
+        "search": "MemoryClient::search",
+        "add": "MemoryClient::add",
+        "compact": "MemoryClient::compact"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

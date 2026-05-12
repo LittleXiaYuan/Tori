@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -14,22 +14,54 @@
     "prompt-scheduler",
     "cron-system",
     "trigger-automation",
+    "memory-kernel",
     "plugin-api-runtime"
   ],
   "capabilities": [
-    { "name": "state", "description": "Access the lightweight State Kernel client or namespace." },
-    { "name": "reflect", "description": "Access the lightweight Reflection Experience client or namespace." },
-    { "name": "missions", "description": "Access the lightweight Mission Parse client or namespace." },
-    { "name": "scheduler", "description": "Access the lightweight Prompt Scheduler client or namespace." },
-    { "name": "cron", "description": "Access the lightweight host Cron System client or namespace." },
-    { "name": "triggers", "description": "Access the lightweight Triggers v2 automation client or namespace." },
-    { "name": "plugin", "description": "Access the lightweight Plugin API Runtime client or namespace." }
+    {
+      "name": "state",
+      "description": "Access the lightweight State Kernel client or namespace."
+    },
+    {
+      "name": "reflect",
+      "description": "Access the lightweight Reflection Experience client or namespace."
+    },
+    {
+      "name": "missions",
+      "description": "Access the lightweight Mission Parse client or namespace."
+    },
+    {
+      "name": "scheduler",
+      "description": "Access the lightweight Prompt Scheduler client or namespace."
+    },
+    {
+      "name": "cron",
+      "description": "Access the lightweight host Cron System client or namespace."
+    },
+    {
+      "name": "triggers",
+      "description": "Access the lightweight Triggers v2 automation client or namespace."
+    },
+    {
+      "name": "memory",
+      "description": "Access the lightweight host Memory Kernel client or namespace."
+    },
+    {
+      "name": "plugin",
+      "description": "Access the lightweight Plugin API Runtime client or namespace."
+    }
   ],
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/agent-kit.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md", "docs/plugins/sdk-overview.md"],
+      "implementationFiles": [
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md",
+        "docs/plugins/sdk-overview.md"
+      ],
       "entrypoints": {
         "create": "yunque-client/agent-kit#createAgentKit",
         "state": "AgentKit.state",
@@ -38,13 +70,20 @@
         "scheduler": "AgentKit.scheduler",
         "cron": "AgentKit.cron",
         "triggers": "AgentKit.triggers",
-        "plugin": "AgentKit.plugin"
+        "plugin": "AgentKit.plugin",
+        "memory": "AgentKit.memory"
       }
     },
     "go": {
       "package": "yunque-agent/sdk/go/yunque",
-      "implementationFiles": ["sdk/go/yunque/yunque.go"],
-      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md", "docs/plugins/sdk-overview.md"],
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md",
+        "docs/plugins/sdk-overview.md"
+      ],
       "entrypoints": {
         "create": "yunque.NewAgentKit",
         "state": "AgentKit.State",
@@ -53,13 +92,20 @@
         "scheduler": "AgentKit.Scheduler",
         "cron": "AgentKit.CronSystem",
         "triggers": "AgentKit.Triggers",
-        "plugin": "AgentKit.Plugin"
+        "plugin": "AgentKit.Plugin",
+        "memory": "AgentKit.MemoryCore"
       }
     },
     "python": {
       "package": "yunque",
-      "implementationFiles": ["sdk/python/yunque/__init__.py"],
-      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md", "docs/plugins/sdk-overview.md"],
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md",
+        "docs/plugins/sdk-overview.md"
+      ],
       "entrypoints": {
         "create": "yunque.create_agent_kit",
         "state": "AgentKit.state",
@@ -68,13 +114,20 @@
         "scheduler": "AgentKit.scheduler",
         "cron": "AgentKit.cron_system",
         "triggers": "AgentKit.triggers",
-        "plugin": "AgentKit.plugin"
+        "plugin": "AgentKit.plugin",
+        "memory": "AgentKit.memory_core"
       }
     },
     "rust": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/rust/src/lib.rs"],
-      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md", "docs/plugins/sdk-overview.md"],
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md",
+        "docs/plugins/sdk-overview.md"
+      ],
       "entrypoints": {
         "create": "AgentKit::new",
         "state": "AgentKit::state",
@@ -83,9 +136,14 @@
         "scheduler": "AgentKit::scheduler",
         "cron": "AgentKit::cron",
         "triggers": "AgentKit::triggers",
-        "plugin": "AgentKit::plugin"
+        "plugin": "AgentKit::plugin",
+        "memory": "AgentKit::memory"
       }
     }
   },
-  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
 }

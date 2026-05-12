@@ -260,6 +260,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"jobs":[{"id":"cron_1","name":"daily","schedule":{"type":"every","every_ms":60000},"payload":{"kind":"agentTurn","message":"ping"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}]}`))
 		case "/v1/triggers/v2":
 			_, _ = w.Write([]byte(`{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}]}],"total":1}`))
+		case "/v1/memory/search":
+			_, _ = w.Write([]byte(`{"results":[{"key":"pref","value":"喜欢中文回复","layer":"mid"}],"count":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -294,6 +296,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	memoryResults, err := kit.MemoryCore.Search(context.Background(), MemorySearchRequest{Query: "中文", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -302,14 +308,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 8 {
-		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -335,6 +341,64 @@ func TestMissionsParseSerializesDescription(t *testing.T) {
 	}
 	if result.Type != "trigger" || result.Config["event_type"] != "review_done" {
 		t.Fatalf("unexpected mission parse result: %+v", result)
+	}
+}
+
+func TestMemoryCoreStatsSearchAddAndCompact(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/memory/stats":
+			_, _ = w.Write([]byte(`{"short":1,"mid":2,"long":3}`))
+		case "/v1/memory/search":
+			var body MemorySearchRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Query != "偏好" || body.Limit != 2 {
+				t.Fatalf("unexpected search body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"results":[{"key":"pref","value":"喜欢短回答","layer":"mid"}],"count":1}`))
+		case "/v1/memory/add":
+			var body MemoryAddRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Value != "喜欢中文回复" || body.Layer != "long" {
+				t.Fatalf("unexpected add body: %+v", body)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/memory/compact":
+			_, _ = w.Write([]byte(`{"status":"compacted"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	stats, err := MemoryCore.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	search, err := MemoryCore.Search(context.Background(), MemorySearchRequest{Query: "偏好", Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := MemoryCore.Add(context.Background(), MemoryAddRequest{Content: "喜欢中文回复", Layer: "long", Source: "sdk-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compacted, err := MemoryCore.Compact(context.Background(), MemoryCompactRequest{TargetCount: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats["long"].(float64) != 3 || search.Count != 1 || added.Status != "ok" || compacted["status"] != "compacted" {
+		t.Fatalf("unexpected memory results: stats=%+v search=%+v added=%+v compacted=%+v", stats, search, added, compacted)
+	}
+	if len(seen) != 4 {
+		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
 	}
 }
 
