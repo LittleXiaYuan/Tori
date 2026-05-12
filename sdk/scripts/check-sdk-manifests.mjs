@@ -13,6 +13,7 @@ const checks = [
   ["Admin SDK manifest", "sdk/scripts/check-admin-sdk-manifest.mjs"],
   ["Federation SDK manifest", "sdk/scripts/check-federation-sdk-manifest.mjs"],
   ["Planner SDK manifest", "sdk/scripts/check-planner-sdk-manifest.mjs"],
+  ["IDE SDK manifest", "sdk/scripts/check-ide-sdk-manifest.mjs"],
   ["Tasks SDK manifest", "sdk/scripts/check-tasks-sdk-manifest.mjs"],
   ["Permissions SDK manifest", "sdk/scripts/check-permissions-sdk-manifest.mjs"],
   ["Reactions SDK manifest", "sdk/scripts/check-reactions-sdk-manifest.mjs"],

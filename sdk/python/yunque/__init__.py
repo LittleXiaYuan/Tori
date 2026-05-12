@@ -1216,6 +1216,45 @@ setup = _SetupNamespace()
 
 
 
+
+# ── IDE Supervisor (/v1/ide) ──
+
+class _IDENamespace:
+    """Lightweight helpers for IDE supervisor status and code review."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/ide/status")
+
+    def review(self, request: dict) -> dict:
+        return _api_call("POST", "/v1/ide/review", request)
+
+    def review_diff(self, diff: str, *, file_path: str = "", language: str = "") -> dict:
+        body = {"diff": diff, "mode": "diff"}
+        if file_path:
+            body["file_path"] = file_path
+        if language:
+            body["language"] = language
+        return self.review(body)
+
+    def review_quick(self, content: str, *, file_path: str = "", language: str = "") -> dict:
+        body = {"content": content, "mode": "quick"}
+        if file_path:
+            body["file_path"] = file_path
+        if language:
+            body["language"] = language
+        return self.review(body)
+
+    def review_full(self, content: str, *, file_path: str = "", language: str = "") -> dict:
+        body = {"content": content, "mode": "full"}
+        if file_path:
+            body["file_path"] = file_path
+        if language:
+            body["language"] = language
+        return self.review(body)
+
+
+ide = _IDENamespace()
+
 # ── Planner Recovery (/v1/planner) ──
 
 class _PlannerNamespace:
@@ -2811,6 +2850,7 @@ class AgentKit:
         self.admin = admin
         self.federation = federation
         self.planner = planner
+        self.ide = ide
         self.settings = settings
         self.system = system
         self.auth = auth

@@ -8,3 +8,4 @@ export * from './speech';
 export * from './setup';
 export * from './admin';
 export * from './federation';
+export * from './ide';

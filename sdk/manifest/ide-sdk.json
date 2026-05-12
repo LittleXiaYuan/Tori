@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "domain": "ide",
+  "description": "Cross-language lightweight SDK for IDE supervisor status and structured code review without importing the full platform client.",
+  "principles": [
+    "Expose IDE status and code review as a focused SDK slice for editor plugins, external review panes, CLIs, sidecars, and automation scripts.",
+    "Keep status reads, full review, diff review, and quick review directly callable through existing authenticated gateway routes.",
+    "Make IDE access available through Agent Kit while preserving standalone TypeScript ide/ide-status/ide-review subpaths."
+  ],
+  "routes": [
+    "GET /v1/ide/status",
+    "POST /v1/ide/review"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/ide/status",
+      "readOnly": true,
+      "description": "Read IDE supervisor server status and capabilities."
+    },
+    {
+      "name": "review",
+      "route": "POST /v1/ide/review",
+      "readOnly": false,
+      "description": "Run structured code review for content or diff."
+    },
+    {
+      "name": "reviewDiff",
+      "route": "POST /v1/ide/review",
+      "readOnly": false,
+      "description": "Review a diff with mode=diff."
+    },
+    {
+      "name": "reviewQuick",
+      "route": "POST /v1/ide/review",
+      "readOnly": false,
+      "description": "Review code content with mode=quick."
+    },
+    {
+      "name": "reviewFull",
+      "route": "POST /v1/ide/review",
+      "readOnly": false,
+      "description": "Review code content with mode=full."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/ide.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createIDEClient().status",
+        "review": "createIDEClient().review",
+        "reviewDiff": "createIDEClient().reviewDiff",
+        "reviewQuick": "createIDEClient().reviewQuick",
+        "reviewFull": "createIDEClient().reviewFull"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.IDE.Status",
+        "review": "yunque.IDE.Review",
+        "reviewDiff": "yunque.IDE.ReviewDiff",
+        "reviewQuick": "yunque.IDE.ReviewQuick",
+        "reviewFull": "yunque.IDE.ReviewFull"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.ide.status",
+        "review": "yunque.ide.review",
+        "reviewDiff": "yunque.ide.review_diff",
+        "reviewQuick": "yunque.ide.review_quick",
+        "reviewFull": "yunque.ide.review_full"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "IDEClient::status",
+        "review": "IDEClient::review",
+        "reviewDiff": "IDEClient::review_diff",
+        "reviewQuick": "IDEClient::review_quick",
+        "reviewFull": "IDEClient::review_full"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

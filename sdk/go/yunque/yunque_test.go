@@ -202,6 +202,36 @@ func TestSetupHelpers(t *testing.T) {
 
 
 
+
+func TestIDEHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/ide/status":
+			_, _ = w.Write([]byte(`{"connected":true,"capabilities":["review"],"skills_count":3}`))
+		case "/v1/ide/review":
+			var body IDEReviewRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Mode == "" { t.Fatalf("missing review mode: %+v", body) }
+			_, _ = w.Write([]byte(`{"summary":"ok","issues":[],"score":9}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	status, _ := IDE.Status(ctx)
+	review, _ := IDE.Review(ctx, IDEReviewRequest{FilePath: "main.go", Content: "package main", Language: "go", Mode: "full"})
+	diff, _ := IDE.ReviewDiff(ctx, "+fmt.Println(1)", "main.go", "go")
+	quick, _ := IDE.ReviewQuick(ctx, "console.log(1)", "main.ts", "ts")
+	full, _ := IDE.ReviewFull(ctx, "print(1)", "main.py", "py")
+	if status["connected"] != true || review["score"].(float64) != 9 || diff["summary"] != "ok" || quick["summary"] != "ok" || full["summary"] != "ok" || NewAgentKit().IDE != IDE {
+		t.Fatalf("unexpected ide results")
+	}
+	if len(seen) != 5 { t.Fatalf("expected 5 ide API calls, got %d: %v", len(seen), seen) }
+}
+
 func TestPlannerHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
