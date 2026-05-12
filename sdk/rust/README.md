@@ -344,3 +344,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+### Memory Kernel helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `MemoryClient` 访问宿主 `/v1/memory/*` 回忆记忆层。它不同于 `PluginApiClient::memory_*` 的插件私有 KV。
+
+```rust
+use yunque_client::{MemoryAddRequest, MemoryClient, MemorySearchRequest};
+
+let memory = MemoryClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let stats = memory.stats().await?;
+let found = memory.search(&MemorySearchRequest { query: "用户偏好".to_string(), limit: 3, ..Default::default() }).await?;
+let added = memory.add(&MemoryAddRequest { value: "用户偏好中文回复".to_string(), layer: "mid".to_string(), source: "sdk".to_string(), ..Default::default() }).await?;
+println!("{:?} {} {}", stats.get("mid"), found.count, added.status);
+```

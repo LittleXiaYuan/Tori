@@ -303,6 +303,60 @@ class _CronSystemNamespace:
 cron_system = _CronSystemNamespace()
 
 
+# ── Memory Kernel (/v1/memory) ──
+
+class _MemoryCoreNamespace:
+    """Lightweight helpers for the host recall memory layer under /v1/memory/*."""
+
+    def stats(self) -> dict:
+        """Return host memory counters and layer statistics."""
+        return _api_call("GET", "/v1/memory/stats")
+
+    def search(self, query: str | dict, *, limit: int = 10, layer: str = "") -> dict:
+        """Search host recall memory. Pass either a query string or a complete body."""
+        if isinstance(query, dict):
+            body = dict(query)
+        else:
+            body = {"query": query, "limit": limit}
+            if layer:
+                body["layer"] = layer
+        return _api_call("POST", "/v1/memory/search", body)
+
+    def add(self, value: str | dict = "", *, key: str = "", layer: str = "mid",
+            source: str = "", tags: Optional[list[str]] = None) -> dict:
+        """Add a fact to host recall memory using the /v1/memory/add shape."""
+        if isinstance(value, dict):
+            body = dict(value)
+            if "value" not in body and "content" in body:
+                body["value"] = body["content"]
+        else:
+            body = {"value": value, "layer": layer}
+            if key:
+                body["key"] = key
+            if source:
+                body["source"] = source
+            if tags:
+                body["tags"] = tags
+        return _api_call("POST", "/v1/memory/add", body)
+
+    def remember(self, content: str, *, layer: str = "mid", source: str = "",
+                 tags: Optional[list[str]] = None) -> dict:
+        """Compact alias for adding a text fact to host recall memory."""
+        return self.add(content, layer=layer, source=source, tags=tags)
+
+    def compact(self, *, target_count: int = 0, decay_days: int = 0) -> dict:
+        """Run memory compaction with optional target/decay hints."""
+        body = {}
+        if target_count > 0:
+            body["target_count"] = target_count
+        if decay_days > 0:
+            body["decay_days"] = decay_days
+        return _api_call("POST", "/v1/memory/compact", body)
+
+
+memory_core = _MemoryCoreNamespace()
+
+
 # ── Reflection Experience ──
 
 class _ReflectNamespace:
@@ -650,6 +704,7 @@ class AgentKit:
         self.scheduler = scheduler
         self.cron_system = cron_system
         self.triggers = triggers
+        self.memory_core = memory_core
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

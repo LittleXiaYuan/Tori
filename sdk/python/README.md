@@ -127,6 +127,18 @@ run = yunque.cron_system.run(added["job"]["id"])
 print(len(jobs["jobs"]), run["run"]["status"])
 ```
 
+
+### Memory Kernel 宿主回忆记忆切片
+
+Python 插件脚本或自动化任务可以用 `yunque.memory_core` 访问宿主 `/v1/memory/*` 回忆记忆层。它不同于 `yunque.memory` 的插件私有 KV。
+
+```python
+stats = yunque.memory_core.stats()
+found = yunque.memory_core.search("用户偏好", limit=3)
+added = yunque.memory_core.remember("用户偏好中文回复", layer="mid", source="sdk")
+print(stats.get("mid"), found["count"], added["status"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

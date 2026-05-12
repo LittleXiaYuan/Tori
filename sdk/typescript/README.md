@@ -48,7 +48,7 @@ console.log(reply);
 
 For external automation that needs the common SDK-first surfaces together, use
 `yunque-client/agent-kit`. It composes the hand-written State Kernel,
-Reflection Experience, and Plugin API Runtime clients without importing the
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, and Plugin API Runtime clients without importing the
 generated all-in-one SDK.
 
 ```ts
@@ -62,9 +62,10 @@ const kit = createAgentKit({
 
 const focus = await kit.state.focus();
 const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
+const found = await kit.memory.search({ query: "incremental SDK package", limit: 3 });
 const search = await kit.plugin.search("incremental SDK package", 5);
 
-console.log(focus.focus, strategies.strategies, search.results.length);
+console.log(focus.focus, strategies.strategies, found.count, search.results.length);
 ```
 
 ### Full generated client
@@ -1724,7 +1725,7 @@ npm run test -- state-actions state-capabilities
 | `src/client.gen.ts` | Default client instance |
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
-| `src/agent-kit.ts` | Lightweight bundle for State Kernel, Reflection Experience, and Plugin API Runtime clients without generated SDK imports |
+| `src/agent-kit.ts` | Lightweight bundle for State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, and Plugin API Runtime clients without generated SDK imports |
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
@@ -2087,3 +2088,17 @@ npm run test -- state-actions state-capabilities
   package size.
 - Client uses ESM (`"type": "module"` in package.json). For CommonJS consumers,
   rebuild with a different tsconfig (`"module": "CommonJS"`).
+
+## Memory Kernel 宿主回忆记忆切片
+
+前端页面、插件 UI 或 Node.js 自动化可以用 `yunque-client/memory-search`、`memory-add`、`memory-stats` 访问宿主 `/v1/memory/*` 回忆记忆层。它不同于 `plugin-memory` 的插件私有 KV。
+
+```ts
+import { createMemorySearchClient } from "yunque-client/memory-search";
+import { createMemoryAddClient } from "yunque-client/memory-add";
+
+const options = { baseUrl: "http://localhost:9090", token: "<jwt-or-plugin-token>" };
+const found = await createMemorySearchClient(options).search("用户偏好", { limit: 3 });
+const added = await createMemoryAddClient(options).remember("用户偏好中文回复", { layer: "mid", source: "sdk" });
+console.log(found.count, added.status);
+```

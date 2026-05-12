@@ -21,6 +21,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.includes("/v1/reflect/strategies")) return jsonResponse({ strategies: "- keep slices small" });
       if (value.endsWith("/v1/missions/parse")) return jsonResponse({ type: "cron", name: "每日总结", description: "每天总结", config: { cron_expr: "0 8 * * *" }, confidence: 0.9, explanation: "mentions daily schedule" });
       if (value.endsWith("/v1/scheduler/jobs")) return jsonResponse({ jobs: [{ id: "job_1", name: "daily" }], count: 1 });
+      if (value.endsWith("/v1/memory/search")) return jsonResponse({ results: [{ key: "pref", value: "喜欢中文" }], count: 1 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
     },
@@ -30,11 +31,13 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assert((await kit.reflect.strategies({ tag: "sdk" })).strategies.includes("slices"));
   assertEqual((await kit.missions.parse("每天八点总结昨天的任务")).type, "cron");
   assertEqual((await kit.scheduler.jobs()).count, 1);
+  assertEqual((await kit.memory.search({ query: "中文", limit: 1 })).count, 1);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[3]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[4]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[4]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[5]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

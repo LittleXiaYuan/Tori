@@ -349,6 +349,78 @@ pub struct CronRunResponse {
     pub run: CronRunRecord,
 }
 
+/// Host recall memory item returned by `/v1/memory/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemoryItem {
+    #[serde(default)]
+    pub key: String,
+    #[serde(default)]
+    pub value: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub layer: String,
+    #[serde(default)]
+    pub score: f64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+pub type MemoryStatsResponse = serde_json::Map<String, serde_json::Value>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemorySearchRequest {
+    pub query: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub layer: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemorySearchResponse {
+    #[serde(default)]
+    pub results: Vec<MemoryItem>,
+    #[serde(default)]
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemoryAddRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub key: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub value: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub layer: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemoryAddResponse {
+    #[serde(default)]
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MemoryCompactRequest {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub target_count: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub decay_days: i32,
+}
+
+pub type MemoryCompactResponse = serde_json::Map<String, serde_json::Value>;
+
 /// Triggers v2 automation definition returned by `/v1/triggers/v2`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TriggerDef {
@@ -790,6 +862,7 @@ pub struct AgentKit {
     pub scheduler: SchedulerClient,
     pub cron: CronClient,
     pub triggers: TriggersClient,
+    pub memory: MemoryClient,
     pub plugin: PluginApiClient,
 }
 
@@ -819,6 +892,7 @@ impl AgentKit {
             scheduler: SchedulerClient::new(base_url.clone(), token.as_ref())?,
             cron: CronClient::new(base_url.clone(), token.as_ref())?,
             triggers: TriggersClient::new(base_url.clone(), token.as_ref())?,
+            memory: MemoryClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -838,6 +912,7 @@ impl AgentKit {
             scheduler: SchedulerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cron: CronClient::new_with_client(base_url.clone(), plugin_http.clone()),
             triggers: TriggersClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            memory: MemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -911,6 +986,101 @@ impl CronClient {
     pub async fn run(&self, id: impl AsRef<str>) -> Result<CronRunResponse, reqwest::Error> {
         self.http
             .post(self.url(&format!("/v1/cron/run?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over host `/v1/memory/*` recall memory endpoints.
+#[derive(Debug, Clone)]
+pub struct MemoryClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl MemoryClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn stats(&self) -> Result<MemoryStatsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/memory/stats"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn search(
+        &self,
+        request: &MemorySearchRequest,
+    ) -> Result<MemorySearchResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/memory/search"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add(
+        &self,
+        request: &MemoryAddRequest,
+    ) -> Result<MemoryAddResponse, reqwest::Error> {
+        let mut request = request.clone();
+        if request.value.is_empty() {
+            request.value = request.content.clone();
+        }
+        self.http
+            .post(self.url("/v1/memory/add"))
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn compact(
+        &self,
+        request: &MemoryCompactRequest,
+    ) -> Result<MemoryCompactResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/memory/compact"))
+            .json(request)
             .send()
             .await?
             .error_for_status()?
@@ -1889,6 +2059,10 @@ mod tests {
             "http://localhost:9090/v1/triggers/v2"
         );
         assert_eq!(
+            kit.memory.url("/v1/memory/search"),
+            "http://localhost:9090/v1/memory/search"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -1947,6 +2121,37 @@ mod tests {
         assert_eq!(
             client.url("/v1/scheduler/jobs"),
             "http://localhost:9090/v1/scheduler/jobs"
+        );
+    }
+
+    #[test]
+    fn memory_types_serialize_incremental_body() {
+        let add = MemoryAddRequest {
+            content: "喜欢中文回复".to_string(),
+            layer: "long".to_string(),
+            source: "sdk-test".to_string(),
+            ..MemoryAddRequest::default()
+        };
+        let value = serde_json::to_value(add).unwrap();
+        assert_eq!(value["content"], "喜欢中文回复");
+        assert_eq!(value["layer"], "long");
+        assert!(value.get("key").is_none());
+
+        let search: MemorySearchResponse = serde_json::from_str(
+            r#"{"results":[{"key":"pref","value":"喜欢短回答","layer":"mid","score":0.9}],"count":1}"#,
+        )
+        .unwrap();
+        assert_eq!(search.count, 1);
+        assert_eq!(search.results[0].key, "pref");
+    }
+
+    #[test]
+    fn memory_client_trims_base_url() {
+        let client =
+            MemoryClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/memory/stats"),
+            "http://localhost:9090/v1/memory/stats"
         );
     }
 

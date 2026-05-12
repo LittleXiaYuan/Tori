@@ -164,7 +164,19 @@ run, err := yunque.CronSystem.Run(ctx, added.Job.ID)
 fmt.Println(len(jobs.Jobs), added.Job.ID, run.Run.Status)
 ```
 
-### Triggers 触发器自动化切片
+#
+### Memory Kernel 宿主回忆记忆切片
+
+Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.MemoryCore` 访问宿主 `/v1/memory/*` 回忆记忆层。它不同于 `yunque.Memory` 的插件私有 KV。
+
+```go
+stats, err := yunque.MemoryCore.Stats(ctx)
+found, err := yunque.MemoryCore.Search(ctx, yunque.MemorySearchRequest{Query: "用户偏好", Limit: 3})
+added, err := yunque.MemoryCore.Add(ctx, yunque.MemoryAddRequest{Value: "用户偏好中文回复", Layer: "mid", Source: "sdk"})
+fmt.Println(stats["mid"], found.Count, added.Status)
+```
+
+## Triggers 触发器自动化切片
 
 Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.Triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。
 

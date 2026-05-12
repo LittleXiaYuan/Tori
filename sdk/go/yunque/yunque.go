@@ -299,6 +299,7 @@ type AgentKit struct {
 	Scheduler   *schedulerNamespace
 	CronSystem  *cronSystemNamespace
 	Triggers    *triggersNamespace
+	MemoryCore  *memoryCoreNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -623,6 +624,102 @@ func (c *cronSystemNamespace) Run(ctx context.Context, id string) (CronRunRespon
 	return out, nil
 }
 
+// ── Memory Kernel ──
+
+// MemoryCore provides focused access to the host /v1/memory/* recall layer.
+// It is separate from Memory, which targets plugin-private /v1/plugin-api/memory/* KV.
+var MemoryCore = &memoryCoreNamespace{}
+
+type memoryCoreNamespace struct{}
+
+type MemoryItem struct {
+	Key     string         `json:"key,omitempty"`
+	Value   string         `json:"value,omitempty"`
+	Content string         `json:"content,omitempty"`
+	Source  string         `json:"source,omitempty"`
+	Layer   string         `json:"layer,omitempty"`
+	Score   float64        `json:"score,omitempty"`
+	Tags    []string       `json:"tags,omitempty"`
+	Extra   map[string]any `json:"-"`
+}
+
+type MemoryStatsResponse map[string]any
+
+type MemorySearchRequest struct {
+	Query string `json:"query"`
+	Limit int    `json:"limit,omitempty"`
+	Layer string `json:"layer,omitempty"`
+}
+
+type MemorySearchResponse struct {
+	Results []MemoryItem `json:"results"`
+	Count   int          `json:"count"`
+}
+
+type MemoryAddRequest struct {
+	Key     string   `json:"key,omitempty"`
+	Value   string   `json:"value,omitempty"`
+	Content string   `json:"content,omitempty"`
+	Layer   string   `json:"layer,omitempty"`
+	Source  string   `json:"source,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
+}
+
+type MemoryAddResponse struct {
+	Status string `json:"status"`
+}
+
+type MemoryCompactRequest struct {
+	TargetCount int `json:"target_count,omitempty"`
+	DecayDays   int `json:"decay_days,omitempty"`
+}
+
+type MemoryCompactResponse map[string]any
+
+func (m *memoryCoreNamespace) Stats(ctx context.Context) (MemoryStatsResponse, error) {
+	var out MemoryStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/memory/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return MemoryStatsResponse{}, nil
+	}
+	return out, nil
+}
+
+func (m *memoryCoreNamespace) Search(ctx context.Context, req MemorySearchRequest) (MemorySearchResponse, error) {
+	var out MemorySearchResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/memory/search", req, &out); err != nil {
+		return MemorySearchResponse{}, err
+	}
+	if out.Results == nil {
+		out.Results = []MemoryItem{}
+	}
+	return out, nil
+}
+
+func (m *memoryCoreNamespace) Add(ctx context.Context, req MemoryAddRequest) (MemoryAddResponse, error) {
+	if req.Value == "" {
+		req.Value = req.Content
+	}
+	var out MemoryAddResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/memory/add", req, &out); err != nil {
+		return MemoryAddResponse{}, err
+	}
+	return out, nil
+}
+
+func (m *memoryCoreNamespace) Compact(ctx context.Context, req MemoryCompactRequest) (MemoryCompactResponse, error) {
+	var out MemoryCompactResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/memory/compact", req, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return MemoryCompactResponse{}, nil
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -692,6 +789,7 @@ func NewAgentKit() AgentKit {
 		Scheduler:   Scheduler,
 		CronSystem:  CronSystem,
 		Triggers:    Triggers,
+		MemoryCore:  MemoryCore,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,
