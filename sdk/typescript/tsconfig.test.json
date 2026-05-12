@@ -105,6 +105,7 @@
     "src/cost-observe.ts",
     "src/usage.ts",
     "src/lora.ts",
+    "src/lora-observe.ts",
     "src/iterate.ts",
     "src/trust.ts",
     "src/review.ts",
