@@ -13,7 +13,7 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "knowledge", "lora", "workflows", "connectors", "notify", "projects", "market", "dispatch", "orchestrator", "fork", "cost", "providers", "cognis", "trace", "heartbeat", "events", "runtime", "subagents", "tools", "audit", "reverie", "chat", "conversations", "approvals", "rbac", "files", "browser", "realtime", "plugin"];
+const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "knowledge", "lora", "workflows", "connectors", "notify", "projects", "market", "dispatch", "orchestrator", "fork", "cost", "providers", "cognis", "trace", "heartbeat", "events", "runtime", "subagents", "tools", "audit", "trust", "reverie", "chat", "conversations", "approvals", "rbac", "files", "browser", "realtime", "plugin"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
@@ -54,7 +54,7 @@ for (const [language, config] of Object.entries(languages)) {
     }
   }
   const docs = (config.docs ?? []).map(readRepoFile).join("\n");
-  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Knowledge", "LoRA", "Workflow", "Connector", "Notify", "Projects", "Market", "Dispatch", "Orchestrator", "Fork", "Cost", "Provider", "Cogni", "Trace", "Heartbeat", "Events", "Runtime", "Subagents", "Tools", "Audit", "Reverie", "Chat", "Conversation", "Approval", "RBAC", "Files", "Browser", "Realtime", "Plugin"]) {
+  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Knowledge", "LoRA", "Workflow", "Connector", "Notify", "Projects", "Market", "Dispatch", "Orchestrator", "Fork", "Cost", "Provider", "Cogni", "Trace", "Heartbeat", "Events", "Runtime", "Subagents", "Tools", "Audit", "Trust", "Reverie", "Chat", "Conversation", "Approval", "RBAC", "Files", "Browser", "Realtime", "Plugin"]) {
     if (!docs.includes(token)) fail(`${language} docs missing Agent Kit token: ${token}`);
   }
 }

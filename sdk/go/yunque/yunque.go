@@ -322,6 +322,7 @@ type AgentKit struct {
 	Subagents     *subagentsNamespace
 	Tools         *toolsNamespace
 	Audit         *auditNamespace
+	Trust         *trustNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1846,6 +1847,9 @@ var Tools = &toolsNamespace{}
 // Audit provides focused access to Merkle audit chain and task audit trail reads.
 var Audit = &auditNamespace{}
 
+// Trust provides focused access to trust scores, review gate status, and skill growth patterns.
+var Trust = &trustNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2769,6 +2773,62 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Trust Governance ──
+
+type trustNamespace struct{}
+
+type TrustScoresResponse map[string]any
+type TrustSlugRequest struct {
+	Slug string `json:"slug"`
+}
+type TrustMutationResponse map[string]any
+type ReviewStatusResponse map[string]any
+type SkillGrowPatternsResponse map[string]any
+
+func (t *trustNamespace) Scores(ctx context.Context) (TrustScoresResponse, error) {
+	var out TrustScoresResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/trust/scores", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *trustNamespace) Reset(ctx context.Context, slug string) (TrustMutationResponse, error) {
+	var out TrustMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/trust/reset", TrustSlugRequest{Slug: slug}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *trustNamespace) Grant(ctx context.Context, slug string) (TrustMutationResponse, error) {
+	var out TrustMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/trust/grant", TrustSlugRequest{Slug: slug}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *trustNamespace) GrantAll(ctx context.Context) (TrustMutationResponse, error) {
+	return t.Grant(ctx, "*")
+}
+
+func (t *trustNamespace) ReviewStatus(ctx context.Context) (ReviewStatusResponse, error) {
+	var out ReviewStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/review/status", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *trustNamespace) SkillGrowPatterns(ctx context.Context) (SkillGrowPatternsResponse, error) {
+	var out SkillGrowPatternsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillgrow/patterns", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ── Audit Chain and Trail ──
@@ -3988,6 +4048,7 @@ func NewAgentKit() AgentKit {
 		Subagents:     Subagents,
 		Tools:         Tools,
 		Audit:         Audit,
+		Trust:         Trust,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

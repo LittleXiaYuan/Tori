@@ -161,6 +161,58 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestTrustHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/trust/scores":
+			_, _ = w.Write([]byte(`{"scores":{"shell":{"score":80,"level":"review"}},"count":1}`))
+		case "/api/trust/reset", "/api/trust/grant":
+			var body TrustSlugRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			_, _ = w.Write([]byte(`{"status":"ok","slug":"` + body.Slug + `"}`))
+		case "/api/review/status":
+			_, _ = w.Write([]byte(`{"enabled":true,"trust_enabled":true,"distill_enabled":false}`))
+		case "/api/skillgrow/patterns":
+			_, _ = w.Write([]byte(`{"patterns":[{"pattern":"repeat-review","count":4}],"count":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	scores, err := Trust.Scores(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reset, err := Trust.Reset(ctx, "shell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	grantAll, err := Trust.GrantAll(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := Trust.ReviewStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patterns, err := Trust.SkillGrowPatterns(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scores["count"].(float64) != 1 || reset["slug"] != "shell" || grantAll["slug"] != "*" || status["enabled"] != true || patterns["count"].(float64) != 1 || NewAgentKit().Trust != Trust {
+		t.Fatalf("unexpected trust results: scores=%+v reset=%+v grantAll=%+v status=%+v patterns=%+v", scores, reset, grantAll, status, patterns)
+	}
+	if len(seen) != 5 || seen[0] != "GET /api/trust/scores" || seen[4] != "GET /api/skillgrow/patterns" {
+		t.Fatalf("unexpected trust requests: %v", seen)
+	}
+}
+
 func TestAuditHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +223,8 @@ func TestAuditHelpers(t *testing.T) {
 			_, _ = w.Write([]byte(`{"records":[{"id":"r1","type":"system"}],"count":1}`))
 		case "/v1/audit/verify":
 			_, _ = w.Write([]byte(`{"valid":true,"checked":1}`))
+		case "/api/trust/scores":
+			_, _ = w.Write([]byte(`{"scores":{"shell":{"score":80}},"count":1}`))
 		case "/v1/audit/stats":
 			_, _ = w.Write([]byte(`{"total":12}`))
 		case "/api/audit/trail":
@@ -224,6 +278,8 @@ func TestToolsHelpers(t *testing.T) {
 			_, _ = w.Write([]byte(`{"sessions":[{"id":"tool-1","command":"npm test","state":"running"}]}`))
 		case "/v1/audit/verify":
 			_, _ = w.Write([]byte(`{"valid":true,"checked":1}`))
+		case "/api/trust/scores":
+			_, _ = w.Write([]byte(`{"scores":{"shell":{"score":80}},"count":1}`))
 		case "/v1/tools/poll":
 			_, _ = w.Write([]byte(`{"lines":["hello"],"state":"running"}`))
 		case "/v1/tools/kill":
@@ -858,6 +914,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"sessions":[{"id":"tool-1","command":"npm test","state":"running"}]}`))
 		case "/v1/audit/verify":
 			_, _ = w.Write([]byte(`{"valid":true,"checked":1}`))
+		case "/api/trust/scores":
+			_, _ = w.Write([]byte(`{"scores":{"shell":{"score":80}},"count":1}`))
 		case "/v1/reflect/strategies":
 			if r.URL.Query().Get("tag") != "sdk" {
 				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
@@ -943,6 +1001,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	auditVerify, err := kit.Audit.Verify(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	trustScores, err := kit.Trust.Scores(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1050,14 +1112,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || runtimeQueues["queues"] == nil || subagentsList.Subagents[0].ID != "sa-1" || toolList.Sessions[0].ID != "tool-1" || auditVerify["valid"] != true || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || runtimeQueues["queues"] == nil || subagentsList.Subagents[0].ID != "sa-1" || toolList.Sessions[0].ID != "tool-1" || auditVerify["valid"] != true || trustScores["count"].(float64) != 1 || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Subagents != Subagents || kit.Tools != Tools || kit.Audit != Audit || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Subagents != Subagents || kit.Tools != Tools || kit.Audit != Audit || kit.Trust != Trust || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 31 {
-		t.Fatalf("expected 31 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 32 {
+		t.Fatalf("expected 32 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -2502,8 +2564,8 @@ func TestCognisHelpers(t *testing.T) {
 	if list["count"].(float64) != 1 || created["id"] != "reviewer" || !detail["enabled"].(bool) || removed["id"] != "reviewer" || enabled["status"] != "ok" || disabled["status"] != "ok" || reloaded["status"] != "ok" || traces["count"].(float64) != 1 || trace["count"].(float64) != 1 || stats["activations"].(float64) != 2 || !health["healthy"].(bool) || !verify["ok"].(bool) || alerts["count"].(float64) != 0 || scanned["status"] != "ok" || generated["status"] != "ok" || exported["bundle"] == nil || imported["status"] != "ok" || workflows["workflows"] == nil || ran["status"] != "ok" || !experience["enabled"].(bool) || recorded["status"] != "ok" || confirmed["status"] != "ok" || evolved["status"] != "ok" || evolution["generation"].(float64) != 2 || !federation["enabled"].(bool) || peers["peers"] == nil || discovered["status"] != "ok" || exposed["status"] != "ok" || unexposed["status"] != "ok" || economics["cost"].(float64) != 0 || kit.Cognis != Cognis {
 		t.Fatalf("unexpected cognis results")
 	}
-	if len(seen) != 31 {
-		t.Fatalf("expected 31 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 32 {
+		t.Fatalf("expected 32 requests, got %d: %v", len(seen), seen)
 	}
 }
 
