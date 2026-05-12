@@ -262,6 +262,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}]}],"total":1}`))
 		case "/v1/memory/search":
 			_, _ = w.Write([]byte(`{"results":[{"key":"pref","value":"喜欢中文回复","layer":"mid"}],"count":1}`))
+		case "/v1/graph/stats":
+			_, _ = w.Write([]byte(`{"entities":2,"relations":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -300,6 +302,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	graphStats, err := kit.Graph.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -308,14 +314,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 9 {
-		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 10 {
+		t.Fatalf("expected 10 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -399,6 +405,85 @@ func TestMemoryCoreStatsSearchAddAndCompact(t *testing.T) {
 	}
 	if len(seen) != 4 {
 		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestGraphNamespaceReadsAndWrites(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/graph/entities":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("q") != "云雀" {
+					t.Fatalf("unexpected entity query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"entities":[{"id":"e1","name":"云雀","type":"agent"}]}`))
+			case http.MethodPost:
+				var body GraphEntity
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Name != "云雀" {
+					t.Fatalf("unexpected entity body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"id":"e1","name":"云雀","type":"agent"}`))
+			case http.MethodDelete:
+				if r.URL.Query().Get("id") != "e1" {
+					t.Fatalf("unexpected delete query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}
+		case "/v1/graph/relations":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"relations":[{"id":"r1","from_id":"e1","to_id":"e2","type":"uses","weight":0.8}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"id":"r1","from_id":"e1","to_id":"e2","type":"uses","weight":0.8}`))
+		case "/v1/graph/context":
+			_, _ = w.Write([]byte(`{"context":"云雀 -> SDK","neighbors":[{"id":"e2"}]}`))
+		case "/v1/graph/stats":
+			_, _ = w.Write([]byte(`{"entities":2,"relations":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	entities, err := Graph.Entities(context.Background(), "云雀")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entity, err := Graph.PutEntity(context.Background(), GraphEntity{Name: "云雀", Type: "agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	relations, err := Graph.Relations(context.Background(), "e1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	relation, err := Graph.PutRelation(context.Background(), GraphRelation{FromID: "e1", ToID: "e2", Type: "uses"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextResult, err := Graph.ContextByEntityID(context.Background(), "e1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats, err := Graph.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Graph.DeleteEntity(context.Background(), "e1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entities.Entities) != 1 || entity.ID != "e1" || len(relations.Relations) != 1 || relation.ID != "r1" || !strings.Contains(contextResult.Context, "SDK") || stats.Entities != 2 || !deleted.OK {
+		t.Fatalf("unexpected graph results: entities=%+v entity=%+v relations=%+v relation=%+v context=%+v stats=%+v deleted=%+v", entities, entity, relations, relation, contextResult, stats, deleted)
+	}
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 

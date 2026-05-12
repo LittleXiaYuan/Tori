@@ -139,6 +139,18 @@ added = yunque.memory_core.remember("用户偏好中文回复", layer="mid", sou
 print(stats.get("mid"), found["count"], added["status"])
 ```
 
+
+### Knowledge Graph 知识图谱切片
+
+Python 插件脚本或自动化任务可以用 `yunque.graph` 访问宿主 `/v1/graph/*` 知识图谱层，读取/维护实体、关系和图谱上下文。
+
+```python
+entities = yunque.graph.entities("云雀")
+entity = yunque.graph.put_entity({"name": "云雀", "type": "agent"})
+context = yunque.graph.context_by_entity_id(entity["id"])
+print(len(entities["entities"]), context["context"])
+```
+
 ## Triggers 触发器自动化切片
 
 Python 插件脚本或自动化任务可以用 `yunque.triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

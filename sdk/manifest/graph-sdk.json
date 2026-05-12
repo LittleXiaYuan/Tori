@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "domain": "knowledge-graph",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque host knowledge graph under /v1/graph/*.",
+  "principles": [
+    "Expose graph entities, relations, context, and stats as focused SDK slices instead of hiding them behind platform UI code.",
+    "Keep read-only graph query helpers separate from mutation-capable entity/relation helpers where language packaging supports it.",
+    "Let external projects, plugin UIs, CLIs, sidecars, and automation scripts connect memory graph context directly."
+  ],
+  "routes": [
+    "GET /v1/graph/entities",
+    "POST /v1/graph/entities",
+    "DELETE /v1/graph/entities",
+    "GET /v1/graph/relations",
+    "POST /v1/graph/relations",
+    "GET /v1/graph/context",
+    "GET /v1/graph/stats"
+  ],
+  "capabilities": [
+    { "name": "entities", "route": "GET /v1/graph/entities", "readOnly": true, "description": "List or search graph entities." },
+    { "name": "putEntity", "route": "POST /v1/graph/entities", "readOnly": false, "description": "Create or update a graph entity." },
+    { "name": "deleteEntity", "route": "DELETE /v1/graph/entities", "readOnly": false, "description": "Delete a graph entity by id." },
+    { "name": "relations", "route": "GET /v1/graph/relations", "readOnly": true, "description": "List graph relations globally or for one entity." },
+    { "name": "putRelation", "route": "POST /v1/graph/relations", "readOnly": false, "description": "Create or update a graph relation." },
+    { "name": "context", "route": "GET /v1/graph/context", "readOnly": true, "description": "Read graph context and neighbors by entity id or name." },
+    { "name": "stats", "route": "GET /v1/graph/stats", "readOnly": true, "description": "Read graph entity and relation counters." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/graph.ts", "sdk/typescript/src/graph-read.ts", "sdk/typescript/src/graph-entities.ts", "sdk/typescript/src/graph-relations.ts", "sdk/typescript/src/graph-context.ts", "sdk/typescript/src/graph-stats.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "entities": "yunque-client/graph-entities#createGraphEntitiesClient().entities",
+        "putEntity": "yunque-client/graph#createGraphClient().putEntity",
+        "deleteEntity": "yunque-client/graph#createGraphClient().deleteEntity",
+        "relations": "yunque-client/graph-relations#createGraphRelationsClient().relations",
+        "putRelation": "yunque-client/graph#createGraphClient().putRelation",
+        "context": "yunque-client/graph-context#createGraphContextClient().byEntityId",
+        "stats": "yunque-client/graph-stats#createGraphStatsClient().stats"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "entities": "yunque.Graph.Entities",
+        "putEntity": "yunque.Graph.PutEntity",
+        "deleteEntity": "yunque.Graph.DeleteEntity",
+        "relations": "yunque.Graph.Relations",
+        "putRelation": "yunque.Graph.PutRelation",
+        "context": "yunque.Graph.ContextByEntityID",
+        "stats": "yunque.Graph.Stats"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "entities": "yunque.graph.entities",
+        "putEntity": "yunque.graph.put_entity",
+        "deleteEntity": "yunque.graph.delete_entity",
+        "relations": "yunque.graph.relations",
+        "putRelation": "yunque.graph.put_relation",
+        "context": "yunque.graph.context_by_entity_id",
+        "stats": "yunque.graph.stats"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "entities": "GraphClient::entities",
+        "putEntity": "GraphClient::put_entity",
+        "deleteEntity": "GraphClient::delete_entity",
+        "relations": "GraphClient::relations",
+        "putRelation": "GraphClient::put_relation",
+        "context": "GraphClient::context_by_entity_id",
+        "stats": "GraphClient::stats"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

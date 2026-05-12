@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -15,6 +15,7 @@
     "cron-system",
     "trigger-automation",
     "memory-kernel",
+    "knowledge-graph",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -47,6 +48,10 @@
       "description": "Access the lightweight host Memory Kernel client or namespace."
     },
     {
+      "name": "graph",
+      "description": "Access the lightweight host Knowledge Graph client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -71,7 +76,8 @@
         "cron": "AgentKit.cron",
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin",
-        "memory": "AgentKit.memory"
+        "memory": "AgentKit.memory",
+        "graph": "AgentKit.graph"
       }
     },
     "go": {
@@ -93,7 +99,8 @@
         "cron": "AgentKit.CronSystem",
         "triggers": "AgentKit.Triggers",
         "plugin": "AgentKit.Plugin",
-        "memory": "AgentKit.MemoryCore"
+        "memory": "AgentKit.MemoryCore",
+        "graph": "AgentKit.Graph"
       }
     },
     "python": {
@@ -115,7 +122,8 @@
         "cron": "AgentKit.cron_system",
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin",
-        "memory": "AgentKit.memory_core"
+        "memory": "AgentKit.memory_core",
+        "graph": "AgentKit.graph"
       }
     },
     "rust": {
@@ -137,7 +145,8 @@
         "cron": "AgentKit::cron",
         "triggers": "AgentKit::triggers",
         "plugin": "AgentKit::plugin",
-        "memory": "AgentKit::memory"
+        "memory": "AgentKit::memory",
+        "graph": "AgentKit::graph"
       }
     }
   },
