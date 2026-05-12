@@ -1391,6 +1391,7 @@ pub struct AgentKit {
     pub tools: ToolsClient,
     pub audit: AuditClient,
     pub trust: TrustClient,
+    pub iterate: IterateClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1451,6 +1452,7 @@ impl AgentKit {
             tools: ToolsClient::new(base_url.clone(), token.as_ref())?,
             audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
+            iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1504,6 +1506,7 @@ impl AgentKit {
             tools: ToolsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3578,6 +3581,135 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+pub type IterateProposalsResponse = serde_json::Value;
+pub type IterateDecisionResponse = serde_json::Value;
+pub type IterateTriggerResponse = serde_json::Value;
+pub type IterateStatusResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct IterateProposalsQuery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct IterateDecisionRequest {
+    pub id: String,
+}
+
+fn iterate_proposals_query(query: &IterateProposalsQuery) -> String {
+    if query.status.is_empty() {
+        String::new()
+    } else {
+        format!("?status={}", url_encode_query_component(&query.status))
+    }
+}
+
+/// Small Rust helper over self-iteration proposal review and manual cycle endpoints.
+#[derive(Debug, Clone)]
+pub struct IterateClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl IterateClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn proposals(
+        &self,
+        query: &IterateProposalsQuery,
+    ) -> Result<IterateProposalsResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/api/iterate/proposals{}",
+                iterate_proposals_query(query)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn pending_proposals(&self) -> Result<IterateProposalsResponse, reqwest::Error> {
+        self.proposals(&IterateProposalsQuery {
+            status: "pending".to_string(),
+        })
+        .await
+    }
+
+    pub async fn approve(&self, id: &str) -> Result<IterateDecisionResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/iterate/approve"))
+            .json(&IterateDecisionRequest { id: id.to_string() })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn reject(&self, id: &str) -> Result<IterateDecisionResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/iterate/reject"))
+            .json(&IterateDecisionRequest { id: id.to_string() })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn trigger(&self) -> Result<IterateTriggerResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/iterate/trigger"))
+            .json(&serde_json::json!({}))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn status(&self) -> Result<IterateStatusResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/api/iterate/status"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
 
 pub type TrustScoresResponse = serde_json::Value;
 
@@ -7765,6 +7897,10 @@ mod tests {
             "http://localhost:9090/api/trust/scores"
         );
         assert_eq!(
+            kit.iterate.url("/api/iterate/status"),
+            "http://localhost:9090/api/iterate/status"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -8087,6 +8223,31 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn iterate_helpers_build_urls_and_payloads() {
+        let client =
+            IterateClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/api/iterate/proposals"),
+            "http://localhost:9090/api/iterate/proposals"
+        );
+        assert_eq!(
+            iterate_proposals_query(&IterateProposalsQuery {
+                status: "pending".to_string(),
+            }),
+            "?status=pending"
+        );
+        let body = serde_json::to_value(IterateDecisionRequest {
+            id: "it-1".to_string(),
+        })
+        .unwrap();
+        assert_eq!(body["id"], "it-1");
+        let proposals: serde_json::Value =
+            serde_json::from_str(r#"{"proposals":[{"id":"it-1","status":"pending"}],"count":1}"#)
+                .unwrap();
+        assert_eq!(proposals["proposals"][0]["id"], "it-1");
     }
 
     #[test]

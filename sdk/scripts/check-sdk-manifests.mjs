@@ -5,6 +5,7 @@ const repoRoot = resolve(import.meta.dirname, "../..");
 const checks = [
   ["Audit SDK manifest", "sdk/scripts/check-audit-sdk-manifest.mjs"],
   ["Trust SDK manifest", "sdk/scripts/check-trust-sdk-manifest.mjs"],
+  ["Iterate SDK manifest", "sdk/scripts/check-iterate-sdk-manifest.mjs"],
   ["State SDK manifest", "sdk/scripts/check-state-sdk-manifest.mjs"],
   ["Reflect SDK manifest", "sdk/scripts/check-reflect-sdk-manifest.mjs"],
   ["Mission Parse SDK manifest", "sdk/scripts/check-mission-parse-sdk-manifest.mjs"],

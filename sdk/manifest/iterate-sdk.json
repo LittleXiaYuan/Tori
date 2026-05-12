@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "domain": "self-iteration",
+  "description": "Cross-language lightweight SDK entrypoints for reviewing self-iteration proposals, approving or rejecting them, triggering a cycle, and reading iteration status without importing the full platform client.",
+  "principles": [
+    "Expose self-iteration governance as a focused SDK slice for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep proposal approval and manual cycle triggers directly callable through existing authenticated iterate routes.",
+    "Make Iterate access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /api/iterate/proposals",
+    "POST /api/iterate/approve",
+    "POST /api/iterate/reject",
+    "POST /api/iterate/trigger",
+    "GET /api/iterate/status"
+  ],
+  "capabilities": [
+    {
+      "name": "proposals",
+      "route": "GET /api/iterate/proposals",
+      "readOnly": true,
+      "description": "Read self-iteration proposals, optionally filtered by status."
+    },
+    {
+      "name": "pendingProposals",
+      "route": "GET /api/iterate/proposals?status=pending",
+      "readOnly": true,
+      "description": "Read only pending self-iteration proposals."
+    },
+    {
+      "name": "approve",
+      "route": "POST /api/iterate/approve",
+      "readOnly": false,
+      "description": "Approve one pending proposal by id."
+    },
+    {
+      "name": "reject",
+      "route": "POST /api/iterate/reject",
+      "readOnly": false,
+      "description": "Reject one pending proposal by id."
+    },
+    {
+      "name": "trigger",
+      "route": "POST /api/iterate/trigger",
+      "readOnly": false,
+      "description": "Manually trigger one self-iteration cycle."
+    },
+    {
+      "name": "status",
+      "route": "GET /api/iterate/status",
+      "readOnly": true,
+      "description": "Read iterate engine status and pending proposal count."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/iterate.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "proposals": "createIterateClient().proposals",
+        "pendingProposals": "createIterateClient().pendingProposals",
+        "approve": "createIterateClient().approve",
+        "reject": "createIterateClient().reject",
+        "trigger": "createIterateClient().trigger",
+        "status": "createIterateClient().status"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "proposals": "yunque.Iterate.Proposals",
+        "pendingProposals": "yunque.Iterate.PendingProposals",
+        "approve": "yunque.Iterate.Approve",
+        "reject": "yunque.Iterate.Reject",
+        "trigger": "yunque.Iterate.Trigger",
+        "status": "yunque.Iterate.Status"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "proposals": "yunque.iterate.proposals",
+        "pendingProposals": "yunque.iterate.pending_proposals",
+        "approve": "yunque.iterate.approve",
+        "reject": "yunque.iterate.reject",
+        "trigger": "yunque.iterate.trigger",
+        "status": "yunque.iterate.status"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "proposals": "IterateClient::proposals",
+        "pendingProposals": "IterateClient::pending_proposals",
+        "approve": "IterateClient::approve",
+        "reject": "IterateClient::reject",
+        "trigger": "IterateClient::trigger",
+        "status": "IterateClient::status"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

@@ -161,6 +161,62 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestIterateHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/iterate/proposals":
+			_, _ = w.Write([]byte(`{"proposals":[{"id":"it-1","status":"pending"}],"count":1}`))
+		case "/api/iterate/approve", "/api/iterate/reject":
+			var body IterateDecisionRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			status := "approved"
+			if r.URL.Path == "/api/iterate/reject" {
+				status = "rejected"
+			}
+			_, _ = w.Write([]byte(`{"status":"` + status + `","id":"` + body.ID + `"}`))
+		case "/api/iterate/trigger":
+			_, _ = w.Write([]byte(`{"status":"ok","cycle":{"id":"cycle-1"}}`))
+		case "/api/iterate/status":
+			_, _ = w.Write([]byte(`{"enabled":true,"pending_proposals":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	pending, err := Iterate.PendingProposals(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := Iterate.Approve(ctx, "it-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := Iterate.Reject(ctx, "it-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trigger, err := Iterate.Trigger(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := Iterate.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending["count"].(float64) != 1 || approved["status"] != "approved" || rejected["id"] != "it-2" || trigger["status"] != "ok" || status["enabled"] != true || NewAgentKit().Iterate != Iterate {
+		t.Fatalf("unexpected iterate results: pending=%+v approved=%+v rejected=%+v trigger=%+v status=%+v", pending, approved, rejected, trigger, status)
+	}
+	if len(seen) != 5 || seen[0] != "GET /api/iterate/proposals?status=pending" || seen[4] != "GET /api/iterate/status" {
+		t.Fatalf("unexpected iterate requests: %v", seen)
+	}
+}
+
 func TestTrustHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
