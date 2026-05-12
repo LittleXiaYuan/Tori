@@ -147,6 +147,14 @@
       "types": "./src/bots.ts",
       "import": "./src/bots.ts"
     },
+    "./bots-read": {
+      "types": "./src/bots-read.ts",
+      "import": "./src/bots-read.ts"
+    },
+    "./bots-control": {
+      "types": "./src/bots-control.ts",
+      "import": "./src/bots-control.ts"
+    },
     "./discovery": {
       "types": "./src/discovery.ts",
       "import": "./src/discovery.ts"

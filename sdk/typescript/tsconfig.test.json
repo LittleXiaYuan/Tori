@@ -51,6 +51,8 @@
     "src/subagents-read.ts",
     "src/subagents-control.ts",
     "src/bots.ts",
+    "src/bots-read.ts",
+    "src/bots-control.ts",
     "src/discovery.ts",
     "src/identity.ts",
     "src/embeddings.ts",
