@@ -43,6 +43,7 @@
     "user-instructions",
     "reactions-runtime",
     "permissions-facade",
+    "auth-bootstrap",
     "tasks-runtime",
     "proactive-reverie",
     "chat-runtime",
@@ -196,6 +197,10 @@
       "description": "Access the lightweight Permissions client or namespace for permission checks and current-role reads."
     },
     {
+      "name": "auth",
+      "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
+    },
+    {
       "name": "tasks",
       "description": "Access the lightweight Tasks client or namespace for task CRUD and lifecycle operations."
     },
@@ -285,7 +290,7 @@
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
         "permissions": "AgentKit.permissions",
-        "tasks": "AgentKit.Tasks",
+        "auth": "AgentKit.auth",
         "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
@@ -345,7 +350,7 @@
         "instructions": "AgentKit.Instructions",
         "reactions": "AgentKit.Reactions",
         "permissions": "AgentKit.Permissions",
-        "tasks": "AgentKit.Tasks",
+        "auth": "AgentKit.Auth",
         "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
@@ -405,7 +410,7 @@
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
         "permissions": "AgentKit.permissions",
-        "tasks": "AgentKit.Tasks",
+        "auth": "AgentKit.auth",
         "tasks": "AgentKit.tasks",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
@@ -465,6 +470,7 @@
         "instructions": "AgentKit::instructions",
         "reactions": "AgentKit::reactions",
         "permissions": "AgentKit::permissions",
+        "auth": "AgentKit::auth",
         "tasks": "AgentKit::tasks",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
