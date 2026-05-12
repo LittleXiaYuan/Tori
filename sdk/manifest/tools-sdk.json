@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "domain": "tool-processes",
+  "description": "Cross-language lightweight SDK entrypoints for controlled tool process execution sessions without importing the full platform client.",
+  "principles": [
+    "Expose tool execution, listing, polling, and kill controls as a focused SDK slice for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep SDK wrapping separate from backend execution policy; callers use the same authenticated routes and server-side guardrails.",
+    "Make Tools access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "POST /v1/tools/exec",
+    "GET /v1/tools/list",
+    "GET /v1/tools/poll?id=...",
+    "POST /v1/tools/kill?id=..."
+  ],
+  "capabilities": [
+    {
+      "name": "exec",
+      "route": "POST /v1/tools/exec",
+      "readOnly": false,
+      "description": "Execute a controlled foreground/background tool command subject to server-side policy."
+    },
+    {
+      "name": "list",
+      "route": "GET /v1/tools/list",
+      "readOnly": true,
+      "description": "List known tool process sessions."
+    },
+    {
+      "name": "poll",
+      "route": "GET /v1/tools/poll?id=...",
+      "readOnly": true,
+      "description": "Poll output lines and state for one tool process session."
+    },
+    {
+      "name": "kill",
+      "route": "POST /v1/tools/kill?id=...",
+      "readOnly": false,
+      "description": "Kill one running tool process session."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/tools.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "exec": "createToolsClient().exec",
+        "list": "createToolsClient().list",
+        "poll": "createToolsClient().poll",
+        "kill": "createToolsClient().kill"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "exec": "yunque.Tools.Exec",
+        "list": "yunque.Tools.List",
+        "poll": "yunque.Tools.Poll",
+        "kill": "yunque.Tools.Kill"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "exec": "yunque.tools.exec",
+        "list": "yunque.tools.list",
+        "poll": "yunque.tools.poll",
+        "kill": "yunque.tools.kill"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "exec": "ToolsClient::exec",
+        "list": "ToolsClient::list",
+        "poll": "ToolsClient::poll",
+        "kill": "ToolsClient::kill"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

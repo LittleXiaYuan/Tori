@@ -320,6 +320,7 @@ type AgentKit struct {
 	Events        *eventsNamespace
 	Runtime       *runtimeNamespace
 	Subagents     *subagentsNamespace
+	Tools         *toolsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1838,6 +1839,9 @@ var Runtime = &runtimeNamespace{}
 // Subagents provides focused access to subagent spawn, listing, messaging, and deletion.
 var Subagents = &subagentsNamespace{}
 
+// Tools provides focused access to controlled tool process execution sessions.
+var Tools = &toolsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2761,6 +2765,74 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Tools Process Execution ──
+
+type toolsNamespace struct{}
+
+type ToolExecOptions struct {
+	Command    string   `json:"Command"`
+	Cwd        string   `json:"Cwd,omitempty"`
+	Background bool     `json:"Background,omitempty"`
+	TimeoutMs  int64    `json:"TimeoutMs,omitempty"`
+	YieldMs    int64    `json:"YieldMs,omitempty"`
+	Env        []string `json:"Env,omitempty"`
+}
+
+type ToolExecResult map[string]any
+
+type ToolProcessSession struct {
+	ID        string `json:"id"`
+	Command   string `json:"command"`
+	State     string `json:"state"`
+	ExitCode  int    `json:"exit_code,omitempty"`
+	StartedAt string `json:"started_at,omitempty"`
+	EndedAt   string `json:"ended_at,omitempty"`
+	Cwd       string `json:"cwd,omitempty"`
+}
+
+type ToolListResponse struct {
+	Sessions []ToolProcessSession `json:"sessions"`
+}
+
+type ToolPollResponse struct {
+	Lines []string `json:"lines"`
+	State string   `json:"state"`
+}
+
+type ToolKillResponse map[string]any
+
+func (t *toolsNamespace) Exec(ctx context.Context, opts ToolExecOptions) (ToolExecResult, error) {
+	var out ToolExecResult
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tools/exec", opts, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (t *toolsNamespace) List(ctx context.Context) (ToolListResponse, error) {
+	var out ToolListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tools/list", nil, &out); err != nil {
+		return ToolListResponse{}, err
+	}
+	return out, nil
+}
+
+func (t *toolsNamespace) Poll(ctx context.Context, id string) (ToolPollResponse, error) {
+	var out ToolPollResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tools/poll?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return ToolPollResponse{}, err
+	}
+	return out, nil
+}
+
+func (t *toolsNamespace) Kill(ctx context.Context, id string) (ToolKillResponse, error) {
+	var out ToolKillResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tools/kill?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ── Subagents ──
@@ -3816,6 +3888,7 @@ func NewAgentKit() AgentKit {
 		Events:        Events,
 		Runtime:       Runtime,
 		Subagents:     Subagents,
+		Tools:         Tools,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
