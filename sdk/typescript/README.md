@@ -64,7 +64,7 @@ const focus = await kit.state.focus();
 const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
 const found = await kit.memory.search({ query: "incremental SDK package", limit: 3 });
 const graphStats = await kit.graph.stats();
-const kbStats = await kit.knowledge.stats();
+const kbStats = await kit.knowledge / kit.lora.stats();
 const search = await kit.plugin.search("incremental SDK package", 5);
 
 console.log(focus.focus, strategies.strategies, found.count, graphStats.entities, kbStats.sources, search.results.length);

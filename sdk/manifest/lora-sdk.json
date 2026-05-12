@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "domain": "lora-lifecycle",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque host LoRA training, preview, rollback, config, and evolution APIs under /v1/lora/*.",
+  "principles": [
+    "Expose local-brain LoRA lifecycle as focused SDK slices instead of forcing full platform imports.",
+    "Keep observe/status/history helpers separate from mutation helpers so external automations can choose small incremental packages.",
+    "Let external projects, plugin UIs, CLIs, sidecars, and automation scripts trigger and observe adaptation directly."
+  ],
+  "routes": [
+    "GET /v1/lora/status",
+    "GET /v1/lora/history",
+    "GET /v1/lora/summary",
+    "GET /v1/lora/preview",
+    "POST /v1/lora/trigger",
+    "POST /v1/lora/rollback",
+    "GET /v1/lora/evolution",
+    "GET /v1/lora/config",
+    "PUT /v1/lora/config"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/lora/status",
+      "readOnly": true,
+      "description": "Read LoRA scheduler/model status."
+    },
+    {
+      "name": "history",
+      "route": "GET /v1/lora/history",
+      "readOnly": true,
+      "description": "Read LoRA training/evaluation history."
+    },
+    {
+      "name": "summary",
+      "route": "GET /v1/lora/summary",
+      "readOnly": true,
+      "description": "Read compact LoRA lifecycle summary."
+    },
+    {
+      "name": "preview",
+      "route": "GET /v1/lora/preview",
+      "readOnly": true,
+      "description": "Preview whether enough samples exist to train."
+    },
+    {
+      "name": "trigger",
+      "route": "POST /v1/lora/trigger",
+      "readOnly": false,
+      "description": "Trigger LoRA training for a tenant."
+    },
+    {
+      "name": "rollback",
+      "route": "POST /v1/lora/rollback",
+      "readOnly": false,
+      "description": "Rollback the active adapter."
+    },
+    {
+      "name": "evolution",
+      "route": "GET /v1/lora/evolution",
+      "readOnly": true,
+      "description": "Read evolution state."
+    },
+    {
+      "name": "config",
+      "route": "GET /v1/lora/config",
+      "readOnly": true,
+      "description": "Read LoRA lifecycle config."
+    },
+    {
+      "name": "updateConfig",
+      "route": "PUT /v1/lora/config",
+      "readOnly": false,
+      "description": "Update LoRA lifecycle config."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/lora.ts",
+        "sdk/typescript/src/lora-observe.ts",
+        "sdk/typescript/src/lora-status.ts",
+        "sdk/typescript/src/lora-history.ts",
+        "sdk/typescript/src/lora-control.ts",
+        "sdk/typescript/src/lora-config.ts",
+        "sdk/typescript/src/lora-preview.ts",
+        "sdk/typescript/src/lora-evolution.ts",
+        "sdk/typescript/src/lora-trigger.ts",
+        "sdk/typescript/src/lora-rollback.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createLoRAClient().status",
+        "history": "createLoRAClient().history",
+        "summary": "createLoRAClient().summary",
+        "preview": "createLoRAClient().preview",
+        "trigger": "createLoRAClient().trigger",
+        "rollback": "createLoRAClient().rollback",
+        "evolution": "createLoRAClient().evolution",
+        "config": "createLoRAClient().config",
+        "updateConfig": "createLoRAClient().updateConfig"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.LoRA.Status",
+        "history": "yunque.LoRA.History",
+        "summary": "yunque.LoRA.Summary",
+        "preview": "yunque.LoRA.Preview",
+        "trigger": "yunque.LoRA.Trigger",
+        "rollback": "yunque.LoRA.Rollback",
+        "evolution": "yunque.LoRA.Evolution",
+        "config": "yunque.LoRA.Config",
+        "updateConfig": "yunque.LoRA.UpdateConfig"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.lora.status",
+        "history": "yunque.lora.history",
+        "summary": "yunque.lora.summary",
+        "preview": "yunque.lora.preview",
+        "trigger": "yunque.lora.trigger",
+        "rollback": "yunque.lora.rollback",
+        "evolution": "yunque.lora.evolution",
+        "config": "yunque.lora.config",
+        "updateConfig": "yunque.lora.update_config"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "LoRAClient::status",
+        "history": "LoRAClient::history",
+        "summary": "LoRAClient::summary",
+        "preview": "LoRAClient::preview",
+        "trigger": "LoRAClient::trigger",
+        "rollback": "LoRAClient::rollback",
+        "evolution": "LoRAClient::evolution",
+        "config": "LoRAClient::config",
+        "updateConfig": "LoRAClient::update_config"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

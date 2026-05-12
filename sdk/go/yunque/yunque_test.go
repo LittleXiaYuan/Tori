@@ -266,6 +266,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"entities":2,"relations":1}`))
 		case "/v1/knowledge/stats":
 			_, _ = w.Write([]byte(`{"sources":2,"chunks":8}`))
+		case "/v1/lora/status":
+			_, _ = w.Write([]byte(`{"active_model":"adapter-a","rolling_success_rate":0.8}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -312,6 +314,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	loraStatus, err := kit.LoRA.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -320,14 +326,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 11 {
-		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 12 {
+		t.Fatalf("expected 12 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -570,6 +576,99 @@ func TestKnowledgeKBStatsSearchSourcesAndMutations(t *testing.T) {
 	}
 	if len(seen) != 8 {
 		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestLoRALifecycleHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/lora/status":
+			_, _ = w.Write([]byte(`{"active_model":"adapter-a","rolling_success_rate":0.8}`))
+		case "/v1/lora/history":
+			_, _ = w.Write([]byte(`{"records":[{"adapter":"a1"}],"count":1}`))
+		case "/v1/lora/summary":
+			_, _ = w.Write([]byte(`{"summary":{"best_score":0.9}}`))
+		case "/v1/lora/preview":
+			if r.URL.Query().Get("tenant_id") != "default" {
+				t.Fatalf("unexpected preview query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"preview":{"ready":true,"tenant_id":"default"}}`))
+		case "/v1/lora/trigger":
+			var body TriggerLoRARequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TenantID != "default" {
+				t.Fatalf("unexpected trigger body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"ok","tenant_id":"default"}`))
+		case "/v1/lora/rollback":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/lora/evolution":
+			_, _ = w.Write([]byte(`{"state":{"phase":"eval"}}`))
+		case "/v1/lora/config":
+			if r.Method == http.MethodPut {
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body["min_samples"].(float64) != 9 {
+					t.Fatalf("unexpected config body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"config":{"min_samples":9},"status":"updated"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"config":{"min_samples":8}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	status, err := LoRA.Status(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, err := LoRA.History(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, err := LoRA.Summary(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := LoRA.Preview(context.Background(), LoRAPreviewOptions{TenantID: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	triggered, err := LoRA.Trigger(context.Background(), TriggerLoRARequest{TenantID: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rolledBack, err := LoRA.Rollback(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	evolution, err := LoRA.Evolution(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := LoRA.Config(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := LoRA.UpdateConfig(context.Background(), LoRAConfig{"min_samples": 9})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status["active_model"] != "adapter-a" || history["count"].(float64) != 1 || summary["summary"].(map[string]any)["best_score"].(float64) != 0.9 || preview["preview"].(map[string]any)["ready"] != true || triggered["status"] != "ok" || rolledBack["status"] != "ok" || evolution["state"].(map[string]any)["phase"] != "eval" || config["config"].(map[string]any)["min_samples"].(float64) != 8 || updated["status"] != "updated" {
+		t.Fatalf("unexpected lora results")
+	}
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
 

@@ -200,6 +200,18 @@ ingested, err := yunque.KnowledgeKB.Ingest(ctx, yunque.KnowledgeIngestRequest{Na
 fmt.Println(stats["sources"], found.Count, ingested.Source.ID)
 ```
 
+
+### LoRA lifecycle 宿主训练进化切片
+
+Go sidecar、CLI 或自动化二进制可以用 `yunque.LoRA` 访问宿主 `/v1/lora/*` 本地脑训练生命周期能力：状态、历史、预览、触发、回滚、进化和配置。
+
+```go
+status, err := yunque.LoRA.Status(ctx)
+preview, err := yunque.LoRA.Preview(ctx, yunque.LoRAPreviewOptions{TenantID: "default"})
+triggered, err := yunque.LoRA.Trigger(ctx, yunque.TriggerLoRARequest{TenantID: "default"})
+fmt.Println(status["active_model"], preview["preview"], triggered["status"])
+```
+
 ## Triggers 触发器自动化切片
 
 Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.Triggers` 管理 Triggers v2 定义、触发事件并读取运行/事件记录。

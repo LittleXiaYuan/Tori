@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA lifecycle, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + LoRA + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -17,6 +17,7 @@
     "memory-kernel",
     "knowledge-graph",
     "knowledge-base",
+    "lora-lifecycle",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -57,6 +58,10 @@
       "description": "Access the lightweight host Knowledge Base client or namespace."
     },
     {
+      "name": "lora",
+      "description": "Access the lightweight host LoRA training and evolution lifecycle client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -83,7 +88,8 @@
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory",
         "graph": "AgentKit.graph",
-        "knowledge": "AgentKit.knowledge"
+        "knowledge": "AgentKit.knowledge",
+        "lora": "AgentKit.lora"
       }
     },
     "go": {
@@ -107,7 +113,8 @@
         "plugin": "AgentKit.Plugin",
         "memory": "AgentKit.MemoryCore",
         "graph": "AgentKit.Graph",
-        "knowledge": "AgentKit.KnowledgeKB"
+        "knowledge": "AgentKit.KnowledgeKB",
+        "lora": "AgentKit.LoRA"
       }
     },
     "python": {
@@ -131,7 +138,8 @@
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory_core",
         "graph": "AgentKit.graph",
-        "knowledge": "AgentKit.knowledge_base"
+        "knowledge": "AgentKit.knowledge_base",
+        "lora": "AgentKit.lora"
       }
     },
     "rust": {
@@ -155,7 +163,8 @@
         "plugin": "AgentKit::plugin",
         "memory": "AgentKit::memory",
         "graph": "AgentKit::graph",
-        "knowledge": "AgentKit::knowledge"
+        "knowledge": "AgentKit::knowledge",
+        "lora": "AgentKit::lora"
       }
     }
   },

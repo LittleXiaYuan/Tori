@@ -302,6 +302,7 @@ type AgentKit struct {
 	MemoryCore  *memoryCoreNamespace
 	Graph       *graphNamespace
 	KnowledgeKB *knowledgeKBNamespace
+	LoRA        *loRANamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1026,6 +1027,114 @@ func (k *knowledgeKBNamespace) ImportRepo(ctx context.Context, req KnowledgeImpo
 	return out, nil
 }
 
+// ── LoRA Training and Evolution (host) ──
+
+// LoRA provides focused access to host /v1/lora/* local-brain training lifecycle APIs.
+var LoRA = &loRANamespace{}
+
+type loRANamespace struct{}
+
+type LoRAStatusResponse map[string]any
+type LoRAHistoryResponse map[string]any
+type LoRASummaryResponse map[string]any
+type LoRAEvolutionResponse map[string]any
+type LoRAConfigResponse map[string]any
+type LoRARollbackResponse map[string]any
+type TriggerLoRAResponse map[string]any
+
+type LoRAPreviewOptions struct {
+	TenantID string
+}
+
+type TriggerLoRARequest struct {
+	TenantID string `json:"tenant_id,omitempty"`
+}
+
+type LoRAConfig map[string]any
+
+func (l *loRANamespace) Status(ctx context.Context) (LoRAStatusResponse, error) {
+	var out LoRAStatusResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/lora/status", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) History(ctx context.Context) (LoRAHistoryResponse, error) {
+	var out LoRAHistoryResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/lora/history", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Summary(ctx context.Context) (LoRASummaryResponse, error) {
+	var out LoRASummaryResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/lora/summary", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Preview(ctx context.Context, opts LoRAPreviewOptions) (map[string]any, error) {
+	path := "/v1/lora/preview"
+	if opts.TenantID != "" {
+		path += "?tenant_id=" + url.QueryEscape(opts.TenantID)
+	}
+	var out map[string]any
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Trigger(ctx context.Context, req TriggerLoRARequest) (TriggerLoRAResponse, error) {
+	var out TriggerLoRAResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/lora/trigger", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Rollback(ctx context.Context) (LoRARollbackResponse, error) {
+	var out LoRARollbackResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/lora/rollback", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Evolution(ctx context.Context) (LoRAEvolutionResponse, error) {
+	var out LoRAEvolutionResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/lora/evolution", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) Config(ctx context.Context) (LoRAConfigResponse, error) {
+	var out LoRAConfigResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/lora/config", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (l *loRANamespace) UpdateConfig(ctx context.Context, config LoRAConfig) (LoRAConfigResponse, error) {
+	var out LoRAConfigResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/lora/config", config, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func nonNilMap[T ~map[string]any](value T) T {
+	if value == nil {
+		return T{}
+	}
+	return value
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -1098,6 +1207,7 @@ func NewAgentKit() AgentKit {
 		MemoryCore:  MemoryCore,
 		Graph:       Graph,
 		KnowledgeKB: KnowledgeKB,
+		LoRA:        LoRA,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,
