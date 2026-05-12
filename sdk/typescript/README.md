@@ -217,6 +217,7 @@ import { createPluginApiClient } from "yunque-client/plugin-api";
 import { createPluginLLMClient } from "yunque-client/plugin-llm";
 import { createPluginSearchClient } from "yunque-client/plugin-search";
 import { createPluginMemoryClient } from "yunque-client/plugin-memory";
+import { createPluginAgentMemoryClient } from "yunque-client/plugin-agent-memory";
 import { createStateClient } from "yunque-client/state";
 import { createResourceStateClient } from "yunque-client/resource-state";
 import { createFocusStateClient } from "yunque-client/focus-state";
@@ -1107,6 +1108,13 @@ await pluginMemory.set("last-summary", pluginReply.reply);
 const pluginMemoryValue = await pluginMemory.get("last-summary");
 console.log(pluginMemoryValue.value);
 
+const pluginAgentMemory = createPluginAgentMemoryClient({
+  baseUrl: "http://localhost:9090",
+  token: "<plugin-token>",
+});
+const pluginAgentContext = await pluginAgentMemory.search("current project", 3);
+console.log(pluginAgentContext.context);
+
 const resourceState = createResourceStateClient({
   baseUrl: "http://localhost:9090",
   token: "<your-token>",
@@ -1184,7 +1192,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `cognis`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
 `/ide`/`persona`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`usage`/`lora`/`iterate`/`trust`/`review`/`skillgrow`/`audit`/`heartbeat`
-`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`system`/`settings`/`tori`/`speech`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1338,6 +1346,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugin-llm.ts` | Lightweight plugin LLM completion facade without plugin search, memory, knowledge, cron or extension APIs |
 | `src/plugin-search.ts` | Lightweight plugin runtime search facade without LLM, memory, knowledge, cron or extension APIs |
 | `src/plugin-memory.ts` | Lightweight plugin KV memory facade without LLM, search, agent memory, knowledge, cron or extension APIs |
+| `src/plugin-agent-memory.ts` | Lightweight plugin access to host Agent memory search/add without plugin KV, knowledge, cron or extension APIs |
 | `src/state.ts` | Lightweight hand-written state kernel snapshot, goals, focus, and resources slice |
 | `src/resource-state.ts` | Lightweight state resource list/track/release facade without full SDK import |
 | `src/focus-state.ts` | Lightweight state focus read/update facade without full SDK import |
