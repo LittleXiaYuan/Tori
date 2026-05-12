@@ -114,6 +114,8 @@ import { createEventsClient } from "yunque-client/events";
 import { createEventsStreamClient } from "yunque-client/events-stream";
 import { createEventsParseClient } from "yunque-client/events-parse";
 import { createRealtimeClient } from "yunque-client/realtime";
+import { createRealtimeConnectClient } from "yunque-client/realtime-connect";
+import { createRealtimeMessagesClient } from "yunque-client/realtime-messages";
 import { createWebChatClient } from "yunque-client/webchat";
 import { createConversationsClient } from "yunque-client/conversations";
 import { createSubagentsClient } from "yunque-client/subagents";
@@ -1253,7 +1255,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`market-search`/`market-stats`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -1307,6 +1309,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/events-stream.ts` | Lightweight SSE connection facade without standalone parser-only API |
 | `src/events-parse.ts` | Lightweight SSE parser facade for local stream decoding without opening `/v1/events/stream` |
 | `src/realtime.ts` | Lightweight hand-written `/v1/ws` URL, connect, ping/chat message helper slice |
+| `src/realtime-connect.ts` | Lightweight WebSocket URL/connect facade without message serialization helpers |
+| `src/realtime-messages.ts` | Lightweight realtime ping/chat/send/parse helper facade without opening sockets |
 | `src/webchat.ts` | Lightweight hand-written embeddable WebChat widget script/snippet slice |
 | `src/conversations.ts` | Lightweight hand-written conversation history, management, and replay slice |
 | `src/subagents.ts` | Lightweight hand-written subagent list/spawn/message/destroy slice |
