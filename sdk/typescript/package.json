@@ -499,6 +499,10 @@
       "types": "./src/plugin-api.ts",
       "import": "./src/plugin-api.ts"
     },
+    "./plugin-llm": {
+      "types": "./src/plugin-llm.ts",
+      "import": "./src/plugin-llm.ts"
+    },
     "./state": {
       "types": "./src/state.ts",
       "import": "./src/state.ts"
