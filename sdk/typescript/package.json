@@ -35,6 +35,10 @@
       "types": "./src/cognis.ts",
       "import": "./src/cognis.ts"
     },
+    "./cognis-registry": {
+      "types": "./src/cognis-registry.ts",
+      "import": "./src/cognis-registry.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
