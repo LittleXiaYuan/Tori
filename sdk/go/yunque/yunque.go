@@ -318,6 +318,7 @@ type AgentKit struct {
 	Trace         *traceNamespace
 	Heartbeat     *heartbeatNamespace
 	Events        *eventsNamespace
+	Runtime       *runtimeNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1830,6 +1831,9 @@ var Heartbeat = &heartbeatNamespace{}
 // Events provides focused access to Server-Sent Events stream helpers.
 var Events = &eventsNamespace{}
 
+// Runtime provides focused access to session queue operations and runtime event streams.
+var Runtime = &runtimeNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2753,6 +2757,45 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 		out = append(out, msg)
 	}
 	return out
+}
+
+// ── Runtime Operations ──
+
+type runtimeNamespace struct{}
+
+type RuntimeQueueTask map[string]any
+type RuntimeQueueOverviewResponse map[string]any
+type RuntimeQueueSessionResponse map[string]any
+type RuntimeQueueCancelResponse map[string]any
+
+func (r *runtimeNamespace) Queues(ctx context.Context) (RuntimeQueueOverviewResponse, error) {
+	var out RuntimeQueueOverviewResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/sessions/queue", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *runtimeNamespace) SessionQueue(ctx context.Context, sessionID string) (RuntimeQueueSessionResponse, error) {
+	var out RuntimeQueueSessionResponse
+	path := "/v1/sessions/queue?id=" + url.QueryEscape(sessionID)
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *runtimeNamespace) CancelQueuedTask(ctx context.Context, sessionID, taskID string) (RuntimeQueueCancelResponse, error) {
+	var out RuntimeQueueCancelResponse
+	body := map[string]any{"session_id": sessionID, "task_id": taskID}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sessions/queue/cancel", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *runtimeNamespace) EventsStreamURL() string {
+	return strings.TrimRight(apiBase, "/") + "/v1/events/stream"
 }
 
 // ── Browser ──
@@ -3690,6 +3733,7 @@ func NewAgentKit() AgentKit {
 		Trace:         Trace,
 		Heartbeat:     Heartbeat,
 		Events:        Events,
+		Runtime:       Runtime,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
