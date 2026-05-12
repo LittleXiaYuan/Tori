@@ -2005,6 +2005,9 @@ type TaskGap map[string]any
 type TaskGapStats map[string]any
 type ResolveTaskGapResponse map[string]any
 type TaskWorkingMemory map[string]any
+type TaskThreadsResponse map[string]any
+type TaskThreadResponse map[string]any
+type TaskThreadActionResponse map[string]any
 
 type TaskConstraints struct {
 	MaxSteps        int      `json:"max_steps,omitempty"`
@@ -2050,6 +2053,25 @@ type CreateTaskTemplateRequest struct {
 type InstantiateTaskTemplateRequest struct {
 	TemplateID string            `json:"template_id"`
 	Variables  map[string]string `json:"variables,omitempty"`
+}
+
+type TaskChannelBinding struct {
+	ChannelType string `json:"channel_type"`
+	ChannelID   string `json:"channel_id"`
+	UserID      string `json:"user_id,omitempty"`
+	UserName    string `json:"user_name,omitempty"`
+	MessageID   string `json:"message_id,omitempty"`
+}
+
+type PostTaskThreadMessageRequest struct {
+	TaskID  string              `json:"task_id"`
+	Content string              `json:"content"`
+	Channel *TaskChannelBinding `json:"channel,omitempty"`
+}
+
+type UpdateTaskThreadStateRequest struct {
+	TaskID string `json:"task_id"`
+	State  string `json:"state"`
 }
 
 func (t *tasksNamespace) List(ctx context.Context) ([]Task, error) {
@@ -2178,6 +2200,42 @@ func (t *tasksNamespace) ResolveGap(ctx context.Context, id string) (ResolveTask
 func (t *tasksNamespace) WorkingMemory(ctx context.Context, taskID string) (TaskWorkingMemory, error) {
 	var out TaskWorkingMemory
 	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/memory?id="+url.QueryEscape(taskID), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Threads(ctx context.Context, state string) (TaskThreadsResponse, error) {
+	path := "/v1/tasks/threads"
+	if state != "" {
+		path += "?state=" + url.QueryEscape(state)
+	}
+	var out TaskThreadsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) Thread(ctx context.Context, taskID string) (TaskThreadResponse, error) {
+	var out TaskThreadResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tasks/threads?id="+url.QueryEscape(taskID), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) PostThreadMessage(ctx context.Context, req PostTaskThreadMessageRequest) (TaskThreadActionResponse, error) {
+	var out TaskThreadActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tasks/threads", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (t *tasksNamespace) UpdateThreadState(ctx context.Context, req UpdateTaskThreadStateRequest) (TaskThreadActionResponse, error) {
+	var out TaskThreadActionResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/tasks/threads", req, &out); err != nil {
 		return nil, err
 	}
 	return nonNilMap(out), nil

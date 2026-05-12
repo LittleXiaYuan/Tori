@@ -5228,6 +5228,9 @@ pub type TaskGap = serde_json::Value;
 pub type TaskGapStats = serde_json::Value;
 pub type ResolveTaskGapResponse = serde_json::Value;
 pub type TaskWorkingMemory = serde_json::Value;
+pub type TaskThreadsResponse = serde_json::Value;
+pub type TaskThreadResponse = serde_json::Value;
+pub type TaskThreadActionResponse = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TaskConstraints {
@@ -5302,6 +5305,32 @@ pub struct InstantiateTaskTemplateRequest {
     pub template_id: String,
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub variables: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct TaskChannelBinding {
+    pub channel_type: String,
+    pub channel_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub user_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub user_name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PostTaskThreadMessageRequest {
+    pub task_id: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<TaskChannelBinding>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct UpdateTaskThreadStateRequest {
+    pub task_id: String,
+    pub state: String,
 }
 
 /// Small Rust helper over task CRUD and lifecycle endpoints.
@@ -5388,6 +5417,27 @@ impl TasksClient {
 
     pub async fn working_memory(&self, task_id: impl AsRef<str>) -> Result<TaskWorkingMemory, reqwest::Error> {
         self.get_json(&format!("/v1/tasks/memory?id={}", url_encode_query_component(task_id.as_ref()))).await
+    }
+
+    pub async fn threads(&self, state: impl AsRef<str>) -> Result<TaskThreadsResponse, reqwest::Error> {
+        let state = state.as_ref();
+        if state.is_empty() {
+            self.get_json("/v1/tasks/threads").await
+        } else {
+            self.get_json(&format!("/v1/tasks/threads?state={}", url_encode_query_component(state))).await
+        }
+    }
+
+    pub async fn thread(&self, task_id: impl AsRef<str>) -> Result<TaskThreadResponse, reqwest::Error> {
+        self.get_json(&format!("/v1/tasks/threads?id={}", url_encode_query_component(task_id.as_ref()))).await
+    }
+
+    pub async fn post_thread_message(&self, request: &PostTaskThreadMessageRequest) -> Result<TaskThreadActionResponse, reqwest::Error> {
+        self.post_json("/v1/tasks/threads", request).await
+    }
+
+    pub async fn update_thread_state(&self, request: &UpdateTaskThreadStateRequest) -> Result<TaskThreadActionResponse, reqwest::Error> {
+        self.http.put(self.url("/v1/tasks/threads")).json(request).send().await?.error_for_status()?.json().await
     }
 
     async fn action(&self, action: &str, id: &str) -> Result<TaskActionResponse, reqwest::Error> {
@@ -9114,6 +9164,22 @@ mod tests {
         );
         let memory: TaskWorkingMemory = serde_json::from_str(r#"{"task_id":"task-1","next_action":"resume"}"#).unwrap();
         assert_eq!(memory["next_action"], "resume");
+        assert_eq!(
+            client.url(&format!("/v1/tasks/threads?state={}", url_encode_query_component("open"))),
+            "http://localhost:9090/v1/tasks/threads?state=open"
+        );
+        assert_eq!(
+            client.url(&format!("/v1/tasks/threads?id={}", url_encode_query_component("task 1"))),
+            "http://localhost:9090/v1/tasks/threads?id=task+1"
+        );
+        let post_thread = serde_json::to_value(PostTaskThreadMessageRequest {
+            task_id: "task-1".to_string(),
+            content: "hi".to_string(),
+            channel: Some(TaskChannelBinding { channel_type: "feishu".to_string(), channel_id: "chat-1".to_string(), ..Default::default() }),
+        }).unwrap();
+        assert_eq!(post_thread["channel"]["channel_id"], "chat-1");
+        let state = serde_json::to_value(UpdateTaskThreadStateRequest { task_id: "task-1".to_string(), state: "paused".to_string() }).unwrap();
+        assert_eq!(state["state"], "paused");
     }
     #[test]
     fn permissions_helpers_build_urls_and_payloads() {

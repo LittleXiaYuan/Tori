@@ -1,11 +1,11 @@
 {
   "version": 1,
   "domain": "tasks-runtime",
-  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, capability-gap, and working-memory operations over /v1/tasks without importing the full platform client.",
+  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, capability-gap, working-memory, and thread operations over /v1/tasks without importing the full platform client.",
   "principles": [
     "Expose task orchestration as a focused SDK slice for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts.",
-    "Keep task reads, creation, lifecycle control, deletion, template instantiation, capability-gap resolution, and working-memory reads directly callable through existing authenticated task routes.",
-    "Make Tasks access available through Agent Kit while leaving deeper task threads and traces as separate incremental slices."
+    "Keep task reads, creation, lifecycle control, deletion, template instantiation, capability-gap resolution, working-memory reads, and task-thread interactions directly callable through existing authenticated task routes.",
+    "Make Tasks access available through Agent Kit while leaving deeper task traces as a separate incremental slice."
   ],
   "routes": [
     "GET /v1/tasks",
@@ -26,7 +26,12 @@
     "GET /v1/tasks/gaps?type=...",
     "GET /v1/tasks/gaps?stats=true",
     "POST /v1/tasks/gaps/resolve",
-    "GET /v1/tasks/memory?id=..."
+    "GET /v1/tasks/memory?id=...",
+    "GET /v1/tasks/threads",
+    "GET /v1/tasks/threads?state=...",
+    "GET /v1/tasks/threads?id=...",
+    "POST /v1/tasks/threads",
+    "PUT /v1/tasks/threads"
   ],
   "capabilities": [
     { "name": "list", "route": "GET /v1/tasks", "readOnly": true, "description": "List recent tasks visible to the current tenant." },
@@ -46,12 +51,16 @@
     { "name": "gaps", "route": "GET /v1/tasks/gaps", "readOnly": true, "description": "List unresolved task capability gaps, optionally filtered by type." },
     { "name": "gapStats", "route": "GET /v1/tasks/gaps?stats=true", "readOnly": true, "description": "Read task capability gap aggregate statistics." },
     { "name": "resolveGap", "route": "POST /v1/tasks/gaps/resolve", "readOnly": false, "description": "Mark a task capability gap as resolved." },
-    { "name": "workingMemory", "route": "GET /v1/tasks/memory?id=...", "readOnly": true, "description": "Read per-task working memory for resumable automation and external task pages." }
+    { "name": "workingMemory", "route": "GET /v1/tasks/memory?id=...", "readOnly": true, "description": "Read per-task working memory for resumable automation and external task pages." },
+    { "name": "threads", "route": "GET /v1/tasks/threads", "readOnly": true, "description": "List task-scoped conversation threads, optionally filtered by state." },
+    { "name": "thread", "route": "GET /v1/tasks/threads?id=...", "readOnly": true, "description": "Read one task-scoped conversation thread with messages." },
+    { "name": "postThreadMessage", "route": "POST /v1/tasks/threads", "readOnly": false, "description": "Post a user message to a task thread, optionally binding a channel." },
+    { "name": "updateThreadState", "route": "PUT /v1/tasks/threads", "readOnly": false, "description": "Update a task thread state to open, paused, or closed." }
   ],
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-context.ts"],
+      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-threads.ts", "sdk/typescript/src/task-context.ts"],
       "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createTasksClient().list",
@@ -71,7 +80,11 @@
         "gaps": "createTaskGapsClient().list",
         "gapStats": "createTaskGapsClient().stats",
         "resolveGap": "createTaskGapsClient().resolve",
-        "workingMemory": "createTaskMemoryClient().get"
+        "workingMemory": "createTaskMemoryClient().get",
+        "threads": "createTaskThreadsClient().list",
+        "thread": "createTaskThreadsClient().get",
+        "postThreadMessage": "createTaskThreadsClient().postMessage",
+        "updateThreadState": "createTaskThreadsClient().updateState"
       }
     },
     "go": {
@@ -96,7 +109,11 @@
         "gaps": "yunque.Tasks.Gaps",
         "gapStats": "yunque.Tasks.GapStats",
         "resolveGap": "yunque.Tasks.ResolveGap",
-        "workingMemory": "yunque.Tasks.WorkingMemory"
+        "workingMemory": "yunque.Tasks.WorkingMemory",
+        "threads": "yunque.Tasks.Threads",
+        "thread": "yunque.Tasks.Thread",
+        "postThreadMessage": "yunque.Tasks.PostThreadMessage",
+        "updateThreadState": "yunque.Tasks.UpdateThreadState"
       }
     },
     "python": {
@@ -121,7 +138,11 @@
         "gaps": "yunque.task_gaps.list",
         "gapStats": "yunque.task_gaps.stats",
         "resolveGap": "yunque.task_gaps.resolve",
-        "workingMemory": "yunque.task_memory.get"
+        "workingMemory": "yunque.task_memory.get",
+        "threads": "yunque.task_threads.list",
+        "thread": "yunque.task_threads.get",
+        "postThreadMessage": "yunque.task_threads.post_message",
+        "updateThreadState": "yunque.task_threads.update_state"
       }
     },
     "rust": {
@@ -146,7 +167,11 @@
         "gaps": "TasksClient::gaps",
         "gapStats": "TasksClient::gap_stats",
         "resolveGap": "TasksClient::resolve_gap",
-        "workingMemory": "TasksClient::working_memory"
+        "workingMemory": "TasksClient::working_memory",
+        "threads": "TasksClient::threads",
+        "thread": "TasksClient::thread",
+        "postThreadMessage": "TasksClient::post_thread_message",
+        "updateThreadState": "TasksClient::update_thread_state"
       }
     }
   },
