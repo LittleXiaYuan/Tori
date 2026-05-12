@@ -207,6 +207,7 @@ import { createSystemProbesClient } from "yunque-client/system-probes";
 import { createSystemOpsClient } from "yunque-client/system-ops";
 import { createSettingsClient } from "yunque-client/settings";
 import { createSettingsConfigClient } from "yunque-client/settings-config";
+import { createSettingsBackupClient } from "yunque-client/settings-backup";
 import { createToriClient } from "yunque-client/tori";
 import { createSpeechClient } from "yunque-client/speech";
 import { createAdminClient } from "yunque-client/admin";
@@ -1359,6 +1360,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/system-ops.ts` | Lightweight system info/stats/metrics/cache/modules/SBOM facade without public probe APIs |
 | `src/settings.ts` | Lightweight hand-written settings, config reload, directory detection, and backup/restore slice |
 | `src/settings-config.ts` | Lightweight settings schema/config/update/check/reload/detect-dirs facade without backup APIs |
+| `src/settings-backup.ts` | Lightweight settings backup info/export/import facade without config APIs |
 | `src/tori.ts` | Lightweight hand-written Tori OAuth binding, status, health, and usage slice |
 | `src/speech.ts` | Lightweight hand-written speech TTS/STT, STT stream URL, voices, and file upload slice |
 | `src/admin.ts` | Lightweight hand-written desktop controls, tenants, and natural-language config slice |
