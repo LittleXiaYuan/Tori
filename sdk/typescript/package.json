@@ -355,6 +355,14 @@
       "types": "./src/ide.ts",
       "import": "./src/ide.ts"
     },
+    "./ide-status": {
+      "types": "./src/ide-status.ts",
+      "import": "./src/ide-status.ts"
+    },
+    "./ide-review": {
+      "types": "./src/ide-review.ts",
+      "import": "./src/ide-review.ts"
+    },
     "./persona": {
       "types": "./src/persona.ts",
       "import": "./src/persona.ts"

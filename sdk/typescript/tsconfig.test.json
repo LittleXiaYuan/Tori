@@ -103,6 +103,8 @@
     "src/modes-observe.ts",
     "src/modes-control.ts",
     "src/ide.ts",
+    "src/ide-status.ts",
+    "src/ide-review.ts",
     "src/persona.ts",
     "src/persona-state.ts",
     "src/persona-skills.ts",
