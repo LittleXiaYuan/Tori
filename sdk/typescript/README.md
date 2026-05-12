@@ -1687,6 +1687,8 @@ cd sdk/typescript
 npm run generate
 npm run typecheck           # should be silent (0 errors)
 npm run check:incremental   # verifies hand-written slice exports/tests/route coverage
+npm run test -- state-actions state-capabilities
+# optional focused run for changed slices; omit args to run all incremental tests
 ```
 
 ## Layout
