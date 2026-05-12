@@ -161,6 +161,46 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestReactionsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/react":
+			var body ReactRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.MessageID != "m1" {
+				t.Fatalf("unexpected react body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/sticker/send":
+			_, _ = w.Write([]byte(`{"status":"sent"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	reacted, err := Reactions.React(ctx, ReactRequest{ChannelType: "wechat", Target: "u1", MessageID: "m1", Emoji: "👍"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := Reactions.SendSticker(ctx, SendStickerRequest{ChannelType: "wechat", Target: "u1", Emoji: "🌟"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if reacted["status"] != "ok" || sent["status"] != "sent" || NewAgentKit().Reactions != Reactions {
+		t.Fatalf("unexpected reactions results")
+	}
+	if len(seen) != 2 || seen[0] != "POST /v1/react" || seen[1] != "POST /v1/sticker/send" {
+		t.Fatalf("unexpected reactions requests: %v", seen)
+	}
+}
+
 func TestInstructionsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

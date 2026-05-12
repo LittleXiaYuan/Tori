@@ -2253,6 +2253,11 @@ Use the lightweight Iterate SDK for self-iteration proposal review from admin pa
 Use the lightweight Persona SDK when an external page, plugin UI, CLI, or automation script needs to read or adjust persona identity without importing the full platform client. `createPersonaClient` wraps `GET/PUT /v1/persona`, persona skills, persona presets, custom presets, and preset feature flags; `createAgentKit(...).persona` exposes the same persona identity, skills, and presets surface.
 
 
+
+### Reactions SDK
+
+The lightweight Reactions SDK exposes emoji reactions and sticker sending for external plugin UIs, front-end pages, CLIs, and automation scripts. Use it to call `/v1/react` and `/v1/sticker/send` without pulling in the full platform backend.
+
 ### Instructions SDK
 
 The lightweight Instructions SDK exposes user instructions and instruction CRUD for external plugin UIs, front-end admin pages, CLIs, and automation scripts. Use it to list, create, update, delete, and reorder `/v1/instructions` records without pulling in the full platform backend.

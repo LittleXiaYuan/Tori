@@ -337,6 +337,11 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 `yunque.persona` exposes persona identity, soul, skills, and presets as a small incremental SDK slice. Use `get()`, `update()`, `skills()`, `add_skill()`, `delete_skill()`, `presets()`, `switch_preset()`, `add_custom_preset()`, `delete_custom_preset()`, and `update_preset_features()` over `/v1/persona*`; `create_agent_kit().persona` reuses the same helpers.
 
 
+
+### Reactions SDK
+
+The lightweight Reactions SDK exposes emoji reactions and sticker sending for external plugin UIs, front-end pages, CLIs, and automation scripts. Use it to call `/v1/react` and `/v1/sticker/send` without pulling in the full platform backend.
+
 ### Instructions SDK
 
 The lightweight Instructions SDK exposes user instructions and instruction CRUD for external plugin UIs, front-end admin pages, CLIs, and automation scripts. Use it to list, create, update, delete, and reorder `/v1/instructions` records without pulling in the full platform backend.

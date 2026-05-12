@@ -327,6 +327,7 @@ type AgentKit struct {
 	Persona       *personaNamespace
 	Emotion       *emotionNamespace
 	Instructions  *instructionsNamespace
+	Reactions     *reactionsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1866,6 +1867,9 @@ var Emotion = &emotionNamespace{}
 // Instructions provides focused access to user instruction CRUD and ordering.
 var Instructions = &instructionsNamespace{}
 
+// Reactions provides focused access to emoji reactions and sticker sending.
+var Reactions = &reactionsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2792,6 +2796,43 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 }
 
 // ── Persona identity, skills, and presets ──
+
+type reactionsNamespace struct{}
+
+type ReactRequest struct {
+	ChannelType string `json:"channel_type"`
+	Target      string `json:"target"`
+	MessageID   string `json:"message_id"`
+	Emoji       string `json:"emoji,omitempty"`
+}
+
+type SendStickerRequest struct {
+	ChannelType string `json:"channel_type"`
+	Target      string `json:"target"`
+	PackageID   string `json:"package_id,omitempty"`
+	StickerID   string `json:"sticker_id,omitempty"`
+	FileID      string `json:"file_id,omitempty"`
+	Emoji       string `json:"emoji,omitempty"`
+	Platform    string `json:"platform,omitempty"`
+}
+
+type ReactionStatusResponse map[string]any
+
+func (r *reactionsNamespace) React(ctx context.Context, req ReactRequest) (ReactionStatusResponse, error) {
+	var out ReactionStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/react", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *reactionsNamespace) SendSticker(ctx context.Context, req SendStickerRequest) (ReactionStatusResponse, error) {
+	var out ReactionStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sticker/send", req, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 type instructionsNamespace struct{}
 
@@ -4395,6 +4436,7 @@ func NewAgentKit() AgentKit {
 		Persona:       Persona,
 		Emotion:       Emotion,
 		Instructions:  Instructions,
+		Reactions:     Reactions,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
