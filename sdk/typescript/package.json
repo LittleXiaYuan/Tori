@@ -483,6 +483,10 @@
       "types": "./src/tori-observe.ts",
       "import": "./src/tori-observe.ts"
     },
+    "./tori-bind": {
+      "types": "./src/tori-bind.ts",
+      "import": "./src/tori-bind.ts"
+    },
     "./speech": {
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
