@@ -384,6 +384,8 @@ import { createPluginMemoryClient } from "yunque-client/plugin-memory";
 import { createPluginMemoryReadClient } from "yunque-client/plugin-memory-read";
 import { createPluginMemoryWriteClient } from "yunque-client/plugin-memory-write";
 import { createPluginAgentMemoryClient } from "yunque-client/plugin-agent-memory";
+import { createPluginAgentMemorySearchClient } from "yunque-client/plugin-agent-memory-search";
+import { createPluginAgentMemoryWriteClient } from "yunque-client/plugin-agent-memory-write";
 import { createPluginKnowledgeClient } from "yunque-client/plugin-knowledge";
 import { createPluginCronClient } from "yunque-client/plugin-cron";
 import { createPluginSendClient } from "yunque-client/plugin-send";
@@ -1402,6 +1404,18 @@ const pluginMemoryWrite = createPluginMemoryWriteClient({
 });
 await pluginMemoryWrite.set("last-summary", pluginReply.reply);
 
+const pluginAgentMemorySearch = createPluginAgentMemorySearchClient({
+  baseUrl: "http://localhost:9090",
+  token: "<plugin-token>",
+});
+await pluginAgentMemorySearch.search("release checklist", 4);
+
+const pluginAgentMemoryWrite = createPluginAgentMemoryWriteClient({
+  baseUrl: "http://localhost:9090",
+  token: "<plugin-token>",
+});
+await pluginAgentMemoryWrite.add("Release checklist passed", "plugin-demo");
+
 const resourceState = createResourceStateClient({
   baseUrl: "http://localhost:9090",
   token: "<your-token>",
@@ -1479,7 +1493,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
-`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`connectors`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`connectors`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1800,6 +1814,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/plugin-memory-read.ts` | Lightweight plugin KV memory get/list/search facade without set/delete or other plugin APIs |
 | `src/plugin-memory-write.ts` | Lightweight plugin KV memory set/delete facade without get/list/search or other plugin APIs |
 | `src/plugin-agent-memory.ts` | Lightweight plugin access to host Agent memory search/add without plugin KV, knowledge, cron or extension APIs |
+| `src/plugin-agent-memory-search.ts` | Lightweight plugin access to host Agent memory search without add or other plugin APIs |
+| `src/plugin-agent-memory-write.ts` | Lightweight plugin access to host Agent memory add without search or other plugin APIs |
 | `src/plugin-knowledge.ts` | Lightweight plugin knowledge search/ingest facade without LLM, memory or cron APIs |
 | `src/plugin-cron.ts` | Lightweight plugin cron add/remove/list facade without LLM, memory, knowledge or extension APIs |
 | `src/plugin-send.ts` | Lightweight plugin message send facade without LLM, memory, knowledge, cron or extension APIs |
