@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "domain": "human-approvals",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/approvals queues, decisions, and rules without importing the full platform client.",
+  "principles": [
+    "Expose human-in-the-loop queues as a focused SDK slice for external approval desks, plugin UIs, CLIs, sidecars, and automation guard scripts.",
+    "Keep approval decisions and durable rules directly callable without coupling callers to generated SDK internals.",
+    "Make Approvals access available through Agent Kit so chat, realtime, and automation workflows can pause for human control from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/approvals",
+    "POST /v1/approvals/approve",
+    "POST /v1/approvals/deny",
+    "POST /v1/approvals/decide",
+    "GET /v1/approvals/rules",
+    "POST /v1/approvals/rules",
+    "DELETE /v1/approvals/rules"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/approvals",
+      "readOnly": true,
+      "description": "List pending approvals or filtered approval history."
+    },
+    {
+      "name": "pending",
+      "route": "GET /v1/approvals",
+      "readOnly": true,
+      "description": "List pending approval requests."
+    },
+    {
+      "name": "history",
+      "route": "GET /v1/approvals",
+      "readOnly": true,
+      "description": "List historical approval decisions with optional status filter."
+    },
+    {
+      "name": "approve",
+      "route": "POST /v1/approvals/approve",
+      "readOnly": false,
+      "description": "Approve a pending request."
+    },
+    {
+      "name": "deny",
+      "route": "POST /v1/approvals/deny",
+      "readOnly": false,
+      "description": "Deny a pending request with an optional reason."
+    },
+    {
+      "name": "decide",
+      "route": "POST /v1/approvals/decide",
+      "readOnly": false,
+      "description": "Apply a one-time or persistent approval decision."
+    },
+    {
+      "name": "rules",
+      "route": "GET /v1/approvals/rules",
+      "readOnly": true,
+      "description": "List approval rules."
+    },
+    {
+      "name": "addRule",
+      "route": "POST /v1/approvals/rules",
+      "readOnly": false,
+      "description": "Add an approval rule."
+    },
+    {
+      "name": "deleteRule",
+      "route": "DELETE /v1/approvals/rules",
+      "readOnly": false,
+      "description": "Delete an approval rule by id."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/approvals.ts",
+        "sdk/typescript/src/approval-pending.ts",
+        "sdk/typescript/src/approval-decisions.ts",
+        "sdk/typescript/src/approval-rules.ts",
+        "sdk/typescript/src/approval-history.ts",
+        "sdk/typescript/src/approval-queue.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createApprovalsClient().list",
+        "pending": "createApprovalsClient().pending",
+        "history": "createApprovalsClient().history",
+        "approve": "createApprovalsClient().approve",
+        "deny": "createApprovalsClient().deny",
+        "decide": "createApprovalsClient().decide",
+        "rules": "createApprovalsClient().rules",
+        "addRule": "createApprovalsClient().addRule",
+        "deleteRule": "createApprovalsClient().deleteRule"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Approvals.List",
+        "pending": "yunque.Approvals.Pending",
+        "history": "yunque.Approvals.History",
+        "approve": "yunque.Approvals.Approve",
+        "deny": "yunque.Approvals.Deny",
+        "decide": "yunque.Approvals.Decide",
+        "rules": "yunque.Approvals.Rules",
+        "addRule": "yunque.Approvals.AddRule",
+        "deleteRule": "yunque.Approvals.DeleteRule"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.approvals.list",
+        "pending": "yunque.approvals.pending",
+        "history": "yunque.approvals.history",
+        "approve": "yunque.approvals.approve",
+        "deny": "yunque.approvals.deny",
+        "decide": "yunque.approvals.decide",
+        "rules": "yunque.approvals.rules",
+        "addRule": "yunque.approvals.add_rule",
+        "deleteRule": "yunque.approvals.delete_rule"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "ApprovalsClient::list",
+        "pending": "ApprovalsClient::pending",
+        "history": "ApprovalsClient::history",
+        "approve": "ApprovalsClient::approve",
+        "deny": "ApprovalsClient::deny",
+        "decide": "ApprovalsClient::decide",
+        "rules": "ApprovalsClient::rules",
+        "addRule": "ApprovalsClient::add_rule",
+        "deleteRule": "ApprovalsClient::delete_rule"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

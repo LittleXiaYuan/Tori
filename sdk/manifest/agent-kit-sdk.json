@@ -35,6 +35,7 @@
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
+    "human-approvals",
     "realtime-websocket",
     "plugin-api-runtime"
   ],
@@ -148,6 +149,10 @@
       "description": "Access the lightweight Conversations client or namespace for session lists, messages, metadata management, and replay."
     },
     {
+      "name": "approvals",
+      "description": "Access the lightweight Approvals client or namespace for human-in-the-loop queues, decisions, and rules."
+    },
+    {
       "name": "realtime",
       "description": "Access the lightweight Realtime WebSocket chat client or namespace."
     },
@@ -197,7 +202,8 @@
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
-        "conversations": "AgentKit.conversations"
+        "conversations": "AgentKit.conversations",
+        "approvals": "AgentKit.approvals"
       }
     },
     "go": {
@@ -240,7 +246,8 @@
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
-        "conversations": "AgentKit.Conversations"
+        "conversations": "AgentKit.Conversations",
+        "approvals": "AgentKit.Approvals"
       }
     },
     "python": {
@@ -283,7 +290,8 @@
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
-        "conversations": "AgentKit.conversations"
+        "conversations": "AgentKit.conversations",
+        "approvals": "AgentKit.approvals"
       }
     },
     "rust": {
@@ -326,7 +334,8 @@
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",
-        "conversations": "AgentKit::conversations"
+        "conversations": "AgentKit::conversations",
+        "approvals": "AgentKit::approvals"
       }
     }
   },

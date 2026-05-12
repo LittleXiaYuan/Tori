@@ -3,6 +3,7 @@ package yunque
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -157,6 +158,49 @@ func TestEventsHelpers(t *testing.T) {
 	}
 	if NewAgentKit().Events != Events {
 		t.Fatalf("agent kit should reuse Events namespace")
+	}
+}
+
+func TestApprovalsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/approvals":
+			fmt.Fprint(w, `{"approvals":[{"id":"ap1","status":"pending"}],"total":1}`)
+		case "/v1/approvals/approve":
+			fmt.Fprint(w, `{"status":"approved","id":"ap1"}`)
+		case "/v1/approvals/deny":
+			fmt.Fprint(w, `{"status":"denied","id":"ap2"}`)
+		case "/v1/approvals/decide":
+			fmt.Fprint(w, `{"status":"ok","decision":"allow_once"}`)
+		case "/v1/approvals/rules":
+			if r.Method == http.MethodGet {
+				fmt.Fprint(w, `{"rules":[{"id":"r1"}],"total":1}`)
+			} else if r.Method == http.MethodPost {
+				fmt.Fprint(w, `{"status":"ok","id":"r1"}`)
+			} else {
+				fmt.Fprint(w, `{"deleted":true}`)
+			}
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	pending, _ := Approvals.Pending(ctx)
+	history, _ := Approvals.History(ctx, "approved")
+	approved, _ := Approvals.Approve(ctx, "ap1")
+	denied, _ := Approvals.Deny(ctx, "ap2", "too risky")
+	decided, _ := Approvals.Decide(ctx, "ap3", "allow_once")
+	rules, _ := Approvals.Rules(ctx)
+	added, _ := Approvals.AddRule(ctx, ApprovalRule{"id": "r1", "decision": "allow_always"})
+	deleted, _ := Approvals.DeleteRule(ctx, "r1")
+	if pending["total"].(float64) != 1 || history["total"].(float64) != 1 || approved["status"] != "approved" || denied["status"] != "denied" || decided["decision"] != "allow_once" || rules["total"].(float64) != 1 || added["id"] != "r1" || !deleted["deleted"].(bool) || NewAgentKit().Approvals != Approvals {
+		t.Fatalf("unexpected approval results")
+	}
+	if len(seen) != 8 || seen[0] != "GET /v1/approvals?status=pending" || seen[1] != "GET /v1/approvals?history=true&status=approved" || seen[7] != "DELETE /v1/approvals/rules?id=r1" {
+		t.Fatalf("unexpected approval requests: %v", seen)
 	}
 }
 
@@ -508,6 +552,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"running":true}`))
 		case "/v1/reverie/stats":
 			_, _ = w.Write([]byte(`{"total":2}`))
+		case "/v1/approvals":
+			_, _ = w.Write([]byte(`{"approvals":[{"id":"ap1","status":"pending"}],"total":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -602,6 +648,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	approvalList, err := kit.Approvals.Pending(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -610,14 +660,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 23 {
-		t.Fatalf("expected 23 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 24 {
+		t.Fatalf("expected 24 requests, got %d: %v", len(seen), seen)
 	}
 }
 
