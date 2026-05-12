@@ -1393,8 +1393,9 @@
     "check:incremental": "node scripts/check-incremental-coverage.mjs",
     "check:state-manifest": "node ../scripts/check-state-sdk-manifest.mjs",
     "check:reflect-manifest": "node ../scripts/check-reflect-sdk-manifest.mjs",
+    "check:plugin-api-manifest": "node ../scripts/check-plugin-api-sdk-manifest.mjs",
     "check:pack": "node scripts/check-pack.mjs",
-    "prepublishOnly": "npm run test && npm run typecheck && npm run check:state-manifest && npm run check:reflect-manifest && npm run check:pack && npm audit --audit-level=high"
+    "prepublishOnly": "npm run test && npm run typecheck && npm run check:state-manifest && npm run check:reflect-manifest && npm run check:plugin-api-manifest && npm run check:pack && npm audit --audit-level=high"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.1",
