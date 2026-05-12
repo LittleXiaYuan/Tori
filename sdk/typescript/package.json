@@ -191,6 +191,14 @@
       "types": "./src/emotion.ts",
       "import": "./src/emotion.ts"
     },
+    "./emotion-history": {
+      "types": "./src/emotion-history.ts",
+      "import": "./src/emotion-history.ts"
+    },
+    "./emotion-stickers": {
+      "types": "./src/emotion-stickers.ts",
+      "import": "./src/emotion-stickers.ts"
+    },
     "./reactions": {
       "types": "./src/reactions.ts",
       "import": "./src/reactions.ts"

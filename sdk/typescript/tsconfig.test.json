@@ -62,6 +62,8 @@
     "src/search.ts",
     "src/interactions.ts",
     "src/emotion.ts",
+    "src/emotion-history.ts",
+    "src/emotion-stickers.ts",
     "src/reactions.ts",
     "src/instructions.ts",
     "src/rbac.ts",
