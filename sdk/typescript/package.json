@@ -443,6 +443,10 @@
       "types": "./src/federation-observe.ts",
       "import": "./src/federation-observe.ts"
     },
+    "./federation-control": {
+      "types": "./src/federation-control.ts",
+      "import": "./src/federation-control.ts"
+    },
     "./system": {
       "types": "./src/system.ts",
       "import": "./src/system.ts"
