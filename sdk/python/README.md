@@ -34,6 +34,26 @@ saved = yunque.state.save_goal({
 })
 ```
 
+## Reflection Experience helpers
+
+```python
+import yunque
+
+experiences = yunque.reflect.experiences(
+    q="code review",
+    tag="quality:9",
+    limit=5,
+)
+
+stats = yunque.reflect.stats(tag="quality:9")
+strategies = yunque.reflect.strategies(tag="quality:9", limit=3)
+print(stats["total"])
+print(strategies)
+```
+
+This slice is intended for automation scripts and plugins that want to reuse
+agent lessons / strategy hints without depending on the full platform client.
+
 ## Runnable state snapshot example
 
 Start `yunque-agent` first so `/v1/state` is reachable, then run from the repo
@@ -41,4 +61,5 @@ root:
 
 ```powershell
 python sdk/python/examples/state_snapshot.py
+python sdk/python/examples/reflect_strategies.py
 ```
