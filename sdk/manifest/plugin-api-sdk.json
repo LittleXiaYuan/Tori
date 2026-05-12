@@ -160,11 +160,20 @@
         "memoryDelete": "PluginApiClient::memory_delete",
         "memoryList": "PluginApiClient::memory_list",
         "memorySearch": "PluginApiClient::memory_search",
+        "agentMemorySearch": "PluginApiClient::agent_memory_search",
+        "agentMemoryAdd": "PluginApiClient::agent_memory_add",
         "knowledgeSearch": "PluginApiClient::knowledge_search",
         "knowledgeIngest": "PluginApiClient::knowledge_ingest",
         "cronAdd": "PluginApiClient::cron_add",
         "cronRemove": "PluginApiClient::cron_remove",
-        "cronList": "PluginApiClient::cron_list"
+        "cronList": "PluginApiClient::cron_list",
+        "registerProvider": "PluginApiClient::register_provider",
+        "registerChannel": "PluginApiClient::register_channel",
+        "registerSearch": "PluginApiClient::register_search",
+        "registerGuardrail": "PluginApiClient::register_guardrail",
+        "registerEmbedding": "PluginApiClient::register_embedding",
+        "registerSpeech": "PluginApiClient::register_speech",
+        "extensions": "PluginApiClient::extensions"
       }
     }
   },
