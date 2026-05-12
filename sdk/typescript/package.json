@@ -467,6 +467,10 @@
       "types": "./src/settings.ts",
       "import": "./src/settings.ts"
     },
+    "./settings-config": {
+      "types": "./src/settings-config.ts",
+      "import": "./src/settings-config.ts"
+    },
     "./tori": {
       "types": "./src/tori.ts",
       "import": "./src/tori.ts"

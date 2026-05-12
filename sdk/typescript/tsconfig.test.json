@@ -131,6 +131,7 @@
     "src/system-probes.ts",
     "src/system-ops.ts",
     "src/settings.ts",
+    "src/settings-config.ts",
     "src/tori.ts",
     "src/speech.ts",
     "src/admin.ts",
