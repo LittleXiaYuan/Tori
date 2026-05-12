@@ -158,6 +158,7 @@ import { createSetupProviderClient } from "yunque-client/setup-provider";
 import { createSetupInstallClient } from "yunque-client/setup-install";
 import { createDocumentsClient } from "yunque-client/documents";
 import { createDocumentTemplatesClient } from "yunque-client/document-templates";
+import { createDocumentGenerateClient } from "yunque-client/document-generate";
 import { createApprovalsClient } from "yunque-client/approvals";
 import { createApprovalQueueClient } from "yunque-client/approval-queue";
 import { createApprovalRulesClient } from "yunque-client/approval-rules";
@@ -1226,7 +1227,7 @@ console.log(sandboxStatus.key_source);
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `realtime`, `webchat`, `conversations`, `subagents`, `bots`, `discovery`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `reactions`, `instructions`, `rbac`, `roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-import`, `knowledge-upload`, or
-`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
+`providers`/`provider-control`/`provider-health`/`provider-registry`/`breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`approvals`/`approval-queue`/`approval-rules`/`trace`/`trace-events`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`router`/`modes`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`cost`/`cost-budget`/`cost-observe`/`usage`/`lora`/`lora-observe`/`lora-control`/`iterate`/`iterate-review`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`cron`/`skillhub`/`skills`/`plugins`/`connectors`/`notify`/`projects`/`market`/`dispatch`/`orchestrator`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
@@ -1323,6 +1324,7 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/setup-install.ts` | Lightweight setup component install and SSE progress facade without detect, templates or provider apply APIs |
 | `src/documents.ts` | Lightweight hand-written DOCX/XLSX/PPTX/HTML generation slice |
 | `src/document-templates.ts` | Lightweight document template catalog facade without generation APIs |
+| `src/document-generate.ts` | Lightweight document generation and format helper facade without template catalog APIs |
 | `src/approvals.ts` | Lightweight hand-written human-in-the-loop approval queue/rules slice |
 | `src/approval-queue.ts` | Lightweight approval queue and decision facade without full SDK import |
 | `src/approval-rules.ts` | Lightweight approval rule management facade without full SDK import |

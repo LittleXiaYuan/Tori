@@ -83,6 +83,7 @@
     "src/setup-install.ts",
     "src/documents.ts",
     "src/document-templates.ts",
+    "src/document-generate.ts",
     "src/approvals.ts",
     "src/approval-queue.ts",
     "src/approval-rules.ts",
