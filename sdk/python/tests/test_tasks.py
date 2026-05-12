@@ -43,6 +43,8 @@ class TasksTest(unittest.TestCase):
                 return {"total": 2, "unresolved": 1}
             if path == "/v1/tasks/gaps/resolve":
                 return {"resolved": body["id"]}
+            if path == "/v1/tasks/memory?id=task-1":
+                return {"task_id": "task-1", "goal": "ship SDK", "next_action": "resume"}
             raise AssertionError(f"unexpected call: {method} {path}")
 
         with patch.object(yunque, "_api_call", side_effect=fake_api_call):
@@ -59,6 +61,7 @@ class TasksTest(unittest.TestCase):
             self.assertEqual(yunque.task_gaps.list("skill_missing")[0]["id"], "gap-1")
             self.assertEqual(yunque.task_gaps.stats()["unresolved"], 1)
             self.assertEqual(yunque.task_gaps.resolve("gap-1")["resolved"], "gap-1")
+            self.assertEqual(yunque.task_memory.get("task-1")["next_action"], "resume")
 
         self.assertEqual(calls[0], ("GET", "/v1/tasks", None))
         self.assertEqual(calls[2], ("POST", "/v1/tasks", {"description": "ship SDK", "title": "SDK", "constraints": {"max_steps": 3}}))
@@ -67,6 +70,7 @@ class TasksTest(unittest.TestCase):
         self.assertEqual(calls[8], ("POST", "/v1/tasks/templates/instantiate", {"template_id": "tpl-1", "variables": {"repo": "yunque"}}))
         self.assertEqual(calls[10], ("GET", "/v1/tasks/gaps?type=skill_missing", None))
         self.assertEqual(calls[12], ("POST", "/v1/tasks/gaps/resolve", {"id": "gap-1"}))
+        self.assertEqual(calls[13], ("GET", "/v1/tasks/memory?id=task-1", None))
 
 
 if __name__ == "__main__":

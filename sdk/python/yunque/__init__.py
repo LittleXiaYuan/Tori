@@ -1110,6 +1110,19 @@ class _TaskGapsNamespace:
 
 task_gaps = _TaskGapsNamespace()
 
+
+# ── Task Working Memory (/v1/tasks/memory) ──
+
+class _TaskMemoryNamespace:
+    """Lightweight helper for reading per-task working memory."""
+
+    def get(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/tasks/memory?{urlencode({'id': task_id})}")
+
+
+task_memory = _TaskMemoryNamespace()
+
 # ── Permissions facade (/v1/rbac/check, /v1/rbac/my-roles) ──
 
 class _PermissionsNamespace:
@@ -2326,6 +2339,7 @@ class AgentKit:
         self.tasks = tasks
         self.task_templates = task_templates
         self.task_gaps = task_gaps
+        self.task_memory = task_memory
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

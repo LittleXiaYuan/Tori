@@ -1,11 +1,11 @@
 {
   "version": 1,
   "domain": "tasks-runtime",
-  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, and capability-gap operations over /v1/tasks without importing the full platform client.",
+  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, capability-gap, and working-memory operations over /v1/tasks without importing the full platform client.",
   "principles": [
     "Expose task orchestration as a focused SDK slice for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts.",
-    "Keep task reads, creation, lifecycle control, deletion, template instantiation, and capability-gap resolution directly callable through existing authenticated task routes.",
-    "Make Tasks access available through Agent Kit while leaving deeper task memory, threads, and traces as separate incremental slices."
+    "Keep task reads, creation, lifecycle control, deletion, template instantiation, capability-gap resolution, and working-memory reads directly callable through existing authenticated task routes.",
+    "Make Tasks access available through Agent Kit while leaving deeper task threads and traces as separate incremental slices."
   ],
   "routes": [
     "GET /v1/tasks",
@@ -25,7 +25,8 @@
     "GET /v1/tasks/gaps",
     "GET /v1/tasks/gaps?type=...",
     "GET /v1/tasks/gaps?stats=true",
-    "POST /v1/tasks/gaps/resolve"
+    "POST /v1/tasks/gaps/resolve",
+    "GET /v1/tasks/memory?id=..."
   ],
   "capabilities": [
     { "name": "list", "route": "GET /v1/tasks", "readOnly": true, "description": "List recent tasks visible to the current tenant." },
@@ -44,12 +45,13 @@
     { "name": "instantiateTemplate", "route": "POST /v1/tasks/templates/instantiate", "readOnly": false, "description": "Instantiate a reusable task template into a concrete task." },
     { "name": "gaps", "route": "GET /v1/tasks/gaps", "readOnly": true, "description": "List unresolved task capability gaps, optionally filtered by type." },
     { "name": "gapStats", "route": "GET /v1/tasks/gaps?stats=true", "readOnly": true, "description": "Read task capability gap aggregate statistics." },
-    { "name": "resolveGap", "route": "POST /v1/tasks/gaps/resolve", "readOnly": false, "description": "Mark a task capability gap as resolved." }
+    { "name": "resolveGap", "route": "POST /v1/tasks/gaps/resolve", "readOnly": false, "description": "Mark a task capability gap as resolved." },
+    { "name": "workingMemory", "route": "GET /v1/tasks/memory?id=...", "readOnly": true, "description": "Read per-task working memory for resumable automation and external task pages." }
   ],
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-context.ts"],
+      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-context.ts"],
       "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createTasksClient().list",
@@ -68,7 +70,8 @@
         "instantiateTemplate": "createTaskTemplatesClient().instantiate",
         "gaps": "createTaskGapsClient().list",
         "gapStats": "createTaskGapsClient().stats",
-        "resolveGap": "createTaskGapsClient().resolve"
+        "resolveGap": "createTaskGapsClient().resolve",
+        "workingMemory": "createTaskMemoryClient().get"
       }
     },
     "go": {
@@ -92,7 +95,8 @@
         "instantiateTemplate": "yunque.Tasks.InstantiateTemplate",
         "gaps": "yunque.Tasks.Gaps",
         "gapStats": "yunque.Tasks.GapStats",
-        "resolveGap": "yunque.Tasks.ResolveGap"
+        "resolveGap": "yunque.Tasks.ResolveGap",
+        "workingMemory": "yunque.Tasks.WorkingMemory"
       }
     },
     "python": {
@@ -116,7 +120,8 @@
         "instantiateTemplate": "yunque.task_templates.instantiate",
         "gaps": "yunque.task_gaps.list",
         "gapStats": "yunque.task_gaps.stats",
-        "resolveGap": "yunque.task_gaps.resolve"
+        "resolveGap": "yunque.task_gaps.resolve",
+        "workingMemory": "yunque.task_memory.get"
       }
     },
     "rust": {
@@ -140,7 +145,8 @@
         "instantiateTemplate": "TasksClient::instantiate_template",
         "gaps": "TasksClient::gaps",
         "gapStats": "TasksClient::gap_stats",
-        "resolveGap": "TasksClient::resolve_gap"
+        "resolveGap": "TasksClient::resolve_gap",
+        "workingMemory": "TasksClient::working_memory"
       }
     }
   },
