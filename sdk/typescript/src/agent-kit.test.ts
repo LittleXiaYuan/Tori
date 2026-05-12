@@ -7,6 +7,7 @@ function assertEqual(actual: unknown, expected: unknown, message?: string): void
 const tests: Array<{ name: string; fn: () => Promise<void> | void }> = [];
 function test(name: string, fn: () => Promise<void> | void): void { tests.push({ name, fn }); }
 function jsonResponse(body: unknown, init?: ResponseInit): Response { return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" }, ...init }); }
+async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> { const out: T[] = []; for await (const item of iterable) out.push(item); return out; }
 
 test("createAgentKit composes state reflect mission parse scheduler and plugin lightweight clients", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
@@ -38,6 +39,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/cognis")) return jsonResponse({ cognis: [{ id: "reviewer", name: "Code Reviewer" }], count: 1 });
       if (value.endsWith("/v1/trace/recent?limit=1")) return jsonResponse({ events: [{ trace_id: "tr-1" }], count: 1 });
       if (value.endsWith("/v1/heartbeat")) return jsonResponse({ running: true });
+      if (value.endsWith("/v1/events/stream")) return new Response(new TextEncoder().encode("event: connected\ndata: {\"client_id\":\"sse-1\"}\n\n"), { status: 200, headers: { "Content-Type": "text/event-stream" } });
       if (value.endsWith("/v1/reverie/stats")) return jsonResponse({ total: 2, delivered: 1 });
       if (value.includes("/v1/plugin-api/search")) return jsonResponse({ results: [{ title: "SDK" }] });
       return jsonResponse({ ok: true });
@@ -65,6 +67,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.cognis.list()).cognis?.[0]?.id, "reviewer");
   assertEqual((await kit.trace.recent({ limit: 1 })).events[0]?.trace_id, "tr-1");
   assertEqual((await kit.heartbeat.status()).running, true);
+  const [event] = await collect(kit.events.stream<{ client_id: string }>());
+  assertEqual(event.data?.client_id, "sse-1");
   assertEqual((await kit.reverie.stats()).total, 2);
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
@@ -88,7 +92,8 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[19]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[20]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[21]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[22]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[22]?.init?.headers).get("authorization"), "Bearer jwt-token");
+  assertEqual(new Headers(calls[23]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

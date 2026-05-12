@@ -18,7 +18,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, Mission Parse,
 Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base,
-LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Reverie, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
+LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Events, Reverie, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -264,6 +264,10 @@ Trace SDK exposes lightweight execution/audit trace helpers (`recent`, `byTraceI
 ### Heartbeat SDK
 
 Heartbeat SDK exposes lightweight proactive lifecycle helpers (`status`, `update`, `trigger`, `logs`) for external operator pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.heartbeat` / `kit.Heartbeat` for one-stop lifecycle supervision workflows.
+
+### Events SDK
+
+Events SDK exposes lightweight Server-Sent Events helpers (`stream`, `parse`) for external dashboards, plugin UIs, CLIs, sidecars, and automation scripts that need live task/workflow/approval/runtime updates without importing the full platform. Agent Kit also exposes this surface as `kit.events` / `kit.Events` for one-stop live observability workflows.
 
 ### Reverie SDK
 
