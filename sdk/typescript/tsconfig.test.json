@@ -263,6 +263,8 @@
     "src/notify.ts",
     "src/notify-share.ts",
     "src/notify-channels.ts",
+    "src/notify-channel-read.ts",
+    "src/notify-channel-control.ts",
     "src/projects.ts",
     "src/project-read.ts",
     "src/project-write.ts",

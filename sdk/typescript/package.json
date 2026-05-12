@@ -995,6 +995,14 @@
       "types": "./src/notify-channels.ts",
       "import": "./src/notify-channels.ts"
     },
+    "./notify-channel-read": {
+      "types": "./src/notify-channel-read.ts",
+      "import": "./src/notify-channel-read.ts"
+    },
+    "./notify-channel-control": {
+      "types": "./src/notify-channel-control.ts",
+      "import": "./src/notify-channel-control.ts"
+    },
     "./projects": {
       "types": "./src/projects.ts",
       "import": "./src/projects.ts"
