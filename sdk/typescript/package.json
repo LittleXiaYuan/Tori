@@ -1179,6 +1179,14 @@
       "types": "./src/plugin-agent-memory.ts",
       "import": "./src/plugin-agent-memory.ts"
     },
+    "./plugin-agent-memory-search": {
+      "types": "./src/plugin-agent-memory-search.ts",
+      "import": "./src/plugin-agent-memory-search.ts"
+    },
+    "./plugin-agent-memory-write": {
+      "types": "./src/plugin-agent-memory-write.ts",
+      "import": "./src/plugin-agent-memory-write.ts"
+    },
     "./plugin-knowledge": {
       "types": "./src/plugin-knowledge.ts",
       "import": "./src/plugin-knowledge.ts"

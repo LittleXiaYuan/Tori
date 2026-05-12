@@ -309,6 +309,8 @@
     "src/plugin-memory-read.ts",
     "src/plugin-memory-write.ts",
     "src/plugin-agent-memory.ts",
+    "src/plugin-agent-memory-search.ts",
+    "src/plugin-agent-memory-write.ts",
     "src/plugin-knowledge.ts",
     "src/plugin-cron.ts",
     "src/plugin-send.ts",
