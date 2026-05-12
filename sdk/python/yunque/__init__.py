@@ -324,6 +324,24 @@ def _reflect_query(q: str = "", source: str = "", category: str = "",
 reflect = _ReflectNamespace()
 
 
+# ── Mission Parse ──
+
+class _MissionsNamespace:
+    """Lightweight helpers for natural-language mission parsing.
+
+    Mission parsing is exposed as a small SDK slice so external pages,
+    plugins, CLIs, and automation scripts can turn user intent into a typed
+    task/workflow/cron/trigger draft without importing platform internals.
+    """
+
+    def parse(self, description: str) -> dict:
+        """Parse a natural-language mission description into a structured draft."""
+        return _api_call("POST", "/v1/missions/parse", {"description": description})
+
+
+missions = _MissionsNamespace()
+
+
 # ── System Extension Registration ──
 # These let plugins ADD new system-level capabilities to the agent.
 # Like Magisk modules or Chrome extensions — you're extending the platform itself.
@@ -489,15 +507,16 @@ class AgentKit:
     """Small bundle of common SDK-first Yunque surfaces.
 
     Use this when an external Python script, plugin, or sidecar wants the State
-    Kernel, Reflection Experience, and Plugin API Runtime helpers from one
-    object without depending on a generated full OpenAPI client. The namespace
-    objects are the same lightweight module-level helpers, so this remains a
-    zero-dependency incremental package.
+    Kernel, Reflection Experience, Mission Parse, and Plugin API Runtime helpers
+    from one object without depending on a generated full OpenAPI client. The
+    namespace objects are the same lightweight module-level helpers, so this
+    remains a zero-dependency incremental package.
     """
 
     def __init__(self):
         self.state = state
         self.reflect = reflect
+        self.missions = missions
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

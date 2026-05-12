@@ -20,7 +20,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
-Reflection Experience, and Plugin API Runtime. It reuses the same small
+Reflection Experience, Mission Parse, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -31,10 +31,22 @@ strategies, err := kit.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategy
     Tag:   "sdk",
     Limit: 5,
 })
+mission, err := kit.Missions.Parse(ctx, "每天八点总结昨天的任务")
 results, err := kit.Plugin.Search(ctx, "incremental SDK package", 5)
 err = kit.Memory.Set(ctx, "last_focus", focus)
 
-fmt.Println(focus, strategies, len(results))
+fmt.Println(focus, strategies, mission.Type, len(results))
+```
+
+## Mission Parse helpers
+
+Use `yunque.Missions.Parse` when a page, plugin, CLI, or automation binary needs
+to turn natural-language intent into a task/workflow/cron/trigger draft without
+depending on platform internals.
+
+```go
+mission, err := yunque.Missions.Parse(ctx, "每天八点总结昨天的任务")
+fmt.Println(mission.Type, mission.Name, mission.Config["cron_expr"])
 ```
 
 ## State Kernel incremental helpers

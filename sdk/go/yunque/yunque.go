@@ -289,12 +289,13 @@ func decodeMapResponse(resp map[string]any, target any) error {
 // plugins, and automation binaries.
 //
 // It is intentionally just a thin bundle over the existing lightweight
-// namespaces, so callers can reach State Kernel, Reflection Experience, and
-// Plugin API Runtime helpers without linking to platform internals or a broad
-// generated client.
+// namespaces, so callers can reach State Kernel, Reflection Experience,
+// Mission Parse, and Plugin API Runtime helpers without linking to platform
+// internals or a broad generated client.
 type AgentKit struct {
 	State       *stateNamespace
 	Reflect     *reflectNamespace
+	Missions    *missionsNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -308,12 +309,43 @@ var Plugin = &pluginRuntimeNamespace{}
 
 type pluginRuntimeNamespace struct{}
 
-// NewAgentKit returns a lightweight bundle of state, reflection, and plugin
-// runtime helpers.
+// ── Mission Parse ──
+
+// Missions provides focused access to natural-language mission parsing.
+var Missions = &missionsNamespace{}
+
+type missionsNamespace struct{}
+
+// MissionParseResult is the structured task/workflow/cron/trigger draft
+// returned by /v1/missions/parse.
+type MissionParseResult struct {
+	Type        string         `json:"type,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Config      map[string]any `json:"config,omitempty"`
+	Confidence  float64        `json:"confidence,omitempty"`
+	Explanation string         `json:"explanation,omitempty"`
+}
+
+// Parse turns a natural-language mission description into a structured draft.
+func (m *missionsNamespace) Parse(ctx context.Context, description string) (MissionParseResult, error) {
+	var out MissionParseResult
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/missions/parse", map[string]any{"description": description}, &out); err != nil {
+		return MissionParseResult{}, err
+	}
+	if out.Config == nil {
+		out.Config = map[string]any{}
+	}
+	return out, nil
+}
+
+// NewAgentKit returns a lightweight bundle of state, reflection, mission parse,
+// and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
 		State:       State,
 		Reflect:     Reflect,
+		Missions:    Missions,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

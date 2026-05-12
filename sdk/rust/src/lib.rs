@@ -190,6 +190,23 @@ pub struct ReflectStrategiesResponse {
     pub strategies: String,
 }
 
+/// Structured task/workflow/cron/trigger draft returned by `/v1/missions/parse`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct MissionParseResult {
+    #[serde(default)]
+    pub r#type: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub config: serde_json::Value,
+    #[serde(default)]
+    pub confidence: f64,
+    #[serde(default)]
+    pub explanation: String,
+}
+
 /// Message accepted by the Plugin API LLM endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct PluginLLMMessage {
@@ -533,6 +550,7 @@ impl ReflectClient {
 pub struct AgentKit {
     pub state: StateClient,
     pub reflect: ReflectClient,
+    pub missions: MissionsClient,
     pub plugin: PluginApiClient,
 }
 
@@ -558,6 +576,7 @@ impl AgentKit {
         Ok(Self {
             state: StateClient::new(base_url.clone(), token.as_ref())?,
             reflect: ReflectClient::new(base_url.clone(), token.as_ref())?,
+            missions: MissionsClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -572,9 +591,70 @@ impl AgentKit {
         let base_url = base_url.into();
         Self {
             state: StateClient::new_with_client(base_url.clone(), state_http),
-            reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http),
+            reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http.clone()),
+            missions: MissionsClient::new_with_client(base_url.clone(), reflect_http),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
+    }
+}
+
+/// Small Rust helper over `/v1/missions/parse`.
+///
+/// Use this when an external Rust CLI, sidecar, plugin runner, or automation
+/// binary wants to turn natural-language user intent into a structured mission
+/// draft without importing the generated all-in-one API surface.
+#[derive(Debug, Clone)]
+pub struct MissionsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl MissionsClient {
+    /// Create a MissionsClient using a bearer token.
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    /// Create a MissionsClient with a caller-provided reqwest client.
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    /// Parse a natural-language mission description into a structured draft.
+    pub async fn parse(
+        &self,
+        description: impl AsRef<str>,
+    ) -> Result<MissionParseResult, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/missions/parse"))
+            .json(&serde_json::json!({ "description": description.as_ref() }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
     }
 }
 
@@ -1195,6 +1275,10 @@ mod tests {
             "http://localhost:9090/v1/reflect/strategies"
         );
         assert_eq!(
+            kit.missions.url("/v1/missions/parse"),
+            "http://localhost:9090/v1/missions/parse"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -1209,5 +1293,25 @@ mod tests {
             "plugin-token"
         )
         .is_ok());
+    }
+
+    #[test]
+    fn mission_parse_result_deserializes_incremental_body() {
+        let result: MissionParseResult = serde_json::from_str(
+            r#"{"type":"cron","name":"每日总结","description":"每天总结昨天的任务","config":{"cron_expr":"0 8 * * *"},"confidence":0.9,"explanation":"mentions daily schedule"}"#,
+        )
+        .unwrap();
+        assert_eq!(result.r#type, "cron");
+        assert_eq!(result.config["cron_expr"], "0 8 * * *");
+    }
+
+    #[test]
+    fn missions_client_trims_base_url() {
+        let client =
+            MissionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/missions/parse"),
+            "http://localhost:9090/v1/missions/parse"
+        );
     }
 }

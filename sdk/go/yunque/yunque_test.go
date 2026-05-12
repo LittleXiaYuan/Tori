@@ -245,6 +245,15 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"strategies":"- keep SDK slices small"}`))
+		case "/v1/missions/parse":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["description"] != "每天八点总结昨天的任务" {
+				t.Fatalf("unexpected mission parse body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"type":"cron","name":"每日总结","description":"每天总结昨天的任务","config":{"cron_expr":"0 8 * * *"},"confidence":0.9,"explanation":"mentions daily schedule"}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -263,6 +272,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mission, err := kit.Missions.Parse(context.Background(), "每天八点总结昨天的任务")
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -271,14 +284,39 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || len(results) != 1 || results[0].Title != "Agent Kit" {
-		t.Fatalf("unexpected kit results: focus=%q strategies=%q results=%+v", focus, strategies, results)
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || len(results) != 1 || results[0].Title != "Agent Kit" {
+		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v results=%+v", focus, strategies, mission, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 4 {
-		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestMissionsParseSerializesDescription(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/missions/parse" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["description"] != "当代码评审完成时提醒我" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"type":"trigger","name":"评审提醒","description":"当代码评审完成时提醒我","config":{"event_type":"review_done"},"confidence":0.8,"explanation":"mentions event condition"}`))
+	})
+
+	result, err := Missions.Parse(context.Background(), "当代码评审完成时提醒我")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Type != "trigger" || result.Config["event_type"] != "review_done" {
+		t.Fatalf("unexpected mission parse result: %+v", result)
 	}
 }
 
