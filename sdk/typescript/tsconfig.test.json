@@ -69,6 +69,7 @@
     "src/setup.ts",
     "src/setup-detect.ts",
     "src/setup-templates.ts",
+    "src/setup-provider.ts",
     "src/documents.ts",
     "src/approvals.ts",
     "src/approval-queue.ts",
