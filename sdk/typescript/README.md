@@ -343,6 +343,10 @@ import { createConnectorsClient } from "yunque-client/connectors";
 import { createConnectorCatalogClient } from "yunque-client/connector-catalog";
 import { createConnectorAuthClient } from "yunque-client/connector-auth";
 import { createConnectorActionsClient } from "yunque-client/connector-actions";
+import { createConnectorListClient } from "yunque-client/connector-list";
+import { createConnectorDetailClient } from "yunque-client/connector-detail";
+import { createConnectorConnectClient } from "yunque-client/connector-connect";
+import { createConnectorDisconnectClient } from "yunque-client/connector-disconnect";
 import { createNotifyClient } from "yunque-client/notify";
 import { createNotifyShareClient } from "yunque-client/notify-share";
 import { createNotifyChannelsClient } from "yunque-client/notify-channels";
@@ -634,6 +638,30 @@ const connectorActions = createConnectorActionsClient({
   apiKey: "<your-api-key>",
 });
 await connectorActions.execute({ connector_id: "github", action_id: "list_issues" });
+
+const connectorListOnly = createConnectorListClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+console.log((await connectorListOnly.list()).connectors.length);
+
+const connectorDetailOnly = createConnectorDetailClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await connectorDetailOnly.detail("github");
+
+const connectorConnectOnly = createConnectorConnectClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await connectorConnectOnly.connect({ connector_id: "github", api_key: "<connector-api-key>" });
+
+const connectorDisconnectOnly = createConnectorDisconnectClient({
+  baseUrl: "http://localhost:9090",
+  apiKey: "<your-api-key>",
+});
+await connectorDisconnectOnly.disconnect("github");
 
 const connectors = createConnectorsClient({
   baseUrl: "http://localhost:9090",
@@ -1591,7 +1619,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
-`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`plugin-toggle`/`plugin-ui`/`plugin-reload`/`plugin-folder`/`connectors`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-knowledge-search`/`plugin-knowledge-ingest`/`plugin-cron`/`plugin-cron-read`/`plugin-cron-control`/`plugin-send`/`plugin-extensions`/`plugin-extensions-list`/`plugin-extension-register`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`plugin-toggle`/`plugin-ui`/`plugin-reload`/`plugin-folder`/`connectors`/`connector-catalog`/`connector-auth`/`connector-actions`/`connector-list`/`connector-detail`/`connector-connect`/`connector-disconnect`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-knowledge-search`/`plugin-knowledge-ingest`/`plugin-cron`/`plugin-cron-read`/`plugin-cron-control`/`plugin-send`/`plugin-extensions`/`plugin-extensions-list`/`plugin-extension-register`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1871,6 +1899,10 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/connector-catalog.ts` | Lightweight connector list/detail catalog facade without full SDK import |
 | `src/connector-auth.ts` | Lightweight connector connect/disconnect facade without full SDK import |
 | `src/connector-actions.ts` | Lightweight connector action execution facade without full SDK import |
+| `src/connector-list.ts` | Lightweight connector list-only facade without detail/auth/action APIs |
+| `src/connector-detail.ts` | Lightweight connector detail-only facade without list/auth/action APIs |
+| `src/connector-connect.ts` | Lightweight connector connect-only facade without disconnect/list/action APIs |
+| `src/connector-disconnect.ts` | Lightweight connector disconnect-only facade without connect/list/action APIs |
 | `src/notify.ts` | Lightweight hand-written notification channels, test, and share dispatch slice |
 | `src/notify-share.ts` | Lightweight notification share dispatch facade without full SDK import |
 | `src/notify-channels.ts` | Lightweight notification channel management facade without full SDK import |

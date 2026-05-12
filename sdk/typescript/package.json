@@ -1015,6 +1015,22 @@
       "types": "./src/connector-actions.ts",
       "import": "./src/connector-actions.ts"
     },
+    "./connector-list": {
+      "types": "./src/connector-list.ts",
+      "import": "./src/connector-list.ts"
+    },
+    "./connector-detail": {
+      "types": "./src/connector-detail.ts",
+      "import": "./src/connector-detail.ts"
+    },
+    "./connector-connect": {
+      "types": "./src/connector-connect.ts",
+      "import": "./src/connector-connect.ts"
+    },
+    "./connector-disconnect": {
+      "types": "./src/connector-disconnect.ts",
+      "import": "./src/connector-disconnect.ts"
+    },
     "./notify": {
       "types": "./src/notify.ts",
       "import": "./src/notify.ts"
