@@ -16,6 +16,27 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 `YUNQUE_API_BASE` defaults to `http://localhost:9090` when omitted.
 
+## Agent Kit bundle
+
+Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
+binary wants the common lightweight surfaces from one object: State Kernel,
+Reflection Experience, and Plugin API Runtime. It reuses the same small
+namespaces and does not require a generated full OpenAPI client.
+
+```go
+kit := yunque.NewAgentKit()
+
+focus, err := kit.State.Focus(ctx)
+strategies, err := kit.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategyOptions{
+    Tag:   "sdk",
+    Limit: 5,
+})
+results, err := kit.Plugin.Search(ctx, "incremental SDK package", 5)
+err = kit.Memory.Set(ctx, "last_focus", focus)
+
+fmt.Println(focus, strategies, len(results))
+```
+
 ## State Kernel incremental helpers
 
 Use `yunque.State` when an external project only needs the agent's current
