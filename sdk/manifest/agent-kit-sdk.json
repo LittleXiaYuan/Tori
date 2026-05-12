@@ -40,6 +40,7 @@
     "self-iteration",
     "persona-runtime",
     "emotion-runtime",
+    "user-instructions",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -180,6 +181,10 @@
       "description": "Access the lightweight Emotion client or namespace for emotion history and sticker mappings."
     },
     {
+      "name": "instructions",
+      "description": "Access the lightweight Instructions client or namespace for user instruction CRUD and ordering."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -262,6 +267,7 @@
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
+        "instructions": "AgentKit.instructions",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -317,6 +323,7 @@
         "iterate": "AgentKit.Iterate",
         "persona": "AgentKit.Persona",
         "emotion": "AgentKit.Emotion",
+        "instructions": "AgentKit.Instructions",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -372,6 +379,7 @@
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
+        "instructions": "AgentKit.instructions",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -427,6 +435,7 @@
         "iterate": "AgentKit::iterate",
         "persona": "AgentKit::persona",
         "emotion": "AgentKit::emotion",
+        "instructions": "AgentKit::instructions",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",

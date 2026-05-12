@@ -607,6 +607,35 @@ conversations = _ConversationsNamespace()
 
 # ── Persona identity, skills, and presets (/v1/persona*) ──
 
+
+# ── User instructions (/v1/instructions) ──
+
+class _InstructionsNamespace:
+    """Lightweight helpers for user instruction list, create, update, delete, and reorder."""
+
+    def list(self, category: str = "") -> dict:
+        from urllib.parse import urlencode
+
+        suffix = f"?{urlencode({'category': category})}" if category else ""
+        return _api_call("GET", f"/v1/instructions{suffix}")
+
+    def create(self, instruction: dict) -> dict:
+        return _api_call("POST", "/v1/instructions", instruction)
+
+    def update(self, instruction: dict) -> dict:
+        return _api_call("PUT", "/v1/instructions", instruction)
+
+    def delete(self, instruction_id: str) -> dict:
+        from urllib.parse import urlencode
+
+        return _api_call("DELETE", f"/v1/instructions?{urlencode({'id': instruction_id})}")
+
+    def reorder(self, ids: list[str]) -> dict:
+        return _api_call("POST", "/v1/instructions/reorder", {"ids": ids})
+
+
+instructions = _InstructionsNamespace()
+
 # ── Emotion runtime (/v1/emotion) ──
 
 class _EmotionNamespace:
@@ -2146,6 +2175,7 @@ class AgentKit:
         self.iterate = iterate
         self.persona = persona
         self.emotion = emotion
+        self.instructions = instructions
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

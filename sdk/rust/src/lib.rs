@@ -1394,6 +1394,7 @@ pub struct AgentKit {
     pub iterate: IterateClient,
     pub persona: PersonaClient,
     pub emotion: EmotionClient,
+    pub instructions: InstructionsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1457,6 +1458,7 @@ impl AgentKit {
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
             emotion: EmotionClient::new(base_url.clone(), token.as_ref())?,
+            instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1513,6 +1515,10 @@ impl AgentKit {
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
             emotion: EmotionClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            instructions: InstructionsClient::new_with_client(
+                base_url.clone(),
+                plugin_http.clone(),
+            ),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -3587,6 +3593,121 @@ pub struct ConversationReplayOptions {
 
 pub type BrowserResponse = serde_json::Value;
 pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+pub type UserInstruction = serde_json::Map<String, serde_json::Value>;
+pub type InstructionsResponse = serde_json::Value;
+pub type InstructionStatusResponse = serde_json::Value;
+
+#[derive(Debug, Clone)]
+pub struct InstructionsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl InstructionsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let bearer = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&bearer) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self, category: &str) -> Result<InstructionsResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&("/v1/instructions".to_string() + &instructions_list_query(category))))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn create(
+        &self,
+        instruction: &UserInstruction,
+    ) -> Result<UserInstruction, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/instructions"))
+            .json(instruction)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update(
+        &self,
+        instruction: &UserInstruction,
+    ) -> Result<InstructionStatusResponse, reqwest::Error> {
+        self.http
+            .put(self.url("/v1/instructions"))
+            .json(instruction)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn delete(&self, id: &str) -> Result<InstructionStatusResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!(
+                "/v1/instructions?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn reorder(
+        &self,
+        ids: &[String],
+    ) -> Result<InstructionStatusResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/instructions/reorder"))
+            .json(&serde_json::json!({ "ids": ids }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+fn instructions_list_query(category: &str) -> String {
+    if category.is_empty() {
+        String::new()
+    } else {
+        format!("?category={}", url_encode_query_component(category))
+    }
+}
 
 pub type EmotionHistoryResponse = serde_json::Value;
 pub type StickerMapResponse = serde_json::Value;
@@ -8282,6 +8403,10 @@ mod tests {
             "http://localhost:9090/v1/emotion/history"
         );
         assert_eq!(
+            kit.instructions.url("/v1/instructions"),
+            "http://localhost:9090/v1/instructions"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -8604,6 +8729,28 @@ mod tests {
             client.url("/v1/heartbeat"),
             "http://localhost:9090/v1/heartbeat"
         );
+    }
+
+    #[test]
+    fn instructions_helpers_build_urls_queries_and_payloads() {
+        let client =
+            InstructionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/instructions"),
+            "http://localhost:9090/v1/instructions"
+        );
+        assert_eq!(
+            instructions_list_query("style guide"),
+            "?category=style+guide"
+        );
+        assert_eq!(instructions_list_query(""), "");
+        let mut instruction = serde_json::Map::new();
+        instruction.insert("category".to_string(), serde_json::json!("style"));
+        instruction.insert("content".to_string(), serde_json::json!("保持简洁"));
+        assert_eq!(instruction["content"], "保持简洁");
+        let ids = vec!["ins-2".to_string(), "ins-1".to_string()];
+        let body = serde_json::json!({ "ids": ids });
+        assert_eq!(body["ids"][0], "ins-2");
     }
 
     #[test]

@@ -326,6 +326,7 @@ type AgentKit struct {
 	Iterate       *iterateNamespace
 	Persona       *personaNamespace
 	Emotion       *emotionNamespace
+	Instructions  *instructionsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -1862,6 +1863,9 @@ var Persona = &personaNamespace{}
 // Emotion provides focused access to emotion history and sticker mappings.
 var Emotion = &emotionNamespace{}
 
+// Instructions provides focused access to user instruction CRUD and ordering.
+var Instructions = &instructionsNamespace{}
+
 // Reverie provides focused access to proactive thought loop journal, stats,
 // configuration, manual think, actions, and targets.
 var Reverie = &reverieNamespace{}
@@ -2788,6 +2792,61 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 }
 
 // ── Persona identity, skills, and presets ──
+
+type instructionsNamespace struct{}
+
+type UserInstruction map[string]any
+type InstructionsResponse map[string]any
+type InstructionStatusResponse map[string]any
+
+func instructionsListQuery(category string) string {
+	if category == "" {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("category", category)
+	return "?" + q.Encode()
+}
+
+func (i *instructionsNamespace) List(ctx context.Context, category string) (InstructionsResponse, error) {
+	var out InstructionsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/instructions"+instructionsListQuery(category), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *instructionsNamespace) Create(ctx context.Context, instruction UserInstruction) (UserInstruction, error) {
+	var out UserInstruction
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/instructions", instruction, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *instructionsNamespace) Update(ctx context.Context, instruction UserInstruction) (InstructionStatusResponse, error) {
+	var out InstructionStatusResponse
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/instructions", instruction, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *instructionsNamespace) Delete(ctx context.Context, id string) (InstructionStatusResponse, error) {
+	var out InstructionStatusResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/instructions?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (i *instructionsNamespace) Reorder(ctx context.Context, ids []string) (InstructionStatusResponse, error) {
+	var out InstructionStatusResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/instructions/reorder", map[string]any{"ids": ids}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 type emotionNamespace struct{}
 
@@ -4335,6 +4394,7 @@ func NewAgentKit() AgentKit {
 		Iterate:       Iterate,
 		Persona:       Persona,
 		Emotion:       Emotion,
+		Instructions:  Instructions,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
