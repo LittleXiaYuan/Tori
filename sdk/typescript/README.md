@@ -178,6 +178,8 @@ import { createModesClient } from "yunque-client/modes";
 import { createModesObserveClient } from "yunque-client/modes-observe";
 import { createModesControlClient } from "yunque-client/modes-control";
 import { createIDEClient } from "yunque-client/ide";
+import { createIDEStatusClient } from "yunque-client/ide-status";
+import { createIDEReviewClient } from "yunque-client/ide-review";
 import { createPersonaClient } from "yunque-client/persona";
 import { createPersonaStateClient } from "yunque-client/persona-state";
 import { createPersonaSkillsClient } from "yunque-client/persona-skills";
@@ -1346,6 +1348,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/modes-observe.ts` | Lightweight persona modes list/current facade without switching APIs |
 | `src/modes-control.ts` | Lightweight persona mode switching facade without list/current observe APIs |
 | `src/ide.ts` | Lightweight hand-written IDE status/code-review slice |
+| `src/ide-status.ts` | Lightweight IDE status facade without code-review APIs |
+| `src/ide-review.ts` | Lightweight IDE code-review facade without status APIs |
 | `src/persona.ts` | Lightweight hand-written persona identity/skills/presets slice |
 | `src/persona-state.ts` | Lightweight persona identity/soul state facade without skills or presets APIs |
 | `src/persona-skills.ts` | Lightweight persona skills list/add/delete facade without identity or presets APIs |
