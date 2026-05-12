@@ -51,6 +51,10 @@
       "types": "./src/cognis-evolution.ts",
       "import": "./src/cognis-evolution.ts"
     },
+    "./cognis-federation": {
+      "types": "./src/cognis-federation.ts",
+      "import": "./src/cognis-federation.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
