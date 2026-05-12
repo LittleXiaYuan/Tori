@@ -23,6 +23,7 @@
     "src/planner.ts",
     "src/chat.ts",
     "src/chat-basic.ts",
+    "src/chat-agentic.ts",
     "src/chat-stream.ts",
     "src/cognis.ts",
     "src/cognis-registry.ts",
