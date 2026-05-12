@@ -17,6 +17,7 @@
     "noEmit": true
   },
   "include": [
+    "src/agent-kit.ts",
     "src/auth.ts",
     "src/airi.ts",
     "src/planner-recovery.ts",

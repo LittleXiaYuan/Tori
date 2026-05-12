@@ -21,8 +21,8 @@ When/if we publish to npm, install with `npm i yunque-client`.
 
 ## Quick start
 
-For app code, prefer subpath imports such as `yunque-client/chat` or
-`yunque-client/planner-recovery`. The package root (`yunque-client`) re-exports
+For app code, prefer subpath imports such as `yunque-client/chat`,
+`yunque-client/planner-recovery`, or `yunque-client/agent-kit`. The package root (`yunque-client`) re-exports
 the generated all-in-one client for full API coverage and is intentionally
 heavier.
 
@@ -42,6 +42,29 @@ const reply = await chat.send({
 });
 
 console.log(reply);
+```
+
+### Agent Kit bundle
+
+For external automation that needs the common SDK-first surfaces together, use
+`yunque-client/agent-kit`. It composes the hand-written State Kernel,
+Reflection Experience, and Plugin API Runtime clients without importing the
+generated all-in-one SDK.
+
+```ts
+import { createAgentKit } from "yunque-client/agent-kit";
+
+const kit = createAgentKit({
+  baseUrl: "http://localhost:9090",
+  token: "<your-jwt>",
+  pluginToken: "<plugin-token>",
+});
+
+const focus = await kit.state.focus();
+const strategies = await kit.reflect.strategies({ tag: "sdk", limit: 5 });
+const search = await kit.plugin.search("incremental SDK package", 5);
+
+console.log(focus.focus, strategies.strategies, search.results.length);
 ```
 
 ### Full generated client
@@ -92,6 +115,7 @@ subpath imports like `yunque-client/planner-recovery` for the smallest runtime
 surface; reserve the package root for full generated API coverage.
 
 ```ts
+import { createAgentKit } from "yunque-client/agent-kit";
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
@@ -1700,6 +1724,7 @@ npm run test -- state-actions state-capabilities
 | `src/client.gen.ts` | Default client instance |
 | `src/client/` | Fetch runtime (from `@hey-api/client-fetch`) |
 | `src/core/` | Internal helpers |
+| `src/agent-kit.ts` | Lightweight bundle for State Kernel, Reflection Experience, and Plugin API Runtime clients without generated SDK imports |
 | `src/auth.ts` | Lightweight hand-written setup status, password login/setup, Tori OAuth URL, and API-key to JWT exchange slice |
 | `src/airi.ts` | Lightweight hand-written Airi bridge status, OpenAI-compatible models, and chat completions slice |
 | `src/planner-recovery.ts` | Lightweight hand-written Planner recovery slice for incremental imports |
