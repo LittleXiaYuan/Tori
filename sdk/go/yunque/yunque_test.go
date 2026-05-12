@@ -161,6 +161,62 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestInstructionsHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/instructions":
+			if r.Method == http.MethodGet {
+				if r.URL.Query().Get("category") != "style" {
+					t.Fatalf("unexpected instructions query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"instructions":[{"instruction_id":"ins-1","content":"保持简洁"}],"total":1}`))
+				return
+			}
+			if r.Method == http.MethodPost {
+				_, _ = w.Write([]byte(`{"instruction_id":"ins-1","content":"保持简洁"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"updated"}`))
+		case "/v1/instructions/reorder":
+			_, _ = w.Write([]byte(`{"status":"reordered"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Instructions.List(ctx, "style")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Instructions.Create(ctx, UserInstruction{"category": "style", "content": "保持简洁"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Instructions.Update(ctx, UserInstruction{"instruction_id": "ins-1", "content": "更新"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Instructions.Delete(ctx, "ins-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reordered, err := Instructions.Reorder(ctx, []string{"ins-2", "ins-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if list["total"].(float64) != 1 || created["instruction_id"] != "ins-1" || updated["status"] != "updated" || deleted["status"] != "updated" || reordered["status"] != "reordered" || NewAgentKit().Instructions != Instructions {
+		t.Fatalf("unexpected instructions results")
+	}
+	if len(seen) != 5 || seen[0] != "GET /v1/instructions?category=style" || seen[4] != "POST /v1/instructions/reorder" {
+		t.Fatalf("unexpected instructions requests: %v", seen)
+	}
+}
+
 func TestEmotionHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

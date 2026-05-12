@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "domain": "user-instructions",
+  "description": "Cross-language lightweight SDK entrypoints for user instruction list, create, update, delete, and reorder without importing the full platform client.",
+  "principles": [
+    "Expose user instruction management as a focused SDK slice for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep instruction CRUD and ordering directly callable through existing authenticated /v1/instructions routes.",
+    "Make Instructions access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "GET /v1/instructions",
+    "POST /v1/instructions",
+    "PUT /v1/instructions",
+    "DELETE /v1/instructions",
+    "POST /v1/instructions/reorder"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/instructions",
+      "readOnly": true,
+      "description": "List user instructions, optionally by category."
+    },
+    {
+      "name": "create",
+      "route": "POST /v1/instructions",
+      "readOnly": false,
+      "description": "Create one user instruction."
+    },
+    {
+      "name": "update",
+      "route": "PUT /v1/instructions",
+      "readOnly": false,
+      "description": "Update one user instruction."
+    },
+    {
+      "name": "delete",
+      "route": "DELETE /v1/instructions",
+      "readOnly": false,
+      "description": "Delete one user instruction by id."
+    },
+    {
+      "name": "reorder",
+      "route": "POST /v1/instructions/reorder",
+      "readOnly": false,
+      "description": "Reorder user instructions by id list."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/instructions.ts",
+        "sdk/typescript/src/interactions.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createInstructionsClient().list",
+        "create": "createInstructionsClient().create",
+        "update": "createInstructionsClient().update",
+        "delete": "createInstructionsClient().delete",
+        "reorder": "createInstructionsClient().reorder"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Instructions.List",
+        "create": "yunque.Instructions.Create",
+        "update": "yunque.Instructions.Update",
+        "delete": "yunque.Instructions.Delete",
+        "reorder": "yunque.Instructions.Reorder"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.instructions.list",
+        "create": "yunque.instructions.create",
+        "update": "yunque.instructions.update",
+        "delete": "yunque.instructions.delete",
+        "reorder": "yunque.instructions.reorder"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "InstructionsClient::list",
+        "create": "InstructionsClient::create",
+        "update": "InstructionsClient::update",
+        "delete": "InstructionsClient::delete",
+        "reorder": "InstructionsClient::reorder"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
