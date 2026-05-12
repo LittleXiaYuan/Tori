@@ -47,6 +47,10 @@
       "types": "./src/cognis-experience.ts",
       "import": "./src/cognis-experience.ts"
     },
+    "./cognis-evolution": {
+      "types": "./src/cognis-evolution.ts",
+      "import": "./src/cognis-evolution.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
