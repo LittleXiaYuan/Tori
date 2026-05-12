@@ -899,6 +899,22 @@
       "types": "./src/skills.ts",
       "import": "./src/skills.ts"
     },
+    "./skills-catalog": {
+      "types": "./src/skills-catalog.ts",
+      "import": "./src/skills-catalog.ts"
+    },
+    "./skills-scan": {
+      "types": "./src/skills-scan.ts",
+      "import": "./src/skills-scan.ts"
+    },
+    "./skills-dynamic": {
+      "types": "./src/skills-dynamic.ts",
+      "import": "./src/skills-dynamic.ts"
+    },
+    "./skills-suggestions": {
+      "types": "./src/skills-suggestions.ts",
+      "import": "./src/skills-suggestions.ts"
+    },
     "./plugins": {
       "types": "./src/plugins.ts",
       "import": "./src/plugins.ts"
