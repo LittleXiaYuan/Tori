@@ -325,6 +325,7 @@ type AgentKit struct {
 	Approvals     *approvalsNamespace
 	RBAC          *rbacNamespace
 	Files         *filesNamespace
+	Browser       *browserNamespace
 	Plugin        *pluginRuntimeNamespace
 	Memory        *memoryNamespace
 	AgentMemory   *agentMemoryNamespace
@@ -1851,6 +1852,9 @@ var RBAC = &rbacNamespace{}
 // Files provides focused access to agent output file listing and previews.
 var Files = &filesNamespace{}
 
+// Browser provides focused access to browser extension automation, capture, and OPP decisions.
+var Browser = &browserNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2751,6 +2755,65 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Browser ──
+
+type browserNamespace struct{}
+
+type BrowserResponse map[string]any
+type BrowserAction map[string]any
+
+func (b *browserNamespace) Status(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/v1/browser/status", nil)
+}
+
+func (b *browserNamespace) Config(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/v1/browser/config", nil)
+}
+
+func (b *browserNamespace) Navigate(ctx context.Context, targetURL string) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/v1/browser/navigate", map[string]any{"url": targetURL})
+}
+
+func (b *browserNamespace) Screenshot(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/v1/browser/screenshot", nil)
+}
+
+func (b *browserNamespace) LatestScreenshot(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/v1/browser/screenshot/latest", nil)
+}
+
+func (b *browserNamespace) OCR(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/v1/browser/ocr", map[string]any{})
+}
+
+func (b *browserNamespace) OPPPending(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/v1/browser/opp/pending", nil)
+}
+
+func (b *browserNamespace) OPPDecide(ctx context.Context, decision map[string]any) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/v1/browser/opp/decide", decision)
+}
+
+func (b *browserNamespace) ExtensionStatus(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/api/browser/ext/status", nil)
+}
+
+func (b *browserNamespace) ExtensionSession(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/api/browser/ext/session", map[string]any{})
+}
+
+func (b *browserNamespace) ExtensionAction(ctx context.Context, action BrowserAction) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/api/browser/ext/action", action)
+}
+
+func (b *browserNamespace) Scenarios(ctx context.Context) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodGet, "/api/browser/ext/scenarios", nil)
+}
+
+func (b *browserNamespace) RunScenario(ctx context.Context, scenarioID string) (BrowserResponse, error) {
+	return apiCall(ctx, http.MethodPost, "/api/browser/ext/scenarios/run", map[string]any{"scenario_id": scenarioID})
+}
+
 // ── Files ──
 
 type filesNamespace struct{}
@@ -3634,6 +3697,7 @@ func NewAgentKit() AgentKit {
 		Approvals:     Approvals,
 		RBAC:          RBAC,
 		Files:         Files,
+		Browser:       Browser,
 		Plugin:        Plugin,
 		Memory:        Memory,
 		AgentMemory:   AgentMemory,

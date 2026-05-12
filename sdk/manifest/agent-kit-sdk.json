@@ -38,6 +38,7 @@
     "human-approvals",
     "rbac-governance",
     "artifact-files",
+    "browser-automation",
     "realtime-websocket",
     "plugin-api-runtime"
   ],
@@ -163,6 +164,10 @@
       "description": "Access the lightweight Files client or namespace for artifact listing, previews, and downloads."
     },
     {
+      "name": "browser",
+      "description": "Access the lightweight Browser client or namespace for automation, capture, OPP, extension actions, and scenarios."
+    },
+    {
       "name": "realtime",
       "description": "Access the lightweight Realtime WebSocket chat client or namespace."
     },
@@ -215,7 +220,8 @@
         "conversations": "AgentKit.conversations",
         "approvals": "AgentKit.approvals",
         "rbac": "AgentKit.rbac",
-        "files": "AgentKit.files"
+        "files": "AgentKit.files",
+        "browser": "AgentKit.browser"
       }
     },
     "go": {
@@ -261,7 +267,8 @@
         "conversations": "AgentKit.Conversations",
         "approvals": "AgentKit.Approvals",
         "rbac": "AgentKit.RBAC",
-        "files": "AgentKit.Files"
+        "files": "AgentKit.Files",
+        "browser": "AgentKit.Browser"
       }
     },
     "python": {
@@ -307,7 +314,8 @@
         "conversations": "AgentKit.conversations",
         "approvals": "AgentKit.approvals",
         "rbac": "AgentKit.rbac",
-        "files": "AgentKit.files"
+        "files": "AgentKit.files",
+        "browser": "AgentKit.browser"
       }
     },
     "rust": {
@@ -353,7 +361,8 @@
         "conversations": "AgentKit::conversations",
         "approvals": "AgentKit::approvals",
         "rbac": "AgentKit::rbac",
-        "files": "AgentKit::files"
+        "files": "AgentKit::files",
+        "browser": "AgentKit::browser"
       }
     }
   },
