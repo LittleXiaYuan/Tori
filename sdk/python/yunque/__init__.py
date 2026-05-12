@@ -599,6 +599,59 @@ conversations = _ConversationsNamespace()
 
 
 
+
+# ── Browser Automation (/v1/browser, /api/browser/ext) ──
+
+class _BrowserNamespace:
+    """Lightweight helpers for browser extension automation, capture, and OPP decisions."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/browser/status")
+
+    def config(self) -> dict:
+        return _api_call("GET", "/v1/browser/config")
+
+    def navigate(self, url: str) -> dict:
+        return _api_call("POST", "/v1/browser/navigate", {"url": url})
+
+    def screenshot(self) -> dict:
+        return _api_call("GET", "/v1/browser/screenshot")
+
+    def latest_screenshot(self) -> dict:
+        return _api_call("GET", "/v1/browser/screenshot/latest")
+
+    def ocr(self) -> dict:
+        return _api_call("POST", "/v1/browser/ocr", {})
+
+    def opp_pending(self) -> dict:
+        return _api_call("GET", "/v1/browser/opp/pending")
+
+    def opp_decide(self, decision: str, *, problem_id: str = "", id: str = "") -> dict:
+        body = {"decision": decision}
+        if problem_id:
+            body["problem_id"] = problem_id
+        if id:
+            body["id"] = id
+        return _api_call("POST", "/v1/browser/opp/decide", body)
+
+    def extension_status(self) -> dict:
+        return _api_call("GET", "/api/browser/ext/status")
+
+    def extension_session(self) -> dict:
+        return _api_call("POST", "/api/browser/ext/session", {})
+
+    def extension_action(self, action: dict) -> dict:
+        return _api_call("POST", "/api/browser/ext/action", action)
+
+    def scenarios(self) -> dict:
+        return _api_call("GET", "/api/browser/ext/scenarios")
+
+    def run_scenario(self, scenario_id: str) -> dict:
+        return _api_call("POST", "/api/browser/ext/scenarios/run", {"scenario_id": scenario_id})
+
+
+browser = _BrowserNamespace()
+
 # ── Files (/api/files) ──
 
 class _FilesNamespace:
@@ -1848,6 +1901,7 @@ class AgentKit:
         self.approvals = approvals
         self.rbac = rbac
         self.files = files
+        self.browser = browser
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

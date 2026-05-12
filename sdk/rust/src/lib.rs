@@ -1393,6 +1393,7 @@ pub struct AgentKit {
     pub approvals: ApprovalsClient,
     pub rbac: RBACClient,
     pub files: FilesClient,
+    pub browser: BrowserClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1447,6 +1448,7 @@ impl AgentKit {
             approvals: ApprovalsClient::new(base_url.clone(), token.as_ref())?,
             rbac: RBACClient::new(base_url.clone(), token.as_ref())?,
             files: FilesClient::new(base_url.clone(), token.as_ref())?,
+            browser: BrowserClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1497,6 +1499,7 @@ impl AgentKit {
             approvals: ApprovalsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             rbac: RBACClient::new_with_client(base_url.clone(), plugin_http.clone()),
             files: FilesClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            browser: BrowserClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3556,6 +3559,135 @@ pub struct ConversationReplayOptions {
     pub limit: i32,
     #[serde(default, skip_serializing_if = "is_default")]
     pub offset: i32,
+}
+
+pub type BrowserResponse = serde_json::Value;
+pub type BrowserAction = serde_json::Map<String, serde_json::Value>;
+
+/// Small Rust helper over `/v1/browser*` and `/api/browser/ext*` browser automation endpoints.
+#[derive(Debug, Clone)]
+pub struct BrowserClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl BrowserClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        let bearer = format!("Bearer {}", token.as_ref());
+        headers.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&bearer).unwrap(),
+        );
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn status(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/v1/browser/status").await
+    }
+    pub async fn config(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/v1/browser/config").await
+    }
+    pub async fn navigate(
+        &self,
+        url: impl Into<String>,
+    ) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json(
+            "/v1/browser/navigate",
+            &serde_json::json!({ "url": url.into() }),
+        )
+        .await
+    }
+    pub async fn screenshot(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/v1/browser/screenshot").await
+    }
+    pub async fn latest_screenshot(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/v1/browser/screenshot/latest").await
+    }
+    pub async fn ocr(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json("/v1/browser/ocr", &serde_json::json!({}))
+            .await
+    }
+    pub async fn opp_pending(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/v1/browser/opp/pending").await
+    }
+    pub async fn opp_decide(
+        &self,
+        decision: BrowserAction,
+    ) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json("/v1/browser/opp/decide", &decision).await
+    }
+    pub async fn extension_status(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/api/browser/ext/status").await
+    }
+    pub async fn extension_session(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json("/api/browser/ext/session", &serde_json::json!({}))
+            .await
+    }
+    pub async fn extension_action(
+        &self,
+        action: BrowserAction,
+    ) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json("/api/browser/ext/action", &action).await
+    }
+    pub async fn scenarios(&self) -> Result<BrowserResponse, reqwest::Error> {
+        self.get_json("/api/browser/ext/scenarios").await
+    }
+    pub async fn run_scenario(
+        &self,
+        scenario_id: impl Into<String>,
+    ) -> Result<BrowserResponse, reqwest::Error> {
+        self.post_json(
+            "/api/browser/ext/scenarios/run",
+            &serde_json::json!({ "scenario_id": scenario_id.into() }),
+        )
+        .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -6686,6 +6818,24 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn browser_helpers_build_urls_and_payloads() {
+        let client =
+            BrowserClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/browser/status"),
+            "http://localhost:9090/v1/browser/status"
+        );
+        let mut action = BrowserAction::new();
+        action.insert(
+            "type".to_string(),
+            serde_json::Value::String("browser_screenshot".to_string()),
+        );
+        assert_eq!(action["type"], "browser_screenshot");
+        let payload = serde_json::json!({ "scenario_id": "open-page" });
+        assert_eq!(payload["scenario_id"], "open-page");
     }
 
     #[test]

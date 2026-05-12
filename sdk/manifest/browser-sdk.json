@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "domain": "browser-automation",
+  "description": "Cross-language lightweight SDK entrypoints for /v1/browser and /api/browser/ext browser automation, capture, OPP, and scenario endpoints without importing the full platform client.",
+  "principles": [
+    "Expose browser automation as a focused SDK slice for external task panes, plugin UIs, browser-extension bridges, CLIs, sidecars, and automation scripts.",
+    "Keep status, capture, navigation, OPP, extension session/action, and scenario helpers directly callable without coupling callers to generated SDK internals.",
+    "Make Browser access available through Agent Kit so chat, workflow, and plugin surfaces can drive browser tasks from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/browser/status",
+    "GET /v1/browser/config",
+    "POST /v1/browser/navigate",
+    "GET /v1/browser/screenshot",
+    "GET /v1/browser/screenshot/latest",
+    "POST /v1/browser/ocr",
+    "GET /v1/browser/opp/pending",
+    "POST /v1/browser/opp/decide",
+    "GET /api/browser/ext/status",
+    "POST /api/browser/ext/session",
+    "POST /api/browser/ext/action",
+    "GET /api/browser/ext/scenarios",
+    "POST /api/browser/ext/scenarios/run"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/browser/status",
+      "readOnly": true,
+      "description": "Read browser runtime status."
+    },
+    {
+      "name": "config",
+      "route": "GET /v1/browser/config",
+      "readOnly": true,
+      "description": "Read browser runtime configuration."
+    },
+    {
+      "name": "navigate",
+      "route": "POST /v1/browser/navigate",
+      "readOnly": false,
+      "description": "Navigate the browser to a URL."
+    },
+    {
+      "name": "screenshot",
+      "route": "GET /v1/browser/screenshot",
+      "readOnly": true,
+      "description": "Capture a browser screenshot."
+    },
+    {
+      "name": "latestScreenshot",
+      "route": "GET /v1/browser/screenshot/latest",
+      "readOnly": true,
+      "description": "Read the latest browser screenshot."
+    },
+    {
+      "name": "ocr",
+      "route": "POST /v1/browser/ocr",
+      "readOnly": true,
+      "description": "Extract page text/content."
+    },
+    {
+      "name": "oppPending",
+      "route": "GET /v1/browser/opp/pending",
+      "readOnly": true,
+      "description": "List pending browser OPP approvals."
+    },
+    {
+      "name": "oppDecide",
+      "route": "POST /v1/browser/opp/decide",
+      "readOnly": false,
+      "description": "Resolve a browser OPP item."
+    },
+    {
+      "name": "extensionStatus",
+      "route": "GET /api/browser/ext/status",
+      "readOnly": true,
+      "description": "Read browser extension connector status."
+    },
+    {
+      "name": "extensionSession",
+      "route": "POST /api/browser/ext/session",
+      "readOnly": false,
+      "description": "Create a browser extension session ticket."
+    },
+    {
+      "name": "extensionAction",
+      "route": "POST /api/browser/ext/action",
+      "readOnly": false,
+      "description": "Run a browser extension action."
+    },
+    {
+      "name": "scenarios",
+      "route": "GET /api/browser/ext/scenarios",
+      "readOnly": true,
+      "description": "List browser extension scenarios."
+    },
+    {
+      "name": "runScenario",
+      "route": "POST /api/browser/ext/scenarios/run",
+      "readOnly": false,
+      "description": "Run a browser extension scenario."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/browser.ts",
+        "sdk/typescript/src/browser-status.ts",
+        "sdk/typescript/src/browser-capture.ts",
+        "sdk/typescript/src/browser-opp.ts",
+        "sdk/typescript/src/browser-extension.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createBrowserClient().status",
+        "config": "createBrowserClient().config",
+        "navigate": "createBrowserClient().navigate",
+        "screenshot": "createBrowserClient().screenshot",
+        "latestScreenshot": "createBrowserClient().latestScreenshot",
+        "ocr": "createBrowserClient().ocr",
+        "oppPending": "createBrowserClient().oppPending",
+        "oppDecide": "createBrowserClient().oppDecide",
+        "extensionStatus": "createBrowserClient().extensionStatus",
+        "extensionSession": "createBrowserClient().extensionSession",
+        "extensionAction": "createBrowserClient().extensionAction",
+        "scenarios": "createBrowserClient().scenarios",
+        "runScenario": "createBrowserClient().runScenario"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.Browser.Status",
+        "config": "yunque.Browser.Config",
+        "navigate": "yunque.Browser.Navigate",
+        "screenshot": "yunque.Browser.Screenshot",
+        "latestScreenshot": "yunque.Browser.LatestScreenshot",
+        "ocr": "yunque.Browser.OCR",
+        "oppPending": "yunque.Browser.OPPPending",
+        "oppDecide": "yunque.Browser.OPPDecide",
+        "extensionStatus": "yunque.Browser.ExtensionStatus",
+        "extensionSession": "yunque.Browser.ExtensionSession",
+        "extensionAction": "yunque.Browser.ExtensionAction",
+        "scenarios": "yunque.Browser.Scenarios",
+        "runScenario": "yunque.Browser.RunScenario"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.browser.status",
+        "config": "yunque.browser.config",
+        "navigate": "yunque.browser.navigate",
+        "screenshot": "yunque.browser.screenshot",
+        "latestScreenshot": "yunque.browser.latest_screenshot",
+        "ocr": "yunque.browser.ocr",
+        "oppPending": "yunque.browser.opp_pending",
+        "oppDecide": "yunque.browser.opp_decide",
+        "extensionStatus": "yunque.browser.extension_status",
+        "extensionSession": "yunque.browser.extension_session",
+        "extensionAction": "yunque.browser.extension_action",
+        "scenarios": "yunque.browser.scenarios",
+        "runScenario": "yunque.browser.run_scenario"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "BrowserClient::status",
+        "config": "BrowserClient::config",
+        "navigate": "BrowserClient::navigate",
+        "screenshot": "BrowserClient::screenshot",
+        "latestScreenshot": "BrowserClient::latest_screenshot",
+        "ocr": "BrowserClient::ocr",
+        "oppPending": "BrowserClient::opp_pending",
+        "oppDecide": "BrowserClient::opp_decide",
+        "extensionStatus": "BrowserClient::extension_status",
+        "extensionSession": "BrowserClient::extension_session",
+        "extensionAction": "BrowserClient::extension_action",
+        "scenarios": "BrowserClient::scenarios",
+        "runScenario": "BrowserClient::run_scenario"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
