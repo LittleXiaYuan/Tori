@@ -106,6 +106,7 @@
     "src/usage.ts",
     "src/lora.ts",
     "src/lora-observe.ts",
+    "src/lora-control.ts",
     "src/iterate.ts",
     "src/trust.ts",
     "src/review.ts",
