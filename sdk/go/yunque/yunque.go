@@ -283,6 +283,85 @@ func decodeMapResponse(resp map[string]any, target any) error {
 	return json.Unmarshal(raw, target)
 }
 
+// ── Agent Kit bundle ──
+
+// AgentKit groups the common SDK-first surfaces for external Go sidecars, CLIs,
+// plugins, and automation binaries.
+//
+// It is intentionally just a thin bundle over the existing lightweight
+// namespaces, so callers can reach State Kernel, Reflection Experience, and
+// Plugin API Runtime helpers without linking to platform internals or a broad
+// generated client.
+type AgentKit struct {
+	State       *stateNamespace
+	Reflect     *reflectNamespace
+	Plugin      *pluginRuntimeNamespace
+	Memory      *memoryNamespace
+	AgentMemory *agentMemoryNamespace
+	Knowledge   *knowledgeNamespace
+	Cron        *cronNamespace
+}
+
+// Plugin groups top-level Plugin API Runtime helpers under one namespace for
+// AgentKit-style callers.
+var Plugin = &pluginRuntimeNamespace{}
+
+type pluginRuntimeNamespace struct{}
+
+// NewAgentKit returns a lightweight bundle of state, reflection, and plugin
+// runtime helpers.
+func NewAgentKit() AgentKit {
+	return AgentKit{
+		State:       State,
+		Reflect:     Reflect,
+		Plugin:      Plugin,
+		Memory:      Memory,
+		AgentMemory: AgentMemory,
+		Knowledge:   Knowledge,
+		Cron:        Cron,
+	}
+}
+
+func (p *pluginRuntimeNamespace) LLM(ctx context.Context, systemPrompt, userInput string) (string, error) {
+	return LLM(ctx, systemPrompt, userInput)
+}
+
+func (p *pluginRuntimeNamespace) Chat(ctx context.Context, messages []Message, temperature float64) (string, error) {
+	return Chat(ctx, messages, temperature)
+}
+
+func (p *pluginRuntimeNamespace) Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
+	return Search(ctx, query, limit)
+}
+
+func (p *pluginRuntimeNamespace) Send(ctx context.Context, channelType, target, content string) error {
+	return Send(ctx, channelType, target, content)
+}
+
+func (p *pluginRuntimeNamespace) RegisterProvider(ctx context.Context, id, baseURL, model string, opts ...ProviderOpt) error {
+	return RegisterProvider(ctx, id, baseURL, model, opts...)
+}
+
+func (p *pluginRuntimeNamespace) RegisterChannel(ctx context.Context, name, webhookURL, sendEndpoint string) error {
+	return RegisterChannel(ctx, name, webhookURL, sendEndpoint)
+}
+
+func (p *pluginRuntimeNamespace) RegisterSearchEngine(ctx context.Context, name, baseURL, apiKey string) error {
+	return RegisterSearchEngine(ctx, name, baseURL, apiKey)
+}
+
+func (p *pluginRuntimeNamespace) RegisterGuardrail(ctx context.Context, name, description, phase string, keywords []string) error {
+	return RegisterGuardrail(ctx, name, description, phase, keywords)
+}
+
+func (p *pluginRuntimeNamespace) RegisterEmbedding(ctx context.Context, name, baseURL, model string, dimensions int) error {
+	return RegisterEmbedding(ctx, name, baseURL, model, dimensions)
+}
+
+func (p *pluginRuntimeNamespace) RegisterSpeech(ctx context.Context, name, speechType, baseURL, model string) error {
+	return RegisterSpeech(ctx, name, speechType, baseURL, model)
+}
+
 // ── State Kernel ──
 
 // State provides typed access to the lightweight State Kernel snapshot API.

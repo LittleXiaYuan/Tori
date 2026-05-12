@@ -232,6 +232,77 @@ func TestStateActionsFallbacksToEmptySlice(t *testing.T) {
 	}
 }
 
+func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/state/focus":
+			_, _ = w.Write([]byte(`{"focus":"sdk"}`))
+		case "/v1/reflect/strategies":
+			if r.URL.Query().Get("tag") != "sdk" {
+				t.Fatalf("unexpected strategies query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"strategies":"- keep SDK slices small"}`))
+		case "/v1/plugin-api/search":
+			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
+		case "/v1/plugin-api/memory/set":
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	kit := NewAgentKit()
+	focus, err := kit.State.Focus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategies, err := kit.Reflect.StrategiesWithOptions(context.Background(), ReflectStrategyOptions{Tag: "sdk"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.Memory.Set(context.Background(), "last", "ok"); err != nil {
+		t.Fatal(err)
+	}
+
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || len(results) != 1 || results[0].Title != "Agent Kit" {
+		t.Fatalf("unexpected kit results: focus=%q strategies=%q results=%+v", focus, strategies, results)
+	}
+	if kit.State != State || kit.Reflect != Reflect || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
+	}
+	if len(seen) != 4 {
+		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestPluginRuntimeNamespaceDelegatesExtensionRegistration(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/plugin-api/register/provider" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["id"] != "local" || body["base_url"] != "http://localhost:11434/v1" || body["model"] != "llama3" || body["type"] != "chat" {
+			t.Fatalf("unexpected provider body: %+v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"provider_id":"local"}`))
+	})
+
+	if err := Plugin.RegisterProvider(context.Background(), "local", "http://localhost:11434/v1", "llama3"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func withTestAPI(t *testing.T, handler http.HandlerFunc) {
 	t.Helper()
 	oldBase := apiBase
