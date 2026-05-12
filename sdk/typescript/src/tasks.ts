@@ -52,6 +52,156 @@ export type TaskConstraints = {
   extra?: Record<string, unknown>;
 };
 
+// ── Task Templates ──
+
+export type TaskTemplateVariable = {
+  name: string;
+  description?: string;
+  default?: string;
+  required?: boolean;
+};
+
+export type TaskTemplateStep = {
+  action: string;
+  skill_name?: string;
+  args?: Record<string, unknown>;
+  group?: number;
+};
+
+export type TaskTemplate = {
+  id: string;
+  name?: string;
+  description?: string;
+  variables?: TaskTemplateVariable[];
+  steps?: TaskTemplateStep[];
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CreateTaskTemplateRequest = {
+  id: string;
+  name?: string;
+  description?: string;
+  variables?: TaskTemplateVariable[];
+  steps?: TaskTemplateStep[];
+  tags?: string[];
+};
+
+export type InstantiateTemplateRequest = {
+  template_id: string;
+  variables?: Record<string, string>;
+};
+
+export type TaskTemplatesResponse = {
+  templates?: TaskTemplate[];
+  total?: number;
+  [key: string]: unknown;
+};
+
+export type DeleteTaskTemplateResponse = {
+  deleted?: string;
+  [key: string]: unknown;
+};
+
+// ── Task Gaps ──
+
+export type TaskGap = {
+  id: string;
+  task_id?: string;
+  type?: string;
+  description?: string;
+  status?: string;
+  created_at?: string;
+  [key: string]: unknown;
+};
+
+export type TaskGapStats = {
+  total?: number;
+  by_type?: Record<string, number>;
+  [key: string]: unknown;
+};
+
+export type ResolveTaskGapResponse = {
+  status?: string;
+  [key: string]: unknown;
+};
+
+// ── Task Working Memory ──
+
+export type TaskWorkingMemory = {
+  task_id?: string;
+  data?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+// ── Task Threads ──
+
+export type TaskChannelBinding = {
+  channel_type: string;
+  channel_id: string;
+  user_id?: string;
+  user_name?: string;
+  message_id?: string;
+};
+
+export type PostTaskThreadMessageRequest = {
+  task_id: string;
+  content: string;
+  channel?: TaskChannelBinding;
+};
+
+export type UpdateTaskThreadStateRequest = {
+  task_id: string;
+  state: string;
+};
+
+export type TaskThread = {
+  id?: string;
+  task_id?: string;
+  state?: string;
+  messages?: Array<Record<string, unknown>>;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+export type TaskThreadsResponse = {
+  threads?: TaskThread[];
+  total?: number;
+  [key: string]: unknown;
+};
+
+export type TaskThreadActionResponse = {
+  status?: string;
+  [key: string]: unknown;
+};
+
+// ── Task Trace ──
+
+export type TaskTraceQueryOptions = {
+  raw?: boolean;
+};
+
+export type TaskTraceEvent = {
+  trace_id: string;
+  step?: string;
+  action?: string;
+  status?: string;
+  started_at?: string;
+  done_at?: string;
+  error?: string;
+  [key: string]: unknown;
+};
+
+export type TaskTraceResponse = {
+  task_id: string;
+  events?: TaskTraceEvent[];
+  [key: string]: unknown;
+};
+
 export type Task = {
   id: string;
   title?: string;
@@ -201,12 +351,85 @@ export class TasksClient {
     return this.request<TaskActionResponse>("DELETE", "/v1/tasks", undefined, { id });
   }
 
+  // ── Task Templates ──
+
+  templates(): Promise<TaskTemplatesResponse> {
+    return this.request<TaskTemplatesResponse>("GET", "/v1/tasks/templates");
+  }
+
+  template(id: string): Promise<TaskTemplate> {
+    return this.request<TaskTemplate>("GET", "/v1/tasks/templates", undefined, { id });
+  }
+
+  createTemplate(body: CreateTaskTemplateRequest): Promise<TaskTemplate> {
+    return this.request<TaskTemplate>("POST", "/v1/tasks/templates", body);
+  }
+
+  deleteTemplate(id: string): Promise<DeleteTaskTemplateResponse> {
+    return this.request<DeleteTaskTemplateResponse>("DELETE", "/v1/tasks/templates", undefined, { id });
+  }
+
+  instantiateTemplate(templateId: string, variables?: Record<string, string>): Promise<Task> {
+    return this.request<Task>("POST", "/v1/tasks/templates/instantiate", {
+      template_id: templateId,
+      variables: variables ?? {},
+    } satisfies InstantiateTemplateRequest);
+  }
+
+  // ── Task Gaps ──
+
+  gaps(gapType?: string): Promise<TaskGap[]> {
+    const path = gapType ? `/v1/tasks/gaps?type=${encodeURIComponent(gapType)}` : "/v1/tasks/gaps";
+    return this.request<TaskGap[]>("GET", path);
+  }
+
+  gapStats(): Promise<TaskGapStats> {
+    return this.request<TaskGapStats>("GET", "/v1/tasks/gaps?stats=true");
+  }
+
+  resolveGap(id: string): Promise<ResolveTaskGapResponse> {
+    return this.request<ResolveTaskGapResponse>("POST", "/v1/tasks/gaps/resolve", { id });
+  }
+
+  // ── Task Working Memory ──
+
+  workingMemory(taskId: string): Promise<TaskWorkingMemory> {
+    return this.request<TaskWorkingMemory>("GET", "/v1/tasks/memory", undefined, { id: taskId });
+  }
+
+  // ── Task Threads ──
+
+  threads(state?: string): Promise<TaskThreadsResponse> {
+    const path = state ? `/v1/tasks/threads?state=${encodeURIComponent(state)}` : "/v1/tasks/threads";
+    return this.request<TaskThreadsResponse>("GET", path);
+  }
+
+  thread(taskId: string): Promise<TaskThread> {
+    return this.request<TaskThread>("GET", "/v1/tasks/threads", undefined, { id: taskId });
+  }
+
+  postThreadMessage(body: PostTaskThreadMessageRequest): Promise<TaskThreadActionResponse> {
+    return this.request<TaskThreadActionResponse>("POST", "/v1/tasks/threads", body);
+  }
+
+  updateThreadState(body: UpdateTaskThreadStateRequest): Promise<TaskThreadActionResponse> {
+    return this.request<TaskThreadActionResponse>("PUT", "/v1/tasks/threads", body);
+  }
+
+  // ── Task Trace ──
+
+  trace(taskId: string, options?: TaskTraceQueryOptions): Promise<TaskTraceResponse> {
+    const query: Record<string, string | undefined> = { id: taskId };
+    if (options?.raw !== undefined) query.raw = String(options.raw);
+    return this.request<TaskTraceResponse>("GET", "/v1/trace/by-task", undefined, query);
+  }
+
   private action(path: string, id: string): Promise<TaskActionResponse> {
     return this.request<TaskActionResponse>("POST", path, { id });
   }
 
   private async request<T>(
-    method: "DELETE" | "GET" | "POST",
+    method: "DELETE" | "GET" | "POST" | "PUT",
     path: string,
     body?: unknown,
     query?: Record<string, string | undefined>,
