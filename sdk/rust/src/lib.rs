@@ -263,6 +263,13 @@ pub struct PluginMemorySearchResponse {
     pub results: Vec<String>,
 }
 
+/// Response returned by `/v1/plugin-api/agent-memory/search`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginAgentMemorySearchResponse {
+    #[serde(default)]
+    pub context: String,
+}
+
 /// Response returned by `/v1/plugin-api/knowledge/search`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct PluginKnowledgeSearchResponse {
@@ -284,6 +291,22 @@ pub struct PluginCronAddResponse {
 pub struct PluginCronListResponse {
     #[serde(default)]
     pub jobs: Vec<serde_json::Value>,
+}
+
+/// Generic Plugin API system extension registration response.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginExtensionRegisterResponse {
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Response returned by `/v1/plugin-api/extensions`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginExtensionsResponse {
+    #[serde(default)]
+    pub extensions: Vec<serde_json::Value>,
 }
 
 /// Small Rust helper over `/v1/state` and focused State Kernel routes.
@@ -708,6 +731,50 @@ impl PluginApiClient {
         .await
     }
 
+    /// Search shared agent memory.
+    pub async fn agent_memory_search(
+        &self,
+        query: impl AsRef<str>,
+        top_k: i32,
+    ) -> Result<PluginAgentMemorySearchResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct AgentMemorySearchRequest<'a> {
+            query: &'a str,
+            #[serde(skip_serializing_if = "is_default")]
+            top_k: i32,
+        }
+        self.post_json(
+            "/v1/plugin-api/agent-memory/search",
+            &AgentMemorySearchRequest {
+                query: query.as_ref(),
+                top_k,
+            },
+        )
+        .await
+    }
+
+    /// Add a fact to shared agent memory.
+    pub async fn agent_memory_add(
+        &self,
+        fact: impl AsRef<str>,
+        source: impl AsRef<str>,
+    ) -> Result<PluginOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct AgentMemoryAddRequest<'a> {
+            fact: &'a str,
+            #[serde(skip_serializing_if = "str::is_empty")]
+            source: &'a str,
+        }
+        self.post_json(
+            "/v1/plugin-api/agent-memory/add",
+            &AgentMemoryAddRequest {
+                fact: fact.as_ref(),
+                source: source.as_ref(),
+            },
+        )
+        .await
+    }
+
     /// Search the agent knowledge base.
     pub async fn knowledge_search(
         &self,
@@ -811,13 +878,62 @@ impl PluginApiClient {
                 url_encode_query_component(plugin)
             )
         };
-        self.http
-            .get(self.url(&path))
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
+        self.get_json(&path).await
+    }
+
+    /// Register a plugin-provided LLM provider.
+    pub async fn register_provider(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/provider", config).await
+    }
+
+    /// Register a plugin-provided channel adapter.
+    pub async fn register_channel(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/channel", config).await
+    }
+
+    /// Register a plugin-provided search engine.
+    pub async fn register_search(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/search", config).await
+    }
+
+    /// Register a plugin-provided guardrail.
+    pub async fn register_guardrail(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/guardrail", config)
             .await
+    }
+
+    /// Register a plugin-provided embedding provider.
+    pub async fn register_embedding(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/embedding", config)
+            .await
+    }
+
+    /// Register a plugin-provided speech provider.
+    pub async fn register_speech(
+        &self,
+        config: &serde_json::Value,
+    ) -> Result<PluginExtensionRegisterResponse, reqwest::Error> {
+        self.post_json("/v1/plugin-api/register/speech", config).await
+    }
+
+    /// List plugin-contributed system extensions.
+    pub async fn extensions(&self) -> Result<PluginExtensionsResponse, reqwest::Error> {
+        self.get_json("/v1/plugin-api/extensions").await
     }
 
     async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
@@ -828,6 +944,19 @@ impl PluginApiClient {
         self.http
             .post(self.url(path))
             .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
             .send()
             .await?
             .error_for_status()?
