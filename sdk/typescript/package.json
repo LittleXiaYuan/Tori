@@ -491,6 +491,14 @@
       "types": "./src/trace-events.ts",
       "import": "./src/trace-events.ts"
     },
+    "./trace-recent": {
+      "types": "./src/trace-recent.ts",
+      "import": "./src/trace-recent.ts"
+    },
+    "./trace-by-id": {
+      "types": "./src/trace-by-id.ts",
+      "import": "./src/trace-by-id.ts"
+    },
     "./task-trace": {
       "types": "./src/task-trace.ts",
       "import": "./src/task-trace.ts"
