@@ -116,6 +116,7 @@
     "src/skillgrow.ts",
     "src/audit.ts",
     "src/audit-chain.ts",
+    "src/audit-trail.ts",
     "src/heartbeat.ts",
     "src/reverie.ts",
     "src/federation.ts",
