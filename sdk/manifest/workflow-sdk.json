@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "domain": "workflow-orchestration",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque DAG workflow definition and instance APIs under /v1/workflows*.",
+  "principles": [
+    "Expose workflow definitions, runs, instances, and cancel actions as focused SDK slices instead of forcing full platform imports.",
+    "Keep workflow read/write/run helpers callable from external projects, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Make Workflow orchestration available through Agent Kit without creating a new platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /v1/workflows",
+    "POST /v1/workflows",
+    "DELETE /v1/workflows",
+    "POST /v1/workflows/run",
+    "GET /v1/workflows/instances",
+    "POST /v1/workflows/cancel"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/workflows",
+      "readOnly": true,
+      "description": "List workflow definitions."
+    },
+    {
+      "name": "get",
+      "route": "GET /v1/workflows",
+      "readOnly": true,
+      "description": "Read one workflow definition by id."
+    },
+    {
+      "name": "save",
+      "route": "POST /v1/workflows",
+      "readOnly": false,
+      "description": "Create or update a workflow definition."
+    },
+    {
+      "name": "delete",
+      "route": "DELETE /v1/workflows",
+      "readOnly": false,
+      "description": "Delete a workflow definition by id."
+    },
+    {
+      "name": "run",
+      "route": "POST /v1/workflows/run",
+      "readOnly": false,
+      "description": "Start a workflow instance."
+    },
+    {
+      "name": "instances",
+      "route": "GET /v1/workflows/instances",
+      "readOnly": true,
+      "description": "List workflow instances."
+    },
+    {
+      "name": "getInstance",
+      "route": "GET /v1/workflows/instances",
+      "readOnly": true,
+      "description": "Read one workflow instance by id."
+    },
+    {
+      "name": "cancel",
+      "route": "POST /v1/workflows/cancel",
+      "readOnly": false,
+      "description": "Cancel a running workflow instance."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/workflow.ts",
+        "sdk/typescript/src/workflow-read.ts",
+        "sdk/typescript/src/workflow-write.ts",
+        "sdk/typescript/src/workflow-run.ts",
+        "sdk/typescript/src/workflow-instances.ts",
+        "sdk/typescript/src/workflow-definitions.ts",
+        "sdk/typescript/src/workflow-runs.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createWorkflowClient().list",
+        "get": "createWorkflowClient().get",
+        "save": "createWorkflowClient().save",
+        "delete": "createWorkflowClient().delete",
+        "run": "createWorkflowClient().run",
+        "instances": "createWorkflowClient().instances",
+        "getInstance": "createWorkflowClient().getInstance",
+        "cancel": "createWorkflowClient().cancel"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Workflows.List",
+        "get": "yunque.Workflows.Get",
+        "save": "yunque.Workflows.Save",
+        "delete": "yunque.Workflows.Delete",
+        "run": "yunque.Workflows.Run",
+        "instances": "yunque.Workflows.Instances",
+        "getInstance": "yunque.Workflows.GetInstance",
+        "cancel": "yunque.Workflows.Cancel"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.workflows.list",
+        "get": "yunque.workflows.get",
+        "save": "yunque.workflows.save",
+        "delete": "yunque.workflows.delete",
+        "run": "yunque.workflows.run",
+        "instances": "yunque.workflows.instances",
+        "getInstance": "yunque.workflows.get_instance",
+        "cancel": "yunque.workflows.cancel"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "WorkflowClient::list",
+        "get": "WorkflowClient::get",
+        "save": "WorkflowClient::save",
+        "delete": "WorkflowClient::delete",
+        "run": "WorkflowClient::run",
+        "instances": "WorkflowClient::instances",
+        "getInstance": "WorkflowClient::get_instance",
+        "cancel": "WorkflowClient::cancel"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

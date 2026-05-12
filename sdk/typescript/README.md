@@ -2134,3 +2134,6 @@ const found = await createKnowledgeSearchClient(options).search("增量 SDK", { 
 const ingested = await createKnowledgeIngestClient(options).ingestText("外部项目可直接调用 Knowledge Base", { name: "sdk-note" });
 console.log(found.count, ingested.source?.id);
 ```
+
+
+Agent Kit also exposes `kit.workflows` for Workflow definition list/get/save/delete, run, instances, getInstance, and cancel helpers.

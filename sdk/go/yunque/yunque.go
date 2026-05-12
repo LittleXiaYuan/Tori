@@ -303,6 +303,7 @@ type AgentKit struct {
 	Graph       *graphNamespace
 	KnowledgeKB *knowledgeKBNamespace
 	LoRA        *loRANamespace
+	Workflows   *workflowsNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1135,6 +1136,147 @@ func nonNilMap[T ~map[string]any](value T) T {
 	return value
 }
 
+// ── Workflow Orchestration (host) ──
+
+// Workflows provides focused access to host /v1/workflows* DAG orchestration APIs.
+var Workflows = &workflowsNamespace{}
+
+type workflowsNamespace struct{}
+
+type WorkflowDefinition struct {
+	ID          string           `json:"id,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Version     int              `json:"version,omitempty"`
+	Nodes       []map[string]any `json:"nodes,omitempty"`
+	Edges       []map[string]any `json:"edges,omitempty"`
+	Variables   []map[string]any `json:"variables,omitempty"`
+	TenantID    string           `json:"tenant_id,omitempty"`
+	CreatedAt   string           `json:"created_at,omitempty"`
+	UpdatedAt   string           `json:"updated_at,omitempty"`
+	Extra       map[string]any   `json:"-"`
+}
+
+type WorkflowInstance struct {
+	ID           string         `json:"id"`
+	DefinitionID string         `json:"definition_id"`
+	Version      int            `json:"version,omitempty"`
+	Status       string         `json:"status"`
+	Variables    map[string]any `json:"variables,omitempty"`
+	NodeStates   map[string]any `json:"node_states,omitempty"`
+	Error        string         `json:"error,omitempty"`
+	TenantID     string         `json:"tenant_id,omitempty"`
+	CreatedAt    string         `json:"created_at,omitempty"`
+	UpdatedAt    string         `json:"updated_at,omitempty"`
+	StartedAt    string         `json:"started_at,omitempty"`
+	FinishedAt   string         `json:"finished_at,omitempty"`
+	Extra        map[string]any `json:"-"`
+}
+
+type WorkflowListResponse struct {
+	Workflows []WorkflowDefinition `json:"workflows"`
+	Total     int                  `json:"total"`
+}
+
+type WorkflowInstancesResponse struct {
+	Instances []WorkflowInstance `json:"instances"`
+	Total     int                `json:"total"`
+}
+
+type WorkflowRunRequest struct {
+	DefinitionID string         `json:"definition_id"`
+	Variables    map[string]any `json:"variables,omitempty"`
+}
+
+type WorkflowRunResponse struct {
+	Status     string           `json:"status"`
+	InstanceID string           `json:"instance_id"`
+	Instance   WorkflowInstance `json:"instance"`
+}
+
+type WorkflowCancelRequest struct {
+	InstanceID string `json:"instance_id"`
+}
+
+type WorkflowCancelResponse struct {
+	Status     string `json:"status,omitempty"`
+	InstanceID string `json:"instance_id,omitempty"`
+}
+
+type WorkflowDeleteResponse struct {
+	Deleted string `json:"deleted,omitempty"`
+}
+
+func (w *workflowsNamespace) List(ctx context.Context) (WorkflowListResponse, error) {
+	var out WorkflowListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workflows", nil, &out); err != nil {
+		return WorkflowListResponse{}, err
+	}
+	if out.Workflows == nil {
+		out.Workflows = []WorkflowDefinition{}
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Get(ctx context.Context, id string) (WorkflowDefinition, error) {
+	var out WorkflowDefinition
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workflows?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return WorkflowDefinition{}, err
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Save(ctx context.Context, def WorkflowDefinition) (WorkflowDefinition, error) {
+	var out WorkflowDefinition
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/workflows", def, &out); err != nil {
+		return WorkflowDefinition{}, err
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Delete(ctx context.Context, id string) (WorkflowDeleteResponse, error) {
+	var out WorkflowDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/workflows?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return WorkflowDeleteResponse{}, err
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Run(ctx context.Context, req WorkflowRunRequest) (WorkflowRunResponse, error) {
+	var out WorkflowRunResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/workflows/run", req, &out); err != nil {
+		return WorkflowRunResponse{}, err
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Instances(ctx context.Context) (WorkflowInstancesResponse, error) {
+	var out WorkflowInstancesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workflows/instances", nil, &out); err != nil {
+		return WorkflowInstancesResponse{}, err
+	}
+	if out.Instances == nil {
+		out.Instances = []WorkflowInstance{}
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) GetInstance(ctx context.Context, id string) (WorkflowInstance, error) {
+	var out WorkflowInstance
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/workflows/instances?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return WorkflowInstance{}, err
+	}
+	return out, nil
+}
+
+func (w *workflowsNamespace) Cancel(ctx context.Context, req WorkflowCancelRequest) (WorkflowCancelResponse, error) {
+	var out WorkflowCancelResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/workflows/cancel", req, &out); err != nil {
+		return WorkflowCancelResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -1208,6 +1350,7 @@ func NewAgentKit() AgentKit {
 		Graph:       Graph,
 		KnowledgeKB: KnowledgeKB,
 		LoRA:        LoRA,
+		Workflows:   Workflows,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

@@ -13,6 +13,7 @@ const checks = [
   ["Graph SDK manifest", "sdk/scripts/check-graph-sdk-manifest.mjs"],
   ["Knowledge SDK manifest", "sdk/scripts/check-knowledge-sdk-manifest.mjs"],
   ["LoRA SDK manifest", "sdk/scripts/check-lora-sdk-manifest.mjs"],
+  ["Workflow SDK manifest", "sdk/scripts/check-workflow-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

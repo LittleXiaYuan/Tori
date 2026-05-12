@@ -400,3 +400,16 @@ let preview = lora.preview(&LoRAPreviewOptions { tenant_id: "default".to_string(
 let triggered = lora.trigger(&TriggerLoRARequest { tenant_id: "default".to_string() }).await?;
 println!("{:?} {:?} {:?}", status.get("active_model"), preview.get("preview"), triggered.get("status"));
 ```
+
+### Workflow orchestration helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `WorkflowClient` 访问宿主 `/v1/workflows*` 工作流定义与实例能力。
+
+```rust
+use yunque_client::{WorkflowClient, WorkflowRunRequest};
+
+let workflows = WorkflowClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let defs = workflows.list().await?;
+let run = workflows.run(&WorkflowRunRequest { definition_id: "wf_1".to_string(), variables: serde_json::Map::new() }).await?;
+println!("{} {}", defs.total, run.instance_id);
+```

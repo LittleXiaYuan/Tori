@@ -358,6 +358,50 @@ class _LoRANamespace:
 lora = _LoRANamespace()
 
 
+
+# ── Workflow Orchestration (/v1/workflows) ──
+
+class _WorkflowsNamespace:
+    """Lightweight helpers for host DAG workflow orchestration under /v1/workflows*."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/workflows")
+
+    def get(self, workflow_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/workflows?{urlencode({'id': workflow_id})}")
+
+    def save(self, definition: dict) -> dict:
+        return _api_call("POST", "/v1/workflows", definition)
+
+    def delete(self, workflow_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/workflows?{urlencode({'id': workflow_id})}")
+
+    def run(self, definition_id: str | dict, variables: Optional[dict] = None) -> dict:
+        if isinstance(definition_id, dict):
+            body = dict(definition_id)
+        else:
+            body = {"definition_id": definition_id}
+            if variables is not None:
+                body["variables"] = variables
+        return _api_call("POST", "/v1/workflows/run", body)
+
+    def instances(self) -> dict:
+        return _api_call("GET", "/v1/workflows/instances")
+
+    def get_instance(self, instance_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/workflows/instances?{urlencode({'id': instance_id})}")
+
+    def cancel(self, instance_id: str | dict) -> dict:
+        body = dict(instance_id) if isinstance(instance_id, dict) else {"instance_id": instance_id}
+        return _api_call("POST", "/v1/workflows/cancel", body)
+
+
+workflows = _WorkflowsNamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -879,6 +923,7 @@ class AgentKit:
         self.graph = graph
         self.knowledge_base = knowledge_base
         self.lora = lora
+        self.workflows = workflows
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
