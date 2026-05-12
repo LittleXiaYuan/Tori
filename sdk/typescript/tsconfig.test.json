@@ -267,6 +267,8 @@
     "src/notify-channel-control.ts",
     "src/projects.ts",
     "src/project-read.ts",
+    "src/project-list.ts",
+    "src/project-detail.ts",
     "src/project-write.ts",
     "src/market.ts",
     "src/market-search.ts",

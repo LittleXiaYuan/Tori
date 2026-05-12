@@ -1011,6 +1011,14 @@
       "types": "./src/project-read.ts",
       "import": "./src/project-read.ts"
     },
+    "./project-list": {
+      "types": "./src/project-list.ts",
+      "import": "./src/project-list.ts"
+    },
+    "./project-detail": {
+      "types": "./src/project-detail.ts",
+      "import": "./src/project-detail.ts"
+    },
     "./project-write": {
       "types": "./src/project-write.ts",
       "import": "./src/project-write.ts"
