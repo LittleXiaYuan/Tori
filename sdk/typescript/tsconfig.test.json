@@ -138,6 +138,7 @@
     "src/tori-bind.ts",
     "src/speech.ts",
     "src/speech-tts.ts",
+    "src/speech-stt.ts",
     "src/admin.ts",
     "src/files.ts",
     "src/cron.ts",
