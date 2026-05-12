@@ -2143,3 +2143,8 @@ Agent Kit also exposes `kit.workflows` for Workflow definition list/get/save/del
 Agent Kit also exposes `kit.connectors` for Connector catalog list/detail, connect/disconnect, and action execution helpers.
 
 Agent Kit also exposes `kit.notify` for notification channel list/add/remove/toggle/test and share dispatch helpers.
+
+
+### Projects SDK
+
+Projects SDK exposes lightweight project workspace CRUD helpers (`list`, `create`, `detail`, `update`, `remove`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.projects` / `kit.Projects` for one-stop automation composition.

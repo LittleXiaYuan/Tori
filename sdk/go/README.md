@@ -272,3 +272,8 @@ emitted, err := yunque.Triggers.Emit(ctx, yunque.TriggerPayload{
 runs, err := yunque.Triggers.Runs(ctx, yunque.TriggerHistoryOptions{TriggerID: created.ID, Limit: 10})
 fmt.Println(defs.Total, emitted.Status, runs.Total)
 ```
+
+
+### Projects SDK
+
+Projects SDK exposes lightweight project workspace CRUD helpers (`list`, `create`, `detail`, `update`, `remove`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.projects` / `kit.Projects` for one-stop automation composition.

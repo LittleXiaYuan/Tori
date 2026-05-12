@@ -452,3 +452,8 @@ let shared = notify.share(&NotifyShareRequest {
 }).await?;
 println!("{} {}", channels.channels.len(), shared.ok);
 ```
+
+
+### Projects SDK
+
+Projects SDK exposes lightweight project workspace CRUD helpers (`list`, `create`, `detail`, `update`, `remove`) for external pages, plugins, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.projects` / `kit.Projects` for one-stop automation composition.

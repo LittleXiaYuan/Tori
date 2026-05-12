@@ -475,6 +475,44 @@ class _NotifyNamespace:
 notify = _NotifyNamespace()
 
 
+# ── Projects (/v1/projects) ──
+
+class _ProjectsNamespace:
+    """Lightweight helpers for project workspace CRUD under /v1/projects*."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/projects")
+
+    def create(self, name: str | dict, repo_path: str = "", *, repo_url: str = "", description: str = "", default_caps: Optional[list[str]] = None, meta: Optional[dict[str, str]] = None) -> dict:
+        if isinstance(name, dict):
+            body = dict(name)
+        else:
+            body = {"name": name, "repo_path": repo_path}
+            if repo_url:
+                body["repo_url"] = repo_url
+            if description:
+                body["description"] = description
+            if default_caps is not None:
+                body["default_caps"] = default_caps
+            if meta is not None:
+                body["meta"] = meta
+        return _api_call("POST", "/v1/projects", body)
+
+    def detail(self, project_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/projects/detail?{urlencode({'id': project_id})}")
+
+    def update(self, project_id: str, patch: dict) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("PUT", f"/v1/projects/detail?{urlencode({'id': project_id})}", patch)
+
+    def remove(self, project_id: str) -> dict:
+        return _api_call("POST", "/v1/projects/remove", {"id": project_id})
+
+
+projects = _ProjectsNamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -999,6 +1037,7 @@ class AgentKit:
         self.workflows = workflows
         self.connectors = connectors
         self.notify = notify
+        self.projects = projects
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

@@ -753,6 +753,86 @@ func TestConnectorsNamespaceManagesCatalogAuthAndActions(t *testing.T) {
 	}
 }
 
+func TestProjectsNamespaceManagesProjectWorkspaces(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/projects":
+			switch r.Method {
+			case http.MethodGet:
+				_, _ = w.Write([]byte(`{"projects":[{"id":"p1","name":"云雀","repo_path":"C:/repo","default_caps":["read"]}]}`))
+			case http.MethodPost:
+				var body CreateProjectRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Name != "云雀" || body.RepoPath != "C:/repo" || body.DefaultCaps[0] != "read" {
+					t.Fatalf("unexpected create body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"id":"p1","name":"云雀","repo_path":"C:/repo"}`))
+			default:
+				t.Fatalf("unexpected method: %s", r.Method)
+			}
+		case "/v1/projects/detail":
+			if r.URL.Query().Get("id") != "p1" {
+				t.Fatalf("unexpected project detail query: %s", r.URL.RawQuery)
+			}
+			if r.Method == http.MethodPut {
+				var body UpdateProjectRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Description != "Agent" {
+					t.Fatalf("unexpected update body: %+v", body)
+				}
+			}
+			_, _ = w.Write([]byte(`{"id":"p1","name":"云雀+","repo_path":"C:/repo","description":"Agent"}`))
+		case "/v1/projects/remove":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["id"] != "p1" {
+				t.Fatalf("unexpected remove body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"deleted"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	list, err := Projects.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Projects.Create(context.Background(), CreateProjectRequest{Name: "云雀", RepoPath: "C:/repo", DefaultCaps: []string{"read"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, err := Projects.Detail(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Projects.Update(context.Background(), "p1", UpdateProjectRequest{Description: "Agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Projects.Remove(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kit := NewAgentKit()
+
+	if list.Projects[0].ID != "p1" || created.ID != "p1" || detail.Name != "云雀+" || updated.Description != "Agent" || removed.Status != "deleted" || kit.Projects != Projects {
+		t.Fatalf("unexpected projects results")
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestNotifyNamespaceManagesChannelsAndShare(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

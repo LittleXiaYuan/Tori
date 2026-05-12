@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "project-workspaces",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque project workspace CRUD under /v1/projects*.",
+  "principles": [
+    "Expose project list/create/detail/update/remove helpers as focused SDK slices instead of requiring the full platform.",
+    "Keep project workspace management directly callable from external projects, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Make Projects access available through Agent Kit without creating a platform-coupled abstraction."
+  ],
+  "routes": [
+    "GET /v1/projects",
+    "POST /v1/projects",
+    "GET /v1/projects/detail",
+    "PUT /v1/projects/detail",
+    "POST /v1/projects/remove"
+  ],
+  "capabilities": [
+    { "name": "list", "route": "GET /v1/projects", "readOnly": true, "description": "List registered project workspaces." },
+    { "name": "create", "route": "POST /v1/projects", "readOnly": false, "description": "Create a project workspace record." },
+    { "name": "detail", "route": "GET /v1/projects/detail", "readOnly": true, "description": "Read a project workspace by id." },
+    { "name": "update", "route": "PUT /v1/projects/detail", "readOnly": false, "description": "Update project workspace metadata." },
+    { "name": "remove", "route": "POST /v1/projects/remove", "readOnly": false, "description": "Remove a project workspace record." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/projects.ts",
+        "sdk/typescript/src/project-read.ts",
+        "sdk/typescript/src/project-list.ts",
+        "sdk/typescript/src/project-detail.ts",
+        "sdk/typescript/src/project-write.ts"
+      ],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "list": "createProjectsClient().list",
+        "create": "createProjectsClient().create",
+        "detail": "createProjectsClient().detail",
+        "update": "createProjectsClient().update",
+        "remove": "createProjectsClient().remove"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "list": "yunque.Projects.List",
+        "create": "yunque.Projects.Create",
+        "detail": "yunque.Projects.Detail",
+        "update": "yunque.Projects.Update",
+        "remove": "yunque.Projects.Remove"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "list": "yunque.projects.list",
+        "create": "yunque.projects.create",
+        "detail": "yunque.projects.detail",
+        "update": "yunque.projects.update",
+        "remove": "yunque.projects.remove"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "list": "ProjectsClient::list",
+        "create": "ProjectsClient::create",
+        "detail": "ProjectsClient::detail",
+        "update": "ProjectsClient::update",
+        "remove": "ProjectsClient::remove"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

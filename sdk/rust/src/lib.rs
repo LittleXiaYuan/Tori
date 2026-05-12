@@ -1375,6 +1375,7 @@ pub struct AgentKit {
     pub workflows: WorkflowClient,
     pub connectors: ConnectorsClient,
     pub notify: NotifyClient,
+    pub projects: ProjectsClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1411,6 +1412,7 @@ impl AgentKit {
             workflows: WorkflowClient::new(base_url.clone(), token.as_ref())?,
             connectors: ConnectorsClient::new(base_url.clone(), token.as_ref())?,
             notify: NotifyClient::new(base_url.clone(), token.as_ref())?,
+            projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1437,6 +1439,7 @@ impl AgentKit {
             workflows: WorkflowClient::new_with_client(base_url.clone(), plugin_http.clone()),
             connectors: ConnectorsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             notify: NotifyClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2067,6 +2070,171 @@ impl WorkflowClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Project workspace record managed by `/v1/projects*`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct Project {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    pub repo_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub repo_url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_caps: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub meta: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ProjectsListResponse {
+    #[serde(default)]
+    pub projects: Vec<Project>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CreateProjectRequest {
+    pub name: String,
+    pub repo_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub repo_url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_caps: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub meta: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct UpdateProjectRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub repo_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub repo_url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_caps: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub meta: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DeleteProjectResponse {
+    #[serde(default)]
+    pub status: String,
+}
+
+/// Small Rust helper over host `/v1/projects*` project workspace endpoints.
+#[derive(Debug, Clone)]
+pub struct ProjectsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ProjectsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(&self) -> Result<ProjectsListResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/projects"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn create(&self, request: &CreateProjectRequest) -> Result<Project, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/projects"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn detail(&self, id: &str) -> Result<Project, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/projects/detail?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn update(
+        &self,
+        id: &str,
+        request: &UpdateProjectRequest,
+    ) -> Result<Project, reqwest::Error> {
+        self.http
+            .put(self.url(&format!(
+                "/v1/projects/detail?id={}",
+                url_encode_query_component(id)
+            )))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn remove(&self, id: &str) -> Result<DeleteProjectResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/projects/remove"))
+            .json(&serde_json::json!({ "id": id }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
     }
 }
 
@@ -3448,6 +3616,10 @@ mod tests {
             "http://localhost:9090/api/notify/channels"
         );
         assert_eq!(
+            kit.projects.url("/v1/projects"),
+            "http://localhost:9090/v1/projects"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -3666,13 +3838,37 @@ mod tests {
         let value = serde_json::to_value(request).unwrap();
         assert_eq!(value["connector_id"], "github");
 
-        let client = ConnectorsClient::new_with_client(
-            "http://localhost:9090/",
-            reqwest::Client::new(),
-        );
+        let client =
+            ConnectorsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(
             client.url("/api/connectors"),
             "http://localhost:9090/api/connectors"
+        );
+    }
+
+    #[test]
+    fn project_types_deserialize_incremental_bodies() {
+        let list: ProjectsListResponse = serde_json::from_str(
+            r#"{"projects":[{"id":"p1","name":"云雀","repo_path":"C:/repo","default_caps":["read"]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(list.projects[0].id, "p1");
+        assert_eq!(list.projects[0].default_caps[0], "read");
+
+        let request = CreateProjectRequest {
+            name: "云雀".to_string(),
+            repo_path: "C:/repo".to_string(),
+            ..CreateProjectRequest::default()
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["repo_path"], "C:/repo");
+        assert!(value.get("repo_url").is_none());
+
+        let client =
+            ProjectsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/projects"),
+            "http://localhost:9090/v1/projects"
         );
     }
 
@@ -3700,10 +3896,8 @@ mod tests {
         let value = serde_json::to_value(request).unwrap();
         assert_eq!(value["channel_id"], "feishu-main");
 
-        let client = NotifyClient::new_with_client(
-            "http://localhost:9090/",
-            reqwest::Client::new(),
-        );
+        let client =
+            NotifyClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(
             client.url("/api/notify/channels"),
             "http://localhost:9090/api/notify/channels"
