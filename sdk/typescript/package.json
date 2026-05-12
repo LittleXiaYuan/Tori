@@ -643,6 +643,18 @@
       "types": "./src/federation-observe.ts",
       "import": "./src/federation-observe.ts"
     },
+    "./federation-peers": {
+      "types": "./src/federation-peers.ts",
+      "import": "./src/federation-peers.ts"
+    },
+    "./federation-stats": {
+      "types": "./src/federation-stats.ts",
+      "import": "./src/federation-stats.ts"
+    },
+    "./federation-capabilities": {
+      "types": "./src/federation-capabilities.ts",
+      "import": "./src/federation-capabilities.ts"
+    },
     "./federation-control": {
       "types": "./src/federation-control.ts",
       "import": "./src/federation-control.ts"
