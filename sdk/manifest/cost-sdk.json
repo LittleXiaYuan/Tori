@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "domain": "cost-usage-quota",
+  "description": "Cross-language lightweight SDK entrypoints for cost summary, budget, task cost, breakdown, history, alerts, usage, and quota helpers under /v1/cost*, /v1/usage, and /v1/quota.",
+  "principles": [
+    "Expose cost governance as focused SDK slices instead of requiring the full platform.",
+    "Keep budget, usage, and quota controls directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make Cost access available through Agent Kit without coupling callers to backend internals."
+  ],
+  "routes": [
+    "GET /v1/cost/summary",
+    "POST /v1/cost/budget",
+    "GET /v1/cost/task",
+    "GET /v1/cost/task/timeline",
+    "GET /v1/cost/breakdown",
+    "GET /v1/cost/history",
+    "GET /v1/cost/alerts",
+    "GET /v1/usage",
+    "POST /v1/quota"
+  ],
+  "capabilities": [
+    {
+      "name": "summary",
+      "route": "GET /v1/cost/summary",
+      "readOnly": true,
+      "description": "Read current cost summary."
+    },
+    {
+      "name": "setBudget",
+      "route": "POST /v1/cost/budget",
+      "readOnly": false,
+      "description": "Update cost budget limits."
+    },
+    {
+      "name": "task",
+      "route": "GET /v1/cost/task",
+      "readOnly": true,
+      "description": "Read aggregate cost for one task."
+    },
+    {
+      "name": "taskTimeline",
+      "route": "GET /v1/cost/task/timeline",
+      "readOnly": true,
+      "description": "Read task cost timeline."
+    },
+    {
+      "name": "breakdown",
+      "route": "GET /v1/cost/breakdown",
+      "readOnly": true,
+      "description": "Read cost breakdowns by channel, tier, runner type, and provider."
+    },
+    {
+      "name": "history",
+      "route": "GET /v1/cost/history",
+      "readOnly": true,
+      "description": "Read filtered cost history."
+    },
+    {
+      "name": "alerts",
+      "route": "GET /v1/cost/alerts",
+      "readOnly": true,
+      "description": "Read recent cost alerts."
+    },
+    {
+      "name": "usage",
+      "route": "GET /v1/usage",
+      "readOnly": true,
+      "description": "Read tenant usage counters."
+    },
+    {
+      "name": "setQuota",
+      "route": "POST /v1/quota",
+      "readOnly": false,
+      "description": "Update tenant quota limits."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/cost.ts",
+        "sdk/typescript/src/cost-budget.ts",
+        "sdk/typescript/src/cost-observe.ts",
+        "sdk/typescript/src/cost-task.ts",
+        "sdk/typescript/src/cost-history.ts",
+        "sdk/typescript/src/cost-alerts.ts",
+        "sdk/typescript/src/usage.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "summary": "createCostClient().summary",
+        "setBudget": "createCostClient().setBudget",
+        "task": "createCostClient().task",
+        "taskTimeline": "createCostClient().taskTimeline",
+        "breakdown": "createCostClient().breakdown",
+        "history": "createCostClient().history",
+        "alerts": "createCostClient().alerts",
+        "usage": "createCostClient().usage",
+        "setQuota": "createCostClient().setQuota"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "summary": "yunque.Cost.Summary",
+        "setBudget": "yunque.Cost.SetBudget",
+        "task": "yunque.Cost.Task",
+        "taskTimeline": "yunque.Cost.TaskTimeline",
+        "breakdown": "yunque.Cost.Breakdown",
+        "history": "yunque.Cost.History",
+        "alerts": "yunque.Cost.Alerts",
+        "usage": "yunque.Cost.Usage",
+        "setQuota": "yunque.Cost.SetQuota"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "summary": "yunque.cost.summary",
+        "setBudget": "yunque.cost.set_budget",
+        "task": "yunque.cost.task",
+        "taskTimeline": "yunque.cost.task_timeline",
+        "breakdown": "yunque.cost.breakdown",
+        "history": "yunque.cost.history",
+        "alerts": "yunque.cost.alerts",
+        "usage": "yunque.cost.usage",
+        "setQuota": "yunque.cost.set_quota"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "summary": "CostClient::summary",
+        "setBudget": "CostClient::set_budget",
+        "task": "CostClient::task",
+        "taskTimeline": "CostClient::task_timeline",
+        "breakdown": "CostClient::breakdown",
+        "history": "CostClient::history",
+        "alerts": "CostClient::alerts",
+        "usage": "CostClient::usage",
+        "setQuota": "CostClient::set_quota"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

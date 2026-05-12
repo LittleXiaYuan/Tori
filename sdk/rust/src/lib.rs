@@ -1380,6 +1380,7 @@ pub struct AgentKit {
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
+    pub cost: CostClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1421,6 +1422,7 @@ impl AgentKit {
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
+            cost: CostClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1455,6 +1457,7 @@ impl AgentKit {
                 plugin_http.clone(),
             ),
             fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2589,6 +2592,239 @@ pub struct ForkDeleteResponse {
 pub struct ForkListResponse {
     #[serde(default)]
     pub forks: Vec<ConversationFork>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CostSummaryResponse {
+    #[serde(default)]
+    pub today_cost: f64,
+    #[serde(default)]
+    pub month_cost: f64,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+pub type CostBudget = serde_json::Map<String, serde_json::Value>;
+pub type SetCostBudgetResponse = serde_json::Value;
+pub type CostTaskResponse = serde_json::Value;
+pub type CostTimelineResponse = serde_json::Value;
+pub type CostBreakdownResponse = serde_json::Value;
+pub type CostHistoryResponse = serde_json::Value;
+pub type CostAlertsResponse = serde_json::Value;
+pub type UsageResponse = serde_json::Value;
+pub type SetQuotaResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CostHistoryQuery {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub page: i32,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub task_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub channel: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub runner_type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub provider_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SetQuotaRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+    pub quota: serde_json::Value,
+}
+
+/// Small Rust helper over host `/v1/cost/*`, `/v1/usage`, and `/v1/quota` endpoints.
+#[derive(Debug, Clone)]
+pub struct CostClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl CostClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn summary(&self) -> Result<CostSummaryResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/cost/summary"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn set_budget(
+        &self,
+        budget: &CostBudget,
+    ) -> Result<SetCostBudgetResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/cost/budget"))
+            .json(budget)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn task(&self, id: &str) -> Result<CostTaskResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/cost/task?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn task_timeline(&self, id: &str) -> Result<CostTimelineResponse, reqwest::Error> {
+        self.http
+            .get(self.url(&format!(
+                "/v1/cost/task/timeline?id={}",
+                url_encode_query_component(id)
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn breakdown(&self) -> Result<CostBreakdownResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/cost/breakdown"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn history(
+        &self,
+        query: &CostHistoryQuery,
+    ) -> Result<CostHistoryResponse, reqwest::Error> {
+        let mut params = Vec::new();
+        if query.page > 0 {
+            params.push(format!("page={}", query.page));
+        }
+        if query.limit > 0 {
+            params.push(format!("limit={}", query.limit));
+        }
+        if !query.task_id.is_empty() {
+            params.push(format!(
+                "task_id={}",
+                url_encode_query_component(&query.task_id)
+            ));
+        }
+        if !query.model.is_empty() {
+            params.push(format!(
+                "model={}",
+                url_encode_query_component(&query.model)
+            ));
+        }
+        if !query.channel.is_empty() {
+            params.push(format!(
+                "channel={}",
+                url_encode_query_component(&query.channel)
+            ));
+        }
+        if !query.runner_type.is_empty() {
+            params.push(format!(
+                "runner_type={}",
+                url_encode_query_component(&query.runner_type)
+            ));
+        }
+        if !query.provider_id.is_empty() {
+            params.push(format!(
+                "provider_id={}",
+                url_encode_query_component(&query.provider_id)
+            ));
+        }
+        let suffix = if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        };
+        self.http
+            .get(self.url(&format!("/v1/cost/history{}", suffix)))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn alerts(&self) -> Result<CostAlertsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/cost/alerts"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn usage(&self) -> Result<UsageResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/usage"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn set_quota(
+        &self,
+        request: &SetQuotaRequest,
+    ) -> Result<SetQuotaResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/quota"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 /// Small Rust helper over host `/v1/fork*` conversation branch endpoints.
@@ -4415,6 +4651,10 @@ mod tests {
             "http://localhost:9090/v1/workers"
         );
         assert_eq!(
+            kit.cost.url("/v1/cost/summary"),
+            "http://localhost:9090/v1/cost/summary"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -4664,6 +4904,37 @@ mod tests {
             client.url("/v1/workers"),
             "http://localhost:9090/v1/workers"
         );
+    }
+
+    #[test]
+    fn cost_types_deserialize_incremental_bodies() {
+        let summary: CostSummaryResponse =
+            serde_json::from_str(r#"{"today_cost":0.12,"month_cost":1.5,"summary":{"calls":2}}"#)
+                .unwrap();
+        assert_eq!(summary.today_cost, 0.12);
+        assert_eq!(summary.extra["summary"]["calls"], serde_json::json!(2));
+
+        let query = CostHistoryQuery {
+            page: 2,
+            limit: 25,
+            task_id: "task/1".to_string(),
+            model: "gpt-test".to_string(),
+            ..CostHistoryQuery::default()
+        };
+        let client = CostClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/cost/summary"),
+            "http://localhost:9090/v1/cost/summary"
+        );
+        assert_eq!(query.task_id, "task/1");
+
+        let quota = SetQuotaRequest {
+            tenant_id: "tenant-1".to_string(),
+            quota: serde_json::json!({"max_chat_calls": 10}),
+        };
+        let value = serde_json::to_value(quota).unwrap();
+        assert_eq!(value["tenant_id"], "tenant-1");
+        assert_eq!(value["quota"]["max_chat_calls"], 10);
     }
 
     #[test]

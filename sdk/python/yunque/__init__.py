@@ -595,6 +595,50 @@ class _ForkNamespace:
 fork = _ForkNamespace()
 
 
+# ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
+
+class _CostNamespace:
+    """Lightweight helpers for cost summary, budget, task cost, history, alerts, usage, and quota."""
+
+    def summary(self) -> dict:
+        return _api_call("GET", "/v1/cost/summary")
+
+    def set_budget(self, budget: dict) -> dict:
+        return _api_call("POST", "/v1/cost/budget", budget)
+
+    def task(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/cost/task?{urlencode({'id': task_id})}")
+
+    def task_timeline(self, task_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/cost/task/timeline?{urlencode({'id': task_id})}")
+
+    def breakdown(self) -> dict:
+        return _api_call("GET", "/v1/cost/breakdown")
+
+    def history(self, **query) -> dict:
+        from urllib.parse import urlencode
+        params = {k: v for k, v in query.items() if v is not None and v != ""}
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/cost/history{suffix}")
+
+    def alerts(self) -> dict:
+        return _api_call("GET", "/v1/cost/alerts")
+
+    def usage(self) -> dict:
+        return _api_call("GET", "/v1/usage")
+
+    def set_quota(self, quota: dict, tenant_id: str = "") -> dict:
+        body = dict(quota) if "quota" in quota else {"quota": quota}
+        if tenant_id:
+            body["tenant_id"] = tenant_id
+        return _api_call("POST", "/v1/quota", body)
+
+
+cost = _CostNamespace()
+
+
 # ── Skill Market (/v1/market) ──
 
 class _SkillMarketNamespace:
@@ -1189,6 +1233,7 @@ class AgentKit:
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork
+        self.cost = cost
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

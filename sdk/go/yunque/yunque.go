@@ -311,6 +311,7 @@ type AgentKit struct {
 	Dispatch     *dispatchNamespace
 	Orchestrator *orchestratorNamespace
 	Fork         *forkNamespace
+	Cost         *costNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1795,6 +1796,9 @@ func (o *orchestratorNamespace) AddAdapter(ctx context.Context, cfg Orchestrator
 // Fork provides focused access to conversation root forks, branches, and branch lists.
 var Fork = &forkNamespace{}
 
+// Cost provides focused access to cost, usage, and quota endpoints.
+var Cost = &costNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -1884,6 +1888,135 @@ func (f *forkNamespace) List(ctx context.Context, sessionID string) (ForkListRes
 		out.Forks = []ConversationFork{}
 	}
 	return out, nil
+}
+
+// ── Cost / Usage / Quota ──
+
+type costNamespace struct{}
+
+type CostSummaryResponse map[string]any
+type SetCostBudgetResponse map[string]any
+type CostBreakdownResponse map[string]any
+type CostTaskResponse map[string]any
+type CostTimelineResponse map[string]any
+type CostHistoryResponse map[string]any
+type CostAlertsResponse map[string]any
+type UsageResponse map[string]any
+type SetQuotaResponse map[string]any
+
+type CostBudget map[string]any
+
+type CostHistoryOptions struct {
+	Page       int
+	Limit      int
+	TaskID     string
+	Model      string
+	Channel    string
+	RunnerType string
+	ProviderID string
+}
+
+type SetQuotaRequest struct {
+	TenantID string         `json:"tenant_id,omitempty"`
+	Quota    map[string]any `json:"quota"`
+}
+
+func (c *costNamespace) Summary(ctx context.Context) (CostSummaryResponse, error) {
+	var out CostSummaryResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cost/summary", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) SetBudget(ctx context.Context, budget CostBudget) (SetCostBudgetResponse, error) {
+	var out SetCostBudgetResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cost/budget", budget, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) Task(ctx context.Context, id string) (CostTaskResponse, error) {
+	var out CostTaskResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cost/task?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) TaskTimeline(ctx context.Context, id string) (CostTimelineResponse, error) {
+	var out CostTimelineResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cost/task/timeline?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) Breakdown(ctx context.Context) (CostBreakdownResponse, error) {
+	var out CostBreakdownResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cost/breakdown", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) History(ctx context.Context, opts CostHistoryOptions) (CostHistoryResponse, error) {
+	q := url.Values{}
+	if opts.Page > 0 {
+		q.Set("page", strconv.Itoa(opts.Page))
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.TaskID != "" {
+		q.Set("task_id", opts.TaskID)
+	}
+	if opts.Model != "" {
+		q.Set("model", opts.Model)
+	}
+	if opts.Channel != "" {
+		q.Set("channel", opts.Channel)
+	}
+	if opts.RunnerType != "" {
+		q.Set("runner_type", opts.RunnerType)
+	}
+	if opts.ProviderID != "" {
+		q.Set("provider_id", opts.ProviderID)
+	}
+	path := "/v1/cost/history"
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var out CostHistoryResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) Alerts(ctx context.Context) (CostAlertsResponse, error) {
+	var out CostAlertsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cost/alerts", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) Usage(ctx context.Context) (UsageResponse, error) {
+	var out UsageResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/usage", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (c *costNamespace) SetQuota(ctx context.Context, req SetQuotaRequest) (SetQuotaResponse, error) {
+	var out SetQuotaResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/quota", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
 }
 
 // ── Skill Market ──
@@ -2139,6 +2272,7 @@ func NewAgentKit() AgentKit {
 		Dispatch:     Dispatch,
 		Orchestrator: Orchestrator,
 		Fork:         Fork,
+		Cost:         Cost,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,
