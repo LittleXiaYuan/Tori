@@ -791,6 +791,14 @@
       "types": "./src/skillhub-updates.ts",
       "import": "./src/skillhub-updates.ts"
     },
+    "./skillhub-installed": {
+      "types": "./src/skillhub-installed.ts",
+      "import": "./src/skillhub-installed.ts"
+    },
+    "./skillhub-versions": {
+      "types": "./src/skillhub-versions.ts",
+      "import": "./src/skillhub-versions.ts"
+    },
     "./skillhub-policy": {
       "types": "./src/skillhub-policy.ts",
       "import": "./src/skillhub-policy.ts"
