@@ -102,7 +102,7 @@ cargo check     # quick verification
 
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
-Experience, and Plugin API Runtime. It composes the hand-written lightweight
+Experience, Mission Parse, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -122,11 +122,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         limit: 5,
         ..ReflectOptions::default()
     }).await?;
+    let mission = kit.missions.parse("每天八点总结昨天的任务").await?;
     let search = kit.plugin.search("incremental SDK package", 5).await?;
 
-    println!("{} {} {}", focus, strategies, search.results.len());
+    println!("{} {} {} {}", focus, strategies, mission.r#type, search.results.len());
     Ok(())
 }
+```
+
+## Lightweight Mission Parse helper
+
+Use `MissionsClient` when a Rust CLI, sidecar, plugin runner, or automation
+binary only needs to turn natural-language intent into a structured
+task/workflow/cron/trigger draft.
+
+```rust
+use yunque_client::MissionsClient;
+
+let missions = MissionsClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let mission = missions.parse("每天八点总结昨天的任务").await?;
+println!("{} {}", mission.r#type, mission.name);
 ```
 
 ## Lightweight State Kernel helper

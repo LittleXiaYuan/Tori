@@ -17,7 +17,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, and Plugin API
-Runtime. It reuses the same module-level helpers and does not pull in a
+Runtime plus Mission Parse. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -27,10 +27,22 @@ kit = yunque.create_agent_kit()
 
 focus = kit.state.focus()
 strategies = kit.reflect.strategies(tag="sdk", limit=5)
+mission = kit.missions.parse("每天八点总结昨天的任务")
 results = kit.plugin.search("incremental SDK package", limit=5)
 
 kit.memory.set("last_focus", focus)
-print(focus, strategies, len(results))
+print(focus, strategies, mission["type"], len(results))
+```
+
+## Mission Parse helpers
+
+Use `yunque.missions.parse()` when an external script, plugin, or page wants to
+turn natural-language intent into a task/workflow/cron/trigger draft without
+importing the full platform client.
+
+```python
+mission = yunque.missions.parse("每天八点总结昨天的任务")
+print(mission["type"], mission["name"], mission.get("config", {}))
 ```
 
 ## State Kernel helpers

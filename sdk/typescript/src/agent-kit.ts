@@ -2,6 +2,7 @@
 import { createPluginApiClient, type PluginApiClient, type PluginApiClientOptions } from "./plugin-api.js";
 import { createReflectClient, type ReflectClient, type ReflectClientOptions } from "./reflect.js";
 import { createStateClient, type StateClient, type StateClientOptions } from "./state.js";
+import { createMissionsParseClient, type MissionsParseClient, type MissionsParseClientOptions } from "./missions-parse.js";
 
 export type AgentKitOptions = {
   baseUrl: string;
@@ -15,6 +16,7 @@ export type AgentKitOptions = {
 export type AgentKit = {
   state: StateClient;
   reflect: ReflectClient;
+  missions: MissionsParseClient;
   plugin: PluginApiClient;
 };
 
@@ -31,7 +33,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -43,10 +45,11 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
   return {
     state: createStateClient(common),
     reflect: createReflectClient(common),
+    missions: createMissionsParseClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createPluginApiClient, createReflectClient, createStateClient };
-export type { PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, StateClient, StateClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createReflectClient, createStateClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, StateClient, StateClientOptions };
 

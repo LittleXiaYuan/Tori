@@ -25,25 +25,29 @@ Invoke-Step "SDK manifest suite" {
   node sdk\scripts\check-sdk-manifests.mjs
 }
 
-Invoke-Step "TypeScript Agent Kit slice" {
+Invoke-Step "TypeScript Agent Kit and Mission Parse slices" {
   Push-Location sdk\typescript
   try {
-    node scripts\run-incremental-tests.mjs agent-kit
+    node scripts\run-incremental-tests.mjs agent-kit missions missions-parse
   } finally {
     Pop-Location
   }
 }
 
-Invoke-Step "Python Agent Kit helpers" {
-  python -m unittest sdk.python.tests.test_agent_kit -v
+Invoke-Step "Python Agent Kit and Mission Parse helpers" {
+  python -m unittest sdk.python.tests.test_agent_kit sdk.python.tests.test_missions -v
 }
 
-Invoke-Step "Go Agent Kit helpers" {
-  go test ./sdk/go/yunque -run "AgentKit|PluginRuntimeNamespace" -count=1
+Invoke-Step "Go Agent Kit and Mission Parse helpers" {
+  go test ./sdk/go/yunque -run "AgentKit|Missions|PluginRuntimeNamespace" -count=1
 }
 
-Invoke-Step "Rust Agent Kit helpers" {
+Invoke-Step "Rust Agent Kit and Mission Parse helpers" {
   cargo test --manifest-path sdk\rust\Cargo.toml agent_kit -q
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  cargo test --manifest-path sdk\rust\Cargo.toml mission -q
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  cargo test --manifest-path sdk\rust\Cargo.toml missions -q
 }
 
 Invoke-Step "Docs SDK manifest gate" {
