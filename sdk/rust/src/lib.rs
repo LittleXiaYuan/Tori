@@ -1403,6 +1403,7 @@ pub struct AgentKit {
     pub setup: SetupClient,
     pub admin: AdminClient,
     pub federation: FederationClient,
+    pub planner: PlannerClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1479,6 +1480,7 @@ impl AgentKit {
             setup: SetupClient::new(base_url.clone(), token.as_ref())?,
             admin: AdminClient::new(base_url.clone(), token.as_ref())?,
             federation: FederationClient::new(base_url.clone(), token.as_ref())?,
+            planner: PlannerClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1551,6 +1553,7 @@ impl AgentKit {
             setup: SetupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             admin: AdminClient::new_with_client(base_url.clone(), plugin_http.clone()),
             federation: FederationClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            planner: PlannerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5604,6 +5607,68 @@ impl SetupClient {
 
 
 
+
+pub type PlannerCheckpointsResponse = serde_json::Value;
+pub type PlannerRecoveryResponse = serde_json::Value;
+pub type PlannerResumeTaskResponse = serde_json::Value;
+pub type PlannerResumePlanResponse = serde_json::Value;
+pub type PlannerResumePlanJobResponse = serde_json::Value;
+pub type PlannerExecutionStateResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct PlannerCheckpointQuery {
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub limit: i32,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub plan_id: String,
+    #[serde(default)]
+    pub include_snapshot: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlannerRecoveryRequest { pub plan_id: String, #[serde(default, skip_serializing_if = "String::is_empty")] pub action: String }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlannerResumeTaskRequest { pub plan_id: String, #[serde(default, skip_serializing_if = "String::is_empty")] pub action: String, pub run: bool }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PlannerResumePlanRequest { pub plan_id: String, #[serde(default, skip_serializing_if = "String::is_empty")] pub action: String, #[serde(rename = "async")] pub async_: bool }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct PlannerResumePlanJobQuery {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub job_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub plan_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct PlannerExecutionStateQuery { pub plan_id: String, #[serde(default, skip_serializing_if = "String::is_empty")] pub action: String }
+
+/// Lightweight Planner SDK client for checkpoint recovery and execution-state inspection.
+#[derive(Debug, Clone)]
+pub struct PlannerClient { base_url: String, http: reqwest::Client }
+
+impl PlannerClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub fn checkpoints_url(&self, query: &PlannerCheckpointQuery) -> String { let mut url = reqwest::Url::parse(&self.url("/v1/planner/checkpoints")).expect("valid planner checkpoints url"); { let mut q = url.query_pairs_mut(); if query.limit > 0 { q.append_pair("limit", &query.limit.to_string()); } if !query.plan_id.is_empty() { q.append_pair("plan_id", &query.plan_id); } if query.include_snapshot { q.append_pair("include_snapshot", "true"); } } url.to_string() }
+    pub fn resume_plan_job_url(&self, query: &PlannerResumePlanJobQuery) -> String { let mut url = reqwest::Url::parse(&self.url("/v1/planner/checkpoints/resume-plan/jobs")).expect("valid planner job url"); { let mut q = url.query_pairs_mut(); if !query.job_id.is_empty() { q.append_pair("job_id", &query.job_id); } if !query.id.is_empty() { q.append_pair("id", &query.id); } if !query.plan_id.is_empty() { q.append_pair("plan_id", &query.plan_id); } } url.to_string() }
+    pub fn execution_state_url(&self, query: &PlannerExecutionStateQuery) -> String { let mut url = reqwest::Url::parse(&self.url("/v1/planner/execution-state")).expect("valid planner state url"); { let mut q = url.query_pairs_mut(); q.append_pair("plan_id", &query.plan_id); if !query.action.is_empty() { q.append_pair("action", &query.action); } } url.to_string() }
+    pub async fn list_checkpoints(&self, query: &PlannerCheckpointQuery) -> Result<PlannerCheckpointsResponse, reqwest::Error> { self.http.get(self.checkpoints_url(query)).send().await?.error_for_status()?.json().await }
+    pub async fn recover_checkpoint(&self, request: &PlannerRecoveryRequest) -> Result<PlannerRecoveryResponse, reqwest::Error> { self.post_json("/v1/planner/checkpoints/recover", request).await }
+    pub async fn resume_checkpoint_task(&self, request: &PlannerResumeTaskRequest) -> Result<PlannerResumeTaskResponse, reqwest::Error> { self.post_json("/v1/planner/checkpoints/resume", request).await }
+    pub async fn resume_checkpoint_plan(&self, request: &PlannerResumePlanRequest) -> Result<PlannerResumePlanResponse, reqwest::Error> { self.post_json("/v1/planner/checkpoints/resume-plan", request).await }
+    pub async fn get_resume_plan_job(&self, query: &PlannerResumePlanJobQuery) -> Result<PlannerResumePlanJobResponse, reqwest::Error> { self.http.get(self.resume_plan_job_url(query)).send().await?.error_for_status()?.json().await }
+    pub async fn execution_state(&self, query: &PlannerExecutionStateQuery) -> Result<PlannerExecutionStateResponse, reqwest::Error> { self.http.get(self.execution_state_url(query)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type FederationPeersResponse = serde_json::Value;
 pub type FederationStatsResponse = serde_json::Value;
 pub type FederationCapabilitiesResponse = serde_json::Value;
@@ -9645,6 +9710,23 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn planner_helpers_build_urls_and_payloads() {
+        let client = PlannerClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        let checkpoints = PlannerCheckpointQuery { limit: 5, plan_id: "plan-1".to_string(), include_snapshot: true };
+        assert_eq!(client.checkpoints_url(&checkpoints), "http://localhost:9090/v1/planner/checkpoints?limit=5&plan_id=plan-1&include_snapshot=true");
+        assert_eq!(client.url("/v1/planner/checkpoints/recover"), "http://localhost:9090/v1/planner/checkpoints/recover");
+        assert_eq!(client.url("/v1/planner/checkpoints/resume"), "http://localhost:9090/v1/planner/checkpoints/resume");
+        assert_eq!(client.url("/v1/planner/checkpoints/resume-plan"), "http://localhost:9090/v1/planner/checkpoints/resume-plan");
+        assert_eq!(client.resume_plan_job_url(&PlannerResumePlanJobQuery { job_id: "job-1".to_string(), ..Default::default() }), "http://localhost:9090/v1/planner/checkpoints/resume-plan/jobs?job_id=job-1");
+        assert_eq!(client.execution_state_url(&PlannerExecutionStateQuery { plan_id: "plan-1".to_string(), action: "retry_failed".to_string() }), "http://localhost:9090/v1/planner/execution-state?plan_id=plan-1&action=retry_failed");
+        let resume = serde_json::to_value(PlannerResumePlanRequest { plan_id: "plan-1".to_string(), action: "partial".to_string(), async_: true }).unwrap();
+        assert_eq!(resume["plan_id"], "plan-1");
+        assert_eq!(resume["action"], "partial");
+        assert_eq!(resume["async"], true);
+    }
 
     #[test]
     fn federation_helpers_build_urls_and_payloads() {

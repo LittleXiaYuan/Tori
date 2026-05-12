@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "domain": "planner",
+  "description": "Cross-language lightweight SDK for planner checkpoint recovery, resume-plan jobs, and execution-state inspection without importing the full platform client.",
+  "principles": [
+    "Expose planner recovery as a focused SDK slice for external task recovery pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep checkpoint listing, recovery prompt generation, task resume, direct plan resume, async job lookup, and execution-state inspection directly callable through existing authenticated gateway routes.",
+    "Make Planner access available through Agent Kit while preserving standalone TypeScript planner-recovery/read/control subpaths."
+  ],
+  "routes": [
+    "GET /v1/planner/checkpoints",
+    "POST /v1/planner/checkpoints/recover",
+    "POST /v1/planner/checkpoints/resume",
+    "POST /v1/planner/checkpoints/resume-plan",
+    "GET /v1/planner/checkpoints/resume-plan/jobs",
+    "GET /v1/planner/execution-state"
+  ],
+  "capabilities": [
+    {
+      "name": "listCheckpoints",
+      "route": "GET /v1/planner/checkpoints",
+      "readOnly": true,
+      "description": "List planner recovery checkpoints with optional plan snapshot."
+    },
+    {
+      "name": "recoverCheckpoint",
+      "route": "POST /v1/planner/checkpoints/recover",
+      "readOnly": false,
+      "description": "Build a recovery prompt/plan for a checkpoint."
+    },
+    {
+      "name": "resumeCheckpointTask",
+      "route": "POST /v1/planner/checkpoints/resume",
+      "readOnly": false,
+      "description": "Create or run a task from a checkpoint recovery plan."
+    },
+    {
+      "name": "resumeCheckpointPlan",
+      "route": "POST /v1/planner/checkpoints/resume-plan",
+      "readOnly": false,
+      "description": "Resume a checkpoint plan directly, optionally asynchronously."
+    },
+    {
+      "name": "getResumePlanJob",
+      "route": "GET /v1/planner/checkpoints/resume-plan/jobs",
+      "readOnly": true,
+      "description": "Read an async resume-plan job by id or plan id."
+    },
+    {
+      "name": "executionState",
+      "route": "GET /v1/planner/execution-state",
+      "readOnly": true,
+      "description": "Read planner recovery state, next action, latest job, and failure summary."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/planner.ts",
+        "sdk/typescript/src/planner-recovery.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "listCheckpoints": "createPlannerClient().listCheckpoints",
+        "recoverCheckpoint": "createPlannerClient().recoverCheckpoint",
+        "resumeCheckpointTask": "createPlannerClient().resumeCheckpointTask",
+        "resumeCheckpointPlan": "createPlannerClient().resumeCheckpointPlan",
+        "getResumePlanJob": "createPlannerClient().getResumePlanJob",
+        "executionState": "createPlannerClient().getExecutionState"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "listCheckpoints": "yunque.Planner.ListCheckpoints",
+        "recoverCheckpoint": "yunque.Planner.RecoverCheckpoint",
+        "resumeCheckpointTask": "yunque.Planner.ResumeCheckpointTask",
+        "resumeCheckpointPlan": "yunque.Planner.ResumeCheckpointPlan",
+        "getResumePlanJob": "yunque.Planner.GetResumePlanJob",
+        "executionState": "yunque.Planner.ExecutionState"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "listCheckpoints": "yunque.planner.list_checkpoints",
+        "recoverCheckpoint": "yunque.planner.recover_checkpoint",
+        "resumeCheckpointTask": "yunque.planner.resume_checkpoint_task",
+        "resumeCheckpointPlan": "yunque.planner.resume_checkpoint_plan",
+        "getResumePlanJob": "yunque.planner.get_resume_plan_job",
+        "executionState": "yunque.planner.execution_state"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "listCheckpoints": "PlannerClient::list_checkpoints",
+        "recoverCheckpoint": "PlannerClient::recover_checkpoint",
+        "resumeCheckpointTask": "PlannerClient::resume_checkpoint_task",
+        "resumeCheckpointPlan": "PlannerClient::resume_checkpoint_plan",
+        "getResumePlanJob": "PlannerClient::get_resume_plan_job",
+        "executionState": "PlannerClient::execution_state"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

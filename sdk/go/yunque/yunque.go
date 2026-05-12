@@ -302,6 +302,106 @@ func filenameFromDisposition(disposition string) string {
 
 
 
+
+// ── Planner Recovery (/v1/planner) ──
+
+// Planner exposes checkpoint recovery and execution-state helpers for external operator pages, CLIs, and automation scripts.
+var Planner = &plannerNamespace{}
+
+type plannerNamespace struct{}
+
+type PlannerCheckpointsResponse map[string]any
+type PlannerRecoveryResponse map[string]any
+type PlannerResumeTaskResponse map[string]any
+type PlannerResumePlanResponse map[string]any
+type PlannerResumePlanJobResponse map[string]any
+type PlannerExecutionStateResponse map[string]any
+
+type PlannerCheckpointQuery struct {
+	Limit           int
+	PlanID          string
+	IncludeSnapshot bool
+}
+
+type PlannerRecoveryRequest struct {
+	PlanID string `json:"plan_id"`
+	Action string `json:"action,omitempty"`
+}
+
+type PlannerResumeTaskRequest struct {
+	PlanID string `json:"plan_id"`
+	Action string `json:"action,omitempty"`
+	Run    bool   `json:"run"`
+}
+
+type PlannerResumePlanRequest struct {
+	PlanID string `json:"plan_id"`
+	Action string `json:"action,omitempty"`
+	Async  bool   `json:"async"`
+}
+
+type PlannerResumePlanJobQuery struct {
+	JobID  string
+	ID     string
+	PlanID string
+}
+
+type PlannerExecutionStateQuery struct {
+	PlanID string
+	Action string
+}
+
+func (p *plannerNamespace) ListCheckpoints(ctx context.Context, query PlannerCheckpointQuery) (PlannerCheckpointsResponse, error) {
+	values := url.Values{}
+	if query.Limit > 0 { values.Set("limit", strconv.Itoa(query.Limit)) }
+	if query.PlanID != "" { values.Set("plan_id", query.PlanID) }
+	if query.IncludeSnapshot { values.Set("include_snapshot", "true") }
+	path := "/v1/planner/checkpoints"
+	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	var out PlannerCheckpointsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *plannerNamespace) RecoverCheckpoint(ctx context.Context, req PlannerRecoveryRequest) (PlannerRecoveryResponse, error) {
+	var out PlannerRecoveryResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/recover", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *plannerNamespace) ResumeCheckpointTask(ctx context.Context, req PlannerResumeTaskRequest) (PlannerResumeTaskResponse, error) {
+	var out PlannerResumeTaskResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *plannerNamespace) ResumeCheckpointPlan(ctx context.Context, req PlannerResumePlanRequest) (PlannerResumePlanResponse, error) {
+	var out PlannerResumePlanResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume-plan", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *plannerNamespace) GetResumePlanJob(ctx context.Context, query PlannerResumePlanJobQuery) (PlannerResumePlanJobResponse, error) {
+	values := url.Values{}
+	if query.JobID != "" { values.Set("job_id", query.JobID) }
+	if query.ID != "" { values.Set("id", query.ID) }
+	if query.PlanID != "" { values.Set("plan_id", query.PlanID) }
+	path := "/v1/planner/checkpoints/resume-plan/jobs"
+	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	var out PlannerResumePlanJobResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *plannerNamespace) ExecutionState(ctx context.Context, query PlannerExecutionStateQuery) (PlannerExecutionStateResponse, error) {
+	values := url.Values{}
+	values.Set("plan_id", query.PlanID)
+	if query.Action != "" { values.Set("action", query.Action) }
+	var out PlannerExecutionStateResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/planner/execution-state?"+values.Encode(), nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
 // ── Federation / A2A OPP (/v1/federation) ──
 
 // Federation exposes model-aware A2A federation helpers for external operator pages, CLIs, and sidecars.
@@ -853,6 +953,7 @@ type AgentKit struct {
 	Setup         *setupNamespace
 	Admin         *adminNamespace
 	Federation    *federationNamespace
+	Planner       *plannerNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -5547,6 +5648,7 @@ func NewAgentKit() AgentKit {
 		Setup:         Setup,
 		Admin:         Admin,
 		Federation:    Federation,
+		Planner:       Planner,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,
