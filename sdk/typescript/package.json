@@ -219,6 +219,10 @@
       "types": "./src/setup-templates.ts",
       "import": "./src/setup-templates.ts"
     },
+    "./setup-provider": {
+      "types": "./src/setup-provider.ts",
+      "import": "./src/setup-provider.ts"
+    },
     "./documents": {
       "types": "./src/documents.ts",
       "import": "./src/documents.ts"
