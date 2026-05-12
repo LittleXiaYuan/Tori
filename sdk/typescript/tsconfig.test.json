@@ -71,6 +71,8 @@
     "src/instructions.ts",
     "src/rbac.ts",
     "src/roles.ts",
+    "src/role-bindings.ts",
+    "src/my-roles.ts",
     "src/permissions.ts",
     "src/memory.ts",
     "src/memory-search.ts",
