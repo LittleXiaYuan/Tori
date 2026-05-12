@@ -17,16 +17,8 @@ function Invoke-Step {
   }
 }
 
-Invoke-Step "State SDK manifest" {
-  node sdk\scripts\check-state-sdk-manifest.mjs
-}
-
-Invoke-Step "Reflect SDK manifest" {
-  node sdk\scripts\check-reflect-sdk-manifest.mjs
-}
-
-Invoke-Step "Plugin API SDK manifest" {
-  node sdk\scripts\check-plugin-api-sdk-manifest.mjs
+Invoke-Step "SDK manifest suite" {
+  node sdk\scripts\check-sdk-manifests.mjs
 }
 
 Invoke-Step "TypeScript focused state slices" {
@@ -74,4 +66,4 @@ Invoke-Step "Docs SDK manifest gate" {
   npm --prefix docs run check:sdk-manifest
 }
 
-Write-Host "`nState SDK validation passed." -ForegroundColor Green
+Write-Host "`nSDK validation passed." -ForegroundColor Green
