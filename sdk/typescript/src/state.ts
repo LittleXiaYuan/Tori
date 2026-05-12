@@ -1,6 +1,9 @@
 /** Lightweight State Kernel SDK slice. */
 export type StateGoal = { id?: string; title: string; description?: string; priority?: number; status?: string; progress?: number; parent_goal?: string; task_ids?: string[]; [key: string]: unknown };
 export type StateResource = { id?: string; path: string; type?: string; description?: string; status?: string; [key: string]: unknown };
+export type StateActionRecord = { timestamp?: string; action: string; result?: string; success?: boolean; [key: string]: unknown };
+export type StateCapabilities = { total_skills?: number; dynamic_skills?: string[]; unresolved_gaps?: number; recent_gaps?: string[]; [key: string]: unknown };
+export type StateSnapshot = { goals: StateGoal[]; resources: StateResource[]; focus?: string; topics?: string[]; recent_actions?: StateActionRecord[]; capabilities?: StateCapabilities; updated_at?: string; [key: string]: unknown };
 export type StateSnapshotResponse = Record<string, unknown>;
 export type StateGoalsResponse = StateGoal[];
 export type StateGoalMutationResponse = { id?: string; status: string; [key: string]: unknown };
@@ -41,6 +44,7 @@ export class StateClient {
   }
 
   snapshot(): Promise<StateSnapshotResponse> { return this.json<StateSnapshotResponse>("/v1/state"); }
+  snapshotTyped(): Promise<StateSnapshot> { return this.json<StateSnapshot>("/v1/state"); }
   goals(): Promise<StateGoalsResponse> { return this.json<StateGoalsResponse>("/v1/state/goals"); }
   saveGoal(goal: StateGoal): Promise<StateGoalMutationResponse> { return this.json<StateGoalMutationResponse>("/v1/state/goals", { method: "POST", body: JSON.stringify(goal) }); }
   deleteGoal(id: string): Promise<StateGoalMutationResponse> { const url = new URL(`${this.baseUrl}/v1/state/goals`); url.searchParams.set("id", id); return this.json<StateGoalMutationResponse>(url, { method: "DELETE" }); }

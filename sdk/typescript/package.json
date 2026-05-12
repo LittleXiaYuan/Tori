@@ -1295,6 +1295,18 @@
       "types": "./src/state.ts",
       "import": "./src/state.ts"
     },
+    "./state-snapshot": {
+      "types": "./src/state-snapshot.ts",
+      "import": "./src/state-snapshot.ts"
+    },
+    "./state-actions": {
+      "types": "./src/state-actions.ts",
+      "import": "./src/state-actions.ts"
+    },
+    "./state-capabilities": {
+      "types": "./src/state-capabilities.ts",
+      "import": "./src/state-capabilities.ts"
+    },
     "./resource-state": {
       "types": "./src/resource-state.ts",
       "import": "./src/resource-state.ts"
