@@ -403,6 +403,10 @@
       "types": "./src/audit.ts",
       "import": "./src/audit.ts"
     },
+    "./audit-chain": {
+      "types": "./src/audit-chain.ts",
+      "import": "./src/audit-chain.ts"
+    },
     "./heartbeat": {
       "types": "./src/heartbeat.ts",
       "import": "./src/heartbeat.ts"
