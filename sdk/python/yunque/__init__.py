@@ -367,6 +367,80 @@ class _SchedulerNamespace:
 scheduler = _SchedulerNamespace()
 
 
+# ── Trigger Automation ──
+
+class _TriggersNamespace:
+    """Lightweight helpers for Triggers v2 automation definitions and events."""
+
+    def list(self, *, tenant_id: str = "", type: str = "", status: str = "") -> dict:
+        """List Triggers v2 definitions with optional tenant/type/status filters."""
+        from urllib.parse import urlencode
+
+        params = {}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+        if type:
+            params["type"] = type
+        if status:
+            params["status"] = status
+        query = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/triggers/v2{query}")
+
+    def get(self, trigger_id: str) -> dict:
+        """Get one Triggers v2 definition by id."""
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/triggers/v2?{urlencode({'id': trigger_id})}")
+
+    def create(self, definition: dict) -> dict:
+        """Create a Triggers v2 definition."""
+        return _api_call("POST", "/v1/triggers/v2", definition)
+
+    def update(self, definition: dict) -> dict:
+        """Update a Triggers v2 definition."""
+        return _api_call("PUT", "/v1/triggers/v2", definition)
+
+    def delete(self, trigger_id: str) -> dict:
+        """Delete a Triggers v2 definition by id."""
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/triggers/v2?{urlencode({'id': trigger_id})}")
+
+    def emit(self, event: str | dict, *, text: str = "", data: Optional[dict] = None, timestamp: str = "") -> dict:
+        """Emit a trigger event. Pass either an event string or a complete payload dict."""
+        if isinstance(event, dict):
+            payload = dict(event)
+        else:
+            payload = {"event": event}
+            if text:
+                payload["text"] = text
+            if data is not None:
+                payload["data"] = data
+            if timestamp:
+                payload["timestamp"] = timestamp
+        return _api_call("POST", "/v1/triggers/v2/emit", payload)
+
+    def runs(self, *, trigger_id: str = "", limit: int = 0) -> dict:
+        """List recent trigger runs."""
+        return _api_call("GET", f"/v1/triggers/v2/runs{_trigger_history_query(trigger_id, limit)}")
+
+    def events(self, *, trigger_id: str = "", limit: int = 0) -> dict:
+        """List recent trigger events."""
+        return _api_call("GET", f"/v1/triggers/v2/events{_trigger_history_query(trigger_id, limit)}")
+
+
+def _trigger_history_query(trigger_id: str = "", limit: int = 0) -> str:
+    from urllib.parse import urlencode
+
+    params = {}
+    if trigger_id:
+        params["trigger_id"] = trigger_id
+    if limit > 0:
+        params["limit"] = str(limit)
+    return f"?{urlencode(params)}" if params else ""
+
+
+triggers = _TriggersNamespace()
+
+
 # ── System Extension Registration ──
 # These let plugins ADD new system-level capabilities to the agent.
 # Like Magisk modules or Chrome extensions — you're extending the platform itself.
@@ -532,7 +606,7 @@ class AgentKit:
     """Small bundle of common SDK-first Yunque surfaces.
 
     Use this when an external Python script, plugin, or sidecar wants the State
-    Kernel, Reflection Experience, Mission Parse, Scheduler, and Plugin API
+    Kernel, Reflection Experience, Mission Parse, Scheduler, Triggers, and Plugin API
     Runtime helpers from one object without depending on a generated full
     OpenAPI client. The namespace objects are the same lightweight module-level
     helpers, so this remains a zero-dependency incremental package.
@@ -543,6 +617,7 @@ class AgentKit:
         self.reflect = reflect
         self.missions = missions
         self.scheduler = scheduler
+        self.triggers = triggers
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

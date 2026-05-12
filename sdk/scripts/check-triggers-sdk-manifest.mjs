@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const manifestPath = resolve(repoRoot, "sdk/manifest/agent-kit-sdk.json");
+const manifestPath = resolve(repoRoot, "sdk/manifest/triggers-sdk.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const failures = [];
 
@@ -13,7 +13,7 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "triggers", "plugin"];
+const requiredCapabilities = ["list", "get", "create", "update", "delete", "emit", "runs", "events"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
@@ -22,10 +22,10 @@ for (const actual of capabilityNames) {
   if (!requiredCapabilities.includes(actual)) fail(`manifest has unexpected capability: ${actual}`);
 }
 
-const requiredLanguages = ["typescript", "go", "python", "rust"];
-const languages = manifest.languages ?? {};
-for (const language of requiredLanguages) {
-  if (!languages[language]) fail(`manifest missing language: ${language}`);
+const gatewayRoutes = readRepoFile("internal/controlplane/gateway/handlers_automation.go") + "\n" + readRepoFile("internal/controlplane/gateway/routes.go");
+for (const route of manifest.routes ?? []) {
+  const [, path] = route.split(" ");
+  if (!gatewayRoutes.includes(path)) fail(`gateway route not found for manifest route: ${route}`);
 }
 
 function symbolAlternatives(symbol) {
@@ -38,37 +38,39 @@ function symbolAlternatives(symbol) {
   ].filter(Boolean);
 }
 
-for (const [language, config] of Object.entries(languages)) {
+for (const [language, config] of Object.entries(manifest.languages ?? {})) {
   const combinedSource = (config.implementationFiles ?? []).map(readRepoFile).join("\n");
-  for (const required of ["create", ...requiredCapabilities]) {
-    if (!config.entrypoints?.[required]) {
-      fail(`${language} entrypoints missing required Agent Kit entrypoint: ${required}`);
+  for (const capability of requiredCapabilities) {
+    if (!config.entrypoints?.[capability]) {
+      fail(`${language} entrypoints missing required trigger capability: ${capability}`);
     }
   }
   for (const [capability, symbol] of Object.entries(config.entrypoints ?? {})) {
-    if (!["create", ...requiredCapabilities].includes(capability)) {
-      fail(`${language} entrypoint references unknown Agent Kit capability: ${capability}`);
+    if (!capabilityNames.has(capability)) {
+      fail(`${language} entrypoint references unknown capability: ${capability}`);
     }
     if (!symbolAlternatives(symbol).some((candidate) => combinedSource.includes(candidate))) {
-      fail(`${language} implementation missing Agent Kit entrypoint for ${capability}: ${symbol}`);
+      fail(`${language} implementation missing entrypoint for ${capability}: ${symbol}`);
     }
   }
-  const docs = (config.docs ?? []).map(readRepoFile).join("\n");
-  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Trigger", "Plugin"]) {
-    if (!docs.includes(token)) fail(`${language} docs missing Agent Kit token: ${token}`);
+  for (const doc of config.docs ?? []) {
+    const text = readRepoFile(doc);
+    if (!/trigger|Trigger|触发器|触发/.test(text)) {
+      fail(`${language} doc ${doc} does not mention trigger helpers`);
+    }
   }
 }
 
 for (const doc of manifest.overviewDocs ?? []) {
   const text = readRepoFile(doc);
-  if (!/Agent Kit|agent-kit|createAgentKit|NewAgentKit|create_agent_kit/.test(text)) {
-    fail(`overview doc ${doc} does not describe Agent Kit SDK surface`);
+  if (!/Triggers|triggers|Trigger|触发器|触发/.test(text)) {
+    fail(`overview doc ${doc} does not describe triggers SDK surface`);
   }
 }
 
 if (failures.length) {
-  console.error("agent kit SDK manifest check failed:");
+  console.error("triggers SDK manifest check failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log(`agent kit SDK manifest ok: ${Object.keys(languages).length} languages, ${capabilityNames.size} capabilities`);
+console.log(`triggers SDK manifest ok: ${Object.keys(manifest.languages ?? {}).length} languages, ${capabilityNames.size} capabilities`);

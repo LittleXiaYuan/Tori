@@ -256,6 +256,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"type":"cron","name":"每日总结","description":"每天总结昨天的任务","config":{"cron_expr":"0 8 * * *"},"confidence":0.9,"explanation":"mentions daily schedule"}`))
 		case "/v1/scheduler/jobs":
 			_, _ = w.Write([]byte(`{"jobs":[{"id":"job_1","name":"daily","interval":60000000000,"prompt":"复盘"}],"count":1}`))
+		case "/v1/triggers/v2":
+			_, _ = w.Write([]byte(`{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}]}],"total":1}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -282,6 +284,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	triggerDefs, err := kit.Triggers.List(context.Background(), TriggerListOptions{Status: "enabled"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -290,14 +296,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || triggerDefs.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.Triggers != Triggers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 6 {
-		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -400,6 +406,95 @@ func TestSchedulerJobsAddAndRemove(t *testing.T) {
 	}
 	if jobs.Count != 1 || added.ID != "job_2" || removed.Status != "removed" {
 		t.Fatalf("unexpected scheduler results: jobs=%+v added=%+v removed=%+v", jobs, added, removed)
+	}
+}
+
+func TestTriggersListEmitHistoryAndControl(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/triggers/v2":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("tenant_id") != "default" || r.URL.Query().Get("type") != "event" || r.URL.Query().Get("status") != "enabled" {
+					t.Fatalf("unexpected trigger query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}]}],"total":1}`))
+			case http.MethodPost, http.MethodPut:
+				var body TriggerDef
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Name != "review done" {
+					t.Fatalf("unexpected trigger body: %+v", body)
+				}
+				body.ID = "tr_1"
+				_ = json.NewEncoder(w).Encode(body)
+			case http.MethodDelete:
+				if r.URL.Query().Get("id") != "tr_1" {
+					t.Fatalf("unexpected delete query: %s", r.URL.RawQuery)
+				}
+				_, _ = w.Write([]byte(`{"deleted":"tr_1"}`))
+			default:
+				t.Fatalf("unexpected method: %s", r.Method)
+			}
+		case "/v1/triggers/v2/emit":
+			var body TriggerPayload
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Event != "review.done" || body.Data["task_id"] != "task_1" {
+				t.Fatalf("unexpected emit body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"emitted","event":"review.done"}`))
+		case "/v1/triggers/v2/runs":
+			if r.URL.Query().Get("trigger_id") != "tr_1" || r.URL.Query().Get("limit") != "2" {
+				t.Fatalf("unexpected runs query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"runs":[{"id":"run_1"}],"total":1}`))
+		case "/v1/triggers/v2/events":
+			_, _ = w.Write([]byte(`{"events":[{"event":"review.done"}],"total":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	list, err := Triggers.List(context.Background(), TriggerListOptions{TenantID: "default", Type: "event", Status: "enabled"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Triggers.Create(context.Background(), TriggerDef{Name: "review done", TenantID: "default", Type: "event", Status: "enabled", Actions: []any{map[string]any{"kind": "notify"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Triggers.Update(context.Background(), created)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emitted, err := Triggers.Emit(context.Background(), TriggerPayload{Event: "review.done", Data: map[string]any{"task_id": "task_1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs, err := Triggers.Runs(context.Background(), TriggerHistoryOptions{TriggerID: "tr_1", Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := Triggers.Events(context.Background(), TriggerHistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Triggers.Delete(context.Background(), "tr_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if list.Total != 1 || created.ID != "tr_1" || updated.Name != "review done" || emitted.Status != "emitted" || runs.Total != 1 || events.Total != 1 || deleted.Deleted != "tr_1" {
+		t.Fatalf("unexpected trigger results: list=%+v created=%+v updated=%+v emitted=%+v runs=%+v events=%+v deleted=%+v", list, created, updated, emitted, runs, events, deleted)
+	}
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
