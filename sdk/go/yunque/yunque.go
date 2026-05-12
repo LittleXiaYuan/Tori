@@ -297,6 +297,7 @@ type AgentKit struct {
 	Reflect     *reflectNamespace
 	Missions    *missionsNamespace
 	Scheduler   *schedulerNamespace
+	CronSystem  *cronSystemNamespace
 	Triggers    *triggersNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
@@ -522,6 +523,106 @@ func triggerHistoryQuery(opts TriggerHistoryOptions) string {
 	return "?" + q.Encode()
 }
 
+// ── Cron System ──
+
+// CronSystem provides focused access to the host /v1/cron/* scheduled task API.
+// It is separate from Cron, which targets plugin-owned /v1/plugin-api/cron/* jobs.
+var CronSystem = &cronSystemNamespace{}
+
+type cronSystemNamespace struct{}
+
+type CronSchedule struct {
+	Type     string     `json:"type"`
+	At       *time.Time `json:"at,omitempty"`
+	EveryMs  int64      `json:"every_ms,omitempty"`
+	CronExpr string     `json:"cron_expr,omitempty"`
+	Timezone string     `json:"timezone,omitempty"`
+}
+
+type CronPayload struct {
+	Kind    string         `json:"kind"`
+	Message string         `json:"message,omitempty"`
+	Data    map[string]any `json:"data,omitempty"`
+}
+
+type CronJob struct {
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	Schedule      CronSchedule `json:"schedule"`
+	Payload       CronPayload  `json:"payload"`
+	AgentID       string       `json:"agent_id,omitempty"`
+	SessionTarget string       `json:"session_target,omitempty"`
+	Delivery      string       `json:"delivery,omitempty"`
+	Enabled       bool         `json:"enabled"`
+	CreatedAt     time.Time    `json:"created_at"`
+	LastRunAt     *time.Time   `json:"last_run_at,omitempty"`
+	NextRunAt     *time.Time   `json:"next_run_at,omitempty"`
+	RunCount      int          `json:"run_count"`
+}
+
+type CronRunRecord struct {
+	JobID     string    `json:"job_id"`
+	RunID     string    `json:"run_id"`
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+	Status    string    `json:"status"`
+	Output    string    `json:"output,omitempty"`
+	Error     string    `json:"error,omitempty"`
+}
+
+type CronListResponse struct {
+	Jobs []CronJob `json:"jobs"`
+}
+type CronAddRequest struct {
+	Name     string       `json:"name"`
+	Schedule CronSchedule `json:"schedule"`
+	Payload  CronPayload  `json:"payload"`
+}
+type CronAddResponse struct {
+	Job CronJob `json:"job"`
+}
+type CronRemoveResponse struct {
+	Deleted string `json:"deleted"`
+}
+type CronRunResponse struct {
+	Run CronRunRecord `json:"run"`
+}
+
+func (c *cronSystemNamespace) List(ctx context.Context) (CronListResponse, error) {
+	var out CronListResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/cron/list", nil, &out); err != nil {
+		return CronListResponse{}, err
+	}
+	if out.Jobs == nil {
+		out.Jobs = []CronJob{}
+	}
+	return out, nil
+}
+
+func (c *cronSystemNamespace) Add(ctx context.Context, req CronAddRequest) (CronAddResponse, error) {
+	var out CronAddResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cron/add", req, &out); err != nil {
+		return CronAddResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *cronSystemNamespace) Remove(ctx context.Context, id string) (CronRemoveResponse, error) {
+	var out CronRemoveResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cron/remove?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return CronRemoveResponse{}, err
+	}
+	return out, nil
+}
+
+func (c *cronSystemNamespace) Run(ctx context.Context, id string) (CronRunResponse, error) {
+	var out CronRunResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/cron/run?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return CronRunResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -582,13 +683,14 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 }
 
 // NewAgentKit returns a lightweight bundle of state, reflection, mission parse,
-// scheduler, triggers, and plugin runtime helpers.
+// scheduler, cron, triggers, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
 	return AgentKit{
 		State:       State,
 		Reflect:     Reflect,
 		Missions:    Missions,
 		Scheduler:   Scheduler,
+		CronSystem:  CronSystem,
 		Triggers:    Triggers,
 		Plugin:      Plugin,
 		Memory:      Memory,

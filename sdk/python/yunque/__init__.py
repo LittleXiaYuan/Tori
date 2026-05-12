@@ -272,6 +272,37 @@ class _Cron:
 cron = _Cron()
 
 
+# ── Cron System (/v1/cron) ──
+
+class _CronSystemNamespace:
+    """Lightweight helpers for host scheduled tasks under /v1/cron/*."""
+
+    def list(self) -> dict:
+        """List host cron jobs."""
+        return _api_call("GET", "/v1/cron/list")
+
+    def add(self, name: str, schedule: dict, payload: dict) -> dict:
+        """Add a host cron job using the /v1/cron/add shape."""
+        return _api_call("POST", "/v1/cron/add", {
+            "name": name,
+            "schedule": schedule,
+            "payload": payload,
+        })
+
+    def remove(self, job_id: str) -> dict:
+        """Remove a host cron job by id."""
+        from urllib.parse import urlencode
+        return _api_call("POST", f"/v1/cron/remove?{urlencode({'id': job_id})}")
+
+    def run(self, job_id: str) -> dict:
+        """Run a host cron job immediately."""
+        from urllib.parse import urlencode
+        return _api_call("POST", f"/v1/cron/run?{urlencode({'id': job_id})}")
+
+
+cron_system = _CronSystemNamespace()
+
+
 # ── Reflection Experience ──
 
 class _ReflectNamespace:
@@ -606,7 +637,7 @@ class AgentKit:
     """Small bundle of common SDK-first Yunque surfaces.
 
     Use this when an external Python script, plugin, or sidecar wants the State
-    Kernel, Reflection Experience, Mission Parse, Scheduler, Triggers, and Plugin API
+    Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API
     Runtime helpers from one object without depending on a generated full
     OpenAPI client. The namespace objects are the same lightweight module-level
     helpers, so this remains a zero-dependency incremental package.
@@ -617,6 +648,7 @@ class AgentKit:
         self.reflect = reflect
         self.missions = missions
         self.scheduler = scheduler
+        self.cron_system = cron_system
         self.triggers = triggers
         self.plugin = plugin
         self.memory = memory

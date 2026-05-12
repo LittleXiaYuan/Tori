@@ -2,6 +2,7 @@
 import { createPluginApiClient, type PluginApiClient, type PluginApiClientOptions } from "./plugin-api.js";
 import { createReflectClient, type ReflectClient, type ReflectClientOptions } from "./reflect.js";
 import { createSchedulerClient, type SchedulerClient, type SchedulerClientOptions } from "./scheduler.js";
+import { createCronClient, type CronClient, type CronClientOptions } from "./cron.js";
 import { createTriggersClient, type TriggersClient, type TriggersClientOptions } from "./triggers.js";
 import { createStateClient, type StateClient, type StateClientOptions } from "./state.js";
 import { createMissionsParseClient, type MissionsParseClient, type MissionsParseClientOptions } from "./missions-parse.js";
@@ -20,6 +21,7 @@ export type AgentKit = {
   reflect: ReflectClient;
   missions: MissionsParseClient;
   scheduler: SchedulerClient;
+  cron: CronClient;
   triggers: TriggersClient;
   plugin: PluginApiClient;
 };
@@ -37,7 +39,7 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     apiKey: options.apiKey,
     headers: options.headers,
     fetch: options.fetch,
-  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & TriggersClientOptions;
+  } satisfies StateClientOptions & ReflectClientOptions & MissionsParseClientOptions & SchedulerClientOptions & CronClientOptions & TriggersClientOptions;
 
   const pluginOptions: PluginApiClientOptions = {
     baseUrl: options.baseUrl,
@@ -51,11 +53,12 @@ export function createAgentKit(options: AgentKitOptions): AgentKit {
     reflect: createReflectClient(common),
     missions: createMissionsParseClient(common),
     scheduler: createSchedulerClient(common),
+    cron: createCronClient(common),
     triggers: createTriggersClient(common),
     plugin: createPluginApiClient(pluginOptions),
   };
 }
 
-export { createMissionsParseClient, createPluginApiClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient };
-export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions };
+export { createMissionsParseClient, createPluginApiClient, createCronClient, createReflectClient, createSchedulerClient, createStateClient, createTriggersClient };
+export type { MissionsParseClient, MissionsParseClientOptions, PluginApiClient, PluginApiClientOptions, ReflectClient, ReflectClientOptions, CronClient, CronClientOptions, SchedulerClient, SchedulerClientOptions, StateClient, StateClientOptions, TriggersClient, TriggersClientOptions };
 

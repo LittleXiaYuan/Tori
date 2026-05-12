@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "domain": "cron-system",
+  "description": "Cross-language lightweight SDK entrypoints for host /v1/cron scheduled task listing, creation, removal, and manual run.",
+  "principles": [
+    "Expose host cron scheduling as reusable SDK capabilities instead of platform-internal dashboard actions.",
+    "Keep cron read and control helpers narrow so external pages, plugins, CLIs, and automation scripts can use them without importing the full generated client.",
+    "Keep host /v1/cron helpers separate from plugin-owned /v1/plugin-api/cron runtime helpers."
+  ],
+  "routes": [
+    "GET /v1/cron/list",
+    "POST /v1/cron/add",
+    "POST /v1/cron/remove",
+    "POST /v1/cron/run"
+  ],
+  "capabilities": [
+    { "name": "list", "route": "GET /v1/cron/list", "readOnly": true, "description": "List host cron jobs." },
+    { "name": "add", "route": "POST /v1/cron/add", "readOnly": false, "description": "Add a host cron job." },
+    { "name": "remove", "route": "POST /v1/cron/remove", "readOnly": false, "description": "Remove a host cron job by id." },
+    { "name": "run", "route": "POST /v1/cron/run", "readOnly": false, "description": "Run a host cron job immediately." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/cron.ts", "sdk/typescript/src/cron-read.ts", "sdk/typescript/src/cron-control.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "list": "yunque-client/cron-read#createCronReadClient().list",
+        "add": "yunque-client/cron-control#createCronControlClient().add",
+        "remove": "yunque-client/cron-control#createCronControlClient().remove",
+        "run": "yunque-client/cron-control#createCronControlClient().run"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "list": "yunque.CronSystem.List",
+        "add": "yunque.CronSystem.Add",
+        "remove": "yunque.CronSystem.Remove",
+        "run": "yunque.CronSystem.Run"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "list": "yunque.cron_system.list",
+        "add": "yunque.cron_system.add",
+        "remove": "yunque.cron_system.remove",
+        "run": "yunque.cron_system.run"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "list": "CronClient::list",
+        "add": "CronClient::add",
+        "remove": "CronClient::remove",
+        "run": "CronClient::run"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

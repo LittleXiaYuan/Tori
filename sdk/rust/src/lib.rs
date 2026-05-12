@@ -246,6 +246,109 @@ pub struct SchedulerRemoveResponse {
     pub status: String,
 }
 
+/// Host cron schedule accepted by `/v1/cron/add`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronSchedule {
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub at: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub every_ms: i64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub cron_expr: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub timezone: String,
+}
+
+/// Host cron payload accepted by `/v1/cron/add`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronPayload {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub data: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Host cron job returned by `/v1/cron/*`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronJob {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub schedule: CronSchedule,
+    #[serde(default)]
+    pub payload: CronPayload,
+    #[serde(default)]
+    pub agent_id: String,
+    #[serde(default)]
+    pub session_target: String,
+    #[serde(default)]
+    pub delivery: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub last_run_at: String,
+    #[serde(default)]
+    pub next_run_at: String,
+    #[serde(default)]
+    pub run_count: i32,
+}
+
+/// Host cron run record returned by `/v1/cron/run`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronRunRecord {
+    #[serde(default)]
+    pub job_id: String,
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub started_at: String,
+    #[serde(default)]
+    pub ended_at: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub output: String,
+    #[serde(default)]
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronListResponse {
+    #[serde(default)]
+    pub jobs: Vec<CronJob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronAddRequest {
+    pub name: String,
+    pub schedule: CronSchedule,
+    pub payload: CronPayload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronAddResponse {
+    #[serde(default)]
+    pub job: CronJob,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronRemoveResponse {
+    #[serde(default)]
+    pub deleted: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CronRunResponse {
+    #[serde(default)]
+    pub run: CronRunRecord,
+}
+
 /// Triggers v2 automation definition returned by `/v1/triggers/v2`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct TriggerDef {
@@ -685,6 +788,7 @@ pub struct AgentKit {
     pub reflect: ReflectClient,
     pub missions: MissionsClient,
     pub scheduler: SchedulerClient,
+    pub cron: CronClient,
     pub triggers: TriggersClient,
     pub plugin: PluginApiClient,
 }
@@ -713,6 +817,7 @@ impl AgentKit {
             reflect: ReflectClient::new(base_url.clone(), token.as_ref())?,
             missions: MissionsClient::new(base_url.clone(), token.as_ref())?,
             scheduler: SchedulerClient::new(base_url.clone(), token.as_ref())?,
+            cron: CronClient::new(base_url.clone(), token.as_ref())?,
             triggers: TriggersClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
@@ -731,9 +836,90 @@ impl AgentKit {
             reflect: ReflectClient::new_with_client(base_url.clone(), reflect_http.clone()),
             missions: MissionsClient::new_with_client(base_url.clone(), reflect_http),
             scheduler: SchedulerClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            cron: CronClient::new_with_client(base_url.clone(), plugin_http.clone()),
             triggers: TriggersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
+    }
+}
+
+/// Small Rust helper over host `/v1/cron/*` scheduled task endpoints.
+#[derive(Debug, Clone)]
+pub struct CronClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl CronClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn list(&self) -> Result<CronListResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/v1/cron/list"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add(&self, request: &CronAddRequest) -> Result<CronAddResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/cron/add"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn remove(&self, id: impl AsRef<str>) -> Result<CronRemoveResponse, reqwest::Error> {
+        self.http
+            .post(self.url(&format!("/v1/cron/remove?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn run(&self, id: impl AsRef<str>) -> Result<CronRunResponse, reqwest::Error> {
+        self.http
+            .post(self.url(&format!("/v1/cron/run?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
     }
 }
 
@@ -1695,6 +1881,10 @@ mod tests {
             "http://localhost:9090/v1/scheduler/jobs"
         );
         assert_eq!(
+            kit.cron.url("/v1/cron/list"),
+            "http://localhost:9090/v1/cron/list"
+        );
+        assert_eq!(
             kit.triggers.url("/v1/triggers/v2"),
             "http://localhost:9090/v1/triggers/v2"
         );
@@ -1800,6 +1990,35 @@ mod tests {
                 limit: 2
             }),
             "?trigger_id=tr_1&limit=2"
+        );
+    }
+
+    #[test]
+    fn cron_types_deserialize_incremental_bodies() {
+        let list: CronListResponse = serde_json::from_str(
+            r#"{"jobs":[{"id":"job_1","name":"daily","schedule":{"type":"every","every_ms":60000},"payload":{"kind":"agentTurn","message":"ping"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}]}"#,
+        ).unwrap();
+        assert_eq!(list.jobs[0].id, "job_1");
+        assert_eq!(list.jobs[0].schedule.every_ms, 60000);
+
+        let added: CronAddResponse = serde_json::from_str(
+            r#"{"job":{"id":"job_2","name":"nightly","schedule":{"type":"cron","cron_expr":"0 2 * * *","timezone":"Asia/Shanghai"},"payload":{"kind":"systemEvent"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}}"#,
+        ).unwrap();
+        assert_eq!(added.job.schedule.cron_expr, "0 2 * * *");
+
+        let run: CronRunResponse = serde_json::from_str(
+            r#"{"run":{"job_id":"job_1","run_id":"run_1","status":"success","output":"ok"}}"#,
+        )
+        .unwrap();
+        assert_eq!(run.run.status, "success");
+    }
+
+    #[test]
+    fn cron_client_trims_base_url() {
+        let client = CronClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/cron/list"),
+            "http://localhost:9090/v1/cron/list"
         );
     }
 }

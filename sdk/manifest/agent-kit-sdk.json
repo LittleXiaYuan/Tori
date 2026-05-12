@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Triggers, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + triggers + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -12,6 +12,7 @@
     "reflection-experience",
     "mission-parse",
     "prompt-scheduler",
+    "cron-system",
     "trigger-automation",
     "plugin-api-runtime"
   ],
@@ -20,6 +21,7 @@
     { "name": "reflect", "description": "Access the lightweight Reflection Experience client or namespace." },
     { "name": "missions", "description": "Access the lightweight Mission Parse client or namespace." },
     { "name": "scheduler", "description": "Access the lightweight Prompt Scheduler client or namespace." },
+    { "name": "cron", "description": "Access the lightweight host Cron System client or namespace." },
     { "name": "triggers", "description": "Access the lightweight Triggers v2 automation client or namespace." },
     { "name": "plugin", "description": "Access the lightweight Plugin API Runtime client or namespace." }
   ],
@@ -34,6 +36,7 @@
         "reflect": "AgentKit.reflect",
         "missions": "AgentKit.missions",
         "scheduler": "AgentKit.scheduler",
+        "cron": "AgentKit.cron",
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin"
       }
@@ -48,6 +51,7 @@
         "reflect": "AgentKit.Reflect",
         "missions": "AgentKit.Missions",
         "scheduler": "AgentKit.Scheduler",
+        "cron": "AgentKit.CronSystem",
         "triggers": "AgentKit.Triggers",
         "plugin": "AgentKit.Plugin"
       }
@@ -62,6 +66,7 @@
         "reflect": "AgentKit.reflect",
         "missions": "AgentKit.missions",
         "scheduler": "AgentKit.scheduler",
+        "cron": "AgentKit.cron_system",
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin"
       }
@@ -76,6 +81,7 @@
         "reflect": "AgentKit::reflect",
         "missions": "AgentKit::missions",
         "scheduler": "AgentKit::scheduler",
+        "cron": "AgentKit::cron",
         "triggers": "AgentKit::triggers",
         "plugin": "AgentKit::plugin"
       }

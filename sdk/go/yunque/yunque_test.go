@@ -256,6 +256,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"type":"cron","name":"每日总结","description":"每天总结昨天的任务","config":{"cron_expr":"0 8 * * *"},"confidence":0.9,"explanation":"mentions daily schedule"}`))
 		case "/v1/scheduler/jobs":
 			_, _ = w.Write([]byte(`{"jobs":[{"id":"job_1","name":"daily","interval":60000000000,"prompt":"复盘"}],"count":1}`))
+		case "/v1/cron/list":
+			_, _ = w.Write([]byte(`{"jobs":[{"id":"cron_1","name":"daily","schedule":{"type":"every","every_ms":60000},"payload":{"kind":"agentTurn","message":"ping"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}]}`))
 		case "/v1/triggers/v2":
 			_, _ = w.Write([]byte(`{"triggers":[{"id":"tr_1","name":"review done","tenant_id":"default","type":"event","status":"enabled","actions":[{"kind":"notify"}]}],"total":1}`))
 		case "/v1/plugin-api/search":
@@ -284,6 +286,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cronJobs, err := kit.CronSystem.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	triggerDefs, err := kit.Triggers.List(context.Background(), TriggerListOptions{Status: "enabled"})
 	if err != nil {
 		t.Fatal(err)
@@ -296,14 +302,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || triggerDefs.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.Triggers != Triggers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 7 {
-		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -409,6 +415,58 @@ func TestSchedulerJobsAddAndRemove(t *testing.T) {
 	}
 }
 
+func TestCronSystemListAddRemoveAndRun(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/cron/list":
+			_, _ = w.Write([]byte(`{"jobs":[{"id":"cron_1","name":"daily","schedule":{"type":"every","every_ms":60000},"payload":{"kind":"agentTurn","message":"ping"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}]}`))
+		case "/v1/cron/add":
+			var body CronAddRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Name != "nightly" || body.Schedule.CronExpr != "0 2 * * *" || body.Payload.Kind != "systemEvent" {
+				t.Fatalf("unexpected cron add body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"job":{"id":"cron_2","name":"nightly","schedule":{"type":"cron","cron_expr":"0 2 * * *","timezone":"Asia/Shanghai"},"payload":{"kind":"systemEvent"},"enabled":true,"created_at":"2026-05-12T00:00:00Z","run_count":0}}`))
+		case "/v1/cron/remove":
+			if r.URL.Query().Get("id") != "cron_1" {
+				t.Fatalf("unexpected remove query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"deleted":"cron_1"}`))
+		case "/v1/cron/run":
+			if r.URL.Query().Get("id") != "cron_1" {
+				t.Fatalf("unexpected run query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"run":{"job_id":"cron_1","run_id":"run_1","started_at":"2026-05-12T00:00:00Z","ended_at":"2026-05-12T00:00:01Z","status":"success","output":"ok"}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	jobs, err := CronSystem.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := CronSystem.Add(context.Background(), CronAddRequest{Name: "nightly", Schedule: CronSchedule{Type: "cron", CronExpr: "0 2 * * *", Timezone: "Asia/Shanghai"}, Payload: CronPayload{Kind: "systemEvent"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := CronSystem.Remove(context.Background(), "cron_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := CronSystem.Run(context.Background(), "cron_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(jobs.Jobs) != 1 || added.Job.ID != "cron_2" || removed.Deleted != "cron_1" || run.Run.Status != "success" {
+		t.Fatalf("unexpected cron system results: jobs=%+v added=%+v removed=%+v run=%+v", jobs, added, removed, run)
+	}
+}
+
 func TestTriggersListEmitHistoryAndControl(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -493,8 +551,8 @@ func TestTriggersListEmitHistoryAndControl(t *testing.T) {
 	if list.Total != 1 || created.ID != "tr_1" || updated.Name != "review done" || emitted.Status != "emitted" || runs.Total != 1 || events.Total != 1 || deleted.Deleted != "tr_1" {
 		t.Fatalf("unexpected trigger results: list=%+v created=%+v updated=%+v emitted=%+v runs=%+v events=%+v deleted=%+v", list, created, updated, emitted, runs, events, deleted)
 	}
-	if len(seen) != 7 {
-		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 

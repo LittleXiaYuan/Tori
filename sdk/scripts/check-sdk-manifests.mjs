@@ -7,6 +7,7 @@ const checks = [
   ["Reflect SDK manifest", "sdk/scripts/check-reflect-sdk-manifest.mjs"],
   ["Mission Parse SDK manifest", "sdk/scripts/check-mission-parse-sdk-manifest.mjs"],
   ["Scheduler SDK manifest", "sdk/scripts/check-scheduler-sdk-manifest.mjs"],
+  ["Cron SDK manifest", "sdk/scripts/check-cron-sdk-manifest.mjs"],
   ["Triggers SDK manifest", "sdk/scripts/check-triggers-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],

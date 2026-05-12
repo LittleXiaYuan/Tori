@@ -20,7 +20,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
-Reflection Experience, Mission Parse, Scheduler, Triggers, and Plugin API Runtime. It reuses the same small
+Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -147,6 +147,22 @@ strategies, err := yunque.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrat
 })
 ```
 
+
+
+### Cron System 主机计划任务切片
+
+Go 插件、sidecar、CLI 或自动化二进制可以用 `yunque.CronSystem` 管理主机级 `/v1/cron/*` 计划任务。它不同于 `yunque.Cron` 的插件自有定时任务。
+
+```go
+jobs, err := yunque.CronSystem.List(ctx)
+added, err := yunque.CronSystem.Add(ctx, yunque.CronAddRequest{
+    Name: "nightly",
+    Schedule: yunque.CronSchedule{Type: "cron", CronExpr: "0 2 * * *", Timezone: "Asia/Shanghai"},
+    Payload: yunque.CronPayload{Kind: "systemEvent", Data: map[string]any{"event": "nightly"}},
+})
+run, err := yunque.CronSystem.Run(ctx, added.Job.ID)
+fmt.Println(len(jobs.Jobs), added.Job.ID, run.Run.Status)
+```
 
 ### Triggers 触发器自动化切片
 
