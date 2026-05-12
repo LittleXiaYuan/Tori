@@ -1,11 +1,11 @@
 {
   "version": 1,
   "domain": "tasks-runtime",
-  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, capability-gap, working-memory, and thread operations over /v1/tasks without importing the full platform client.",
+  "description": "Cross-language lightweight SDK for task CRUD, lifecycle, reusable template, capability-gap, working-memory, thread, and task-trace operations without importing the full platform client.",
   "principles": [
     "Expose task orchestration as a focused SDK slice for external plugin UIs, front-end task pages, CLIs, sidecars, and automation scripts.",
-    "Keep task reads, creation, lifecycle control, deletion, template instantiation, capability-gap resolution, working-memory reads, and task-thread interactions directly callable through existing authenticated task routes.",
-    "Make Tasks access available through Agent Kit while leaving deeper task traces as a separate incremental slice."
+    "Keep task reads, creation, lifecycle control, deletion, template instantiation, capability-gap resolution, working-memory reads, task-thread interactions, and task-scoped traces directly callable through existing authenticated routes.",
+    "Make Tasks access available through Agent Kit while keeping this domain as a composable facade over adjacent Trace capabilities."
   ],
   "routes": [
     "GET /v1/tasks",
@@ -31,7 +31,8 @@
     "GET /v1/tasks/threads?state=...",
     "GET /v1/tasks/threads?id=...",
     "POST /v1/tasks/threads",
-    "PUT /v1/tasks/threads"
+    "PUT /v1/tasks/threads",
+    "GET /v1/trace/task/{task_id}"
   ],
   "capabilities": [
     { "name": "list", "route": "GET /v1/tasks", "readOnly": true, "description": "List recent tasks visible to the current tenant." },
@@ -55,12 +56,13 @@
     { "name": "threads", "route": "GET /v1/tasks/threads", "readOnly": true, "description": "List task-scoped conversation threads, optionally filtered by state." },
     { "name": "thread", "route": "GET /v1/tasks/threads?id=...", "readOnly": true, "description": "Read one task-scoped conversation thread with messages." },
     { "name": "postThreadMessage", "route": "POST /v1/tasks/threads", "readOnly": false, "description": "Post a user message to a task thread, optionally binding a channel." },
-    { "name": "updateThreadState", "route": "PUT /v1/tasks/threads", "readOnly": false, "description": "Update a task thread state to open, paused, or closed." }
+    { "name": "updateThreadState", "route": "PUT /v1/tasks/threads", "readOnly": false, "description": "Update a task thread state to open, paused, or closed." },
+    { "name": "trace", "route": "GET /v1/trace/task/{task_id}", "readOnly": true, "description": "Read execution trace events for one task id." }
   ],
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-threads.ts", "sdk/typescript/src/task-context.ts"],
+      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-threads.ts", "sdk/typescript/src/task-trace.ts", "sdk/typescript/src/task-context.ts"],
       "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createTasksClient().list",
@@ -84,7 +86,8 @@
         "threads": "createTaskThreadsClient().list",
         "thread": "createTaskThreadsClient().get",
         "postThreadMessage": "createTaskThreadsClient().postMessage",
-        "updateThreadState": "createTaskThreadsClient().updateState"
+        "updateThreadState": "createTaskThreadsClient().updateState",
+        "trace": "createTaskTraceClient().get"
       }
     },
     "go": {
@@ -113,7 +116,8 @@
         "threads": "yunque.Tasks.Threads",
         "thread": "yunque.Tasks.Thread",
         "postThreadMessage": "yunque.Tasks.PostThreadMessage",
-        "updateThreadState": "yunque.Tasks.UpdateThreadState"
+        "updateThreadState": "yunque.Tasks.UpdateThreadState",
+        "trace": "yunque.Tasks.Trace"
       }
     },
     "python": {
@@ -142,7 +146,8 @@
         "threads": "yunque.task_threads.list",
         "thread": "yunque.task_threads.get",
         "postThreadMessage": "yunque.task_threads.post_message",
-        "updateThreadState": "yunque.task_threads.update_state"
+        "updateThreadState": "yunque.task_threads.update_state",
+        "trace": "yunque.task_trace.get"
       }
     },
     "rust": {
@@ -171,7 +176,8 @@
         "threads": "TasksClient::threads",
         "thread": "TasksClient::thread",
         "postThreadMessage": "TasksClient::post_thread_message",
-        "updateThreadState": "TasksClient::update_thread_state"
+        "updateThreadState": "TasksClient::update_thread_state",
+        "trace": "TasksClient::trace"
       }
     }
   },

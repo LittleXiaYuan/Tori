@@ -54,6 +54,8 @@ class TasksTest(unittest.TestCase):
                     return {"status": "posted", "task_id": body["task_id"]}
                 if method == "PUT":
                     return {"status": "updated", "task_id": body["task_id"], "state": body["state"]}
+            if path == "/v1/trace/task/task-1?raw=true":
+                return {"task_id": "task-1", "count": 1, "raw": True, "events": [{"id": "evt-1"}]}
             raise AssertionError(f"unexpected call: {method} {path}")
 
         with patch.object(yunque, "_api_call", side_effect=fake_api_call):
@@ -75,6 +77,7 @@ class TasksTest(unittest.TestCase):
             self.assertEqual(yunque.task_threads.get("task-1")["messages"][0]["content"], "hi")
             self.assertEqual(yunque.task_threads.post_message("task-1", "hi", {"channel_type": "feishu", "channel_id": "chat-1"})["status"], "posted")
             self.assertEqual(yunque.task_threads.update_state("task-1", "paused")["state"], "paused")
+            self.assertEqual(yunque.task_trace.get("task-1", raw=True)["events"][0]["id"], "evt-1")
 
         self.assertEqual(calls[0], ("GET", "/v1/tasks", None))
         self.assertEqual(calls[2], ("POST", "/v1/tasks", {"description": "ship SDK", "title": "SDK", "constraints": {"max_steps": 3}}))
@@ -86,6 +89,7 @@ class TasksTest(unittest.TestCase):
         self.assertEqual(calls[13], ("GET", "/v1/tasks/memory?id=task-1", None))
         self.assertEqual(calls[16], ("POST", "/v1/tasks/threads", {"task_id": "task-1", "content": "hi", "channel": {"channel_type": "feishu", "channel_id": "chat-1"}}))
         self.assertEqual(calls[17], ("PUT", "/v1/tasks/threads", {"task_id": "task-1", "state": "paused"}))
+        self.assertEqual(calls[18], ("GET", "/v1/trace/task/task-1?raw=true", None))
 
 
 if __name__ == "__main__":
