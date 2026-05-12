@@ -227,6 +227,14 @@
       "types": "./src/roles.ts",
       "import": "./src/roles.ts"
     },
+    "./role-bindings": {
+      "types": "./src/role-bindings.ts",
+      "import": "./src/role-bindings.ts"
+    },
+    "./my-roles": {
+      "types": "./src/my-roles.ts",
+      "import": "./src/my-roles.ts"
+    },
     "./permissions": {
       "types": "./src/permissions.ts",
       "import": "./src/permissions.ts"
