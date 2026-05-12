@@ -124,6 +124,7 @@
     "src/reverie-observe.ts",
     "src/reverie-control.ts",
     "src/federation.ts",
+    "src/federation-observe.ts",
     "src/system.ts",
     "src/settings.ts",
     "src/tori.ts",
