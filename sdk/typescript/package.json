@@ -563,6 +563,14 @@
       "types": "./src/cron.ts",
       "import": "./src/cron.ts"
     },
+    "./cron-read": {
+      "types": "./src/cron-read.ts",
+      "import": "./src/cron-read.ts"
+    },
+    "./cron-control": {
+      "types": "./src/cron-control.ts",
+      "import": "./src/cron-control.ts"
+    },
     "./skillhub": {
       "types": "./src/skillhub.ts",
       "import": "./src/skillhub.ts"
