@@ -146,6 +146,7 @@
     "src/plugin-knowledge.ts",
     "src/plugin-cron.ts",
     "src/plugin-send.ts",
+    "src/plugin-extensions.ts",
     "src/state.ts",
     "src/resource-state.ts",
     "src/focus-state.ts",
