@@ -1381,6 +1381,7 @@ pub struct AgentKit {
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
     pub cost: CostClient,
+    pub providers: ProvidersClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1423,6 +1424,7 @@ impl AgentKit {
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
             cost: CostClient::new(base_url.clone(), token.as_ref())?,
+            providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1458,6 +1460,7 @@ impl AgentKit {
             ),
             fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2592,6 +2595,241 @@ pub struct ForkDeleteResponse {
 pub struct ForkListResponse {
     #[serde(default)]
     pub forks: Vec<ConversationFork>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ModelsResponse {
+    #[serde(default)]
+    pub models: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ProvidersResponse {
+    #[serde(default)]
+    pub providers: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mode: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub warning: String,
+}
+
+pub type ProviderConfig = serde_json::Value;
+pub type ModelEntry = serde_json::Value;
+pub type ProviderActionResponse = serde_json::Value;
+pub type ProviderTestResponse = serde_json::Value;
+pub type ProviderModeResponse = serde_json::Value;
+pub type ProviderPresetsResponse = serde_json::Value;
+pub type ExecProviderResponse = serde_json::Value;
+pub type ToriDiscoverResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ProviderSessionOverrideRequest {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub provider_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct LocalDiscoverRequest {
+    pub base_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct LocalRegisterRequest {
+    pub base_url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tier: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub backend: String,
+}
+
+/// Small Rust helper over host `/api/providers*`, `/v1/models`, and provider breaker endpoints.
+#[derive(Debug, Clone)]
+pub struct ProvidersClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ProvidersClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn models(&self) -> Result<ModelsResponse, reqwest::Error> {
+        self.get_json("/v1/models").await
+    }
+    pub async fn add_model(&self, model: &ModelEntry) -> Result<ModelEntry, reqwest::Error> {
+        self.post_json("/v1/models", model).await
+    }
+    pub async fn delete_model(&self, id: &str) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.delete_json(&format!("/v1/models?id={}", url_encode_query_component(id)))
+            .await
+    }
+    pub async fn list(&self) -> Result<ProvidersResponse, reqwest::Error> {
+        self.get_json("/api/providers").await
+    }
+    pub async fn test(&self, id: &str) -> Result<ProviderTestResponse, reqwest::Error> {
+        self.post_json("/api/providers/test", &serde_json::json!({"id": id}))
+            .await
+    }
+    pub async fn enable(&self, id: &str) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/enable", &serde_json::json!({"id": id}))
+            .await
+    }
+    pub async fn disable(&self, id: &str) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/disable", &serde_json::json!({"id": id}))
+            .await
+    }
+    pub async fn switch_model(
+        &self,
+        id: &str,
+        model: &str,
+    ) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json(
+            "/api/providers/switch-model",
+            &serde_json::json!({"id": id, "model": model}),
+        )
+        .await
+    }
+    pub async fn set_session(
+        &self,
+        request: &ProviderSessionOverrideRequest,
+    ) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/session", request).await
+    }
+    pub async fn mode(&self) -> Result<ProviderModeResponse, reqwest::Error> {
+        self.get_json("/api/providers/mode").await
+    }
+    pub async fn set_mode(&self, mode: &str) -> Result<ProviderModeResponse, reqwest::Error> {
+        self.post_json("/api/providers/mode", &serde_json::json!({"mode": mode}))
+            .await
+    }
+    pub async fn presets(&self) -> Result<ProviderPresetsResponse, reqwest::Error> {
+        self.get_json("/api/providers/presets").await
+    }
+    pub async fn register(
+        &self,
+        config: &ProviderConfig,
+    ) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/register", config).await
+    }
+    pub async fn delete(&self, id: &str) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/delete", &serde_json::json!({"id": id}))
+            .await
+    }
+    pub async fn discover_local(
+        &self,
+        request: &LocalDiscoverRequest,
+    ) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/local/discover", request)
+            .await
+    }
+    pub async fn register_local(
+        &self,
+        request: &LocalRegisterRequest,
+    ) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/providers/local/register", request)
+            .await
+    }
+    pub async fn discover_tori(
+        &self,
+        auto_register: bool,
+    ) -> Result<ToriDiscoverResponse, reqwest::Error> {
+        let suffix = if auto_register {
+            "?auto_register=true"
+        } else {
+            ""
+        };
+        self.post_json(
+            &format!("/api/providers/tori/discover{}", suffix),
+            &serde_json::json!({}),
+        )
+        .await
+    }
+    pub async fn exec(&self) -> Result<ExecProviderResponse, reqwest::Error> {
+        self.get_json("/api/providers/exec").await
+    }
+    pub async fn set_exec(
+        &self,
+        provider_id: &str,
+    ) -> Result<ExecProviderResponse, reqwest::Error> {
+        self.post_json(
+            "/api/providers/exec",
+            &serde_json::json!({"provider_id": provider_id}),
+        )
+        .await
+    }
+    pub async fn reset_breakers(&self) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.post_json("/api/breaker/reset", &serde_json::json!({}))
+            .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+    async fn delete_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .delete(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -4655,6 +4893,10 @@ mod tests {
             "http://localhost:9090/v1/cost/summary"
         );
         assert_eq!(
+            kit.providers.url("/api/providers"),
+            "http://localhost:9090/api/providers"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -4903,6 +5145,34 @@ mod tests {
         assert_eq!(
             client.url("/v1/workers"),
             "http://localhost:9090/v1/workers"
+        );
+    }
+
+    #[test]
+    fn providers_types_deserialize_incremental_bodies() {
+        let models: ModelsResponse =
+            serde_json::from_str(r#"{"models":[{"id":"m1","model_id":"deepseek-chat"}]}"#).unwrap();
+        assert_eq!(models.models[0]["id"], "m1");
+
+        let providers: ProvidersResponse = serde_json::from_str(
+            r#"{"providers":[{"id":"deepseek","model":"deepseek-chat"}],"mode":"hybrid"}"#,
+        )
+        .unwrap();
+        assert_eq!(providers.providers[0]["id"], "deepseek");
+        assert_eq!(providers.mode, "hybrid");
+
+        let session = ProviderSessionOverrideRequest {
+            session_id: "s1".to_string(),
+            provider_id: "deepseek".to_string(),
+        };
+        let value = serde_json::to_value(session).unwrap();
+        assert_eq!(value["provider_id"], "deepseek");
+
+        let client =
+            ProvidersClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/api/providers"),
+            "http://localhost:9090/api/providers"
         );
     }
 

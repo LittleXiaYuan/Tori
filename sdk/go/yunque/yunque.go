@@ -312,6 +312,7 @@ type AgentKit struct {
 	Orchestrator *orchestratorNamespace
 	Fork         *forkNamespace
 	Cost         *costNamespace
+	Providers    *providersNamespace
 	Plugin       *pluginRuntimeNamespace
 	Memory       *memoryNamespace
 	AgentMemory  *agentMemoryNamespace
@@ -1799,6 +1800,9 @@ var Fork = &forkNamespace{}
 // Cost provides focused access to cost, usage, and quota endpoints.
 var Cost = &costNamespace{}
 
+// Providers provides focused access to LLM provider, model, mode, and breaker endpoints.
+var Providers = &providersNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2014,6 +2018,217 @@ func (c *costNamespace) Usage(ctx context.Context) (UsageResponse, error) {
 func (c *costNamespace) SetQuota(ctx context.Context, req SetQuotaRequest) (SetQuotaResponse, error) {
 	var out SetQuotaResponse
 	if err := apiCallInto(ctx, http.MethodPost, "/v1/quota", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+// ── Providers / Models ──
+
+type providersNamespace struct{}
+
+type ProviderMode string
+
+type ModelEntry map[string]any
+type ProviderConfig map[string]any
+type ProviderActionResponse map[string]any
+type ProviderTestResponse map[string]any
+type ProviderModeResponse map[string]any
+type ProviderPresetsResponse map[string]any
+type ExecProviderResponse map[string]any
+type ToriDiscoverResponse map[string]any
+
+type ModelsResponse struct {
+	Models []ModelEntry `json:"models"`
+}
+
+type ProvidersResponse struct {
+	Providers []ProviderConfig `json:"providers"`
+	Mode      string           `json:"mode,omitempty"`
+	Warning   string           `json:"warning,omitempty"`
+}
+
+type ProviderSessionOverrideRequest struct {
+	SessionID  string `json:"session_id"`
+	ProviderID string `json:"provider_id,omitempty"`
+}
+
+type LocalDiscoverRequest struct {
+	BaseURL string `json:"base_url"`
+}
+
+type LocalRegisterRequest struct {
+	BaseURL string `json:"base_url"`
+	Model   string `json:"model,omitempty"`
+	Tier    string `json:"tier,omitempty"`
+	Backend string `json:"backend,omitempty"`
+}
+
+func (p *providersNamespace) Models(ctx context.Context) (ModelsResponse, error) {
+	var out ModelsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/models", nil, &out); err != nil {
+		return ModelsResponse{}, err
+	}
+	if out.Models == nil {
+		out.Models = []ModelEntry{}
+	}
+	return out, nil
+}
+
+func (p *providersNamespace) AddModel(ctx context.Context, model ModelEntry) (ModelEntry, error) {
+	var out ModelEntry
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/models", model, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) DeleteModel(ctx context.Context, id string) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/models?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) List(ctx context.Context) (ProvidersResponse, error) {
+	var out ProvidersResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/providers", nil, &out); err != nil {
+		return ProvidersResponse{}, err
+	}
+	if out.Providers == nil {
+		out.Providers = []ProviderConfig{}
+	}
+	return out, nil
+}
+
+func (p *providersNamespace) Test(ctx context.Context, id string) (ProviderTestResponse, error) {
+	var out ProviderTestResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/test", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Enable(ctx context.Context, id string) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/enable", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Disable(ctx context.Context, id string) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/disable", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) SwitchModel(ctx context.Context, id, model string) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/switch-model", map[string]any{"id": id, "model": model}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) SetSession(ctx context.Context, req ProviderSessionOverrideRequest) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/session", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Mode(ctx context.Context) (ProviderModeResponse, error) {
+	var out ProviderModeResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/providers/mode", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) SetMode(ctx context.Context, mode string) (ProviderModeResponse, error) {
+	var out ProviderModeResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/mode", map[string]any{"mode": mode}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Presets(ctx context.Context) (ProviderPresetsResponse, error) {
+	var out ProviderPresetsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/providers/presets", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Register(ctx context.Context, config ProviderConfig) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/register", config, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Delete(ctx context.Context, id string) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/delete", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) DiscoverLocal(ctx context.Context, req LocalDiscoverRequest) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/local/discover", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) RegisterLocal(ctx context.Context, req LocalRegisterRequest) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/local/register", req, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) DiscoverTori(ctx context.Context, autoRegister bool) (ToriDiscoverResponse, error) {
+	path := "/api/providers/tori/discover"
+	if autoRegister {
+		path += "?auto_register=true"
+	}
+	var out ToriDiscoverResponse
+	if err := apiCallInto(ctx, http.MethodPost, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) Exec(ctx context.Context) (ExecProviderResponse, error) {
+	var out ExecProviderResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/providers/exec", nil, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) SetExec(ctx context.Context, providerID string) (ExecProviderResponse, error) {
+	var out ExecProviderResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/providers/exec", map[string]any{"provider_id": providerID}, &out); err != nil {
+		return nil, err
+	}
+	return nonNilMap(out), nil
+}
+
+func (p *providersNamespace) ResetBreakers(ctx context.Context) (ProviderActionResponse, error) {
+	var out ProviderActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/breaker/reset", nil, &out); err != nil {
 		return nil, err
 	}
 	return nonNilMap(out), nil
@@ -2273,6 +2488,7 @@ func NewAgentKit() AgentKit {
 		Orchestrator: Orchestrator,
 		Fork:         Fork,
 		Cost:         Cost,
+		Providers:    Providers,
 		Plugin:       Plugin,
 		Memory:       Memory,
 		AgentMemory:  AgentMemory,

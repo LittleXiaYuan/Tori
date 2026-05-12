@@ -22,6 +22,7 @@ const checks = [
   ["Orchestrator SDK manifest", "sdk/scripts/check-orchestrator-sdk-manifest.mjs"],
   ["Fork SDK manifest", "sdk/scripts/check-fork-sdk-manifest.mjs"],
   ["Cost SDK manifest", "sdk/scripts/check-cost-sdk-manifest.mjs"],
+  ["Providers SDK manifest", "sdk/scripts/check-providers-sdk-manifest.mjs"],
   ["Plugin API SDK manifest", "sdk/scripts/check-plugin-api-sdk-manifest.mjs"],
   ["Agent Kit SDK manifest", "sdk/scripts/check-agent-kit-sdk-manifest.mjs"],
 ];

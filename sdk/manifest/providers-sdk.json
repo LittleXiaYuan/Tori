@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "domain": "llm-providers",
+  "description": "Cross-language lightweight SDK entrypoints for LLM provider registry, model catalog, runtime mode/session selection, local/Tori discovery, exec provider, and breaker reset helpers.",
+  "principles": [
+    "Expose LLM provider and model configuration as focused SDK slices instead of requiring the full platform.",
+    "Keep provider setup, model maintenance, runtime routing, and health checks directly callable from frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Make Providers access available through Agent Kit without coupling callers to backend internals."
+  ],
+  "routes": [
+    "GET /v1/models",
+    "POST /v1/models",
+    "DELETE /v1/models",
+    "GET /api/providers",
+    "POST /api/providers/test",
+    "POST /api/providers/enable",
+    "POST /api/providers/disable",
+    "POST /api/providers/switch-model",
+    "POST /api/providers/session",
+    "GET /api/providers/mode",
+    "POST /api/providers/mode",
+    "GET /api/providers/presets",
+    "POST /api/providers/register",
+    "POST /api/providers/delete",
+    "POST /api/providers/local/discover",
+    "POST /api/providers/local/register",
+    "POST /api/providers/tori/discover",
+    "GET /api/providers/exec",
+    "POST /api/providers/exec",
+    "POST /api/breaker/reset"
+  ],
+  "capabilities": [
+    {
+      "name": "models",
+      "route": "GET /v1/models",
+      "readOnly": true,
+      "description": "Provider SDK helper for models."
+    },
+    {
+      "name": "addModel",
+      "route": "POST /v1/models",
+      "readOnly": false,
+      "description": "Provider SDK helper for addModel."
+    },
+    {
+      "name": "deleteModel",
+      "route": "DELETE /v1/models",
+      "readOnly": false,
+      "description": "Provider SDK helper for deleteModel."
+    },
+    {
+      "name": "list",
+      "route": "GET /api/providers",
+      "readOnly": true,
+      "description": "Provider SDK helper for list."
+    },
+    {
+      "name": "test",
+      "route": "POST /api/providers/test",
+      "readOnly": false,
+      "description": "Provider SDK helper for test."
+    },
+    {
+      "name": "enable",
+      "route": "POST /api/providers/enable",
+      "readOnly": false,
+      "description": "Provider SDK helper for enable."
+    },
+    {
+      "name": "disable",
+      "route": "POST /api/providers/disable",
+      "readOnly": false,
+      "description": "Provider SDK helper for disable."
+    },
+    {
+      "name": "switchModel",
+      "route": "POST /api/providers/switch-model",
+      "readOnly": false,
+      "description": "Provider SDK helper for switchModel."
+    },
+    {
+      "name": "setSession",
+      "route": "POST /api/providers/session",
+      "readOnly": false,
+      "description": "Provider SDK helper for setSession."
+    },
+    {
+      "name": "mode",
+      "route": "GET /api/providers/mode",
+      "readOnly": true,
+      "description": "Provider SDK helper for mode."
+    },
+    {
+      "name": "setMode",
+      "route": "POST /api/providers/mode",
+      "readOnly": false,
+      "description": "Provider SDK helper for setMode."
+    },
+    {
+      "name": "presets",
+      "route": "GET /api/providers/presets",
+      "readOnly": true,
+      "description": "Provider SDK helper for presets."
+    },
+    {
+      "name": "register",
+      "route": "POST /api/providers/register",
+      "readOnly": false,
+      "description": "Provider SDK helper for register."
+    },
+    {
+      "name": "delete",
+      "route": "POST /api/providers/delete",
+      "readOnly": false,
+      "description": "Provider SDK helper for delete."
+    },
+    {
+      "name": "discoverLocal",
+      "route": "POST /api/providers/local/discover",
+      "readOnly": false,
+      "description": "Provider SDK helper for discoverLocal."
+    },
+    {
+      "name": "registerLocal",
+      "route": "POST /api/providers/local/register",
+      "readOnly": false,
+      "description": "Provider SDK helper for registerLocal."
+    },
+    {
+      "name": "discoverTori",
+      "route": "POST /api/providers/tori/discover",
+      "readOnly": false,
+      "description": "Provider SDK helper for discoverTori."
+    },
+    {
+      "name": "exec",
+      "route": "GET /api/providers/exec",
+      "readOnly": true,
+      "description": "Provider SDK helper for exec."
+    },
+    {
+      "name": "setExec",
+      "route": "POST /api/providers/exec",
+      "readOnly": false,
+      "description": "Provider SDK helper for setExec."
+    },
+    {
+      "name": "resetBreakers",
+      "route": "POST /api/breaker/reset",
+      "readOnly": false,
+      "description": "Provider SDK helper for resetBreakers."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/providers.ts",
+        "sdk/typescript/src/provider-registry.ts",
+        "sdk/typescript/src/provider-control.ts",
+        "sdk/typescript/src/provider-mode.ts",
+        "sdk/typescript/src/provider-session.ts",
+        "sdk/typescript/src/provider-health.ts",
+        "sdk/typescript/src/provider-breaker.ts",
+        "sdk/typescript/src/models.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "models": "createProvidersClient().listModels",
+        "addModel": "createProvidersClient().addModel",
+        "deleteModel": "createProvidersClient().deleteModel",
+        "list": "createProvidersClient().listProviders",
+        "test": "createProvidersClient().testProvider",
+        "enable": "createProvidersClient().enableProvider",
+        "disable": "createProvidersClient().disableProvider",
+        "switchModel": "createProvidersClient().switchModel",
+        "setSession": "createProvidersClient().setSessionProvider",
+        "mode": "createProvidersClient().getMode",
+        "setMode": "createProvidersClient().setMode",
+        "presets": "createProvidersClient().presets",
+        "register": "createProvidersClient().registerProvider",
+        "delete": "createProvidersClient().deleteProvider",
+        "discoverLocal": "createProvidersClient().discoverLocal",
+        "registerLocal": "createProvidersClient().registerLocal",
+        "discoverTori": "createProvidersClient().discoverTori",
+        "exec": "createProvidersClient().getExecProvider",
+        "setExec": "createProvidersClient().setExecProvider",
+        "resetBreakers": "createProvidersClient().resetBreakers"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "models": "yunque.Providers.Models",
+        "addModel": "yunque.Providers.AddModel",
+        "deleteModel": "yunque.Providers.DeleteModel",
+        "list": "yunque.Providers.List",
+        "test": "yunque.Providers.Test",
+        "enable": "yunque.Providers.Enable",
+        "disable": "yunque.Providers.Disable",
+        "switchModel": "yunque.Providers.SwitchModel",
+        "setSession": "yunque.Providers.SetSession",
+        "mode": "yunque.Providers.Mode",
+        "setMode": "yunque.Providers.SetMode",
+        "presets": "yunque.Providers.Presets",
+        "register": "yunque.Providers.Register",
+        "delete": "yunque.Providers.Delete",
+        "discoverLocal": "yunque.Providers.DiscoverLocal",
+        "registerLocal": "yunque.Providers.RegisterLocal",
+        "discoverTori": "yunque.Providers.DiscoverTori",
+        "exec": "yunque.Providers.Exec",
+        "setExec": "yunque.Providers.SetExec",
+        "resetBreakers": "yunque.Providers.ResetBreakers"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "models": "yunque.providers.models",
+        "addModel": "yunque.providers.add_model",
+        "deleteModel": "yunque.providers.delete_model",
+        "list": "yunque.providers.list",
+        "test": "yunque.providers.test",
+        "enable": "yunque.providers.enable",
+        "disable": "yunque.providers.disable",
+        "switchModel": "yunque.providers.switch_model",
+        "setSession": "yunque.providers.set_session",
+        "mode": "yunque.providers.mode",
+        "setMode": "yunque.providers.set_mode",
+        "presets": "yunque.providers.presets",
+        "register": "yunque.providers.register",
+        "delete": "yunque.providers.delete",
+        "discoverLocal": "yunque.providers.discover_local",
+        "registerLocal": "yunque.providers.register_local",
+        "discoverTori": "yunque.providers.discover_tori",
+        "exec": "yunque.providers.exec",
+        "setExec": "yunque.providers.set_exec",
+        "resetBreakers": "yunque.providers.reset_breakers"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "models": "ProvidersClient::models",
+        "addModel": "ProvidersClient::add_model",
+        "deleteModel": "ProvidersClient::delete_model",
+        "list": "ProvidersClient::list",
+        "test": "ProvidersClient::test",
+        "enable": "ProvidersClient::enable",
+        "disable": "ProvidersClient::disable",
+        "switchModel": "ProvidersClient::switch_model",
+        "setSession": "ProvidersClient::set_session",
+        "mode": "ProvidersClient::mode",
+        "setMode": "ProvidersClient::set_mode",
+        "presets": "ProvidersClient::presets",
+        "register": "ProvidersClient::register",
+        "delete": "ProvidersClient::delete",
+        "discoverLocal": "ProvidersClient::discover_local",
+        "registerLocal": "ProvidersClient::register_local",
+        "discoverTori": "ProvidersClient::discover_tori",
+        "exec": "ProvidersClient::exec",
+        "setExec": "ProvidersClient::set_exec",
+        "resetBreakers": "ProvidersClient::reset_breakers"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
