@@ -563,6 +563,14 @@
       "types": "./src/iterate-review.ts",
       "import": "./src/iterate-review.ts"
     },
+    "./iterate-pending": {
+      "types": "./src/iterate-pending.ts",
+      "import": "./src/iterate-pending.ts"
+    },
+    "./iterate-decisions": {
+      "types": "./src/iterate-decisions.ts",
+      "import": "./src/iterate-decisions.ts"
+    },
     "./iterate-cycle": {
       "types": "./src/iterate-cycle.ts",
       "import": "./src/iterate-cycle.ts"
