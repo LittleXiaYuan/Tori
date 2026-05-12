@@ -363,6 +363,8 @@ import { createOrchestratorEventsClient } from "yunque-client/orchestrator-event
 import { createOrchestratorControlClient } from "yunque-client/orchestrator-control";
 import { createForkClient } from "yunque-client/fork";
 import { createForkReadClient } from "yunque-client/fork-read";
+import { createForkRootClient } from "yunque-client/fork-root";
+import { createForkListClient } from "yunque-client/fork-list";
 import { createForkControlClient } from "yunque-client/fork-control";
 import { createSchedulerClient } from "yunque-client/scheduler";
 import { createSchedulerReadClient } from "yunque-client/scheduler-read";
@@ -750,6 +752,18 @@ const fork = createForkClient({
 });
 const branches = await fork.list("session-1");
 console.log(branches.forks.length);
+
+const forkRoot = createForkRootClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+await forkRoot.root("session-1");
+
+const forkList = createForkListClient({
+  baseUrl: "http://localhost:9090",
+  token: "<your-token>",
+});
+await forkList.list("session-1");
 
 const scheduler = createSchedulerClient({
   baseUrl: "http://localhost:9090",
@@ -1423,7 +1437,7 @@ This keeps the SDK usable as an **incremental package**: embedder code can bring
 in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
-`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`connectors`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
+`/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`connectors`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-agent-memory`/`plugin-knowledge`/`plugin-cron`/`plugin-send`/`plugin-extensions`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
 slices in the same style when those surfaces need stable, lightweight
 integration APIs.
 
@@ -1723,6 +1737,8 @@ npm run check:incremental   # verifies hand-written slice exports/tests/route co
 | `src/orchestrator-control.ts` | Lightweight orchestrator toggle/policy-update/adapter-control facade without read APIs |
 | `src/fork.ts` | Lightweight hand-written conversation fork root, branch, list, and delete slice |
 | `src/fork-read.ts` | Lightweight conversation fork root/get/list facade without create/branch/delete APIs |
+| `src/fork-root.ts` | Lightweight conversation fork root/get facade without list or mutation APIs |
+| `src/fork-list.ts` | Lightweight conversation fork list-only facade without root/get or mutation APIs |
 | `src/fork-control.ts` | Lightweight conversation fork create/branch/delete facade without read APIs |
 | `src/scheduler.ts` | Lightweight hand-written prompt scheduler job list/add/remove slice |
 | `src/scheduler-read.ts` | Lightweight prompt scheduler job list facade without add/remove APIs |

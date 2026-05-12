@@ -1095,6 +1095,14 @@
       "types": "./src/fork-read.ts",
       "import": "./src/fork-read.ts"
     },
+    "./fork-root": {
+      "types": "./src/fork-root.ts",
+      "import": "./src/fork-root.ts"
+    },
+    "./fork-list": {
+      "types": "./src/fork-list.ts",
+      "import": "./src/fork-list.ts"
+    },
     "./fork-control": {
       "types": "./src/fork-control.ts",
       "import": "./src/fork-control.ts"
