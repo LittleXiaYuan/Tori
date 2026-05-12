@@ -322,6 +322,7 @@ type AgentKit struct {
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
 	Conversations *conversationsNamespace
+	Approvals     *approvalsNamespace
 	Plugin        *pluginRuntimeNamespace
 	Memory        *memoryNamespace
 	AgentMemory   *agentMemoryNamespace
@@ -1839,6 +1840,9 @@ var ChatSDK = &chatNamespace{}
 // Conversations provides focused access to conversation sessions, messages, metadata, and replay.
 var Conversations = &conversationsNamespace{}
 
+// Approvals provides focused access to human-in-the-loop approval queues and rules.
+var Approvals = &approvalsNamespace{}
+
 type forkNamespace struct{}
 
 type ForkMessage struct {
@@ -2739,6 +2743,100 @@ func (e *eventsNamespace) Parse(text string) []EventStreamMessage {
 	return out
 }
 
+// ── Approvals ──
+
+type approvalsNamespace struct{}
+
+type ApprovalRequest map[string]any
+type ApprovalRule map[string]any
+type ListApprovalsResponse map[string]any
+type ApprovalActionResponse map[string]any
+type ApprovalRulesResponse map[string]any
+
+type ListApprovalsOptions struct {
+	Status  string
+	History bool
+}
+
+func (a *approvalsNamespace) List(ctx context.Context, opts ListApprovalsOptions) (ListApprovalsResponse, error) {
+	path := "/v1/approvals"
+	q := url.Values{}
+	if opts.Status != "" {
+		q.Set("status", opts.Status)
+	}
+	if opts.History {
+		q.Set("history", "true")
+	}
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var out ListApprovalsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) Pending(ctx context.Context) (ListApprovalsResponse, error) {
+	return a.List(ctx, ListApprovalsOptions{Status: "pending"})
+}
+
+func (a *approvalsNamespace) History(ctx context.Context, status string) (ListApprovalsResponse, error) {
+	return a.List(ctx, ListApprovalsOptions{Status: status, History: true})
+}
+
+func (a *approvalsNamespace) Approve(ctx context.Context, id string) (ApprovalActionResponse, error) {
+	var out ApprovalActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/approvals/approve", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) Deny(ctx context.Context, id, reason string) (ApprovalActionResponse, error) {
+	body := map[string]any{"id": id}
+	if reason != "" {
+		body["reason"] = reason
+	}
+	var out ApprovalActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/approvals/deny", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) Decide(ctx context.Context, id, decision string) (ApprovalActionResponse, error) {
+	var out ApprovalActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/approvals/decide", map[string]any{"id": id, "decision": decision}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) Rules(ctx context.Context) (ApprovalRulesResponse, error) {
+	var out ApprovalRulesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/approvals/rules", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) AddRule(ctx context.Context, rule ApprovalRule) (ApprovalActionResponse, error) {
+	var out ApprovalActionResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/approvals/rules", rule, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *approvalsNamespace) DeleteRule(ctx context.Context, id string) (ApprovalActionResponse, error) {
+	var out ApprovalActionResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/approvals/rules?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Conversations ──
 
 type conversationsNamespace struct{}
@@ -3364,6 +3462,7 @@ func NewAgentKit() AgentKit {
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
 		Conversations: Conversations,
+		Approvals:     Approvals,
 		Plugin:        Plugin,
 		Memory:        Memory,
 		AgentMemory:   AgentMemory,

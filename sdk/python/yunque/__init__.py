@@ -596,6 +596,53 @@ class _ConversationsNamespace:
 
 conversations = _ConversationsNamespace()
 
+
+# ── Approvals (/v1/approvals) ──
+
+class _ApprovalsNamespace:
+    """Lightweight helpers for human-in-the-loop approval queues and rules."""
+
+    def list(self, *, status: str = "", history: bool = False) -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if status != "":
+            params["status"] = status
+        if history:
+            params["history"] = "true"
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/approvals{suffix}")
+
+    def pending(self) -> dict:
+        return self.list(status="pending")
+
+    def history(self, status: str = "") -> dict:
+        return self.list(status=status, history=True)
+
+    def approve(self, approval_id: str) -> dict:
+        return _api_call("POST", "/v1/approvals/approve", {"id": approval_id})
+
+    def deny(self, approval_id: str, reason: str = "") -> dict:
+        body = {"id": approval_id}
+        if reason:
+            body["reason"] = reason
+        return _api_call("POST", "/v1/approvals/deny", body)
+
+    def decide(self, approval_id: str, decision: str) -> dict:
+        return _api_call("POST", "/v1/approvals/decide", {"id": approval_id, "decision": decision})
+
+    def rules(self) -> dict:
+        return _api_call("GET", "/v1/approvals/rules")
+
+    def add_rule(self, rule: dict) -> dict:
+        return _api_call("POST", "/v1/approvals/rules", rule)
+
+    def delete_rule(self, rule_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/approvals/rules?{urlencode({'id': rule_id})}")
+
+
+approvals = _ApprovalsNamespace()
+
 # ── Conversation Forks (/v1/fork) ──
 
 class _ForkNamespace:
@@ -1734,6 +1781,7 @@ class AgentKit:
         self.realtime = realtime
         self.chat = chat_sdk
         self.conversations = conversations
+        self.approvals = approvals
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

@@ -1390,6 +1390,7 @@ pub struct AgentKit {
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
     pub conversations: ConversationsClient,
+    pub approvals: ApprovalsClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1441,6 +1442,7 @@ impl AgentKit {
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
             conversations: ConversationsClient::new(base_url.clone(), token.as_ref())?,
+            approvals: ApprovalsClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1488,6 +1490,7 @@ impl AgentKit {
                 base_url.clone(),
                 plugin_http.clone(),
             ),
+            approvals: ApprovalsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -3547,6 +3550,194 @@ pub struct ConversationReplayOptions {
     pub limit: i32,
     #[serde(default, skip_serializing_if = "is_default")]
     pub offset: i32,
+}
+
+pub type ApprovalRequest = serde_json::Map<String, serde_json::Value>;
+pub type ApprovalRule = serde_json::Map<String, serde_json::Value>;
+pub type ListApprovalsResponse = serde_json::Value;
+pub type ApprovalActionResponse = serde_json::Value;
+pub type ApprovalRulesResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ListApprovalsOptions {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub status: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub history: bool,
+}
+
+/// Small Rust helper over `/v1/approvals*` human-in-the-loop queues and rules.
+#[derive(Debug, Clone)]
+pub struct ApprovalsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl ApprovalsClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        let bearer = format!("Bearer {}", token.as_ref());
+        headers.insert(
+            reqwest::header::AUTHORIZATION,
+            reqwest::header::HeaderValue::from_str(&bearer).unwrap(),
+        );
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn list(
+        &self,
+        opts: ListApprovalsOptions,
+    ) -> Result<ListApprovalsResponse, reqwest::Error> {
+        let mut query = Vec::new();
+        if !opts.status.is_empty() {
+            query.push(format!("status={}", encode_query_component(&opts.status)));
+        }
+        if opts.history {
+            query.push("history=true".to_string());
+        }
+        let path = if query.is_empty() {
+            "/v1/approvals".to_string()
+        } else {
+            format!("/v1/approvals?{}", query.join("&"))
+        };
+        self.get_json(&path).await
+    }
+
+    pub async fn pending(&self) -> Result<ListApprovalsResponse, reqwest::Error> {
+        self.list(ListApprovalsOptions {
+            status: "pending".to_string(),
+            history: false,
+        })
+        .await
+    }
+
+    pub async fn history(
+        &self,
+        status: impl Into<String>,
+    ) -> Result<ListApprovalsResponse, reqwest::Error> {
+        self.list(ListApprovalsOptions {
+            status: status.into(),
+            history: true,
+        })
+        .await
+    }
+
+    pub async fn approve(
+        &self,
+        id: impl Into<String>,
+    ) -> Result<ApprovalActionResponse, reqwest::Error> {
+        self.post_json(
+            "/v1/approvals/approve",
+            &serde_json::json!({ "id": id.into() }),
+        )
+        .await
+    }
+
+    pub async fn deny(
+        &self,
+        id: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Result<ApprovalActionResponse, reqwest::Error> {
+        let reason = reason.into();
+        let mut body = serde_json::Map::new();
+        body.insert("id".to_string(), serde_json::Value::String(id.into()));
+        if !reason.is_empty() {
+            body.insert("reason".to_string(), serde_json::Value::String(reason));
+        }
+        self.post_json("/v1/approvals/deny", &body).await
+    }
+
+    pub async fn decide(
+        &self,
+        id: impl Into<String>,
+        decision: impl Into<String>,
+    ) -> Result<ApprovalActionResponse, reqwest::Error> {
+        self.post_json(
+            "/v1/approvals/decide",
+            &serde_json::json!({ "id": id.into(), "decision": decision.into() }),
+        )
+        .await
+    }
+
+    pub async fn rules(&self) -> Result<ApprovalRulesResponse, reqwest::Error> {
+        self.get_json("/v1/approvals/rules").await
+    }
+
+    pub async fn add_rule(
+        &self,
+        rule: ApprovalRule,
+    ) -> Result<ApprovalActionResponse, reqwest::Error> {
+        self.post_json("/v1/approvals/rules", &rule).await
+    }
+
+    pub async fn delete_rule(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<ApprovalActionResponse, reqwest::Error> {
+        self.delete_json(&format!(
+            "/v1/approvals/rules?id={}",
+            encode_query_component(id.as_ref())
+        ))
+        .await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn delete_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .delete(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
 }
 
 /// Small Rust helper over `/v1/conversations*` session, message, metadata, and replay endpoints.
@@ -6206,6 +6397,36 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+    }
+
+    #[test]
+    fn approvals_helpers_build_urls_and_requests() {
+        let client =
+            ApprovalsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/approvals"),
+            "http://localhost:9090/v1/approvals"
+        );
+        let opts = ListApprovalsOptions {
+            status: "approved".to_string(),
+            history: true,
+        };
+        let value = serde_json::to_value(opts).unwrap();
+        assert_eq!(value["status"], "approved");
+        assert_eq!(value["history"], true);
+        let empty = serde_json::to_value(ListApprovalsOptions::default()).unwrap();
+        assert!(empty.get("status").is_none());
+        assert!(empty.get("history").is_none());
+        let mut rule = ApprovalRule::new();
+        rule.insert(
+            "id".to_string(),
+            serde_json::Value::String("r1".to_string()),
+        );
+        rule.insert(
+            "decision".to_string(),
+            serde_json::Value::String("allow_always".to_string()),
+        );
+        assert_eq!(rule["decision"], "allow_always");
     }
 
     #[test]
