@@ -997,6 +997,51 @@ class _RealtimeNamespace:
 
 realtime = _RealtimeNamespace()
 
+# ── Chat Runtime (/v1/chat, /v1/chat/stream, /v1/chat/agentic) ──
+
+class _ChatNamespace:
+    """Lightweight helpers for basic, streaming, and agentic chat endpoints."""
+
+    def send(self, messages: list[dict], **extra) -> dict:
+        return _api_call("POST", "/v1/chat", {"messages": messages, **extra})
+
+    def agentic(self, messages: list[dict], **extra) -> dict:
+        return _api_call("POST", "/v1/chat/agentic", {"messages": messages, **extra})
+
+    def stream_url(self) -> str:
+        return f"{_API_BASE}/v1/chat/stream"
+
+    def stream_request(self, messages: list[dict], **extra) -> dict:
+        return {"messages": messages, "stream": True, **extra}
+
+    def parse_stream(self, text: str) -> list[dict]:
+        parsed_events = events.parse(text)
+        out: list[dict] = []
+        for event in parsed_events:
+            raw = event.get("raw_data", event.get("data"))
+            if raw == "[DONE]":
+                continue
+            item = {"event": event.get("event", "message"), "raw": raw}
+            data = event.get("data")
+            if isinstance(data, dict):
+                item["data"] = data
+                if data.get("type") == "delta" or "content" in data:
+                    item["kind"] = "delta"
+                    item["content"] = data.get("content", "")
+                elif data.get("type") == "error" or "error" in data:
+                    item["kind"] = "error"
+                    item["message"] = data.get("error") or data.get("message") or str(raw)
+                else:
+                    item["kind"] = item["event"]
+            else:
+                item["data"] = data
+                item["kind"] = item["event"] or "raw"
+            out.append(item)
+        return out
+
+
+chat_sdk = _ChatNamespace()
+
 # ── Cost / Usage / Quota (/v1/cost, /v1/usage, /v1/quota) ──
 
 class _CostNamespace:
@@ -1643,6 +1688,7 @@ class AgentKit:
         self.events = events
         self.reverie = reverie
         self.realtime = realtime
+        self.chat = chat_sdk
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory
