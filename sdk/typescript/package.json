@@ -959,6 +959,10 @@
       "types": "./src/plugin-control.ts",
       "import": "./src/plugin-control.ts"
     },
+    "./plugin-toggle": {
+      "types": "./src/plugin-toggle.ts",
+      "import": "./src/plugin-toggle.ts"
+    },
     "./plugin-ui": {
       "types": "./src/plugin-ui.ts",
       "import": "./src/plugin-ui.ts"
@@ -978,6 +982,14 @@
     "./plugin-crud": {
       "types": "./src/plugin-crud.ts",
       "import": "./src/plugin-crud.ts"
+    },
+    "./plugin-create": {
+      "types": "./src/plugin-create.ts",
+      "import": "./src/plugin-create.ts"
+    },
+    "./plugin-delete": {
+      "types": "./src/plugin-delete.ts",
+      "import": "./src/plugin-delete.ts"
     },
     "./connectors": {
       "types": "./src/connectors.ts",
