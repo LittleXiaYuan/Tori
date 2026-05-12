@@ -97,6 +97,7 @@
     "src/modes.ts",
     "src/ide.ts",
     "src/persona.ts",
+    "src/persona-state.ts",
     "src/workflow.ts",
     "src/workflow-definitions.ts",
     "src/workflow-runs.ts",
