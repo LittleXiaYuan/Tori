@@ -301,6 +301,7 @@ type AgentKit struct {
 	Triggers    *triggersNamespace
 	MemoryCore  *memoryCoreNamespace
 	Graph       *graphNamespace
+	KnowledgeKB *knowledgeKBNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -850,6 +851,181 @@ func (g *graphNamespace) Stats(ctx context.Context) (GraphStatsResponse, error) 
 	return out, nil
 }
 
+// ── Knowledge Base (host) ──
+
+// KnowledgeKB provides focused access to the host /v1/knowledge/* RAG API.
+// It is separate from Knowledge, which targets plugin-owned /v1/plugin-api/knowledge/* helpers.
+var KnowledgeKB = &knowledgeKBNamespace{}
+
+type knowledgeKBNamespace struct{}
+
+type KnowledgeChunk struct {
+	ID       string         `json:"id,omitempty"`
+	SourceID string         `json:"source_id,omitempty"`
+	Source   string         `json:"source,omitempty"`
+	File     string         `json:"file,omitempty"`
+	Path     string         `json:"path,omitempty"`
+	Lang     string         `json:"lang,omitempty"`
+	Content  string         `json:"content,omitempty"`
+	Text     string         `json:"text,omitempty"`
+	Score    float64        `json:"score,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+	Extra    map[string]any `json:"-"`
+}
+
+type KnowledgeSource struct {
+	ID        string         `json:"id"`
+	Name      string         `json:"name,omitempty"`
+	Type      string         `json:"type,omitempty"`
+	Path      string         `json:"path,omitempty"`
+	Trigger   string         `json:"trigger,omitempty"`
+	Chunks    int            `json:"chunks,omitempty"`
+	Size      int64          `json:"size,omitempty"`
+	CreatedAt string         `json:"created_at,omitempty"`
+	UpdatedAt string         `json:"updated_at,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	Extra     map[string]any `json:"-"`
+}
+
+type KnowledgeStatsResponse map[string]any
+
+type KnowledgeSearchOptions struct {
+	Query string
+	Limit int
+	File  string
+	Lang  string
+}
+
+type KnowledgeSearchResponse struct {
+	Chunks []KnowledgeChunk `json:"chunks"`
+	Count  int              `json:"count"`
+}
+
+type KnowledgeSourcesResponse struct {
+	Sources []KnowledgeSource `json:"sources"`
+}
+
+type KnowledgeIngestRequest struct {
+	Name    string `json:"name,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
+	Content string `json:"content"`
+}
+
+type KnowledgeUpdateSourceRequest struct {
+	ID      string `json:"id"`
+	Name    string `json:"name,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
+	Content string `json:"content,omitempty"`
+}
+
+type KnowledgeImportURLRequest struct {
+	URL           string `json:"url"`
+	Name          string `json:"name,omitempty"`
+	CrawlChildren bool   `json:"crawl_children,omitempty"`
+	MaxPages      int    `json:"max_pages,omitempty"`
+}
+
+type KnowledgeImportRepoRequest struct {
+	Path     string `json:"path"`
+	MaxFiles int    `json:"max_files,omitempty"`
+}
+
+type KnowledgeMutationResponse struct {
+	Source  *KnowledgeSource       `json:"source,omitempty"`
+	Sources []KnowledgeSource      `json:"sources,omitempty"`
+	Stats   KnowledgeStatsResponse `json:"stats,omitempty"`
+	Extra   map[string]any         `json:"-"`
+}
+
+type KnowledgeDeleteResponse struct {
+	Deleted string                 `json:"deleted,omitempty"`
+	Stats   KnowledgeStatsResponse `json:"stats,omitempty"`
+}
+
+func (k *knowledgeKBNamespace) Stats(ctx context.Context) (KnowledgeStatsResponse, error) {
+	var out KnowledgeStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/knowledge/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return KnowledgeStatsResponse{}, nil
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) Sources(ctx context.Context) (KnowledgeSourcesResponse, error) {
+	var out KnowledgeSourcesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/knowledge/sources", nil, &out); err != nil {
+		return KnowledgeSourcesResponse{}, err
+	}
+	if out.Sources == nil {
+		out.Sources = []KnowledgeSource{}
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) Search(ctx context.Context, opts KnowledgeSearchOptions) (KnowledgeSearchResponse, error) {
+	q := url.Values{}
+	q.Set("q", opts.Query)
+	if opts.Limit > 0 {
+		q.Set("n", strconv.Itoa(opts.Limit))
+	}
+	if opts.File != "" {
+		q.Set("file", opts.File)
+	}
+	if opts.Lang != "" {
+		q.Set("lang", opts.Lang)
+	}
+	var out KnowledgeSearchResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/knowledge/search?"+q.Encode(), nil, &out); err != nil {
+		return KnowledgeSearchResponse{}, err
+	}
+	if out.Chunks == nil {
+		out.Chunks = []KnowledgeChunk{}
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) Ingest(ctx context.Context, req KnowledgeIngestRequest) (KnowledgeMutationResponse, error) {
+	var out KnowledgeMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/knowledge/ingest", req, &out); err != nil {
+		return KnowledgeMutationResponse{}, err
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) UpdateSource(ctx context.Context, req KnowledgeUpdateSourceRequest) (KnowledgeMutationResponse, error) {
+	var out KnowledgeMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/knowledge/source/update", req, &out); err != nil {
+		return KnowledgeMutationResponse{}, err
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) DeleteSource(ctx context.Context, id string) (KnowledgeDeleteResponse, error) {
+	var out KnowledgeDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/knowledge/source?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return KnowledgeDeleteResponse{}, err
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) ImportURL(ctx context.Context, req KnowledgeImportURLRequest) (KnowledgeMutationResponse, error) {
+	var out KnowledgeMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/knowledge/import-url", req, &out); err != nil {
+		return KnowledgeMutationResponse{}, err
+	}
+	return out, nil
+}
+
+func (k *knowledgeKBNamespace) ImportRepo(ctx context.Context, req KnowledgeImportRepoRequest) (KnowledgeMutationResponse, error) {
+	var out KnowledgeMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/knowledge/import-repo", req, &out); err != nil {
+		return KnowledgeMutationResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -921,6 +1097,7 @@ func NewAgentKit() AgentKit {
 		Triggers:    Triggers,
 		MemoryCore:  MemoryCore,
 		Graph:       Graph,
+		KnowledgeKB: KnowledgeKB,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

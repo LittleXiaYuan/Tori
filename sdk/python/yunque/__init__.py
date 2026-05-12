@@ -235,6 +235,89 @@ class _Knowledge:
 knowledge = _Knowledge()
 
 
+# ── Knowledge Base (/v1/knowledge) ──
+
+class _KnowledgeBaseNamespace:
+    """Lightweight helpers for the host RAG knowledge base under /v1/knowledge/*."""
+
+    def stats(self) -> dict:
+        return _api_call("GET", "/v1/knowledge/stats")
+
+    def sources(self) -> dict:
+        return _api_call("GET", "/v1/knowledge/sources")
+
+    def search(self, query: str | dict, *, limit: int = 10, file: str = "", lang: str = "") -> dict:
+        from urllib.parse import urlencode
+        if isinstance(query, dict):
+            q = query.get("query") or query.get("q") or ""
+            limit = int(query.get("limit") or query.get("n") or limit)
+            file = query.get("file") or file
+            lang = query.get("lang") or lang
+        else:
+            q = query
+        params = {"q": q}
+        if limit > 0:
+            params["n"] = str(limit)
+        if file:
+            params["file"] = file
+        if lang:
+            params["lang"] = lang
+        return _api_call("GET", f"/v1/knowledge/search?{urlencode(params)}")
+
+    def ingest(self, content: str | dict, *, name: str = "", trigger: str = "") -> dict:
+        if isinstance(content, dict):
+            body = dict(content)
+        else:
+            body = {"content": content}
+            if name:
+                body["name"] = name
+            if trigger:
+                body["trigger"] = trigger
+        return _api_call("POST", "/v1/knowledge/ingest", body)
+
+    def update_source(self, source_id: str | dict, *, name: str = "", trigger: str = "", content: str = "") -> dict:
+        if isinstance(source_id, dict):
+            body = dict(source_id)
+        else:
+            body = {"id": source_id}
+            if name:
+                body["name"] = name
+            if trigger:
+                body["trigger"] = trigger
+            if content:
+                body["content"] = content
+        return _api_call("POST", "/v1/knowledge/source/update", body)
+
+    def delete_source(self, source_id: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/knowledge/source?{urlencode({'id': source_id})}")
+
+    def import_url(self, url: str | dict, *, name: str = "", crawl_children: bool = False, max_pages: int = 0) -> dict:
+        if isinstance(url, dict):
+            body = dict(url)
+        else:
+            body = {"url": url}
+            if name:
+                body["name"] = name
+            if crawl_children:
+                body["crawl_children"] = crawl_children
+            if max_pages > 0:
+                body["max_pages"] = max_pages
+        return _api_call("POST", "/v1/knowledge/import-url", body)
+
+    def import_repo(self, path: str | dict, *, max_files: int = 0) -> dict:
+        if isinstance(path, dict):
+            body = dict(path)
+        else:
+            body = {"path": path}
+            if max_files > 0:
+                body["max_files"] = max_files
+        return _api_call("POST", "/v1/knowledge/import-repo", body)
+
+
+knowledge_base = _KnowledgeBaseNamespace()
+
+
 # ── Cron / Scheduling ──
 
 class _Cron:
@@ -754,6 +837,7 @@ class AgentKit:
         self.triggers = triggers
         self.memory_core = memory_core
         self.graph = graph
+        self.knowledge_base = knowledge_base
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

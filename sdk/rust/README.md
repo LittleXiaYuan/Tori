@@ -372,3 +372,17 @@ let entity = graph.put_entity(&GraphEntity { name: "云雀".to_string(), r#type:
 let context = graph.context_by_entity_id(&entity.id).await?;
 println!("{} {}", entities.entities.len(), context.context);
 ```
+
+### Knowledge Base helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `KnowledgeClient` 访问宿主 `/v1/knowledge/*` RAG 知识库。它不同于 `PluginApiClient::knowledge_*` 的插件运行时 helper。
+
+```rust
+use yunque_client::{KnowledgeClient, KnowledgeIngestRequest, KnowledgeSearchOptions};
+
+let knowledge = KnowledgeClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let stats = knowledge.stats().await?;
+let found = knowledge.search(&KnowledgeSearchOptions { query: "增量 SDK".to_string(), limit: 3, ..Default::default() }).await?;
+let ingested = knowledge.ingest(&KnowledgeIngestRequest { name: "sdk-note".to_string(), content: "外部项目可直接调用 Knowledge Base".to_string(), ..Default::default() }).await?;
+println!("{:?} {} {:?}", stats.get("sources"), found.count, ingested.source.map(|s| s.id));
+```

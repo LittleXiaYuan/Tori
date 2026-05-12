@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "domain": "knowledge-base",
+  "description": "Cross-language lightweight SDK entrypoints for Yunque host RAG knowledge base under /v1/knowledge/*.",
+  "principles": [
+    "Expose RAG search, sources, stats, ingest, import, update, and delete as focused SDK slices instead of forcing full platform imports.",
+    "Keep host Knowledge Base helpers separate from plugin-owned /v1/plugin-api/knowledge/* helpers.",
+    "Let external projects, plugin UIs, CLIs, sidecars, and automation scripts call knowledge capabilities directly."
+  ],
+  "routes": [
+    "GET /v1/knowledge/search",
+    "GET /v1/knowledge/sources",
+    "GET /v1/knowledge/stats",
+    "POST /v1/knowledge/ingest",
+    "POST /v1/knowledge/import-url",
+    "POST /v1/knowledge/import-repo",
+    "DELETE /v1/knowledge/source",
+    "POST /v1/knowledge/source/update"
+  ],
+  "capabilities": [
+    { "name": "search", "route": "GET /v1/knowledge/search", "readOnly": true, "description": "Search indexed knowledge chunks." },
+    { "name": "sources", "route": "GET /v1/knowledge/sources", "readOnly": true, "description": "List knowledge sources." },
+    { "name": "stats", "route": "GET /v1/knowledge/stats", "readOnly": true, "description": "Read knowledge base counters." },
+    { "name": "ingest", "route": "POST /v1/knowledge/ingest", "readOnly": false, "description": "Ingest inline text into the knowledge base." },
+    { "name": "importUrl", "route": "POST /v1/knowledge/import-url", "readOnly": false, "description": "Import readable content from a URL." },
+    { "name": "importRepo", "route": "POST /v1/knowledge/import-repo", "readOnly": false, "description": "Import a repository/directory under configured KB roots." },
+    { "name": "updateSource", "route": "POST /v1/knowledge/source/update", "readOnly": false, "description": "Update a knowledge source." },
+    { "name": "deleteSource", "route": "DELETE /v1/knowledge/source", "readOnly": false, "description": "Delete a knowledge source by id." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/knowledge.ts", "sdk/typescript/src/knowledge-search.ts", "sdk/typescript/src/knowledge-sources.ts", "sdk/typescript/src/knowledge-ingest.ts", "sdk/typescript/src/knowledge-import.ts", "sdk/typescript/src/knowledge-upload.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "search": "yunque-client/knowledge-search#createKnowledgeSearchClient().search",
+        "sources": "yunque-client/knowledge-sources#createKnowledgeSourcesClient().list",
+        "stats": "yunque-client/knowledge-sources#createKnowledgeSourcesClient().stats",
+        "ingest": "yunque-client/knowledge-ingest#createKnowledgeIngestClient().ingest",
+        "importUrl": "yunque-client/knowledge-import#createKnowledgeImportClient().importUrl",
+        "importRepo": "yunque-client/knowledge-import#createKnowledgeImportClient().importRepo",
+        "updateSource": "yunque-client/knowledge-sources#createKnowledgeSourcesClient().update",
+        "deleteSource": "yunque-client/knowledge-sources#createKnowledgeSourcesClient().delete"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "search": "yunque.KnowledgeKB.Search",
+        "sources": "yunque.KnowledgeKB.Sources",
+        "stats": "yunque.KnowledgeKB.Stats",
+        "ingest": "yunque.KnowledgeKB.Ingest",
+        "importUrl": "yunque.KnowledgeKB.ImportURL",
+        "importRepo": "yunque.KnowledgeKB.ImportRepo",
+        "updateSource": "yunque.KnowledgeKB.UpdateSource",
+        "deleteSource": "yunque.KnowledgeKB.DeleteSource"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "search": "yunque.knowledge_base.search",
+        "sources": "yunque.knowledge_base.sources",
+        "stats": "yunque.knowledge_base.stats",
+        "ingest": "yunque.knowledge_base.ingest",
+        "importUrl": "yunque.knowledge_base.import_url",
+        "importRepo": "yunque.knowledge_base.import_repo",
+        "updateSource": "yunque.knowledge_base.update_source",
+        "deleteSource": "yunque.knowledge_base.delete_source"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "search": "KnowledgeClient::search",
+        "sources": "KnowledgeClient::sources",
+        "stats": "KnowledgeClient::stats",
+        "ingest": "KnowledgeClient::ingest",
+        "importUrl": "KnowledgeClient::import_url",
+        "importRepo": "KnowledgeClient::import_repo",
+        "updateSource": "KnowledgeClient::update_source",
+        "deleteSource": "KnowledgeClient::delete_source"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

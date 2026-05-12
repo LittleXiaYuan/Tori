@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -16,6 +16,7 @@
     "trigger-automation",
     "memory-kernel",
     "knowledge-graph",
+    "knowledge-base",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -52,6 +53,10 @@
       "description": "Access the lightweight host Knowledge Graph client or namespace."
     },
     {
+      "name": "knowledge",
+      "description": "Access the lightweight host Knowledge Base client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -77,7 +82,8 @@
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory",
-        "graph": "AgentKit.graph"
+        "graph": "AgentKit.graph",
+        "knowledge": "AgentKit.knowledge"
       }
     },
     "go": {
@@ -100,7 +106,8 @@
         "triggers": "AgentKit.Triggers",
         "plugin": "AgentKit.Plugin",
         "memory": "AgentKit.MemoryCore",
-        "graph": "AgentKit.Graph"
+        "graph": "AgentKit.Graph",
+        "knowledge": "AgentKit.KnowledgeKB"
       }
     },
     "python": {
@@ -123,7 +130,8 @@
         "triggers": "AgentKit.triggers",
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory_core",
-        "graph": "AgentKit.graph"
+        "graph": "AgentKit.graph",
+        "knowledge": "AgentKit.knowledge_base"
       }
     },
     "rust": {
@@ -146,7 +154,8 @@
         "triggers": "AgentKit::triggers",
         "plugin": "AgentKit::plugin",
         "memory": "AgentKit::memory",
-        "graph": "AgentKit::graph"
+        "graph": "AgentKit::graph",
+        "knowledge": "AgentKit::knowledge"
       }
     }
   },
