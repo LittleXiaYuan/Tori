@@ -523,6 +523,22 @@
       "types": "./src/workflow-runs.ts",
       "import": "./src/workflow-runs.ts"
     },
+    "./workflow-read": {
+      "types": "./src/workflow-read.ts",
+      "import": "./src/workflow-read.ts"
+    },
+    "./workflow-write": {
+      "types": "./src/workflow-write.ts",
+      "import": "./src/workflow-write.ts"
+    },
+    "./workflow-run": {
+      "types": "./src/workflow-run.ts",
+      "import": "./src/workflow-run.ts"
+    },
+    "./workflow-instances": {
+      "types": "./src/workflow-instances.ts",
+      "import": "./src/workflow-instances.ts"
+    },
     "./cost": {
       "types": "./src/cost.ts",
       "import": "./src/cost.ts"
