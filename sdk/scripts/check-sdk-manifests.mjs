@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const checks = [
+  ["Reactions SDK manifest", "sdk/scripts/check-reactions-sdk-manifest.mjs"],
   ["Instructions SDK manifest", "sdk/scripts/check-instructions-sdk-manifest.mjs"],
   ["Emotion SDK manifest", "sdk/scripts/check-emotion-sdk-manifest.mjs"],
   ["Audit SDK manifest", "sdk/scripts/check-audit-sdk-manifest.mjs"],

@@ -608,6 +608,28 @@ conversations = _ConversationsNamespace()
 # ── Persona identity, skills, and presets (/v1/persona*) ──
 
 
+
+# ── Reactions and sticker send (/v1/react, /v1/sticker/send) ──
+
+class _ReactionsNamespace:
+    """Lightweight helpers for emoji reactions and sticker sending."""
+
+    def react(self, channel_type: str, target: str, message_id: str, emoji: str = "") -> dict:
+        body = {"channel_type": channel_type, "target": target, "message_id": message_id}
+        if emoji:
+            body["emoji"] = emoji
+        return _api_call("POST", "/v1/react", body)
+
+    def send_sticker(self, channel_type: str, target: str, package_id: str = "", sticker_id: str = "", file_id: str = "", emoji: str = "", platform: str = "") -> dict:
+        body = {"channel_type": channel_type, "target": target}
+        for key, value in {"package_id": package_id, "sticker_id": sticker_id, "file_id": file_id, "emoji": emoji, "platform": platform}.items():
+            if value:
+                body[key] = value
+        return _api_call("POST", "/v1/sticker/send", body)
+
+
+reactions = _ReactionsNamespace()
+
 # ── User instructions (/v1/instructions) ──
 
 class _InstructionsNamespace:
@@ -2176,6 +2198,7 @@ class AgentKit:
         self.persona = persona
         self.emotion = emotion
         self.instructions = instructions
+        self.reactions = reactions
         self.plugin = plugin
         self.memory = memory
         self.agent_memory = agent_memory

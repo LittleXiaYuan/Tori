@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "reactions-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for emoji reactions and sticker sending without importing the full platform client.",
+  "principles": [
+    "Expose message reactions and sticker sending as a focused SDK slice for external plugin UIs, front-end pages, CLIs, sidecars, and automation scripts.",
+    "Keep reaction and sticker delivery directly callable through existing authenticated /v1/react and /v1/sticker/send routes.",
+    "Make Reactions access available through Agent Kit while keeping the slice independently importable."
+  ],
+  "routes": [
+    "POST /v1/react",
+    "POST /v1/sticker/send"
+  ],
+  "capabilities": [
+    {
+      "name": "react",
+      "route": "POST /v1/react",
+      "readOnly": false,
+      "description": "Add an emoji reaction to a channel message."
+    },
+    {
+      "name": "sendSticker",
+      "route": "POST /v1/sticker/send",
+      "readOnly": false,
+      "description": "Send a sticker or emoji sticker payload through a channel."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/reactions.ts",
+        "sdk/typescript/src/interactions.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "react": "createReactionsClient().react",
+        "sendSticker": "createReactionsClient().sendSticker"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "react": "yunque.Reactions.React",
+        "sendSticker": "yunque.Reactions.SendSticker"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "react": "yunque.reactions.react",
+        "sendSticker": "yunque.reactions.send_sticker"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "react": "ReactionsClient::react",
+        "sendSticker": "ReactionsClient::send_sticker"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

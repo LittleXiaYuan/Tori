@@ -41,6 +41,7 @@
     "persona-runtime",
     "emotion-runtime",
     "user-instructions",
+    "reactions-runtime",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -185,6 +186,10 @@
       "description": "Access the lightweight Instructions client or namespace for user instruction CRUD and ordering."
     },
     {
+      "name": "reactions",
+      "description": "Access the lightweight Reactions client or namespace for emoji reactions and sticker sending."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -268,6 +273,7 @@
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
         "instructions": "AgentKit.instructions",
+        "reactions": "AgentKit.reactions",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -324,6 +330,7 @@
         "persona": "AgentKit.Persona",
         "emotion": "AgentKit.Emotion",
         "instructions": "AgentKit.Instructions",
+        "reactions": "AgentKit.Reactions",
         "reverie": "AgentKit.Reverie",
         "realtime": "AgentKit.Realtime",
         "chat": "AgentKit.Chat",
@@ -380,6 +387,7 @@
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
         "instructions": "AgentKit.instructions",
+        "reactions": "AgentKit.reactions",
         "reverie": "AgentKit.reverie",
         "realtime": "AgentKit.realtime",
         "chat": "AgentKit.chat",
@@ -436,6 +444,7 @@
         "persona": "AgentKit::persona",
         "emotion": "AgentKit::emotion",
         "instructions": "AgentKit::instructions",
+        "reactions": "AgentKit::reactions",
         "reverie": "AgentKit::reverie",
         "realtime": "AgentKit::realtime",
         "chat": "AgentKit::chat",
