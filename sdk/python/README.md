@@ -18,7 +18,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-python-sidecar"
 Use `create_agent_kit()` when an external script wants the common lightweight
 surfaces from one object: State Kernel, Reflection Experience, Mission Parse,
 Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base,
-LoRA, Workflow, Connector, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
+LoRA, Workflow, Connector, Notify, and Plugin API Runtime. It reuses the same module-level helpers and does not pull in a
 generated OpenAPI client.
 
 ```python
@@ -31,10 +31,11 @@ strategies = kit.reflect.strategies(tag="sdk", limit=5)
 mission = kit.missions.parse("每天八点总结昨天的任务")
 scheduler_jobs = kit.scheduler.jobs()
 connector_list = kit.connectors.list()
+notify_channels = kit.notify.channels()
 results = kit.plugin.search("incremental SDK package", limit=5)
 
 kit.memory.set("last_focus", focus)
-print(focus, strategies, mission["type"], scheduler_jobs["count"], len(connector_list["connectors"]), len(results))
+print(focus, strategies, mission["type"], scheduler_jobs["count"], len(connector_list["connectors"]), len(notify_channels["channels"]), len(results))
 ```
 
 ## Mission Parse helpers
@@ -198,6 +199,16 @@ catalog = yunque.connectors.list()
 detail = yunque.connectors.detail("github")
 result = yunque.connectors.execute("github", "create_issue", {"title": "SDK"})
 print(len(catalog["connectors"]), detail["status"], result["ok"])
+```
+
+### Notify runtime 通知运行时切片
+
+Python 脚本、插件处理器或自动化任务可以用 `yunque.notify` 管理通知渠道、发送测试通知并分享任务/会话产物。
+
+```python
+channels = yunque.notify.channels()
+shared = yunque.notify.share("feishu-main", message="任务完成", task_id="task_1")
+print(len(channels["channels"]), shared["ok"])
 ```
 
 ## Triggers 触发器自动化切片

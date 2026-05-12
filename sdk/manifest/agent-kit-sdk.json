@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "agent-kit",
-  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA lifecycle, Workflow orchestration, Connector runtime, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
+  "description": "Cross-language lightweight bundle entrypoints that compose State Kernel, Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel, Knowledge Graph, Knowledge Base, LoRA lifecycle, Workflow orchestration, Connector runtime, Notification runtime, and Plugin API Runtime helpers without importing the generated all-in-one clients.",
   "principles": [
-    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + LoRA + workflows + connectors + plugin runtime.",
+    "Expose the common external automation workflow as one small SDK bundle: state + reflection + mission parse + scheduler + cron + triggers + memory + graph + knowledge + LoRA + workflows + connectors + notify + plugin runtime.",
     "Keep Agent Kit as a thin composition layer over focused SDK slices, not a new platform abstraction.",
     "Guard TypeScript, Go, Python, and Rust bundle entrypoints and docs against drifting apart."
   ],
@@ -20,6 +20,7 @@
     "lora-lifecycle",
     "workflow-orchestration",
     "connector-runtime",
+    "notification-runtime",
     "plugin-api-runtime"
   ],
   "capabilities": [
@@ -72,6 +73,10 @@
       "description": "Access the lightweight host Connector runtime client or namespace."
     },
     {
+      "name": "notify",
+      "description": "Access the lightweight host Notification runtime client or namespace."
+    },
+    {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
     }
@@ -96,6 +101,7 @@
         "cron": "AgentKit.cron",
         "triggers": "AgentKit.triggers",
         "connectors": "AgentKit.connectors",
+        "notify": "AgentKit.notify",
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory",
         "graph": "AgentKit.graph",
@@ -123,6 +129,7 @@
         "cron": "AgentKit.CronSystem",
         "triggers": "AgentKit.Triggers",
         "connectors": "AgentKit.Connectors",
+        "notify": "AgentKit.Notify",
         "plugin": "AgentKit.Plugin",
         "memory": "AgentKit.MemoryCore",
         "graph": "AgentKit.Graph",
@@ -150,6 +157,7 @@
         "cron": "AgentKit.cron_system",
         "triggers": "AgentKit.triggers",
         "connectors": "AgentKit.connectors",
+        "notify": "AgentKit.notify",
         "plugin": "AgentKit.plugin",
         "memory": "AgentKit.memory_core",
         "graph": "AgentKit.graph",
@@ -177,6 +185,7 @@
         "cron": "AgentKit::cron",
         "triggers": "AgentKit::triggers",
         "connectors": "AgentKit::connectors",
+        "notify": "AgentKit::notify",
         "plugin": "AgentKit::plugin",
         "memory": "AgentKit::memory",
         "graph": "AgentKit::graph",

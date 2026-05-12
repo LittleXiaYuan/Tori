@@ -42,6 +42,8 @@ class AgentKitTest(unittest.TestCase):
                 return {"workflows": [{"id": "wf_1", "name": "SDK flow"}], "total": 1}
             if path == "/api/connectors":
                 return {"connectors": [{"id": "github", "name": "GitHub", "supported": True, "status": "connected"}]}
+            if path == "/api/notify/channels":
+                return {"channels": [{"id": "feishu-main", "type": "feishu", "name": "Feishu", "enabled": True}]}
             if path == "/v1/plugin-api/search":
                 return {"results": [{"title": "Agent Kit"}]}
             if path == "/v1/plugin-api/memory/set":
@@ -60,6 +62,7 @@ class AgentKitTest(unittest.TestCase):
             self.assertEqual(kit.lora.status()["active_model"], "adapter-a")
             self.assertEqual(kit.workflows.list()["total"], 1)
             self.assertEqual(kit.connectors.list()["connectors"][0]["id"], "github")
+            self.assertEqual(kit.notify.channels()["channels"][0]["id"], "feishu-main")
             self.assertEqual(kit.plugin.search("agent kit", limit=2)[0]["title"], "Agent Kit")
             kit.memory.set("last", "ok")
 
@@ -73,9 +76,10 @@ class AgentKitTest(unittest.TestCase):
         self.assertIs(kit.lora, yunque.lora)
         self.assertIs(kit.workflows, yunque.workflows)
         self.assertIs(kit.connectors, yunque.connectors)
+        self.assertIs(kit.notify, yunque.notify)
         self.assertIs(kit.plugin, yunque.plugin)
         self.assertIs(kit.memory, yunque.memory)
-        self.assertEqual(calls[10], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
+        self.assertEqual(calls[11], ("POST", "/v1/plugin-api/search", {"query": "agent kit", "limit": 2}))
 
     def test_plugin_runtime_namespace_delegates_extension_registration(self) -> None:
         with patch.object(yunque, "_api_call", return_value={"ok": True, "provider_id": "local"}) as api_call:

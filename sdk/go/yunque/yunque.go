@@ -305,6 +305,7 @@ type AgentKit struct {
 	LoRA        *loRANamespace
 	Workflows   *workflowsNamespace
 	Connectors  *connectorsNamespace
+	Notify      *notifyNamespace
 	Plugin      *pluginRuntimeNamespace
 	Memory      *memoryNamespace
 	AgentMemory *agentMemoryNamespace
@@ -1404,6 +1405,107 @@ func (c *connectorsNamespace) Execute(ctx context.Context, req ConnectorExecuteR
 	return out, nil
 }
 
+// Notify provides focused access to notification channel management and share dispatch APIs.
+var Notify = &notifyNamespace{}
+
+type notifyNamespace struct{}
+
+type NotifyChannel struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	URL     string `json:"url,omitempty"`
+	Secret  string `json:"secret,omitempty"`
+	Enabled bool   `json:"enabled,omitempty"`
+}
+
+type NotifyChannelsResponse struct {
+	Channels []NotifyChannel `json:"channels"`
+}
+
+type NotifyOKResponse struct {
+	OK bool `json:"ok"`
+}
+
+type NotifyToggleRequest struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+}
+
+type NotifyShareFile struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Size int64  `json:"size,omitempty"`
+}
+
+type NotifyShareRequest struct {
+	ChannelID string            `json:"channel_id"`
+	Title     string            `json:"title,omitempty"`
+	Message   string            `json:"message,omitempty"`
+	SessionID string            `json:"session_id,omitempty"`
+	TaskID    string            `json:"task_id,omitempty"`
+	URL       string            `json:"url,omitempty"`
+	Files     []NotifyShareFile `json:"files,omitempty"`
+}
+
+type NotifyShareResponse struct {
+	OK      bool           `json:"ok"`
+	SentAt  string         `json:"sent_at,omitempty"`
+	Share   map[string]any `json:"share,omitempty"`
+	Channel map[string]any `json:"channel,omitempty"`
+}
+
+func (n *notifyNamespace) Channels(ctx context.Context) (NotifyChannelsResponse, error) {
+	var out NotifyChannelsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/notify/channels", nil, &out); err != nil {
+		return NotifyChannelsResponse{}, err
+	}
+	if out.Channels == nil {
+		out.Channels = []NotifyChannel{}
+	}
+	return out, nil
+}
+
+func (n *notifyNamespace) AddChannel(ctx context.Context, channel NotifyChannel) (NotifyOKResponse, error) {
+	var out NotifyOKResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/notify/add", channel, &out); err != nil {
+		return NotifyOKResponse{}, err
+	}
+	return out, nil
+}
+
+func (n *notifyNamespace) RemoveChannel(ctx context.Context, id string) (NotifyOKResponse, error) {
+	var out NotifyOKResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/notify/remove?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return NotifyOKResponse{}, err
+	}
+	return out, nil
+}
+
+func (n *notifyNamespace) ToggleChannel(ctx context.Context, req NotifyToggleRequest) (NotifyOKResponse, error) {
+	var out NotifyOKResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/notify/toggle", req, &out); err != nil {
+		return NotifyOKResponse{}, err
+	}
+	return out, nil
+}
+
+func (n *notifyNamespace) TestChannel(ctx context.Context, id string) (NotifyOKResponse, error) {
+	var out NotifyOKResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/notify/test", map[string]string{"id": id}, &out); err != nil {
+		return NotifyOKResponse{}, err
+	}
+	return out, nil
+}
+
+func (n *notifyNamespace) Share(ctx context.Context, req NotifyShareRequest) (NotifyShareResponse, error) {
+	var out NotifyShareResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/notify/share", req, &out); err != nil {
+		return NotifyShareResponse{}, err
+	}
+	return out, nil
+}
+
 // ── Prompt Scheduler ──
 
 // Scheduler provides focused access to prompt-based recurring jobs.
@@ -1479,6 +1581,7 @@ func NewAgentKit() AgentKit {
 		LoRA:        LoRA,
 		Workflows:   Workflows,
 		Connectors:  Connectors,
+		Notify:      Notify,
 		Plugin:      Plugin,
 		Memory:      Memory,
 		AgentMemory: AgentMemory,

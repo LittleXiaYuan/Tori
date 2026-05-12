@@ -272,6 +272,8 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 			_, _ = w.Write([]byte(`{"workflows":[{"id":"wf_1","name":"SDK flow"}],"total":1}`))
 		case "/api/connectors":
 			_, _ = w.Write([]byte(`{"connectors":[{"id":"github","name":"GitHub","supported":true,"status":"connected"}]}`))
+		case "/api/notify/channels":
+			_, _ = w.Write([]byte(`{"channels":[{"id":"feishu-main","type":"feishu","name":"Feishu","enabled":true}]}`))
 		case "/v1/plugin-api/search":
 			_, _ = w.Write([]byte(`{"results":[{"title":"Agent Kit","url":"https://example.test","snippet":"ok"}]}`))
 		case "/v1/plugin-api/memory/set":
@@ -330,6 +332,10 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	notifyChannels, err := kit.Notify.Channels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := kit.Plugin.Search(context.Background(), "agent kit", 2)
 	if err != nil {
 		t.Fatal(err)
@@ -338,14 +344,14 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(results) != 1 || results[0].Title != "Agent Kit" {
+	if focus != "sdk" || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || len(results) != 1 || results[0].Title != "Agent Kit" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Plugin != Plugin || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 14 {
-		t.Fatalf("expected 14 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 15 {
+		t.Fatalf("expected 15 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -744,6 +750,85 @@ func TestConnectorsNamespaceManagesCatalogAuthAndActions(t *testing.T) {
 	}
 	if len(seen) != 5 {
 		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestNotifyNamespaceManagesChannelsAndShare(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/notify/channels":
+			_, _ = w.Write([]byte(`{"channels":[{"id":"feishu-main","type":"feishu","name":"Feishu","enabled":true}]}`))
+		case "/api/notify/add":
+			var body NotifyChannel
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ID != "feishu-main" || body.Type != "feishu" {
+				t.Fatalf("unexpected add body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/api/notify/remove":
+			if r.URL.Query().Get("id") != "feishu-main" {
+				t.Fatalf("unexpected remove query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/api/notify/toggle":
+			var body NotifyToggleRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ID != "feishu-main" || body.Enabled {
+				t.Fatalf("unexpected toggle body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/api/notify/test":
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case "/api/notify/share":
+			var body NotifyShareRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.ChannelID != "feishu-main" || body.Message != "done" {
+				t.Fatalf("unexpected share body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"ok":true,"sent_at":"2026-05-12T00:00:00Z","share":{"code":"yq_abc"},"channel":{"id":"feishu-main"}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	channels, err := Notify.Channels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, err := Notify.AddChannel(context.Background(), NotifyChannel{ID: "feishu-main", Type: "feishu", Name: "Feishu"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Notify.RemoveChannel(context.Background(), "feishu-main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	toggled, err := Notify.ToggleChannel(context.Background(), NotifyToggleRequest{ID: "feishu-main", Enabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tested, err := Notify.TestChannel(context.Background(), "feishu-main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := Notify.Share(context.Background(), NotifyShareRequest{ChannelID: "feishu-main", Message: "done"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if channels.Channels[0].ID != "feishu-main" || !added.OK || !removed.OK || !toggled.OK || !tested.OK || shared.Share["code"] != "yq_abc" {
+		t.Fatalf("unexpected notify results")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
 

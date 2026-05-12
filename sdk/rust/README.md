@@ -103,7 +103,7 @@ cargo check     # quick verification
 Use `AgentKit` when a Rust CLI, sidecar, plugin runner, or automation binary
 wants the common SDK-first surfaces from one object: State Kernel, Reflection
 Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
-Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, and Plugin API Runtime. It composes the hand-written lightweight
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, and Plugin API Runtime. It composes the hand-written lightweight
 clients and does not import the generated all-in-one API surface.
 
 ```rust
@@ -126,9 +126,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mission = kit.missions.parse("每天八点总结昨天的任务").await?;
     let jobs = kit.scheduler.jobs().await?;
     let connectors = kit.connectors.list().await?;
+    let channels = kit.notify.channels().await?;
     let search = kit.plugin.search("incremental SDK package", 5).await?;
 
-    println!("{} {} {} {} {} {}", focus, strategies, mission.r#type, jobs.count, connectors.connectors.len(), search.results.len());
+    println!("{} {} {} {} {} {} {}", focus, strategies, mission.r#type, jobs.count, connectors.connectors.len(), channels.channels.len(), search.results.len());
     Ok(())
 }
 ```
@@ -432,4 +433,22 @@ let executed = connectors.execute(&ConnectorExecuteRequest {
     params: serde_json::Map::new(),
 }).await?;
 println!("{} {} {}", catalog.connectors.len(), detail.status, executed.ok);
+```
+
+### Notify runtime helper
+
+Rust CLI、sidecar、插件运行器或自动化二进制可以用 `NotifyClient` 管理通知渠道、发送测试通知并分享任务/会话产物。
+
+```rust
+use yunque_client::{NotifyClient, NotifyShareRequest};
+
+let notify = NotifyClient::new("http://localhost:9090", "<plugin-or-api-token>")?;
+let channels = notify.channels().await?;
+let shared = notify.share(&NotifyShareRequest {
+    channel_id: "feishu-main".to_string(),
+    message: "任务完成".to_string(),
+    task_id: "task_1".to_string(),
+    ..NotifyShareRequest::default()
+}).await?;
+println!("{} {}", channels.channels.len(), shared.ok);
 ```

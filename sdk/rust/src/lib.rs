@@ -836,6 +836,76 @@ pub struct ConnectorExecuteResponse {
     pub result: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyChannel {
+    pub id: String,
+    pub r#type: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub url: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub secret: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyChannelsResponse {
+    #[serde(default)]
+    pub channels: Vec<NotifyChannel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyOkResponse {
+    #[serde(default)]
+    pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyToggleRequest {
+    pub id: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyShareFile {
+    pub name: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub size: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyShareRequest {
+    pub channel_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub message: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub task_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<NotifyShareFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct NotifyShareResponse {
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub sent_at: String,
+    #[serde(default)]
+    pub share: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    pub channel: serde_json::Map<String, serde_json::Value>,
+}
+
 pub type LoRAStatusResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRAHistoryResponse = serde_json::Map<String, serde_json::Value>;
 pub type LoRASummaryResponse = serde_json::Map<String, serde_json::Value>;
@@ -1304,6 +1374,7 @@ pub struct AgentKit {
     pub lora: LoRAClient,
     pub workflows: WorkflowClient,
     pub connectors: ConnectorsClient,
+    pub notify: NotifyClient,
     pub plugin: PluginApiClient,
 }
 
@@ -1339,6 +1410,7 @@ impl AgentKit {
             lora: LoRAClient::new(base_url.clone(), token.as_ref())?,
             workflows: WorkflowClient::new(base_url.clone(), token.as_ref())?,
             connectors: ConnectorsClient::new(base_url.clone(), token.as_ref())?,
+            notify: NotifyClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
         })
     }
@@ -1364,6 +1436,7 @@ impl AgentKit {
             lora: LoRAClient::new_with_client(base_url.clone(), plugin_http.clone()),
             workflows: WorkflowClient::new_with_client(base_url.clone(), plugin_http.clone()),
             connectors: ConnectorsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            notify: NotifyClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url, plugin_http),
         }
     }
@@ -2097,6 +2170,131 @@ impl ConnectorsClient {
     ) -> Result<ConnectorExecuteResponse, reqwest::Error> {
         self.http
             .post(self.url("/api/connectors/execute"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+/// Small Rust helper over notification channels, tests, and share dispatch endpoints.
+#[derive(Debug, Clone)]
+pub struct NotifyClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl NotifyClient {
+    pub fn new(
+        base_url: impl Into<String>,
+        token: impl AsRef<str>,
+    ) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: trim_base_url(base_url.into()),
+            http,
+        }
+    }
+
+    pub async fn channels(&self) -> Result<NotifyChannelsResponse, reqwest::Error> {
+        self.http
+            .get(self.url("/api/notify/channels"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn add_channel(
+        &self,
+        channel: &NotifyChannel,
+    ) -> Result<NotifyOkResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/notify/add"))
+            .json(channel)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn remove_channel(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<NotifyOkResponse, reqwest::Error> {
+        self.http
+            .post(self.url(&format!(
+                "/api/notify/remove?id={}",
+                url_encode_query_component(id.as_ref())
+            )))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn toggle_channel(
+        &self,
+        request: &NotifyToggleRequest,
+    ) -> Result<NotifyOkResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/notify/toggle"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn test_channel(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<NotifyOkResponse, reqwest::Error> {
+        #[derive(Serialize)]
+        struct TestRequest<'a> {
+            id: &'a str,
+        }
+        self.http
+            .post(self.url("/api/notify/test"))
+            .json(&TestRequest { id: id.as_ref() })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn share(
+        &self,
+        request: &NotifyShareRequest,
+    ) -> Result<NotifyShareResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/api/notify/share"))
             .json(request)
             .send()
             .await?
@@ -3246,6 +3444,10 @@ mod tests {
             "http://localhost:9090/api/connectors"
         );
         assert_eq!(
+            kit.notify.url("/api/notify/channels"),
+            "http://localhost:9090/api/notify/channels"
+        );
+        assert_eq!(
             kit.plugin.url("/v1/plugin-api/search"),
             "http://localhost:9090/v1/plugin-api/search"
         );
@@ -3471,6 +3673,40 @@ mod tests {
         assert_eq!(
             client.url("/api/connectors"),
             "http://localhost:9090/api/connectors"
+        );
+    }
+
+    #[test]
+    fn notify_types_deserialize_incremental_bodies() {
+        let channels: NotifyChannelsResponse = serde_json::from_str(
+            r#"{"channels":[{"id":"feishu-main","type":"feishu","name":"Feishu","enabled":true}]}"#,
+        )
+        .unwrap();
+        assert_eq!(channels.channels[0].id, "feishu-main");
+        assert_eq!(channels.channels[0].r#type, "feishu");
+
+        let share: NotifyShareResponse = serde_json::from_str(
+            r#"{"ok":true,"sent_at":"2026-05-12T00:00:00Z","share":{"code":"yq_abc"},"channel":{"id":"feishu-main"}}"#,
+        )
+        .unwrap();
+        assert!(share.ok);
+        assert_eq!(share.share["code"], "yq_abc");
+
+        let request = NotifyShareRequest {
+            channel_id: "feishu-main".to_string(),
+            message: "done".to_string(),
+            ..NotifyShareRequest::default()
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["channel_id"], "feishu-main");
+
+        let client = NotifyClient::new_with_client(
+            "http://localhost:9090/",
+            reqwest::Client::new(),
+        );
+        assert_eq!(
+            client.url("/api/notify/channels"),
+            "http://localhost:9090/api/notify/channels"
         );
     }
 

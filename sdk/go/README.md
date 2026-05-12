@@ -21,7 +21,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
 Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
-Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, and Plugin API Runtime. It reuses the same small
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -35,10 +35,11 @@ strategies, err := kit.Reflect.StrategiesWithOptions(ctx, yunque.ReflectStrategy
 mission, err := kit.Missions.Parse(ctx, "每天八点总结昨天的任务")
 schedulerJobs, err := kit.Scheduler.Jobs(ctx)
 connectorList, err := kit.Connectors.List(ctx)
+notifyChannels, err := kit.Notify.Channels(ctx)
 results, err := kit.Plugin.Search(ctx, "incremental SDK package", 5)
 err = kit.Memory.Set(ctx, "last_focus", focus)
 
-fmt.Println(focus, strategies, mission.Type, schedulerJobs.Count, len(connectorList.Connectors), len(results))
+fmt.Println(focus, strategies, mission.Type, schedulerJobs.Count, len(connectorList.Connectors), len(notifyChannels.Channels), len(results))
 ```
 
 ## Mission Parse helpers
@@ -239,6 +240,20 @@ executed, err := yunque.Connectors.Execute(ctx, yunque.ConnectorExecuteRequest{
     Params:      map[string]any{"title": "SDK"},
 })
 fmt.Println(len(catalog.Connectors), detail.Status, executed.OK)
+```
+
+### Notify runtime 通知运行时切片
+
+Go sidecar、CLI 或自动化二进制可以用 `yunque.Notify` 管理通知渠道、发送测试通知并分享任务/会话产物。
+
+```go
+channels, err := yunque.Notify.Channels(ctx)
+shared, err := yunque.Notify.Share(ctx, yunque.NotifyShareRequest{
+    ChannelID: "feishu-main",
+    Message:   "任务完成",
+    TaskID:    "task_1",
+})
+fmt.Println(len(channels.Channels), shared.OK)
 ```
 
 ## Triggers 触发器自动化切片
