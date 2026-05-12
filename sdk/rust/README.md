@@ -560,3 +560,7 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Persona SDK
 
 `PersonaClient` is the Rust lightweight persona SDK slice. It wraps persona identity reads/updates, persona skills, persona presets, custom preset management, and feature flags through `/v1/persona*`; `AgentKit::new(...).persona` composes it with the other incremental clients.
+
+### Emotion SDK
+
+The lightweight Emotion SDK exposes emotion history and emotion stickers for external plugin UIs, front-end admin pages, CLIs, and automation scripts. Use it to read `/v1/emotion/history`, export `/v1/emotion/stickers`, register sticker mappings, or clear stale mappings without pulling in the full platform backend.

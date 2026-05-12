@@ -380,3 +380,7 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 ### Persona SDK
 
 `yunque.Persona` keeps persona identity, persona skills, persona presets, custom presets, and preset feature flags available to Go sidecars and CLIs without a generated platform client. `NewAgentKit().Persona` points to the same lightweight namespace for `/v1/persona*` operations.
+
+### Emotion SDK
+
+The lightweight Emotion SDK exposes emotion history and emotion stickers for external plugin UIs, front-end admin pages, CLIs, and automation scripts. Use it to read `/v1/emotion/history`, export `/v1/emotion/stickers`, register sticker mappings, or clear stale mappings without pulling in the full platform backend.

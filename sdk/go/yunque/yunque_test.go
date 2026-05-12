@@ -161,6 +161,54 @@ func TestEventsHelpers(t *testing.T) {
 	}
 }
 
+func TestEmotionHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/emotion/history":
+			if r.URL.Query().Get("session_id") != "s1" || r.URL.Query().Get("limit") != "5" {
+				t.Fatalf("unexpected emotion query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"entries":[{"emotion":"happy"}],"total":1}`))
+		case "/v1/emotion/stickers":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"happy":{"wechat":[{"package_id":"p1","sticker_id":"s1"}]}}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	history, err := Emotion.History(ctx, EmotionHistoryOptions{SessionID: "s1", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stickers, err := Emotion.Stickers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registered, err := Emotion.RegisterStickers(ctx, RegisterStickersRequest{Platform: "wechat", Emotion: "happy", Stickers: []StickerSuggestion{{PackageID: "p1", StickerID: "s1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := Emotion.ClearStickers(ctx, ClearStickersRequest{Platform: "wechat", Emotion: "happy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if history["total"].(float64) != 1 || stickers["happy"] == nil || registered["status"] != "ok" || cleared["status"] != "ok" || NewAgentKit().Emotion != Emotion {
+		t.Fatalf("unexpected emotion results")
+	}
+	if len(seen) != 4 || seen[0] != "GET /v1/emotion/history?limit=5&session_id=s1" || seen[1] != "GET /v1/emotion/stickers" || seen[2] != "PUT /v1/emotion/stickers" || seen[3] != "DELETE /v1/emotion/stickers" {
+		t.Fatalf("unexpected emotion requests: %v", seen)
+	}
+}
+
 func TestPersonaHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
