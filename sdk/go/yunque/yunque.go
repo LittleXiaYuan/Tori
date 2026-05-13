@@ -418,8 +418,12 @@ var Skills = &skillsNamespace{}
 // SkillsCatalog exposes the read-only runtime skills catalog as a standalone slice.
 var SkillsCatalog = &skillsCatalogNamespace{}
 
+// SkillsScan exposes runtime skill scanning as a standalone operator slice.
+var SkillsScan = &skillsScanNamespace{}
+
 type skillsNamespace struct{}
 type skillsCatalogNamespace struct{}
+type skillsScanNamespace struct{}
 type SkillsResponse map[string]any
 
 func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
@@ -432,6 +436,10 @@ func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
 
 func (s *skillsCatalogNamespace) List(ctx context.Context) (SkillsResponse, error) {
 	return Skills.List(ctx)
+}
+
+func (s *skillsScanNamespace) Scan(ctx context.Context) (SkillsResponse, error) {
+	return Skills.Scan(ctx)
 }
 
 func (s *skillsNamespace) Scan(ctx context.Context) (SkillsResponse, error) {
@@ -1495,6 +1503,7 @@ type AgentKit struct {
 	PluginUI      *pluginUINamespace
 	Skills        *skillsNamespace
 	SkillsCatalog *skillsCatalogNamespace
+	SkillsScan    *skillsScanNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
 	Fork          *forkNamespace
@@ -6762,6 +6771,7 @@ func NewAgentKit() AgentKit {
 		PluginUI:      PluginUI,
 		Skills:        Skills,
 		SkillsCatalog: SkillsCatalog,
+		SkillsScan:    SkillsScan,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,
 		Fork:          Fork,

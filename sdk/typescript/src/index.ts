@@ -16,3 +16,5 @@ export * from './review';
 export * from './runtime-queue';
 export * from './plugin-ui';
 export * from './skills-catalog';
+
+export * from './skills-scan';
