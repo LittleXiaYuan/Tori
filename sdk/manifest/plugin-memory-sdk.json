@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "domain": "plugin-memory",
+  "description": "Cross-language lightweight SDK for plugin-private KV memory without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose plugin-private memory as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep get/set/delete/list/search directly callable through existing plugin-authenticated runtime routes.",
+    "Make PluginMemory available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/memory/get",
+    "POST /v1/plugin-api/memory/set",
+    "POST /v1/plugin-api/memory/delete",
+    "POST /v1/plugin-api/memory/list",
+    "POST /v1/plugin-api/memory/search"
+  ],
+  "capabilities": [
+    {
+      "name": "get",
+      "route": "POST /v1/plugin-api/memory/get",
+      "readOnly": true,
+      "description": "Read a plugin-private memory value."
+    },
+    {
+      "name": "set",
+      "route": "POST /v1/plugin-api/memory/set",
+      "readOnly": false,
+      "description": "Write a plugin-private memory value."
+    },
+    {
+      "name": "delete",
+      "route": "POST /v1/plugin-api/memory/delete",
+      "readOnly": false,
+      "description": "Delete a plugin-private memory value."
+    },
+    {
+      "name": "list",
+      "route": "POST /v1/plugin-api/memory/list",
+      "readOnly": true,
+      "description": "List plugin-private memory entries."
+    },
+    {
+      "name": "search",
+      "route": "POST /v1/plugin-api/memory/search",
+      "readOnly": true,
+      "description": "Search plugin-private memory entries."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-memory.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "get": "createPluginMemoryClient().get",
+        "set": "createPluginMemoryClient().set",
+        "delete": "createPluginMemoryClient().delete",
+        "list": "createPluginMemoryClient().list",
+        "search": "createPluginMemoryClient().search"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "get": "yunque.PluginMemory.Get",
+        "set": "yunque.PluginMemory.Set",
+        "delete": "yunque.PluginMemory.Delete",
+        "list": "yunque.PluginMemory.List",
+        "search": "yunque.PluginMemory.Search"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "get": "yunque.plugin_memory.get",
+        "set": "yunque.plugin_memory.set",
+        "delete": "yunque.plugin_memory.delete",
+        "list": "yunque.plugin_memory.list",
+        "search": "yunque.plugin_memory.search"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "get": "PluginMemoryClient::get",
+        "set": "PluginMemoryClient::set",
+        "delete": "PluginMemoryClient::delete",
+        "list": "PluginMemoryClient::list",
+        "search": "PluginMemoryClient::search"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

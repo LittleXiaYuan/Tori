@@ -27,3 +27,5 @@ export * from './plugin-folder';
 export * from './plugin-search';
 export * from './plugin-send';
 export * from './plugin-llm';
+
+export * from './plugin-memory';
