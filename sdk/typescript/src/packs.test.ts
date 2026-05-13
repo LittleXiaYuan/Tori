@@ -1,0 +1,21 @@
+import { createPacksClient, PacksClientError } from "./packs";
+
+declare const process: { exitCode?: number };
+function assert(condition: unknown, message?: string): asserts condition { if (!condition) throw new Error(message || "assertion failed"); }
+function assertEqual(actual: unknown, expected: unknown, message?: string): void { if (actual !== expected) throw new Error(message || `expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`); }
+const tests: Array<{ name: string; fn: () => Promise<void> | void }> = [];
+function test(name: string, fn: () => Promise<void> | void): void { tests.push({ name, fn }); }
+function jsonResponse(body: unknown, init?: ResponseInit): Response { return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" }, ...init }); }
+
+const backupPack = { manifest: { id: "yunque.pack.backup", name: "Backup Pack", version: "0.1.0", frontend: { menus: [{ key: "backup", label: "备份恢复", path: "/packs/backup", order: 90 }], routes: [{ path: "/packs/backup", component: "backup/BackupPage" }] }, sdk: { typescript: "yunque-client/backup" } }, status: "enabled" };
+
+test("PacksClient lists installed packs for frontend sync", async () => { const calls: { url: string; init?: RequestInit }[] = []; const client = createPacksClient({ baseUrl: "http://localhost:9090/", token: "jwt", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ packs: [backupPack], enabled: [backupPack], count: 1 }); } }); const installed = await client.installed(); assertEqual(installed.count, 1); assertEqual(installed.packs[0]?.manifest.sdk?.typescript, "yunque-client/backup"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/packs/installed"); assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt"); });
+
+test("PacksClient mutates pack status with API key", async () => { const calls: { url: string; init?: RequestInit }[] = []; const client = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "key-1", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse({ pack: { ...backupPack, status: "disabled" }, status: "disabled" }); } }); const disabled = await client.disable("yunque.pack.backup"); assertEqual(disabled.status, "disabled"); assertEqual(calls[0]?.url, "http://localhost:9090/v1/packs/disable"); assertEqual(calls[0]?.init?.body, JSON.stringify({ id: "yunque.pack.backup" })); assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-1"); });
+
+test("PacksClient builds frontend menus and routes from enabled packs", async () => { const client = createPacksClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ packs: [backupPack], count: 1 }) }); const sync = await client.frontendSync(); assertEqual(sync.menus[0]?.label, "备份恢复"); assertEqual(sync.routes[0]?.component, "backup/BackupPage"); assertEqual(sync.packs[0]?.manifest.id, "yunque.pack.backup"); });
+
+test("PacksClient reads nested gateway error messages", async () => { const client = createPacksClient({ baseUrl: "http://localhost:9090", fetch: async () => jsonResponse({ error: { code: "PACK_MISSING", message: "pack not installed" } }, { status: 404 }) }); try { await client.enable("missing"); throw new Error("expected enable to reject"); } catch (error) { assert(error instanceof PacksClientError); assertEqual(error.status, 404); assertEqual(error.message, "pack not installed"); } });
+
+let failures = 0; for (const { name, fn } of tests) { try { await fn(); console.log(`ok - ${name}`); } catch (error) { failures += 1; console.error(`not ok - ${name}`); console.error(error); } }
+if (failures > 0) process.exitCode = 1; else console.log(`1..${tests.length}`);

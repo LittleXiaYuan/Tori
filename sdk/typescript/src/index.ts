@@ -5,6 +5,7 @@ export * from './settings';
 export * from './tori';
 export { BackupClient, BackupClientError, createBackupClient } from './backup';
 export type { BackupClientOptions } from './backup';
+export * from './packs';
 export { UploadClient, UploadClientError, createUploadClient } from './upload';
 export type { UploadAction, UploadClientOptions, UploadParseMetadata, UploadRequest, UploadResponse as UploadFileResponse } from './upload';
 export { SpeechClient, SpeechClientError, createSpeechClient } from './speech';
