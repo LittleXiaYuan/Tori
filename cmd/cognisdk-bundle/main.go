@@ -55,6 +55,21 @@ func run(args []string) error {
 		}
 		return cognisdk.SavePackBundle(bundle, args[1])
 
+	case "digest":
+		if len(args) != 2 {
+			return fmt.Errorf("usage: cognisdk-bundle digest <bundle.json>")
+		}
+		bundle, err := cognisdk.LoadPackBundle(args[1])
+		if err != nil {
+			return err
+		}
+		digest, err := cognisdk.DigestPackBundle(*bundle)
+		if err != nil {
+			return err
+		}
+		fmt.Println(digest)
+		return nil
+
 	case "inspect":
 		if len(args) != 2 {
 			return fmt.Errorf("usage: cognisdk-bundle inspect <bundle.json> [--markdown]")
@@ -218,6 +233,7 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
+	fmt.Println("  cognisdk-bundle digest <bundle.json>")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")

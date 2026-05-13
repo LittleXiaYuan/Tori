@@ -129,3 +129,17 @@ func TestRunInspectBundle(t *testing.T) {
 		t.Fatalf("inspect bundle markdown: %v", err)
 	}
 }
+
+func TestRunDigestBundle(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.json")
+	if err := run([]string{"init", bundlePath, "--builtin"}); err != nil {
+		t.Fatalf("init bundle: %v", err)
+	}
+	if err := run([]string{"digest", bundlePath}); err != nil {
+		t.Fatalf("digest bundle: %v", err)
+	}
+	if err := run([]string{"digest"}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle digest") {
+		t.Fatalf("expected digest usage error, got %v", err)
+	}
+}

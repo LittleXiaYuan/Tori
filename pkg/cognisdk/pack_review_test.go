@@ -92,6 +92,8 @@ func TestRenderPackBundleReviewMarkdown(t *testing.T) {
 	review := PackBundleReview{
 		FromID:           "current",
 		CandidateID:      "candidate",
+		FromDigest:       "sha256:current",
+		CandidateDigest:  "sha256:candidate",
 		Outcome:          PackBundleReviewReady,
 		Reason:           "ok",
 		RollbackBundleID: "current",
@@ -99,7 +101,7 @@ func TestRenderPackBundleReviewMarkdown(t *testing.T) {
 		GoldenTests:      GoldenTestSummary{Passed: 1},
 	}
 	markdown := RenderPackBundleReviewMarkdown(review)
-	for _, want := range []string{"Cogni Pack Bundle Review", "outcome: ready", "rollback_bundle: current", "Cogni Pack Bundle Diff", "Cogni Pack Golden Tests"} {
+	for _, want := range []string{"Cogni Pack Bundle Review", "outcome: ready", "current_digest: sha256:current", "candidate_digest: sha256:candidate", "rollback_bundle: current", "Cogni Pack Bundle Diff", "Cogni Pack Golden Tests"} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("review markdown missing %q:\n%s", want, markdown)
 		}

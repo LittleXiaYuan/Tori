@@ -158,6 +158,7 @@
       "file": "cmd/cognisdk-bundle/main.go",
       "commands": [
         "init",
+        "digest",
         "inspect",
         "diff",
         "golden",

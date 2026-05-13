@@ -117,7 +117,7 @@ func TestSummarizePackBundle(t *testing.T) {
 		t.Fatalf("expected bundle digest: %#v", summary)
 	}
 	markdown := RenderPackBundleSummaryMarkdown(summary)
-	for _, want := range []string{"Cogni Pack Bundle Summary", "enabled: 1", PackXiaoyuCompanion} {
+	for _, want := range []string{"Cogni Pack Bundle Summary", "digest: sha256:", "enabled: 1", PackXiaoyuCompanion} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("summary markdown missing %q:\n%s", want, markdown)
 		}
