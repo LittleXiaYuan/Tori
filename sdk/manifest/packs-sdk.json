@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "domain": "packs",
+  "description": "Lightweight Pack Runtime SDK for installed/enabled pack registry access, pack installation lifecycle, rollback, and frontend shell synchronization without importing the full platform client.",
+  "principles": [
+    "Expose Pack Runtime as the stable integration surface for external frontends, plugins, CLIs, sidecars, and automation scripts.",
+    "Keep optional capabilities discoverable through the backend pack registry instead of hard-coding every feature into the main system.",
+    "Let frontend shells synchronize menus, routes, UI resources, and SDK entrypoints from enabled packs while preserving enable, disable, and rollback controls."
+  ],
+  "routes": [
+    "GET /v1/packs",
+    "GET /v1/packs/installed",
+    "GET /v1/packs/enabled",
+    "POST /v1/packs/install",
+    "POST /v1/packs/enable",
+    "POST /v1/packs/disable",
+    "POST /v1/packs/rollback"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/packs",
+      "readOnly": true,
+      "description": "Read installed packs with enabled-pack summary for operator consoles."
+    },
+    {
+      "name": "installed",
+      "route": "GET /v1/packs/installed",
+      "readOnly": true,
+      "description": "Read the local installed pack registry."
+    },
+    {
+      "name": "enabled",
+      "route": "GET /v1/packs/enabled",
+      "readOnly": true,
+      "description": "Read enabled packs that should contribute frontend menus, routes, UI assets, and SDK entrypoints."
+    },
+    {
+      "name": "install",
+      "route": "POST /v1/packs/install",
+      "readOnly": false,
+      "description": "Install a pack from a local manifest path or manifest URL."
+    },
+    {
+      "name": "enable",
+      "route": "POST /v1/packs/enable",
+      "readOnly": false,
+      "description": "Enable an installed pack and make its backend/frontend capabilities active."
+    },
+    {
+      "name": "disable",
+      "route": "POST /v1/packs/disable",
+      "readOnly": false,
+      "description": "Disable an installed pack without deleting it from the local registry."
+    },
+    {
+      "name": "rollback",
+      "route": "POST /v1/packs/rollback",
+      "readOnly": false,
+      "description": "Rollback an installed pack to its previous version metadata when available."
+    },
+    {
+      "name": "frontendSync",
+      "route": "GET /v1/packs/enabled",
+      "readOnly": true,
+      "description": "Build frontend shell menus and routes from enabled pack manifests."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/packs.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createPacksClient().list",
+        "installed": "createPacksClient().installed",
+        "enabled": "createPacksClient().enabled",
+        "install": "createPacksClient().install",
+        "enable": "createPacksClient().enable",
+        "disable": "createPacksClient().disable",
+        "rollback": "createPacksClient().rollback",
+        "frontendSync": "createPacksClient().frontendSync"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md",
+    "docs/guide/pack-runtime.md",
+    "docs/zh/guide/pack-runtime.md",
+    "packs/AUTHORING.md"
+  ]
+}
