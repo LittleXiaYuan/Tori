@@ -40,6 +40,7 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 export default function PacksPage() {
   const { data, loading, refresh } = useApiData(async () => api.packsInstalled(), { packs: [], count: 0 });
   const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
+  const [manifestUrl, setManifestUrl] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
   const packs = data?.packs || [];
@@ -64,6 +65,7 @@ export default function PacksPage() {
   };
 
   const install = () => run("install", () => api.packInstall(manifestPath));
+  const installFromURL = () => run("install-url", () => api.packInstallFromURL(manifestUrl));
   const enable = (id: string) => run(`enable:${id}`, () => api.packEnable(id));
   const disable = (id: string) => run(`disable:${id}`, () => api.packDisable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => api.packRollback(id));
@@ -112,14 +114,25 @@ export default function PacksPage() {
             backend registry source-of-truth
           </Chip>
         </div>
-        <div className="flex flex-col md:flex-row gap-3">
-          <TextField value={manifestPath} onChange={(v: string) => setManifestPath(v)} className="flex-1">
-            <Label>manifest_path</Label>
-            <Input placeholder={EXAMPLE_BACKUP_MANIFEST} />
-          </TextField>
-          <Button className="btn-accent md:self-end" isDisabled={!manifestPath || busy === "install"} onPress={install}>
-            <Download size={14} /> 安装 / 更新
-          </Button>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <TextField value={manifestPath} onChange={(v: string) => setManifestPath(v)} className="flex-1">
+              <Label>manifest_path</Label>
+              <Input placeholder={EXAMPLE_BACKUP_MANIFEST} />
+            </TextField>
+            <Button className="btn-accent md:self-end" isDisabled={!manifestPath || busy === "install"} onPress={install}>
+              <Download size={14} /> 安装本地
+            </Button>
+          </div>
+          <div className="flex flex-col md:flex-row gap-3">
+            <TextField value={manifestUrl} onChange={(v: string) => setManifestUrl(v)} className="flex-1">
+              <Label>manifest_url</Label>
+              <Input placeholder="https://packs.example/backup-pack/pack.json" />
+            </TextField>
+            <Button variant="outline" className="md:self-end" isDisabled={!manifestUrl || busy === "install-url"} onPress={installFromURL}>
+              <Download size={14} /> 下载安装
+            </Button>
+          </div>
         </div>
       </Card>
 

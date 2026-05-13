@@ -94,6 +94,45 @@ func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {
 	}
 }
 
+func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	manifest := packruntime.Manifest{
+		ID:           "yunque.pack.remote-backup",
+		Name:         "Remote Backup Pack",
+		Version:      "0.2.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"backup.info"}, Routes: []string{"/v1/backup/info"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "backup", Label: "备份恢复", Path: "/packs/backup"}}},
+		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/backup"},
+		Update:       packruntime.UpdateManifest{Rollback: true},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/pack.json" {
+			t.Fatalf("unexpected manifest URL path: %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(manifest)
+	}))
+	defer srv.Close()
+	gw := NewFromConfig(GatewayConfig{Packs: registry})
+
+	body := bytes.NewBufferString(`{"manifest_url":` + strconv.Quote(srv.URL+"/pack.json") + `}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/install", body)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+	gw.handlePackInstall(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("install status=%d body=%s", w.Code, w.Body.String())
+	}
+	pack, ok := registry.Get("yunque.pack.remote-backup")
+	if !ok || pack.Status != packruntime.PackStatusEnabled || pack.Source != srv.URL+"/pack.json" {
+		t.Fatalf("unexpected downloaded pack: %#v", pack)
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

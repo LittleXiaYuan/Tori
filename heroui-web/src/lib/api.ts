@@ -658,6 +658,8 @@ export const api = {
     fetcher<PackListResponse>("/v1/packs/enabled"),
   packInstall: (manifestPath: string, source?: string) =>
     fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source }) }),
+  packInstallFromURL: (manifestUrl: string, source?: string) =>
+    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_url: manifestUrl, source }) }),
   packEnable: (id: string) =>
     fetcher<PackMutationResponse>("/v1/packs/enable", { method: "POST", body: JSON.stringify({ id }) }),
   packDisable: (id: string) =>
