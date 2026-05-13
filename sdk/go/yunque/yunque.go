@@ -1481,6 +1481,7 @@ type AgentKit struct {
 	Fork          *forkNamespace
 	Cost          *costNamespace
 	Providers     *providersNamespace
+	Breaker       *breakerNamespace
 	Models        *modelsNamespace
 	Cognis        *cognisNamespace
 	Trace         *traceNamespace
@@ -3018,6 +3019,15 @@ var Cost = &costNamespace{}
 
 // Providers provides focused access to LLM provider, model, mode, and breaker endpoints.
 var Providers = &providersNamespace{}
+
+// Breaker provides focused access to LLM circuit-breaker reset operations.
+var Breaker = &breakerNamespace{}
+
+type breakerNamespace struct{}
+
+func (b *breakerNamespace) Reset(ctx context.Context) (ProviderActionResponse, error) {
+	return Providers.ResetBreakers(ctx)
+}
 
 // Models provides focused access to model list, add, and delete helpers.
 var Models = &modelsNamespace{}
@@ -6681,6 +6691,7 @@ func NewAgentKit() AgentKit {
 		Fork:          Fork,
 		Cost:          Cost,
 		Providers:     Providers,
+		Breaker:       Breaker,
 		Models:        Models,
 		Cognis:        Cognis,
 		Trace:         Trace,

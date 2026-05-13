@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "breaker",
+  "description": "Cross-language lightweight SDK entrypoints for resetting host LLM circuit breakers without importing the full providers/platform client.",
+  "principles": [
+    "Expose the circuit-breaker reset as a focused operational SDK slice for admin pages, plugins, CLIs, sidecars, and automation scripts.",
+    "Keep Breaker as a thin facade over the Providers reset operation rather than a new platform abstraction.",
+    "Make the reset operation available through Agent Kit while preserving Providers as the broader LLM-provider slice."
+  ],
+  "routes": [
+    "POST /api/breaker/reset"
+  ],
+  "capabilities": [
+    {
+      "name": "reset",
+      "route": "POST /api/breaker/reset",
+      "readOnly": false,
+      "description": "Reset all configured LLM provider circuit breakers."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/breaker.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "reset": "createBreakerClient().reset"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "reset": "yunque.Breaker.Reset"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "reset": "yunque.breaker.reset"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "reset": "BreakerClient::reset"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

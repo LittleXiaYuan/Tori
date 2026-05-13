@@ -719,3 +719,14 @@ let reply = airi.chat_completions(&AiriChatCompletionRequest {
     ..Default::default()
 }).await?;
 ```
+
+### Lightweight Breaker helper
+
+`BreakerClient` exposes `/api/breaker/reset` for Rust CLIs, sidecars, and automation binaries that need to reset LLM provider circuit breakers without coupling to the full generated client. Agent Kit also exposes it as `AgentKit::breaker`.
+
+```rust
+use yunque_client::BreakerClient;
+
+let breaker = BreakerClient::new("http://localhost:9090", "<token>")?;
+let _reset = breaker.reset().await?;
+```

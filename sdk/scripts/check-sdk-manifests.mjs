@@ -54,6 +54,7 @@ const checks = [
   ["Fork SDK manifest", "sdk/scripts/check-fork-sdk-manifest.mjs"],
   ["Cost SDK manifest", "sdk/scripts/check-cost-sdk-manifest.mjs"],
   ["Providers SDK manifest", "sdk/scripts/check-providers-sdk-manifest.mjs"],
+  ["Breaker SDK manifest", "sdk/scripts/check-breaker-sdk-manifest.mjs"],
   ["Models SDK manifest", "sdk/scripts/check-models-sdk-manifest.mjs"],
   ["Router SDK manifest", "sdk/scripts/check-router-sdk-manifest.mjs"],
   ["Cognis SDK manifest", "sdk/scripts/check-cognis-sdk-manifest.mjs"],

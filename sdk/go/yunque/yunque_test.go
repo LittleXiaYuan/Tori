@@ -11,6 +11,24 @@ import (
 	"testing"
 )
 
+func TestBreakerHelpers(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/breaker/reset" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"reset_count":2}`))
+	})
+
+	reset, err := Breaker.Reset(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reset["reset_count"].(float64) != 2 || NewAgentKit().Breaker != Breaker {
+		t.Fatalf("unexpected breaker reset: %+v", reset)
+	}
+}
+
 func TestAiriHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
