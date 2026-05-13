@@ -4357,6 +4357,41 @@ func TestModelsNamespaceWrapsModelRegistry(t *testing.T) {
 	}
 }
 
+func TestWebSearchNamespaceWrapsDiscoverySearch(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/search":
+			_, _ = w.Write([]byte(`{"results":[{"title":"云雀"}],"total":1}`))
+		case "/v1/search/providers":
+			_, _ = w.Write([]byte(`{"enabled":true,"providers":["local"]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	results, err := WebSearch.Query(ctx, "agent", 3, "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, err := WebSearch.Providers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results["results"] == nil || providers["enabled"] != true {
+		t.Fatalf("unexpected web search results")
+	}
+	if NewAgentKit().WebSearch != WebSearch {
+		t.Fatalf("agent kit should expose WebSearch namespace")
+	}
+	if len(seen) != 2 || seen[0] != "GET /v1/search?limit=3&provider=local&q=agent" || seen[1] != "GET /v1/search/providers" {
+		t.Fatalf("unexpected web search requests: %v", seen)
+	}
+}
+
 func TestEmbeddingsNamespaceWrapsDiscoveryEmbeddings(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

@@ -72,7 +72,8 @@
     "plugin-api-runtime",
     "discovery",
     "identity-resolution",
-    "embeddings-runtime"
+    "embeddings-runtime",
+    "web-search"
   ],
   "capabilities": [
     {
@@ -280,6 +281,10 @@
       "description": "Access the lightweight Embeddings client or namespace for provider listing and text embedding."
     },
     {
+      "name": "search",
+      "description": "Access the lightweight Search client or namespace for provider listing and web-search queries."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -413,7 +418,8 @@
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
-        "embeddings": "createAgentKit().embeddings"
+        "embeddings": "createAgentKit().embeddings",
+        "search": "createAgentKit().search"
       }
     },
     "go": {
@@ -492,7 +498,8 @@
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
-        "embeddings": "yunque.NewAgentKit().Embeddings"
+        "embeddings": "yunque.NewAgentKit().Embeddings",
+        "search": "yunque.NewAgentKit().WebSearch"
       }
     },
     "python": {
@@ -571,7 +578,8 @@
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
-        "embeddings": "yunque.create_agent_kit().embeddings"
+        "embeddings": "yunque.create_agent_kit().embeddings",
+        "search": "yunque.create_agent_kit().search_sdk"
       }
     },
     "rust": {
@@ -650,7 +658,8 @@
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",
-        "embeddings": "AgentKit::embeddings"
+        "embeddings": "AgentKit::embeddings",
+        "search": "AgentKit::search"
       }
     }
   },

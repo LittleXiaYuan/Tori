@@ -1413,6 +1413,7 @@ pub struct AgentKit {
     pub discovery: DiscoveryClient,
     pub identity: IdentityClient,
     pub embeddings: EmbeddingsClient,
+    pub search: SearchClient,
     pub router: RouterClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
@@ -1503,6 +1504,7 @@ impl AgentKit {
             discovery: DiscoveryClient::new(base_url.clone(), token.as_ref())?,
             identity: IdentityClient::new(base_url.clone(), token.as_ref())?,
             embeddings: EmbeddingsClient::new(base_url.clone(), token.as_ref())?,
+            search: SearchClient::new(base_url.clone(), token.as_ref())?,
             router: RouterClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
@@ -1589,6 +1591,7 @@ impl AgentKit {
             discovery: DiscoveryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             identity: IdentityClient::new_with_client(base_url.clone(), plugin_http.clone()),
             embeddings: EmbeddingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            search: SearchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             router: RouterClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -6080,6 +6083,25 @@ impl EmbeddingsClient {
 
     pub async fn providers(&self) -> Result<DiscoveryEmbeddingProvidersResponse, reqwest::Error> { self.inner.embedding_providers().await }
     pub async fn embed(&self, text: impl Into<String>, provider: impl Into<String>) -> Result<DiscoveryEmbeddingResponse, reqwest::Error> { self.inner.embed(text, provider).await }
+}
+
+/// Lightweight Search SDK facade over `/v1/search`.
+#[derive(Debug, Clone)]
+pub struct SearchClient {
+    inner: DiscoveryClient,
+}
+
+impl SearchClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: DiscoveryClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: DiscoveryClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn query(&self, q: &str, limit: i32, provider: &str) -> Result<DiscoverySearchResponse, reqwest::Error> { self.inner.search(q, limit, provider).await }
+    pub async fn providers(&self) -> Result<DiscoverySearchProvidersResponse, reqwest::Error> { self.inner.search_providers().await }
 }
 
 /// Lightweight Discovery SDK client for identity resolution, embeddings, and web search.
@@ -10585,6 +10607,12 @@ mod tests {
         let client = IdentityClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.inner.url("/v1/identity/resolve"), "http://localhost:9090/v1/identity/resolve");
         assert_eq!(client.inner.url("/v1/identity/profiles"), "http://localhost:9090/v1/identity/profiles");
+    }
+
+    #[test]
+    fn search_facade_wraps_discovery_search_paths() {
+        let client = SearchClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.inner.url("/v1/search/providers"), "http://localhost:9090/v1/search/providers");
     }
 
     #[test]

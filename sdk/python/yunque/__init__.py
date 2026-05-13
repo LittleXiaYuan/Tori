@@ -1305,6 +1305,20 @@ class _EmbeddingsNamespace:
 
 embeddings = _EmbeddingsNamespace()
 
+# ── Search facade (/v1/search) ──
+
+class _SearchNamespace:
+    """Lightweight helpers for web-search provider listing and querying."""
+
+    def query(self, q: str, limit: int = 0, provider: str = "") -> dict:
+        return discovery.search(q, limit, provider)
+
+    def providers(self) -> dict:
+        return discovery.search_providers()
+
+
+search_sdk = _SearchNamespace()
+
 # ── IDE Supervisor (/v1/ide) ──
 
 class _IDENamespace:
@@ -3331,6 +3345,7 @@ class AgentKit:
         self.discovery = discovery
         self.identity = identity
         self.embeddings = embeddings
+        self.search_sdk = search_sdk
         self.router = router
         self.settings = settings
         self.system = system

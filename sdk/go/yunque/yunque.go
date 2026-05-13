@@ -633,6 +633,19 @@ var Identity = &identityNamespace{}
 // Embeddings provides focused access to embedding provider listing and text embedding.
 var Embeddings = &embeddingsNamespace{}
 
+// WebSearch provides focused access to web-search provider listing and querying.
+var WebSearch = &searchNamespace{}
+
+type searchNamespace struct{}
+
+func (s *searchNamespace) Query(ctx context.Context, q string, limit int, provider string) (DiscoverySearchResponse, error) {
+	return Discovery.Search(ctx, q, limit, provider)
+}
+
+func (s *searchNamespace) Providers(ctx context.Context) (DiscoverySearchProvidersResponse, error) {
+	return Discovery.SearchProviders(ctx)
+}
+
 type embeddingsNamespace struct{}
 
 func (e *embeddingsNamespace) Providers(ctx context.Context) (DiscoveryEmbeddingProvidersResponse, error) {
@@ -1496,6 +1509,7 @@ type AgentKit struct {
 	Discovery     *discoveryNamespace
 	Identity      *identityNamespace
 	Embeddings    *embeddingsNamespace
+	WebSearch     *searchNamespace
 	Router        *routerNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
@@ -6626,6 +6640,7 @@ func NewAgentKit() AgentKit {
 		Discovery:     Discovery,
 		Identity:      Identity,
 		Embeddings:    Embeddings,
+		WebSearch:     WebSearch,
 		Router:        Router,
 		Settings:      Settings,
 		System:        System,
