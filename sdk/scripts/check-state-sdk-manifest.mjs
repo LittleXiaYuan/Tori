@@ -13,7 +13,7 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-const requiredCapabilities = ["snapshot", "actions", "capabilities", "goals", "saveGoal", "focus", "resources"];
+const requiredCapabilities = ["snapshot", "actions", "capabilities", "goals", "saveGoal", "deleteGoal", "focus", "updateFocus", "resources", "trackResource", "releaseResource"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);

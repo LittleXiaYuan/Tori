@@ -175,7 +175,7 @@ or dashboards that only need the agent state layer, use the hand-written
 surface and mirrors the incremental helpers in the TypeScript, Go, and Python SDKs.
 
 ```rust
-use yunque_client::{StateClient, StateGoal};
+use yunque_client::{StateClient, StateFocusUpdateRequest, StateGoal, StateResource};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -196,6 +196,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         priority: 2,
         ..StateGoal::default()
     }).await?;
+
+    let _updated = state.update_focus(&StateFocusUpdateRequest {
+        focus: "整理 SDK 状态层".to_string(),
+        topics: vec!["sdk".to_string(), "state".to_string()],
+    }).await?;
+    let _deleted = state.delete_goal("goal-1").await?;
+    let _tracked = state.track_resource(&StateResource {
+        path: "sdk/rust".to_string(),
+        r#type: "repo".to_string(),
+        ..StateResource::default()
+    }).await?;
+    let _released = state.release_resource("resource-1").await?;
+    let _ = (actions, caps, focus, resources, saved, _updated, _deleted, _tracked, _released);
 
     Ok(())
 }
