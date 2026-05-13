@@ -39,6 +39,7 @@ import (
 	"yunque-agent/internal/integrations/mineru"
 	iledger "yunque-agent/internal/ledger"
 	"yunque-agent/pkg/document"
+	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -62,6 +63,14 @@ func initTasks(app *agentrt.App) error {
 	// ── Phase 2: Gateway ──
 	gw := gateway.New(p, tenantMgr, app.MemManager, app.SkillRegistry, sa.sched, sa.convStore, app.PluginReg, sa.feishuAPI, learningLoop, sa.jwtCfg, app.Metrics, app.MemPipeline, botPersona)
 	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
+	packRegistry, err := packruntime.NewRegistry(cfg.DataPath("packs"))
+	if err != nil {
+		slog.Warn("pack runtime registry disabled", "err", err)
+	} else {
+		gw.SetPackRegistry(packRegistry)
+		app.Set("pack_runtime_registry", packRegistry)
+		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()))
+	}
 	if sa.hbService != nil {
 		gw.SetHeartbeat(sa.hbService)
 	}
