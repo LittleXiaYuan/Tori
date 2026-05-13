@@ -75,7 +75,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/controlplane/gateway/gateway_setters.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_packs_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "route.Method = strings.TrimSpace", "handlePackBackendModules", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "expected mounted route method to be preserved"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -83,7 +83,7 @@ if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
 }
 
 const backendContract = readText("pkg/packruntime/backend.go");
-for (const token of ["type BackendRoute", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
+for (const token of ["type BackendRoute", "Method  string", "Path    string", "type BackendRouteInfo", "Method string `json:\"method,omitempty\"`", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
   if (!backendContract.includes(token)) fail(`packruntime backend contract missing token: ${token}`);
 }
 
