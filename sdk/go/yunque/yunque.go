@@ -383,10 +383,18 @@ func (p *pluginsNamespace) UI(ctx context.Context) (PluginsResponse, error) {
 // PluginUI exposes standalone plugin UI tab discovery for external pages and operator panels.
 var PluginUI = &pluginUINamespace{}
 
+// PluginToggle exposes standalone plugin enable/disable control for operator tools.
+var PluginToggle = &pluginToggleNamespace{}
+
 type pluginUINamespace struct{}
+type pluginToggleNamespace struct{}
 
 func (p *pluginUINamespace) UI(ctx context.Context) (PluginsResponse, error) {
 	return Plugins.UI(ctx)
+}
+
+func (p *pluginToggleNamespace) Toggle(ctx context.Context, name string, enabled bool) (PluginsResponse, error) {
+	return Plugins.Toggle(ctx, name, enabled)
 }
 
 func (p *pluginsNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
@@ -1525,6 +1533,7 @@ type AgentKit struct {
 	SkillHub          *skillHubNamespace
 	Plugins           *pluginsNamespace
 	PluginUI          *pluginUINamespace
+	PluginToggle      *pluginToggleNamespace
 	Skills            *skillsNamespace
 	SkillsCatalog     *skillsCatalogNamespace
 	SkillsScan        *skillsScanNamespace
@@ -6795,6 +6804,7 @@ func NewAgentKit() AgentKit {
 		SkillHub:          SkillHub,
 		Plugins:           Plugins,
 		PluginUI:          PluginUI,
+		PluginToggle:      PluginToggle,
 		Skills:            Skills,
 		SkillsCatalog:     SkillsCatalog,
 		SkillsScan:        SkillsScan,

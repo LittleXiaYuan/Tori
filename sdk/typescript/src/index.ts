@@ -20,3 +20,4 @@ export * from './skills-catalog';
 export * from './skills-scan';
 export * from './skills-suggestions';
 export * from './skills-dynamic';
+export * from './plugin-toggle';

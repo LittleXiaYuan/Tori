@@ -3344,6 +3344,15 @@ class _PluginUINamespace:
 
 plugin_ui = _PluginUINamespace()
 
+class _PluginToggleNamespace:
+    """Standalone plugin enable/disable helper for external operator tools."""
+
+    def toggle(self, name: str, enabled: bool) -> dict:
+        return plugins.toggle(name, enabled)
+
+
+plugin_toggle = _PluginToggleNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3531,6 +3540,7 @@ class AgentKit:
         self.skillhub = skillhub
         self.plugins = plugins
         self.plugin_ui = plugin_ui
+        self.plugin_toggle = plugin_toggle
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
