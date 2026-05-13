@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join, relative, resolve, sep } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -46,6 +47,7 @@ const englishGuide = readText("docs/guide/pack-runtime.md");
 const chineseGuide = readText("docs/zh/guide/pack-runtime.md");
 const docsConfig = readText("docs/.vitepress/config.ts");
 const scaffoldScript = readText("scripts/scaffold-pack.mjs");
+const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
 for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
@@ -66,8 +68,15 @@ for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs
   }
 }
 
-for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "RegisterBackendPack"]) {
+for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
   if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
+}
+for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.update.rollback"]) {
+  if (!scaffoldCheck.includes(token)) fail(`check-pack-scaffold.mjs missing token: ${token}`);
+}
+const scaffoldCheckResult = spawnSync(process.execPath, ["scripts/check-pack-scaffold.mjs"], { cwd: repoRoot, encoding: "utf8" });
+if (scaffoldCheckResult.status !== 0) {
+  fail(`check-pack-scaffold.mjs failed: ${scaffoldCheckResult.stderr || scaffoldCheckResult.stdout}`);
 }
 
 if (!docsConfig.includes("/guide/pack-runtime") || !docsConfig.includes("/zh/guide/pack-runtime")) {
