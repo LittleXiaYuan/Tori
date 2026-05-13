@@ -55,6 +55,7 @@ const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
   "heroui-web/src/lib/pack-sync.tsx",
   "heroui-web/src/app/packs/page.tsx",
+  "heroui-web/src/app/packs/[...slug]/page.tsx",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
 ].map(read).join("\n");
@@ -132,9 +133,11 @@ requireTokens("backup-pack 示例包", backup + backupManifest, [
 requireTokens("前端同步菜单/路由/资源/控制台", frontend, [
   "fetchEnabledPacks",
   "buildPackNavItems",
+  "PackRuntimeRoutePage",
   "packsEnabled",
   "frontend?.menus",
   "frontend?.routes",
+  "/v1/packs/enabled",
   "manifest.distribution",
   "packBackendModules",
   "packInstallFromURL",
