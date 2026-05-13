@@ -262,6 +262,25 @@ type PackBundleApplyChecklistItem struct {
 	Info        PackBundleApplyActionKindInfo `json:"info" yaml:"info"`
 }
 
+// PackBundleApplyChecklistSummary is a compact dashboard counter for a
+// checklist. It lets frontends, plugin installers, and CI summaries show
+// progress/gating state without parsing every checklist row themselves.
+type PackBundleApplyChecklistSummary struct {
+	Total         int                               `json:"total" yaml:"total"`
+	Required      int                               `json:"required" yaml:"required"`
+	Optional      int                               `json:"optional" yaml:"optional"`
+	Done          int                               `json:"done" yaml:"done"`
+	Open          int                               `json:"open" yaml:"open"`
+	Blocked       int                               `json:"blocked" yaml:"blocked"`
+	RequiredOpen  int                               `json:"required_open" yaml:"required_open"`
+	RequiredDone  int                               `json:"required_done" yaml:"required_done"`
+	OptionalOpen  int                               `json:"optional_open" yaml:"optional_open"`
+	OptionalDone  int                               `json:"optional_done" yaml:"optional_done"`
+	BlockedKinds  []PackBundleApplyActionKind       `json:"blocked_kinds,omitempty" yaml:"blocked_kinds,omitempty"`
+	RequiredKinds []PackBundleApplyActionKind       `json:"required_kinds,omitempty" yaml:"required_kinds,omitempty"`
+	ByKind        map[PackBundleApplyActionKind]int `json:"by_kind" yaml:"by_kind"`
+}
+
 // PackBundleApplyAction is a structured, frontend/script-friendly action entry
 // derived from the bundle diff and review gate.
 type PackBundleApplyAction struct {

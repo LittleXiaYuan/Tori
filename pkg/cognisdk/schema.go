@@ -48,7 +48,7 @@ type JSONSchemaArtifactCheck struct {
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "pack-bundle-apply-checklist", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "pack-bundle-apply-checklist", "pack-bundle-apply-checklist-summary", "feedback-proposal"}
 }
 
 // JSONSchemaInfos returns stable schema catalog metadata for non-Go callers
@@ -95,6 +95,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleApplyActionKindsJSONSchema(), true
 	case "pack-bundle-apply-checklist":
 		return PackBundleApplyChecklistJSONSchema(), true
+	case "pack-bundle-apply-checklist-summary":
+		return PackBundleApplyChecklistSummaryJSONSchema(), true
 	case "feedback-proposal":
 		return FeedbackProposalJSONSchema(), true
 	default:
@@ -305,6 +307,38 @@ func PackBundleApplyChecklistJSONSchema() JSONSchema {
 		"title":   "Cognition SDK Pack Bundle Apply Checklist",
 		"type":    "array",
 		"items":   packBundleApplyChecklistItemSchema(),
+	}
+}
+
+// PackBundleApplyChecklistSummaryJSONSchema returns the schema for compact
+// checklist dashboard counters emitted by SummarizePackBundleApplyChecklist
+// and cognisdk-bundle checklist-summary.
+func PackBundleApplyChecklistSummaryJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-apply-checklist-summary.json",
+		"title":                "Cognition SDK Pack Bundle Apply Checklist Summary",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"total", "required", "optional", "done", "open", "blocked", "required_open", "required_done", "optional_open", "optional_done", "by_kind"},
+		"properties": map[string]any{
+			"total":          integerSchema(),
+			"required":       integerSchema(),
+			"optional":       integerSchema(),
+			"done":           integerSchema(),
+			"open":           integerSchema(),
+			"blocked":        integerSchema(),
+			"required_open":  integerSchema(),
+			"required_done":  integerSchema(),
+			"optional_open":  integerSchema(),
+			"optional_done":  integerSchema(),
+			"blocked_kinds":  map[string]any{"type": "array", "items": enumSchema(packBundleApplyActionKindStrings()...)},
+			"required_kinds": map[string]any{"type": "array", "items": enumSchema(packBundleApplyActionKindStrings()...)},
+			"by_kind": map[string]any{
+				"type":                 "object",
+				"additionalProperties": integerSchema(),
+			},
+		},
 	}
 }
 
@@ -732,6 +766,8 @@ func packBundleApplyActionKindStrings() []string {
 
 func stringSchema() map[string]any { return map[string]any{"type": "string"} }
 
+func integerSchema() map[string]any { return map[string]any{"type": "integer"} }
+
 func stringArraySchema() map[string]any {
 	return map[string]any{"type": "array", "items": stringSchema()}
 }
@@ -771,6 +807,8 @@ func schemaDescription(name string) string {
 		return "Stable apply action vocabulary with UI labels and descriptions."
 	case "pack-bundle-apply-checklist":
 		return "UI-friendly apply checklist for plugin installers and dashboards."
+	case "pack-bundle-apply-checklist-summary":
+		return "Compact apply checklist counters for plugin dashboards and CI summaries."
 	case "feedback-proposal":
 		return "Non-mutating belief update proposal derived from audit feedback."
 	default:

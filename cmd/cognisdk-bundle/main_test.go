@@ -518,6 +518,68 @@ func TestRunChecklistBundle(t *testing.T) {
 	}
 }
 
+func TestRunChecklistSummaryBundle(t *testing.T) {
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.json")
+	candidate := filepath.Join(dir, "candidate.json")
+	summaryOut := filepath.Join(dir, "checklist-summary.json")
+	summaryMarkdownOut := filepath.Join(dir, "checklist-summary.md")
+	if err := run([]string{"init", current}); err != nil {
+		t.Fatalf("init current: %v", err)
+	}
+	if err := run([]string{"init", candidate, "--builtin"}); err != nil {
+		t.Fatalf("init candidate: %v", err)
+	}
+	if err := run([]string{"checklist-summary", current, candidate}); err != nil {
+		t.Fatalf("checklist summary bundle: %v", err)
+	}
+	if err := run([]string{"checklist-summary", current, candidate, "--markdown"}); err != nil {
+		t.Fatalf("checklist summary markdown: %v", err)
+	}
+	if err := run([]string{"checklist-summary", current, candidate, "--out", summaryOut}); err != nil {
+		t.Fatalf("checklist summary out: %v", err)
+	}
+	data, err := os.ReadFile(summaryOut)
+	if err != nil {
+		t.Fatalf("read checklist summary output: %v", err)
+	}
+	var summary cognisdk.PackBundleApplyChecklistSummary
+	if err := json.Unmarshal(data, &summary); err != nil {
+		t.Fatalf("checklist summary output is not json: %v", err)
+	}
+	if summary.Total == 0 || summary.Required == 0 || summary.ByKind[cognisdk.PackBundleApplyActionKeepRollback] == 0 {
+		t.Fatalf("unexpected checklist summary output: %#v", summary)
+	}
+	filteredOut := filepath.Join(dir, "checklist-summary-add-pack.json")
+	if err := run([]string{"checklist-summary", current, candidate, "--kind", "add_pack", "--out", filteredOut}); err != nil {
+		t.Fatalf("checklist summary kind filter out: %v", err)
+	}
+	filteredData, err := os.ReadFile(filteredOut)
+	if err != nil {
+		t.Fatalf("read filtered checklist summary output: %v", err)
+	}
+	var filtered cognisdk.PackBundleApplyChecklistSummary
+	if err := json.Unmarshal(filteredData, &filtered); err != nil {
+		t.Fatalf("filtered checklist summary output is not json: %v", err)
+	}
+	if filtered.ByKind[cognisdk.PackBundleApplyActionAddPack] == 0 || filtered.ByKind[cognisdk.PackBundleApplyActionKeepRollback] != 0 {
+		t.Fatalf("unexpected filtered checklist summary: %#v", filtered)
+	}
+	if err := run([]string{"checklist-summary", current, candidate, "--out", summaryMarkdownOut, "--markdown"}); err != nil {
+		t.Fatalf("checklist summary markdown out: %v", err)
+	}
+	markdownData, err := os.ReadFile(summaryMarkdownOut)
+	if err != nil {
+		t.Fatalf("read checklist summary markdown output: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Cogni Pack Bundle Apply Checklist Summary") {
+		t.Fatalf("checklist summary markdown missing heading: %s", markdownData)
+	}
+	if err := run([]string{"checklist-summary", current}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle checklist-summary") {
+		t.Fatalf("expected checklist summary usage error, got %v", err)
+	}
+}
+
 func TestRunPlanBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")

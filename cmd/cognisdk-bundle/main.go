@@ -249,6 +249,40 @@ func run(args []string) error {
 		}
 		return enforcePlanGate(plan, planOptions)
 
+	case "checklist-summary":
+		planOptions, normalizedArgs, err := parseActionsOptions(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
+		if len(args) != 3 {
+			return fmt.Errorf("usage: cognisdk-bundle checklist-summary <current.json> <candidate.json> [--markdown] [--out checklist-summary.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
+		}
+		current, candidate, err := loadPair(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		plan, err := cognisdk.PlanPackBundleApply(context.Background(), *current, *candidate)
+		if err != nil {
+			return err
+		}
+		checklist := cognisdk.FilterPackBundleApplyChecklistItems(cognisdk.BuildPackBundleApplyChecklist(plan), planOptions.Kinds...)
+		summary := cognisdk.SummarizePackBundleApplyChecklist(checklist)
+		if planOptions.Out != "" {
+			if markdown {
+				if err := saveTextFile(cognisdk.RenderPackBundleApplyChecklistSummaryMarkdown(summary), planOptions.Out); err != nil {
+					return err
+				}
+			} else if err := saveJSONFile(summary, planOptions.Out); err != nil {
+				return err
+			}
+		} else if markdown {
+			fmt.Print(cognisdk.RenderPackBundleApplyChecklistSummaryMarkdown(summary))
+		} else if err := printJSON(summary); err != nil {
+			return err
+		}
+		return enforcePlanGate(plan, planOptions)
+
 	case "plan":
 		planOptions, normalizedArgs, err := parsePlanOptions(args)
 		if err != nil {
@@ -595,6 +629,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle action-kinds [--details] [--markdown] [--out action-kinds.json]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
+	fmt.Println("  cognisdk-bundle checklist-summary <current.json> <candidate.json> [--markdown] [--out checklist-summary.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")

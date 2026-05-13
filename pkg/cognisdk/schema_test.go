@@ -9,17 +9,18 @@ import (
 
 func TestJSONSchemasMarshal(t *testing.T) {
 	for name, schema := range map[string]JSONSchema{
-		"pack":      PackManifestJSONSchema(),
-		"bundle":    PackBundleJSONSchema(),
-		"feedback":  FeedbackProposalJSONSchema(),
-		"summary":   PackBundleSummaryJSONSchema(),
-		"digest":    PackBundleDigestCheckJSONSchema(),
-		"diff":      PackBundleDiffJSONSchema(),
-		"review":    PackBundleReviewJSONSchema(),
-		"plan":      PackBundleApplyPlanJSONSchema(),
-		"actions":   PackBundleApplyActionsJSONSchema(),
-		"kinds":     PackBundleApplyActionKindsJSONSchema(),
-		"checklist": PackBundleApplyChecklistJSONSchema(),
+		"pack":              PackManifestJSONSchema(),
+		"bundle":            PackBundleJSONSchema(),
+		"feedback":          FeedbackProposalJSONSchema(),
+		"bundle-summary":    PackBundleSummaryJSONSchema(),
+		"digest":            PackBundleDigestCheckJSONSchema(),
+		"diff":              PackBundleDiffJSONSchema(),
+		"review":            PackBundleReviewJSONSchema(),
+		"plan":              PackBundleApplyPlanJSONSchema(),
+		"actions":           PackBundleApplyActionsJSONSchema(),
+		"kinds":             PackBundleApplyActionKindsJSONSchema(),
+		"checklist":         PackBundleApplyChecklistJSONSchema(),
+		"checklist-summary": PackBundleApplyChecklistSummaryJSONSchema(),
 	} {
 		data, err := json.Marshal(schema)
 		if err != nil {
@@ -327,6 +328,19 @@ func TestPackBundleApplyChecklistSchema(t *testing.T) {
 	for _, field := range []string{"kind", "label", "description", "required", "done", "blocked", "message", "action", "info"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle apply checklist item schema missing %q", field)
+		}
+	}
+}
+
+func TestPackBundleApplyChecklistSummarySchema(t *testing.T) {
+	schema := PackBundleApplyChecklistSummaryJSONSchema()
+	if schema["type"] != "object" {
+		t.Fatalf("checklist summary schema type = %#v", schema["type"])
+	}
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"total", "required", "optional", "done", "open", "blocked", "required_open", "required_done", "optional_open", "optional_done", "blocked_kinds", "required_kinds", "by_kind"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle apply checklist summary schema missing %q", field)
 		}
 	}
 }

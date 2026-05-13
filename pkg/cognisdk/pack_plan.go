@@ -310,6 +310,82 @@ func RenderPackBundleApplyChecklistMarkdown(items []PackBundleApplyChecklistItem
 	return b.String()
 }
 
+// SummarizePackBundleApplyChecklist returns dashboard-friendly counters for a
+// checklist. It is non-mutating and does not infer execution state beyond the
+// Done/Required/Blocked fields already present on each item.
+func SummarizePackBundleApplyChecklist(items []PackBundleApplyChecklistItem) PackBundleApplyChecklistSummary {
+	summary := PackBundleApplyChecklistSummary{
+		Total:  len(items),
+		ByKind: map[PackBundleApplyActionKind]int{},
+	}
+	blockedSeen := map[PackBundleApplyActionKind]bool{}
+	requiredSeen := map[PackBundleApplyActionKind]bool{}
+	for _, item := range items {
+		summary.ByKind[item.Kind]++
+		if item.Done {
+			summary.Done++
+		} else {
+			summary.Open++
+		}
+		if item.Required {
+			summary.Required++
+			if item.Done {
+				summary.RequiredDone++
+			} else {
+				summary.RequiredOpen++
+			}
+			if !requiredSeen[item.Kind] {
+				summary.RequiredKinds = append(summary.RequiredKinds, item.Kind)
+				requiredSeen[item.Kind] = true
+			}
+		} else {
+			summary.Optional++
+			if item.Done {
+				summary.OptionalDone++
+			} else {
+				summary.OptionalOpen++
+			}
+		}
+		if item.Blocked {
+			summary.Blocked++
+			if !blockedSeen[item.Kind] {
+				summary.BlockedKinds = append(summary.BlockedKinds, item.Kind)
+				blockedSeen[item.Kind] = true
+			}
+		}
+	}
+	return summary
+}
+
+// RenderPackBundleApplyChecklistSummaryMarkdown renders compact checklist
+// counters for release notes, plugin cards, and automation logs.
+func RenderPackBundleApplyChecklistSummaryMarkdown(summary PackBundleApplyChecklistSummary) string {
+	var b strings.Builder
+	b.WriteString("## Cogni Pack Bundle Apply Checklist Summary\n\n")
+	fmt.Fprintf(&b, "- total: %d\n", summary.Total)
+	fmt.Fprintf(&b, "- required: %d\n", summary.Required)
+	fmt.Fprintf(&b, "- optional: %d\n", summary.Optional)
+	fmt.Fprintf(&b, "- done: %d\n", summary.Done)
+	fmt.Fprintf(&b, "- open: %d\n", summary.Open)
+	fmt.Fprintf(&b, "- blocked: %d\n", summary.Blocked)
+	fmt.Fprintf(&b, "- required_open: %d\n", summary.RequiredOpen)
+	if len(summary.BlockedKinds) > 0 {
+		fmt.Fprintf(&b, "- blocked_kinds: %s\n", joinApplyActionKinds(summary.BlockedKinds))
+	}
+	if len(summary.RequiredKinds) > 0 {
+		fmt.Fprintf(&b, "- required_kinds: %s\n", joinApplyActionKinds(summary.RequiredKinds))
+	}
+	if len(summary.ByKind) > 0 {
+		b.WriteString("\n### By Kind\n\n")
+		for _, kind := range PackBundleApplyActionKinds() {
+			if count, ok := summary.ByKind[kind]; ok {
+				fmt.Fprintf(&b, "- `%s`: %d\n", kind, count)
+			}
+		}
+	}
+	return b.String()
+}
+
 // FilterPackBundleApplyChecklistItems returns only checklist rows whose Kind
 // matches one of the requested kinds. Passing no kinds returns the original
 // checklist slice. This mirrors FilterPackBundleApplyActions for UI flows that
@@ -375,4 +451,12 @@ func KnownPackBundleApplyActionKind(kind PackBundleApplyActionKind) bool {
 		}
 	}
 	return false
+}
+
+func joinApplyActionKinds(kinds []PackBundleApplyActionKind) string {
+	values := make([]string, 0, len(kinds))
+	for _, kind := range kinds {
+		values = append(values, string(kind))
+	}
+	return strings.Join(values, ", ")
 }
