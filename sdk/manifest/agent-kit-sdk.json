@@ -25,6 +25,7 @@
     "skill-market",
     "skillhub-incremental-packages",
     "plugins-management",
+    "plugin-ui",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -151,6 +152,10 @@
     {
       "name": "plugins",
       "description": "Access the lightweight Plugins management client or namespace for plugin catalog, lifecycle, file editing, UI tabs, reload, and open-folder helpers."
+    },
+    {
+      "name": "pluginUI",
+      "description": "Access the lightweight PluginUI client or namespace for plugin UI tab discovery."
     },
     {
       "name": "skills",
@@ -461,6 +466,7 @@
         "router": "createAgentKit().router",
         "skillhub": "createAgentKit().skillhub",
         "plugins": "createAgentKit().plugins",
+        "pluginUI": "createAgentKit().pluginUI",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
@@ -549,6 +555,7 @@
         "router": "yunque.NewAgentKit().Router",
         "skillhub": "yunque.NewAgentKit().SkillHub",
         "plugins": "yunque.NewAgentKit().Plugins",
+        "pluginUI": "yunque.NewAgentKit().PluginUI",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
@@ -637,6 +644,7 @@
         "router": "yunque.create_agent_kit().router",
         "skillhub": "yunque.create_agent_kit().skillhub",
         "plugins": "yunque.create_agent_kit().plugins",
+        "pluginUI": "yunque.create_agent_kit().plugin_ui",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
@@ -725,6 +733,7 @@
         "router": "AgentKit::router",
         "skillhub": "AgentKit::skillhub",
         "plugins": "AgentKit::plugins",
+        "pluginUI": "AgentKit::plugin_ui",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",

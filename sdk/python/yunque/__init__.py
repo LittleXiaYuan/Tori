@@ -3335,6 +3335,15 @@ class _PluginsNamespace:
 
 plugins = _PluginsNamespace()
 
+class _PluginUINamespace:
+    """Standalone plugin UI tab discovery helper for external pages and operator panels."""
+
+    def ui(self) -> dict:
+        return plugins.ui()
+
+
+plugin_ui = _PluginUINamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3479,6 +3488,7 @@ class AgentKit:
         self.market = market
         self.skillhub = skillhub
         self.plugins = plugins
+        self.plugin_ui = plugin_ui
         self.skills = skills
         self.dispatch = dispatch
         self.orchestrator = orchestrator

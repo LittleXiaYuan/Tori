@@ -380,6 +380,15 @@ func (p *pluginsNamespace) UI(ctx context.Context) (PluginsResponse, error) {
 	return out, nil
 }
 
+// PluginUI exposes standalone plugin UI tab discovery for external pages and operator panels.
+var PluginUI = &pluginUINamespace{}
+
+type pluginUINamespace struct{}
+
+func (p *pluginUINamespace) UI(ctx context.Context) (PluginsResponse, error) {
+	return Plugins.UI(ctx)
+}
+
 func (p *pluginsNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
 	var out PluginsResponse
 	if err := apiCallInto(ctx, http.MethodPost, "/v1/plugins/reload", nil, &out); err != nil {
@@ -1475,6 +1484,7 @@ type AgentKit struct {
 	Market        *skillMarketNamespace
 	SkillHub      *skillHubNamespace
 	Plugins       *pluginsNamespace
+	PluginUI      *pluginUINamespace
 	Skills        *skillsNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
@@ -6740,6 +6750,7 @@ func NewAgentKit() AgentKit {
 		Market:        SkillMarket,
 		SkillHub:      SkillHub,
 		Plugins:       Plugins,
+		PluginUI:      PluginUI,
 		Skills:        Skills,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,

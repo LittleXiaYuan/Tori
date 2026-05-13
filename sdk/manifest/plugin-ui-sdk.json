@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-ui",
+  "description": "Cross-language lightweight SDK for plugin UI tab discovery without importing the full platform client or broader Plugins management slice.",
+  "principles": [
+    "Expose plugin UI tabs as a focused read-only incremental SDK slice for external frontends, plugin marketplaces, operator panels, CLIs, and automation scripts.",
+    "Keep plugin UI discovery directly callable through the existing authenticated gateway route.",
+    "Make PluginUI available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/plugins/ui"
+  ],
+  "capabilities": [
+    {
+      "name": "ui",
+      "route": "GET /v1/plugins/ui",
+      "readOnly": true,
+      "description": "List UI tabs contributed by enabled plugins."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-ui.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "ui": "createPluginUIClient().ui"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "ui": "yunque.PluginUI.UI"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "ui": "yunque.plugin_ui.ui"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "ui": "PluginUIClient::ui"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
