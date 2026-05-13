@@ -61,6 +61,88 @@ export interface PluginUITab {
   plugin: string;
 }
 
+// --- Pack Runtime ---
+// The backend pack registry is the source of truth for optional capability
+// packs. Frontend shells should render menus/routes from enabled packs instead
+// of hardcoding every new feature into the main app.
+
+export interface PackBackendManifest {
+  capabilities?: string[];
+  routes?: string[];
+  permissions?: string[];
+}
+
+export interface PackFrontendMenu {
+  key: string;
+  label: string;
+  path: string;
+  icon?: string;
+  order?: number;
+}
+
+export interface PackFrontendRoute {
+  path: string;
+  component: string;
+  title?: string;
+}
+
+export interface PackFrontendAssets {
+  type?: string;
+  entry?: string;
+}
+
+export interface PackFrontendManifest {
+  menus?: PackFrontendMenu[];
+  routes?: PackFrontendRoute[];
+  assets?: PackFrontendAssets;
+}
+
+export interface PackSDKManifest {
+  typescript?: string;
+  go?: string;
+  python?: string;
+}
+
+export interface PackUpdateManifest {
+  channel?: string;
+  rollback: boolean;
+}
+
+export interface PackManifest {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  requiresCore?: string;
+  optional: boolean;
+  defaultState?: "enabled" | "disabled" | string;
+  backend: PackBackendManifest;
+  frontend: PackFrontendManifest;
+  sdk?: PackSDKManifest;
+  update?: PackUpdateManifest;
+  metadata?: Record<string, string>;
+}
+
+export interface InstalledPack {
+  manifest: PackManifest;
+  status: "enabled" | "disabled" | "rolled_back" | string;
+  source: string;
+  installed_at: string;
+  updated_at: string;
+  previous_version?: string;
+}
+
+export interface PackListResponse {
+  packs: InstalledPack[];
+  enabled?: InstalledPack[];
+  count: number;
+}
+
+export interface PackMutationResponse {
+  pack: InstalledPack;
+  status: InstalledPack["status"];
+}
+
 // --- SkillHub ---
 
 export interface SkillHubItem {
