@@ -27,6 +27,7 @@
     "plugins-management",
     "plugin-ui",
     "skills-catalog",
+    "skills-scan",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -161,6 +162,10 @@
     {
       "name": "skillsCatalog",
       "description": "Access the lightweight SkillsCatalog client or namespace for read-only runtime skill catalog listing."
+    },
+    {
+      "name": "skillsScan",
+      "description": "Access the lightweight SkillsScan client or namespace for runtime skill discovery refreshes."
     },
     {
       "name": "skills",
@@ -473,6 +478,7 @@
         "plugins": "createAgentKit().plugins",
         "pluginUI": "createAgentKit().pluginUI",
         "skillsCatalog": "createAgentKit().skillsCatalog",
+        "skillsScan": "createAgentKit().skillsScan",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
@@ -563,6 +569,7 @@
         "plugins": "yunque.NewAgentKit().Plugins",
         "pluginUI": "yunque.NewAgentKit().PluginUI",
         "skillsCatalog": "yunque.NewAgentKit().SkillsCatalog",
+        "skillsScan": "yunque.NewAgentKit().SkillsScan",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
@@ -653,6 +660,7 @@
         "plugins": "yunque.create_agent_kit().plugins",
         "pluginUI": "yunque.create_agent_kit().plugin_ui",
         "skillsCatalog": "yunque.create_agent_kit().skills_catalog",
+        "skillsScan": "yunque.create_agent_kit().skills_scan",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
@@ -743,6 +751,7 @@
         "plugins": "AgentKit::plugins",
         "pluginUI": "AgentKit::plugin_ui",
         "skillsCatalog": "AgentKit::skills_catalog",
+        "skillsScan": "AgentKit::skills_scan",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",

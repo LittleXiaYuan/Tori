@@ -3385,6 +3385,15 @@ class _SkillsCatalogNamespace:
 
 skills_catalog = _SkillsCatalogNamespace()
 
+class _SkillsScanNamespace:
+    """Standalone runtime skill scanning helper for external operators and scripts."""
+
+    def scan(self) -> dict:
+        return skills.scan()
+
+
+skills_scan = _SkillsScanNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3500,6 +3509,7 @@ class AgentKit:
         self.plugin_ui = plugin_ui
         self.skills = skills
         self.skills_catalog = skills_catalog
+        self.skills_scan = skills_scan
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork
