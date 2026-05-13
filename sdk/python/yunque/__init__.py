@@ -3362,6 +3362,18 @@ class _PluginReloadNamespace:
 
 plugin_reload = _PluginReloadNamespace()
 
+class _PluginFilesNamespace:
+    """Standalone plugin file read/write helpers for external plugin editors and scripts."""
+
+    def files(self, name: str) -> dict:
+        return plugins.files(name)
+
+    def save_file(self, name: str, file: str, content: str, *, plugin: str = "") -> dict:
+        return plugins.save_file(name, file, content, plugin=plugin)
+
+
+plugin_files = _PluginFilesNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3551,6 +3563,7 @@ class AgentKit:
         self.plugin_ui = plugin_ui
         self.plugin_toggle = plugin_toggle
         self.plugin_reload = plugin_reload
+        self.plugin_files = plugin_files
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

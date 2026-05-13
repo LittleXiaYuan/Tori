@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "plugin-files",
+  "description": "Cross-language lightweight SDK for reading and saving plugin files without importing the full platform client or broader Plugins management slice.",
+  "principles": [
+    "Expose plugin file read/write as a focused SDK slice for external plugin editors, admin pages, marketplaces, CLIs, sidecars, and automation scripts.",
+    "Keep plugin file operations directly callable through the existing authenticated gateway route.",
+    "Make PluginFiles available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/plugins/files",
+    "PUT /v1/plugins/files"
+  ],
+  "capabilities": [
+    {
+      "name": "files",
+      "route": "GET /v1/plugins/files",
+      "readOnly": true,
+      "description": "Read editable files for a plugin by name."
+    },
+    {
+      "name": "saveFile",
+      "route": "PUT /v1/plugins/files",
+      "readOnly": false,
+      "description": "Save an editable plugin file by name and path."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-files.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "files": "createPluginFilesClient().files",
+        "saveFile": "createPluginFilesClient().saveFile"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "files": "yunque.PluginFiles.Files",
+        "saveFile": "yunque.PluginFiles.SaveFile"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "files": "yunque.plugin_files.files",
+        "saveFile": "yunque.plugin_files.save_file"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "files": "PluginFilesClient::files",
+        "saveFile": "PluginFilesClient::save_file"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
