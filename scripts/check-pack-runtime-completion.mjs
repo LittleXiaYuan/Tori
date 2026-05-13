@@ -54,6 +54,7 @@ const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
   "heroui-web/src/lib/pack-sync.tsx",
+  "heroui-web/src/lib/__tests__/pack-sync.test.ts",
   "heroui-web/src/app/packs/page.tsx",
   "heroui-web/src/app/packs/[...slug]/page.tsx",
   "heroui-web/src/lib/api.ts",
@@ -130,11 +131,13 @@ requireTokens("backup-pack 示例包", backup + backupManifest, [
   "rollback",
 ]);
 
-requireTokens("前端同步菜单/路由/资源/控制台", frontend, [
+requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerification, [
   "fetchEnabledPacks",
   "buildPackNavItems",
   "buildPackRouteBindings",
   "findPackRouteBinding",
+  "pack-sync frontend runtime",
+  "Frontend Pack sync tests",
   "PackRuntimeRoutePage",
   "packsEnabled",
   "frontend?.menus",

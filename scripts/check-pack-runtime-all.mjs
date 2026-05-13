@@ -55,6 +55,12 @@ const checks = [
     args: [npmCli, "run", "typecheck", "--prefix", "heroui-web"],
   },
   {
+    name: "Frontend Pack sync tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/pack-sync.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
     name: "TypeScript SDK typecheck",
     command: process.execPath,
     args: [npmCli, "run", "typecheck"],
