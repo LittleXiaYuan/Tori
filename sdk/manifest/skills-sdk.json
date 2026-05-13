@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "domain": "skills",
+  "description": "Cross-language lightweight SDK entrypoints for runtime skills catalog, scan, dynamic skill review, and session suggestions without importing the full platform client.",
+  "principles": [
+    "Expose the runtime skill catalog and dynamic skill review loop as focused SDK helpers for external plugin UIs, CLIs, operator pages, sidecars, and automation scripts.",
+    "Keep skill scan, approve, reject, and suggestion workflows directly callable through the existing authenticated /v1/skills routes.",
+    "Make runtime skills available through Agent Kit while keeping SkillHub package installation and plugin management as separate focused slices."
+  ],
+  "routes": [
+    "GET /v1/skills",
+    "POST /v1/skills/scan",
+    "GET /v1/skills/dynamic",
+    "POST /v1/skills/approve",
+    "POST /v1/skills/reject",
+    "GET /v1/skill-suggestions"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/skills",
+      "readOnly": true,
+      "description": "List runtime skills and categories."
+    },
+    {
+      "name": "scan",
+      "route": "POST /v1/skills/scan",
+      "readOnly": false,
+      "description": "Scan and reload runtime skills."
+    },
+    {
+      "name": "dynamic",
+      "route": "GET /v1/skills/dynamic",
+      "readOnly": true,
+      "description": "List pending or learned dynamic skills."
+    },
+    {
+      "name": "approve",
+      "route": "POST /v1/skills/approve",
+      "readOnly": false,
+      "description": "Approve a dynamic skill."
+    },
+    {
+      "name": "reject",
+      "route": "POST /v1/skills/reject",
+      "readOnly": false,
+      "description": "Reject a dynamic skill."
+    },
+    {
+      "name": "suggestions",
+      "route": "GET /v1/skill-suggestions",
+      "readOnly": true,
+      "description": "Fetch pending skill suggestions for a session."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/skills.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createSkillsClient().list",
+        "scan": "createSkillsClient().scan",
+        "dynamic": "createSkillsClient().dynamic",
+        "approve": "createSkillsClient().approve",
+        "reject": "createSkillsClient().reject",
+        "suggestions": "createSkillsClient().suggestions"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Skills.List",
+        "scan": "yunque.Skills.Scan",
+        "dynamic": "yunque.Skills.Dynamic",
+        "approve": "yunque.Skills.Approve",
+        "reject": "yunque.Skills.Reject",
+        "suggestions": "yunque.Skills.Suggestions"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.skills.list",
+        "scan": "yunque.skills.scan",
+        "dynamic": "yunque.skills.dynamic",
+        "approve": "yunque.skills.approve",
+        "reject": "yunque.skills.reject",
+        "suggestions": "yunque.skills.suggestions"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "SkillsClient::list",
+        "scan": "SkillsClient::scan",
+        "dynamic": "SkillsClient::dynamic",
+        "approve": "SkillsClient::approve",
+        "reject": "SkillsClient::reject",
+        "suggestions": "SkillsClient::suggestions"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

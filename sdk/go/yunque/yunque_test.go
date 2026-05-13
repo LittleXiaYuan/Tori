@@ -4275,3 +4275,48 @@ func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
 		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
 	}
 }
+
+func TestSkillsNamespaceManagesRuntimeSkills(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/skills":
+			_, _ = w.Write([]byte(`{"skills":[{"name":"web.search","description":"search"}],"count":1}`))
+		case "/v1/skills/scan":
+			_, _ = w.Write([]byte(`{"status":"scanned","skills_loaded":2}`))
+		case "/v1/skills/dynamic":
+			_, _ = w.Write([]byte(`{"skills":[{"name":"draft_doc","approval_status":"pending"}]}`))
+		case "/v1/skills/approve":
+			_, _ = w.Write([]byte(`{"status":"ok","name":"draft_doc"}`))
+		case "/v1/skills/reject":
+			_, _ = w.Write([]byte(`{"status":"ok","name":"old_skill"}`))
+		case "/v1/skill-suggestions":
+			_, _ = w.Write([]byte(`{"suggestions":[{"name":"summarize"}]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Skills.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, _ := Skills.Scan(ctx)
+	dynamic, _ := Skills.Dynamic(ctx)
+	approved, _ := Skills.Approve(ctx, "draft_doc", "use safely")
+	rejected, _ := Skills.Reject(ctx, "old_skill")
+	suggestions, _ := Skills.Suggestions(ctx, "sess-1")
+
+	if list["count"].(float64) != 1 || scan["status"] != "scanned" || dynamic["skills"] == nil || approved["status"] != "ok" || rejected["name"] != "old_skill" || suggestions["suggestions"] == nil {
+		t.Fatalf("unexpected Skills results")
+	}
+	if NewAgentKit().Skills != Skills {
+		t.Fatalf("agent kit should expose Skills namespace")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	}
+}
