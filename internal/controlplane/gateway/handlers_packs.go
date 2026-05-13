@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"yunque-agent/pkg/packruntime"
 )
@@ -29,6 +31,39 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
 	g.mux.HandleFunc("/v1/packs/rollback", g.requireAuth(g.handlePackRollback))
+	g.registerBackupPackRoutes()
+}
+
+func (g *Gateway) registerBackupPackRoutes() {
+	g.mux.HandleFunc("/v1/backup/export", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/export", g.handleBackupExport)))
+	g.mux.HandleFunc("/v1/backup/import", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/import", g.handleBackupImport)))
+	g.mux.HandleFunc("/v1/backup/info", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/info", g.handleBackupInfo)))
+}
+
+func (g *Gateway) requirePackRoute(packID string, route string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !g.packRouteEnabled(packID, route) {
+			writeJSONStatus(w, http.StatusNotFound, map[string]any{
+				"error":   "pack route is not enabled",
+				"pack_id": packID,
+				"route":   route,
+			})
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (g *Gateway) packRouteEnabled(packID string, route string) bool {
+	if g.packRegistry == nil {
+		return false
+	}
+	pack, ok := g.packRegistry.Get(packID)
+	if !ok || pack.Status != packruntime.PackStatusEnabled {
+		return false
+	}
+	route = strings.TrimSpace(route)
+	return route != "" && slices.Contains(pack.Manifest.Backend.Routes, route)
 }
 
 func (g *Gateway) handlePacksList(w http.ResponseWriter, r *http.Request) {

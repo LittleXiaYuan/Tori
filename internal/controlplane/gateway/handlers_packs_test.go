@@ -157,3 +157,42 @@ func TestPackRoutesTogglePackStatus(t *testing.T) {
 		t.Fatalf("expected disabled pack, got %#v", pack)
 	}
 }
+
+func TestBackupRoutesArePackGated(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, tenants := newTestGateway()
+	gw.SetPackRegistry(registry)
+	tenant := tenants.Register("pack-gated-backup")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/backup/info", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected disabled pack route to be 404, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.backup",
+		Name:         "Backup Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Routes: []string{"/v1/backup/info"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "backup", Label: "备份恢复", Path: "/packs/backup"}}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/backup/info", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected enabled pack route to be 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}

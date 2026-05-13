@@ -127,11 +127,6 @@ func (g *Gateway) registerSystemRoutes() {
 	g.mux.HandleFunc("/v1/config/reload", g.requireAuth(g.handleConfigReload))
 	g.mux.HandleFunc("/api/settings/detect-dirs", g.requireAuth(g.handleDetectDirs))
 
-	// Backup & Restore
-	g.mux.HandleFunc("/v1/backup/export", g.requireAuth(g.handleBackupExport))
-	g.mux.HandleFunc("/v1/backup/import", g.requireAuth(g.handleBackupImport))
-	g.mux.HandleFunc("/v1/backup/info", g.requireAuth(g.handleBackupInfo))
-
 	// Tori Integration (OAuth2 bind/unbind + health/usage)
 	g.mux.HandleFunc("/v1/tori/bind", g.requireAuth(g.handleToriBind))
 	g.mux.HandleFunc("/v1/tori/status", g.requireAuth(g.handleToriStatus))
