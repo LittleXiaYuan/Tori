@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "domain": "airi-bridge",
+  "description": "Cross-language lightweight SDK entrypoints for the Airi desktop pet bridge and OpenAI-compatible chat completion API without importing the full platform client.",
+  "principles": [
+    "Expose the Airi bridge as an incremental SDK slice for desktop widgets, front-end pages, plugins, CLIs, and automation scripts.",
+    "Keep status/model/chat helpers aligned with the plugin-mounted /v1/ext/airi/* routes.",
+    "Preserve the OpenAI-compatible request and streaming response shape so external Airi integrations do not couple to Yunque internals."
+  ],
+  "routes": [
+    "GET /v1/ext/airi/status",
+    "GET /v1/ext/airi/models",
+    "POST /v1/ext/airi/chat/completions"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /v1/ext/airi/status",
+      "readOnly": true,
+      "description": "Read Airi bridge connection status and message counters."
+    },
+    {
+      "name": "models",
+      "route": "GET /v1/ext/airi/models",
+      "readOnly": true,
+      "description": "List OpenAI-compatible Airi bridge models."
+    },
+    {
+      "name": "chatCompletions",
+      "route": "POST /v1/ext/airi/chat/completions",
+      "readOnly": false,
+      "description": "Send non-streaming OpenAI-compatible chat completions to the Airi bridge."
+    },
+    {
+      "name": "streamRequest",
+      "route": "POST /v1/ext/airi/chat/completions",
+      "readOnly": false,
+      "description": "Construct a streaming OpenAI-compatible Airi chat completion request."
+    },
+    {
+      "name": "parseStream",
+      "route": "POST /v1/ext/airi/chat/completions",
+      "readOnly": true,
+      "description": "Parse Airi Server-Sent Event chat completion chunks."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/airi.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createAiriClient().status",
+        "models": "createAiriClient().models",
+        "chatCompletions": "createAiriClient().chatCompletions",
+        "streamRequest": "createAiriClient().streamChatCompletions",
+        "parseStream": "createAiriClient().parseStream"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.Airi.Status",
+        "models": "yunque.Airi.Models",
+        "chatCompletions": "yunque.Airi.ChatCompletions",
+        "streamRequest": "yunque.Airi.StreamRequest",
+        "parseStream": "yunque.Airi.ParseStream"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.airi.status",
+        "models": "yunque.airi.models",
+        "chatCompletions": "yunque.airi.chat_completions",
+        "streamRequest": "yunque.airi.stream_request",
+        "parseStream": "yunque.airi.parse_stream"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "AiriClient::status",
+        "models": "AiriClient::models",
+        "chatCompletions": "AiriClient::chat_completions",
+        "streamRequest": "AiriClient::stream_request",
+        "parseStream": "AiriClient::parse_stream"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
