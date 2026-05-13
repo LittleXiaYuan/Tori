@@ -392,10 +392,14 @@ var PluginReload = &pluginReloadNamespace{}
 // PluginFiles exposes standalone plugin file read/write control for external editors.
 var PluginFiles = &pluginFilesNamespace{}
 
+// PluginFolder exposes standalone plugin folder opening for operator tools.
+var PluginFolder = &pluginFolderNamespace{}
+
 type pluginUINamespace struct{}
 type pluginToggleNamespace struct{}
 type pluginReloadNamespace struct{}
 type pluginFilesNamespace struct{}
+type pluginFolderNamespace struct{}
 
 func (p *pluginUINamespace) UI(ctx context.Context) (PluginsResponse, error) {
 	return Plugins.UI(ctx)
@@ -415,6 +419,10 @@ func (p *pluginFilesNamespace) Files(ctx context.Context, name string) (PluginsR
 
 func (p *pluginFilesNamespace) SaveFile(ctx context.Context, name, file, content string, plugin string) (PluginsResponse, error) {
 	return Plugins.SaveFile(ctx, name, file, content, plugin)
+}
+
+func (p *pluginFolderNamespace) OpenFolder(ctx context.Context, name string) (PluginsResponse, error) {
+	return Plugins.OpenFolder(ctx, name)
 }
 
 func (p *pluginsNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
@@ -1556,6 +1564,7 @@ type AgentKit struct {
 	PluginToggle      *pluginToggleNamespace
 	PluginReload      *pluginReloadNamespace
 	PluginFiles       *pluginFilesNamespace
+	PluginFolder      *pluginFolderNamespace
 	Skills            *skillsNamespace
 	SkillsCatalog     *skillsCatalogNamespace
 	SkillsScan        *skillsScanNamespace
@@ -6829,6 +6838,7 @@ func NewAgentKit() AgentKit {
 		PluginToggle:      PluginToggle,
 		PluginReload:      PluginReload,
 		PluginFiles:       PluginFiles,
+		PluginFolder:      PluginFolder,
 		Skills:            Skills,
 		SkillsCatalog:     SkillsCatalog,
 		SkillsScan:        SkillsScan,

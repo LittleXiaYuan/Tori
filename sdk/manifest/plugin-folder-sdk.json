@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-folder",
+  "description": "Cross-language lightweight SDK for opening the plugin workspace folder without importing the full platform client or broader Plugins management slice.",
+  "principles": [
+    "Expose plugin folder opening as a focused SDK slice for external plugin editors, marketplaces, admin pages, CLIs, sidecars, and automation scripts.",
+    "Keep plugin folder operations directly callable through the existing authenticated gateway route.",
+    "Make PluginFolder available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/plugins/open-folder"
+  ],
+  "capabilities": [
+    {
+      "name": "openFolder",
+      "route": "GET /v1/plugins/open-folder",
+      "readOnly": false,
+      "description": "Open the root plugin folder or a named plugin folder for local operator workflows."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-folder.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "openFolder": "createPluginFolderClient().openFolder"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "openFolder": "yunque.PluginFolder.OpenFolder"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "openFolder": "yunque.plugin_folder.open_folder"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "openFolder": "PluginFolderClient::open_folder"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
