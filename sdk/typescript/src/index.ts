@@ -16,6 +16,8 @@ export * from './review';
 export * from './runtime-queue';
 export * from './plugin-ui';
 export * from './skills-catalog';
+export * from './cognisdk-schema';
+export * from './cognisdk-package';
 
 export * from './skills-scan';
 export * from './skills-suggestions';

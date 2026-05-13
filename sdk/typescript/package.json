@@ -115,6 +115,10 @@
       "types": "./src/cognisdk-schema.ts",
       "import": "./src/cognisdk-schema.ts"
     },
+    "./cognisdk-package": {
+      "types": "./src/cognisdk-package.ts",
+      "import": "./src/cognisdk-package.ts"
+    },
     "./events": {
       "types": "./src/events.ts",
       "import": "./src/events.ts"
