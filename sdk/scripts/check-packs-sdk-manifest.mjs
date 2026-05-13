@@ -28,12 +28,12 @@ for (const [language, config] of Object.entries(manifest.languages ?? {})) {
   }
   for (const doc of config.docs ?? []) {
     const text = readRepoFile(doc);
-    if (!/Pack Runtime SDK|Packs SDK|createPacksClient|frontendSync|sync\.sdk|backend-modules|v1\/packs/i.test(text)) fail(`${language} doc ${doc} does not mention Packs SDK helpers`);
+    if (!/Pack Runtime SDK|Packs SDK|createPacksClient|frontendSync|sync\.sdk|TypeScript pack SDK import example|backend-modules|v1\/packs/i.test(text)) fail(`${language} doc ${doc} does not mention Packs SDK helpers`);
   }
 }
 for (const doc of manifest.overviewDocs ?? []) {
   const text = readRepoFile(doc);
-  if (!/Pack Runtime SDK|Packs SDK|frontendSync|sync\.sdk|backend-modules|v1\/packs/i.test(text)) fail(`overview doc ${doc} does not describe Packs SDK surface`);
+  if (!/Pack Runtime SDK|Packs SDK|frontendSync|sync\.sdk|TypeScript pack SDK import example|backend-modules|v1\/packs/i.test(text)) fail(`overview doc ${doc} does not describe Packs SDK surface`);
 }
 const packsSource = readRepoFile("sdk/typescript/src/packs.ts");
 for (const token of ["PackSdkEntrypoint", "sdk: packs.flatMap", "Object.entries(pack.manifest.sdk", "importPath"]) if (!packsSource.includes(token)) fail(`Packs SDK frontendSync missing SDK entrypoint sync token: ${token}`);
