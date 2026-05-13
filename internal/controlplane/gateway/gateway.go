@@ -78,6 +78,7 @@ import (
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/skills"
 )
@@ -129,7 +130,8 @@ type Gateway struct {
 	embedResolver  *embeddings.Resolver
 	identityRes    *identity.Resolver
 
-	// ── Plugins & Skills ───────────────────────
+	// ── Pack Runtime / Plugins / Skills ────────
+	packRegistry          *packruntime.Registry
 	registry              *skills.Registry
 	pluginReg             *plugin.Registry
 	pluginLoader          *plugin.Loader
@@ -374,6 +376,7 @@ type GatewayConfig struct {
 	Metrics   *observe.Metrics
 	Pipeline  *memory.Pipeline
 	Persona   *persona.Persona
+	Packs     *packruntime.Registry
 }
 
 // New creates a new Gateway.
@@ -408,6 +411,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		metrics:         met,
 		pipeline:        cfg.Pipeline,
 		persona:         cfg.Persona,
+		packRegistry:    cfg.Packs,
 		limiter:         NewRateLimiter(30, time.Minute),
 		usage:           NewUsageTracker(),
 		mux:             http.NewServeMux(),
@@ -620,6 +624,7 @@ func (g *Gateway) routes() {
 	g.registerKnowledgeRoutes()    // knowledge base (RAG)
 	g.registerTaskRoutes()         // tasks, state kernel, reflection, documents
 	g.registerTriggerRoutes()      // triggers, cron, scheduler, tools, sandbox
+	g.registerPackRoutes()         // packs registry, frontend sync, enable/disable/rollback
 	g.registerPluginRoutes()       // plugins, skills, skill market, skillhub
 	g.registerGovernanceRoutes()   // audit, trust, iterate, review, cost, usage
 	g.registerProviderRoutes()     // LLM providers, router stats

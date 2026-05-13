@@ -55,6 +55,7 @@ import (
 	"yunque-agent/internal/orchestrator"
 	"yunque-agent/internal/tori"
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
 	"yunque-agent/pkg/safego"
 )
@@ -63,6 +64,9 @@ import (
 // Each setter attaches an optional subsystem to the Gateway.
 // They are called during init_tasks wiring phase and are kept in
 // a dedicated file to reduce noise in gateway.go.
+
+// SetPackRegistry attaches the Pack Runtime registry used by /v1/packs and frontend sync.
+func (g *Gateway) SetPackRegistry(r *packruntime.Registry) { g.packRegistry = r }
 
 // SetHeartbeat attaches a heartbeat service.
 func (g *Gateway) SetHeartbeat(hb *heartbeat.Service) { g.heartbeat = hb }
