@@ -145,6 +145,7 @@ import { createCognisEvolutionClient } from "yunque-client/cognis-evolution";
 import { createCognisFederationClient } from "yunque-client/cognis-federation";
 import { createCognisWorkflowsClient } from "yunque-client/cognis-workflows";
 import { createCognisBundlesClient } from "yunque-client/cognis-bundles";
+import { normalizeCognitionSchemaCatalog } from "yunque-client/cognisdk-schema";
 import { createEventsClient } from "yunque-client/events";
 import { createEventsStreamClient } from "yunque-client/events-stream";
 import { createEventsParseClient } from "yunque-client/events-parse";
@@ -1704,7 +1705,7 @@ console.log(sandboxStatus.key_source);
 ```
 
 This keeps the SDK usable as an **incremental package**: embedder code can bring
-in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
+in only `auth`, `airi`, `planner-recovery`, `planner`, `planner-read`, `planner-control`, `planner-checkpoints`, `planner-resume`, `planner-execution-state`, `chat`, `chat-basic`, `chat-agentic`, `chat-stream`, `cognis`, `cognis-registry`, `cognis-observe`, `cognis-traces`, `cognis-health`, `cognis-alerts`, `cognis-experience`, `cognis-evolution`, `cognis-federation`, `cognis-workflows`, `cognis-bundles`, `cognisdk-schema`, `events`, `events-stream`, `events-parse`, `realtime`, `realtime-connect`, `realtime-messages`, `webchat`, `webchat-widget`, `webchat-embed`, `conversations`, `conversations-read`, `conversations-control`, `conversation-sessions`, `conversation-messages`, `conversation-replay`, `conversation-message-control`, `conversation-manage`, `subagents`, `subagents-read`, `subagents-control`, `bots`, `bots-read`, `bots-control`, `bots-list`, `bots-detail`, `bots-inbox`, `bots-channels`, `discovery`, `discovery-identity`, `discovery-embeddings`, `discovery-search`, `identity`, `embeddings`, `search`, `interactions`, `emotion`, `emotion-history`, `emotion-stickers`, `reactions`, `instructions`, `rbac`, `roles`, `role-bindings`, `my-roles`, `permissions`, `memory`, `memory-search`, `memory-stats`, `memory-add`, `memory-compact`, `tasks`, `task-context`, `task-observe`, `task-templates`, `task-threads`, `task-gaps`, `task-memory`, `task-thread-read`, `task-thread-control`, `task-lifecycle`, `task-read`, `task-create`, `task-delete`, `knowledge`, `knowledge-search`, `knowledge-ingest`, `knowledge-sources`, `knowledge-source-read`, `knowledge-source-control`, `knowledge-import`, `knowledge-upload`, or
 `providers`/`provider-control`/`provider-mode`/`provider-session`/`provider-health`/`provider-registry`/`breaker`/`provider-breaker`/`models`/`setup`/`setup-detect`/`setup-templates`/`setup-provider`/`setup-install`/`documents`/`document-templates`/`document-generate`/`document-docx`/`document-xlsx`/`document-pptx`/`document-html`/`approvals`/`approval-queue`/`approval-pending`/`approval-history`/`approval-rules`/`trace`/`trace-events`/`trace-recent`/`trace-by-id`/`task-trace`/`browser`/`browser-status`/`browser-capture`/`browser-opp`/`browser-extension`/`runtime`/`runtime-queue`/`runtime-events`/`runtime-queue-read`/`runtime-queue-control`/`router`/`modes`/`modes-observe`
 `/ide`/`persona`/`persona-state`/`persona-skills`/`persona-presets`/`workflow`/`workflow-definitions`/`workflow-runs`/`workflow-read`/`workflow-write`/`workflow-run`/`workflow-instances`/`cost`/`cost-budget`/`cost-alerts`/`cost-observe`/`cost-task`/`cost-history`/`usage`/`lora`/`lora-observe`/`lora-status`/`lora-history`/`lora-control`/`lora-config`/`lora-preview`/`lora-evolution`/`lora-trigger`/`lora-rollback`/`iterate`/`iterate-review`/`iterate-pending`/`iterate-decisions`/`iterate-cycle`/`trust`/`trust-control`/`review`/`skillgrow`/`audit`/`audit-chain`/`audit-tail`/`audit-verify`/`audit-trail`/`heartbeat`/`heartbeat-observe`/`heartbeat-control`
 `/reverie`/`federation`/`federation-peers`/`federation-stats`/`federation-capabilities`/`system`/`system-probes`/`system-ops`/`settings`/`settings-config`/`settings-backup`/`settings-schema`/`settings-runtime`/`tori`/`tori-observe`/`tori-bind`/`upload`/`speech`/`speech-tts`/`speech-stt`/`speech-voices`/`upload`/`admin`/`files`/`files-list`/`files-preview`/`cron`/`skillhub`/`skillhub-installed`/`skillhub-versions`/`skills`/`skills-catalog`/`skills-scan`/`skills-dynamic`/`skills-suggestions`/`plugins`/`plugin-toggle`/`plugin-ui`/`plugin-reload`/`plugin-folder`/`connectors`/`connector-catalog`/`connector-auth`/`connector-actions`/`connector-list`/`connector-detail`/`connector-connect`/`connector-disconnect`/`notify`/`notify-share`/`notify-channels`/`notify-channel-read`/`notify-channel-control`/`projects`/`project-read`/`project-list`/`project-detail`/`project-write`/`market`/`market-search`/`market-query`/`market-top`/`market-stats`/`dispatch`/`dispatch-read`/`dispatch-workers`/`dispatch-queue`/`dispatch-worker-config`/`dispatch-control`/`orchestrator`/`orchestrator-read`/`orchestrator-status`/`orchestrator-events`/`orchestrator-control`/`fork`/`fork-read`/`fork-root`/`fork-list`/`fork-control`/`scheduler`/`graph`/`graph-read`/`graph-entities`/`graph-relations`/`graph-context`/`graph-stats`/`graph-write`/`plugin-api`/`plugin-llm`/`plugin-search`/`plugin-memory`/`plugin-memory-read`/`plugin-memory-write`/`plugin-agent-memory`/`plugin-agent-memory-search`/`plugin-agent-memory-write`/`plugin-knowledge`/`plugin-knowledge-search`/`plugin-knowledge-ingest`/`plugin-cron`/`plugin-cron-read`/`plugin-cron-control`/`plugin-send`/`plugin-extensions`/`plugin-extensions-list`/`plugin-extension-register`/`state`/`triggers`/`trigger-definitions`/`trigger-definition-control`/`trigger-history`/`trigger-emit`/`missions`/`reflect`/`tools`/`sandbox` without importing the generated 500KB+ SDK/types bundle. Add future
@@ -1763,6 +1764,7 @@ npm run test -- state-actions state-capabilities
 | `src/cognis-federation.ts` | Lightweight Cogni federation status/peers/discover/expose/economics facade without registry, trace, experience or workflow APIs |
 | `src/cognis-workflows.ts` | Lightweight Cogni workflows list/run facade without registry, trace, experience, evolution or federation APIs |
 | `src/cognis-bundles.ts` | Lightweight Cogni bundle generate/export/import facade without registry, trace, experience, evolution, workflow or federation APIs |
+| `src/cognisdk-schema.ts` | Lightweight Cognition SDK schema catalog helpers for frontends, plugin pages, and automation scripts consuming exported schema artifact bundles |
 | `src/events.ts` | Lightweight hand-written SSE event stream slice for task/workflow/approval live updates |
 | `src/events-stream.ts` | Lightweight SSE connection facade without standalone parser-only API |
 | `src/events-parse.ts` | Lightweight SSE parser facade for local stream decoding without opening `/v1/events/stream` |
@@ -2499,6 +2501,25 @@ const reply = await airi.chatCompletions({
   messages: [{ role: "user", content: "你好" }],
 });
 const streamItems = airi.streamChatCompletions({ messages: [{ role: "user", content: "hi" }] });
+```
+
+### Cognition SDK Schema Helpers
+
+The lightweight `cognisdk-schema` slice is local-only and does not call the Yunque backend. It helps frontends, plugin pages, installers, and automation scripts consume `cognisdk-schema list --json --with-schema`, exported schema artifact catalogs, and `schema-checks.json` files without importing the full generated platform client.
+
+```ts
+import {
+  buildCognitionSchemaArtifacts,
+  normalizeCognitionSchemaCatalog,
+  verifyCognitionSchemaArtifacts,
+} from "yunque-client/cognisdk-schema";
+
+const catalog = normalizeCognitionSchemaCatalog(await response.json());
+const artifacts = buildCognitionSchemaArtifacts(catalog);
+const checks = verifyCognitionSchemaArtifacts(artifacts, {
+  "pack-bundle.schema.json": { $id: "https://yunque.local/schemas/cognisdk/pack-bundle.json" },
+});
+console.log(checks.every((check) => check.match));
 ```
 
 ### Breaker SDK
