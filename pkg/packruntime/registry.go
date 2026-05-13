@@ -44,6 +44,12 @@ type PackArtifacts struct {
 	CachedAt    time.Time `json:"cachedAt"`
 }
 
+type PruneReport struct {
+	Removed []string `json:"removed"`
+	Kept    []string `json:"kept"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
 type RegistrySnapshot struct {
 	Version int             `json:"version"`
 	Packs   []InstalledPack `json:"packs"`
@@ -209,6 +215,65 @@ func safeArtifactSegment(value string) string {
 		return "pack"
 	}
 	return out
+}
+
+func (r *Registry) PruneArtifacts() PruneReport {
+	artifactsRoot := filepath.Join(r.root, "artifacts")
+	report := PruneReport{Removed: []string{}, Kept: []string{}}
+	referenced := r.referencedArtifactPaths()
+	if _, err := os.Stat(artifactsRoot); err != nil {
+		if os.IsNotExist(err) {
+			return report
+		}
+		report.Errors = append(report.Errors, err.Error())
+		return report
+	}
+	_ = filepath.WalkDir(artifactsRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			return nil
+		}
+		if referenced[abs] {
+			report.Kept = append(report.Kept, path)
+			return nil
+		}
+		if err := os.Remove(path); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("remove %s: %v", path, err))
+			return nil
+		}
+		report.Removed = append(report.Removed, path)
+		return nil
+	})
+	sort.Strings(report.Kept)
+	sort.Strings(report.Removed)
+	return report
+}
+
+func (r *Registry) referencedArtifactPaths() map[string]bool {
+	referenced := make(map[string]bool)
+	add := func(artifacts *PackArtifacts) {
+		if artifacts == nil || strings.TrimSpace(artifacts.PackagePath) == "" {
+			return
+		}
+		abs, err := filepath.Abs(artifacts.PackagePath)
+		if err != nil {
+			return
+		}
+		referenced[abs] = true
+	}
+	for _, pack := range r.snapshot.Packs {
+		add(pack.Artifacts)
+		add(pack.PreviousArtifacts)
+	}
+	return referenced
 }
 
 func clonePackArtifacts(artifacts *PackArtifacts) *PackArtifacts {

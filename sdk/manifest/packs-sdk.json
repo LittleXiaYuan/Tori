@@ -15,7 +15,8 @@
     "POST /v1/packs/install",
     "POST /v1/packs/enable",
     "POST /v1/packs/disable",
-    "POST /v1/packs/rollback"
+    "POST /v1/packs/rollback",
+    "POST /v1/packs/prune"
   ],
   "capabilities": [
     {
@@ -67,6 +68,12 @@
       "description": "Rollback an installed pack to its previous version metadata when available."
     },
     {
+      "name": "prune",
+      "route": "POST /v1/packs/prune",
+      "readOnly": false,
+      "description": "Prune cached pack artifacts that are no longer referenced by current or rollback versions."
+    },
+    {
       "name": "frontendSync",
       "route": "GET /v1/packs/enabled",
       "readOnly": true,
@@ -92,7 +99,8 @@
         "enable": "createPacksClient().enable",
         "disable": "createPacksClient().disable",
         "rollback": "createPacksClient().rollback",
-        "frontendSync": "createPacksClient().frontendSync"
+        "frontendSync": "createPacksClient().frontendSync",
+        "prune": "createPacksClient().prune"
       }
     }
   },

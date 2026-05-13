@@ -132,6 +132,52 @@ func TestRegistryCacheDistributionRejectsSHA256Mismatch(t *testing.T) {
 	}
 }
 
+func TestRegistryPruneArtifactsRemovesUnreferencedFiles(t *testing.T) {
+	dir := t.TempDir()
+	registry, err := NewRegistry(dir)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	keepDir := filepath.Join(dir, "artifacts", "yunque.pack.backup", "0.1.0")
+	oldDir := filepath.Join(dir, "artifacts", "yunque.pack.backup", "0.0.9")
+	if err := os.MkdirAll(keepDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll keep: %v", err)
+	}
+	if err := os.MkdirAll(oldDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll old: %v", err)
+	}
+	keepPath := filepath.Join(keepDir, "backup-pack-0.1.0.tgz")
+	previousPath := filepath.Join(keepDir, "backup-pack-0.0.10.tgz")
+	oldPath := filepath.Join(oldDir, "backup-pack-0.0.9.tgz")
+	for _, path := range []string{keepPath, previousPath, oldPath} {
+		if err := os.WriteFile(path, []byte(path), 0o644); err != nil {
+			t.Fatalf("WriteFile %s: %v", path, err)
+		}
+	}
+	manifest := backupManifest("0.1.0")
+	pack, err := registry.InstallWithArtifacts(manifest, "test", &PackArtifacts{PackagePath: keepPath, SHA256: "keep", SizeBytes: 1, CachedAt: time.Now().UTC()})
+	if err != nil {
+		t.Fatalf("InstallWithArtifacts: %v", err)
+	}
+	pack.PreviousArtifacts = &PackArtifacts{PackagePath: previousPath, SHA256: "previous", SizeBytes: 1, CachedAt: time.Now().UTC()}
+	registry.snapshot.Packs[0] = pack
+	report := registry.PruneArtifacts()
+	if len(report.Errors) > 0 {
+		t.Fatalf("unexpected prune errors: %#v", report.Errors)
+	}
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Fatalf("expected unreferenced artifact removed, stat err=%v", err)
+	}
+	for _, path := range []string{keepPath, previousPath} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected referenced artifact kept %s: %v", path, err)
+		}
+	}
+	if len(report.Removed) != 1 || len(report.Kept) != 2 {
+		t.Fatalf("unexpected prune report: %#v", report)
+	}
+}
+
 func TestRegistryInstallEnableDisableAndRollback(t *testing.T) {
 	dir := t.TempDir()
 	registry, err := NewRegistry(dir)

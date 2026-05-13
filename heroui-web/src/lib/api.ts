@@ -668,6 +668,8 @@ export const api = {
     fetcher<PackMutationResponse>("/v1/packs/disable", { method: "POST", body: JSON.stringify({ id }) }),
   packRollback: (id: string) =>
     fetcher<PackMutationResponse>("/v1/packs/rollback", { method: "POST", body: JSON.stringify({ id }) }),
+  packPrune: () =>
+    fetcher<{ removed: string[]; kept: string[]; errors?: string[]; removed_count: number; kept_count: number }>("/v1/packs/prune", { method: "POST", body: JSON.stringify({}) }),
 
   // QQ Chat Analyzer (ext plugin)
   qqUpload: (content: string, filename?: string) =>

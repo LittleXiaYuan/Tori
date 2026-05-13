@@ -17,6 +17,7 @@ export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [k
 export type PackBackendRouteInfo = { method?: string; path: string };
 export type PackBackendModuleInfo = { pack_id: string; routes: PackBackendRouteInfo[] };
 export type PackBackendModulesResponse = { modules: PackBackendModuleInfo[]; count: number; [key: string]: unknown };
+export type PackPruneResponse = { removed: string[]; kept: string[]; errors?: string[]; removed_count: number; kept_count: number; [key: string]: unknown };
 export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string; download?: boolean };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
@@ -38,6 +39,7 @@ export class PacksClient {
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }
   rollback(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/rollback", id); }
+  prune(): Promise<PackPruneResponse> { return this.json<PackPruneResponse>("POST", "/v1/packs/prune", {}); }
   async frontendSync(): Promise<{ menus: PackFrontendMenu[]; routes: PackFrontendRoute[]; sdk: PackSdkEntrypoint[]; distributions: PackDistributionManifest[]; packs: InstalledPack[] }> { const response = await this.enabled(); const packs = response.packs ?? []; return { packs, menus: packs.flatMap((pack) => pack.manifest.frontend?.menus ?? []).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), routes: packs.flatMap((pack) => pack.manifest.frontend?.routes ?? []), sdk: packs.flatMap((pack) => Object.entries(pack.manifest.sdk ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0).map(([language, importPath]) => ({ packId: pack.manifest.id, packName: pack.manifest.name, language, importPath }))), distributions: packs.map((pack) => pack.manifest.distribution).filter((distribution): distribution is PackDistributionManifest => Boolean(distribution?.packageUrl || distribution?.frontendUrl)) }; }
   private mutate(path: string, id: string): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", path, { id }); }
   private authHeaders(extra?: HeadersInit): Headers { const headers = mergeHeaders(this.headers, extra); if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`); if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey); return headers; }

@@ -34,6 +34,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
 	g.mux.HandleFunc("/v1/packs/rollback", g.requireAuth(g.handlePackRollback))
+	g.mux.HandleFunc("/v1/packs/prune", g.requireAuth(g.handlePackPrune))
 	g.registerBuiltinBackendPacks()
 }
 
@@ -274,6 +275,19 @@ func (g *Gateway) handlePackRollback(w http.ResponseWriter, r *http.Request) {
 	g.handlePackMutation(w, r, func(registry *packruntime.Registry, id string) (packruntime.InstalledPack, error) {
 		return registry.Rollback(id)
 	})
+}
+
+func (g *Gateway) handlePackPrune(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if g.packRegistry == nil {
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{"error": "pack registry not configured"})
+		return
+	}
+	report := g.packRegistry.PruneArtifacts()
+	writeJSON(w, map[string]any{"removed": report.Removed, "kept": report.Kept, "errors": report.Errors, "removed_count": len(report.Removed), "kept_count": len(report.Kept)})
 }
 
 func (g *Gateway) handlePackMutation(w http.ResponseWriter, r *http.Request, mutate func(*packruntime.Registry, string) (packruntime.InstalledPack, error)) {
