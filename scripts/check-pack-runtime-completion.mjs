@@ -47,12 +47,16 @@ const gateway = [
   "internal/controlplane/gateway/gateway.go",
   "internal/controlplane/gateway/gateway_setters.go",
   "internal/controlplane/gateway/handlers_packs_test.go",
+  "internal/controlplane/gateway/handlers_cogni.go",
+  "internal/controlplane/gateway/handlers_cogni_experience_test.go",
   "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
 const backup = read("internal/packs/backup/handler.go");
 const backupManifest = read("packs/examples/backup-pack/pack.json");
 const loraPack = read("internal/packs/lora/handler.go");
 const loraManifest = read("packs/examples/lora-pack/pack.json");
+const cogniKernelPack = read("internal/packs/cognikernel/handler.go");
+const cogniKernelManifest = read("packs/examples/cogni-kernel-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
@@ -64,11 +68,14 @@ const frontend = [
   "heroui-web/src/app/packs/[...slug]/page.tsx",
   "heroui-web/src/app/packs/backup/page.tsx",
   "heroui-web/src/app/packs/lora/page.tsx",
+  "heroui-web/src/app/packs/cognis/page.tsx",
   "heroui-web/src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx",
   "heroui-web/src/lib/backup-pack-client.ts",
   "heroui-web/src/lib/__tests__/backup-pack-client.test.ts",
   "heroui-web/src/lib/lora-pack-client.ts",
   "heroui-web/src/lib/__tests__/lora-pack-client.test.ts",
+  "heroui-web/src/lib/cogni-kernel-pack-client.ts",
+  "heroui-web/src/lib/__tests__/cogni-kernel-pack-client.test.ts",
   "heroui-web/src/lib/pack-types.ts",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
@@ -77,6 +84,8 @@ const legacyBackupPage = read("heroui-web/src/app/backup/page.tsx");
 const backupPackPage = read("heroui-web/src/app/packs/backup/page.tsx");
 const legacyLoRAPage = read("heroui-web/src/app/lora/page.tsx");
 const loraPackPage = read("heroui-web/src/app/packs/lora/page.tsx");
+const legacyCogniPage = read("heroui-web/src/app/cognis/page.tsx");
+const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
@@ -87,8 +96,10 @@ const sdk = [
   "sdk/typescript/src/packs.test.ts",
   "sdk/manifest/packs-sdk.json",
   "sdk/manifest/lora-pack-sdk.json",
+  "sdk/manifest/cogni-kernel-pack-sdk.json",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
 ].map(read).join("\n");
 const docs = [
   "packs/AUTHORING.md",
@@ -132,6 +143,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "ensureBuiltinPacks",
   "loadBuiltinPackManifest",
   "packs/examples/lora-pack/pack.json",
+  "packs/examples/cogni-kernel-pack/pack.json",
 ]);
 
 requireTokens("后端 backend pack module registry / route gates", backend + gateway, [
@@ -180,6 +192,24 @@ requireTokens("lora-pack 蓝图能力包", loraPack + loraManifest + frontend, [
   "rollback",
 ]);
 
+requireTokens("cogni-kernel 蓝图能力包", cogniKernelPack + cogniKernelManifest + frontend + gateway, [
+  'const PackID = "yunque.pack.cogni-kernel"',
+  "type CogniGateway interface",
+  "HandleCogniKernelPack",
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/cognis",
+  "/v1/cognis/",
+  "http.MethodDelete",
+  "yunque-client/cognis",
+  "Cogni Kernel Pack",
+  "createCogniKernelPackClient",
+  "cogni-kernel-pack-client",
+  "TestCogniKernelPackGateReturnsNotFoundWhenDisabled",
+  "/packs/cognis",
+  "distribution",
+  "rollback",
+]);
+
 requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerification, [
   "fetchEnabledPacks",
   "buildPackNavItems",
@@ -195,6 +225,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend packs client tests",
   "Frontend backup pack client tests",
   "Frontend LoRA pack client tests",
+  "Frontend Cogni Kernel pack client tests",
   "Frontend shell pack entry tests",
   "PackRuntimeRoutePage",
   "enabled()",
@@ -243,6 +274,24 @@ if (loraPackPage.includes("api.getLoRA") || loraPackPage.includes("api.triggerLo
   ok("前端 LoRA pack 客户端拆分", "LoRA page uses lora-pack-client instead of monolithic api LoRA methods");
 }
 
+if (!legacyCogniPage.includes('redirect("/packs/cognis")')) {
+  fail("前端同步菜单/路由/资源/控制台", "legacy /cognis page must redirect to the Cogni Kernel pack route");
+} else {
+  ok("前端 Cogni Kernel pack 路由兼容", "legacy /cognis redirects to /packs/cognis");
+}
+
+if (frontendShell.includes('href: "/cognis"') || frontendShell.includes("nav-cognis")) {
+  fail("前端同步菜单/路由/资源/控制台", "Cogni Kernel must not be exposed as a hard-coded main-shell nav item; use enabled-pack sync");
+} else {
+  ok("前端轻内核导航", "Cogni Kernel entry is not hard-coded in sidebar/nav-items/command-palette");
+}
+
+if (cogniPackPage.includes("api.listCognis") || cogniPackPage.includes("api.reloadCognis") || cogniPackPage.includes("api.triggerCogniEvolution") || cogniPackPage.includes('from "@/lib/api"')) {
+  fail("前端同步菜单/路由/资源/控制台", "Cogni Kernel pack page must use cogni-kernel-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Cogni Kernel pack 客户端拆分", "Cogni Kernel page uses cogni-kernel-pack-client instead of monolithic api Cogni methods");
+}
+
 const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
 if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
@@ -274,6 +323,27 @@ const forbiddenMonolithicPackMethods = [
   "getEvolutionState:",
   "getLoRAConfig:",
   "updateLoRAConfig:",
+  "listCognis:",
+  "getCogni:",
+  "addCogni:",
+  "removeCogni:",
+  "setCogniEnabled:",
+  "reloadCognis:",
+  "getCogniHealth:",
+  "getCogniAlerts:",
+  "scanCogniAlerts:",
+  "verifyCognis:",
+  "getCogniTraces:",
+  "getCogniTracesByID:",
+  "generateCogni:",
+  "getCogniWorkflows:",
+  "runCogniWorkflow:",
+  "getCogniExperience:",
+  "confirmCogniExperiencePattern:",
+  "triggerCogniEvolution:",
+  "getCogniEvolution:",
+  "getCogniFederation:",
+  "exposeCogni:",
 ];
 const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) => monolithicApi.includes(token));
 if (leakedMonolithicMethods.length > 0) {
@@ -332,6 +402,7 @@ runCheck("contract checker", process.execPath, ["scripts/check-pack-contract.mjs
 runCheck("scaffold checker", process.execPath, ["scripts/check-pack-scaffold.mjs"]);
 runCheck("packs sdk checker", process.execPath, ["sdk/scripts/check-packs-sdk-manifest.mjs"]);
 runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pack-sdk-manifest.mjs"]);
+runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"]);
 
 if (failures.length > 0) {
   console.error("Pack Runtime completion audit failed:");

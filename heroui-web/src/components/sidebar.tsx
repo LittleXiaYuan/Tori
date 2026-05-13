@@ -50,7 +50,6 @@ const categories: NavCategory[] = [
     { href: "/skills", label: "技能", labelEn: "Skills", icon: <Package size={16} />, tier: "full" },
     { href: "/plugins", label: "插件", labelEn: "Plugins", icon: <Puzzle size={16} />, tier: "full" },
     { href: "/packs", label: "增量包", labelEn: "Packs", icon: <Boxes size={16} />, tier: "full" },
-    { href: "/cognis", label: "智体", labelEn: "Cognis", icon: <Boxes size={16} />, tier: "full" },
     { href: "/tools", label: "终端", labelEn: "Terminal", icon: <Wrench size={16} />, tier: "full" },
     { href: "/browser", label: "浏览器", labelEn: "Browser", icon: <Globe size={16} />, tier: "full" },
   ]},

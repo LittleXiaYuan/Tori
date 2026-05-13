@@ -75,17 +75,44 @@ const loraPack: InstalledPack = {
   },
 };
 
+const cogniKernelPack: InstalledPack = {
+  status: "enabled",
+  source: "packs/examples/cogni-kernel-pack",
+  manifest: {
+    id: "yunque.pack.cogni-kernel",
+    name: "Cogni Kernel Pack",
+    version: "0.1.0",
+    optional: true,
+    backend: {
+      routes: ["/v1/cognis", "/v1/cognis/"],
+      routeSpecs: [
+        { method: "GET", path: "/v1/cognis" },
+        { method: "POST", path: "/v1/cognis" },
+        { method: "GET", path: "/v1/cognis/" },
+        { method: "POST", path: "/v1/cognis/" },
+        { method: "DELETE", path: "/v1/cognis/" },
+      ],
+    },
+    frontend: {
+      menus: [{ key: "cognis", label: "智体内核", path: "/packs/cognis", icon: "brain-circuit", order: 80 }],
+      routes: [{ path: "/packs/cognis", component: "cognis/CogniKernelPackPage", title: "智体内核" }],
+    },
+    sdk: { typescript: "yunque-client/cognis" },
+  },
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("pack-sync frontend runtime", () => {
   it("builds sorted nav items from enabled pack menus", () => {
-    const items = buildPackNavItems([laterPack, backupPack]);
+    const items = buildPackNavItems([laterPack, backupPack, cogniKernelPack]);
 
-    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/later"]);
+    expect(items.map((item) => item.href)).toEqual(["/packs/backup", "/packs/cognis", "/packs/later"]);
     expect(items[0]).toMatchObject({ packId: "yunque.pack.backup", label: "备份恢复", order: 20 });
     expect(items[0]?.keywords).toContain("yunque.pack.backup");
+    expect(items[1]).toMatchObject({ packId: "yunque.pack.cogni-kernel", label: "智体内核", order: 80 });
   });
 
   it("builds sdk entrypoints and import snippets", () => {
@@ -127,6 +154,7 @@ describe("pack-sync frontend runtime", () => {
     expect(formatBackendRouteSpec(binding!)).toBe("GET /v1/backup/info");
     expect(formatBackendRouteSpec("/v1/legacy/info")).toBe("/v1/legacy/info");
     expect(bindings.map(formatBackendRouteSpec)).toContain("PATCH /v1/lora/config");
+    expect(buildPackBackendRouteBindings([cogniKernelPack]).map(formatBackendRouteSpec)).toContain("DELETE /v1/cognis/");
   });
 
   it("normalizes and resolves route bindings by pathname", () => {

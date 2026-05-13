@@ -103,8 +103,14 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_packs_test.go")
   + "\n"
-  + readText("internal/packs/lora/handler.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/controlplane/gateway/handlers_cogni.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_cogni_experience_test.go")
+  + "\n"
+  + readText("internal/packs/lora/handler.go")
+  + "\n"
+  + readText("internal/packs/cognikernel/handler.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "HandleCogniKernelPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -211,6 +217,47 @@ if (loraPage.includes('from "@/lib/api"') || loraPage.includes("api.getLoRA") ||
 }
 if (!legacyLoraPage.includes('redirect("/packs/lora")')) {
   fail("legacy /lora page should redirect to /packs/lora");
+}
+
+const cogniKernelManifest = readJSON("packs/examples/cogni-kernel-pack/pack.json");
+const cogniKernelSource = readText("internal/packs/cognikernel/handler.go");
+const cogniGatewayBridge = readText("internal/controlplane/gateway/handlers_cogni.go");
+const cogniKernelPage = readText("heroui-web/src/app/packs/cognis/page.tsx");
+const legacyCogniPage = readText("heroui-web/src/app/cognis/page.tsx");
+const cogniKernelClient = readText("heroui-web/src/lib/cogni-kernel-pack-client.ts");
+if (cogniKernelManifest) {
+  if (!cogniKernelSource.includes(`const PackID = "${cogniKernelManifest.id}"`)) {
+    fail("Cogni Kernel pack handler PackID must match packs/examples/cogni-kernel-pack/pack.json");
+  }
+  for (const route of cogniKernelManifest.backend?.routes ?? []) {
+    if (!cogniKernelSource.includes(route)) fail(`Cogni Kernel handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost", "http.MethodDelete"]) {
+    if (!cogniKernelSource.includes(method)) fail(`Cogni Kernel handler missing method gate declaration: ${method}`);
+  }
+  if (cogniKernelManifest.frontend?.menus?.[0]?.path !== "/packs/cognis") fail("Cogni Kernel menu path must stay under /packs/cognis");
+  if (cogniKernelManifest.sdk?.typescript !== "yunque-client/cognis") fail("Cogni Kernel SDK import must stay yunque-client/cognis");
+}
+if (!cogniGatewayBridge.includes("HandleCogniKernelPack") || !cogniGatewayBridge.includes("g.handleCognis(w, r)")) {
+  fail("Cogni Kernel Gateway bridge must delegate through HandleCogniKernelPack");
+}
+if (cogniKernelPage.includes('from "@/lib/api"') || cogniKernelPage.includes("api.listCognis") || !cogniKernelPage.includes("createCogniKernelPackClient")) {
+  fail("Cogni Kernel pack page must use cogni-kernel-pack-client instead of monolithic api object");
+}
+if (!legacyCogniPage.includes('redirect("/packs/cognis")')) {
+  fail("legacy /cognis page should redirect to /packs/cognis");
+}
+for (const token of ["createCogniKernelPackClient", "/v1/cognis", "/v1/cognis/reload", "/v1/cognis/alerts", "/v1/cognis/export", 'method: "DELETE"']) {
+  if (!cogniKernelClient.includes(token)) fail(`cogni-kernel-pack-client missing token: ${token}`);
+}
+const hardcodedCogniShell = [
+  "heroui-web/src/components/sidebar.tsx",
+  "heroui-web/src/lib/nav-items.tsx",
+  "heroui-web/src/components/layout/account-rail.tsx",
+  "heroui-web/src/components/command-palette.tsx",
+].map(readText).join("\n");
+if (hardcodedCogniShell.includes('href: "/cognis"') || hardcodedCogniShell.includes("nav-cognis")) {
+  fail("Cogni Kernel must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 }
 
 if (failures.length > 0) {

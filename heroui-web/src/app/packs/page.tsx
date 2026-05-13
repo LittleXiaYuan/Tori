@@ -21,7 +21,7 @@ import {
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import type { InstalledPack, PackBackendRouteSpec } from "@/lib/api";
+import type { InstalledPack, PackBackendRouteSpec } from "@/lib/pack-types";
 import { createPacksClient } from "@/lib/packs-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";

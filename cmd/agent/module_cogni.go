@@ -16,6 +16,7 @@ import (
 	builtinCogni "yunque-agent/internal/cognikernel/builtin"
 	"yunque-agent/internal/controlplane/gateway"
 	mcpkg "yunque-agent/internal/mcp"
+	cognikernelpack "yunque-agent/internal/packs/cognikernel"
 	"yunque-agent/pkg/cogni"
 	"yunque-agent/pkg/skills"
 )
@@ -283,6 +284,7 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			gw.SetCogniFederation(federation)
 			gw.SetCogniCostTracker(m.costTracker)
 			gw.SetNLConfigTranslator(nlTranslator)
+			gw.RegisterBackendPack(cognikernelpack.NewHandler(gw))
 		}
 	}
 

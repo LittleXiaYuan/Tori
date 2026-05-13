@@ -369,6 +369,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 	}
 	for _, manifestPath := range []string{
 		"packs/examples/backup-pack/pack.json",
+		"packs/examples/cogni-kernel-pack/pack.json",
 		"packs/examples/lora-pack/pack.json",
 	} {
 		manifest, err := loadBuiltinPackManifest(manifestPath)

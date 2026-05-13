@@ -1,0 +1,104 @@
+{
+  "id": "yunque.pack.cogni-kernel",
+  "name": "Cogni Kernel Pack",
+  "version": "0.1.0",
+  "description": "将声明式智体注册、热重载、观测、经验、进化、联邦和经济状态作为可选 CogniKernel 增量包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "cognis.registry",
+      "cognis.reload",
+      "cognis.traces",
+      "cognis.health",
+      "cognis.alerts",
+      "cognis.verify",
+      "cognis.generate",
+      "cognis.bundle",
+      "cognis.workflows",
+      "cognis.experience",
+      "cognis.evolution",
+      "cognis.federation",
+      "cognis.economics"
+    ],
+    "routes": [
+      "/v1/cognis",
+      "/v1/cognis/"
+    ],
+    "permissions": [
+      "cognis:read",
+      "cognis:write",
+      "cognis:evolve",
+      "cognis:federate"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/cognis",
+        "description": "List Cogni declarations and health summaries."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis",
+        "description": "Create an inline Cogni declaration."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/",
+        "description": "Read Cogni detail, traces, health, workflows, experience, evolution, federation or economics sub-resources."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognis/",
+        "description": "Reload, enable, disable, verify, generate, import, evolve, record experience, run workflows or update federation sub-resources."
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/cognis/",
+        "description": "Remove a Cogni declaration."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "cognis",
+        "label": "智体内核",
+        "path": "/packs/cognis",
+        "icon": "brain-circuit",
+        "order": 80
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/cognis",
+        "component": "cognis/CogniKernelPackPage",
+        "title": "智体内核"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "cognis/CogniKernelPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/cognis"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
+    "stage": "bridge-gateway-to-pack",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/cogni-kernel-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/cogni-kernel-pack/cogni-kernel-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/cogni-kernel-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}
