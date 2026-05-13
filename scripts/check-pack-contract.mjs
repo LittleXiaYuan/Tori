@@ -139,13 +139,27 @@ for (const path of packFiles) {
   }
   const menus = manifest.frontend?.menus ?? [];
   if (!Array.isArray(menus) || menus.length === 0) fail(`${path}: frontend.menus must not be empty`);
+  const frontendRoutes = manifest.frontend?.routes ?? [];
+  const frontendRoutePaths = new Set(Array.isArray(frontendRoutes) ? frontendRoutes.map((route) => route?.path).filter(Boolean) : []);
   for (const [index, menu] of menus.entries()) {
     for (const key of ["key", "label", "path"]) {
       if (!menu?.[key]) fail(`${path}: frontend.menus[${index}].${key} is required`);
     }
+    if (menu?.path && !String(menu.path).startsWith("/packs/")) {
+      fail(`${path}: frontend.menus[${index}].path must live under /packs/ to keep pack UI out of the main shell`);
+    }
+    if (menu?.path && !frontendRoutePaths.has(menu.path)) {
+      fail(`${path}: frontend.menus[${index}].path must have a matching frontend.routes entry`);
+    }
   }
-  const frontendRoutes = manifest.frontend?.routes ?? [];
   if (!Array.isArray(frontendRoutes) || frontendRoutes.length === 0) fail(`${path}: frontend.routes must not be empty`);
+  for (const [index, route] of frontendRoutes.entries()) {
+    if (!route?.path) fail(`${path}: frontend.routes[${index}].path is required`);
+    if (route?.path && !String(route.path).startsWith("/packs/")) {
+      fail(`${path}: frontend.routes[${index}].path must live under /packs/ to keep pack UI out of the main shell`);
+    }
+    if (!route?.component) fail(`${path}: frontend.routes[${index}].component is required`);
+  }
   if (!manifest.sdk?.typescript) fail(`${path}: sdk.typescript is required for lightweight external callers`);
   if (!manifest.distribution?.packageUrl) fail(`${path}: distribution.packageUrl is required for downloadable incremental packs`);
   if (!manifest.distribution?.frontendUrl) fail(`${path}: distribution.frontendUrl is required for frontend synchronized updates`);
