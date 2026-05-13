@@ -124,7 +124,9 @@
         "PackBundleApplyActionKind",
         "PackBundleApplyAction",
         "PlanPackBundleApply",
-        "RenderPackBundleApplyPlanMarkdown"
+        "RenderPackBundleApplyPlanMarkdown",
+        "Actions",
+        "RecommendedActions"
       ]
     },
     {
