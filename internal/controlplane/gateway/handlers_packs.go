@@ -52,11 +52,22 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 	packID := module.PackID()
 	g.routesMu.Lock()
 	defer g.routesMu.Unlock()
+	if g.backendPackRoutes == nil {
+		g.backendPackRoutes = make(map[string]string)
+	}
 	for _, route := range module.Routes() {
 		route := route
-		if strings.TrimSpace(route.Path) == "" || route.Handler == nil {
+		route.Path = strings.TrimSpace(route.Path)
+		if route.Path == "" || route.Handler == nil {
 			continue
 		}
+		if owner, ok := g.backendPackRoutes[route.Path]; ok {
+			if owner == packID {
+				continue
+			}
+			panic(fmt.Sprintf("backend pack route conflict: %s already registered by %s, cannot register %s", route.Path, owner, packID))
+		}
+		g.backendPackRoutes[route.Path] = packID
 		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Path, func(w http.ResponseWriter, r *http.Request) {
 			if route.Method != "" && r.Method != route.Method {
 				writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
