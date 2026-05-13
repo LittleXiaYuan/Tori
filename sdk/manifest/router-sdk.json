@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "domain": "smart-router",
+  "description": "Cross-language lightweight SDK entrypoints for smart-router slot and routing statistics without importing the full platform client.",
+  "principles": [
+    "Expose router observability as a focused SDK slice for external operator pages, plugin UIs, CLIs, sidecars, and automation monitors.",
+    "Keep smart-router stats directly callable through the existing authenticated route.",
+    "Make Router access available through Agent Kit so provider, cost, and routing dashboards can be composed from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/router/stats"
+  ],
+  "capabilities": [
+    {
+      "name": "stats",
+      "route": "GET /v1/router/stats",
+      "readOnly": true,
+      "description": "Read smart-router slot and routing statistics."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/router.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "stats": "createRouterClient().stats"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "stats": "yunque.Router.Stats"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "stats": "yunque.router.stats"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "stats": "RouterClient::stats"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

@@ -13,7 +13,7 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "knowledge", "lora", "workflows", "connectors", "notify", "projects", "market", "dispatch", "orchestrator", "fork", "cost", "providers", "cognis", "trace", "heartbeat", "events", "runtime", "subagents", "tools", "sandbox", "audit", "trust", "iterate", "persona", "emotion", "instructions", "reactions", "permissions", "tori", "speech", "setup", "admin", "federation", "planner", "ide", "discovery", "auth", "tasks", "documents", "bots", "reverie", "chat", "webchat", "conversations", "approvals", "rbac", "files", "browser", "realtime", "plugin"];
+const requiredCapabilities = ["state", "reflect", "missions", "scheduler", "cron", "triggers", "memory", "graph", "knowledge", "lora", "workflows", "connectors", "notify", "projects", "market", "dispatch", "orchestrator", "fork", "cost", "providers", "router", "cognis", "trace", "heartbeat", "events", "runtime", "subagents", "tools", "sandbox", "audit", "trust", "iterate", "persona", "emotion", "instructions", "reactions", "permissions", "tori", "speech", "setup", "admin", "federation", "planner", "ide", "discovery", "auth", "tasks", "documents", "bots", "reverie", "chat", "webchat", "conversations", "approvals", "rbac", "files", "browser", "realtime", "plugin"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) {
   if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
@@ -54,7 +54,7 @@ for (const [language, config] of Object.entries(languages)) {
     }
   }
   const docs = (config.docs ?? []).map(readRepoFile).join("\n");
-  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Knowledge", "LoRA", "Workflow", "Connector", "Notify", "Projects", "Market", "Dispatch", "Orchestrator", "Fork", "Cost", "Provider", "Cogni", "Trace", "Heartbeat", "Events", "Runtime", "Subagents", "Tools", "Sandbox", "Audit", "Trust", "Iterate", "Persona", "Emotion", "Instructions", "Reactions", "Permissions", "Tori", "Speech", "Setup", "Admin", "Federation", "Planner", "IDE", "Discovery", "Auth", "Tasks", "Documents", "Bots", "Reverie", "Chat", "WebChat", "Conversation", "Approval", "RBAC", "Files", "Browser", "Realtime", "Plugin"]) {
+  for (const token of ["Agent Kit", "State", "Reflect", "Mission", "Scheduler", "Cron", "Trigger", "Memory", "Graph", "Knowledge", "LoRA", "Workflow", "Connector", "Notify", "Projects", "Market", "Dispatch", "Orchestrator", "Fork", "Cost", "Provider", "Router", "Cogni", "Trace", "Heartbeat", "Events", "Runtime", "Subagents", "Tools", "Sandbox", "Audit", "Trust", "Iterate", "Persona", "Emotion", "Instructions", "Reactions", "Permissions", "Tori", "Speech", "Setup", "Admin", "Federation", "Planner", "IDE", "Discovery", "Auth", "Tasks", "Documents", "Bots", "Reverie", "Chat", "WebChat", "Conversation", "Approval", "RBAC", "Files", "Browser", "Realtime", "Plugin"]) {
     if (!docs.includes(token)) fail(`${language} docs missing Agent Kit token: ${token}`);
   }
 }

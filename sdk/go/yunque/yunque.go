@@ -300,10 +300,22 @@ func filenameFromDisposition(disposition string) string {
 	return ""
 }
 
+// ── Smart Router (/v1/router) ──
 
+// Router exposes smart-router slot and routing statistics for external operator pages and automation monitors.
+var Router = &routerNamespace{}
 
+type routerNamespace struct{}
 
+type RouterStatsResponse map[string]any
 
+func (r *routerNamespace) Stats(ctx context.Context) (RouterStatsResponse, error) {
+	var out RouterStatsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/router/stats", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // ── Discovery SDK (/v1/identity, /v1/embeddings, /v1/search) ──
 
@@ -327,41 +339,57 @@ type DiscoveryResolveIdentityRequest struct {
 
 func (d *discoveryNamespace) ResolveIdentity(ctx context.Context, req DiscoveryResolveIdentityRequest) (DiscoveryIdentityProfile, error) {
 	var out DiscoveryIdentityProfile
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/identity/resolve", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/identity/resolve", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (d *discoveryNamespace) IdentityProfiles(ctx context.Context) (DiscoveryIdentityProfilesResponse, error) {
 	var out DiscoveryIdentityProfilesResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/identity/profiles", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/identity/profiles", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (d *discoveryNamespace) EmbeddingProviders(ctx context.Context) (DiscoveryEmbeddingProvidersResponse, error) {
 	var out DiscoveryEmbeddingProvidersResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/embeddings", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/embeddings", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (d *discoveryNamespace) Embed(ctx context.Context, text, provider string) (DiscoveryEmbeddingResponse, error) {
 	var out DiscoveryEmbeddingResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/embeddings", map[string]any{"text": text, "provider": provider}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/embeddings", map[string]any{"text": text, "provider": provider}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (d *discoveryNamespace) Search(ctx context.Context, q string, limit int, provider string) (DiscoverySearchResponse, error) {
 	values := url.Values{}
 	values.Set("q", q)
-	if limit > 0 { values.Set("limit", strconv.Itoa(limit)) }
-	if provider != "" { values.Set("provider", provider) }
+	if limit > 0 {
+		values.Set("limit", strconv.Itoa(limit))
+	}
+	if provider != "" {
+		values.Set("provider", provider)
+	}
 	var out DiscoverySearchResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/search?"+values.Encode(), nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/search?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (d *discoveryNamespace) SearchProviders(ctx context.Context) (DiscoverySearchProvidersResponse, error) {
 	var out DiscoverySearchProvidersResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/search/providers", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/search/providers", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -385,13 +413,17 @@ type IDEReviewRequest struct {
 
 func (i *ideNamespace) Status(ctx context.Context) (IDEStatusResponse, error) {
 	var out IDEStatusResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/ide/status", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/ide/status", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (i *ideNamespace) Review(ctx context.Context, req IDEReviewRequest) (IDEReviewResponse, error) {
 	var out IDEReviewResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/ide/review", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/ide/review", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -457,52 +489,82 @@ type PlannerExecutionStateQuery struct {
 
 func (p *plannerNamespace) ListCheckpoints(ctx context.Context, query PlannerCheckpointQuery) (PlannerCheckpointsResponse, error) {
 	values := url.Values{}
-	if query.Limit > 0 { values.Set("limit", strconv.Itoa(query.Limit)) }
-	if query.PlanID != "" { values.Set("plan_id", query.PlanID) }
-	if query.IncludeSnapshot { values.Set("include_snapshot", "true") }
+	if query.Limit > 0 {
+		values.Set("limit", strconv.Itoa(query.Limit))
+	}
+	if query.PlanID != "" {
+		values.Set("plan_id", query.PlanID)
+	}
+	if query.IncludeSnapshot {
+		values.Set("include_snapshot", "true")
+	}
 	path := "/v1/planner/checkpoints"
-	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	if encoded := values.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
 	var out PlannerCheckpointsResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *plannerNamespace) RecoverCheckpoint(ctx context.Context, req PlannerRecoveryRequest) (PlannerRecoveryResponse, error) {
 	var out PlannerRecoveryResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/recover", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/recover", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *plannerNamespace) ResumeCheckpointTask(ctx context.Context, req PlannerResumeTaskRequest) (PlannerResumeTaskResponse, error) {
 	var out PlannerResumeTaskResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *plannerNamespace) ResumeCheckpointPlan(ctx context.Context, req PlannerResumePlanRequest) (PlannerResumePlanResponse, error) {
 	var out PlannerResumePlanResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume-plan", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/planner/checkpoints/resume-plan", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *plannerNamespace) GetResumePlanJob(ctx context.Context, query PlannerResumePlanJobQuery) (PlannerResumePlanJobResponse, error) {
 	values := url.Values{}
-	if query.JobID != "" { values.Set("job_id", query.JobID) }
-	if query.ID != "" { values.Set("id", query.ID) }
-	if query.PlanID != "" { values.Set("plan_id", query.PlanID) }
+	if query.JobID != "" {
+		values.Set("job_id", query.JobID)
+	}
+	if query.ID != "" {
+		values.Set("id", query.ID)
+	}
+	if query.PlanID != "" {
+		values.Set("plan_id", query.PlanID)
+	}
 	path := "/v1/planner/checkpoints/resume-plan/jobs"
-	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	if encoded := values.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
 	var out PlannerResumePlanJobResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *plannerNamespace) ExecutionState(ctx context.Context, query PlannerExecutionStateQuery) (PlannerExecutionStateResponse, error) {
 	values := url.Values{}
 	values.Set("plan_id", query.PlanID)
-	if query.Action != "" { values.Set("action", query.Action) }
+	if query.Action != "" {
+		values.Set("action", query.Action)
+	}
 	var out PlannerExecutionStateResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/planner/execution-state?"+values.Encode(), nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/planner/execution-state?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -534,51 +596,71 @@ type FederationDiscoverRequest struct {
 
 func (f *federationNamespace) Peers(ctx context.Context) (FederationPeersResponse, error) {
 	var out FederationPeersResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/peers", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/peers", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) Stats(ctx context.Context) (FederationStatsResponse, error) {
 	var out FederationStatsResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/stats", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/stats", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) Capabilities(ctx context.Context) (FederationCapabilitiesResponse, error) {
 	var out FederationCapabilitiesResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/capabilities", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/capabilities", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) UpdateCapabilities(ctx context.Context, payload FederationCapabilityPayload) (FederationStatusResponse, error) {
 	var out FederationStatusResponse
-	if payload == nil { payload = FederationCapabilityPayload{} }
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/capabilities", payload, &out); err != nil { return nil, err }
+	if payload == nil {
+		payload = FederationCapabilityPayload{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/capabilities", payload, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) Discover(ctx context.Context, req FederationDiscoverRequest) (FederationDiscoverResponse, error) {
 	var out FederationDiscoverResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/discover", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/discover", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) Delegate(ctx context.Context, payload FederationDelegatePayload) (FederationDelegateResponse, error) {
 	var out FederationDelegateResponse
-	if payload == nil { payload = FederationDelegatePayload{} }
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/delegate", payload, &out); err != nil { return nil, err }
+	if payload == nil {
+		payload = FederationDelegatePayload{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/delegate", payload, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) BridgeStats(ctx context.Context) (FederationBridgeStatsResponse, error) {
 	var out FederationBridgeStatsResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/bridge/stats", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/federation/bridge/stats", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (f *federationNamespace) Broadcast(ctx context.Context) (FederationStatusResponse, error) {
 	var out FederationStatusResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/broadcast", map[string]any{}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/federation/broadcast", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -606,49 +688,65 @@ type AdminNLConfigRequest struct {
 
 func (a *adminNamespace) ConsoleStatus(ctx context.Context) (AdminDesktopConsoleResponse, error) {
 	var out AdminDesktopConsoleResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/console", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/console", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) ToggleConsole(ctx context.Context) (AdminDesktopConsoleResponse, error) {
 	var out AdminDesktopConsoleResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/console", map[string]any{}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/console", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) AutostartStatus(ctx context.Context) (AdminDesktopAutostartResponse, error) {
 	var out AdminDesktopAutostartResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/autostart", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/desktop/autostart", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) ToggleAutostart(ctx context.Context) (AdminDesktopAutostartResponse, error) {
 	var out AdminDesktopAutostartResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/autostart", map[string]any{}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/desktop/autostart", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) ListTenants(ctx context.Context) (AdminTenantListResponse, error) {
 	var out AdminTenantListResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/tenants", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/tenants", nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) CreateTenant(ctx context.Context, name string) (AdminTenantRecord, error) {
 	var out AdminTenantRecord
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/tenants", AdminCreateTenantRequest{Name: name}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/tenants", AdminCreateTenantRequest{Name: name}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) NLConfig(ctx context.Context, text string, execute bool) (AdminNLConfigResponse, error) {
 	var out AdminNLConfigResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config", AdminNLConfigRequest{Text: text, Execute: execute}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config", AdminNLConfigRequest{Text: text, Execute: execute}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (a *adminNamespace) NLConfigTranslate(ctx context.Context, text string) (AdminNLConfigResponse, error) {
 	var out AdminNLConfigResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config/translate", AdminNLConfigRequest{Text: text, Execute: false}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/nl-config/translate", AdminNLConfigRequest{Text: text, Execute: false}, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -1061,6 +1159,7 @@ type AgentKit struct {
 	Planner       *plannerNamespace
 	IDE           *ideNamespace
 	Discovery     *discoveryNamespace
+	Router        *routerNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
 	Auth          *authNamespace
@@ -4117,29 +4216,47 @@ func (p *personaNamespace) UpdatePresetFeatures(ctx context.Context, req UpdateP
 
 func (p *personaNamespace) Modes(ctx context.Context, tenantID, sessionID string) (PersonaModesResponse, error) {
 	values := url.Values{}
-	if tenantID != "" { values.Set("tenant_id", tenantID) }
-	if sessionID != "" { values.Set("session_id", sessionID) }
+	if tenantID != "" {
+		values.Set("tenant_id", tenantID)
+	}
+	if sessionID != "" {
+		values.Set("session_id", sessionID)
+	}
 	path := "/v1/persona/modes"
-	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	if encoded := values.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
 	var out PersonaModesResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *personaNamespace) SetMode(ctx context.Context, req SetPersonaModeRequest) (PersonaSetModeResponse, error) {
 	var out PersonaSetModeResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/mode", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/mode", req, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
 func (p *personaNamespace) CurrentMode(ctx context.Context, tenantID, sessionID string) (PersonaCurrentModeResponse, error) {
 	values := url.Values{}
-	if tenantID != "" { values.Set("tenant_id", tenantID) }
-	if sessionID != "" { values.Set("session_id", sessionID) }
+	if tenantID != "" {
+		values.Set("tenant_id", tenantID)
+	}
+	if sessionID != "" {
+		values.Set("session_id", sessionID)
+	}
 	path := "/v1/persona/mode/current"
-	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	if encoded := values.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
 	var out PersonaCurrentModeResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -4685,7 +4802,7 @@ type SpeechAudioResponse struct {
 type SpeechSTTOptions struct {
 	Language      string
 	DetectEmotion bool
-	ContentType    string
+	ContentType   string
 }
 
 type SpeechSTTResponse map[string]any
@@ -5750,10 +5867,6 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 	return out, nil
 }
 
-
-
-
-
 // ── Sandbox Runtime ──
 
 // Sandbox provides focused access to sandbox command execution and desktop lifecycle helpers.
@@ -5772,31 +5885,41 @@ type DesktopSandboxResponse map[string]any
 
 func (s *sandboxNamespace) Exec(ctx context.Context, req SandboxExecRequest) (SandboxExecResponse, error) {
 	var out SandboxExecResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/exec", req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/exec", req, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (s *sandboxNamespace) Probe(ctx context.Context) (SandboxProbeResponse, error) {
 	var out SandboxProbeResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/probe", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/probe", nil, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (s *sandboxNamespace) CreateDesktop(ctx context.Context) (DesktopSandboxResponse, error) {
 	var out DesktopSandboxResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop", map[string]any{}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (s *sandboxNamespace) DesktopStatus(ctx context.Context) (DesktopSandboxResponse, error) {
 	var out DesktopSandboxResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/desktop/status", nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/desktop/status", nil, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (s *sandboxNamespace) DestroyDesktop(ctx context.Context) (DesktopSandboxResponse, error) {
 	var out DesktopSandboxResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop/destroy", map[string]any{}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop/destroy", map[string]any{}, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
@@ -5823,12 +5946,22 @@ func (w *webchatNamespace) WidgetURL() string {
 }
 
 func (w *webchatNamespace) EmbedSnippet(opts WebChatEmbedOptions) (string, error) {
-	if opts.APIKey == "" { return "", fmt.Errorf("EmbedSnippet requires APIKey") }
-	if opts.ScriptPath == "" { opts.ScriptPath = w.WidgetURL() }
-	if opts.APIBase == "" { opts.APIBase = strings.TrimRight(apiBase, "/") }
+	if opts.APIKey == "" {
+		return "", fmt.Errorf("EmbedSnippet requires APIKey")
+	}
+	if opts.ScriptPath == "" {
+		opts.ScriptPath = w.WidgetURL()
+	}
+	if opts.APIBase == "" {
+		opts.APIBase = strings.TrimRight(apiBase, "/")
+	}
 	attrs := [][2]string{{"src", opts.ScriptPath}, {"data-api-key", opts.APIKey}, {"data-api-base", opts.APIBase}, {"data-title", opts.Title}, {"data-placeholder", opts.Placeholder}, {"data-position", opts.Position}, {"data-theme", opts.Theme}, {"data-tenant-id", opts.TenantID}}
 	parts := make([]string, 0, len(attrs))
-	for _, attr := range attrs { if attr[1] != "" { parts = append(parts, fmt.Sprintf(`%s="%s"`, attr[0], htmlAttrEscape(attr[1]))) } }
+	for _, attr := range attrs {
+		if attr[1] != "" {
+			parts = append(parts, fmt.Sprintf(`%s="%s"`, attr[0], htmlAttrEscape(attr[1])))
+		}
+	}
 	return "<script " + strings.Join(parts, " ") + "></script>", nil
 }
 
@@ -5870,14 +6003,20 @@ type DocumentTemplatesResponse struct {
 
 func (d *documentsNamespace) Templates(ctx context.Context) (DocumentTemplatesResponse, error) {
 	var out DocumentTemplatesResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/documents/templates", nil, &out); err != nil { return DocumentTemplatesResponse{}, err }
-	if out.Templates == nil { out.Templates = []DocumentTemplate{} }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/documents/templates", nil, &out); err != nil {
+		return DocumentTemplatesResponse{}, err
+	}
+	if out.Templates == nil {
+		out.Templates = []DocumentTemplate{}
+	}
 	return out, nil
 }
 
 func (d *documentsNamespace) Generate(ctx context.Context, req DocumentGenerateRequest) (DocumentGenerateResponse, error) {
 	var out DocumentGenerateResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/documents/generate", req, &out); err != nil { return DocumentGenerateResponse{}, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/documents/generate", req, &out); err != nil {
+		return DocumentGenerateResponse{}, err
+	}
 	return out, nil
 }
 
@@ -5962,27 +6101,39 @@ type ChannelGroupsResponse struct {
 
 func (b *botsNamespace) List(ctx context.Context) (BotsResponse, error) {
 	var out BotsResponse
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots", nil, &out); err != nil { return BotsResponse{}, err }
-	if out.Bots == nil { out.Bots = []Bot{} }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots", nil, &out); err != nil {
+		return BotsResponse{}, err
+	}
+	if out.Bots == nil {
+		out.Bots = []Bot{}
+	}
 	return out, nil
 }
 
 func (b *botsNamespace) Create(ctx context.Context, req CreateBotRequest) (Bot, error) {
 	var out Bot
-	if req.Config == nil { req.Config = BotConfig{} }
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/bots", req, &out); err != nil { return nil, err }
+	if req.Config == nil {
+		req.Config = BotConfig{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/bots", req, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (b *botsNamespace) Get(ctx context.Context, id string) (Bot, error) {
 	var out Bot
-	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (b *botsNamespace) Update(ctx context.Context, id string, req UpdateBotRequest) (Bot, error) {
 	var out Bot
-	if err := apiCallInto(ctx, http.MethodPut, "/v1/bots/detail?id="+url.QueryEscape(id), req, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/bots/detail?id="+url.QueryEscape(id), req, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
@@ -5992,51 +6143,77 @@ func (b *botsNamespace) SetActive(ctx context.Context, id string, active bool) (
 
 func (b *botsNamespace) Delete(ctx context.Context, id string) (DeleteBotResponse, error) {
 	var out DeleteBotResponse
-	if err := apiCallInto(ctx, http.MethodDelete, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (b *botsNamespace) Inbox(ctx context.Context, unread bool) (InboxResponse, error) {
 	path := "/v1/inbox"
-	if unread { path += "?unread=true" }
+	if unread {
+		path += "?unread=true"
+	}
 	var out InboxResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return InboxResponse{}, err }
-	if out.Items == nil { out.Items = []InboxItem{} }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return InboxResponse{}, err
+	}
+	if out.Items == nil {
+		out.Items = []InboxItem{}
+	}
 	return out, nil
 }
 
 func (b *botsNamespace) PushInbox(ctx context.Context, req PushInboxRequest) (InboxItem, error) {
 	var out InboxItem
-	if req.Action == "" { req.Action = "notify" }
-	if req.Header == nil { req.Header = map[string]any{} }
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox", req, &out); err != nil { return nil, err }
+	if req.Action == "" {
+		req.Action = "notify"
+	}
+	if req.Header == nil {
+		req.Header = map[string]any{}
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox", req, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (b *botsNamespace) DeleteInbox(ctx context.Context, id string) (InboxDeleteResponse, error) {
 	var out InboxDeleteResponse
-	if err := apiCallInto(ctx, http.MethodDelete, "/v1/inbox", map[string]any{"id": id}, &out); err != nil { return nil, err }
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/inbox", map[string]any{"id": id}, &out); err != nil {
+		return nil, err
+	}
 	return nonNilMap(out), nil
 }
 
 func (b *botsNamespace) MarkInboxRead(ctx context.Context, ids []string) (InboxReadResponse, error) {
 	var out InboxReadResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"ids": ids, "all": false}, &out); err != nil { return InboxReadResponse{}, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"ids": ids, "all": false}, &out); err != nil {
+		return InboxReadResponse{}, err
+	}
 	return out, nil
 }
 
 func (b *botsNamespace) MarkAllInboxRead(ctx context.Context) (InboxReadResponse, error) {
 	var out InboxReadResponse
-	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"all": true}, &out); err != nil { return InboxReadResponse{}, err }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"all": true}, &out); err != nil {
+		return InboxReadResponse{}, err
+	}
 	return out, nil
 }
 
 func (b *botsNamespace) ChannelGroups(ctx context.Context, typ string) (ChannelGroupsResponse, error) {
 	path := "/v1/channels/groups"
-	if typ != "" { path += "?type=" + url.QueryEscape(typ) }
+	if typ != "" {
+		path += "?type=" + url.QueryEscape(typ)
+	}
 	var out ChannelGroupsResponse
-	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return ChannelGroupsResponse{}, err }
-	if out.Groups == nil { out.Groups = []ChannelGroup{} }
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return ChannelGroupsResponse{}, err
+	}
+	if out.Groups == nil {
+		out.Groups = []ChannelGroup{}
+	}
 	return out, nil
 }
 
@@ -6089,6 +6266,7 @@ func NewAgentKit() AgentKit {
 		Planner:       Planner,
 		IDE:           IDE,
 		Discovery:     Discovery,
+		Router:        Router,
 		Settings:      Settings,
 		System:        System,
 		Auth:          Auth,

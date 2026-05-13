@@ -199,11 +199,6 @@ func TestSetupHelpers(t *testing.T) {
 	}
 }
 
-
-
-
-
-
 func TestDiscoveryHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -212,8 +207,12 @@ func TestDiscoveryHelpers(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/identity/resolve":
 			var body DiscoveryResolveIdentityRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Channel != "feishu" || body.UserID != "42" { t.Fatalf("unexpected identity body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Channel != "feishu" || body.UserID != "42" {
+				t.Fatalf("unexpected identity body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"unified_id":"u1","display_name":"小羽"}`))
 		case "/v1/identity/profiles":
 			_, _ = w.Write([]byte(`{"profiles":[{"unified_id":"u1"}]}`))
@@ -223,11 +222,17 @@ func TestDiscoveryHelpers(t *testing.T) {
 				return
 			}
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body["text"] != "云雀" || body["provider"] != "mock" { t.Fatalf("unexpected embed body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["text"] != "云雀" || body["provider"] != "mock" {
+				t.Fatalf("unexpected embed body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"embedding":[0.1,0.2],"dimensions":2}`))
 		case "/v1/search":
-			if r.URL.Query().Get("q") != "planner" || r.URL.Query().Get("limit") != "3" || r.URL.Query().Get("provider") != "bing" { t.Fatalf("unexpected search query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("q") != "planner" || r.URL.Query().Get("limit") != "3" || r.URL.Query().Get("provider") != "bing" {
+				t.Fatalf("unexpected search query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"results":[{"title":"云雀"}]}`))
 		case "/v1/search/providers":
 			_, _ = w.Write([]byte(`{"enabled":true,"providers":["bing"]}`))
@@ -238,17 +243,29 @@ func TestDiscoveryHelpers(t *testing.T) {
 
 	ctx := context.Background()
 	profile, err := Discovery.ResolveIdentity(ctx, DiscoveryResolveIdentityRequest{Channel: "feishu", UserID: "42", DisplayName: "小羽"})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	profiles, err := Discovery.IdentityProfiles(ctx)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	embedProviders, err := Discovery.EmbeddingProviders(ctx)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	embedded, err := Discovery.Embed(ctx, "云雀", "mock")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	searched, err := Discovery.Search(ctx, "planner", 3, "bing")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	searchProviders, err := Discovery.SearchProviders(ctx)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	kit := NewAgentKit()
 
 	if profile["unified_id"] != "u1" || profiles["profiles"] == nil || embedProviders["providers"] == nil || embedded["dimensions"].(float64) != 2 || searched["results"] == nil || searchProviders["enabled"] != true || kit.Discovery != Discovery {
@@ -269,8 +286,12 @@ func TestIDEHelpers(t *testing.T) {
 			_, _ = w.Write([]byte(`{"connected":true,"capabilities":["review"],"skills_count":3}`))
 		case "/v1/ide/review":
 			var body IDEReviewRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Mode == "" { t.Fatalf("missing review mode: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Mode == "" {
+				t.Fatalf("missing review mode: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"summary":"ok","issues":[],"score":9}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -285,7 +306,9 @@ func TestIDEHelpers(t *testing.T) {
 	if status["connected"] != true || review["score"].(float64) != 9 || diff["summary"] != "ok" || quick["summary"] != "ok" || full["summary"] != "ok" || NewAgentKit().IDE != IDE {
 		t.Fatalf("unexpected ide results")
 	}
-	if len(seen) != 5 { t.Fatalf("expected 5 ide API calls, got %d: %v", len(seen), seen) }
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 ide API calls, got %d: %v", len(seen), seen)
+	}
 }
 
 func TestPlannerHelpers(t *testing.T) {
@@ -295,7 +318,9 @@ func TestPlannerHelpers(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/v1/planner/checkpoints":
-			if r.URL.Query().Get("plan_id") != "plan-1" || r.URL.Query().Get("include_snapshot") != "true" { t.Fatalf("unexpected checkpoints query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("plan_id") != "plan-1" || r.URL.Query().Get("include_snapshot") != "true" {
+				t.Fatalf("unexpected checkpoints query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"checkpoints":[{"plan_id":"plan-1"}],"count":1}`))
 		case "/v1/planner/checkpoints/recover":
 			_, _ = w.Write([]byte(`{"action":"retry_failed","plan_id":"plan-1"}`))
@@ -304,10 +329,14 @@ func TestPlannerHelpers(t *testing.T) {
 		case "/v1/planner/checkpoints/resume-plan":
 			_, _ = w.Write([]byte(`{"status":"accepted","plan_id":"plan-1","job_id":"job-1"}`))
 		case "/v1/planner/checkpoints/resume-plan/jobs":
-			if r.URL.Query().Get("job_id") != "job-1" { t.Fatalf("unexpected job query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("job_id") != "job-1" {
+				t.Fatalf("unexpected job query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"job":{"id":"job-1","status":"running"}}`))
 		case "/v1/planner/execution-state":
-			if r.URL.Query().Get("action") != "retry_failed" { t.Fatalf("unexpected state query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("action") != "retry_failed" {
+				t.Fatalf("unexpected state query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"plan_id":"plan-1","next_action":"retry_failed"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -323,7 +352,9 @@ func TestPlannerHelpers(t *testing.T) {
 	if checkpoints["count"].(float64) != 1 || recovered["action"] != "retry_failed" || resumedTask["status"] != "accepted" || resumedPlan["job_id"] != "job-1" || job["job"] == nil || state["next_action"] != "retry_failed" || NewAgentKit().Planner != Planner {
 		t.Fatalf("unexpected planner results")
 	}
-	if len(seen) != 6 { t.Fatalf("expected 6 planner API calls, got %d: %v", len(seen), seen) }
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 planner API calls, got %d: %v", len(seen), seen)
+	}
 }
 
 func TestFederationHelpers(t *testing.T) {
@@ -337,10 +368,18 @@ func TestFederationHelpers(t *testing.T) {
 		case "/v1/federation/stats":
 			_, _ = w.Write([]byte(`{"peers":1,"messages":2}`))
 		case "/v1/federation/capabilities":
-			if r.Method == http.MethodPost { _, _ = w.Write([]byte(`{"status":"updated"}`)); return }
+			if r.Method == http.MethodPost {
+				_, _ = w.Write([]byte(`{"status":"updated"}`))
+				return
+			}
 			_, _ = w.Write([]byte(`{"local":{"agent_id":"agent-a"},"peers":[]}`))
 		case "/v1/federation/discover":
-			var body FederationDiscoverRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Feature != "browser" { t.Fatalf("unexpected discover body: %+v", body) }; _, _ = w.Write([]byte(`{"results":[{"peer_id":"p1"}],"count":1}`))
+			var body FederationDiscoverRequest
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.Feature != "browser" {
+				t.Fatalf("unexpected discover body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"results":[{"peer_id":"p1"}],"count":1}`))
 		case "/v1/federation/delegate":
 			_, _ = w.Write([]byte(`{"status":"delegated","result":{"task_id":"t1"}}`))
 		case "/v1/federation/bridge/stats":
@@ -363,7 +402,9 @@ func TestFederationHelpers(t *testing.T) {
 	if peers["local_id"] != "agent-local" || stats["messages"].(float64) != 2 || caps["local"] == nil || updated["status"] != "updated" || found["count"].(float64) != 1 || delegated["status"] != "delegated" || bridge["configured"] != true || broadcast["status"] != "broadcasted" || NewAgentKit().Federation != Federation {
 		t.Fatalf("unexpected federation results")
 	}
-	if len(seen) != 8 { t.Fatalf("expected 8 federation API calls, got %d: %v", len(seen), seen) }
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 federation API calls, got %d: %v", len(seen), seen)
+	}
 }
 
 func TestAdminHelpers(t *testing.T) {
@@ -377,10 +418,23 @@ func TestAdminHelpers(t *testing.T) {
 		case "/v1/desktop/autostart":
 			_, _ = w.Write([]byte(`{"autostart_enabled":` + fmt.Sprint(r.Method == http.MethodPost) + `}`))
 		case "/v1/tenants":
-			if r.Method == http.MethodPost { var body AdminCreateTenantRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Name != "team" { t.Fatalf("unexpected tenant body: %+v", body) }; _, _ = w.Write([]byte(`{"id":"t2","name":"team"}`)); return }
+			if r.Method == http.MethodPost {
+				var body AdminCreateTenantRequest
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if body.Name != "team" {
+					t.Fatalf("unexpected tenant body: %+v", body)
+				}
+				_, _ = w.Write([]byte(`{"id":"t2","name":"team"}`))
+				return
+			}
 			_, _ = w.Write([]byte(`{"tenants":[{"id":"t1","name":"default"}],"count":1}`))
 		case "/v1/nl-config", "/v1/nl-config/translate":
-			var body AdminNLConfigRequest; _ = json.NewDecoder(r.Body).Decode(&body); if body.Text == "" { t.Fatalf("missing nl config text") }; _, _ = w.Write([]byte(`{"status":"ok","executed":` + fmt.Sprint(body.Execute) + `}`))
+			var body AdminNLConfigRequest
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.Text == "" {
+				t.Fatalf("missing nl config text")
+			}
+			_, _ = w.Write([]byte(`{"status":"ok","executed":` + fmt.Sprint(body.Execute) + `}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
 		}
@@ -397,7 +451,9 @@ func TestAdminHelpers(t *testing.T) {
 	if consoleStatus["console_hidden"] != false || consoleToggle["console_hidden"] != true || autostartStatus["autostart_enabled"] != false || autostartToggle["autostart_enabled"] != true || tenants["count"].(float64) != 1 || created["name"] != "team" || translated["executed"] != false || executed["executed"] != true || NewAgentKit().Admin != Admin {
 		t.Fatalf("unexpected admin results")
 	}
-	if len(seen) != 8 { t.Fatalf("expected 8 admin API calls, got %d: %v", len(seen), seen) }
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 admin API calls, got %d: %v", len(seen), seen)
+	}
 }
 
 func TestSettingsHelpers(t *testing.T) {
@@ -1111,7 +1167,6 @@ func TestEmotionHelpers(t *testing.T) {
 	}
 }
 
-
 func TestPersonaModesHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -1119,15 +1174,23 @@ func TestPersonaModesHelpers(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/v1/persona/modes":
-			if r.URL.Query().Get("tenant_id") != "tenant-1" || r.URL.Query().Get("session_id") != "session-1" { t.Fatalf("unexpected persona modes query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("tenant_id") != "tenant-1" || r.URL.Query().Get("session_id") != "session-1" {
+				t.Fatalf("unexpected persona modes query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"modes":[{"mode":"study"}],"total":1}`))
 		case "/v1/persona/mode":
 			var body SetPersonaModeRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.TenantID != "tenant-1" || body.Mode != "focus" || body.SessionID != "session-1" { t.Fatalf("unexpected persona mode body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.TenantID != "tenant-1" || body.Mode != "focus" || body.SessionID != "session-1" {
+				t.Fatalf("unexpected persona mode body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"success":true,"current_mode":"focus"}`))
 		case "/v1/persona/mode/current":
-			if r.URL.Query().Get("tenant_id") != "tenant-1" { t.Fatalf("unexpected current mode query: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("tenant_id") != "tenant-1" {
+				t.Fatalf("unexpected current mode query: %s", r.URL.RawQuery)
+			}
 			_, _ = w.Write([]byte(`{"mode":"study","name":"Study","description":"Study mode"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -1136,11 +1199,17 @@ func TestPersonaModesHelpers(t *testing.T) {
 
 	ctx := context.Background()
 	modes, err := Persona.Modes(ctx, "tenant-1", "session-1")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	set, err := Persona.SetMode(ctx, SetPersonaModeRequest{TenantID: "tenant-1", Mode: "focus", SessionID: "session-1"})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	current, err := Persona.CurrentMode(ctx, "tenant-1", "")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if modes["total"].(float64) != 1 || set["current_mode"] != "focus" || current["mode"] != "study" || NewAgentKit().Persona != Persona {
 		t.Fatalf("unexpected persona mode results")
 	}
@@ -3797,7 +3866,6 @@ func withTestAPI(t *testing.T, handler http.HandlerFunc) {
 	pluginName = "state-plugin"
 }
 
-
 func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -3807,21 +3875,31 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 		case "/v1/bots":
 			if r.Method == http.MethodPost {
 				var body CreateBotRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.Name != "planner" || body.Config["model"] != "deepseek" { t.Fatalf("unexpected bot create body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Name != "planner" || body.Config["model"] != "deepseek" {
+					t.Fatalf("unexpected bot create body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"id":"bot-2","name":"planner"}`))
 				return
 			}
 			_, _ = w.Write([]byte(`{"bots":[{"id":"bot-1","name":"default"}],"total":1,"active":1}`))
 		case "/v1/bots/detail":
-			if r.URL.Query().Get("id") != "bot/1" { t.Fatalf("unexpected bot id: %s", r.URL.RawQuery) }
+			if r.URL.Query().Get("id") != "bot/1" {
+				t.Fatalf("unexpected bot id: %s", r.URL.RawQuery)
+			}
 			switch r.Method {
 			case http.MethodGet:
 				_, _ = w.Write([]byte(`{"id":"bot-1","name":"default"}`))
 			case http.MethodPut:
 				var body UpdateBotRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.Active == nil || *body.Active { t.Fatalf("unexpected bot update body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Active == nil || *body.Active {
+					t.Fatalf("unexpected bot update body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"id":"bot-1","active":false}`))
 			case http.MethodDelete:
 				_, _ = w.Write([]byte(`{"status":"ok"}`))
@@ -3829,12 +3907,18 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 		case "/v1/inbox":
 			switch r.Method {
 			case http.MethodGet:
-				if r.URL.Query().Get("unread") != "true" { t.Fatalf("expected unread query") }
+				if r.URL.Query().Get("unread") != "true" {
+					t.Fatalf("expected unread query")
+				}
 				_, _ = w.Write([]byte(`{"items":[{"id":"in-1","content":"ping"}],"count":{"unread":1,"total":1}}`))
 			case http.MethodPost:
 				var body PushInboxRequest
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-				if body.Content != "ping" || body.Action != "trigger" { t.Fatalf("unexpected inbox body: %+v", body) }
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Content != "ping" || body.Action != "trigger" {
+					t.Fatalf("unexpected inbox body: %+v", body)
+				}
 				_, _ = w.Write([]byte(`{"id":"in-2","content":"ping","action":"trigger"}`))
 			case http.MethodDelete:
 				_, _ = w.Write([]byte(`{"status":"ok"}`))
@@ -3842,7 +3926,9 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 		case "/v1/inbox/read":
 			_, _ = w.Write([]byte(`{"marked":2}`))
 		case "/v1/channels/groups":
-			if r.URL.Query().Get("type") != "telegram" { t.Fatalf("expected telegram type") }
+			if r.URL.Query().Get("type") != "telegram" {
+				t.Fatalf("expected telegram type")
+			}
 			_, _ = w.Write([]byte(`{"groups":[{"id":"g1","channel_type":"telegram"}],"count":1}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
@@ -3850,25 +3936,61 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	list, err := Bots.List(ctx); if err != nil { t.Fatal(err) }
-	created, err := Bots.Create(ctx, CreateBotRequest{Name: "planner", Config: BotConfig{"model": "deepseek"}}); if err != nil { t.Fatal(err) }
-	got, err := Bots.Get(ctx, "bot/1"); if err != nil { t.Fatal(err) }
-	updated, err := Bots.SetActive(ctx, "bot/1", false); if err != nil { t.Fatal(err) }
-	deleted, err := Bots.Delete(ctx, "bot/1"); if err != nil { t.Fatal(err) }
-	inbox, err := Bots.Inbox(ctx, true); if err != nil { t.Fatal(err) }
-	pushed, err := Bots.PushInbox(ctx, PushInboxRequest{Source: "webhook", Content: "ping", Action: "trigger"}); if err != nil { t.Fatal(err) }
-	removed, err := Bots.DeleteInbox(ctx, "in-1"); if err != nil { t.Fatal(err) }
-	marked, err := Bots.MarkInboxRead(ctx, []string{"in-1", "in-2"}); if err != nil { t.Fatal(err) }
-	markedAll, err := Bots.MarkAllInboxRead(ctx); if err != nil { t.Fatal(err) }
-	groups, err := Bots.ChannelGroups(ctx, "telegram"); if err != nil { t.Fatal(err) }
+	list, err := Bots.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Bots.Create(ctx, CreateBotRequest{Name: "planner", Config: BotConfig{"model": "deepseek"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Bots.Get(ctx, "bot/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Bots.SetActive(ctx, "bot/1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := Bots.Delete(ctx, "bot/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbox, err := Bots.Inbox(ctx, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushed, err := Bots.PushInbox(ctx, PushInboxRequest{Source: "webhook", Content: "ping", Action: "trigger"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Bots.DeleteInbox(ctx, "in-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked, err := Bots.MarkInboxRead(ctx, []string{"in-1", "in-2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markedAll, err := Bots.MarkAllInboxRead(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups, err := Bots.ChannelGroups(ctx, "telegram")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if list.Total != 1 || created["id"] != "bot-2" || got["id"] != "bot-1" || updated["active"] != false || deleted["status"] != "ok" || inbox.Count.Unread != 1 || pushed["action"] != "trigger" || removed["status"] != "ok" || marked.Marked != 2 || markedAll.Marked != 2 || groups.Groups[0]["id"] != "g1" {
 		t.Fatalf("unexpected bots results")
 	}
-	if NewAgentKit().Bots != Bots { t.Fatalf("agent kit should expose Bots namespace") }
-	if len(seen) != 11 { t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen) }
+	if NewAgentKit().Bots != Bots {
+		t.Fatalf("agent kit should expose Bots namespace")
+	}
+	if len(seen) != 11 {
+		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
+	}
 }
-
 
 func TestDocumentsNamespaceGeneratesArtifacts(t *testing.T) {
 	var seen []string
@@ -3880,41 +4002,76 @@ func TestDocumentsNamespaceGeneratesArtifacts(t *testing.T) {
 			_, _ = w.Write([]byte(`{"templates":[{"id":"brief","format":"docx"}]}`))
 		case "/v1/documents/generate":
 			var body DocumentGenerateRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Content == "" || body.Format == "" { t.Fatalf("unexpected document body: %+v", body) }
-			_, _ = w.Write([]byte(`{"result":"ok","path":"out.`+body.Format+`","format":"`+body.Format+`"}`))
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Content == "" || body.Format == "" {
+				t.Fatalf("unexpected document body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"result":"ok","path":"out.` + body.Format + `","format":"` + body.Format + `"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
 		}
 	})
 	ctx := context.Background()
-	templates, err := Documents.Templates(ctx); if err != nil { t.Fatal(err) }
-	docx, err := Documents.GenerateDocx(ctx, "hello", "out.docx", "Report"); if err != nil { t.Fatal(err) }
-	xlsx, err := Documents.GenerateXlsx(ctx, "a,b", "out.xlsx", "Sheet", "Data"); if err != nil { t.Fatal(err) }
-	pptx, err := Documents.GeneratePptx(ctx, "slides", "out.pptx", "Deck"); if err != nil { t.Fatal(err) }
-	html, err := Documents.GenerateHtml(ctx, "<p>hi</p>", "out.html", "HTML"); if err != nil { t.Fatal(err) }
-	if templates.Templates[0]["id"] != "brief" || docx.Format != "docx" || xlsx.Format != "xlsx" || pptx.Format != "pptx" || html.Format != "html" { t.Fatalf("unexpected document results") }
-	if NewAgentKit().Documents != Documents { t.Fatalf("agent kit should expose Documents namespace") }
-	if len(seen) != 5 { t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen) }
+	templates, err := Documents.Templates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	docx, err := Documents.GenerateDocx(ctx, "hello", "out.docx", "Report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	xlsx, err := Documents.GenerateXlsx(ctx, "a,b", "out.xlsx", "Sheet", "Data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pptx, err := Documents.GeneratePptx(ctx, "slides", "out.pptx", "Deck")
+	if err != nil {
+		t.Fatal(err)
+	}
+	html, err := Documents.GenerateHtml(ctx, "<p>hi</p>", "out.html", "HTML")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if templates.Templates[0]["id"] != "brief" || docx.Format != "docx" || xlsx.Format != "xlsx" || pptx.Format != "pptx" || html.Format != "html" {
+		t.Fatalf("unexpected document results")
+	}
+	if NewAgentKit().Documents != Documents {
+		t.Fatalf("agent kit should expose Documents namespace")
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	}
 }
-
 
 func TestWebChatNamespaceBuildsWidgetHelpers(t *testing.T) {
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/webchat/widget.js" { t.Fatalf("unexpected request: %s", r.URL.String()) }
+		if r.URL.Path != "/v1/webchat/widget.js" {
+			t.Fatalf("unexpected request: %s", r.URL.String())
+		}
 		w.Header().Set("Content-Type", "application/javascript")
 		_, _ = w.Write([]byte("console.log('ok')"))
 	})
 	url := WebChat.WidgetURL()
 	snippet, err := WebChat.EmbedSnippet(WebChatEmbedOptions{APIKey: "key&1", Title: `Tori "Chat"`, Theme: "dark"})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	script, err := WebChat.WidgetScript(context.Background())
-	if err != nil { t.Fatal(err) }
-	if !strings.HasSuffix(url, "/v1/webchat/widget.js") || !strings.Contains(snippet, `data-api-key="key&amp;1"`) || !strings.Contains(snippet, `data-title="Tori &quot;Chat&quot;"`) || script != "console.log('ok')" { t.Fatalf("unexpected webchat helpers: %s %s %s", url, snippet, script) }
-	if _, err := WebChat.EmbedSnippet(WebChatEmbedOptions{}); err == nil { t.Fatalf("expected missing APIKey error") }
-	if NewAgentKit().WebChat != WebChat { t.Fatalf("agent kit should expose WebChat namespace") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(url, "/v1/webchat/widget.js") || !strings.Contains(snippet, `data-api-key="key&amp;1"`) || !strings.Contains(snippet, `data-title="Tori &quot;Chat&quot;"`) || script != "console.log('ok')" {
+		t.Fatalf("unexpected webchat helpers: %s %s %s", url, snippet, script)
+	}
+	if _, err := WebChat.EmbedSnippet(WebChatEmbedOptions{}); err == nil {
+		t.Fatalf("expected missing APIKey error")
+	}
+	if NewAgentKit().WebChat != WebChat {
+		t.Fatalf("agent kit should expose WebChat namespace")
+	}
 }
-
 
 func TestSandboxNamespaceManagesRuntime(t *testing.T) {
 	var seen []string
@@ -3924,8 +4081,12 @@ func TestSandboxNamespaceManagesRuntime(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/sandbox/exec":
 			var body SandboxExecRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
-			if body.Command != "python" || body.Args[0] != "-V" { t.Fatalf("unexpected sandbox exec body: %+v", body) }
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Command != "python" || body.Args[0] != "-V" {
+				t.Fatalf("unexpected sandbox exec body: %+v", body)
+			}
 			_, _ = w.Write([]byte(`{"stdout":"ok","exit_code":0}`))
 		case "/v1/sandbox/probe":
 			_, _ = w.Write([]byte(`{"cloud_runner_ready":true}`))
@@ -3940,12 +4101,59 @@ func TestSandboxNamespaceManagesRuntime(t *testing.T) {
 		}
 	})
 	ctx := context.Background()
-	exec, err := Sandbox.Exec(ctx, SandboxExecRequest{Command: "python", Args: []string{"-V"}}); if err != nil { t.Fatal(err) }
-	probe, err := Sandbox.Probe(ctx); if err != nil { t.Fatal(err) }
-	created, err := Sandbox.CreateDesktop(ctx); if err != nil { t.Fatal(err) }
-	status, err := Sandbox.DesktopStatus(ctx); if err != nil { t.Fatal(err) }
-	destroyed, err := Sandbox.DestroyDesktop(ctx); if err != nil { t.Fatal(err) }
-	if exec["stdout"] != "ok" || probe["cloud_runner_ready"] != true || created["ok"] != true || status["running"] != true || destroyed["message"] != "destroyed" { t.Fatalf("unexpected sandbox results") }
-	if NewAgentKit().Sandbox != Sandbox { t.Fatalf("agent kit should expose Sandbox namespace") }
-	if len(seen) != 5 { t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen) }
+	exec, err := Sandbox.Exec(ctx, SandboxExecRequest{Command: "python", Args: []string{"-V"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe, err := Sandbox.Probe(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := Sandbox.CreateDesktop(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := Sandbox.DesktopStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	destroyed, err := Sandbox.DestroyDesktop(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exec["stdout"] != "ok" || probe["cloud_runner_ready"] != true || created["ok"] != true || status["running"] != true || destroyed["message"] != "destroyed" {
+		t.Fatalf("unexpected sandbox results")
+	}
+	if NewAgentKit().Sandbox != Sandbox {
+		t.Fatalf("agent kit should expose Sandbox namespace")
+	}
+	if len(seen) != 5 {
+		t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen)
+	}
+}
+
+func TestRouterNamespaceReadsStats(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/v1/router/stats" || r.Method != http.MethodGet {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		_, _ = w.Write([]byte(`{"slots":{"coding":{"provider":"deepseek"}},"stats":{"routed":7,"fallback":1}}`))
+	})
+
+	stats, err := Router.Stats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats["slots"] == nil || stats["stats"].(map[string]any)["routed"].(float64) != 7 {
+		t.Fatalf("unexpected router stats: %+v", stats)
+	}
+	if NewAgentKit().Router != Router {
+		t.Fatalf("agent kit should expose Router namespace")
+	}
+	if len(seen) != 1 || seen[0] != "GET /v1/router/stats" {
+		t.Fatalf("unexpected router requests: %v", seen)
+	}
 }
