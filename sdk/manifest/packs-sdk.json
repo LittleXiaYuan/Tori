@@ -77,7 +77,13 @@
       "name": "frontendSync",
       "route": "GET /v1/packs/enabled",
       "readOnly": true,
-      "description": "Build frontend shell menus and routes from enabled pack manifests."
+      "description": "Build frontend shell menus, routes, route bindings, UI resource descriptors, distributions, and SDK entrypoints from enabled pack manifests."
+    },
+    {
+      "name": "routeBinding",
+      "route": "GET /v1/packs/enabled",
+      "readOnly": true,
+      "description": "Resolve one synchronized frontend route to its owning pack, component, UI assets, distribution metadata, and SDK entrypoints."
     }
   ],
   "languages": {
@@ -100,6 +106,7 @@
         "disable": "createPacksClient().disable",
         "rollback": "createPacksClient().rollback",
         "frontendSync": "createPacksClient().frontendSync",
+        "routeBinding": "createPacksClient().routeBinding",
         "prune": "createPacksClient().prune"
       }
     }

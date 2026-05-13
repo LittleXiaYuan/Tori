@@ -5,7 +5,7 @@ const manifest = JSON.parse(readFileSync(resolve(repoRoot, "sdk/manifest/packs-s
 const failures = [];
 function fail(message) { failures.push(message); }
 function readRepoFile(path) { const fullPath = resolve(repoRoot, path); if (!existsSync(fullPath)) { fail(`missing file: ${path}`); return ""; } return readFileSync(fullPath, "utf8"); }
-const requiredCapabilities = ["list", "installed", "enabled", "backendModules", "install", "enable", "disable", "rollback", "prune", "frontendSync"];
+const requiredCapabilities = ["list", "installed", "enabled", "backendModules", "install", "enable", "disable", "rollback", "prune", "frontendSync", "routeBinding"];
 const requiredRoutes = ["GET /v1/packs", "GET /v1/packs/installed", "GET /v1/packs/enabled", "GET /v1/packs/backend-modules", "POST /v1/packs/install", "POST /v1/packs/enable", "POST /v1/packs/disable", "POST /v1/packs/rollback", "POST /v1/packs/prune"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
@@ -36,7 +36,7 @@ for (const doc of manifest.overviewDocs ?? []) {
   if (!/Pack Runtime SDK|Packs SDK|frontendSync|sync\.sdk|TypeScript pack SDK import example|backend-modules|v1\/packs/i.test(text)) fail(`overview doc ${doc} does not describe Packs SDK surface`);
 }
 const packsSource = readRepoFile("sdk/typescript/src/packs.ts");
-for (const token of ["PackSdkEntrypoint", "PackDistributionManifest", "PackArtifacts", "PackPruneResponse", "previousArtifacts", "download?: boolean", "prune()", "sdk: packs.flatMap", "Object.entries(pack.manifest.sdk", "importPath", "distributions:", "pack.manifest.distribution"]) if (!packsSource.includes(token)) fail(`Packs SDK frontendSync missing SDK/distribution sync token: ${token}`);
+for (const token of ["PackSdkEntrypoint", "PackDistributionManifest", "PackArtifacts", "PackPruneResponse", "PackRouteBinding", "previousArtifacts", "download?: boolean", "prune()", "routeBindings:", "routeBinding(path", "packRouteBindings", "packSdkEntrypoints", "Object.entries(pack.manifest.sdk", "importPath", "distributions:", "pack.manifest.distribution"]) if (!packsSource.includes(token)) fail(`Packs SDK frontendSync missing SDK/distribution sync token: ${token}`);
 if (!manifest.languages?.typescript) fail("manifest must expose a TypeScript Packs SDK implementation");
 if (failures.length) { console.error("Packs SDK manifest check failed:"); for (const failure of failures) console.error(`- ${failure}`); process.exit(1); }
 console.log(`Packs SDK manifest ok: ${Object.keys(manifest.languages ?? {}).length} languages, ${capabilityNames.size} capabilities`);

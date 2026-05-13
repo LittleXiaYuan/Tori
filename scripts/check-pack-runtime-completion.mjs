@@ -158,10 +158,13 @@ requireTokens("TypeScript packs SDK", sdk, [
   "rollback(id",
   "prune()",
   "frontendSync()",
+  "routeBinding(path",
+  "PackRouteBinding",
   "PackDistributionManifest",
   "PackPruneResponse",
   "download?: boolean",
   "distributions:",
+  "routeBindings:",
 ]);
 
 requireTokens("脚手架和可回滚工程化", scaffold + fullVerification + docs, [
