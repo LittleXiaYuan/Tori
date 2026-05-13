@@ -38,6 +38,7 @@ import (
 	"yunque-agent/internal/experimental/rlsched"
 	"yunque-agent/internal/integrations/mineru"
 	iledger "yunque-agent/internal/ledger"
+	backuppack "yunque-agent/internal/packs/backup"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
@@ -61,7 +62,22 @@ func initTasks(app *agentrt.App) error {
 	}
 
 	// ── Phase 2: Gateway ──
-	gw := gateway.New(p, tenantMgr, app.MemManager, app.SkillRegistry, sa.sched, sa.convStore, app.PluginReg, sa.feishuAPI, learningLoop, sa.jwtCfg, app.Metrics, app.MemPipeline, botPersona)
+	gw := gateway.NewFromConfig(gateway.GatewayConfig{
+		Planner:      p,
+		Tenants:      tenantMgr,
+		Memory:       app.MemManager,
+		Skills:       app.SkillRegistry,
+		Scheduler:    sa.sched,
+		ConvStore:    sa.convStore,
+		Plugins:      app.PluginReg,
+		FeishuAPI:    sa.feishuAPI,
+		Learning:     learningLoop,
+		JWTConfig:    sa.jwtCfg,
+		Metrics:      app.Metrics,
+		Pipeline:     app.MemPipeline,
+		Persona:      botPersona,
+		BackendPacks: []packruntime.BackendModule{backuppack.DefaultHandler()},
+	})
 	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
 	packRegistry, err := packruntime.NewRegistry(cfg.DataPath("packs"))
 	if err != nil {

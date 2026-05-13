@@ -28,6 +28,7 @@ if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
 const pascal = slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("");
 const name = argValue("--name") ?? `${pascal} Pack`;
 const route = argValue("--route") ?? `/v1/${slug}/ping`;
+const routeMethod = (argValue("--method") ?? "GET").trim().toUpperCase();
 const sdk = argValue("--sdk") ?? `yunque-client/${slug}`;
 const manifestUrl = argValue("--manifest-url") ?? `https://packs.yunque.local/${slug}/pack.json`;
 const packageUrl = argValue("--package-url") ?? `https://packs.yunque.local/${slug}/${slug}-0.1.0.tgz`;
@@ -35,6 +36,10 @@ const frontendUrl = argValue("--frontend-url") ?? `https://packs.yunque.local/${
 const sha256 = argValue("--sha256") ?? "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 if (!route.startsWith("/")) {
   console.error("--route must start with /");
+  process.exit(1);
+}
+if (!routeMethod) {
+  console.error("--method must not be empty");
   process.exit(1);
 }
 
@@ -74,6 +79,7 @@ const manifest = {
   backend: {
     capabilities: [capability],
     routes: [route],
+    routeSpecs: [{ method: routeMethod, path: route, description: `${name} backend entrypoint.` }],
     permissions: [permission],
   },
   frontend: {
@@ -113,7 +119,7 @@ func (h *Handler) PackID() string { return PackID }
 
 func (h *Handler) Routes() []packruntime.BackendRoute {
 \treturn []packruntime.BackendRoute{
-\t\t{Method: http.MethodGet, Path: "${route}", Handler: h.Ping},
+\t\t{Method: "${routeMethod}", Path: "${route}", Handler: h.Ping},
 \t}
 }
 
@@ -211,7 +217,7 @@ const readme = `# ${name}
 Scaffolded Pack Runtime capability pack.
 
 - Pack ID: \`${packID}\`
-- Backend route: \`${route}\`
+- Backend route: \`${routeMethod} ${route}\`
 - Frontend route: \`${pagePath}\`
 - TypeScript SDK: \`${sdk}\`
 - Manifest URL: \`${manifestUrl}\`

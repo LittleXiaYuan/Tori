@@ -26,9 +26,19 @@ type Manifest struct {
 }
 
 type BackendManifest struct {
-	Capabilities []string `json:"capabilities,omitempty"`
-	Routes       []string `json:"routes,omitempty"`
-	Permissions  []string `json:"permissions,omitempty"`
+	Capabilities []string           `json:"capabilities,omitempty"`
+	Routes       []string           `json:"routes,omitempty"`
+	RouteSpecs   []BackendRouteSpec `json:"routeSpecs,omitempty"`
+	Permissions  []string           `json:"permissions,omitempty"`
+}
+
+// BackendRouteSpec is manifest-owned backend route metadata. Routes keeps the
+// legacy path-only gate for compatibility, while RouteSpecs allows packs and
+// external tooling to audit method/path pairs without loading backend code.
+type BackendRouteSpec struct {
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Description string `json:"description,omitempty"`
 }
 
 type FrontendManifest struct {
@@ -93,6 +103,14 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("backend.routes[%d] must start with /", i)
 		}
 	}
+	for i, route := range m.Backend.RouteSpecs {
+		if strings.TrimSpace(route.Method) == "" {
+			return fmt.Errorf("backend.routeSpecs[%d].method is required", i)
+		}
+		if !strings.HasPrefix(strings.TrimSpace(route.Path), "/") {
+			return fmt.Errorf("backend.routeSpecs[%d].path must start with /", i)
+		}
+	}
 	for i, menu := range m.Frontend.Menus {
 		if strings.TrimSpace(menu.Key) == "" || strings.TrimSpace(menu.Label) == "" || strings.TrimSpace(menu.Path) == "" {
 			return fmt.Errorf("frontend.menus[%d] requires key, label and path", i)
@@ -110,6 +128,35 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("distribution.sizeBytes must be greater than or equal to 0")
 	}
 	return nil
+}
+
+// AllowsRoute reports whether a mounted backend route is declared by the
+// manifest. Path-only backend.routes remain supported for older packs. When a
+// routeSpecs entry exists for the same path, the method must also match.
+func (b BackendManifest) AllowsRoute(method string, path string) bool {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	matchedPathOnly := false
+	for _, route := range b.Routes {
+		if strings.TrimSpace(route) == path {
+			matchedPathOnly = true
+			break
+		}
+	}
+	matchedSpecPath := false
+	for _, route := range b.RouteSpecs {
+		if strings.TrimSpace(route.Path) != path {
+			continue
+		}
+		matchedSpecPath = true
+		if strings.ToUpper(strings.TrimSpace(route.Method)) == method {
+			return true
+		}
+	}
+	return matchedPathOnly && !matchedSpecPath
 }
 
 func LoadManifest(path string) (Manifest, error) {

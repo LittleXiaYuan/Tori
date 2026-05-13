@@ -25,7 +25,12 @@ func backupManifest(version string) Manifest {
 		Backend: BackendManifest{
 			Capabilities: []string{"backup.info", "backup.export", "backup.import"},
 			Routes:       []string{"/v1/backup/info", "/v1/backup/export", "/v1/backup/import"},
-			Permissions:  []string{"backup:read", "backup:write"},
+			RouteSpecs: []BackendRouteSpec{
+				{Method: http.MethodGet, Path: "/v1/backup/info", Description: "Read backup pack runtime status."},
+				{Method: http.MethodGet, Path: "/v1/backup/export", Description: "Export a backup archive."},
+				{Method: http.MethodPost, Path: "/v1/backup/import", Description: "Import backup payload data."},
+			},
+			Permissions: []string{"backup:read", "backup:write"},
 		},
 		Frontend: FrontendManifest{
 			Menus:  []FrontendMenu{{Key: "backup", Label: "备份恢复", Path: "/packs/backup", Icon: "archive", Order: 90}},
@@ -55,7 +60,7 @@ func TestManifestValidateAndRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
 	}
-	if loaded.ID != manifest.ID || loaded.SDK.TypeScript != "yunque-client/backup" {
+	if loaded.ID != manifest.ID || loaded.SDK.TypeScript != "yunque-client/backup" || len(loaded.Backend.RouteSpecs) != 3 {
 		t.Fatalf("unexpected manifest roundtrip: %#v", loaded)
 	}
 	if loaded.Distribution.PackageURL == "" || loaded.Distribution.SHA256 == "" || loaded.Distribution.FrontendURL == "" {
@@ -76,6 +81,35 @@ func TestManifestValidateRejectsNegativeDistributionSize(t *testing.T) {
 	manifest.Distribution.SizeBytes = -1
 	if err := manifest.Validate(); err == nil {
 		t.Fatalf("expected distribution size validation error")
+	}
+}
+
+func TestBackendManifestAllowsRouteUsesMethodAwareSpecs(t *testing.T) {
+	backend := BackendManifest{
+		Routes:     []string{"/v1/backup/import", "/v1/legacy/ping"},
+		RouteSpecs: []BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/backup/import"}},
+	}
+	if !backend.AllowsRoute(http.MethodPost, "/v1/backup/import") {
+		t.Fatalf("expected POST import route to be allowed")
+	}
+	if backend.AllowsRoute(http.MethodGet, "/v1/backup/import") {
+		t.Fatalf("expected GET import route to be rejected when routeSpecs declares POST")
+	}
+	if !backend.AllowsRoute(http.MethodGet, "/v1/legacy/ping") {
+		t.Fatalf("expected legacy path-only route to remain compatible")
+	}
+}
+
+func TestManifestValidateRequiresBackendRouteSpecMethodAndPath(t *testing.T) {
+	manifest := backupManifest("0.1.0")
+	manifest.Backend.RouteSpecs = []BackendRouteSpec{{Path: "/v1/backup/info"}}
+	if err := manifest.Validate(); err == nil {
+		t.Fatalf("expected missing backend.routeSpecs method validation error")
+	}
+	manifest = backupManifest("0.1.0")
+	manifest.Backend.RouteSpecs = []BackendRouteSpec{{Method: http.MethodGet, Path: "v1/backup/info"}}
+	if err := manifest.Validate(); err == nil {
+		t.Fatalf("expected invalid backend.routeSpecs path validation error")
 	}
 }
 

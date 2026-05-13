@@ -77,7 +77,7 @@
       "name": "frontendSync",
       "route": "GET /v1/packs/enabled",
       "readOnly": true,
-      "description": "Build frontend shell menus, routes, route bindings, UI resource descriptors, distributions, and SDK entrypoints from enabled pack manifests."
+      "description": "Build frontend shell menus, routes, route bindings, backend route bindings, UI resource descriptors, distributions, and SDK entrypoints from enabled pack manifests."
     },
     {
       "name": "routeBinding",

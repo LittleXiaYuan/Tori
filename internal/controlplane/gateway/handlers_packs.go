@@ -79,7 +79,7 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 		}
 		g.backendPackRoutes[route.Path] = packID
 		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: route.Method, Path: route.Path}
-		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Path, func(w http.ResponseWriter, r *http.Request) {
+		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Method, route.Path, func(w http.ResponseWriter, r *http.Request) {
 			if route.Method != "" && r.Method != route.Method {
 				writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 				return
@@ -112,9 +112,9 @@ func (g *Gateway) backendModuleInfos() []packruntime.BackendModuleInfo {
 	return infos
 }
 
-func (g *Gateway) requirePackRoute(packID string, route string, next http.HandlerFunc) http.HandlerFunc {
+func (g *Gateway) requirePackRoute(packID string, method string, route string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !g.packRouteEnabled(packID, route) {
+		if !g.packRouteEnabled(packID, method, route) {
 			writeJSONStatus(w, http.StatusNotFound, map[string]any{
 				"error":   "pack route is not enabled",
 				"pack_id": packID,
@@ -126,7 +126,7 @@ func (g *Gateway) requirePackRoute(packID string, route string, next http.Handle
 	}
 }
 
-func (g *Gateway) packRouteEnabled(packID string, route string) bool {
+func (g *Gateway) packRouteEnabled(packID string, method string, route string) bool {
 	if g.packRegistry == nil {
 		return false
 	}
@@ -135,7 +135,7 @@ func (g *Gateway) packRouteEnabled(packID string, route string) bool {
 		return false
 	}
 	route = strings.TrimSpace(route)
-	return route != "" && slices.Contains(pack.Manifest.Backend.Routes, route)
+	return pack.Manifest.Backend.AllowsRoute(method, route)
 }
 
 func (g *Gateway) handlePacksList(w http.ResponseWriter, r *http.Request) {

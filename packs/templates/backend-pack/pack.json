@@ -15,6 +15,13 @@
     ],
     "permissions": [
       "example:read"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/example-pack/ping",
+        "description": "Example pack health/readiness endpoint."
+      }
     ]
   },
   "frontend": {
