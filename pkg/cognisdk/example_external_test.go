@@ -61,3 +61,19 @@ func ExampleRenderFeedbackProposalMarkdown() {
 	fmt.Println(strings.Contains(markdown, "add_preference"))
 	// Output: true
 }
+
+func ExamplePlanPackBundleApply_actions() {
+	current, _ := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{cognisdk.XiaoyuCompanionPack()}, []string{cognisdk.PackXiaoyuCompanion})
+	candidate, _ := cognisdk.NewPackBundle("candidate", cognisdk.BuiltinPacks(), []string{cognisdk.PackXiaoyuCompanion, cognisdk.PackYunqueWork})
+	plan, _ := cognisdk.PlanPackBundleApply(context.Background(), current, candidate)
+
+	for _, action := range plan.Actions {
+		if action.Kind == cognisdk.PackBundleApplyActionAddPack {
+			fmt.Println(action.Kind)
+			fmt.Println(action.PackID)
+		}
+	}
+	// Output:
+	// add_pack
+	// yunque-work-pack
+}
