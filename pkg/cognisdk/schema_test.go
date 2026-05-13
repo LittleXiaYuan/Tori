@@ -82,7 +82,7 @@ func TestPackBundleDiffSchemaNamesReviewFields(t *testing.T) {
 func TestPackBundleReviewSchemaNamesGateFields(t *testing.T) {
 	schema := PackBundleReviewJSONSchema()
 	props := schema["properties"].(map[string]any)
-	for _, field := range []string{"outcome", "rollback_bundle_id", "diff", "golden_tests"} {
+	for _, field := range []string{"from_digest", "candidate_digest", "outcome", "rollback_bundle_id", "diff", "golden_tests"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle review schema missing %q", field)
 		}
@@ -111,7 +111,7 @@ func TestJSONSchemaByName(t *testing.T) {
 func TestPackBundleSummarySchemaNamesInspectFields(t *testing.T) {
 	schema := PackBundleSummaryJSONSchema()
 	props := schema["properties"].(map[string]any)
-	for _, field := range []string{"pack_count", "enabled_count", "disabled_count", "golden_test_count", "packs"} {
+	for _, field := range []string{"digest", "pack_count", "enabled_count", "disabled_count", "golden_test_count", "packs"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle summary schema missing %q", field)
 		}

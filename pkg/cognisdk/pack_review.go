@@ -18,9 +18,19 @@ func ReviewPackBundleCandidate(ctx context.Context, current, candidate PackBundl
 	if err != nil {
 		return PackBundleReview{}, err
 	}
+	fromDigest, err := DigestPackBundle(current)
+	if err != nil {
+		return PackBundleReview{}, err
+	}
+	candidateDigest, err := DigestPackBundle(candidate)
+	if err != nil {
+		return PackBundleReview{}, err
+	}
 	review := PackBundleReview{
 		FromID:           current.ID,
 		CandidateID:      candidate.ID,
+		FromDigest:       fromDigest,
+		CandidateDigest:  candidateDigest,
 		RollbackBundleID: current.ID,
 		Diff:             diff,
 		GoldenTests:      golden,

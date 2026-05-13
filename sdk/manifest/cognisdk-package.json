@@ -19,6 +19,7 @@
       "pkg/cognisdk/pack.go",
       "pkg/cognisdk/pack_io.go",
       "pkg/cognisdk/pack_bundle.go",
+      "pkg/cognisdk/pack_digest.go",
       "pkg/cognisdk/pack_summary.go",
       "pkg/cognisdk/pack_diff.go",
       "pkg/cognisdk/pack_review.go",
@@ -82,6 +83,13 @@
         "LoadPackBundle",
         "SavePackBundle",
         "NewPackManagerFromBundle"
+      ]
+    },
+    {
+      "name": "packBundleDigest",
+      "symbols": [
+        "CanonicalPackBundle",
+        "DigestPackBundle"
       ]
     },
     {

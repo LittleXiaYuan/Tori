@@ -12,6 +12,10 @@ func SummarizePackBundle(bundle PackBundle) (PackBundleSummary, error) {
 	if err := ValidatePackBundle(bundle); err != nil {
 		return PackBundleSummary{}, err
 	}
+	digest, err := DigestPackBundle(bundle)
+	if err != nil {
+		return PackBundleSummary{}, err
+	}
 	enabled := stringSet(bundle.EnabledPacks)
 	packs := make([]PackStatus, 0, len(bundle.Packs))
 	goldenCount := 0
@@ -23,6 +27,7 @@ func SummarizePackBundle(bundle PackBundle) (PackBundleSummary, error) {
 	summary := PackBundleSummary{
 		ID:              bundle.ID,
 		Version:         bundle.Version,
+		Digest:          digest,
 		PackCount:       len(bundle.Packs),
 		EnabledCount:    len(bundle.EnabledPacks),
 		GoldenTestCount: goldenCount,

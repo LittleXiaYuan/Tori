@@ -105,6 +105,7 @@ func PackBundleSummaryJSONSchema() JSONSchema {
 		"properties": map[string]any{
 			"id":                stringSchema(),
 			"version":           map[string]any{"type": "integer"},
+			"digest":            stringSchema(),
 			"pack_count":        map[string]any{"type": "integer"},
 			"enabled_count":     map[string]any{"type": "integer"},
 			"disabled_count":    map[string]any{"type": "integer"},
@@ -147,6 +148,8 @@ func PackBundleReviewJSONSchema() JSONSchema {
 		"properties": map[string]any{
 			"from_id":            stringSchema(),
 			"candidate_id":       stringSchema(),
+			"from_digest":        stringSchema(),
+			"candidate_digest":   stringSchema(),
 			"outcome":            enumSchema(string(PackBundleReviewReady), string(PackBundleReviewReview), string(PackBundleReviewBlocked)),
 			"reason":             stringSchema(),
 			"rollback_bundle_id": stringSchema(),

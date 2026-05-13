@@ -113,10 +113,35 @@ func TestSummarizePackBundle(t *testing.T) {
 	if summary.GoldenTestCount == 0 {
 		t.Fatalf("expected golden test count: %#v", summary)
 	}
+	if !strings.HasPrefix(summary.Digest, "sha256:") {
+		t.Fatalf("expected bundle digest: %#v", summary)
+	}
 	markdown := RenderPackBundleSummaryMarkdown(summary)
 	for _, want := range []string{"Cogni Pack Bundle Summary", "enabled: 1", PackXiaoyuCompanion} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("summary markdown missing %q:\n%s", want, markdown)
 		}
+	}
+}
+
+func TestDigestPackBundleIsStableAcrossPackOrder(t *testing.T) {
+	left, err := NewPackBundle("digest", []PackManifest{XiaoyuCompanionPack(), YunqueWorkPack()}, []string{PackYunqueWork, PackXiaoyuCompanion})
+	if err != nil {
+		t.Fatalf("left bundle: %v", err)
+	}
+	right, err := NewPackBundle("digest", []PackManifest{YunqueWorkPack(), XiaoyuCompanionPack()}, []string{PackXiaoyuCompanion, PackYunqueWork})
+	if err != nil {
+		t.Fatalf("right bundle: %v", err)
+	}
+	leftDigest, err := DigestPackBundle(left)
+	if err != nil {
+		t.Fatalf("left digest: %v", err)
+	}
+	rightDigest, err := DigestPackBundle(right)
+	if err != nil {
+		t.Fatalf("right digest: %v", err)
+	}
+	if leftDigest != rightDigest {
+		t.Fatalf("digest changed with order: %s != %s", leftDigest, rightDigest)
 	}
 }
