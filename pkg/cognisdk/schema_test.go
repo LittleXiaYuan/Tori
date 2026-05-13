@@ -13,6 +13,7 @@ func TestJSONSchemasMarshal(t *testing.T) {
 		"bundle":   PackBundleJSONSchema(),
 		"feedback": FeedbackProposalJSONSchema(),
 		"diff":     PackBundleDiffJSONSchema(),
+		"review":   PackBundleReviewJSONSchema(),
 	} {
 		data, err := json.Marshal(schema)
 		if err != nil {
@@ -73,6 +74,16 @@ func TestPackBundleDiffSchemaNamesReviewFields(t *testing.T) {
 	for _, field := range []string{"added_packs", "removed_packs", "changed_packs", "enabled_packs", "disabled_packs"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle diff schema missing %q", field)
+		}
+	}
+}
+
+func TestPackBundleReviewSchemaNamesGateFields(t *testing.T) {
+	schema := PackBundleReviewJSONSchema()
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"outcome", "rollback_bundle_id", "diff", "golden_tests"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle review schema missing %q", field)
 		}
 	}
 }
