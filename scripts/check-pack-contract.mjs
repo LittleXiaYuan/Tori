@@ -97,7 +97,7 @@ if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
   fail("RegisterBackendPack must remain usable after Gateway construction");
 }
 
-const backendContract = readText("pkg/packruntime/backend.go");
+const backendContract = readText("pkg/packruntime/backend.go") + "\n" + readText("pkg/packruntime/registry.go");
 for (const token of ["type BackendRoute", "Method  string", "Path    string", "type BackendRouteInfo", "Method string `json:\"method,omitempty\"`", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
   if (!backendContract.includes(token)) fail(`packruntime backend contract missing token: ${token}`);
 }

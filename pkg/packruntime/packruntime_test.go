@@ -154,20 +154,31 @@ func TestRegistryInstallEnableDisableAndRollback(t *testing.T) {
 	if err != nil || disabled.Status != PackStatusDisabled {
 		t.Fatalf("Disable: %v %#v", err, disabled)
 	}
+	baseArtifacts := &PackArtifacts{PackagePath: filepath.Join(dir, "base.tgz"), SHA256: "base-sha", SizeBytes: 10, CachedAt: base}
+	if _, err := registry.InstallWithArtifacts(backupManifest("0.1.1"), "downloaded://backup-0.1.1", baseArtifacts); err != nil {
+		t.Fatalf("Install artifacts base: %v", err)
+	}
 	updatedManifest := backupManifest("0.2.0")
 	updatedManifest.DefaultState = "disabled"
-	updated, err := registry.Install(updatedManifest, "downloaded://backup-0.2.0")
+	updatedArtifacts := &PackArtifacts{PackagePath: filepath.Join(dir, "updated.tgz"), SHA256: "updated-sha", SizeBytes: 20, CachedAt: base.Add(time.Minute)}
+	updated, err := registry.InstallWithArtifacts(updatedManifest, "downloaded://backup-0.2.0", updatedArtifacts)
 	if err != nil {
 		t.Fatalf("Install update: %v", err)
 	}
-	if updated.Manifest.Version != "0.2.0" || updated.PreviousVersion != "0.1.0" {
+	if updated.Manifest.Version != "0.2.0" || updated.PreviousVersion != "0.1.1" {
 		t.Fatalf("unexpected update state: %#v", updated)
+	}
+	if updated.Artifacts == nil || updated.Artifacts.SHA256 != "updated-sha" || updated.PreviousArtifacts == nil || updated.PreviousArtifacts.SHA256 != "base-sha" {
+		t.Fatalf("expected current and previous artifacts to be recorded: %#v", updated)
 	}
 	rolledBack, err := registry.Rollback("yunque.pack.backup")
 	if err != nil {
 		t.Fatalf("Rollback: %v", err)
 	}
-	if rolledBack.Manifest.Version != "0.1.0" || rolledBack.PreviousVersion != "0.2.0" {
+	if rolledBack.Manifest.Version != "0.1.1" || rolledBack.PreviousVersion != "0.2.0" {
 		t.Fatalf("unexpected rollback state: %#v", rolledBack)
+	}
+	if rolledBack.Artifacts == nil || rolledBack.Artifacts.SHA256 != "base-sha" || rolledBack.PreviousArtifacts == nil || rolledBack.PreviousArtifacts.SHA256 != "updated-sha" {
+		t.Fatalf("expected rollback to swap artifacts: %#v", rolledBack)
 	}
 }
