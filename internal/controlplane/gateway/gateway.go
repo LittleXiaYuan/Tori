@@ -305,6 +305,7 @@ type Gateway struct {
 	mux       *http.ServeMux
 	reqCount  atomic.Int64
 	startTime time.Time
+	routesMu  sync.Mutex
 
 	replyHooks   []ReplyHook
 	replyHooksMu sync.RWMutex
