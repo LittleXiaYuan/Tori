@@ -277,19 +277,7 @@ func packBundleApplyActionSchema() map[string]any {
 		"additionalProperties": false,
 		"required":             []string{"kind", "message"},
 		"properties": map[string]any{
-			"kind": enumSchema(
-				string(PackBundleApplyActionKeepRollback),
-				string(PackBundleApplyActionVerifyDigest),
-				string(PackBundleApplyActionRequireReview),
-				string(PackBundleApplyActionStopBlocked),
-				string(PackBundleApplyActionAddPack),
-				string(PackBundleApplyActionReplacePack),
-				string(PackBundleApplyActionRemovePack),
-				string(PackBundleApplyActionEnablePack),
-				string(PackBundleApplyActionDisablePack),
-				string(PackBundleApplyActionNoop),
-				string(PackBundleApplyActionWriteCandidate),
-			),
+			"kind":         enumSchema(packBundleApplyActionKindStrings()...),
 			"pack_id":      stringSchema(),
 			"from_version": stringSchema(),
 			"to_version":   stringSchema(),
@@ -452,6 +440,15 @@ func beliefUpdateProposalSchema() map[string]any {
 			"evidence":           stringArraySchema(),
 		},
 	}
+}
+
+func packBundleApplyActionKindStrings() []string {
+	kinds := PackBundleApplyActionKinds()
+	values := make([]string, 0, len(kinds))
+	for _, kind := range kinds {
+		values = append(values, string(kind))
+	}
+	return values
 }
 
 func stringSchema() map[string]any { return map[string]any{"type": "string"} }

@@ -153,4 +153,21 @@ func TestPackBundleApplyActionsSchema(t *testing.T) {
 			t.Fatalf("bundle apply actions item schema missing %q", field)
 		}
 	}
+	kindSchema := props["kind"].(map[string]any)
+	enumValues := kindSchema["enum"].([]string)
+	if len(enumValues) != len(PackBundleApplyActionKinds()) {
+		t.Fatalf("action kind enum length = %d, want %d", len(enumValues), len(PackBundleApplyActionKinds()))
+	}
+	for _, kind := range PackBundleApplyActionKinds() {
+		found := false
+		for _, value := range enumValues {
+			if value == string(kind) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("action kind enum missing %q", kind)
+		}
+	}
 }
