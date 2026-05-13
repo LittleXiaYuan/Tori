@@ -21,11 +21,13 @@ import {
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import { api, type InstalledPack } from "@/lib/api";
+import type { InstalledPack } from "@/lib/api";
+import { createPacksClient } from "@/lib/packs-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
 
 const EXAMPLE_BACKUP_MANIFEST = "packs/examples/backup-pack/pack.json";
+const packsClient = createPacksClient();
 
 function formatTime(value?: string): string {
   if (!value) return "-";
@@ -55,8 +57,8 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 }
 
 export default function PacksPage() {
-  const { data, loading, refresh } = useApiData(async () => api.packsInstalled(), { packs: [], count: 0 });
-  const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => api.packBackendModules(), { modules: [], count: 0 });
+  const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
+  const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => packsClient.backendModules(), { modules: [], count: 0 });
   const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
   const [manifestUrl, setManifestUrl] = useState("");
   const [downloadArtifact, setDownloadArtifact] = useState(true);
@@ -88,12 +90,12 @@ export default function PacksPage() {
     }
   };
 
-  const install = () => run("install", () => api.packInstall(manifestPath, undefined, false));
-  const installFromURL = () => run("install-url", () => api.packInstallFromURL(manifestUrl, undefined, downloadArtifact));
-  const enable = (id: string) => run(`enable:${id}`, () => api.packEnable(id));
-  const disable = (id: string) => run(`disable:${id}`, () => api.packDisable(id));
-  const rollback = (id: string) => run(`rollback:${id}`, () => api.packRollback(id));
-  const prune = () => run("prune", () => api.packPrune());
+  const install = () => run("install", () => packsClient.installLocal(manifestPath, undefined, false));
+  const installFromURL = () => run("install-url", () => packsClient.installFromURL(manifestUrl, undefined, downloadArtifact));
+  const enable = (id: string) => run(`enable:${id}`, () => packsClient.enable(id));
+  const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id));
+  const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id));
+  const prune = () => run("prune", () => packsClient.prune());
 
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;

@@ -55,6 +55,8 @@ const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
   "heroui-web/src/lib/pack-sync.tsx",
   "heroui-web/src/lib/__tests__/pack-sync.test.ts",
+  "heroui-web/src/lib/packs-client.ts",
+  "heroui-web/src/lib/__tests__/packs-client.test.ts",
   "heroui-web/src/app/packs/page.tsx",
   "heroui-web/src/app/packs/[...slug]/page.tsx",
   "heroui-web/src/app/packs/backup/page.tsx",
@@ -147,9 +149,12 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "buildPackRouteBindings",
   "findPackRouteBinding",
   "pack-sync frontend runtime",
+  "createPacksClient",
+  "packs-client",
   "createBackupPackClient",
   "backup-pack-client",
   "Frontend Pack sync tests",
+  "Frontend packs client tests",
   "Frontend backup pack client tests",
   "PackRuntimeRoutePage",
   "packsEnabled",
@@ -176,6 +181,13 @@ if (backupPackPage.includes("api.backupInfo") || backupPackPage.includes("api.ba
   fail("前端同步菜单/路由/资源/控制台", "backup pack page must use backup-pack-client instead of the monolithic api object");
 } else {
   ok("前端 pack 客户端拆分", "backup page uses backup-pack-client instead of monolithic api backup methods");
+}
+
+const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
+if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
+  fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
+} else {
+  ok("前端 Pack Runtime 客户端拆分", "Pack console uses packs-client instead of monolithic api pack methods");
 }
 
 requireTokens("TypeScript packs SDK", sdk, [
