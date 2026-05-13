@@ -794,6 +794,32 @@ class _PersonaNamespace:
     def update_preset_features(self, preset_id: str, features: dict[str, bool]) -> dict:
         return _api_call("PUT", "/v1/persona/presets/features", {"id": preset_id, "features": features})
 
+    def modes(self, tenant_id: str = "", session_id: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+        if session_id:
+            params["session_id"] = session_id
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/persona/modes{suffix}")
+
+    def set_mode(self, tenant_id: str, mode: str, session_id: str = "") -> dict:
+        body = {"tenant_id": tenant_id, "mode": mode}
+        if session_id:
+            body["session_id"] = session_id
+        return _api_call("POST", "/v1/persona/mode", body)
+
+    def current_mode(self, tenant_id: str = "", session_id: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+        if session_id:
+            params["session_id"] = session_id
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/v1/persona/mode/current{suffix}")
+
 
 persona = _PersonaNamespace()
 

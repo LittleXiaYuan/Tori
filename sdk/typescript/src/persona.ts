@@ -94,6 +94,31 @@ export type UpdatePersonaPresetFeaturesRequest = {
   id: string;
   features: Record<string, boolean>;
 };
+export type PersonaModeRecord = Record<string, unknown>;
+export type ListPersonaModesResponse = {
+  modes: PersonaModeRecord[];
+  total: number;
+  [key: string]: unknown;
+};
+export type SetPersonaModeRequest = {
+  tenant_id?: string;
+  mode: string;
+  session_id?: string;
+};
+export type SetPersonaModeResponse = {
+  success?: boolean;
+  current_mode?: string;
+  modes?: PersonaModeRecord[];
+  [key: string]: unknown;
+};
+export type CurrentPersonaModeResponse = {
+  mode?: string;
+  name?: string;
+  name_en?: string;
+  description?: string;
+  features?: Record<string, unknown>;
+  [key: string]: unknown;
+};
 
 export type PersonaClientOptions = {
   baseUrl: string;
@@ -210,6 +235,26 @@ export class PersonaClient {
 
   updatePresetFeatures(body: UpdatePersonaPresetFeaturesRequest): Promise<PersonaStatusResponse> {
     return this.request<PersonaStatusResponse>("PUT", "/v1/persona/presets/features", body);
+  }
+
+  modes(query: { tenant_id?: string; session_id?: string } = {}): Promise<ListPersonaModesResponse> {
+    const params = new URLSearchParams();
+    if (query.tenant_id) params.set("tenant_id", query.tenant_id);
+    if (query.session_id) params.set("session_id", query.session_id);
+    const suffix = params.toString();
+    return this.request<ListPersonaModesResponse>("GET", suffix ? `/v1/persona/modes?${suffix}` : "/v1/persona/modes");
+  }
+
+  setMode(body: SetPersonaModeRequest): Promise<SetPersonaModeResponse> {
+    return this.request<SetPersonaModeResponse>("POST", "/v1/persona/mode", body);
+  }
+
+  currentMode(query: { tenant_id?: string; session_id?: string } = {}): Promise<CurrentPersonaModeResponse> {
+    const params = new URLSearchParams();
+    if (query.tenant_id) params.set("tenant_id", query.tenant_id);
+    if (query.session_id) params.set("session_id", query.session_id);
+    const suffix = params.toString();
+    return this.request<CurrentPersonaModeResponse>("GET", suffix ? `/v1/persona/mode/current?${suffix}` : "/v1/persona/mode/current");
   }
 
   private async request<T>(method: "GET" | "PUT" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {

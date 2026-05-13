@@ -4050,6 +4050,18 @@ pub struct UpdatePersonaPresetFeaturesRequest {
     pub id: String,
     pub features: std::collections::BTreeMap<String, bool>,
 }
+pub type PersonaModesResponse = serde_json::Value;
+pub type PersonaSetModeResponse = serde_json::Value;
+pub type PersonaCurrentModeResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SetPersonaModeRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tenant_id: String,
+    pub mode: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub session_id: String,
+}
 
 /// Small Rust helper over persona identity, skills, and preset endpoints.
 #[derive(Debug, Clone)]
@@ -4211,6 +4223,72 @@ impl PersonaClient {
             .error_for_status()?
             .json()
             .await
+    }
+
+    pub async fn modes(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+    ) -> Result<PersonaModesResponse, reqwest::Error> {
+        self.get_json(&persona_mode_path("/v1/persona/modes", tenant_id, session_id)).await
+    }
+
+    pub async fn set_mode(
+        &self,
+        request: &SetPersonaModeRequest,
+    ) -> Result<PersonaSetModeResponse, reqwest::Error> {
+        self.post_json("/v1/persona/mode", request).await
+    }
+
+    pub async fn current_mode(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+    ) -> Result<PersonaCurrentModeResponse, reqwest::Error> {
+        self.get_json(&persona_mode_path("/v1/persona/mode/current", tenant_id, session_id)).await
+    }
+
+    async fn get_json<T>(&self, path: &str) -> Result<T, reqwest::Error>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T, reqwest::Error>
+    where
+        B: Serialize + ?Sized,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.http
+            .post(self.url(path))
+            .json(body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+}
+
+fn persona_mode_path(base: &str, tenant_id: &str, session_id: &str) -> String {
+    let mut params = Vec::new();
+    if !tenant_id.is_empty() {
+        params.push(format!("tenant_id={}", url_encode_query_component(tenant_id)));
+    }
+    if !session_id.is_empty() {
+        params.push(format!("session_id={}", url_encode_query_component(session_id)));
+    }
+    if params.is_empty() {
+        base.to_string()
+    } else {
+        format!("{}?{}", base, params.join("&"))
     }
 }
 
@@ -10109,6 +10187,34 @@ mod tests {
         })
         .unwrap();
         assert_eq!(clear["emotion"], "happy");
+    }
+
+    #[test]
+    fn persona_modes_helpers_build_urls_and_payloads() {
+        let client =
+            PersonaClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/v1/persona/modes?tenant_id=tenant-1&session_id=session-1"),
+            "http://localhost:9090/v1/persona/modes?tenant_id=tenant-1&session_id=session-1"
+        );
+        assert_eq!(
+            client.url("/v1/persona/mode/current?tenant_id=tenant-1"),
+            "http://localhost:9090/v1/persona/mode/current?tenant_id=tenant-1"
+        );
+        let body = serde_json::to_value(SetPersonaModeRequest {
+            tenant_id: "tenant-1".to_string(),
+            mode: "focus".to_string(),
+            session_id: "session-1".to_string(),
+        })
+        .unwrap();
+        assert_eq!(body["tenant_id"], "tenant-1");
+        assert_eq!(body["mode"], "focus");
+        let request = serde_json::to_value(UpdatePersonaPresetFeaturesRequest {
+            id: "studio".to_string(),
+            features: std::collections::BTreeMap::from([(String::from("emotion"), true)]),
+        })
+        .unwrap();
+        assert_eq!(request["id"], "studio");
     }
 
     #[test]

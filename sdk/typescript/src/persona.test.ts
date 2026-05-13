@@ -93,12 +93,14 @@ test("PersonaClient manages skills", async () => {
   assertEqual(calls[2]?.init?.body, JSON.stringify({ name: "planner" }));
 });
 
-test("PersonaClient manages presets and feature flags", async () => {
+test("PersonaClient manages modes, presets and feature flags", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createPersonaClient({
     baseUrl: "http://localhost:9090",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
+      if (String(url).includes("/v1/persona/modes")) return jsonResponse({ modes: [{ mode: "study" }, { mode: "focus" }], total: 2 });
+      if (String(url).includes("/v1/persona/mode/current")) return jsonResponse({ mode: "study", name: "Study", description: "Study mode" });
       if (init?.method === "GET") return jsonResponse({ presets: [{ id: "default", name: "Default" }], active: "default" });
       if (String(url).endsWith("/custom") && init?.method === "POST") return jsonResponse({ status: "ok", id: "studio" });
       if (String(url).endsWith("/presets") && init?.method === "POST") return jsonResponse({ status: "ok", active: "studio" });
@@ -107,21 +109,28 @@ test("PersonaClient manages presets and feature flags", async () => {
   });
 
   const presets = await client.presets();
+  const modes = await client.modes({ tenant_id: "tenant-1", session_id: "session-1" });
+  const currentMode = await client.currentMode({ tenant_id: "tenant-1" });
   const switched = await client.switchPreset({ id: "studio" });
   const added = await client.addCustomPreset({ id: "studio", name: "Studio", features: { emotion: true } });
   const featureUpdated = await client.updatePresetFeatures({ id: "studio", features: { sticker: false } });
   const deleted = await client.deleteCustomPreset({ id: "studio" });
 
   assertEqual(presets.active, "default");
+  assertEqual(modes.total, 2);
+  assertEqual(currentMode.mode, "study");
   assertEqual(switched.active, "studio");
   assertEqual(added.id, "studio");
   assertEqual(featureUpdated.status, "ok");
   assertEqual(deleted.status, "ok");
-  assertEqual(calls[2]?.url, "http://localhost:9090/v1/persona/presets/custom");
-  assertEqual(calls[3]?.url, "http://localhost:9090/v1/persona/presets/features");
-  assertEqual(calls[3]?.init?.method, "PUT");
+  assertEqual(calls[1]?.url, "http://localhost:9090/v1/persona/modes?tenant_id=tenant-1&session_id=session-1");
+  assertEqual(calls[2]?.url, "http://localhost:9090/v1/persona/mode/current?tenant_id=tenant-1");
+  assertEqual(calls[3]?.url, "http://localhost:9090/v1/persona/presets");
   assertEqual(calls[4]?.url, "http://localhost:9090/v1/persona/presets/custom");
-  assertEqual(calls[4]?.init?.method, "DELETE");
+  assertEqual(calls[5]?.url, "http://localhost:9090/v1/persona/presets/features");
+  assertEqual(calls[5]?.init?.method, "PUT");
+  assertEqual(calls[6]?.url, "http://localhost:9090/v1/persona/presets/custom");
+  assertEqual(calls[6]?.init?.method, "DELETE");
 });
 
 test("PersonaClient throws PersonaClientError with parsed and text bodies", async () => {

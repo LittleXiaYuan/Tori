@@ -4021,6 +4021,15 @@ type UpdatePersonaPresetFeaturesRequest struct {
 	ID       string          `json:"id"`
 	Features map[string]bool `json:"features"`
 }
+type PersonaModesResponse map[string]any
+type PersonaSetModeResponse map[string]any
+type PersonaCurrentModeResponse map[string]any
+
+type SetPersonaModeRequest struct {
+	TenantID  string `json:"tenant_id,omitempty"`
+	Mode      string `json:"mode"`
+	SessionID string `json:"session_id,omitempty"`
+}
 
 func (p *personaNamespace) Get(ctx context.Context) (PersonaStateResponse, error) {
 	var out PersonaStateResponse
@@ -4099,6 +4108,34 @@ func (p *personaNamespace) UpdatePresetFeatures(ctx context.Context, req UpdateP
 	if err := apiCallInto(ctx, http.MethodPut, "/v1/persona/presets/features", req, &out); err != nil {
 		return nil, err
 	}
+	return out, nil
+}
+
+func (p *personaNamespace) Modes(ctx context.Context, tenantID, sessionID string) (PersonaModesResponse, error) {
+	values := url.Values{}
+	if tenantID != "" { values.Set("tenant_id", tenantID) }
+	if sessionID != "" { values.Set("session_id", sessionID) }
+	path := "/v1/persona/modes"
+	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	var out PersonaModesResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *personaNamespace) SetMode(ctx context.Context, req SetPersonaModeRequest) (PersonaSetModeResponse, error) {
+	var out PersonaSetModeResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/persona/mode", req, &out); err != nil { return nil, err }
+	return out, nil
+}
+
+func (p *personaNamespace) CurrentMode(ctx context.Context, tenantID, sessionID string) (PersonaCurrentModeResponse, error) {
+	values := url.Values{}
+	if tenantID != "" { values.Set("tenant_id", tenantID) }
+	if sessionID != "" { values.Set("session_id", sessionID) }
+	path := "/v1/persona/mode/current"
+	if encoded := values.Encode(); encoded != "" { path += "?" + encoded }
+	var out PersonaCurrentModeResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return nil, err }
 	return out, nil
 }
 

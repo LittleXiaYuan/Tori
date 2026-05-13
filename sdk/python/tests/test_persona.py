@@ -25,6 +25,8 @@ class PersonaTest(unittest.TestCase):
             yunque.persona.add_skill("review", "Review", "review code")
             yunque.persona.delete_skill("review")
             yunque.persona.presets()
+            yunque.persona.modes(tenant_id="tenant-1", session_id="session-1")
+            yunque.persona.current_mode(tenant_id="tenant-1")
             yunque.persona.switch_preset("studio")
             yunque.persona.add_custom_preset({"id": "studio", "name": "Studio"})
             yunque.persona.delete_custom_preset("studio")
@@ -36,10 +38,12 @@ class PersonaTest(unittest.TestCase):
         self.assertEqual(api_call.call_args_list[3].args, ("POST", "/v1/persona/skills", {"name": "review", "description": "Review", "content": "review code"}))
         self.assertEqual(api_call.call_args_list[4].args, ("DELETE", "/v1/persona/skills", {"name": "review"}))
         self.assertEqual(api_call.call_args_list[5].args, ("GET", "/v1/persona/presets"))
-        self.assertEqual(api_call.call_args_list[6].args, ("POST", "/v1/persona/presets", {"id": "studio"}))
-        self.assertEqual(api_call.call_args_list[7].args, ("POST", "/v1/persona/presets/custom", {"id": "studio", "name": "Studio"}))
-        self.assertEqual(api_call.call_args_list[8].args, ("DELETE", "/v1/persona/presets/custom", {"id": "studio"}))
-        self.assertEqual(api_call.call_args_list[9].args, ("PUT", "/v1/persona/presets/features", {"id": "studio", "features": {"emotion": True}}))
+        self.assertEqual(api_call.call_args_list[6].args, ("GET", "/v1/persona/modes?tenant_id=tenant-1&session_id=session-1"))
+        self.assertEqual(api_call.call_args_list[7].args, ("GET", "/v1/persona/mode/current?tenant_id=tenant-1"))
+        self.assertEqual(api_call.call_args_list[8].args, ("POST", "/v1/persona/presets", {"id": "studio"}))
+        self.assertEqual(api_call.call_args_list[9].args, ("POST", "/v1/persona/presets/custom", {"id": "studio", "name": "Studio"}))
+        self.assertEqual(api_call.call_args_list[10].args, ("DELETE", "/v1/persona/presets/custom", {"id": "studio"}))
+        self.assertEqual(api_call.call_args_list[11].args, ("PUT", "/v1/persona/presets/features", {"id": "studio", "features": {"emotion": True}}))
 
 
 if __name__ == "__main__":

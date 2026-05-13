@@ -17,7 +17,10 @@
     "POST /v1/persona/presets",
     "POST /v1/persona/presets/custom",
     "DELETE /v1/persona/presets/custom",
-    "PUT /v1/persona/presets/features"
+    "PUT /v1/persona/presets/features",
+    "GET /v1/persona/modes",
+    "POST /v1/persona/mode",
+    "GET /v1/persona/mode/current"
   ],
   "capabilities": [
     {
@@ -79,6 +82,24 @@
       "route": "PUT /v1/persona/presets/features",
       "readOnly": false,
       "description": "Update feature flags for a persona preset."
+    },
+    {
+      "name": "modes",
+      "route": "GET /v1/persona/modes",
+      "readOnly": true,
+      "description": "List available persona modes."
+    },
+    {
+      "name": "setMode",
+      "route": "POST /v1/persona/mode",
+      "readOnly": false,
+      "description": "Switch the active persona mode."
+    },
+    {
+      "name": "currentMode",
+      "route": "GET /v1/persona/mode/current",
+      "readOnly": true,
+      "description": "Read the current active persona mode."
     }
   ],
   "languages": {
@@ -101,7 +122,10 @@
         "switchPreset": "createPersonaClient().switchPreset",
         "addCustomPreset": "createPersonaClient().addCustomPreset",
         "deleteCustomPreset": "createPersonaClient().deleteCustomPreset",
-        "updatePresetFeatures": "createPersonaClient().updatePresetFeatures"
+        "updatePresetFeatures": "createPersonaClient().updatePresetFeatures",
+        "modes": "createPersonaClient().modes",
+        "setMode": "createPersonaClient().setMode",
+        "currentMode": "createPersonaClient().currentMode"
       }
     },
     "go": {
@@ -123,7 +147,10 @@
         "switchPreset": "yunque.Persona.SwitchPreset",
         "addCustomPreset": "yunque.Persona.AddCustomPreset",
         "deleteCustomPreset": "yunque.Persona.DeleteCustomPreset",
-        "updatePresetFeatures": "yunque.Persona.UpdatePresetFeatures"
+        "updatePresetFeatures": "yunque.Persona.UpdatePresetFeatures",
+        "modes": "yunque.Persona.Modes",
+        "setMode": "yunque.Persona.SetMode",
+        "currentMode": "yunque.Persona.CurrentMode"
       }
     },
     "python": {
@@ -145,7 +172,10 @@
         "switchPreset": "yunque.persona.switch_preset",
         "addCustomPreset": "yunque.persona.add_custom_preset",
         "deleteCustomPreset": "yunque.persona.delete_custom_preset",
-        "updatePresetFeatures": "yunque.persona.update_preset_features"
+        "updatePresetFeatures": "yunque.persona.update_preset_features",
+        "modes": "yunque.persona.modes",
+        "setMode": "yunque.persona.set_mode",
+        "currentMode": "yunque.persona.current_mode"
       }
     },
     "rust": {
@@ -167,7 +197,10 @@
         "switchPreset": "PersonaClient::switch_preset",
         "addCustomPreset": "PersonaClient::add_custom_preset",
         "deleteCustomPreset": "PersonaClient::delete_custom_preset",
-        "updatePresetFeatures": "PersonaClient::update_preset_features"
+        "updatePresetFeatures": "PersonaClient::update_preset_features",
+        "modes": "PersonaClient::modes",
+        "setMode": "PersonaClient::set_mode",
+        "currentMode": "PersonaClient::current_mode"
       }
     }
   },
