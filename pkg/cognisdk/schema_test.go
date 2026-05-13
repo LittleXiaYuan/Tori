@@ -12,6 +12,7 @@ func TestJSONSchemasMarshal(t *testing.T) {
 		"pack":     PackManifestJSONSchema(),
 		"bundle":   PackBundleJSONSchema(),
 		"feedback": FeedbackProposalJSONSchema(),
+		"summary":  PackBundleSummaryJSONSchema(),
 		"diff":     PackBundleDiffJSONSchema(),
 		"review":   PackBundleReviewJSONSchema(),
 	} {
@@ -104,5 +105,15 @@ func TestJSONSchemaByName(t *testing.T) {
 	}
 	if _, ok := JSONSchemaByName("missing"); ok {
 		t.Fatal("unexpected schema for missing name")
+	}
+}
+
+func TestPackBundleSummarySchemaNamesInspectFields(t *testing.T) {
+	schema := PackBundleSummaryJSONSchema()
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"pack_count", "enabled_count", "disabled_count", "golden_test_count", "packs"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle summary schema missing %q", field)
+		}
 	}
 }

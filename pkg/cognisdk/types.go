@@ -208,6 +208,17 @@ type PackBundleReview struct {
 	GoldenTests      GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
 }
 
+// PackBundleSummary is a compact inspection view for a portable bundle.
+type PackBundleSummary struct {
+	ID              string       `json:"id" yaml:"id"`
+	Version         int          `json:"version" yaml:"version"`
+	PackCount       int          `json:"pack_count" yaml:"pack_count"`
+	EnabledCount    int          `json:"enabled_count" yaml:"enabled_count"`
+	DisabledCount   int          `json:"disabled_count" yaml:"disabled_count"`
+	GoldenTestCount int          `json:"golden_test_count" yaml:"golden_test_count"`
+	Packs           []PackStatus `json:"packs" yaml:"packs"`
+}
+
 // PackBundle is a portable collection of declarative packs. It is still data
 // only: loading a bundle validates manifests but never executes code.
 type PackBundle struct {

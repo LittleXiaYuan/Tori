@@ -13,7 +13,7 @@ type JSONSchema map[string]any
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-diff", "pack-bundle-review", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "feedback-proposal"}
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -23,6 +23,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackManifestJSONSchema(), true
 	case "pack-bundle":
 		return PackBundleJSONSchema(), true
+	case "pack-bundle-summary":
+		return PackBundleSummaryJSONSchema(), true
 	case "pack-bundle-diff":
 		return PackBundleDiffJSONSchema(), true
 	case "pack-bundle-review":
@@ -87,6 +89,27 @@ func PackBundleJSONSchema() JSONSchema {
 			"packs":         map[string]any{"type": "array", "items": PackManifestJSONSchema()},
 			"enabled_packs": stringArraySchema(),
 			"metadata":      stringMapSchema(),
+		},
+	}
+}
+
+// PackBundleSummaryJSONSchema returns the schema for bundle inspect summaries.
+func PackBundleSummaryJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-summary.json",
+		"title":                "Cognition SDK Pack Bundle Summary",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"id", "version", "pack_count", "enabled_count", "disabled_count", "golden_test_count", "packs"},
+		"properties": map[string]any{
+			"id":                stringSchema(),
+			"version":           map[string]any{"type": "integer"},
+			"pack_count":        map[string]any{"type": "integer"},
+			"enabled_count":     map[string]any{"type": "integer"},
+			"disabled_count":    map[string]any{"type": "integer"},
+			"golden_test_count": map[string]any{"type": "integer"},
+			"packs":             map[string]any{"type": "array", "items": packStatusSchema()},
 		},
 	}
 }

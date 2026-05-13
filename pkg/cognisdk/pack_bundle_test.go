@@ -97,3 +97,26 @@ func TestRenderGoldenTestSummaryMarkdown(t *testing.T) {
 		}
 	}
 }
+
+func TestSummarizePackBundle(t *testing.T) {
+	bundle, err := NewPackBundle("summary", BuiltinPacks(), []string{PackXiaoyuCompanion})
+	if err != nil {
+		t.Fatalf("new bundle: %v", err)
+	}
+	summary, err := SummarizePackBundle(bundle)
+	if err != nil {
+		t.Fatalf("summarize bundle: %v", err)
+	}
+	if summary.PackCount != 2 || summary.EnabledCount != 1 || summary.DisabledCount != 1 {
+		t.Fatalf("unexpected summary counts: %#v", summary)
+	}
+	if summary.GoldenTestCount == 0 {
+		t.Fatalf("expected golden test count: %#v", summary)
+	}
+	markdown := RenderPackBundleSummaryMarkdown(summary)
+	for _, want := range []string{"Cogni Pack Bundle Summary", "enabled: 1", PackXiaoyuCompanion} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("summary markdown missing %q:\n%s", want, markdown)
+		}
+	}
+}

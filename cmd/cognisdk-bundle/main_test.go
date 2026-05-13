@@ -115,3 +115,17 @@ func TestRunPromoteReviewOutRequiresPath(t *testing.T) {
 		t.Fatalf("expected review-out path error, got %v", err)
 	}
 }
+
+func TestRunInspectBundle(t *testing.T) {
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "bundle.json")
+	if err := run([]string{"init", bundlePath, "--builtin"}); err != nil {
+		t.Fatalf("init bundle: %v", err)
+	}
+	if err := run([]string{"inspect", bundlePath}); err != nil {
+		t.Fatalf("inspect bundle: %v", err)
+	}
+	if err := run([]string{"inspect", bundlePath, "--markdown"}); err != nil {
+		t.Fatalf("inspect bundle markdown: %v", err)
+	}
+}
