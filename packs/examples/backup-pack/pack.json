@@ -1,0 +1,29 @@
+{
+  "id": "yunque.pack.backup",
+  "name": "Backup Pack",
+  "version": "0.1.0",
+  "description": "将备份信息、导出和导入能力作为可选增量包暴露给后端 registry 与前端同步菜单。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": ["backup.info", "backup.export", "backup.import"],
+    "routes": ["/v1/backup/info", "/v1/backup/export", "/v1/backup/import"],
+    "permissions": ["backup:read", "backup:write"]
+  },
+  "frontend": {
+    "menus": [
+      { "key": "backup", "label": "备份恢复", "path": "/packs/backup", "icon": "archive", "order": 90 }
+    ],
+    "routes": [
+      { "path": "/packs/backup", "component": "backup/BackupPage", "title": "备份恢复" }
+    ],
+    "assets": { "type": "builtin", "entry": "backup/BackupPage" }
+  },
+  "sdk": { "typescript": "yunque-client/backup" },
+  "update": { "channel": "stable", "rollback": true },
+  "metadata": {
+    "example": "true",
+    "sync": "backend-registry-drives-frontend"
+  }
+}
