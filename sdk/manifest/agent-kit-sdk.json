@@ -216,6 +216,10 @@
       "description": "Access the lightweight PluginMemory client or namespace for plugin-private KV memory."
     },
     {
+      "name": "pluginKnowledge",
+      "description": "Access the lightweight PluginKnowledge client or namespace for plugin-scoped knowledge search and ingest."
+    },
+    {
       "name": "skills",
       "description": "Access the lightweight Runtime Skills client or namespace for skill catalog, scan, dynamic skill review, and session suggestions."
     },
@@ -543,7 +547,8 @@
         "pluginSearch": "createAgentKit().pluginSearch",
         "pluginSend": "createAgentKit().pluginSend",
         "pluginLLM": "kit.pluginLLM",
-        "pluginMemory": "kit.pluginMemory"
+        "pluginMemory": "kit.pluginMemory",
+        "pluginKnowledge": "kit.pluginKnowledge"
       }
     },
     "go": {
@@ -644,7 +649,8 @@
         "pluginSearch": "yunque.NewAgentKit().PluginSearch",
         "pluginSend": "yunque.NewAgentKit().PluginSend",
         "pluginLLM": "kit.PluginLLM",
-        "pluginMemory": "kit.PluginMemory"
+        "pluginMemory": "kit.PluginMemory",
+        "pluginKnowledge": "kit.PluginKnowledge"
       }
     },
     "python": {
@@ -745,7 +751,8 @@
         "pluginSearch": "yunque.create_agent_kit().plugin_search",
         "pluginSend": "yunque.create_agent_kit().plugin_send",
         "pluginLLM": "kit.plugin_llm",
-        "pluginMemory": "kit.plugin_memory"
+        "pluginMemory": "kit.plugin_memory",
+        "pluginKnowledge": "kit.plugin_knowledge"
       }
     },
     "rust": {
@@ -846,7 +853,8 @@
         "pluginSearch": "AgentKit::plugin_search",
         "pluginSend": "AgentKit::plugin_send",
         "pluginLLM": "kit.plugin_llm",
-        "pluginMemory": "kit.plugin_memory"
+        "pluginMemory": "kit.plugin_memory",
+        "pluginKnowledge": "kit.plugin_knowledge"
       }
     }
   },

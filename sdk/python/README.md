@@ -458,6 +458,10 @@ The lightweight SkillHub SDK exposes incremental skill-package catalog, install,
 The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file editing, UI tabs, reload, and open-folder helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/plugins*`; Agent Kit also exposes this surface as `kit.plugins` / `kit.Plugins`.
 
 
+### PluginKnowledge SDK
+
+PluginKnowledge SDK exposes plugin-scoped knowledge/RAG operations (`search`, `ingest`) for plugins, external frontends, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugin API runtime slice. It maps directly to `POST /v1/plugin-api/knowledge/search` and `POST /v1/plugin-api/knowledge/ingest`; Agent Kit also exposes this surface as `kit.pluginKnowledge` / `kit.PluginKnowledge` / `kit.plugin_knowledge`.
+
 ### PluginMemory SDK
 
 PluginMemory SDK exposes plugin-private memory (`get`, `set`, `delete`, `list`, `search`) for plugins, external frontends, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugin API runtime slice. It maps directly to `POST /v1/plugin-api/memory/get` and sibling memory routes; Agent Kit also exposes this surface as `kit.pluginMemory` / `kit.PluginMemory` / `kit.plugin_memory`.
