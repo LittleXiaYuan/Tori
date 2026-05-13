@@ -18,6 +18,7 @@ func TestJSONSchemasMarshal(t *testing.T) {
 		"review":   PackBundleReviewJSONSchema(),
 		"plan":     PackBundleApplyPlanJSONSchema(),
 		"actions":  PackBundleApplyActionsJSONSchema(),
+		"kinds":    PackBundleApplyActionKindsJSONSchema(),
 	} {
 		data, err := json.Marshal(schema)
 		if err != nil {
@@ -169,5 +170,24 @@ func TestPackBundleApplyActionsSchema(t *testing.T) {
 		if !found {
 			t.Fatalf("action kind enum missing %q", kind)
 		}
+	}
+}
+
+func TestPackBundleApplyActionKindsSchema(t *testing.T) {
+	schema := PackBundleApplyActionKindsJSONSchema()
+	if schema["type"] != "array" {
+		t.Fatalf("action kinds schema type = %#v", schema["type"])
+	}
+	item := schema["items"].(map[string]any)
+	props := item["properties"].(map[string]any)
+	for _, field := range []string{"kind", "label", "description"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle apply action kinds item schema missing %q", field)
+		}
+	}
+	kindSchema := props["kind"].(map[string]any)
+	enumValues := kindSchema["enum"].([]string)
+	if len(enumValues) != len(PackBundleApplyActionKinds()) {
+		t.Fatalf("action kind info enum length = %d, want %d", len(enumValues), len(PackBundleApplyActionKinds()))
 	}
 }

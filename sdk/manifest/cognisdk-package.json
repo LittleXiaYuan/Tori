@@ -155,6 +155,7 @@
         "PackBundleReviewJSONSchema",
         "PackBundleApplyPlanJSONSchema",
         "PackBundleApplyActionsJSONSchema",
+        "PackBundleApplyActionKindsJSONSchema",
         "FeedbackProposalJSONSchema",
         "JSONSchemaByName"
       ]
@@ -176,6 +177,7 @@
         "pack-bundle-review",
         "pack-bundle-apply-plan",
         "pack-bundle-apply-actions",
+        "pack-bundle-apply-action-kinds",
         "feedback-proposal"
       ]
     },
