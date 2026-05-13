@@ -41,6 +41,7 @@ import {
 import { CherryModal } from "./overlay";
 import { api } from "@/lib/api";
 import type { VersionInfo } from "@/lib/api-types";
+import { createBackupPackClient } from "@/lib/backup-pack-client";
 import { loadTheme, patchAndApply, THEME_STORAGE_KEY } from "@/lib/theme-engine";
 
 export interface CherrySettingsModalProps {
@@ -48,6 +49,8 @@ export interface CherrySettingsModalProps {
   onClose: () => void;
   initialSection?: SectionId;
 }
+
+const backupPack = createBackupPackClient();
 
 type SectionId =
   | "general"
@@ -578,7 +581,7 @@ function DataSection() {
     setBacking(true);
     setMsg("");
     try {
-      await api.backupExport();
+      await backupPack.export();
       setMsg("备份已下载到本地。");
     } catch (e) {
       setMsg(`备份失败：${(e as Error).message}`);

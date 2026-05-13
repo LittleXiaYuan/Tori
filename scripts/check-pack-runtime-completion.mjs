@@ -157,15 +157,15 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend packs client tests",
   "Frontend backup pack client tests",
   "PackRuntimeRoutePage",
-  "packsEnabled",
+  "enabled()",
   "frontend?.menus",
   "frontend?.routes",
   "/v1/packs/enabled",
   "manifest.distribution",
-  "packBackendModules",
-  "packInstallFromURL",
+  "backendModules()",
+  "installFromURL",
   "downloadArtifact",
-  "packPrune",
+  "prune()",
   "previousArtifacts",
   "SDK 调用入口",
 ]);
@@ -188,6 +188,28 @@ if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
 } else {
   ok("前端 Pack Runtime 客户端拆分", "Pack console uses packs-client instead of monolithic api pack methods");
+}
+
+const monolithicApi = read("heroui-web/src/lib/api.ts");
+const forbiddenMonolithicPackMethods = [
+  "backupInfo:",
+  "backupExport:",
+  "backupImport:",
+  "packsInstalled:",
+  "packsEnabled:",
+  "packBackendModules:",
+  "packInstall:",
+  "packInstallFromURL:",
+  "packEnable:",
+  "packDisable:",
+  "packRollback:",
+  "packPrune:",
+];
+const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) => monolithicApi.includes(token));
+if (leakedMonolithicMethods.length > 0) {
+  fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
+} else {
+  ok("前端轻内核 API 拆分", "backup/pack methods live in lightweight clients instead of monolithic api.ts");
 }
 
 requireTokens("TypeScript packs SDK", sdk, [
