@@ -191,6 +191,7 @@ if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes
 }
 
 const monolithicApi = read("heroui-web/src/lib/api.ts");
+const cherrySettings = read("heroui-web/src/components/cherry/settings-modal.tsx");
 const forbiddenMonolithicPackMethods = [
   "backupInfo:",
   "backupExport:",
@@ -210,6 +211,14 @@ if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
   ok("前端轻内核 API 拆分", "backup/pack methods live in lightweight clients instead of monolithic api.ts");
+}
+
+if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
+  fail("前端轻内核设置入口", "Cherry settings must not execute backup pack actions directly; link to Pack Runtime instead");
+} else if (!cherrySettings.includes("BACKUP_PACK_ID") || !cherrySettings.includes('"/packs/backup"') || !cherrySettings.includes("packsClient") || !cherrySettings.includes(".installed()")) {
+  fail("前端轻内核设置入口", "Cherry settings must expose backup as a pack-registry-aware entrypoint");
+} else {
+  ok("前端轻内核设置入口", "Cherry settings links to backup pack through pack registry state");
 }
 
 requireTokens("TypeScript packs SDK", sdk, [
