@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "domain": "interactions",
+  "description": "Cross-language lightweight SDK entrypoints that bundle emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending without importing the full platform client.",
+  "principles": [
+    "Expose user interaction primitives as a focused SDK slice for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts.",
+    "Keep emotion, instruction, reaction, and sticker operations directly callable through existing authenticated interaction routes.",
+    "Make Interactions access available through Agent Kit while preserving Emotion, Instructions, and Reactions as smaller focused slices."
+  ],
+  "routes": [
+    "GET /v1/emotion/history",
+    "GET /v1/emotion/stickers",
+    "PUT /v1/emotion/stickers",
+    "DELETE /v1/emotion/stickers",
+    "GET /v1/instructions",
+    "POST /v1/instructions",
+    "PUT /v1/instructions",
+    "DELETE /v1/instructions",
+    "POST /v1/instructions/reorder",
+    "POST /v1/react",
+    "POST /v1/sticker/send"
+  ],
+  "capabilities": [
+    { "name": "emotionHistory", "route": "GET /v1/emotion/history", "readOnly": true, "description": "Read emotion history entries and summary." },
+    { "name": "stickers", "route": "GET /v1/emotion/stickers", "readOnly": true, "description": "Export emotion sticker mappings." },
+    { "name": "registerStickers", "route": "PUT /v1/emotion/stickers", "readOnly": false, "description": "Register sticker suggestions for one platform and emotion." },
+    { "name": "clearStickers", "route": "DELETE /v1/emotion/stickers", "readOnly": false, "description": "Clear sticker mappings for one platform and emotion." },
+    { "name": "instructions", "route": "GET /v1/instructions", "readOnly": true, "description": "List user instructions." },
+    { "name": "createInstruction", "route": "POST /v1/instructions", "readOnly": false, "description": "Create one user instruction." },
+    { "name": "updateInstruction", "route": "PUT /v1/instructions", "readOnly": false, "description": "Update one user instruction." },
+    { "name": "deleteInstruction", "route": "DELETE /v1/instructions", "readOnly": false, "description": "Delete one user instruction." },
+    { "name": "reorderInstructions", "route": "POST /v1/instructions/reorder", "readOnly": false, "description": "Reorder user instructions." },
+    { "name": "react", "route": "POST /v1/react", "readOnly": false, "description": "Send an emoji reaction to a channel message." },
+    { "name": "sendSticker", "route": "POST /v1/sticker/send", "readOnly": false, "description": "Send a sticker or emoji to a channel target." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/interactions.ts", "sdk/typescript/src/agent-kit.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": {
+        "emotionHistory": "createInteractionsClient().emotionHistory",
+        "stickers": "createInteractionsClient().stickers",
+        "registerStickers": "createInteractionsClient().registerStickers",
+        "clearStickers": "createInteractionsClient().clearStickers",
+        "instructions": "createInteractionsClient().instructions",
+        "createInstruction": "createInteractionsClient().createInstruction",
+        "updateInstruction": "createInteractionsClient().updateInstruction",
+        "deleteInstruction": "createInteractionsClient().deleteInstruction",
+        "reorderInstructions": "createInteractionsClient().reorderInstructions",
+        "react": "createInteractionsClient().react",
+        "sendSticker": "createInteractionsClient().sendSticker"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": {
+        "emotionHistory": "yunque.Interactions.EmotionHistory",
+        "stickers": "yunque.Interactions.Stickers",
+        "registerStickers": "yunque.Interactions.RegisterStickers",
+        "clearStickers": "yunque.Interactions.ClearStickers",
+        "instructions": "yunque.Interactions.Instructions",
+        "createInstruction": "yunque.Interactions.CreateInstruction",
+        "updateInstruction": "yunque.Interactions.UpdateInstruction",
+        "deleteInstruction": "yunque.Interactions.DeleteInstruction",
+        "reorderInstructions": "yunque.Interactions.ReorderInstructions",
+        "react": "yunque.Interactions.React",
+        "sendSticker": "yunque.Interactions.SendSticker"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": {
+        "emotionHistory": "yunque.interactions.emotion_history",
+        "stickers": "yunque.interactions.stickers",
+        "registerStickers": "yunque.interactions.register_stickers",
+        "clearStickers": "yunque.interactions.clear_stickers",
+        "instructions": "yunque.interactions.instructions",
+        "createInstruction": "yunque.interactions.create_instruction",
+        "updateInstruction": "yunque.interactions.update_instruction",
+        "deleteInstruction": "yunque.interactions.delete_instruction",
+        "reorderInstructions": "yunque.interactions.reorder_instructions",
+        "react": "yunque.interactions.react",
+        "sendSticker": "yunque.interactions.send_sticker"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": {
+        "emotionHistory": "InteractionsClient::emotion_history",
+        "stickers": "InteractionsClient::stickers",
+        "registerStickers": "InteractionsClient::register_stickers",
+        "clearStickers": "InteractionsClient::clear_stickers",
+        "instructions": "InteractionsClient::instructions",
+        "createInstruction": "InteractionsClient::create_instruction",
+        "updateInstruction": "InteractionsClient::update_instruction",
+        "deleteInstruction": "InteractionsClient::delete_instruction",
+        "reorderInstructions": "InteractionsClient::reorder_instructions",
+        "react": "InteractionsClient::react",
+        "sendSticker": "InteractionsClient::send_sticker"
+      }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

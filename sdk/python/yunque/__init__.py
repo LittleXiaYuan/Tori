@@ -756,6 +756,47 @@ class _EmotionNamespace:
 
 emotion = _EmotionNamespace()
 
+# ── Interactions facade (/v1/emotion, /v1/instructions, /v1/react) ──
+
+class _InteractionsNamespace:
+    """Lightweight bundle for emotion, instructions, reactions, and sticker helpers."""
+
+    def emotion_history(self, session_id: str = "", limit: int = 0, from_time: str = "", to_time: str = "") -> dict:
+        return emotion.history(session_id, limit, from_time, to_time)
+
+    def stickers(self) -> dict:
+        return emotion.stickers()
+
+    def register_stickers(self, platform: str, emotion_name: str, stickers: list[dict]) -> dict:
+        return emotion.register_stickers(platform, emotion_name, stickers)
+
+    def clear_stickers(self, platform: str, emotion_name: str) -> dict:
+        return emotion.clear_stickers(platform, emotion_name)
+
+    def instructions(self, category: str = "") -> dict:
+        return instructions.list(category)
+
+    def create_instruction(self, instruction: dict) -> dict:
+        return instructions.create(instruction)
+
+    def update_instruction(self, instruction: dict) -> dict:
+        return instructions.update(instruction)
+
+    def delete_instruction(self, instruction_id: str) -> dict:
+        return instructions.delete(instruction_id)
+
+    def reorder_instructions(self, ids: list[str]) -> dict:
+        return instructions.reorder(ids)
+
+    def react(self, channel_type: str, target: str, message_id: str, emoji: str = "") -> dict:
+        return reactions.react(channel_type, target, message_id, emoji)
+
+    def send_sticker(self, channel_type: str, target: str, package_id: str = "", sticker_id: str = "", file_id: str = "", emoji: str = "", platform: str = "") -> dict:
+        return reactions.send_sticker(channel_type, target, package_id, sticker_id, file_id, emoji, platform)
+
+
+interactions = _InteractionsNamespace()
+
 class _PersonaNamespace:
     """Lightweight helpers for persona identity, skills, and preset management."""
 
@@ -3349,6 +3390,7 @@ class AgentKit:
         self.persona = persona
         self.modes = modes
         self.emotion = emotion
+        self.interactions = interactions
         self.instructions = instructions
         self.reactions = reactions
         self.permissions = permissions
