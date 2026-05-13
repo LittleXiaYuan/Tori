@@ -210,6 +210,15 @@ type PackBundleReview struct {
 	GoldenTests      GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
 }
 
+// PackBundleDigestCheck is a portable verification result for bundle digest
+// assertions in CI jobs, plugin installs, and rollback scripts.
+type PackBundleDigestCheck struct {
+	BundleID string `json:"bundle_id" yaml:"bundle_id"`
+	Expected string `json:"expected" yaml:"expected"`
+	Actual   string `json:"actual" yaml:"actual"`
+	Match    bool   `json:"match" yaml:"match"`
+}
+
 // PackBundleApplyActionKind is a machine-readable action type in a dry-run
 // bundle apply plan.
 type PackBundleApplyActionKind string

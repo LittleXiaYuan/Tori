@@ -90,7 +90,9 @@
       "name": "packBundleDigest",
       "symbols": [
         "CanonicalPackBundle",
-        "DigestPackBundle"
+        "DigestPackBundle",
+        "PackBundleDigestCheck",
+        "VerifyPackBundleDigest"
       ]
     },
     {
@@ -191,7 +193,8 @@
         "--review-out",
         "--out",
         "--fail-on-review",
-        "--fail-on-blocked"
+        "--fail-on-blocked",
+        "--expect"
       ]
     }
   ],

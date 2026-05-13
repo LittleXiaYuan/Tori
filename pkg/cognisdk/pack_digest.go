@@ -34,3 +34,19 @@ func DigestPackBundle(bundle PackBundle) (string, error) {
 	sum := sha256.Sum256(data)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
+
+// VerifyPackBundleDigest compares a bundle with an expected digest without
+// mutating the bundle or host state.
+func VerifyPackBundleDigest(bundle PackBundle, expected string) (PackBundleDigestCheck, error) {
+	actual, err := DigestPackBundle(bundle)
+	if err != nil {
+		return PackBundleDigestCheck{}, err
+	}
+	check := PackBundleDigestCheck{
+		BundleID: bundle.ID,
+		Expected: expected,
+		Actual:   actual,
+		Match:    actual == expected,
+	}
+	return check, nil
+}
