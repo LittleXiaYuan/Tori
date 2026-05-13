@@ -73,6 +73,12 @@ const checks = [
     cwd: "heroui-web",
   },
   {
+    name: "Frontend shell pack entry tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx"],
+    cwd: "heroui-web",
+  },
+  {
     name: "TypeScript SDK typecheck",
     command: process.execPath,
     args: [npmCli, "run", "typecheck"],
