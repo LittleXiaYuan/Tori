@@ -64,9 +64,12 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 	for _, route := range module.Routes() {
 		route := route
 		route.Path = strings.TrimSpace(route.Path)
-		route.Method = strings.TrimSpace(route.Method)
+		route.Method = strings.ToUpper(strings.TrimSpace(route.Method))
 		if route.Path == "" || route.Handler == nil {
 			continue
+		}
+		if route.Method == "" {
+			panic(fmt.Sprintf("backend pack route %s from %s must declare an HTTP method", route.Path, packID))
 		}
 		if owner, ok := g.backendPackRoutes[route.Path]; ok {
 			if owner == packID {

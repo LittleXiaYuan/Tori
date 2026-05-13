@@ -5,11 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"yunque-agent/pkg/packruntime"
@@ -247,6 +249,32 @@ func TestRegisterBackendPackPanicsOnRouteConflict(t *testing.T) {
 		}
 	}()
 	gw.RegisterBackendPack(second)
+}
+
+func TestRegisterBackendPackPanicsOnMissingRouteMethod(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, _ := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	module := testBackendPackModule{
+		id: "yunque.pack.no-method",
+		routes: []packruntime.BackendRoute{{
+			Path:    "/v1/no-method-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {},
+		}},
+	}
+
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected missing route method panic")
+		}
+		if !strings.Contains(fmt.Sprint(recovered), "must declare an HTTP method") {
+			t.Fatalf("expected missing method panic, got %v", recovered)
+		}
+	}()
+	gw.RegisterBackendPack(module)
 }
 
 func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
