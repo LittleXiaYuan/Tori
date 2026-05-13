@@ -3045,6 +3045,77 @@ class _BotsNamespace:
 bots = _BotsNamespace()
 
 
+
+# ── SkillHub Incremental Packages (/api/skillhub) ──
+
+class _SkillHubNamespace:
+    """Lightweight helpers for SkillHub catalog, install, update, rollback, policy, and analytics."""
+
+    def search(self, q: str, *, limit: int = 0, source: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {"q": q}
+        if limit > 0:
+            params["limit"] = str(limit)
+        if source:
+            params["source"] = source
+        return _api_call("GET", f"/api/skillhub/search?{urlencode(params)}")
+
+    def installed(self) -> dict:
+        return _api_call("GET", "/api/skillhub/installed")
+
+    def install(self, slug: str) -> dict:
+        return _api_call("POST", "/api/skillhub/install", {"slug": slug})
+
+    def uninstall(self, slug: str, method: str = "POST") -> dict:
+        if method.upper() not in {"POST", "DELETE"}:
+            raise ValueError("uninstall method must be POST or DELETE")
+        return _api_call(method.upper(), "/api/skillhub/uninstall", {"slug": slug})
+
+    def trending(self, *, limit: int = 0, source: str = "", cursor: str = "") -> dict:
+        from urllib.parse import urlencode
+        params = {}
+        if limit > 0:
+            params["limit"] = str(limit)
+        if source:
+            params["source"] = source
+        if cursor:
+            params["cursor"] = cursor
+        suffix = f"?{urlencode(params)}" if params else ""
+        return _api_call("GET", f"/api/skillhub/trending{suffix}")
+
+    def detail(self, slug: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/api/skillhub/detail?{urlencode({'slug': slug})}")
+
+    def check_updates(self) -> dict:
+        return _api_call("GET", "/api/skillhub/check-updates")
+
+    def update(self, slug: str) -> dict:
+        return _api_call("POST", "/api/skillhub/update", {"slug": slug})
+
+    def rollback(self, slug: str, version: str) -> dict:
+        return _api_call("POST", "/api/skillhub/rollback", {"slug": slug, "version": version})
+
+    def versions(self, slug: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/api/skillhub/versions?{urlencode({'slug': slug})}")
+
+    def policy(self) -> dict:
+        return _api_call("GET", "/api/skillhub/policy")
+
+    def update_policy(self, policy: dict) -> dict:
+        return _api_call("POST", "/api/skillhub/policy", policy)
+
+    def policy_check(self, slug: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/api/skillhub/policy/check?{urlencode({'slug': slug})}")
+
+    def analytics(self) -> dict:
+        return _api_call("GET", "/api/skillhub/analytics")
+
+
+skillhub = _SkillHubNamespace()
+
 # ── Smart Router ──
 
 class _RouterNamespace:
@@ -3085,6 +3156,7 @@ class AgentKit:
         self.notify = notify
         self.projects = projects
         self.market = market
+        self.skillhub = skillhub
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork

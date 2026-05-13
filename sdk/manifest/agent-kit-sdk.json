@@ -23,6 +23,7 @@
     "notification-runtime",
     "project-workspaces",
     "skill-market",
+    "skillhub-incremental-packages",
     "mcp-dispatch",
     "ide-orchestrator",
     "conversation-fork",
@@ -128,6 +129,10 @@
     {
       "name": "market",
       "description": "Access the lightweight host Skill Market client or namespace."
+    },
+    {
+      "name": "skillhub",
+      "description": "Access the lightweight SkillHub client or namespace for incremental package catalog, install, update, rollback, policy, and analytics."
     },
     {
       "name": "dispatch",
@@ -377,7 +382,8 @@
         "documents": "createAgentKit().documents",
         "webchat": "createAgentKit().webchat",
         "sandbox": "createAgentKit().sandbox",
-        "router": "createAgentKit().router"
+        "router": "createAgentKit().router",
+        "skillhub": "createAgentKit().skillhub"
       }
     },
     "go": {
@@ -450,7 +456,8 @@
         "documents": "yunque.NewAgentKit().Documents",
         "webchat": "yunque.NewAgentKit().WebChat",
         "sandbox": "yunque.NewAgentKit().Sandbox",
-        "router": "yunque.NewAgentKit().Router"
+        "router": "yunque.NewAgentKit().Router",
+        "skillhub": "yunque.NewAgentKit().SkillHub"
       }
     },
     "python": {
@@ -523,7 +530,8 @@
         "documents": "yunque.create_agent_kit().documents",
         "webchat": "yunque.create_agent_kit().webchat",
         "sandbox": "yunque.create_agent_kit().sandbox",
-        "router": "yunque.create_agent_kit().router"
+        "router": "yunque.create_agent_kit().router",
+        "skillhub": "yunque.create_agent_kit().skillhub"
       }
     },
     "rust": {
@@ -596,7 +604,8 @@
         "documents": "AgentKit::documents",
         "webchat": "AgentKit::webchat",
         "sandbox": "AgentKit::sandbox",
-        "router": "AgentKit::router"
+        "router": "AgentKit::router",
+        "skillhub": "AgentKit::skillhub"
       }
     }
   },

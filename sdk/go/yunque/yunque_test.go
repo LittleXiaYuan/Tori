@@ -4157,3 +4157,65 @@ func TestRouterNamespaceReadsStats(t *testing.T) {
 		t.Fatalf("unexpected router requests: %v", seen)
 	}
 }
+
+func TestSkillHubNamespaceManagesIncrementalPackages(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/skillhub/search":
+			if r.URL.Query().Get("q") != "browser" || r.URL.Query().Get("limit") != "5" {
+				t.Fatalf("unexpected search query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"results":[{"slug":"browser"}],"count":1}`))
+		case "/api/skillhub/installed":
+			_, _ = w.Write([]byte(`{"skills":[{"slug":"browser"}],"count":1}`))
+		case "/api/skillhub/install", "/api/skillhub/uninstall", "/api/skillhub/update", "/api/skillhub/rollback", "/api/skillhub/policy":
+			_, _ = w.Write([]byte(`{"ok":true,"slug":"browser"}`))
+		case "/api/skillhub/trending":
+			_, _ = w.Write([]byte(`{"skills":[{"slug":"browser"}],"count":1}`))
+		case "/api/skillhub/detail":
+			_, _ = w.Write([]byte(`{"slug":"browser","name":"Browser"}`))
+		case "/api/skillhub/check-updates":
+			_, _ = w.Write([]byte(`{"updates":[{"slug":"browser"}]}`))
+		case "/api/skillhub/versions":
+			_, _ = w.Write([]byte(`{"versions":["1.0.0"]}`))
+		case "/api/skillhub/policy/check":
+			_, _ = w.Write([]byte(`{"allowed":true}`))
+		case "/api/skillhub/analytics":
+			_, _ = w.Write([]byte(`{"installed_count":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	search, err := SkillHub.Search(ctx, SkillHubQuery{Q: "browser", Limit: 5, Source: "clawhub"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed, _ := SkillHub.Installed(ctx)
+	installedOne, _ := SkillHub.Install(ctx, "browser")
+	_, _ = SkillHub.Uninstall(ctx, "browser")
+	trending, _ := SkillHub.Trending(ctx, SkillHubQuery{Limit: 3, Cursor: "n1"})
+	detail, _ := SkillHub.Detail(ctx, "browser")
+	updates, _ := SkillHub.CheckUpdates(ctx)
+	_, _ = SkillHub.Update(ctx, "browser")
+	_, _ = SkillHub.Rollback(ctx, "browser", "1.0.0")
+	versions, _ := SkillHub.Versions(ctx, "browser")
+	policy, _ := SkillHub.Policy(ctx)
+	_, _ = SkillHub.UpdatePolicy(ctx, map[string]any{"min_security_score": 80})
+	check, _ := SkillHub.PolicyCheck(ctx, "browser")
+	analytics, _ := SkillHub.Analytics(ctx)
+
+	if search["count"].(float64) != 1 || installed["count"].(float64) != 1 || installedOne["slug"] != "browser" || trending["count"].(float64) != 1 || detail["name"] != "Browser" || updates["updates"] == nil || versions["versions"] == nil || policy["ok"] != true || check["allowed"] != true || analytics["installed_count"].(float64) != 1 {
+		t.Fatalf("unexpected SkillHub results")
+	}
+	if NewAgentKit().SkillHub != SkillHub {
+		t.Fatalf("agent kit should expose SkillHub namespace")
+	}
+	if len(seen) != 14 {
+		t.Fatalf("expected 14 requests, got %d: %v", len(seen), seen)
+	}
+}
