@@ -119,6 +119,34 @@ pub struct StateGoalMutationResponse {
     pub status: String,
 }
 
+/// Response returned by State Kernel focus reads.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct StateFocusResponse {
+    #[serde(default)]
+    pub focus: String,
+}
+
+/// Request body for State Kernel focus updates.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct StateFocusUpdateRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub focus: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub topics: Vec<String>,
+}
+
+/// Response returned by State Kernel focus updates.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct StateFocusUpdateResponse {
+    pub status: String,
+}
+
+/// Response returned by State Kernel resource mutations.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct StateResourceMutationResponse {
+    pub status: String,
+}
+
 /// Filters for the reflection experience and strategy APIs.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct ReflectOptions {
@@ -1226,14 +1254,23 @@ impl StateClient {
             .await
     }
 
+    /// Delete a State Kernel goal by id.
+    pub async fn delete_goal(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<StateGoalMutationResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!("/v1/state/goals?id={}", id.as_ref())))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
     /// Return the current focus string.
     pub async fn focus(&self) -> Result<String, reqwest::Error> {
-        #[derive(Deserialize)]
-        struct FocusResponse {
-            #[serde(default)]
-            focus: String,
-        }
-        let response: FocusResponse = self
+        let response: StateFocusResponse = self
             .http
             .get(self.url("/v1/state/focus"))
             .send()
@@ -1244,10 +1281,54 @@ impl StateClient {
         Ok(response.focus)
     }
 
+    /// Update the current State Kernel focus and optional topics.
+    pub async fn update_focus(
+        &self,
+        request: &StateFocusUpdateRequest,
+    ) -> Result<StateFocusUpdateResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/state/focus"))
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
     /// List active resources tracked by the State Kernel.
     pub async fn resources(&self) -> Result<Vec<StateResource>, reqwest::Error> {
         self.http
             .get(self.url("/v1/state/resources"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Track a State Kernel resource.
+    pub async fn track_resource(
+        &self,
+        resource: &StateResource,
+    ) -> Result<StateResourceMutationResponse, reqwest::Error> {
+        self.http
+            .post(self.url("/v1/state/resources"))
+            .json(resource)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    /// Release a tracked State Kernel resource by id.
+    pub async fn release_resource(
+        &self,
+        id: impl AsRef<str>,
+    ) -> Result<StateResourceMutationResponse, reqwest::Error> {
+        self.http
+            .delete(self.url(&format!("/v1/state/resources?id={}", id.as_ref())))
             .send()
             .await?
             .error_for_status()?
@@ -9848,6 +9929,30 @@ mod tests {
         let value = serde_json::to_value(goal).unwrap();
         assert_eq!(value["title"], "Ship Rust state helper");
         assert_eq!(value["priority"], 2);
+        assert!(value.get("id").is_none());
+    }
+
+    #[test]
+    fn state_focus_update_serializes_incremental_body() {
+        let request = StateFocusUpdateRequest {
+            focus: "SDK boundary".to_string(),
+            topics: vec!["state".to_string()],
+        };
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["focus"], "SDK boundary");
+        assert_eq!(value["topics"][0], "state");
+    }
+
+    #[test]
+    fn state_resource_serializes_incremental_body() {
+        let resource = StateResource {
+            path: "sdk/rust/src/lib.rs".to_string(),
+            r#type: "file".to_string(),
+            ..StateResource::default()
+        };
+        let value = serde_json::to_value(resource).unwrap();
+        assert_eq!(value["path"], "sdk/rust/src/lib.rs");
+        assert_eq!(value["type"], "file");
         assert!(value.get("id").is_none());
     }
 

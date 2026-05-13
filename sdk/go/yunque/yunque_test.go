@@ -2095,10 +2095,38 @@ func TestStateFocusedHelpers(t *testing.T) {
 				t.Fatalf("unexpected goal body: %+v", body)
 			}
 			_, _ = w.Write([]byte(`{"id":"g2","status":"created"}`))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/state/goals":
+			if r.URL.Query().Get("id") != "g1" {
+				t.Fatalf("unexpected delete goal query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"id":"g1","status":"deleted"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/state/focus":
 			_, _ = w.Write([]byte(`{"focus":"SDK boundary"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/state/focus":
+			var body StateFocusUpdateRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Focus != "Next SDK" || len(body.Topics) != 1 || body.Topics[0] != "state" {
+				t.Fatalf("unexpected focus body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"updated"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/state/resources":
 			_, _ = w.Write([]byte(`[{"id":"r1","type":"file","path":"sdk/go/yunque/yunque.go","status":"active"}]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/state/resources":
+			var body StateResource
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Path != "sdk/go/yunque/yunque.go" || body.Type != "file" {
+				t.Fatalf("unexpected resource body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"status":"tracked"}`))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/state/resources":
+			if r.URL.Query().Get("id") != "r1" {
+				t.Fatalf("unexpected release resource query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"status":"released"}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
 		}
@@ -2120,12 +2148,28 @@ func TestStateFocusedHelpers(t *testing.T) {
 		t.Fatalf("unexpected save response: %+v", saved)
 	}
 
+	deleted, err := State.DeleteGoal(context.Background(), "g1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted.ID != "g1" || deleted.Status != "deleted" {
+		t.Fatalf("unexpected delete response: %+v", deleted)
+	}
+
 	focus, err := State.Focus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if focus != "SDK boundary" {
 		t.Fatalf("unexpected focus: %q", focus)
+	}
+
+	updatedFocus, err := State.UpdateFocus(context.Background(), "Next SDK", []string{"state"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedFocus.Status != "updated" {
+		t.Fatalf("unexpected focus update response: %+v", updatedFocus)
 	}
 
 	resources, err := State.Resources(context.Background())
@@ -2136,8 +2180,24 @@ func TestStateFocusedHelpers(t *testing.T) {
 		t.Fatalf("unexpected resources: %+v", resources)
 	}
 
-	if len(seen) != 4 {
-		t.Fatalf("expected 4 requests, got %d: %v", len(seen), seen)
+	tracked, err := State.TrackResource(context.Background(), StateResource{Path: "sdk/go/yunque/yunque.go", Type: "file"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tracked.Status != "tracked" {
+		t.Fatalf("unexpected track response: %+v", tracked)
+	}
+
+	released, err := State.ReleaseResource(context.Background(), "r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if released.Status != "released" {
+		t.Fatalf("unexpected release response: %+v", released)
+	}
+
+	if len(seen) != 8 {
+		t.Fatalf("expected 8 requests, got %d: %v", len(seen), seen)
 	}
 }
 

@@ -2953,14 +2953,35 @@ class _StateNamespace:
         """Create or update a State Kernel goal."""
         return _api_call("POST", "/v1/state/goals", goal)
 
+    def delete_goal(self, id: str) -> dict:
+        """Delete a State Kernel goal by id."""
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/state/goals?{urlencode({'id': id})}")
+
     def focus(self) -> str:
         """Return the current focus string."""
         return _api_call("GET", "/v1/state/focus").get("focus", "")
+
+    def update_focus(self, focus: str = "", topics: Optional[list[str]] = None) -> dict:
+        """Update the current State Kernel focus and optional topics."""
+        body = {"focus": focus}
+        if topics is not None:
+            body["topics"] = topics
+        return _api_call("POST", "/v1/state/focus", body)
 
     def resources(self) -> list[dict]:
         """List active resources tracked by the State Kernel."""
         result = _api_call("GET", "/v1/state/resources")
         return result if isinstance(result, list) else []
+
+    def track_resource(self, resource: dict) -> dict:
+        """Track a State Kernel resource."""
+        return _api_call("POST", "/v1/state/resources", resource)
+
+    def release_resource(self, id: str) -> dict:
+        """Release a tracked State Kernel resource by id."""
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/state/resources?{urlencode({'id': id})}")
 
 
 state = _StateNamespace()

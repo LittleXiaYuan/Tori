@@ -1622,6 +1622,11 @@ const goalState = createGoalStateClient({
 });
 
 const goals = await goalState.list();
+await goalState.save({ title: "Ship focused state helper", priority: 2 });
+await goalState.delete("goal-1");
+
+await resourceState.track({ path: "sdk/typescript", type: "repo" });
+await resourceState.release("resource-1");
 
 const state = createStateClient({
   baseUrl: "http://localhost:9090",
@@ -1629,6 +1634,10 @@ const state = createStateClient({
 });
 const focus = await state.focus();
 console.log(focus.focus);
+await state.updateFocus("整理 SDK 状态层", ["sdk", "state"]);
+await state.deleteGoal("goal-1");
+await state.trackResource({ path: "sdk/typescript", type: "repo" });
+await state.releaseResource("resource-1");
 
 const stateSnapshot = createStateSnapshotClient({
   baseUrl: "http://localhost:9090",

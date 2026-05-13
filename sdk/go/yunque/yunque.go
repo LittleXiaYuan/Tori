@@ -6849,6 +6849,17 @@ type StateFocusResponse struct {
 	Focus string `json:"focus"`
 }
 
+// StateFocusUpdateRequest updates the current State Kernel focus and topics.
+type StateFocusUpdateRequest struct {
+	Focus  string   `json:"focus,omitempty"`
+	Topics []string `json:"topics,omitempty"`
+}
+
+// StateFocusUpdateResponse is returned by focus update operations.
+type StateFocusUpdateResponse struct {
+	Status string `json:"status"`
+}
+
 // StateResourceMutationResponse is returned by resource track/release operations.
 type StateResourceMutationResponse struct {
 	Status string `json:"status"`
@@ -6913,6 +6924,15 @@ func (s *stateNamespace) SaveGoal(ctx context.Context, goal StateGoal) (StateGoa
 	return out, nil
 }
 
+// DeleteGoal deletes a State Kernel goal by id.
+func (s *stateNamespace) DeleteGoal(ctx context.Context, id string) (StateGoalMutationResponse, error) {
+	var out StateGoalMutationResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/state/goals?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return StateGoalMutationResponse{}, err
+	}
+	return out, nil
+}
+
 // Focus returns the current State Kernel focus string.
 func (s *stateNamespace) Focus(ctx context.Context) (string, error) {
 	resp, err := apiCall(ctx, "GET", "/v1/state/focus", nil)
@@ -6926,6 +6946,15 @@ func (s *stateNamespace) Focus(ctx context.Context) (string, error) {
 	return out.Focus, nil
 }
 
+// UpdateFocus updates the current State Kernel focus and optional topics.
+func (s *stateNamespace) UpdateFocus(ctx context.Context, focus string, topics []string) (StateFocusUpdateResponse, error) {
+	var out StateFocusUpdateResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/state/focus", StateFocusUpdateRequest{Focus: focus, Topics: topics}, &out); err != nil {
+		return StateFocusUpdateResponse{}, err
+	}
+	return out, nil
+}
+
 // Resources lists active resources tracked by the State Kernel.
 func (s *stateNamespace) Resources(ctx context.Context) ([]StateResource, error) {
 	var out []StateResource
@@ -6934,6 +6963,24 @@ func (s *stateNamespace) Resources(ctx context.Context) ([]StateResource, error)
 	}
 	if out == nil {
 		return []StateResource{}, nil
+	}
+	return out, nil
+}
+
+// TrackResource tracks a State Kernel resource.
+func (s *stateNamespace) TrackResource(ctx context.Context, resource StateResource) (StateResourceMutationResponse, error) {
+	var out StateResourceMutationResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/state/resources", resource, &out); err != nil {
+		return StateResourceMutationResponse{}, err
+	}
+	return out, nil
+}
+
+// ReleaseResource releases a tracked State Kernel resource by id.
+func (s *stateNamespace) ReleaseResource(ctx context.Context, id string) (StateResourceMutationResponse, error) {
+	var out StateResourceMutationResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/state/resources?id="+url.QueryEscape(id), nil, &out); err != nil {
+		return StateResourceMutationResponse{}, err
 	}
 	return out, nil
 }
