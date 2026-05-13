@@ -99,6 +99,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.plugins.list()).plugins[0]?.name, "demo");
   assertEqual(((await kit.pluginUI.ui()).tabs[0] as { id?: string })?.id, "demo-tab");
   assertEqual((await kit.skills.list()).skills[0]?.name, "web.search");
+  assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.dispatch.workers()).count, 1);
   assertEqual((await kit.orchestrator.status()).running, true);
   assertEqual((await kit.fork.list("s1")).forks[0]?.id, "fork_1");

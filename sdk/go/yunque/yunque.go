@@ -415,7 +415,11 @@ func (p *pluginsNamespace) OpenFolder(ctx context.Context, name string) (Plugins
 // Skills exposes runtime skill catalog, scan, dynamic review, and suggestion helpers.
 var Skills = &skillsNamespace{}
 
+// SkillsCatalog exposes the read-only runtime skills catalog as a standalone slice.
+var SkillsCatalog = &skillsCatalogNamespace{}
+
 type skillsNamespace struct{}
+type skillsCatalogNamespace struct{}
 type SkillsResponse map[string]any
 
 func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
@@ -424,6 +428,10 @@ func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+func (s *skillsCatalogNamespace) List(ctx context.Context) (SkillsResponse, error) {
+	return Skills.List(ctx)
 }
 
 func (s *skillsNamespace) Scan(ctx context.Context) (SkillsResponse, error) {
@@ -1486,6 +1494,7 @@ type AgentKit struct {
 	Plugins       *pluginsNamespace
 	PluginUI      *pluginUINamespace
 	Skills        *skillsNamespace
+	SkillsCatalog *skillsCatalogNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
 	Fork          *forkNamespace
@@ -6752,6 +6761,7 @@ func NewAgentKit() AgentKit {
 		Plugins:       Plugins,
 		PluginUI:      PluginUI,
 		Skills:        Skills,
+		SkillsCatalog: SkillsCatalog,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,
 		Fork:          Fork,

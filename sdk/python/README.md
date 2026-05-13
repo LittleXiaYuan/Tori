@@ -462,6 +462,11 @@ The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file
 PluginUI SDK exposes read-only plugin UI tab discovery (`ui`) for external frontends, plugin marketplaces, operator panels, CLIs, and automation scripts without importing the full platform or broader Plugins management slice. It maps directly to `/v1/plugins/ui`; Agent Kit also exposes this surface as `kit.pluginUI` / `kit.PluginUI`.
 
 
+
+### SkillsCatalog SDK
+
+SkillsCatalog SDK exposes read-only runtime skills catalog listing (`list`) for external frontends, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform or broader Skills management slice. It maps directly to `/v1/skills`; Agent Kit also exposes this surface as `kit.skillsCatalog` / `kit.SkillsCatalog` / `kit.skills_catalog`.
+
 ### Skills SDK
 
 The lightweight Runtime Skills SDK exposes skill catalog, scan, dynamic skill review, approve/reject, and session suggestion helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/skills*` and `/v1/skill-suggestions`; Agent Kit also exposes this surface as `kit.skills` / `kit.Skills`.

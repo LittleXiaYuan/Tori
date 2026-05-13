@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "skills-catalog",
+  "description": "Cross-language lightweight SDK for read-only runtime skills catalog listing without importing the full platform client or broader Skills management slice.",
+  "principles": [
+    "Expose runtime skill catalog listing as a focused read-only incremental SDK slice for external frontends, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep catalog discovery directly callable through the existing authenticated gateway route.",
+    "Make SkillsCatalog available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/skills"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/skills",
+      "readOnly": true,
+      "description": "List runtime skills available to the agent."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/skills-catalog.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createSkillsCatalogClient().list"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.SkillsCatalog.List"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.skills_catalog.list"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "SkillsCatalogClient::list"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

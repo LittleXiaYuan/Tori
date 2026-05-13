@@ -3376,6 +3376,15 @@ class _SkillsNamespace:
 
 skills = _SkillsNamespace()
 
+class _SkillsCatalogNamespace:
+    """Standalone read-only runtime skills catalog helper for external pages and scripts."""
+
+    def list(self) -> dict:
+        return skills.list()
+
+
+skills_catalog = _SkillsCatalogNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3490,6 +3499,7 @@ class AgentKit:
         self.plugins = plugins
         self.plugin_ui = plugin_ui
         self.skills = skills
+        self.skills_catalog = skills_catalog
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork
