@@ -19,6 +19,8 @@
   "include": [
     "src/agent-kit.ts",
     "src/auth.ts",
+    "src/backup.test.ts",
+    "src/backup.ts",
     "src/airi.ts",
     "src/planner-recovery.ts",
     "src/planner.ts",
