@@ -1410,6 +1410,7 @@ pub struct AgentKit {
     pub system: SystemClient,
     pub auth: AuthClient,
     pub tasks: TasksClient,
+    pub bots: BotsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
@@ -1489,6 +1490,7 @@ impl AgentKit {
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
             tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
+            bots: BotsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
@@ -1564,6 +1566,7 @@ impl AgentKit {
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            bots: BotsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5476,6 +5479,124 @@ pub struct UpdateTaskThreadStateRequest {
     pub state: String,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct BotsResponse {
+    #[serde(default)]
+    pub bots: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub total: i64,
+    #[serde(default)]
+    pub active: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CreateBotRequest {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub config: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct UpdateBotRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Map<String, serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
+}
+
+pub type BotResponse = serde_json::Value;
+pub type DeleteBotResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct InboxCount {
+    #[serde(default)]
+    pub unread: i64,
+    #[serde(default)]
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct InboxResponse {
+    #[serde(default)]
+    pub items: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub count: InboxCount,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PushInboxRequest {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub action: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub header: serde_json::Map<String, serde_json::Value>,
+}
+
+pub type InboxItemResponse = serde_json::Value;
+pub type InboxDeleteResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct InboxReadResponse {
+    #[serde(default)]
+    pub marked: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct ChannelGroupsResponse {
+    #[serde(default)]
+    pub groups: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub count: i64,
+}
+
+/// Lightweight Bots SDK client for bot management, inbox operations, and channel groups.
+#[derive(Debug, Clone)]
+pub struct BotsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl BotsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); }
+        }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn list(&self) -> Result<BotsResponse, reqwest::Error> { self.get_json("/v1/bots").await }
+    pub async fn create(&self, request: &CreateBotRequest) -> Result<BotResponse, reqwest::Error> { self.post_json("/v1/bots", request).await }
+    pub async fn get(&self, id: &str) -> Result<BotResponse, reqwest::Error> { self.get_json(&format!("/v1/bots/detail?id={}", url_encode_query_component(id))).await }
+    pub async fn update(&self, id: &str, request: &UpdateBotRequest) -> Result<BotResponse, reqwest::Error> { self.http.put(self.url(&format!("/v1/bots/detail?id={}", url_encode_query_component(id)))).json(request).send().await?.error_for_status()?.json().await }
+    pub async fn set_active(&self, id: &str, active: bool) -> Result<BotResponse, reqwest::Error> { self.update(id, &UpdateBotRequest { active: Some(active), ..Default::default() }).await }
+    pub async fn delete(&self, id: &str) -> Result<DeleteBotResponse, reqwest::Error> { self.http.delete(self.url(&format!("/v1/bots/detail?id={}", url_encode_query_component(id)))).send().await?.error_for_status()?.json().await }
+    pub async fn inbox(&self, unread: bool) -> Result<InboxResponse, reqwest::Error> { self.get_json(if unread { "/v1/inbox?unread=true" } else { "/v1/inbox" }).await }
+    pub async fn push_inbox(&self, request: &PushInboxRequest) -> Result<InboxItemResponse, reqwest::Error> { self.post_json("/v1/inbox", request).await }
+    pub async fn delete_inbox(&self, id: &str) -> Result<InboxDeleteResponse, reqwest::Error> { self.http.delete(self.url("/v1/inbox")).json(&serde_json::json!({ "id": id })).send().await?.error_for_status()?.json().await }
+    pub async fn mark_inbox_read(&self, ids: &[String]) -> Result<InboxReadResponse, reqwest::Error> { self.post_json("/v1/inbox/read", &serde_json::json!({ "ids": ids, "all": false })).await }
+    pub async fn mark_all_inbox_read(&self) -> Result<InboxReadResponse, reqwest::Error> { self.post_json("/v1/inbox/read", &serde_json::json!({ "all": true })).await }
+    pub async fn channel_groups(&self, typ: &str) -> Result<ChannelGroupsResponse, reqwest::Error> {
+        let path = if typ.is_empty() { "/v1/channels/groups".to_string() } else { format!("/v1/channels/groups?type={}", url_encode_query_component(typ)) };
+        self.get_json(&path).await
+    }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 pub type BackupInfoResponse = serde_json::Value;
 pub type BackupImportResponse = serde_json::Value;
 
@@ -9225,6 +9346,22 @@ mod tests {
         assert_eq!(action["type"], "browser_screenshot");
         let payload = serde_json::json!({ "scenario_id": "open-page" });
         assert_eq!(payload["scenario_id"], "open-page");
+    }
+
+
+    #[test]
+    fn bots_helpers_build_urls_and_payloads() {
+        let client = BotsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/bots"), "http://localhost:9090/v1/bots");
+        let mut config = serde_json::Map::new();
+        config.insert("model".to_string(), serde_json::json!("deepseek"));
+        let create = CreateBotRequest { name: "planner".to_string(), description: "plan".to_string(), config };
+        assert_eq!(create.name, "planner");
+        let update = UpdateBotRequest { active: Some(false), ..Default::default() };
+        assert_eq!(update.active, Some(false));
+        let push = PushInboxRequest { source: "webhook".to_string(), content: "ping".to_string(), action: "trigger".to_string(), header: serde_json::Map::new() };
+        assert_eq!(push.content, "ping");
+        assert_eq!(url_encode_query_component("bot/1"), "bot%2F1");
     }
 
     #[test]

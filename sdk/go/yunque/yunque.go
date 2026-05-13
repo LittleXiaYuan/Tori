@@ -1064,6 +1064,7 @@ type AgentKit struct {
 	System        *systemNamespace
 	Auth          *authNamespace
 	Tasks         *tasksNamespace
+	Bots          *botsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
@@ -5746,6 +5747,150 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 	return out, nil
 }
 
+
+// ── Bots and Inbox ──
+
+// Bots provides focused access to bot management, inbox operations, and channel groups.
+var Bots = &botsNamespace{}
+
+type botsNamespace struct{}
+
+type BotConfig map[string]any
+type Bot map[string]any
+
+type BotsResponse struct {
+	Bots   []Bot `json:"bots"`
+	Total  int   `json:"total"`
+	Active int   `json:"active"`
+}
+
+type CreateBotRequest struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Config      BotConfig `json:"config,omitempty"`
+}
+
+type UpdateBotRequest struct {
+	Name        *string    `json:"name,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	Config      *BotConfig `json:"config,omitempty"`
+	Active      *bool      `json:"active,omitempty"`
+}
+
+type DeleteBotResponse map[string]any
+
+type InboxItem map[string]any
+
+type InboxCount struct {
+	Unread int `json:"unread"`
+	Total  int `json:"total"`
+}
+
+type InboxResponse struct {
+	Items []InboxItem `json:"items"`
+	Count InboxCount  `json:"count"`
+}
+
+type PushInboxRequest struct {
+	Source  string         `json:"source,omitempty"`
+	Content string         `json:"content"`
+	Action  string         `json:"action,omitempty"`
+	Header  map[string]any `json:"header,omitempty"`
+}
+
+type InboxDeleteResponse map[string]any
+
+type InboxReadResponse struct {
+	Marked int `json:"marked"`
+}
+
+type ChannelGroup map[string]any
+
+type ChannelGroupsResponse struct {
+	Groups []ChannelGroup `json:"groups"`
+	Count  int            `json:"count"`
+}
+
+func (b *botsNamespace) List(ctx context.Context) (BotsResponse, error) {
+	var out BotsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots", nil, &out); err != nil { return BotsResponse{}, err }
+	if out.Bots == nil { out.Bots = []Bot{} }
+	return out, nil
+}
+
+func (b *botsNamespace) Create(ctx context.Context, req CreateBotRequest) (Bot, error) {
+	var out Bot
+	if req.Config == nil { req.Config = BotConfig{} }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/bots", req, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) Get(ctx context.Context, id string) (Bot, error) {
+	var out Bot
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) Update(ctx context.Context, id string, req UpdateBotRequest) (Bot, error) {
+	var out Bot
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/bots/detail?id="+url.QueryEscape(id), req, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) SetActive(ctx context.Context, id string, active bool) (Bot, error) {
+	return b.Update(ctx, id, UpdateBotRequest{Active: &active})
+}
+
+func (b *botsNamespace) Delete(ctx context.Context, id string) (DeleteBotResponse, error) {
+	var out DeleteBotResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/bots/detail?id="+url.QueryEscape(id), nil, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) Inbox(ctx context.Context, unread bool) (InboxResponse, error) {
+	path := "/v1/inbox"
+	if unread { path += "?unread=true" }
+	var out InboxResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return InboxResponse{}, err }
+	if out.Items == nil { out.Items = []InboxItem{} }
+	return out, nil
+}
+
+func (b *botsNamespace) PushInbox(ctx context.Context, req PushInboxRequest) (InboxItem, error) {
+	var out InboxItem
+	if req.Action == "" { req.Action = "notify" }
+	if req.Header == nil { req.Header = map[string]any{} }
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox", req, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) DeleteInbox(ctx context.Context, id string) (InboxDeleteResponse, error) {
+	var out InboxDeleteResponse
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/inbox", map[string]any{"id": id}, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (b *botsNamespace) MarkInboxRead(ctx context.Context, ids []string) (InboxReadResponse, error) {
+	var out InboxReadResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"ids": ids, "all": false}, &out); err != nil { return InboxReadResponse{}, err }
+	return out, nil
+}
+
+func (b *botsNamespace) MarkAllInboxRead(ctx context.Context) (InboxReadResponse, error) {
+	var out InboxReadResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/inbox/read", map[string]any{"all": true}, &out); err != nil { return InboxReadResponse{}, err }
+	return out, nil
+}
+
+func (b *botsNamespace) ChannelGroups(ctx context.Context, typ string) (ChannelGroupsResponse, error) {
+	path := "/v1/channels/groups"
+	if typ != "" { path += "?type=" + url.QueryEscape(typ) }
+	var out ChannelGroupsResponse
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil { return ChannelGroupsResponse{}, err }
+	if out.Groups == nil { out.Groups = []ChannelGroup{} }
+	return out, nil
+}
+
 // NewAgentKit returns a lightweight bundle of state, reflection, mission parse,
 // scheduler, cron, triggers, and plugin runtime helpers.
 func NewAgentKit() AgentKit {
@@ -5798,6 +5943,7 @@ func NewAgentKit() AgentKit {
 		System:        System,
 		Auth:          Auth,
 		Tasks:         Tasks,
+		Bots:          Bots,
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,

@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "domain": "bots-inbox",
+  "description": "Cross-language lightweight SDK entrypoints for bot management, inbox operations, and channel group discovery without importing the full platform client.",
+  "principles": [
+    "Expose bot and inbox operations as a focused SDK slice for external bot admin pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep bot CRUD, inbox reads/mutations, and channel group discovery directly callable through authenticated routes.",
+    "Make Bots access available through Agent Kit so external operators can manage bot personas and inbound work from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/bots",
+    "POST /v1/bots",
+    "GET /v1/bots/detail",
+    "PUT /v1/bots/detail",
+    "DELETE /v1/bots/detail",
+    "GET /v1/inbox",
+    "POST /v1/inbox",
+    "DELETE /v1/inbox",
+    "POST /v1/inbox/read",
+    "GET /v1/channels/groups"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/bots",
+      "readOnly": true,
+      "description": "List configured bots with total and active counts."
+    },
+    {
+      "name": "create",
+      "route": "POST /v1/bots",
+      "readOnly": false,
+      "description": "Create a bot with name, description, and runtime config."
+    },
+    {
+      "name": "get",
+      "route": "GET /v1/bots/detail",
+      "readOnly": true,
+      "description": "Read one bot by id."
+    },
+    {
+      "name": "update",
+      "route": "PUT /v1/bots/detail",
+      "readOnly": false,
+      "description": "Update bot name, description, config, or active state."
+    },
+    {
+      "name": "setActive",
+      "route": "PUT /v1/bots/detail",
+      "readOnly": false,
+      "description": "Toggle a bot active state."
+    },
+    {
+      "name": "delete",
+      "route": "DELETE /v1/bots/detail",
+      "readOnly": false,
+      "description": "Delete a bot by id."
+    },
+    {
+      "name": "inbox",
+      "route": "GET /v1/inbox",
+      "readOnly": true,
+      "description": "List inbox items, optionally unread-only."
+    },
+    {
+      "name": "pushInbox",
+      "route": "POST /v1/inbox",
+      "readOnly": false,
+      "description": "Push an item into the bot inbox."
+    },
+    {
+      "name": "deleteInbox",
+      "route": "DELETE /v1/inbox",
+      "readOnly": false,
+      "description": "Delete an inbox item by id."
+    },
+    {
+      "name": "markInboxRead",
+      "route": "POST /v1/inbox/read",
+      "readOnly": false,
+      "description": "Mark selected inbox items as read."
+    },
+    {
+      "name": "markAllInboxRead",
+      "route": "POST /v1/inbox/read",
+      "readOnly": false,
+      "description": "Mark all inbox items as read."
+    },
+    {
+      "name": "channelGroups",
+      "route": "GET /v1/channels/groups",
+      "readOnly": true,
+      "description": "List channel groups, optionally filtered by channel type."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/bots.ts",
+        "sdk/typescript/src/bots-read.ts",
+        "sdk/typescript/src/bots-control.ts",
+        "sdk/typescript/src/bots-list.ts",
+        "sdk/typescript/src/bots-detail.ts",
+        "sdk/typescript/src/bots-inbox.ts",
+        "sdk/typescript/src/bots-channels.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createBotsClient().list",
+        "create": "createBotsClient().create",
+        "get": "createBotsClient().get",
+        "update": "createBotsClient().update",
+        "setActive": "createBotsClient().setActive",
+        "delete": "createBotsClient().delete",
+        "inbox": "createBotsClient().inbox",
+        "pushInbox": "createBotsClient().pushInbox",
+        "deleteInbox": "createBotsClient().deleteInbox",
+        "markInboxRead": "createBotsClient().markInboxRead",
+        "markAllInboxRead": "createBotsClient().markAllInboxRead",
+        "channelGroups": "createBotsClient().channelGroups"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Bots.List",
+        "create": "yunque.Bots.Create",
+        "get": "yunque.Bots.Get",
+        "update": "yunque.Bots.Update",
+        "setActive": "yunque.Bots.SetActive",
+        "delete": "yunque.Bots.Delete",
+        "inbox": "yunque.Bots.Inbox",
+        "pushInbox": "yunque.Bots.PushInbox",
+        "deleteInbox": "yunque.Bots.DeleteInbox",
+        "markInboxRead": "yunque.Bots.MarkInboxRead",
+        "markAllInboxRead": "yunque.Bots.MarkAllInboxRead",
+        "channelGroups": "yunque.Bots.ChannelGroups"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.bots.list",
+        "create": "yunque.bots.create",
+        "get": "yunque.bots.get",
+        "update": "yunque.bots.update",
+        "setActive": "yunque.bots.set_active",
+        "delete": "yunque.bots.delete",
+        "inbox": "yunque.bots.inbox",
+        "pushInbox": "yunque.bots.push_inbox",
+        "deleteInbox": "yunque.bots.delete_inbox",
+        "markInboxRead": "yunque.bots.mark_inbox_read",
+        "markAllInboxRead": "yunque.bots.mark_all_inbox_read",
+        "channelGroups": "yunque.bots.channel_groups"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "BotsClient::list",
+        "create": "BotsClient::create",
+        "get": "BotsClient::get",
+        "update": "BotsClient::update",
+        "setActive": "BotsClient::set_active",
+        "delete": "BotsClient::delete",
+        "inbox": "BotsClient::inbox",
+        "pushInbox": "BotsClient::push_inbox",
+        "deleteInbox": "BotsClient::delete_inbox",
+        "markInboxRead": "BotsClient::mark_inbox_read",
+        "markAllInboxRead": "BotsClient::mark_all_inbox_read",
+        "channelGroups": "BotsClient::channel_groups"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

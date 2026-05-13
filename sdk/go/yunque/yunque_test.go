@@ -3796,3 +3796,75 @@ func withTestAPI(t *testing.T, handler http.HandlerFunc) {
 	pluginToken = "test-token"
 	pluginName = "state-plugin"
 }
+
+
+func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/bots":
+			if r.Method == http.MethodPost {
+				var body CreateBotRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.Name != "planner" || body.Config["model"] != "deepseek" { t.Fatalf("unexpected bot create body: %+v", body) }
+				_, _ = w.Write([]byte(`{"id":"bot-2","name":"planner"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"bots":[{"id":"bot-1","name":"default"}],"total":1,"active":1}`))
+		case "/v1/bots/detail":
+			if r.URL.Query().Get("id") != "bot/1" { t.Fatalf("unexpected bot id: %s", r.URL.RawQuery) }
+			switch r.Method {
+			case http.MethodGet:
+				_, _ = w.Write([]byte(`{"id":"bot-1","name":"default"}`))
+			case http.MethodPut:
+				var body UpdateBotRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.Active == nil || *body.Active { t.Fatalf("unexpected bot update body: %+v", body) }
+				_, _ = w.Write([]byte(`{"id":"bot-1","active":false}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+			}
+		case "/v1/inbox":
+			switch r.Method {
+			case http.MethodGet:
+				if r.URL.Query().Get("unread") != "true" { t.Fatalf("expected unread query") }
+				_, _ = w.Write([]byte(`{"items":[{"id":"in-1","content":"ping"}],"count":{"unread":1,"total":1}}`))
+			case http.MethodPost:
+				var body PushInboxRequest
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+				if body.Content != "ping" || body.Action != "trigger" { t.Fatalf("unexpected inbox body: %+v", body) }
+				_, _ = w.Write([]byte(`{"id":"in-2","content":"ping","action":"trigger"}`))
+			case http.MethodDelete:
+				_, _ = w.Write([]byte(`{"status":"ok"}`))
+			}
+		case "/v1/inbox/read":
+			_, _ = w.Write([]byte(`{"marked":2}`))
+		case "/v1/channels/groups":
+			if r.URL.Query().Get("type") != "telegram" { t.Fatalf("expected telegram type") }
+			_, _ = w.Write([]byte(`{"groups":[{"id":"g1","channel_type":"telegram"}],"count":1}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Bots.List(ctx); if err != nil { t.Fatal(err) }
+	created, err := Bots.Create(ctx, CreateBotRequest{Name: "planner", Config: BotConfig{"model": "deepseek"}}); if err != nil { t.Fatal(err) }
+	got, err := Bots.Get(ctx, "bot/1"); if err != nil { t.Fatal(err) }
+	updated, err := Bots.SetActive(ctx, "bot/1", false); if err != nil { t.Fatal(err) }
+	deleted, err := Bots.Delete(ctx, "bot/1"); if err != nil { t.Fatal(err) }
+	inbox, err := Bots.Inbox(ctx, true); if err != nil { t.Fatal(err) }
+	pushed, err := Bots.PushInbox(ctx, PushInboxRequest{Source: "webhook", Content: "ping", Action: "trigger"}); if err != nil { t.Fatal(err) }
+	removed, err := Bots.DeleteInbox(ctx, "in-1"); if err != nil { t.Fatal(err) }
+	marked, err := Bots.MarkInboxRead(ctx, []string{"in-1", "in-2"}); if err != nil { t.Fatal(err) }
+	markedAll, err := Bots.MarkAllInboxRead(ctx); if err != nil { t.Fatal(err) }
+	groups, err := Bots.ChannelGroups(ctx, "telegram"); if err != nil { t.Fatal(err) }
+
+	if list.Total != 1 || created["id"] != "bot-2" || got["id"] != "bot-1" || updated["active"] != false || deleted["status"] != "ok" || inbox.Count.Unread != 1 || pushed["action"] != "trigger" || removed["status"] != "ok" || marked.Marked != 2 || markedAll.Marked != 2 || groups.Groups[0]["id"] != "g1" {
+		t.Fatalf("unexpected bots results")
+	}
+	if NewAgentKit().Bots != Bots { t.Fatalf("agent kit should expose Bots namespace") }
+	if len(seen) != 11 { t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen) }
+}

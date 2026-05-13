@@ -637,3 +637,6 @@ The lightweight Discovery SDK exposes identity, embeddings, and search as a reus
 ### Persona Modes SDK
 
 The lightweight Persona SDK now also exposes persona mode listing, current-mode reads, and mode switching as reusable incremental helpers for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts. It maps directly to `GET /v1/persona/modes`, `POST /v1/persona/mode`, and `GET /v1/persona/mode/current`, and Agent Kit exposes these helpers as `kit.persona` / `kit.Persona`.
+### Bots SDK
+
+The lightweight Bots SDK exposes bot management, inbox operations, and channel group discovery for external bot admin pages, plugin UIs, CLIs, sidecars, front-end pages, and automation scripts without importing the full platform client. It maps directly to `GET/POST /v1/bots`, `GET/PUT/DELETE /v1/bots/detail`, `GET/POST/DELETE /v1/inbox`, `POST /v1/inbox/read`, and `GET /v1/channels/groups`; Agent Kit also exposes this surface as `kit.bots` / `kit.Bots`.

@@ -2846,6 +2846,78 @@ class _StateNamespace:
 
 state = _StateNamespace()
 
+
+
+# ── Bots and Inbox ──
+
+class _BotsNamespace:
+    """Lightweight helpers for bot management, inbox operations, and channel groups."""
+
+    def list(self) -> dict:
+        """List configured bots."""
+        return _api_call("GET", "/v1/bots")
+
+    def create(self, name: str, description: str = "", config: Optional[dict] = None) -> dict:
+        """Create a bot with runtime config."""
+        return _api_call("POST", "/v1/bots", {"name": name, "description": description, "config": config or {}})
+
+    def get(self, bot_id: str) -> dict:
+        """Read one bot by id."""
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/bots/detail?{urlencode({'id': bot_id})}")
+
+    def update(self, bot_id: str, *, name: str | None = None, description: str | None = None,
+               config: Optional[dict] = None, active: Optional[bool] = None) -> dict:
+        """Update bot fields. Omitted values are not sent."""
+        from urllib.parse import urlencode
+        body = {}
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if config is not None:
+            body["config"] = config
+        if active is not None:
+            body["active"] = active
+        return _api_call("PUT", f"/v1/bots/detail?{urlencode({'id': bot_id})}", body)
+
+    def set_active(self, bot_id: str, active: bool) -> dict:
+        """Toggle a bot active state."""
+        return self.update(bot_id, active=active)
+
+    def delete(self, bot_id: str) -> dict:
+        """Delete a bot by id."""
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/bots/detail?{urlencode({'id': bot_id})}")
+
+    def inbox(self, unread: bool = False) -> dict:
+        """List inbox items, optionally unread-only."""
+        return _api_call("GET", "/v1/inbox?unread=true" if unread else "/v1/inbox")
+
+    def push_inbox(self, content: str, *, source: str = "", action: str = "notify", header: Optional[dict] = None) -> dict:
+        """Push an item into the bot inbox."""
+        return _api_call("POST", "/v1/inbox", {"source": source, "content": content, "action": action, "header": header or {}})
+
+    def delete_inbox(self, item_id: str) -> dict:
+        """Delete an inbox item."""
+        return _api_call("DELETE", "/v1/inbox", {"id": item_id})
+
+    def mark_inbox_read(self, ids: list[str]) -> dict:
+        """Mark selected inbox items as read."""
+        return _api_call("POST", "/v1/inbox/read", {"ids": ids, "all": False})
+
+    def mark_all_inbox_read(self) -> dict:
+        """Mark all inbox items as read."""
+        return _api_call("POST", "/v1/inbox/read", {"all": True})
+
+    def channel_groups(self, type: str = "") -> dict:
+        """List channel groups, optionally filtered by channel type."""
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/channels/groups?{urlencode({'type': type})}" if type else "/v1/channels/groups")
+
+
+bots = _BotsNamespace()
+
 # ── Agent Kit bundle ──
 
 class AgentKit:
@@ -2915,6 +2987,7 @@ class AgentKit:
         self.system = system
         self.auth = auth
         self.tasks = tasks
+        self.bots = bots
         self.task_templates = task_templates
         self.task_gaps = task_gaps
         self.task_memory = task_memory
