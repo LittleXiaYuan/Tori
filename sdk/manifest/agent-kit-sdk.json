@@ -28,6 +28,7 @@
     "plugin-ui",
     "skills-catalog",
     "skills-scan",
+    "skills-suggestions",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -166,6 +167,10 @@
     {
       "name": "skillsScan",
       "description": "Access the lightweight SkillsScan client or namespace for runtime skill discovery refreshes."
+    },
+    {
+      "name": "skillsSuggestions",
+      "description": "Access the lightweight SkillsSuggestions client or namespace for session skill suggestion reads."
     },
     {
       "name": "skills",
@@ -479,6 +484,7 @@
         "pluginUI": "createAgentKit().pluginUI",
         "skillsCatalog": "createAgentKit().skillsCatalog",
         "skillsScan": "createAgentKit().skillsScan",
+        "skillsSuggestions": "createAgentKit().skillsSuggestions",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
@@ -570,6 +576,7 @@
         "pluginUI": "yunque.NewAgentKit().PluginUI",
         "skillsCatalog": "yunque.NewAgentKit().SkillsCatalog",
         "skillsScan": "yunque.NewAgentKit().SkillsScan",
+        "skillsSuggestions": "yunque.NewAgentKit().SkillsSuggestions",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
@@ -661,6 +668,7 @@
         "pluginUI": "yunque.create_agent_kit().plugin_ui",
         "skillsCatalog": "yunque.create_agent_kit().skills_catalog",
         "skillsScan": "yunque.create_agent_kit().skills_scan",
+        "skillsSuggestions": "yunque.create_agent_kit().skills_suggestions",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
@@ -752,6 +760,7 @@
         "pluginUI": "AgentKit::plugin_ui",
         "skillsCatalog": "AgentKit::skills_catalog",
         "skillsScan": "AgentKit::skills_scan",
+        "skillsSuggestions": "AgentKit::skills_suggestions",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",

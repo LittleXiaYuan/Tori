@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "skills-suggestions",
+  "description": "Cross-language lightweight SDK for session skill suggestions without importing the full platform client or broader Skills management slice.",
+  "principles": [
+    "Expose session skill suggestions as a focused read-only incremental SDK slice for chat UIs, plugins, CLIs, sidecars, and automation scripts.",
+    "Keep suggestions directly callable through the existing authenticated gateway route.",
+    "Make SkillsSuggestions available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/skill-suggestions"
+  ],
+  "capabilities": [
+    {
+      "name": "suggestions",
+      "route": "GET /v1/skill-suggestions",
+      "readOnly": true,
+      "description": "List suggested skills for a session, optionally filtered by session_id."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/skills-suggestions.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "suggestions": "createSkillsSuggestionsClient().suggestions"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "suggestions": "yunque.SkillsSuggestions.Suggestions"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "suggestions": "yunque.skills_suggestions.suggestions"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "suggestions": "SkillsSuggestionsClient::suggestions"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

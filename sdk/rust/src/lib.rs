@@ -1464,6 +1464,7 @@ pub struct AgentKit {
     pub skills: SkillsClient,
     pub skills_catalog: SkillsCatalogClient,
     pub skills_scan: SkillsScanClient,
+    pub skills_suggestions: SkillsSuggestionsClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1566,6 +1567,7 @@ impl AgentKit {
             skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
             skills_catalog: SkillsCatalogClient::new(base_url.clone(), token.as_ref())?,
             skills_scan: SkillsScanClient::new(base_url.clone(), token.as_ref())?,
+            skills_suggestions: SkillsSuggestionsClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1658,6 +1660,7 @@ impl AgentKit {
             skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_catalog: SkillsCatalogClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_scan: SkillsScanClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skills_suggestions: SkillsSuggestionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -8491,6 +8494,26 @@ impl SkillsScanClient {
     pub async fn scan(&self) -> Result<SkillsResponse, reqwest::Error> { self.inner.scan().await }
 }
 
+/// Standalone SkillsSuggestions SDK client for session skill suggestions.
+#[derive(Debug, Clone)]
+pub struct SkillsSuggestionsClient {
+    inner: SkillsClient,
+}
+
+impl SkillsSuggestionsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: SkillsClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: SkillsClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+
+    pub async fn suggestions(&self, session_id: Option<&str>) -> Result<SkillsResponse, reqwest::Error> { self.inner.suggestions(session_id).await }
+}
+
 /// Lightweight Plugins SDK client for plugin catalog, lifecycle, file editing, UI, and reload.
 #[derive(Debug, Clone)]
 pub struct PluginsClient {
@@ -11837,6 +11860,14 @@ mod tests {
         assert_eq!(ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
+    }
+
+    #[test]
+    fn skills_suggestions_helpers_build_urls_and_agent_kit_surface() {
+        let suggestions = SkillsSuggestionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(suggestions.url("/v1/skill-suggestions?session_id=s1"), "http://localhost:9090/v1/skill-suggestions?session_id=s1");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.skills_suggestions.url("/v1/skill-suggestions"), "http://localhost:9090/v1/skill-suggestions");
     }
 
     #[test]
