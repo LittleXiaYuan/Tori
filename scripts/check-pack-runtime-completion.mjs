@@ -57,9 +57,11 @@ const frontend = [
   "heroui-web/src/lib/__tests__/pack-sync.test.ts",
   "heroui-web/src/app/packs/page.tsx",
   "heroui-web/src/app/packs/[...slug]/page.tsx",
+  "heroui-web/src/app/packs/backup/page.tsx",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
 ].map(read).join("\n");
+const legacyBackupPage = read("heroui-web/src/app/backup/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
