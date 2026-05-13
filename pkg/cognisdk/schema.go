@@ -4,11 +4,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // JSONSchema is a minimal JSON Schema document usable by frontends, plugins,
 // and automation scripts that exchange Cognition SDK artifacts.
 type JSONSchema map[string]any
+
+// JSONSchemaNames returns stable names accepted by JSONSchemaByName.
+func JSONSchemaNames() []string {
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-diff", "pack-bundle-review", "feedback-proposal"}
+}
+
+// JSONSchemaByName returns a schema by its stable CLI/API name.
+func JSONSchemaByName(name string) (JSONSchema, bool) {
+	switch strings.TrimSpace(name) {
+	case "pack-manifest":
+		return PackManifestJSONSchema(), true
+	case "pack-bundle":
+		return PackBundleJSONSchema(), true
+	case "pack-bundle-diff":
+		return PackBundleDiffJSONSchema(), true
+	case "pack-bundle-review":
+		return PackBundleReviewJSONSchema(), true
+	case "feedback-proposal":
+		return FeedbackProposalJSONSchema(), true
+	default:
+		return nil, false
+	}
+}
 
 // PackManifestJSONSchema returns the public schema for a single declarative
 // Cogni Pack manifest. It intentionally models the stable phase-1 fields only.
