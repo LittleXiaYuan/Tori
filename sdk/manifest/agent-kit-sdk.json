@@ -39,6 +39,7 @@
     "proactive-heartbeat",
     "server-sent-events",
     "runtime-operations",
+    "runtime-queue",
     "subagent-orchestration",
     "tool-processes",
     "sandbox-runtime",
@@ -206,6 +207,10 @@
     {
       "name": "runtime",
       "description": "Access the lightweight Runtime operations client or namespace for session queue inspection/cancellation and runtime event streams."
+    },
+    {
+      "name": "runtimeQueue",
+      "description": "Access the lightweight RuntimeQueue client or namespace for queue-only runtime monitoring and cancellation."
     },
     {
       "name": "subagents",
@@ -416,6 +421,7 @@
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
+        "runtimeQueue": "AgentKit.runtimeQueue",
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
@@ -503,6 +509,7 @@
         "heartbeat": "AgentKit.Heartbeat",
         "events": "AgentKit.Events",
         "runtime": "AgentKit.Runtime",
+        "runtimeQueue": "AgentKit.RuntimeQueue",
         "subagents": "AgentKit.Subagents",
         "tools": "AgentKit.Tools",
         "audit": "AgentKit.Audit",
@@ -590,6 +597,7 @@
         "heartbeat": "AgentKit.heartbeat",
         "events": "AgentKit.events",
         "runtime": "AgentKit.runtime",
+        "runtimeQueue": "AgentKit.runtime_queue",
         "subagents": "AgentKit.subagents",
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
@@ -677,6 +685,7 @@
         "heartbeat": "AgentKit::heartbeat",
         "events": "AgentKit::events",
         "runtime": "AgentKit::runtime",
+        "runtimeQueue": "AgentKit::runtime_queue",
         "subagents": "AgentKit::subagents",
         "tools": "AgentKit::tools",
         "audit": "AgentKit::audit",

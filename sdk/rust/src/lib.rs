@@ -1473,6 +1473,7 @@ pub struct AgentKit {
     pub heartbeat: HeartbeatClient,
     pub events: EventsClient,
     pub runtime: RuntimeClient,
+    pub runtime_queue: RuntimeQueueClient,
     pub subagents: SubagentsClient,
     pub tools: ToolsClient,
     pub sandbox: SandboxClient,
@@ -1571,6 +1572,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
             events: EventsClient::new(base_url.clone(), token.as_ref())?,
             runtime: RuntimeClient::new(base_url.clone(), token.as_ref())?,
+            runtime_queue: RuntimeQueueClient::new(base_url.clone(), token.as_ref())?,
             subagents: SubagentsClient::new(base_url.clone(), token.as_ref())?,
             tools: ToolsClient::new(base_url.clone(), token.as_ref())?,
             sandbox: SandboxClient::new(base_url.clone(), token.as_ref())?,
@@ -1662,6 +1664,7 @@ impl AgentKit {
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
             events: EventsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             runtime: RuntimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            runtime_queue: RuntimeQueueClient::new_with_client(base_url.clone(), plugin_http.clone()),
             subagents: SubagentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tools: ToolsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             sandbox: SandboxClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5456,6 +5459,29 @@ impl RuntimeClient {
 
     pub fn events_stream_url(&self) -> String {
         self.url("/v1/events/stream")
+    }
+}
+
+/// Standalone RuntimeQueue SDK client for queue-only runtime monitoring and cancellation.
+#[derive(Debug, Clone)]
+pub struct RuntimeQueueClient { inner: RuntimeClient }
+
+impl RuntimeQueueClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: RuntimeClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: RuntimeClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn overview(&self) -> Result<RuntimeQueueOverviewResponse, reqwest::Error> {
+        self.inner.queues().await
+    }
+    pub async fn session(&self, session_id: &str) -> Result<RuntimeQueueSessionResponse, reqwest::Error> {
+        self.inner.session_queue(session_id).await
+    }
+    pub async fn cancel(&self, session_id: &str, task_id: &str) -> Result<RuntimeQueueCancelResponse, reqwest::Error> {
+        self.inner.cancel_queued_task(session_id, task_id).await
     }
 }
 
@@ -11585,6 +11611,17 @@ mod tests {
         assert_eq!(
             client.events_stream_url(),
             "http://localhost:9090/v1/events/stream"
+        );
+        let queue =
+            RuntimeQueueClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            queue.url("/v1/sessions/queue"),
+            "http://localhost:9090/v1/sessions/queue"
+        );
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(
+            kit.runtime_queue.url("/v1/sessions/queue"),
+            "http://localhost:9090/v1/sessions/queue"
         );
     }
 

@@ -318,6 +318,11 @@ Events SDK exposes lightweight Server-Sent Events helpers (`stream`, `parse`) fo
 
 Runtime SDK exposes lightweight `/v1/sessions/queue` and `/v1/events/stream` helpers (`queues`, `sessionQueue`, `cancelQueuedTask`, `events`) for external runtime dashboards, plugin UIs, CLIs, sidecars, and automation monitors without importing the full platform. Agent Kit also exposes this surface as `kit.runtime` / `kit.Runtime`.
 
+### RuntimeQueue SDK
+
+RuntimeQueue SDK exposes queue-only runtime helpers (`overview`, `session`, `cancel`) for dashboards, plugin UIs, CLIs, sidecars, and automation monitors without importing the full platform or broader Runtime operations slice. It maps directly to `/v1/sessions/queue` and `/v1/sessions/queue/cancel`; Agent Kit also exposes this surface as `kit.runtimeQueue` / `kit.RuntimeQueue`.
+
+
 ### Subagents SDK
 
 Subagents SDK exposes lightweight `/v1/subagent` and `/v1/subagent/message` helpers (`list`, `get`, `spawn`, `destroy`, `appendMessages`) for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts to orchestrate specialist agents without importing the full platform. Agent Kit also exposes this surface as `kit.subagents` / `kit.Subagents`.

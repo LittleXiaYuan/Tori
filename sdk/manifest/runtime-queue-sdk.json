@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "runtime-queue",
+  "description": "Cross-language lightweight SDK for queue-only runtime monitoring and cancellation without importing the full platform client or broader Runtime operations slice.",
+  "principles": [
+    "Expose runtime queue reads and cancellation as a focused incremental SDK slice for dashboards, plugin UIs, CLIs, sidecars, and automation monitors.",
+    "Keep queue overview, per-session queue reads, and cancellation directly callable through existing authenticated gateway routes.",
+    "Make RuntimeQueue available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/sessions/queue",
+    "GET /v1/sessions/queue?id=...",
+    "POST /v1/sessions/queue/cancel"
+  ],
+  "capabilities": [
+    {
+      "name": "overview",
+      "route": "GET /v1/sessions/queue",
+      "readOnly": true,
+      "description": "Read session queue overview."
+    },
+    {
+      "name": "session",
+      "route": "GET /v1/sessions/queue?id=...",
+      "readOnly": true,
+      "description": "Read queued tasks for one session."
+    },
+    {
+      "name": "cancel",
+      "route": "POST /v1/sessions/queue/cancel",
+      "readOnly": false,
+      "description": "Cancel one queued task by session and task id."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/runtime-queue.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "overview": "createRuntimeQueueClient().overview",
+        "session": "createRuntimeQueueClient().session",
+        "cancel": "createRuntimeQueueClient().cancel"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "overview": "yunque.RuntimeQueue.Overview",
+        "session": "yunque.RuntimeQueue.Session",
+        "cancel": "yunque.RuntimeQueue.Cancel"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "overview": "yunque.runtime_queue.overview",
+        "session": "yunque.runtime_queue.session",
+        "cancel": "yunque.runtime_queue.cancel"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "overview": "RuntimeQueueClient::overview",
+        "session": "RuntimeQueueClient::session",
+        "cancel": "RuntimeQueueClient::cancel"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

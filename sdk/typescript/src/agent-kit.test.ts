@@ -118,6 +118,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.files.list("artifacts")).files[0]?.name, "report.md");
   assertEqual((await kit.browser.status()).connected, true);
   assertEqual((await kit.runtime.queues()).queues?.s1, 1);
+  assertEqual((await kit.runtimeQueue.overview()).queues?.s1, 1);
   assertEqual((await kit.subagents.list("task-1")).subagents[0]?.id, "sa-1");
   assertEqual((await kit.tools.list()).sessions[0]?.id, "tool-1");
   assertEqual((await kit.audit.verify()).valid, true);

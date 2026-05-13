@@ -1800,10 +1800,22 @@ func TestRuntimeHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if overview["queues"] == nil || session["session_id"] != "session 1" || cancelled["status"] != "cancelled" || Runtime.EventsStreamURL() != strings.TrimRight(apiBase, "/")+"/v1/events/stream" || NewAgentKit().Runtime != Runtime {
+	queueOverview, err := RuntimeQueue.Overview(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queueSession, err := RuntimeQueue.Session(ctx, "session 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	queueCancelled, err := RuntimeQueue.Cancel(ctx, "session 1", "task/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview["queues"] == nil || session["session_id"] != "session 1" || cancelled["status"] != "cancelled" || queueOverview["queues"] == nil || queueSession["session_id"] != "session 1" || queueCancelled["status"] != "cancelled" || Runtime.EventsStreamURL() != strings.TrimRight(apiBase, "/")+"/v1/events/stream" || NewAgentKit().Runtime != Runtime || NewAgentKit().RuntimeQueue != RuntimeQueue {
 		t.Fatalf("unexpected runtime results: overview=%+v session=%+v cancelled=%+v", overview, session, cancelled)
 	}
-	if len(seen) != 3 || seen[0] != "GET /v1/sessions/queue" || seen[1] != "GET /v1/sessions/queue?id=session+1" || seen[2] != "POST /v1/sessions/queue/cancel" {
+	if len(seen) != 6 || seen[0] != "GET /v1/sessions/queue" || seen[1] != "GET /v1/sessions/queue?id=session+1" || seen[2] != "POST /v1/sessions/queue/cancel" || seen[3] != "GET /v1/sessions/queue" || seen[4] != "GET /v1/sessions/queue?id=session+1" || seen[5] != "POST /v1/sessions/queue/cancel" {
 		t.Fatalf("unexpected runtime requests: %v", seen)
 	}
 }

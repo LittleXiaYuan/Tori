@@ -22,12 +22,19 @@ class RuntimeTest(unittest.TestCase):
             yunque.runtime.queues()
             yunque.runtime.session_queue("session/1")
             yunque.runtime.cancel_queued_task("session/1", "task-1")
+            yunque.runtime_queue.overview()
+            yunque.runtime_queue.session("session/1")
+            yunque.runtime_queue.cancel("session/1", "task-1")
 
         self.assertEqual(api_call.call_args_list[0].args, ("GET", "/v1/sessions/queue"))
         self.assertEqual(api_call.call_args_list[1].args, ("GET", "/v1/sessions/queue?id=session%2F1"))
         self.assertEqual(api_call.call_args_list[2].args, ("POST", "/v1/sessions/queue/cancel", {"session_id": "session/1", "task_id": "task-1"}))
+        self.assertEqual(api_call.call_args_list[3].args, ("GET", "/v1/sessions/queue"))
+        self.assertEqual(api_call.call_args_list[4].args, ("GET", "/v1/sessions/queue?id=session%2F1"))
+        self.assertEqual(api_call.call_args_list[5].args, ("POST", "/v1/sessions/queue/cancel", {"session_id": "session/1", "task_id": "task-1"}))
         self.assertTrue(yunque.runtime.events_url().endswith("/v1/events/stream"))
         self.assertEqual(yunque.runtime.event_headers()["Accept"], "text/event-stream")
+        self.assertIs(yunque.create_agent_kit().runtime_queue, yunque.runtime_queue)
 
 
 if __name__ == "__main__":
