@@ -2,7 +2,8 @@
 
 import type React from "react";
 import { HardDriveDownload, Package, Puzzle } from "lucide-react";
-import { api, type InstalledPack, type PackDistributionManifest, type PackFrontendAssets, type PackFrontendMenu } from "@/lib/api";
+import { createPacksClient } from "@/lib/packs-client";
+import type { InstalledPack, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/api";
 
 
 export interface PackSdkEntrypoint {
@@ -42,13 +43,15 @@ const packIconMap: Record<string, React.ReactNode> = {
   puzzle: <Puzzle size={16} />,
 };
 
+const packsClient = createPacksClient();
+
 export function resolvePackIcon(name?: string): React.ReactNode {
   if (!name) return <Package size={16} />;
   return packIconMap[name.toLowerCase()] || <Package size={16} />;
 }
 
 export async function fetchEnabledPacks(): Promise<InstalledPack[]> {
-  const res = await api.packsEnabled();
+  const res = await packsClient.enabled();
   return Array.isArray(res?.packs) ? res.packs : [];
 }
 
