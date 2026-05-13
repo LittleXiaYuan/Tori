@@ -147,6 +147,16 @@ func run(args []string) error {
 		}
 		return printJSON(summary)
 
+	case "action-kinds":
+		if len(args) != 1 {
+			return fmt.Errorf("usage: cognisdk-bundle action-kinds")
+		}
+		if markdown {
+			fmt.Print(renderApplyActionKindsMarkdown(cognisdk.PackBundleApplyActionKinds()))
+			return nil
+		}
+		return printJSON(cognisdk.PackBundleApplyActionKinds())
+
 	case "actions":
 		planOptions, normalizedArgs, err := parseActionsOptions(args)
 		if err != nil {
@@ -391,6 +401,19 @@ func parsePromoteOptions(args []string) (bool, string, []string, error) {
 	return allowReview, reviewOut, normalized, nil
 }
 
+func renderApplyActionKindsMarkdown(kinds []cognisdk.PackBundleApplyActionKind) string {
+	var out string
+	out += "## Cogni Pack Bundle Apply Action Kinds\n\n"
+	if len(kinds) == 0 {
+		out += "No action kinds.\n"
+		return out
+	}
+	for _, kind := range kinds {
+		out += fmt.Sprintf("- `%s`\n", kind)
+	}
+	return out
+}
+
 func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string {
 	var out string
 	out += "## Cogni Pack Bundle Apply Actions\n\n"
@@ -469,6 +492,7 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
+	fmt.Println("  cognisdk-bundle action-kinds [--markdown]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")

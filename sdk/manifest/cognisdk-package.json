@@ -182,6 +182,7 @@
       "file": "cmd/cognisdk-bundle/main.go",
       "commands": [
         "init",
+        "action-kinds",
         "actions",
         "digest",
         "inspect",
