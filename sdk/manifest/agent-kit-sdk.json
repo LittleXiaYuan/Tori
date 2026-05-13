@@ -31,6 +31,7 @@
     "skills-suggestions",
     "skills-dynamic",
     "plugin-toggle",
+    "plugin-reload",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -181,6 +182,10 @@
     {
       "name": "pluginToggle",
       "description": "Access the lightweight PluginToggle client or namespace for enabling and disabling plugins."
+    },
+    {
+      "name": "pluginReload",
+      "description": "Access the lightweight PluginReload client or namespace for reloading the plugin registry."
     },
     {
       "name": "skills",
@@ -503,7 +508,8 @@
         "embeddings": "createAgentKit().embeddings",
         "search": "createAgentKit().search",
         "modes": "createAgentKit().modes",
-        "airi": "createAgentKit().airi"
+        "airi": "createAgentKit().airi",
+        "pluginReload": "createAgentKit().pluginReload"
       }
     },
     "go": {
@@ -597,7 +603,8 @@
         "embeddings": "yunque.NewAgentKit().Embeddings",
         "search": "yunque.NewAgentKit().WebSearch",
         "modes": "yunque.NewAgentKit().Modes",
-        "airi": "yunque.NewAgentKit().Airi"
+        "airi": "yunque.NewAgentKit().Airi",
+        "pluginReload": "yunque.NewAgentKit().PluginReload"
       }
     },
     "python": {
@@ -691,7 +698,8 @@
         "embeddings": "yunque.create_agent_kit().embeddings",
         "search": "yunque.create_agent_kit().search_sdk",
         "modes": "yunque.create_agent_kit().modes",
-        "airi": "yunque.create_agent_kit().airi"
+        "airi": "yunque.create_agent_kit().airi",
+        "pluginReload": "yunque.create_agent_kit().plugin_reload"
       }
     },
     "rust": {
@@ -785,7 +793,8 @@
         "embeddings": "AgentKit::embeddings",
         "search": "AgentKit::search",
         "modes": "AgentKit::modes",
-        "airi": "AgentKit::airi"
+        "airi": "AgentKit::airi",
+        "pluginReload": "AgentKit::plugin_reload"
       }
     }
   },

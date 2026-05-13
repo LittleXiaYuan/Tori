@@ -17,6 +17,7 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugins.ui()
             yunque.plugin_ui.ui()
             yunque.plugins.reload()
+            yunque.plugin_reload.reload()
             yunque.plugins.open_folder("demo")
 
         calls = [call.args for call in api_call.call_args_list]
@@ -30,12 +31,14 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[7], ("GET", "/v1/plugins/ui"))
         self.assertEqual(calls[8], ("GET", "/v1/plugins/ui"))
         self.assertEqual(calls[9], ("POST", "/v1/plugins/reload"))
-        self.assertEqual(calls[10], ("GET", "/v1/plugins/open-folder?name=demo"))
+        self.assertEqual(calls[10], ("POST", "/v1/plugins/reload"))
+        self.assertEqual(calls[11], ("GET", "/v1/plugins/open-folder?name=demo"))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
         self.assertIs(yunque.create_agent_kit().plugin_ui, yunque.plugin_ui)
         self.assertIs(yunque.create_agent_kit().plugin_toggle, yunque.plugin_toggle)
+        self.assertIs(yunque.create_agent_kit().plugin_reload, yunque.plugin_reload)
 
 
 if __name__ == "__main__":

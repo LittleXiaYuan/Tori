@@ -4242,7 +4242,7 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 	if NewAgentKit().Bots != Bots {
 		t.Fatalf("agent kit should expose Bots namespace")
 	}
-	if len(seen) != 11 {
+	if len(seen) != 12 {
 		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
 	}
 }
@@ -4520,15 +4520,16 @@ func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
 	ui, _ := Plugins.UI(ctx)
 	pluginUI, _ := PluginUI.UI(ctx)
 	reloaded, _ := Plugins.Reload(ctx)
+	reloadedStandalone, _ := PluginReload.Reload(ctx)
 	opened, _ := Plugins.OpenFolder(ctx, "demo")
 
-	if list["plugins"] == nil || toggled["enabled"] != true || toggledStandalone["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || pluginUI["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
+	if list["plugins"] == nil || toggled["enabled"] != true || toggledStandalone["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || pluginUI["tabs"] == nil || reloaded["skills"].(float64) != 1 || reloadedStandalone["skills"].(float64) != 1 || opened["ok"] != true {
 		t.Fatalf("unexpected Plugins results")
 	}
-	if NewAgentKit().Plugins != Plugins || NewAgentKit().PluginUI != PluginUI || NewAgentKit().PluginToggle != PluginToggle {
+	if NewAgentKit().Plugins != Plugins || NewAgentKit().PluginUI != PluginUI || NewAgentKit().PluginToggle != PluginToggle || NewAgentKit().PluginReload != PluginReload {
 		t.Fatalf("agent kit should expose Plugins namespace")
 	}
-	if len(seen) != 11 {
+	if len(seen) != 12 {
 		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
 	}
 }
