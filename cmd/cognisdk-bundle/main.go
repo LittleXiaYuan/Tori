@@ -29,6 +29,31 @@ func run(args []string) error {
 	}
 
 	switch args[0] {
+
+	case "init":
+		if len(args) < 2 || len(args) > 3 {
+			return fmt.Errorf("usage: cognisdk-bundle init <output.json> [--builtin]")
+		}
+		includeBuiltin := len(args) == 3 && args[2] == "--builtin"
+		if len(args) == 3 && !includeBuiltin {
+			return fmt.Errorf("unknown init option %q", args[2])
+		}
+		var packs []cognisdk.PackManifest
+		var enabled []string
+		bundleID := "empty-cogni-pack-bundle"
+		if includeBuiltin {
+			packs = cognisdk.BuiltinPacks()
+			enabled = make([]string, 0, len(packs))
+			for _, pack := range packs {
+				enabled = append(enabled, pack.ID)
+			}
+			bundleID = "builtin-cogni-pack-bundle"
+		}
+		bundle, err := cognisdk.NewPackBundle(bundleID, packs, enabled)
+		if err != nil {
+			return err
+		}
+		return cognisdk.SavePackBundle(bundle, args[1])
 	case "diff":
 		if len(args) != 3 {
 			return fmt.Errorf("usage: cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
@@ -108,6 +133,7 @@ func printJSON(value any) error {
 
 func printUsage() {
 	fmt.Println("Usage:")
+	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
