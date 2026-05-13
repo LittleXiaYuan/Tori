@@ -14,12 +14,12 @@ const (
 
 // PackStatus is a stable snapshot for list operations.
 type PackStatus struct {
-	ID          string
-	Version     string
-	Type        string
-	DisplayName string
-	Enabled     bool
-	Provides    []string
+	ID          string   `json:"id" yaml:"id"`
+	Version     string   `json:"version" yaml:"version"`
+	Type        string   `json:"type" yaml:"type"`
+	DisplayName string   `json:"display_name,omitempty" yaml:"display_name,omitempty"`
+	Enabled     bool     `json:"enabled" yaml:"enabled"`
+	Provides    []string `json:"provides,omitempty" yaml:"provides,omitempty"`
 }
 
 // PackManager manages local declarative packs only.

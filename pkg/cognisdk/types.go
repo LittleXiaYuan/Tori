@@ -167,6 +167,26 @@ type PackManifest struct {
 	Permissions      []string          `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
+// PackChange describes a changed pack between two portable bundle snapshots.
+type PackChange struct {
+	ID          string `json:"id" yaml:"id"`
+	FromVersion string `json:"from_version,omitempty" yaml:"from_version,omitempty"`
+	ToVersion   string `json:"to_version,omitempty" yaml:"to_version,omitempty"`
+	Reason      string `json:"reason,omitempty" yaml:"reason,omitempty"`
+}
+
+// PackBundleDiff is a reviewable, non-mutating delta between two bundle
+// snapshots. It is useful for plugin UIs, CI checks, and rollback notes.
+type PackBundleDiff struct {
+	FromID        string       `json:"from_id" yaml:"from_id"`
+	ToID          string       `json:"to_id" yaml:"to_id"`
+	AddedPacks    []PackStatus `json:"added_packs,omitempty" yaml:"added_packs,omitempty"`
+	RemovedPacks  []PackStatus `json:"removed_packs,omitempty" yaml:"removed_packs,omitempty"`
+	ChangedPacks  []PackChange `json:"changed_packs,omitempty" yaml:"changed_packs,omitempty"`
+	EnabledPacks  []string     `json:"enabled_packs,omitempty" yaml:"enabled_packs,omitempty"`
+	DisabledPacks []string     `json:"disabled_packs,omitempty" yaml:"disabled_packs,omitempty"`
+}
+
 // PackBundle is a portable collection of declarative packs. It is still data
 // only: loading a bundle validates manifests but never executes code.
 type PackBundle struct {
