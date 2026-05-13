@@ -42,6 +42,7 @@
     "src/cognis-federation.ts",
     "src/cognis-workflows.ts",
     "src/cognis-bundles.ts",
+    "src/cognisdk-schema.ts",
     "src/events.ts",
     "src/events-stream.ts",
     "src/events-parse.ts",
