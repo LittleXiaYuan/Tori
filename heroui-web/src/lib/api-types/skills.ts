@@ -103,6 +103,14 @@ export interface PackSDKManifest {
   python?: string;
 }
 
+export interface PackDistributionManifest {
+  manifestUrl?: string;
+  packageUrl?: string;
+  frontendUrl?: string;
+  sha256?: string;
+  sizeBytes?: number;
+}
+
 export interface PackUpdateManifest {
   channel?: string;
   rollback: boolean;
@@ -119,6 +127,7 @@ export interface PackManifest {
   backend: PackBackendManifest;
   frontend: PackFrontendManifest;
   sdk?: PackSDKManifest;
+  distribution?: PackDistributionManifest;
   update?: PackUpdateManifest;
   metadata?: Record<string, string>;
 }

@@ -217,6 +217,7 @@ export default function PacksPage() {
             const backendModule = backendModuleByPack.get(manifest.id);
             const mountedRoutes = backendModule?.routes || [];
             const sdkEntries = Object.entries(manifest.sdk || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
+            const distribution = manifest.distribution;
             const declaredBackendRoutes = manifest.backend?.routes || [];
             const mountedPathSet = new Set(mountedRoutes.map((route) => route.path));
             const missingMountedRoutes = declaredBackendRoutes.filter((route) => !mountedPathSet.has(route));
@@ -287,6 +288,9 @@ export default function PacksPage() {
                       <div>来源：<span className="font-mono">{pack.source || "-"}</span></div>
                       <div>上次更新：{formatTime(pack.updatedAt)}</div>
                       <div>上一版本：{pack.previousVersion || "-"}</div>
+                      <div>增量包：<span className="font-mono">{distribution?.packageUrl || "-"}</span></div>
+                      <div>前端资源：<span className="font-mono">{distribution?.frontendUrl || "-"}</span></div>
+                      <div>校验：<span className="font-mono">{distribution?.sha256 ? distribution.sha256.slice(0, 12) + "…" : "-"}</span></div>
                     </div>
                   </div>
                 </div>

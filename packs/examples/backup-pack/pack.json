@@ -7,23 +7,59 @@
   "optional": true,
   "defaultState": "enabled",
   "backend": {
-    "capabilities": ["backup.info", "backup.export", "backup.import"],
-    "routes": ["/v1/backup/info", "/v1/backup/export", "/v1/backup/import"],
-    "permissions": ["backup:read", "backup:write"]
+    "capabilities": [
+      "backup.info",
+      "backup.export",
+      "backup.import"
+    ],
+    "routes": [
+      "/v1/backup/info",
+      "/v1/backup/export",
+      "/v1/backup/import"
+    ],
+    "permissions": [
+      "backup:read",
+      "backup:write"
+    ]
   },
   "frontend": {
     "menus": [
-      { "key": "backup", "label": "备份恢复", "path": "/packs/backup", "icon": "archive", "order": 90 }
+      {
+        "key": "backup",
+        "label": "备份恢复",
+        "path": "/packs/backup",
+        "icon": "archive",
+        "order": 90
+      }
     ],
     "routes": [
-      { "path": "/packs/backup", "component": "backup/BackupPage", "title": "备份恢复" }
+      {
+        "path": "/packs/backup",
+        "component": "backup/BackupPage",
+        "title": "备份恢复"
+      }
     ],
-    "assets": { "type": "builtin", "entry": "backup/BackupPage" }
+    "assets": {
+      "type": "builtin",
+      "entry": "backup/BackupPage"
+    }
   },
-  "sdk": { "typescript": "yunque-client/backup" },
-  "update": { "channel": "stable", "rollback": true },
+  "sdk": {
+    "typescript": "yunque-client/backup"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
   "metadata": {
     "example": "true",
     "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/backup-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/backup-pack/backup-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/backup-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
   }
 }

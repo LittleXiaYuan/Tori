@@ -10,18 +10,19 @@ import (
 const ManifestFileName = "pack.json"
 
 type Manifest struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Version      string            `json:"version"`
-	Description  string            `json:"description,omitempty"`
-	RequiresCore string            `json:"requiresCore,omitempty"`
-	Optional     bool              `json:"optional"`
-	DefaultState string            `json:"defaultState,omitempty"`
-	Backend      BackendManifest   `json:"backend"`
-	Frontend     FrontendManifest  `json:"frontend"`
-	SDK          SDKManifest       `json:"sdk,omitempty"`
-	Update       UpdateManifest    `json:"update,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Version      string               `json:"version"`
+	Description  string               `json:"description,omitempty"`
+	RequiresCore string               `json:"requiresCore,omitempty"`
+	Optional     bool                 `json:"optional"`
+	DefaultState string               `json:"defaultState,omitempty"`
+	Backend      BackendManifest      `json:"backend"`
+	Frontend     FrontendManifest     `json:"frontend"`
+	SDK          SDKManifest          `json:"sdk,omitempty"`
+	Distribution DistributionManifest `json:"distribution,omitempty"`
+	Update       UpdateManifest       `json:"update,omitempty"`
+	Metadata     map[string]string    `json:"metadata,omitempty"`
 }
 
 type BackendManifest struct {
@@ -61,6 +62,14 @@ type SDKManifest struct {
 	Python     string `json:"python,omitempty"`
 }
 
+type DistributionManifest struct {
+	ManifestURL string `json:"manifestUrl,omitempty"`
+	PackageURL  string `json:"packageUrl,omitempty"`
+	FrontendURL string `json:"frontendUrl,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+	SizeBytes   int64  `json:"sizeBytes,omitempty"`
+}
+
 type UpdateManifest struct {
 	Channel  string `json:"channel,omitempty"`
 	Rollback bool   `json:"rollback"`
@@ -93,6 +102,12 @@ func (m Manifest) Validate() error {
 		if strings.TrimSpace(route.Path) == "" || strings.TrimSpace(route.Component) == "" {
 			return fmt.Errorf("frontend.routes[%d] requires path and component", i)
 		}
+	}
+	if m.Distribution.PackageURL != "" && strings.TrimSpace(m.Distribution.SHA256) == "" {
+		return fmt.Errorf("distribution.sha256 is required when distribution.packageUrl is set")
+	}
+	if m.Distribution.SizeBytes < 0 {
+		return fmt.Errorf("distribution.sizeBytes must be greater than or equal to 0")
 	}
 	return nil
 }
