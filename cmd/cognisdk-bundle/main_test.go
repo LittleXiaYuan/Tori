@@ -312,6 +312,32 @@ func TestRunActionsBundle(t *testing.T) {
 	if len(actions) == 0 || actions[0].Kind != cognisdk.PackBundleApplyActionKeepRollback {
 		t.Fatalf("unexpected actions output: %#v", actions)
 	}
+	filteredOut := filepath.Join(dir, "actions-add-pack.json")
+	if err := run([]string{"actions", current, candidate, "--kind", "add_pack", "--out", filteredOut}); err != nil {
+		t.Fatalf("actions kind filter out: %v", err)
+	}
+	filteredData, err := os.ReadFile(filteredOut)
+	if err != nil {
+		t.Fatalf("read filtered actions output: %v", err)
+	}
+	var filtered []cognisdk.PackBundleApplyAction
+	if err := json.Unmarshal(filteredData, &filtered); err != nil {
+		t.Fatalf("filtered actions output is not json: %v", err)
+	}
+	if len(filtered) == 0 {
+		t.Fatal("expected filtered add_pack actions")
+	}
+	for _, action := range filtered {
+		if action.Kind != cognisdk.PackBundleApplyActionAddPack {
+			t.Fatalf("unexpected filtered action: %#v", action)
+		}
+	}
+	if err := run([]string{"actions", current, candidate, "--kind", "missing_kind"}); err == nil || !strings.Contains(err.Error(), "unknown action kind") {
+		t.Fatalf("expected unknown action kind error, got %v", err)
+	}
+	if err := run([]string{"actions", current, candidate, "--kind"}); err == nil || !strings.Contains(err.Error(), "--kind requires an action kind") {
+		t.Fatalf("expected kind path error, got %v", err)
+	}
 	if err := run([]string{"actions", current, candidate, "--out", actionsMarkdownOut, "--markdown"}); err != nil {
 		t.Fatalf("actions bundle markdown out: %v", err)
 	}
