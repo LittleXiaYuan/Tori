@@ -12,7 +12,7 @@ import type {
   BackupInfo, BackupRestoreResult, ConversationInfo,
   TaskInfo, GapRecord, GapStats, StateGoal,
   StateSnapshot, ExperienceItem, ExperienceOutcome, ExperienceStats, TaskTemplate,
-  PluginUITab, PackListResponse, PackMutationResponse, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
+  PluginUITab, PackListResponse, PackMutationResponse, PackBackendModulesResponse, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
   CostTaskSummary, CostUsageEvent, CostBreakdown,
   TriggerItem, TriggerDef, TriggerRun, TriggerLogEvent, TriggerEventPayload,
   ApprovalRequest, ApprovalRule,
@@ -656,6 +656,8 @@ export const api = {
     fetcher<PackListResponse>("/v1/packs/installed"),
   packsEnabled: () =>
     fetcher<PackListResponse>("/v1/packs/enabled"),
+  packBackendModules: () =>
+    fetcher<PackBackendModulesResponse>("/v1/packs/backend-modules"),
   packInstall: (manifestPath: string, source?: string) =>
     fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source }) }),
   packInstallFromURL: (manifestUrl: string, source?: string) =>

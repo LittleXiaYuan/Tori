@@ -143,6 +143,21 @@ export interface PackMutationResponse {
   status: InstalledPack["status"];
 }
 
+export interface PackBackendRouteInfo {
+  method?: string;
+  path: string;
+}
+
+export interface PackBackendModuleInfo {
+  pack_id: string;
+  routes: PackBackendRouteInfo[];
+}
+
+export interface PackBackendModulesResponse {
+  modules: PackBackendModuleInfo[];
+  count: number;
+}
+
 // --- SkillHub ---
 
 export interface SkillHubItem {
