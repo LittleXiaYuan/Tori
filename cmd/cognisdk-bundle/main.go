@@ -123,13 +123,13 @@ func run(args []string) error {
 		return printJSON(summary)
 
 	case "plan":
-		planOut, normalizedArgs, err := parseOutputOption(args)
+		planOptions, normalizedArgs, err := parsePlanOptions(args)
 		if err != nil {
 			return err
 		}
 		args = normalizedArgs
 		if len(args) != 3 {
-			return fmt.Errorf("usage: cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json]")
+			return fmt.Errorf("usage: cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json] [--fail-on-review] [--fail-on-blocked]")
 		}
 		current, candidate, err := loadPair(args[1], args[2])
 		if err != nil {
@@ -139,17 +139,20 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if planOut != "" {
+		if planOptions.Out != "" {
 			if markdown {
-				return saveTextFile(cognisdk.RenderPackBundleApplyPlanMarkdown(plan), planOut)
+				if err := saveTextFile(cognisdk.RenderPackBundleApplyPlanMarkdown(plan), planOptions.Out); err != nil {
+					return err
+				}
+			} else if err := saveJSONFile(plan, planOptions.Out); err != nil {
+				return err
 			}
-			return saveJSONFile(plan, planOut)
-		}
-		if markdown {
+		} else if markdown {
 			fmt.Print(cognisdk.RenderPackBundleApplyPlanMarkdown(plan))
-			return nil
+		} else if err := printJSON(plan); err != nil {
+			return err
 		}
-		return printJSON(plan)
+		return enforcePlanGate(plan, planOptions)
 
 	case "promote":
 		allowReview, reviewOut, normalizedArgs, err := parsePromoteOptions(args)
@@ -206,22 +209,42 @@ func run(args []string) error {
 	}
 }
 
-func parseOutputOption(args []string) (string, []string, error) {
-	out := ""
+type planCLIOptions struct {
+	Out           string
+	FailOnReview  bool
+	FailOnBlocked bool
+}
+
+func parsePlanOptions(args []string) (planCLIOptions, []string, error) {
+	var opts planCLIOptions
 	normalized := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--out":
 			if i+1 >= len(args) {
-				return "", nil, fmt.Errorf("--out requires a path")
+				return planCLIOptions{}, nil, fmt.Errorf("--out requires a path")
 			}
-			out = args[i+1]
+			opts.Out = args[i+1]
 			i++
+		case "--fail-on-review":
+			opts.FailOnReview = true
+		case "--fail-on-blocked":
+			opts.FailOnBlocked = true
 		default:
 			normalized = append(normalized, args[i])
 		}
 	}
-	return out, normalized, nil
+	return opts, normalized, nil
+}
+
+func enforcePlanGate(plan cognisdk.PackBundleApplyPlan, opts planCLIOptions) error {
+	if opts.FailOnBlocked && plan.Blocked {
+		return fmt.Errorf("candidate bundle blocked: %s", plan.Reason)
+	}
+	if opts.FailOnReview && plan.RequiresReview {
+		return fmt.Errorf("candidate bundle requires review: %s", plan.Reason)
+	}
+	return nil
 }
 
 func parsePromoteOptions(args []string) (bool, string, []string, error) {
@@ -291,7 +314,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
-	fmt.Println("  cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json]")
+	fmt.Println("  cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review] [--review-out review.json]")
 }

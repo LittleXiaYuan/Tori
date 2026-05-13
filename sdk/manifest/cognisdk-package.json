@@ -182,7 +182,9 @@
         "--markdown",
         "--allow-review",
         "--review-out",
-        "--out"
+        "--out",
+        "--fail-on-review",
+        "--fail-on-blocked"
       ]
     }
   ],

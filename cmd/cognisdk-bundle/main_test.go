@@ -84,6 +84,81 @@ func TestRunPromoteRejectsReviewWithoutOverride(t *testing.T) {
 	}
 }
 
+func TestRunPlanFailOnReviewGate(t *testing.T) {
+	dir := t.TempDir()
+	currentPack := cognisdk.XiaoyuCompanionPack()
+	current, err := cognisdk.NewPackBundle("current", []cognisdk.PackManifest{currentPack}, []string{cognisdk.PackXiaoyuCompanion})
+	if err != nil {
+		t.Fatalf("current bundle: %v", err)
+	}
+	changed := currentPack
+	changed.Version = "0.2.0"
+	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{changed}, []string{cognisdk.PackXiaoyuCompanion})
+	if err != nil {
+		t.Fatalf("candidate bundle: %v", err)
+	}
+	currentPath := filepath.Join(dir, "current.json")
+	candidatePath := filepath.Join(dir, "candidate.json")
+	planOut := filepath.Join(dir, "review-plan.json")
+	if err := cognisdk.SavePackBundle(current, currentPath); err != nil {
+		t.Fatalf("save current: %v", err)
+	}
+	if err := cognisdk.SavePackBundle(candidate, candidatePath); err != nil {
+		t.Fatalf("save candidate: %v", err)
+	}
+
+	err = run([]string{"plan", currentPath, candidatePath, "--out", planOut, "--fail-on-review"})
+	if err == nil || !strings.Contains(err.Error(), "requires review") {
+		t.Fatalf("expected fail-on-review error, got %v", err)
+	}
+	data, readErr := os.ReadFile(planOut)
+	if readErr != nil {
+		t.Fatalf("plan output should be written before gate failure: %v", readErr)
+	}
+	var plan cognisdk.PackBundleApplyPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatalf("plan output is not json: %v", err)
+	}
+	if !plan.RequiresReview || plan.Outcome != cognisdk.PackBundleReviewReview {
+		t.Fatalf("unexpected review plan: %#v", plan)
+	}
+}
+
+func TestRunPlanFailOnBlockedGate(t *testing.T) {
+	dir := t.TempDir()
+	badPack := cognisdk.PackManifest{
+		ID:      "bad-pack",
+		Version: "0.1.0",
+		Type:    "cogni",
+		GoldenTests: []cognisdk.GoldenTest{{
+			Name:       "bad expectation",
+			Input:      "hello",
+			ExpectMode: "impossible_mode",
+		}},
+	}
+	current, err := cognisdk.NewPackBundle("current", nil, nil)
+	if err != nil {
+		t.Fatalf("current bundle: %v", err)
+	}
+	candidate, err := cognisdk.NewPackBundle("candidate", []cognisdk.PackManifest{badPack}, []string{"bad-pack"})
+	if err != nil {
+		t.Fatalf("candidate bundle: %v", err)
+	}
+	currentPath := filepath.Join(dir, "current.json")
+	candidatePath := filepath.Join(dir, "candidate.json")
+	if err := cognisdk.SavePackBundle(current, currentPath); err != nil {
+		t.Fatalf("save current: %v", err)
+	}
+	if err := cognisdk.SavePackBundle(candidate, candidatePath); err != nil {
+		t.Fatalf("save candidate: %v", err)
+	}
+
+	err = run([]string{"plan", currentPath, candidatePath, "--fail-on-blocked"})
+	if err == nil || !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("expected fail-on-blocked error, got %v", err)
+	}
+}
+
 func TestRunGoldenOutputsJSON(t *testing.T) {
 	dir := t.TempDir()
 	candidate := filepath.Join(dir, "candidate.json")
