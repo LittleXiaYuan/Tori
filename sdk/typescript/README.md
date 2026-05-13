@@ -2383,6 +2383,10 @@ The lightweight SkillHub SDK exposes incremental skill-package catalog, install,
 The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file editing, UI tabs, reload, and open-folder helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/plugins*`; Agent Kit also exposes this surface as `kit.plugins` / `kit.Plugins`.
 
 
+### PluginExtensions SDK
+
+PluginExtensions SDK exposes plugin-contributed system extensions (`registerProvider`, `registerChannel`, `registerSearch`, `registerGuardrail`, `registerEmbedding`, `registerSpeech`, `list`) for plugins, external frontends, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugin API runtime slice. It maps directly to `POST /v1/plugin-api/register/provider` and sibling extension registration routes plus `GET /v1/plugin-api/extensions`; Agent Kit also exposes this surface as `kit.pluginExtensions` / `kit.PluginExtensions` / `kit.plugin_extensions`.
+
 ### PluginCron SDK
 
 PluginCron SDK exposes plugin-scoped cron automation (`add`, `remove`, `list`) for plugins, external frontends, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugin API runtime slice. It maps directly to `POST /v1/plugin-api/cron/add`, `POST /v1/plugin-api/cron/remove`, and `GET /v1/plugin-api/cron/list`; Agent Kit also exposes this surface as `kit.pluginCron` / `kit.PluginCron` / `kit.plugin_cron`.

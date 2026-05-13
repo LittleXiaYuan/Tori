@@ -38,6 +38,13 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugin_cron.add("daily", "0 8 * * *", "ping")
             yunque.plugin_cron.remove("cron-1")
             yunque.plugin_cron.list()
+            yunque.plugin_extensions.register_provider("p1", "http://provider/v1", "demo")
+            yunque.plugin_extensions.register_channel("ops", "http://hook", "/send")
+            yunque.plugin_extensions.register_search("search", "http://search", api_key="key")
+            yunque.plugin_extensions.register_guardrail("guard", "Guard", phase="pre", keywords=["block"])
+            yunque.plugin_extensions.register_embedding("embed", "http://embed", "model", dimensions=768)
+            yunque.plugin_extensions.register_speech("tts", "tts", "http://tts", model="model")
+            yunque.plugin_extensions.list()
 
         calls = [call.args for call in api_call.call_args_list]
         self.assertEqual(calls[0], ("GET", "/v1/plugins"))
@@ -71,6 +78,13 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[28], ("POST", "/v1/plugin-api/cron/add", {"expression": "0 8 * * *", "name": "yunque:daily", "message": "ping"}))
         self.assertEqual(calls[29], ("POST", "/v1/plugin-api/cron/remove", {"id": "cron-1"}))
         self.assertEqual(calls[30], ("GET", "/v1/plugin-api/cron/list?plugin=yunque"))
+        self.assertEqual(calls[31], ("POST", "/v1/plugin-api/register/provider", {"id": "p1", "base_url": "http://provider/v1", "model": "demo", "type": "chat"}))
+        self.assertEqual(calls[32], ("POST", "/v1/plugin-api/register/channel", {"name": "ops", "webhook_url": "http://hook", "send_endpoint": "/send"}))
+        self.assertEqual(calls[33], ("POST", "/v1/plugin-api/register/search", {"name": "search", "base_url": "http://search", "api_key": "key", "search_path": "/search"}))
+        self.assertEqual(calls[34], ("POST", "/v1/plugin-api/register/guardrail", {"name": "guard", "description": "Guard", "phase": "pre", "keywords": ["block"]}))
+        self.assertEqual(calls[35], ("POST", "/v1/plugin-api/register/embedding", {"name": "embed", "base_url": "http://embed", "model": "model", "dimensions": 768}))
+        self.assertEqual(calls[36], ("POST", "/v1/plugin-api/register/speech", {"name": "tts", "type": "tts", "base_url": "http://tts", "model": "model"}))
+        self.assertEqual(calls[37], ("GET", "/v1/plugin-api/extensions"))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
@@ -86,6 +100,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_knowledge, yunque.plugin_knowledge)
         self.assertIs(yunque.create_agent_kit().plugin_agent_memory, yunque.plugin_agent_memory)
         self.assertIs(yunque.create_agent_kit().plugin_cron, yunque.plugin_cron)
+        self.assertIs(yunque.create_agent_kit().plugin_extensions, yunque.plugin_extensions)
 
 
 if __name__ == "__main__":

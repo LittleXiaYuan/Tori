@@ -1536,6 +1536,7 @@ pub struct AgentKit {
     pub plugin_knowledge: PluginKnowledgeClient,
     pub plugin_agent_memory: PluginAgentMemoryClient,
     pub plugin_cron: PluginCronClient,
+    pub plugin_extensions: PluginExtensionsClient,
 }
 
 impl AgentKit {
@@ -1650,7 +1651,8 @@ impl AgentKit {
             plugin_memory: PluginMemoryClient::new(base_url.clone(), plugin_token.as_ref())?,
             plugin_knowledge: PluginKnowledgeClient::new(base_url.clone(), plugin_token.as_ref())?,
             plugin_agent_memory: PluginAgentMemoryClient::new(base_url.clone(), plugin_token.as_ref())?,
-            plugin_cron: PluginCronClient::new(base_url, plugin_token.as_ref())?,
+            plugin_cron: PluginCronClient::new(base_url.clone(), plugin_token.as_ref())?,
+            plugin_extensions: PluginExtensionsClient::new(base_url, plugin_token.as_ref())?,
         })
     }
 
@@ -1764,7 +1766,8 @@ impl AgentKit {
             plugin_memory: PluginMemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_knowledge: PluginKnowledgeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_agent_memory: PluginAgentMemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            plugin_cron: PluginCronClient::new_with_client(base_url, plugin_http),
+            plugin_cron: PluginCronClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_extensions: PluginExtensionsClient::new_with_client(base_url, plugin_http),
         }
     }
 }
@@ -9886,6 +9889,29 @@ impl PluginCronClient {
     pub async fn list(&self, plugin: impl AsRef<str>) -> Result<PluginCronListResponse, reqwest::Error> { self.inner.cron_list(plugin).await }
 }
 
+/// Standalone PluginExtensions SDK client for plugin-contributed system extensions.
+#[derive(Debug, Clone)]
+pub struct PluginExtensionsClient { inner: PluginApiClient }
+
+impl PluginExtensionsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginApiClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginApiClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn register_provider(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_provider(config).await }
+    pub async fn register_channel(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_channel(config).await }
+    pub async fn register_search(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_search(config).await }
+    pub async fn register_guardrail(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_guardrail(config).await }
+    pub async fn register_embedding(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_embedding(config).await }
+    pub async fn register_speech(&self, config: &serde_json::Value) -> Result<PluginExtensionRegisterResponse, reqwest::Error> { self.inner.register_speech(config).await }
+    pub async fn list(&self) -> Result<PluginExtensionsResponse, reqwest::Error> { self.inner.extensions().await }
+}
+
 /// Standalone PluginSearch SDK client for plugin-scoped web search.
 #[derive(Debug, Clone)]
 pub struct PluginSearchClient { inner: PluginApiClient }
@@ -10648,6 +10674,9 @@ mod tests {
         let plugin_cron = PluginCronClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(plugin_cron.url("/v1/plugin-api/cron/add"), "http://localhost:9090/v1/plugin-api/cron/add");
         assert_eq!(kit.plugin_cron.url("/v1/plugin-api/cron/list"), "http://localhost:9090/v1/plugin-api/cron/list");
+        let plugin_extensions = PluginExtensionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(plugin_extensions.url("/v1/plugin-api/extensions"), "http://localhost:9090/v1/plugin-api/extensions");
+        assert_eq!(kit.plugin_extensions.url("/v1/plugin-api/register/provider"), "http://localhost:9090/v1/plugin-api/register/provider");
     }
 
     #[test]

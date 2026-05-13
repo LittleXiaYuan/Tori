@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "domain": "plugin-extensions",
+  "description": "Cross-language lightweight SDK for plugin-contributed system extension registration and listing without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose extension registration and listing as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep plugin-contributed provider/channel/search/guardrail/embedding/speech extension registration callable through existing plugin-authenticated runtime routes.",
+    "Make PluginExtensions available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/register/provider",
+    "POST /v1/plugin-api/register/channel",
+    "POST /v1/plugin-api/register/search",
+    "POST /v1/plugin-api/register/guardrail",
+    "POST /v1/plugin-api/register/embedding",
+    "POST /v1/plugin-api/register/speech",
+    "GET /v1/plugin-api/extensions"
+  ],
+  "capabilities": [
+    {
+      "name": "registerProvider",
+      "route": "POST /v1/plugin-api/register/provider",
+      "readOnly": false,
+      "description": "Register a plugin-provided LLM provider."
+    },
+    {
+      "name": "registerChannel",
+      "route": "POST /v1/plugin-api/register/channel",
+      "readOnly": false,
+      "description": "Register a plugin-provided channel adapter."
+    },
+    {
+      "name": "registerSearch",
+      "route": "POST /v1/plugin-api/register/search",
+      "readOnly": false,
+      "description": "Register a plugin-provided search engine."
+    },
+    {
+      "name": "registerGuardrail",
+      "route": "POST /v1/plugin-api/register/guardrail",
+      "readOnly": false,
+      "description": "Register a plugin-provided guardrail."
+    },
+    {
+      "name": "registerEmbedding",
+      "route": "POST /v1/plugin-api/register/embedding",
+      "readOnly": false,
+      "description": "Register a plugin-provided embedding provider."
+    },
+    {
+      "name": "registerSpeech",
+      "route": "POST /v1/plugin-api/register/speech",
+      "readOnly": false,
+      "description": "Register a plugin-provided speech provider."
+    },
+    {
+      "name": "list",
+      "route": "GET /v1/plugin-api/extensions",
+      "readOnly": true,
+      "description": "List plugin-contributed system extensions."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-extensions.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "registerProvider": "createPluginExtensionsClient().registerProvider",
+        "registerChannel": "createPluginExtensionsClient().registerChannel",
+        "registerSearch": "createPluginExtensionsClient().registerSearch",
+        "registerGuardrail": "createPluginExtensionsClient().registerGuardrail",
+        "registerEmbedding": "createPluginExtensionsClient().registerEmbedding",
+        "registerSpeech": "createPluginExtensionsClient().registerSpeech",
+        "list": "createPluginExtensionsClient().list"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "registerProvider": "yunque.PluginExtensions.RegisterProvider",
+        "registerChannel": "yunque.PluginExtensions.RegisterChannel",
+        "registerSearch": "yunque.PluginExtensions.RegisterSearchEngine",
+        "registerGuardrail": "yunque.PluginExtensions.RegisterGuardrail",
+        "registerEmbedding": "yunque.PluginExtensions.RegisterEmbedding",
+        "registerSpeech": "yunque.PluginExtensions.RegisterSpeech",
+        "list": "yunque.PluginExtensions.List"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "registerProvider": "yunque.plugin_extensions.register_provider",
+        "registerChannel": "yunque.plugin_extensions.register_channel",
+        "registerSearch": "yunque.plugin_extensions.register_search",
+        "registerGuardrail": "yunque.plugin_extensions.register_guardrail",
+        "registerEmbedding": "yunque.plugin_extensions.register_embedding",
+        "registerSpeech": "yunque.plugin_extensions.register_speech",
+        "list": "yunque.plugin_extensions.list"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "registerProvider": "PluginExtensionsClient::register_provider",
+        "registerChannel": "PluginExtensionsClient::register_channel",
+        "registerSearch": "PluginExtensionsClient::register_search",
+        "registerGuardrail": "PluginExtensionsClient::register_guardrail",
+        "registerEmbedding": "PluginExtensionsClient::register_embedding",
+        "registerSpeech": "PluginExtensionsClient::register_speech",
+        "list": "PluginExtensionsClient::list"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
