@@ -57,3 +57,18 @@ func TestRenderFeedbackProposalMarkdown(t *testing.T) {
 		}
 	}
 }
+
+func TestNewHostAdapterFromBundle(t *testing.T) {
+	bundle, err := NewPackBundle("host-bundle", []PackManifest{YunqueWorkPack()}, []string{PackYunqueWork})
+	if err != nil {
+		t.Fatalf("new bundle: %v", err)
+	}
+	adapter, err := NewHostAdapterFromBundle(bundle)
+	if err != nil {
+		t.Fatalf("host adapter from bundle: %v", err)
+	}
+	ctx := adapter.BuildContext(context.Background(), "请帮我修复测试", "tenant-a", "chat")
+	if !strings.Contains(ctx, "deliver_work") {
+		t.Fatalf("bundle adapter did not activate work pack: %s", ctx)
+	}
+}

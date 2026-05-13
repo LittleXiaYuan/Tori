@@ -167,6 +167,17 @@ type PackManifest struct {
 	Permissions      []string          `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
+// PackBundle is a portable collection of declarative packs. It is still data
+// only: loading a bundle validates manifests but never executes code.
+type PackBundle struct {
+	Version      int               `json:"version" yaml:"version"`
+	ID           string            `json:"id" yaml:"id"`
+	CreatedAt    time.Time         `json:"created_at,omitempty" yaml:"created_at,omitempty"`
+	Packs        []PackManifest    `json:"packs" yaml:"packs"`
+	EnabledPacks []string          `json:"enabled_packs,omitempty" yaml:"enabled_packs,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+}
+
 // MergedPack is the deterministic union of enabled packs.
 type MergedPack struct {
 	PackIDs          []string
