@@ -173,6 +173,70 @@ func PackBundleApplyActionKinds() []PackBundleApplyActionKind {
 	}
 }
 
+// PackBundleApplyActionKindInfos returns UI/plugin-friendly labels and
+// descriptions for the stable public apply action vocabulary. It intentionally
+// mirrors PackBundleApplyActionKinds one-for-one so existing callers can keep
+// using the compact string list while richer consumers avoid hard-coded copy.
+func PackBundleApplyActionKindInfos() []PackBundleApplyActionKindInfo {
+	return []PackBundleApplyActionKindInfo{
+		{
+			Kind:        PackBundleApplyActionKeepRollback,
+			Label:       "Keep rollback bundle",
+			Description: "Keep the current bundle available as a rollback source until the candidate is verified.",
+		},
+		{
+			Kind:        PackBundleApplyActionVerifyDigest,
+			Label:       "Verify digest",
+			Description: "Check the expected bundle digest before replacing or writing bundle artifacts.",
+		},
+		{
+			Kind:        PackBundleApplyActionRequireReview,
+			Label:       "Require review",
+			Description: "Pause promotion until a human reviewer or host policy approves the candidate.",
+		},
+		{
+			Kind:        PackBundleApplyActionStopBlocked,
+			Label:       "Stop blocked candidate",
+			Description: "Stop promotion because the candidate failed a blocking review or golden-test gate.",
+		},
+		{
+			Kind:        PackBundleApplyActionAddPack,
+			Label:       "Add pack",
+			Description: "Add a pack that exists in the candidate bundle but not in the current bundle.",
+		},
+		{
+			Kind:        PackBundleApplyActionReplacePack,
+			Label:       "Replace pack",
+			Description: "Replace an existing pack with a changed candidate version.",
+		},
+		{
+			Kind:        PackBundleApplyActionRemovePack,
+			Label:       "Remove pack",
+			Description: "Remove a pack that is no longer present in the candidate bundle.",
+		},
+		{
+			Kind:        PackBundleApplyActionEnablePack,
+			Label:       "Enable pack",
+			Description: "Enable a pack that is present but newly activated by the candidate bundle.",
+		},
+		{
+			Kind:        PackBundleApplyActionDisablePack,
+			Label:       "Disable pack",
+			Description: "Disable a pack that remains present but is no longer active in the candidate bundle.",
+		},
+		{
+			Kind:        PackBundleApplyActionNoop,
+			Label:       "No change",
+			Description: "Report that no pack changes were detected and the active bundle can remain unchanged.",
+		},
+		{
+			Kind:        PackBundleApplyActionWriteCandidate,
+			Label:       "Write candidate",
+			Description: "Write the candidate bundle only after digest, review, and rollback gates pass.",
+		},
+	}
+}
+
 // FilterPackBundleApplyActions returns only actions whose Kind matches one of
 // the requested kinds. Passing no kinds returns the original action slice. The
 // helper is intentionally non-mutating so external installers, plugin hooks,
