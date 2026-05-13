@@ -823,6 +823,23 @@ class _PersonaNamespace:
 
 persona = _PersonaNamespace()
 
+# ── Persona Modes facade (/v1/persona/modes, /v1/persona/mode) ──
+
+class _ModesNamespace:
+    """Lightweight helpers for persona mode listing, current mode, and switching."""
+
+    def list(self, tenant_id: str = "", session_id: str = "") -> dict:
+        return persona.modes(tenant_id, session_id)
+
+    def current(self, tenant_id: str = "", session_id: str = "") -> dict:
+        return persona.current_mode(tenant_id, session_id)
+
+    def set(self, mode: str, tenant_id: str = "", session_id: str = "") -> dict:
+        return persona.set_mode(tenant_id, mode, session_id)
+
+
+modes = _ModesNamespace()
+
 # ── Trust governance (/api/trust, /api/review, /api/skillgrow) ──
 
 class _TrustNamespace:
@@ -3330,6 +3347,7 @@ class AgentKit:
         self.trust = trust
         self.iterate = iterate
         self.persona = persona
+        self.modes = modes
         self.emotion = emotion
         self.instructions = instructions
         self.reactions = reactions

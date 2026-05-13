@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "persona-modes",
+  "description": "Cross-language lightweight SDK entrypoints for persona mode listing, current-mode reads, and mode switching without importing the full platform client.",
+  "principles": [
+    "Expose persona modes as a focused SDK helper for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep list/current/switch operations directly callable through the existing authenticated /v1/persona/mode routes.",
+    "Make Modes access available through Agent Kit while preserving Persona as the broader persona runtime slice."
+  ],
+  "routes": [
+    "GET /v1/persona/modes",
+    "GET /v1/persona/mode/current",
+    "POST /v1/persona/mode"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/persona/modes",
+      "readOnly": true,
+      "description": "List available persona modes."
+    },
+    {
+      "name": "current",
+      "route": "GET /v1/persona/mode/current",
+      "readOnly": true,
+      "description": "Read the current active persona mode."
+    },
+    {
+      "name": "set",
+      "route": "POST /v1/persona/mode",
+      "readOnly": false,
+      "description": "Switch the active persona mode."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/modes.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createModesClient().list",
+        "current": "createModesClient().current",
+        "set": "createModesClient().set"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Modes.List",
+        "current": "yunque.Modes.Current",
+        "set": "yunque.Modes.Set"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.modes.list",
+        "current": "yunque.modes.current",
+        "set": "yunque.modes.set"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "ModesClient::list",
+        "current": "ModesClient::current",
+        "set": "ModesClient::set"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

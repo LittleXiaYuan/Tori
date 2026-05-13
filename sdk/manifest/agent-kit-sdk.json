@@ -45,6 +45,7 @@
     "trust-governance",
     "self-iteration",
     "persona-runtime",
+    "persona-modes",
     "emotion-runtime",
     "user-instructions",
     "reactions-runtime",
@@ -223,6 +224,10 @@
     {
       "name": "persona",
       "description": "Access the lightweight Persona client or namespace for persona identity, skills, presets, custom presets, and feature flags."
+    },
+    {
+      "name": "modes",
+      "description": "Access the lightweight Modes client or namespace for persona mode listing, current-mode reads, and switching."
     },
     {
       "name": "emotion",
@@ -419,7 +424,8 @@
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
         "embeddings": "createAgentKit().embeddings",
-        "search": "createAgentKit().search"
+        "search": "createAgentKit().search",
+        "modes": "createAgentKit().modes"
       }
     },
     "go": {
@@ -499,7 +505,8 @@
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
         "embeddings": "yunque.NewAgentKit().Embeddings",
-        "search": "yunque.NewAgentKit().WebSearch"
+        "search": "yunque.NewAgentKit().WebSearch",
+        "modes": "yunque.NewAgentKit().Modes"
       }
     },
     "python": {
@@ -579,7 +586,8 @@
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
         "embeddings": "yunque.create_agent_kit().embeddings",
-        "search": "yunque.create_agent_kit().search_sdk"
+        "search": "yunque.create_agent_kit().search_sdk",
+        "modes": "yunque.create_agent_kit().modes"
       }
     },
     "rust": {
@@ -659,7 +667,8 @@
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",
         "embeddings": "AgentKit::embeddings",
-        "search": "AgentKit::search"
+        "search": "AgentKit::search",
+        "modes": "AgentKit::modes"
       }
     }
   },

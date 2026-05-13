@@ -58,6 +58,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/api/trust/scores")) return jsonResponse({ scores: { shell: { score: 80 } }, count: 1 });
       if (value.endsWith("/api/iterate/proposals?status=pending")) return jsonResponse({ proposals: [{ id: "it-1", status: "pending" }], count: 1 });
       if (value.endsWith("/v1/persona")) return jsonResponse({ identity: "Tori", soul: "careful", skills: [{ name: "review" }] });
+      if (value.endsWith("/v1/persona/mode/current")) return jsonResponse({ mode: "coder", name: "Coder" });
       if (value.endsWith("/v1/emotion/history?session_id=s1&limit=1")) return jsonResponse({ entries: [{ emotion: "happy" }], total: 1 });
       if (value.endsWith("/v1/instructions?category=style")) return jsonResponse({ instructions: [{ instruction_id: "ins-1", content: "保持简洁" }], total: 1 });
       if (value.endsWith("/v1/react")) return jsonResponse({ status: "ok" });
@@ -119,6 +120,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(((await kit.trust.scores()).scores.shell as { score?: number }).score, 80);
   assertEqual((await kit.iterate.pendingProposals()).proposals[0]?.id, "it-1");
   assertEqual((await kit.persona.get()).identity, "Tori");
+  assertEqual((await kit.modes.current()).mode, "coder");
   assertEqual((await kit.emotion.history({ sessionId: "s1", limit: 1 })).entries[0]?.emotion, "happy");
   assertEqual((await kit.instructions.list("style")).instructions[0]?.instruction_id, "ins-1");
   assertEqual((await kit.reactions.react({ channel_type: "wechat", target: "u1", message_id: "m1", emoji: "👍" })).status, "ok");
@@ -179,7 +181,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[44]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[45]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[46]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[53]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[54]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

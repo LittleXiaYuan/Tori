@@ -1398,6 +1398,7 @@ pub struct AgentKit {
     pub trust: TrustClient,
     pub iterate: IterateClient,
     pub persona: PersonaClient,
+    pub modes: ModesClient,
     pub emotion: EmotionClient,
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
@@ -1489,6 +1490,7 @@ impl AgentKit {
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
+            modes: ModesClient::new(base_url.clone(), token.as_ref())?,
             emotion: EmotionClient::new(base_url.clone(), token.as_ref())?,
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
@@ -1573,6 +1575,7 @@ impl AgentKit {
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            modes: ModesClient::new_with_client(base_url.clone(), plugin_http.clone()),
             emotion: EmotionClient::new_with_client(base_url.clone(), plugin_http.clone()),
             instructions: InstructionsClient::new_with_client(
                 base_url.clone(),
@@ -4118,6 +4121,26 @@ pub struct SetPersonaModeRequest {
     pub mode: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub session_id: String,
+}
+
+/// Lightweight Modes SDK facade over persona mode endpoints.
+#[derive(Debug, Clone)]
+pub struct ModesClient {
+    inner: PersonaClient,
+}
+
+impl ModesClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PersonaClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PersonaClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn list(&self, tenant_id: &str, session_id: &str) -> Result<PersonaModesResponse, reqwest::Error> { self.inner.modes(tenant_id, session_id).await }
+    pub async fn current(&self, tenant_id: &str, session_id: &str) -> Result<PersonaCurrentModeResponse, reqwest::Error> { self.inner.current_mode(tenant_id, session_id).await }
+    pub async fn set(&self, request: &SetPersonaModeRequest) -> Result<PersonaSetModeResponse, reqwest::Error> { self.inner.set_mode(request).await }
 }
 
 /// Small Rust helper over persona identity, skills, and preset endpoints.
@@ -10911,6 +10934,12 @@ mod tests {
         })
         .unwrap();
         assert_eq!(clear["emotion"], "happy");
+    }
+
+    #[test]
+    fn modes_facade_wraps_persona_mode_paths() {
+        let client = ModesClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.inner.url("/v1/persona/modes"), "http://localhost:9090/v1/persona/modes");
     }
 
     #[test]
