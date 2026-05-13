@@ -226,6 +226,51 @@ func TestFilterPackBundleApplyChecklistItems(t *testing.T) {
 	}
 }
 
+func TestSummarizePackBundleApplyChecklist(t *testing.T) {
+	items := []PackBundleApplyChecklistItem{
+		{Kind: PackBundleApplyActionKeepRollback, Required: true, Done: true, Message: "keep"},
+		{Kind: PackBundleApplyActionVerifyDigest, Required: true, Message: "verify"},
+		{Kind: PackBundleApplyActionAddPack, Message: "add"},
+		{Kind: PackBundleApplyActionStopBlocked, Required: true, Blocked: true, Message: "stop"},
+	}
+	summary := SummarizePackBundleApplyChecklist(items)
+	if summary.Total != 4 || summary.Required != 3 || summary.Optional != 1 {
+		t.Fatalf("unexpected summary totals: %#v", summary)
+	}
+	if summary.Done != 1 || summary.Open != 3 || summary.RequiredDone != 1 || summary.RequiredOpen != 2 || summary.OptionalOpen != 1 {
+		t.Fatalf("unexpected summary progress: %#v", summary)
+	}
+	if summary.Blocked != 1 || len(summary.BlockedKinds) != 1 || summary.BlockedKinds[0] != PackBundleApplyActionStopBlocked {
+		t.Fatalf("unexpected blocked summary: %#v", summary)
+	}
+	if summary.ByKind[PackBundleApplyActionVerifyDigest] != 1 || summary.ByKind[PackBundleApplyActionAddPack] != 1 {
+		t.Fatalf("unexpected kind counts: %#v", summary.ByKind)
+	}
+}
+
+func TestRenderPackBundleApplyChecklistSummaryMarkdown(t *testing.T) {
+	summary := PackBundleApplyChecklistSummary{
+		Total:         2,
+		Required:      1,
+		Optional:      1,
+		Open:          2,
+		Blocked:       1,
+		RequiredOpen:  1,
+		BlockedKinds:  []PackBundleApplyActionKind{PackBundleApplyActionStopBlocked},
+		RequiredKinds: []PackBundleApplyActionKind{PackBundleApplyActionVerifyDigest},
+		ByKind: map[PackBundleApplyActionKind]int{
+			PackBundleApplyActionVerifyDigest: 1,
+			PackBundleApplyActionAddPack:      1,
+		},
+	}
+	markdown := RenderPackBundleApplyChecklistSummaryMarkdown(summary)
+	for _, want := range []string{"Cogni Pack Bundle Apply Checklist Summary", "required: 1", "blocked_kinds: stop_blocked", "`verify_digest`: 1"} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("checklist summary markdown missing %q:\n%s", want, markdown)
+		}
+	}
+}
+
 func TestRenderPackBundleApplyChecklistMarkdown(t *testing.T) {
 	markdown := RenderPackBundleApplyChecklistMarkdown([]PackBundleApplyChecklistItem{{
 		Kind:     PackBundleApplyActionVerifyDigest,
