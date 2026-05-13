@@ -15,9 +15,10 @@ type JSONSchema map[string]any
 // settings, and automation UIs that need to discover SDK artifact contracts
 // without embedding a hand-written list.
 type JSONSchemaInfo struct {
-	Name   string `json:"name" yaml:"name"`
-	Title  string `json:"title" yaml:"title"`
-	Schema string `json:"schema" yaml:"schema"`
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title" yaml:"title"`
+	Schema      string `json:"schema" yaml:"schema"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
@@ -37,9 +38,10 @@ func JSONSchemaInfos() []JSONSchemaInfo {
 			continue
 		}
 		infos = append(infos, JSONSchemaInfo{
-			Name:   name,
-			Title:  schemaString(schema, "title"),
-			Schema: schemaString(schema, "$id"),
+			Name:        name,
+			Title:       schemaString(schema, "title"),
+			Schema:      schemaString(schema, "$id"),
+			Description: schemaDescription(name),
 		})
 	}
 	return infos
@@ -558,4 +560,33 @@ func enumSchema(values ...string) map[string]any {
 func schemaString(schema JSONSchema, key string) string {
 	value, _ := schema[key].(string)
 	return value
+}
+
+func schemaDescription(name string) string {
+	switch name {
+	case "pack-manifest":
+		return "Single declarative Cogni Pack manifest."
+	case "pack-bundle":
+		return "Portable collection of declarative Cogni Packs."
+	case "pack-bundle-summary":
+		return "Compact bundle inspection summary for previews and logs."
+	case "pack-bundle-digest-check":
+		return "Digest verification result for CI, install, and rollback checks."
+	case "pack-bundle-diff":
+		return "Non-mutating diff between current and candidate bundles."
+	case "pack-bundle-review":
+		return "Candidate review report with diff, golden-test, and rollback evidence."
+	case "pack-bundle-apply-plan":
+		return "Dry-run apply plan with gates, actions, diff, and golden-test evidence."
+	case "pack-bundle-apply-actions":
+		return "Script-friendly apply action list derived from an apply plan."
+	case "pack-bundle-apply-action-kinds":
+		return "Stable apply action vocabulary with UI labels and descriptions."
+	case "pack-bundle-apply-checklist":
+		return "UI-friendly apply checklist for plugin installers and dashboards."
+	case "feedback-proposal":
+		return "Non-mutating belief update proposal derived from audit feedback."
+	default:
+		return ""
+	}
 }

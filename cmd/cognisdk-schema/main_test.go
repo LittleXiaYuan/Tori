@@ -15,6 +15,9 @@ func TestRunListSchemas(t *testing.T) {
 	if err := run([]string{"list", "--json"}); err != nil {
 		t.Fatalf("list schemas json: %v", err)
 	}
+	if err := run([]string{"list", "--json", "--with-schema"}); err != nil {
+		t.Fatalf("list schemas json with schema: %v", err)
+	}
 }
 
 func TestRunListSchemasOut(t *testing.T) {
@@ -48,6 +51,21 @@ func TestRunListSchemasOut(t *testing.T) {
 	if len(infos) == 0 || infos[0]["name"] == "" {
 		t.Fatalf("unexpected list json output: %#v", infos)
 	}
+	withSchemaOut := filepath.Join(dir, "schemas-with-documents.json")
+	if err := run([]string{"list", "--json", "--with-schema", "--out", withSchemaOut}); err != nil {
+		t.Fatalf("list schemas json with schema out: %v", err)
+	}
+	withSchemaData, err := os.ReadFile(withSchemaOut)
+	if err != nil {
+		t.Fatalf("read list json with schema output: %v", err)
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal(withSchemaData, &entries); err != nil {
+		t.Fatalf("unmarshal list json with schema output: %v", err)
+	}
+	if len(entries) == 0 || entries[0]["schema_document"] == nil {
+		t.Fatalf("unexpected list json with schema output: %#v", entries)
+	}
 }
 
 func TestRunListRejectsUnknownOption(t *testing.T) {
@@ -58,6 +76,10 @@ func TestRunListRejectsUnknownOption(t *testing.T) {
 	err = run([]string{"list", "--out"})
 	if err == nil || !strings.Contains(err.Error(), "--out requires a path") {
 		t.Fatalf("expected list out path error, got %v", err)
+	}
+	err = run([]string{"list", "--with-schema"})
+	if err == nil || !strings.Contains(err.Error(), "--with-schema requires --json") {
+		t.Fatalf("expected with-schema requires json error, got %v", err)
 	}
 }
 

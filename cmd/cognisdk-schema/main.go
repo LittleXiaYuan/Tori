@@ -27,7 +27,11 @@ func run(args []string) error {
 			return err
 		}
 		if listOptions.JSON {
-			data, err := json.MarshalIndent(cognisdk.JSONSchemaInfos(), "", "  ")
+			var value any = cognisdk.JSONSchemaInfos()
+			if listOptions.WithSchema {
+				value = schemaCatalogEntriesWithSchema()
+			}
+			data, err := json.MarshalIndent(value, "", "  ")
 			if err != nil {
 				return err
 			}
@@ -65,7 +69,7 @@ func run(args []string) error {
 
 func printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println("  cognisdk-schema list [--json] [--out schema-catalog.json]")
+	fmt.Println("  cognisdk-schema list [--json] [--with-schema] [--out schema-catalog.json]")
 	fmt.Println("  cognisdk-schema <schema-name> [output.json]")
 	fmt.Println("")
 	fmt.Println("Schema names:")
@@ -75,8 +79,9 @@ func printUsage() {
 }
 
 type listOptions struct {
-	JSON bool
-	Out  string
+	JSON       bool
+	WithSchema bool
+	Out        string
 }
 
 func parseListOptions(args []string) (listOptions, error) {
@@ -85,6 +90,8 @@ func parseListOptions(args []string) (listOptions, error) {
 		switch args[i] {
 		case "--json":
 			opts.JSON = true
+		case "--with-schema":
+			opts.WithSchema = true
 		case "--out":
 			if i+1 >= len(args) {
 				return listOptions{}, fmt.Errorf("--out requires a path")
@@ -95,7 +102,31 @@ func parseListOptions(args []string) (listOptions, error) {
 			return listOptions{}, fmt.Errorf("unknown list option %q", args[i])
 		}
 	}
+	if opts.WithSchema && !opts.JSON {
+		return listOptions{}, fmt.Errorf("--with-schema requires --json")
+	}
 	return opts, nil
+}
+
+type schemaCatalogEntry struct {
+	cognisdk.JSONSchemaInfo
+	SchemaDocument cognisdk.JSONSchema `json:"schema_document" yaml:"schema_document"`
+}
+
+func schemaCatalogEntriesWithSchema() []schemaCatalogEntry {
+	infos := cognisdk.JSONSchemaInfos()
+	entries := make([]schemaCatalogEntry, 0, len(infos))
+	for _, info := range infos {
+		schema, ok := cognisdk.JSONSchemaByName(info.Name)
+		if !ok {
+			continue
+		}
+		entries = append(entries, schemaCatalogEntry{
+			JSONSchemaInfo: info,
+			SchemaDocument: schema,
+		})
+	}
+	return entries
 }
 
 func writeTextFile(path, value string) error {
