@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Route,
   ShieldCheck,
+  TerminalSquare,
 } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
@@ -200,6 +201,7 @@ export default function PacksPage() {
             const caps = manifest.backend?.capabilities || [];
             const backendModule = backendModuleByPack.get(manifest.id);
             const mountedRoutes = backendModule?.routes || [];
+            const sdkEntries = Object.entries(manifest.sdk || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
             const declaredBackendRoutes = manifest.backend?.routes || [];
             const mountedPathSet = new Set(mountedRoutes.map((route) => route.path));
             const missingMountedRoutes = declaredBackendRoutes.filter((route) => !mountedPathSet.has(route));
@@ -273,6 +275,13 @@ export default function PacksPage() {
                     </div>
                   </div>
                 </div>
+
+                {sdkEntries.length > 0 && (
+                  <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-text-muted)" }}>
+                    <TerminalSquare size={13} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }} />
+                    <span>SDK 调用入口：{sdkEntries.map(([language, entry]) => <code key={language} className="mx-1">{language}:{entry}</code>)}</span>
+                  </div>
+                )}
 
                 {(routes.length > 0 || declaredBackendRoutes.length > 0) && (
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-text-muted)" }}>

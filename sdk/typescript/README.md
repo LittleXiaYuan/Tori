@@ -2343,7 +2343,7 @@ import { createPacksClient } from "yunque-client/packs";
 const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<api-key>" });
 await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
 const modules = await packs.backendModules();\nconst sync = await packs.frontendSync();
-console.log(sync.menus, sync.routes);
+console.log(sync.menus, sync.routes, sync.sdk);
 await packs.disable("yunque.pack.backup");
 ```
 
