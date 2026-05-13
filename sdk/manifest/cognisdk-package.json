@@ -177,6 +177,7 @@
       ],
       "flags": [
         "--json",
+        "--with-schema",
         "--out"
       ],
       "schemas": [

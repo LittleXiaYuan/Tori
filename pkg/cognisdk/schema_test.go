@@ -136,6 +136,9 @@ func TestJSONSchemaInfos(t *testing.T) {
 		if info.Title == "" || info.Schema == "" {
 			t.Fatalf("schema info missing title or schema id: %#v", info)
 		}
+		if info.Description == "" {
+			t.Fatalf("schema info missing description: %#v", info)
+		}
 	}
 }
 
