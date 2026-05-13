@@ -907,6 +907,15 @@ class _TrustNamespace:
 
 trust = _TrustNamespace()
 
+class _SkillGrowNamespace:
+    """Standalone skill-growth pattern helper for plugins, CLIs, and automation scripts."""
+
+    def patterns(self) -> dict:
+        return trust.skillgrow_patterns()
+
+
+skillgrow = _SkillGrowNamespace()
+
 # ── Self-iteration governance (/api/iterate/*) ──
 
 class _IterateNamespace:
@@ -3473,6 +3482,7 @@ class AgentKit:
         self.sandbox = sandbox
         self.audit = audit
         self.trust = trust
+        self.skillgrow = skillgrow
         self.iterate = iterate
         self.persona = persona
         self.modes = modes

@@ -56,6 +56,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/tools/list")) return jsonResponse({ sessions: [{ id: "tool-1", command: "npm test", state: "running" }] });
       if (value.endsWith("/v1/audit/verify")) return jsonResponse({ valid: true, checked: 1 });
       if (value.endsWith("/api/trust/scores")) return jsonResponse({ scores: { shell: { score: 80 } }, count: 1 });
+      if (value.endsWith("/api/skillgrow/patterns")) return jsonResponse({ patterns: [{ pattern: "retry_then_fix", count: 2 }], count: 1 });
       if (value.endsWith("/api/iterate/proposals?status=pending")) return jsonResponse({ proposals: [{ id: "it-1", status: "pending" }], count: 1 });
       if (value.endsWith("/v1/persona")) return jsonResponse({ identity: "Tori", soul: "careful", skills: [{ name: "review" }] });
       if (value.endsWith("/v1/persona/mode/current")) return jsonResponse({ mode: "coder", name: "Coder" });
@@ -120,6 +121,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.tools.list()).sessions[0]?.id, "tool-1");
   assertEqual((await kit.audit.verify()).valid, true);
   assertEqual(((await kit.trust.scores()).scores.shell as { score?: number }).score, 80);
+  assertEqual((await kit.skillgrow.patterns()).patterns[0]?.pattern, "retry_then_fix");
   assertEqual((await kit.iterate.pendingProposals()).proposals[0]?.id, "it-1");
   assertEqual((await kit.persona.get()).identity, "Tori");
   assertEqual((await kit.modes.current()).mode, "coder");

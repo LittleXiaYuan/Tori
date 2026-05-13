@@ -1493,6 +1493,7 @@ type AgentKit struct {
 	Sandbox       *sandboxNamespace
 	Audit         *auditNamespace
 	Trust         *trustNamespace
+	SkillGrow     *skillGrowNamespace
 	Iterate       *iterateNamespace
 	Persona       *personaNamespace
 	Modes         *modesNamespace
@@ -4834,6 +4835,15 @@ func (t *trustNamespace) SkillGrowPatterns(ctx context.Context) (SkillGrowPatter
 	return out, nil
 }
 
+// SkillGrow exposes standalone skill-growth pattern reads for plugins, CLIs, sidecars, and automation scripts.
+var SkillGrow = &skillGrowNamespace{}
+
+type skillGrowNamespace struct{}
+
+func (s *skillGrowNamespace) Patterns(ctx context.Context) (SkillGrowPatternsResponse, error) {
+	return Trust.SkillGrowPatterns(ctx)
+}
+
 // ── Audit Chain and Trail ──
 
 type auditNamespace struct{}
@@ -6720,6 +6730,7 @@ func NewAgentKit() AgentKit {
 		Sandbox:       Sandbox,
 		Audit:         Audit,
 		Trust:         Trust,
+		SkillGrow:     SkillGrow,
 		Iterate:       Iterate,
 		Persona:       Persona,
 		Modes:         Modes,

@@ -11,3 +11,4 @@ export * from './admin';
 export * from './federation';
 export * from './ide';
 export * from './discovery';
+export * from './skillgrow';

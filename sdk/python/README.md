@@ -329,6 +329,11 @@ Files SDK exposes lightweight `/api/files` helpers (`list`, `preview`, `download
 
 Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`status`, `config`, `navigate`, `screenshot`, `latestScreenshot`, `ocr`, `oppPending`, `oppDecide`, `extensionStatus`, `extensionSession`, `extensionAction`, `scenarios`, `runScenario`) for external browser task panes, plugin UIs, extension bridges, CLIs, sidecars, and automation scripts without importing the full platform. Agent Kit also exposes this surface as `kit.browser` / `kit.Browser`.
 
+### SkillGrow SDK
+
+SkillGrow SDK exposes the focused skill-growth pattern reader (`patterns`) for external plugin UIs, admin panels, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/skillgrow/patterns`; Agent Kit also exposes this surface as `kit.skillgrow` / `kit.SkillGrow`.
+
+
 ### Iterate SDK
 
 `yunque.iterate` exposes the self-iteration proposal review loop as a small incremental SDK slice: `proposals()`, `pending_proposals()`, `approve(id)`, `reject(id)`, `trigger()`, and `status()` call `/api/iterate/proposals`, `/api/iterate/approve`, `/api/iterate/reject`, `/api/iterate/trigger`, and `/api/iterate/status`. `create_agent_kit().iterate` reuses the same helpers for scripts and plugins.
