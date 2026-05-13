@@ -91,6 +91,36 @@ func TestPlanPackBundleApplyBlocksGoldenFailure(t *testing.T) {
 	}
 }
 
+func TestFilterPackBundleApplyActions(t *testing.T) {
+	actions := []PackBundleApplyAction{
+		{Kind: PackBundleApplyActionKeepRollback, Message: "keep"},
+		{Kind: PackBundleApplyActionAddPack, PackID: PackYunqueWork, Message: "add"},
+		{Kind: PackBundleApplyActionWriteCandidate, Message: "write"},
+	}
+	if got := FilterPackBundleApplyActions(actions); len(got) != len(actions) {
+		t.Fatalf("no-kind filter changed actions: %#v", got)
+	}
+	filtered := FilterPackBundleApplyActions(actions, PackBundleApplyActionAddPack, PackBundleApplyActionWriteCandidate)
+	if len(filtered) != 2 {
+		t.Fatalf("expected two filtered actions, got %#v", filtered)
+	}
+	if filtered[0].Kind != PackBundleApplyActionAddPack || filtered[1].Kind != PackBundleApplyActionWriteCandidate {
+		t.Fatalf("unexpected filtered actions: %#v", filtered)
+	}
+	if got := FilterPackBundleApplyActions(actions, PackBundleApplyActionRemovePack); len(got) != 0 {
+		t.Fatalf("expected empty filter result, got %#v", got)
+	}
+}
+
+func TestKnownPackBundleApplyActionKind(t *testing.T) {
+	if !KnownPackBundleApplyActionKind(PackBundleApplyActionAddPack) {
+		t.Fatal("expected add_pack to be known")
+	}
+	if KnownPackBundleApplyActionKind(PackBundleApplyActionKind("missing_kind")) {
+		t.Fatal("unexpected missing action kind accepted")
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",
