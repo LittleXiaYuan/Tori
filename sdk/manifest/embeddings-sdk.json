@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "embeddings",
+  "description": "Cross-language lightweight SDK entrypoints for embedding provider listing and text embedding without importing the full platform client.",
+  "principles": [
+    "Expose embeddings as focused SDK helpers for external knowledge tools, plugin UIs, operator pages, CLIs, sidecars, and automation scripts.",
+    "Keep provider listing and text embedding directly callable through the existing authenticated /v1/embeddings route.",
+    "Make Embeddings access available through Agent Kit while preserving Discovery as the broader identity, embeddings, and search slice."
+  ],
+  "routes": [
+    "GET /v1/embeddings",
+    "POST /v1/embeddings"
+  ],
+  "capabilities": [
+    {
+      "name": "providers",
+      "route": "GET /v1/embeddings",
+      "readOnly": true,
+      "description": "List configured embedding providers."
+    },
+    {
+      "name": "embed",
+      "route": "POST /v1/embeddings",
+      "readOnly": false,
+      "description": "Embed one text input with an optional provider override."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/embeddings.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "providers": "createEmbeddingsClient().providers",
+        "embed": "createEmbeddingsClient().embed"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "providers": "yunque.Embeddings.Providers",
+        "embed": "yunque.Embeddings.Embed"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "providers": "yunque.embeddings.providers",
+        "embed": "yunque.embeddings.embed"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "providers": "EmbeddingsClient::providers",
+        "embed": "EmbeddingsClient::embed"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

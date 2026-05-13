@@ -448,3 +448,7 @@ The lightweight Models SDK exposes model registry list, add, and delete helpers 
 ### Identity SDK
 
 The lightweight Identity SDK exposes cross-channel identity resolution and profile listing helpers for external channel adapters, plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/identity/resolve` and `/v1/identity/profiles`; Agent Kit also exposes this surface as `kit.identity` / `kit.Identity`.
+
+### Embeddings SDK
+
+The lightweight Embeddings SDK exposes embedding provider listing and text embedding helpers for external knowledge tools, plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/embeddings`; Agent Kit also exposes this surface as `kit.embeddings` / `kit.Embeddings`.

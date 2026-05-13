@@ -1412,6 +1412,7 @@ pub struct AgentKit {
     pub ide: IDEClient,
     pub discovery: DiscoveryClient,
     pub identity: IdentityClient,
+    pub embeddings: EmbeddingsClient,
     pub router: RouterClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
@@ -1501,6 +1502,7 @@ impl AgentKit {
             ide: IDEClient::new(base_url.clone(), token.as_ref())?,
             discovery: DiscoveryClient::new(base_url.clone(), token.as_ref())?,
             identity: IdentityClient::new(base_url.clone(), token.as_ref())?,
+            embeddings: EmbeddingsClient::new(base_url.clone(), token.as_ref())?,
             router: RouterClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
@@ -1586,6 +1588,7 @@ impl AgentKit {
             ide: IDEClient::new_with_client(base_url.clone(), plugin_http.clone()),
             discovery: DiscoveryClient::new_with_client(base_url.clone(), plugin_http.clone()),
             identity: IdentityClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            embeddings: EmbeddingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             router: RouterClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -6058,6 +6061,25 @@ impl IdentityClient {
 
     pub async fn resolve(&self, request: &DiscoveryResolveIdentityRequest) -> Result<DiscoveryIdentityProfile, reqwest::Error> { self.inner.resolve_identity(request).await }
     pub async fn profiles(&self) -> Result<DiscoveryIdentityProfilesResponse, reqwest::Error> { self.inner.identity_profiles().await }
+}
+
+/// Lightweight Embeddings SDK facade over `/v1/embeddings`.
+#[derive(Debug, Clone)]
+pub struct EmbeddingsClient {
+    inner: DiscoveryClient,
+}
+
+impl EmbeddingsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: DiscoveryClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: DiscoveryClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn providers(&self) -> Result<DiscoveryEmbeddingProvidersResponse, reqwest::Error> { self.inner.embedding_providers().await }
+    pub async fn embed(&self, text: impl Into<String>, provider: impl Into<String>) -> Result<DiscoveryEmbeddingResponse, reqwest::Error> { self.inner.embed(text, provider).await }
 }
 
 /// Lightweight Discovery SDK client for identity resolution, embeddings, and web search.
@@ -10563,6 +10585,12 @@ mod tests {
         let client = IdentityClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.inner.url("/v1/identity/resolve"), "http://localhost:9090/v1/identity/resolve");
         assert_eq!(client.inner.url("/v1/identity/profiles"), "http://localhost:9090/v1/identity/profiles");
+    }
+
+    #[test]
+    fn embeddings_facade_wraps_discovery_embedding_paths() {
+        let client = EmbeddingsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.inner.url("/v1/embeddings"), "http://localhost:9090/v1/embeddings");
     }
 
     #[test]
