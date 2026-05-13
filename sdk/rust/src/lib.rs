@@ -1533,6 +1533,7 @@ pub struct AgentKit {
     pub plugin_send: PluginSendClient,
     pub plugin_llm: PluginLLMClient,
     pub plugin_memory: PluginMemoryClient,
+    pub plugin_knowledge: PluginKnowledgeClient,
 }
 
 impl AgentKit {
@@ -1644,7 +1645,8 @@ impl AgentKit {
             plugin_search: PluginSearchClient::new(base_url.clone(), plugin_token.as_ref())?,
             plugin_send: PluginSendClient::new(base_url.clone(), plugin_token.as_ref())?,
             plugin_llm: PluginLLMClient::new(base_url.clone(), plugin_token.as_ref())?,
-            plugin_memory: PluginMemoryClient::new(base_url, plugin_token.as_ref())?,
+            plugin_memory: PluginMemoryClient::new(base_url.clone(), plugin_token.as_ref())?,
+            plugin_knowledge: PluginKnowledgeClient::new(base_url, plugin_token.as_ref())?,
         })
     }
 
@@ -1755,7 +1757,8 @@ impl AgentKit {
             plugin_search: PluginSearchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_send: PluginSendClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_llm: PluginLLMClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            plugin_memory: PluginMemoryClient::new_with_client(base_url, plugin_http),
+            plugin_memory: PluginMemoryClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_knowledge: PluginKnowledgeClient::new_with_client(base_url, plugin_http),
         }
     }
 }
@@ -9819,6 +9822,25 @@ impl PluginMemoryClient {
     pub async fn search(&self, query: impl AsRef<str>, limit: i32) -> Result<PluginMemorySearchResponse, reqwest::Error> { self.inner.memory_search(query, limit).await }
 }
 
+
+/// Standalone PluginKnowledge SDK client for plugin-scoped knowledge/RAG operations.
+#[derive(Debug, Clone)]
+pub struct PluginKnowledgeClient { inner: PluginApiClient }
+
+impl PluginKnowledgeClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginApiClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginApiClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn search(&self, query: impl AsRef<str>, limit: i32) -> Result<PluginKnowledgeSearchResponse, reqwest::Error> { self.inner.knowledge_search(query, limit).await }
+    pub async fn ingest(&self, content: impl AsRef<str>, source: impl AsRef<str>, filename: impl AsRef<str>) -> Result<PluginOkResponse, reqwest::Error> { self.inner.knowledge_ingest(content, source, filename).await }
+}
+
 /// Standalone PluginSearch SDK client for plugin-scoped web search.
 #[derive(Debug, Clone)]
 pub struct PluginSearchClient { inner: PluginApiClient }
@@ -10572,6 +10594,9 @@ mod tests {
         let memory = PluginMemoryClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(memory.url("/v1/plugin-api/memory/get"), "http://localhost:9090/v1/plugin-api/memory/get");
         assert_eq!(kit.plugin_memory.url("/v1/plugin-api/memory/set"), "http://localhost:9090/v1/plugin-api/memory/set");
+        let knowledge = PluginKnowledgeClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(knowledge.url("/v1/plugin-api/knowledge/search"), "http://localhost:9090/v1/plugin-api/knowledge/search");
+        assert_eq!(kit.plugin_knowledge.url("/v1/plugin-api/knowledge/ingest"), "http://localhost:9090/v1/plugin-api/knowledge/ingest");
     }
 
     #[test]

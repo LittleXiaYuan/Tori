@@ -3432,6 +3432,17 @@ class _PluginMemoryNamespace:
 
 plugin_memory = _PluginMemoryNamespace()
 
+class _PluginKnowledgeNamespace:
+    """Standalone plugin-scoped knowledge/RAG helper for plugins and automation scripts."""
+
+    def search(self, query: str, limit: int = 5) -> list[dict]:
+        return knowledge.search(query, limit)
+
+    def ingest(self, content: str, source: str = "", filename: str = "") -> dict:
+        return knowledge.ingest(content, source, filename)
+
+plugin_knowledge = _PluginKnowledgeNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3627,6 +3638,7 @@ class AgentKit:
         self.plugin_send = plugin_send
         self.plugin_llm = plugin_llm
         self.plugin_memory = plugin_memory
+        self.plugin_knowledge = plugin_knowledge
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

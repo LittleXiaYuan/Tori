@@ -31,6 +31,8 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugin_memory.delete("foo")
             yunque.plugin_memory.list("f")
             yunque.plugin_memory.search("bar", 3)
+            yunque.plugin_knowledge.search("sdk", 2)
+            yunque.plugin_knowledge.ingest("content", source="doc", filename="a.md")
 
         calls = [call.args for call in api_call.call_args_list]
         self.assertEqual(calls[0], ("GET", "/v1/plugins"))
@@ -57,6 +59,8 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[21], ("POST", "/v1/plugin-api/memory/delete", {"key": "foo"}))
         self.assertEqual(calls[22], ("POST", "/v1/plugin-api/memory/list", {"prefix": "f"}))
         self.assertEqual(calls[23], ("POST", "/v1/plugin-api/memory/search", {"query": "bar", "limit": 3}))
+        self.assertEqual(calls[24], ("POST", "/v1/plugin-api/knowledge/search", {"query": "sdk", "limit": 2}))
+        self.assertEqual(calls[25], ("POST", "/v1/plugin-api/knowledge/ingest", {"content": "content", "source": "doc", "filename": "a.md"}))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
@@ -69,6 +73,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_send, yunque.plugin_send)
         self.assertIs(yunque.create_agent_kit().plugin_llm, yunque.plugin_llm)
         self.assertIs(yunque.create_agent_kit().plugin_memory, yunque.plugin_memory)
+        self.assertIs(yunque.create_agent_kit().plugin_knowledge, yunque.plugin_knowledge)
 
 
 if __name__ == "__main__":
