@@ -280,6 +280,36 @@ func BuildPackBundleApplyChecklist(plan PackBundleApplyPlan) []PackBundleApplyCh
 	return items
 }
 
+// RenderPackBundleApplyChecklistMarkdown renders a UI-friendly checklist for
+// release notes, plugin previews, and human approval tickets. Rendering is
+// non-mutating and uses only the provided checklist rows.
+func RenderPackBundleApplyChecklistMarkdown(items []PackBundleApplyChecklistItem) string {
+	var b strings.Builder
+	b.WriteString("## Cogni Pack Bundle Apply Checklist\n\n")
+	if len(items) == 0 {
+		b.WriteString("No checklist items.\n")
+		return b.String()
+	}
+	for _, item := range items {
+		mark := "[ ]"
+		if item.Done {
+			mark = "[x]"
+		}
+		fmt.Fprintf(&b, "- %s `%s` — %s", mark, item.Kind, emptyAs(item.Label, string(item.Kind)))
+		if item.Required {
+			b.WriteString(" required")
+		}
+		if item.Blocked {
+			b.WriteString(" blocked")
+		}
+		if item.Message != "" {
+			fmt.Fprintf(&b, ": %s", item.Message)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 // FilterPackBundleApplyChecklistItems returns only checklist rows whose Kind
 // matches one of the requested kinds. Passing no kinds returns the original
 // checklist slice. This mirrors FilterPackBundleApplyActions for UI flows that
