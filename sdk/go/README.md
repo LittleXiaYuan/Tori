@@ -379,6 +379,11 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 SkillGrow SDK exposes the focused skill-growth pattern reader (`patterns`) for external plugin UIs, admin panels, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/skillgrow/patterns`; Agent Kit also exposes this surface as `kit.skillgrow` / `kit.SkillGrow`.
 
 
+### Review SDK
+
+Review SDK exposes the focused review-gate status reader (`status`) for frontends, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/review/status`; Agent Kit also exposes this surface as `kit.review` / `kit.Review`.
+
+
 ### Iterate SDK
 
 `yunque.Iterate` keeps self-iteration proposal review available to Go sidecars and CLIs without a generated platform client. Use `Proposals`, `PendingProposals`, `Approve`, `Reject`, `Trigger`, and `Status` for `/api/iterate/proposals`, approval/rejection, manual cycle triggering, and status reads; `NewAgentKit().Iterate` points to the same lightweight namespace.

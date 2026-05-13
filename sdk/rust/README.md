@@ -572,6 +572,11 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 SkillGrow SDK exposes the focused skill-growth pattern reader (`patterns`) for external plugin UIs, admin panels, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/skillgrow/patterns`; Agent Kit also exposes this surface as `kit.skillgrow` / `kit.SkillGrow`.
 
 
+### Review SDK
+
+Review SDK exposes the focused review-gate status reader (`status`) for frontends, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/review/status`; Agent Kit also exposes this surface as `kit.review` / `kit.Review`.
+
+
 ### Iterate SDK
 
 `IterateClient` is the Rust lightweight self-iteration SDK slice. It wraps proposal review and manual cycles through `proposals`, `pending_proposals`, `approve`, `reject`, `trigger`, and `status` over `/api/iterate/proposals`, `/api/iterate/approve`, `/api/iterate/reject`, `/api/iterate/trigger`, and `/api/iterate/status`; `AgentKit::new(...).iterate` composes it with the other incremental clients.

@@ -1494,6 +1494,7 @@ type AgentKit struct {
 	Audit         *auditNamespace
 	Trust         *trustNamespace
 	SkillGrow     *skillGrowNamespace
+	Review        *reviewNamespace
 	Iterate       *iterateNamespace
 	Persona       *personaNamespace
 	Modes         *modesNamespace
@@ -4844,6 +4845,15 @@ func (s *skillGrowNamespace) Patterns(ctx context.Context) (SkillGrowPatternsRes
 	return Trust.SkillGrowPatterns(ctx)
 }
 
+// Review exposes standalone review-gate status reads for frontends, plugins, CLIs, and automation scripts.
+var Review = &reviewNamespace{}
+
+type reviewNamespace struct{}
+
+func (r *reviewNamespace) Status(ctx context.Context) (ReviewStatusResponse, error) {
+	return Trust.ReviewStatus(ctx)
+}
+
 // ── Audit Chain and Trail ──
 
 type auditNamespace struct{}
@@ -6731,6 +6741,7 @@ func NewAgentKit() AgentKit {
 		Audit:         Audit,
 		Trust:         Trust,
 		SkillGrow:     SkillGrow,
+		Review:        Review,
 		Iterate:       Iterate,
 		Persona:       Persona,
 		Modes:         Modes,

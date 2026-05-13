@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "review",
+  "description": "Cross-language lightweight SDK for reading review-gate status without importing the full platform client or the broader Trust governance slice.",
+  "principles": [
+    "Expose review gate status as a focused incremental SDK slice for frontends, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep review readiness directly callable through the existing authenticated gateway route.",
+    "Make Review available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /api/review/status"
+  ],
+  "capabilities": [
+    {
+      "name": "status",
+      "route": "GET /api/review/status",
+      "readOnly": true,
+      "description": "Read review gate, trust, and distillation enablement status."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/review.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "status": "createReviewClient().status"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.Review.Status"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "status": "yunque.review.status"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "status": "ReviewClient::status"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
