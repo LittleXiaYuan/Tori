@@ -37,6 +37,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/skills")) return jsonResponse({ skills: [{ name: "web.search", description: "search" }], count: 1 });
       if (value.endsWith("/v1/skills/scan")) return jsonResponse({ status: "scanned", skills_loaded: 2 });
       if (value.endsWith("/v1/skill-suggestions?session_id=s1")) return jsonResponse({ suggestions: [{ name: "summarize" }] });
+      if (value.endsWith("/v1/skills/dynamic")) return jsonResponse({ skills: [{ name: "draft_doc", approval_status: "pending" }] });
       if (value.endsWith("/v1/workers")) return jsonResponse({ workers: [{ id: "w1", type: "cursor", capabilities: ["coding"] }], count: 1 });
       if (value.endsWith("/v1/orchestrator/status")) return jsonResponse({ running: true, adapters: ["cursor"], active_sessions: 1, event_count: 2, policy: { allow_auto_launch: true } });
       if (value.endsWith("/v1/fork/list?session_id=s1")) return jsonResponse({ forks: [{ id: "fork_1", session_id: "s1", messages: [], created_at: "2026-05-12T00:00:00Z" }] });
@@ -104,6 +105,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsScan.scan()).skills_loaded, 2);
   assertEqual((await kit.skillsSuggestions.suggestions("s1")).suggestions[0]?.name, "summarize");
+  assertEqual((await kit.skillsDynamic.list()).skills[0]?.approval_status, "pending");
   assertEqual((await kit.dispatch.workers()).count, 1);
   assertEqual((await kit.orchestrator.status()).running, true);
   assertEqual((await kit.fork.list("s1")).forks[0]?.id, "fork_1");

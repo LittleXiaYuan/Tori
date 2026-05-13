@@ -1465,6 +1465,7 @@ pub struct AgentKit {
     pub skills_catalog: SkillsCatalogClient,
     pub skills_scan: SkillsScanClient,
     pub skills_suggestions: SkillsSuggestionsClient,
+    pub skills_dynamic: SkillsDynamicClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1568,6 +1569,7 @@ impl AgentKit {
             skills_catalog: SkillsCatalogClient::new(base_url.clone(), token.as_ref())?,
             skills_scan: SkillsScanClient::new(base_url.clone(), token.as_ref())?,
             skills_suggestions: SkillsSuggestionsClient::new(base_url.clone(), token.as_ref())?,
+            skills_dynamic: SkillsDynamicClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1661,6 +1663,7 @@ impl AgentKit {
             skills_catalog: SkillsCatalogClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_scan: SkillsScanClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_suggestions: SkillsSuggestionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skills_dynamic: SkillsDynamicClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -8514,6 +8517,28 @@ impl SkillsSuggestionsClient {
     pub async fn suggestions(&self, session_id: Option<&str>) -> Result<SkillsResponse, reqwest::Error> { self.inner.suggestions(session_id).await }
 }
 
+/// Standalone SkillsDynamic SDK client for dynamic skill review, approval, and rejection.
+#[derive(Debug, Clone)]
+pub struct SkillsDynamicClient {
+    inner: SkillsClient,
+}
+
+impl SkillsDynamicClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: SkillsClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: SkillsClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+
+    pub async fn list(&self) -> Result<SkillsResponse, reqwest::Error> { self.inner.dynamic().await }
+    pub async fn approve(&self, name: &str, instruction: Option<&str>) -> Result<SkillsResponse, reqwest::Error> { self.inner.approve(name, instruction).await }
+    pub async fn reject(&self, name: &str) -> Result<SkillsResponse, reqwest::Error> { self.inner.reject(name).await }
+}
+
 /// Lightweight Plugins SDK client for plugin catalog, lifecycle, file editing, UI, and reload.
 #[derive(Debug, Clone)]
 pub struct PluginsClient {
@@ -11860,6 +11885,15 @@ mod tests {
         assert_eq!(ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
+    }
+
+    #[test]
+    fn skills_dynamic_helpers_build_urls_and_agent_kit_surface() {
+        let dynamic = SkillsDynamicClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(dynamic.url("/v1/skills/dynamic"), "http://localhost:9090/v1/skills/dynamic");
+        assert_eq!(dynamic.url("/v1/skills/approve"), "http://localhost:9090/v1/skills/approve");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.skills_dynamic.url("/v1/skills/reject"), "http://localhost:9090/v1/skills/reject");
     }
 
     #[test]

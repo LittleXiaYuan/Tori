@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "skills-dynamic",
+  "description": "Cross-language lightweight SDK for dynamic skill review, approval, and rejection without importing the full platform client or broader Skills management slice.",
+  "principles": [
+    "Expose dynamic skill review operations as a focused operator SDK slice for admin pages, plugin tools, CLIs, sidecars, and automation scripts.",
+    "Keep review, approve, and reject calls directly callable through existing authenticated gateway routes.",
+    "Make SkillsDynamic available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /v1/skills/dynamic",
+    "POST /v1/skills/approve",
+    "POST /v1/skills/reject"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/skills/dynamic",
+      "readOnly": true,
+      "description": "List dynamic skills waiting for review."
+    },
+    {
+      "name": "approve",
+      "route": "POST /v1/skills/approve",
+      "readOnly": false,
+      "description": "Approve a dynamic skill, optionally with a final instruction."
+    },
+    {
+      "name": "reject",
+      "route": "POST /v1/skills/reject",
+      "readOnly": false,
+      "description": "Reject a dynamic skill by name."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/skills-dynamic.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createSkillsDynamicClient().list",
+        "approve": "createSkillsDynamicClient().approve",
+        "reject": "createSkillsDynamicClient().reject"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.SkillsDynamic.List",
+        "approve": "yunque.SkillsDynamic.Approve",
+        "reject": "yunque.SkillsDynamic.Reject"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.skills_dynamic.list",
+        "approve": "yunque.skills_dynamic.approve",
+        "reject": "yunque.skills_dynamic.reject"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "SkillsDynamicClient::list",
+        "approve": "SkillsDynamicClient::approve",
+        "reject": "SkillsDynamicClient::reject"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
