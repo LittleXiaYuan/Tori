@@ -43,8 +43,8 @@ function walk(dir) {
 }
 
 const authoring = readText("packs/AUTHORING.md");
-const englishGuide = readText("docs/guide/pack-runtime.md");
-const chineseGuide = readText("docs/zh/guide/pack-runtime.md");
+const englishGuide = readText("docs/guide/pack-runtime.md") + "\n" + readText("docs/guide/pack-runtime-state.md");
+const chineseGuide = readText("docs/zh/guide/pack-runtime.md") + "\n" + readText("docs/zh/guide/pack-runtime-state.md");
 const docsConfig = readText("docs/.vitepress/config.ts");
 const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
@@ -89,8 +89,8 @@ if (!process.env.PACK_COMPLETION_AUDIT_CHILD) {
   }
 }
 
-if (!docsConfig.includes("/guide/pack-runtime") || !docsConfig.includes("/zh/guide/pack-runtime")) {
-  fail("docs vitepress config must expose Pack Runtime guide in both locales");
+if (!docsConfig.includes("/guide/pack-runtime") || !docsConfig.includes("/zh/guide/pack-runtime") || !docsConfig.includes("/guide/pack-runtime-state") || !docsConfig.includes("/zh/guide/pack-runtime-state")) {
+  fail("docs vitepress config must expose Pack Runtime guide and state pages in both locales");
 }
 
 const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go")
