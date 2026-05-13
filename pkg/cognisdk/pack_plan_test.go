@@ -112,3 +112,21 @@ func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 		}
 	}
 }
+
+func hasApplyAction(actions []PackBundleApplyAction, kind PackBundleApplyActionKind) bool {
+	for _, action := range actions {
+		if action.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPackApplyAction(actions []PackBundleApplyAction, kind PackBundleApplyActionKind, packID string) bool {
+	for _, action := range actions {
+		if action.Kind == kind && action.PackID == packID {
+			return true
+		}
+	}
+	return false
+}

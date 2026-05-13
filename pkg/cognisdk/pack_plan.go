@@ -14,6 +14,7 @@ func PlanPackBundleApply(ctx context.Context, current, candidate PackBundle) (Pa
 	if err != nil {
 		return PackBundleApplyPlan{}, err
 	}
+	actions := packBundleApplyActions(review)
 	plan := PackBundleApplyPlan{
 		FromID:             review.FromID,
 		CandidateID:        review.CandidateID,
@@ -24,7 +25,8 @@ func PlanPackBundleApply(ctx context.Context, current, candidate PackBundle) (Pa
 		RequiresReview:     review.Outcome == PackBundleReviewReview,
 		Blocked:            review.Outcome == PackBundleReviewBlocked,
 		RollbackBundleID:   review.RollbackBundleID,
-		RecommendedActions: packBundleApplyActions(review),
+		RecommendedActions: packBundleApplyActionMessages(actions),
+		Actions:            actions,
 		Diff:               review.Diff,
 		GoldenTests:        review.GoldenTests,
 	}
@@ -62,36 +64,91 @@ func RenderPackBundleApplyPlanMarkdown(plan PackBundleApplyPlan) string {
 	return b.String()
 }
 
-func packBundleApplyActions(review PackBundleReview) []string {
-	actions := []string{
-		fmt.Sprintf("keep rollback bundle %q available until the candidate is verified", emptyAs(review.RollbackBundleID, review.FromID)),
-		fmt.Sprintf("verify current digest %s before replacing the active bundle", emptyAs(review.FromDigest, "unknown")),
+func packBundleApplyActions(review PackBundleReview) []PackBundleApplyAction {
+	actions := []PackBundleApplyAction{
+		{
+			Kind:     PackBundleApplyActionKeepRollback,
+			BundleID: emptyAs(review.RollbackBundleID, review.FromID),
+			Message:  fmt.Sprintf("keep rollback bundle %q available until the candidate is verified", emptyAs(review.RollbackBundleID, review.FromID)),
+		},
+		{
+			Kind:    PackBundleApplyActionVerifyDigest,
+			Digest:  emptyAs(review.FromDigest, "unknown"),
+			Message: fmt.Sprintf("verify current digest %s before replacing the active bundle", emptyAs(review.FromDigest, "unknown")),
+		},
 	}
 	if review.Outcome == PackBundleReviewBlocked {
-		return append(actions, "do not promote the candidate bundle because the review is blocked")
+		return append(actions, PackBundleApplyAction{
+			Kind:    PackBundleApplyActionStopBlocked,
+			Message: "do not promote the candidate bundle because the review is blocked",
+		})
 	}
 	if review.Outcome == PackBundleReviewReview {
-		actions = append(actions, "require a human or policy approval before writing the candidate bundle")
+		actions = append(actions, PackBundleApplyAction{
+			Kind:    PackBundleApplyActionRequireReview,
+			Message: "require a human or policy approval before writing the candidate bundle",
+		})
 	}
 	for _, pack := range review.Diff.AddedPacks {
-		actions = append(actions, fmt.Sprintf("add pack %q", pack.ID))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:      PackBundleApplyActionAddPack,
+			PackID:    pack.ID,
+			ToVersion: pack.Version,
+			Message:   fmt.Sprintf("add pack %q", pack.ID),
+		})
 	}
 	for _, change := range review.Diff.ChangedPacks {
-		actions = append(actions, fmt.Sprintf("replace pack %q (%s -> %s)", change.ID, emptyAs(change.FromVersion, "unknown"), emptyAs(change.ToVersion, "unknown")))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:        PackBundleApplyActionReplacePack,
+			PackID:      change.ID,
+			FromVersion: change.FromVersion,
+			ToVersion:   change.ToVersion,
+			Message:     fmt.Sprintf("replace pack %q (%s -> %s)", change.ID, emptyAs(change.FromVersion, "unknown"), emptyAs(change.ToVersion, "unknown")),
+		})
 	}
 	for _, pack := range review.Diff.RemovedPacks {
-		actions = append(actions, fmt.Sprintf("remove pack %q", pack.ID))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:        PackBundleApplyActionRemovePack,
+			PackID:      pack.ID,
+			FromVersion: pack.Version,
+			Message:     fmt.Sprintf("remove pack %q", pack.ID),
+		})
 	}
 	for _, id := range review.Diff.EnabledPacks {
-		actions = append(actions, fmt.Sprintf("enable pack %q", id))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:    PackBundleApplyActionEnablePack,
+			PackID:  id,
+			Message: fmt.Sprintf("enable pack %q", id),
+		})
 	}
 	for _, id := range review.Diff.DisabledPacks {
-		actions = append(actions, fmt.Sprintf("disable pack %q", id))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:    PackBundleApplyActionDisablePack,
+			PackID:  id,
+			Message: fmt.Sprintf("disable pack %q", id),
+		})
 	}
 	if len(review.Diff.AddedPacks) == 0 && len(review.Diff.ChangedPacks) == 0 && len(review.Diff.RemovedPacks) == 0 && len(review.Diff.EnabledPacks) == 0 && len(review.Diff.DisabledPacks) == 0 {
-		actions = append(actions, "no pack changes detected; keep the active bundle unchanged")
+		actions = append(actions, PackBundleApplyAction{
+			Kind:    PackBundleApplyActionNoop,
+			Message: "no pack changes detected; keep the active bundle unchanged",
+		})
 	} else {
-		actions = append(actions, fmt.Sprintf("write candidate bundle %q only after the above gates pass", review.CandidateID))
+		actions = append(actions, PackBundleApplyAction{
+			Kind:     PackBundleApplyActionWriteCandidate,
+			BundleID: review.CandidateID,
+			Message:  fmt.Sprintf("write candidate bundle %q only after the above gates pass", review.CandidateID),
+		})
 	}
 	return actions
+}
+
+func packBundleApplyActionMessages(actions []PackBundleApplyAction) []string {
+	messages := make([]string, 0, len(actions))
+	for _, action := range actions {
+		if strings.TrimSpace(action.Message) != "" {
+			messages = append(messages, action.Message)
+		}
+	}
+	return messages
 }

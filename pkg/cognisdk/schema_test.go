@@ -122,7 +122,7 @@ func TestPackBundleSummarySchemaNamesInspectFields(t *testing.T) {
 func TestPackBundleApplyPlanSchemaNamesFields(t *testing.T) {
 	schema := PackBundleApplyPlanJSONSchema()
 	props := schema["properties"].(map[string]any)
-	for _, field := range []string{"from_digest", "candidate_digest", "requires_review", "blocked", "rollback_bundle_id", "recommended_actions", "diff", "golden_tests"} {
+	for _, field := range []string{"from_digest", "candidate_digest", "requires_review", "blocked", "rollback_bundle_id", "recommended_actions", "actions", "diff", "golden_tests"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle apply plan schema missing %q", field)
 		}
