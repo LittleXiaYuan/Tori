@@ -93,6 +93,7 @@ export default function PacksPage() {
   const enable = (id: string) => run(`enable:${id}`, () => api.packEnable(id));
   const disable = (id: string) => run(`disable:${id}`, () => api.packDisable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => api.packRollback(id));
+  const prune = () => run("prune", () => api.packPrune());
 
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
@@ -134,9 +135,14 @@ export default function PacksPage() {
               最小闭环先支持本地 manifest；后续下载源/签名校验可以继续沉淀到 Pack Runtime，而不是压进主系统。
             </div>
           </div>
-          <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
-            backend registry source-of-truth
-          </Chip>
+          <div className="flex items-center gap-2">
+            <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+              backend registry source-of-truth
+            </Chip>
+            <Button size="sm" variant="ghost" isDisabled={busy === "prune"} onPress={prune}>
+              清理未引用缓存
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
           <div className="flex flex-col md:flex-row gap-3">

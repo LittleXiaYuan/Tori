@@ -393,6 +393,59 @@ func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
 	}
 }
 
+func TestPackRoutesPruneArtifacts(t *testing.T) {
+	root := t.TempDir()
+	registry, err := packruntime.NewRegistry(root)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	keepDir := filepath.Join(root, "artifacts", "yunque.pack.backup", "0.1.0")
+	oldDir := filepath.Join(root, "artifacts", "yunque.pack.backup", "0.0.9")
+	if err := os.MkdirAll(keepDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll keep: %v", err)
+	}
+	if err := os.MkdirAll(oldDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll old: %v", err)
+	}
+	keepPath := filepath.Join(keepDir, "keep.tgz")
+	oldPath := filepath.Join(oldDir, "old.tgz")
+	if err := os.WriteFile(keepPath, []byte("keep"), 0o644); err != nil {
+		t.Fatalf("WriteFile keep: %v", err)
+	}
+	if err := os.WriteFile(oldPath, []byte("old"), 0o644); err != nil {
+		t.Fatalf("WriteFile old: %v", err)
+	}
+	_, err = registry.InstallWithArtifacts(packruntime.Manifest{
+		ID:           "yunque.pack.backup",
+		Name:         "Backup Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Update:       packruntime.UpdateManifest{Rollback: true},
+	}, "test", &packruntime.PackArtifacts{PackagePath: keepPath, SHA256: "keep", SizeBytes: 4})
+	if err != nil {
+		t.Fatalf("InstallWithArtifacts: %v", err)
+	}
+	gw := NewFromConfig(GatewayConfig{Packs: registry})
+	req := httptest.NewRequest(http.MethodPost, "/v1/packs/prune", nil)
+	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
+	w := httptest.NewRecorder()
+	gw.handlePackPrune(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("prune status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		RemovedCount int `json:"removed_count"`
+		KeptCount    int `json:"kept_count"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.RemovedCount != 1 || body.KeptCount != 1 {
+		t.Fatalf("unexpected prune body: %#v", body)
+	}
+}
+
 func TestPackRoutesTogglePackStatus(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
