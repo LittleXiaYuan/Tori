@@ -13,7 +13,7 @@ type JSONSchema map[string]any
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "feedback-proposal"}
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -35,6 +35,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleApplyPlanJSONSchema(), true
 	case "pack-bundle-apply-actions":
 		return PackBundleApplyActionsJSONSchema(), true
+	case "pack-bundle-apply-action-kinds":
+		return PackBundleApplyActionKindsJSONSchema(), true
 	case "feedback-proposal":
 		return FeedbackProposalJSONSchema(), true
 	default:
@@ -223,6 +225,18 @@ func PackBundleApplyActionsJSONSchema() JSONSchema {
 	}
 }
 
+// PackBundleApplyActionKindsJSONSchema returns the schema for the detailed
+// action-kind metadata emitted by cognisdk-bundle action-kinds --details.
+func PackBundleApplyActionKindsJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id":     "https://yunque.local/schemas/cognisdk/pack-bundle-apply-action-kinds.json",
+		"title":   "Cognition SDK Pack Bundle Apply Action Kinds",
+		"type":    "array",
+		"items":   packBundleApplyActionKindInfoSchema(),
+	}
+}
+
 // FeedbackProposalJSONSchema returns the schema for non-mutating feedback
 // proposals returned by BuildFeedbackProposal or Engine.ProposeUpdates.
 func FeedbackProposalJSONSchema() JSONSchema {
@@ -284,6 +298,19 @@ func packBundleApplyActionSchema() map[string]any {
 			"digest":       stringSchema(),
 			"bundle_id":    stringSchema(),
 			"message":      stringSchema(),
+		},
+	}
+}
+
+func packBundleApplyActionKindInfoSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"kind", "label", "description"},
+		"properties": map[string]any{
+			"kind":        enumSchema(packBundleApplyActionKindStrings()...),
+			"label":       stringSchema(),
+			"description": stringSchema(),
 		},
 	}
 }
