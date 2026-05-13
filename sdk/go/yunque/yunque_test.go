@@ -4517,17 +4517,18 @@ func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
 	files, _ := Plugins.Files(ctx, "demo")
 	saved, _ := Plugins.SaveFile(ctx, "demo", "handler.py", "print('ok')", "demo")
 	ui, _ := Plugins.UI(ctx)
+	pluginUI, _ := PluginUI.UI(ctx)
 	reloaded, _ := Plugins.Reload(ctx)
 	opened, _ := Plugins.OpenFolder(ctx, "demo")
 
-	if list["plugins"] == nil || toggled["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
+	if list["plugins"] == nil || toggled["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || pluginUI["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
 		t.Fatalf("unexpected Plugins results")
 	}
-	if NewAgentKit().Plugins != Plugins {
+	if NewAgentKit().Plugins != Plugins || NewAgentKit().PluginUI != PluginUI {
 		t.Fatalf("agent kit should expose Plugins namespace")
 	}
-	if len(seen) != 9 {
-		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 10 {
+		t.Fatalf("expected 10 requests, got %d: %v", len(seen), seen)
 	}
 }
 

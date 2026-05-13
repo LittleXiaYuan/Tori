@@ -1460,6 +1460,7 @@ pub struct AgentKit {
     pub market: SkillMarketClient,
     pub skillhub: SkillHubClient,
     pub plugins: PluginsClient,
+    pub plugin_ui: PluginUIClient,
     pub skills: SkillsClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
@@ -1559,6 +1560,7 @@ impl AgentKit {
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             skillhub: SkillHubClient::new(base_url.clone(), token.as_ref())?,
             plugins: PluginsClient::new(base_url.clone(), token.as_ref())?,
+            plugin_ui: PluginUIClient::new(base_url.clone(), token.as_ref())?,
             skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
@@ -1648,6 +1650,7 @@ impl AgentKit {
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skillhub: SkillHubClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugins: PluginsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_ui: PluginUIClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
@@ -8506,6 +8509,23 @@ impl PluginsClient {
     }
 }
 
+/// Standalone PluginUI SDK client for plugin UI tab discovery.
+#[derive(Debug, Clone)]
+pub struct PluginUIClient { inner: PluginsClient }
+
+impl PluginUIClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginsClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginsClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn ui(&self) -> Result<PluginsResponse, reqwest::Error> {
+        self.inner.ui().await
+    }
+}
+
 /// Lightweight SkillHub SDK client for incremental skill packages.
 #[derive(Debug, Clone)]
 pub struct SkillHubClient {
@@ -11767,6 +11787,10 @@ mod tests {
         let client = PluginsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.url("/v1/plugins"), "http://localhost:9090/v1/plugins");
         assert_eq!(client.url(&format!("/v1/plugins/files?name={}", url_encode_query_component("demo plugin"))), "http://localhost:9090/v1/plugins/files?name=demo+plugin");
+        let ui = PluginUIClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.plugin_ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
     }
 
     #[test]

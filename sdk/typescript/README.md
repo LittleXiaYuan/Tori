@@ -2382,6 +2382,11 @@ The lightweight SkillHub SDK exposes incremental skill-package catalog, install,
 
 The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file editing, UI tabs, reload, and open-folder helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/plugins*`; Agent Kit also exposes this surface as `kit.plugins` / `kit.Plugins`.
 
+### PluginUI SDK
+
+PluginUI SDK exposes read-only plugin UI tab discovery (`ui`) for external frontends, plugin marketplaces, operator panels, CLIs, and automation scripts without importing the full platform or broader Plugins management slice. It maps directly to `/v1/plugins/ui`; Agent Kit also exposes this surface as `kit.pluginUI` / `kit.PluginUI`.
+
+
 ### Skills SDK
 
 The lightweight Runtime Skills SDK exposes skill catalog, scan, dynamic skill review, approve/reject, and session suggestion helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/skills*` and `/v1/skill-suggestions`; Agent Kit also exposes this surface as `kit.skills` / `kit.Skills`.
