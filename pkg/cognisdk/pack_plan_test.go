@@ -137,6 +137,25 @@ func TestPackBundleApplyActionKinds(t *testing.T) {
 	}
 }
 
+func TestPackBundleApplyActionKindInfos(t *testing.T) {
+	kinds := PackBundleApplyActionKinds()
+	infos := PackBundleApplyActionKindInfos()
+	if len(infos) != len(kinds) {
+		t.Fatalf("kind info length = %d, want %d", len(infos), len(kinds))
+	}
+	for i, info := range infos {
+		if info.Kind != kinds[i] {
+			t.Fatalf("kind info[%d] = %q, want %q", i, info.Kind, kinds[i])
+		}
+		if !KnownPackBundleApplyActionKind(info.Kind) {
+			t.Fatalf("kind info not known: %#v", info)
+		}
+		if strings.TrimSpace(info.Label) == "" || strings.TrimSpace(info.Description) == "" {
+			t.Fatalf("kind info missing copy: %#v", info)
+		}
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",

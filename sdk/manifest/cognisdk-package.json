@@ -124,10 +124,12 @@
       "symbols": [
         "PackBundleApplyPlan",
         "PackBundleApplyActionKind",
+        "PackBundleApplyActionKindInfo",
         "PackBundleApplyAction",
         "PlanPackBundleApply",
         "RenderPackBundleApplyPlanMarkdown",
         "PackBundleApplyActionKinds",
+        "PackBundleApplyActionKindInfos",
         "FilterPackBundleApplyActions",
         "KnownPackBundleApplyActionKind",
         "Actions",
@@ -201,7 +203,8 @@
         "--kind",
         "--fail-on-review",
         "--fail-on-blocked",
-        "--expect"
+        "--expect",
+        "--details"
       ]
     }
   ],

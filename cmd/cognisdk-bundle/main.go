@@ -154,7 +154,21 @@ func run(args []string) error {
 		}
 		args = normalizedArgs
 		if len(args) != 1 {
-			return fmt.Errorf("usage: cognisdk-bundle action-kinds [--markdown] [--out action-kinds.json]")
+			return fmt.Errorf("usage: cognisdk-bundle action-kinds [--details] [--markdown] [--out action-kinds.json]")
+		}
+		if actionKindsOptions.Details {
+			infos := cognisdk.PackBundleApplyActionKindInfos()
+			if actionKindsOptions.Out != "" {
+				if markdown {
+					return saveTextFile(renderApplyActionKindInfosMarkdown(infos), actionKindsOptions.Out)
+				}
+				return saveJSONFile(infos, actionKindsOptions.Out)
+			}
+			if markdown {
+				fmt.Print(renderApplyActionKindInfosMarkdown(infos))
+				return nil
+			}
+			return printJSON(infos)
 		}
 		kinds := cognisdk.PackBundleApplyActionKinds()
 		if actionKindsOptions.Out != "" {
@@ -302,7 +316,8 @@ type digestCLIOptions struct {
 }
 
 type actionKindsCLIOptions struct {
-	Out string
+	Out     string
+	Details bool
 }
 
 func parseActionKindsOptions(args []string) (actionKindsCLIOptions, []string, error) {
@@ -310,6 +325,8 @@ func parseActionKindsOptions(args []string) (actionKindsCLIOptions, []string, er
 	normalized := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--details":
+			opts.Details = true
 		case "--out":
 			if i+1 >= len(args) {
 				return actionKindsCLIOptions{}, nil, fmt.Errorf("--out requires a path")
@@ -451,6 +468,19 @@ func renderApplyActionKindsMarkdown(kinds []cognisdk.PackBundleApplyActionKind) 
 	return out
 }
 
+func renderApplyActionKindInfosMarkdown(infos []cognisdk.PackBundleApplyActionKindInfo) string {
+	var out string
+	out += "## Cogni Pack Bundle Apply Action Kinds\n\n"
+	if len(infos) == 0 {
+		out += "No action kinds.\n"
+		return out
+	}
+	for _, info := range infos {
+		out += fmt.Sprintf("- `%s` — %s: %s\n", info.Kind, info.Label, info.Description)
+	}
+	return out
+}
+
 func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string {
 	var out string
 	out += "## Cogni Pack Bundle Apply Actions\n\n"
@@ -529,7 +559,7 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
-	fmt.Println("  cognisdk-bundle action-kinds [--markdown] [--out action-kinds.json]")
+	fmt.Println("  cognisdk-bundle action-kinds [--details] [--markdown] [--out action-kinds.json]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")

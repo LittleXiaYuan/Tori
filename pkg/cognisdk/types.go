@@ -237,6 +237,15 @@ const (
 	PackBundleApplyActionWriteCandidate PackBundleApplyActionKind = "write_candidate"
 )
 
+// PackBundleApplyActionKindInfo describes a stable action kind for external
+// UIs, plugin settings, and automation configuration. It is metadata only:
+// callers should still use PackBundleApplyAction.Kind as the machine value.
+type PackBundleApplyActionKindInfo struct {
+	Kind        PackBundleApplyActionKind `json:"kind" yaml:"kind"`
+	Label       string                    `json:"label" yaml:"label"`
+	Description string                    `json:"description" yaml:"description"`
+}
+
 // PackBundleApplyAction is a structured, frontend/script-friendly action entry
 // derived from the bundle diff and review gate.
 type PackBundleApplyAction struct {
