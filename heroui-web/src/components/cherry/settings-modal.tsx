@@ -41,7 +41,7 @@ import {
 import { CherryModal } from "./overlay";
 import { api } from "@/lib/api";
 import type { VersionInfo } from "@/lib/api-types";
-import { createBackupPackClient } from "@/lib/backup-pack-client";
+import { createPacksClient } from "@/lib/packs-client";
 import { loadTheme, patchAndApply, THEME_STORAGE_KEY } from "@/lib/theme-engine";
 
 export interface CherrySettingsModalProps {
@@ -50,7 +50,8 @@ export interface CherrySettingsModalProps {
   initialSection?: SectionId;
 }
 
-const backupPack = createBackupPackClient();
+const packsClient = createPacksClient();
+const BACKUP_PACK_ID = "yunque.pack.backup";
 
 type SectionId =
   | "general"
@@ -566,29 +567,30 @@ function MemorySection({ onClose }: { onClose: () => void }) {
    ══════════════════════════════════════════════════════════════ */
 
 function DataSection() {
+  const router = useRouter();
   const [systemInfo, setSystemInfo] = useState<{ data_dir?: string; db_size_mb?: number } | null>(null);
-  const [backing, setBacking] = useState(false);
-  const [msg, setMsg] = useState<string>("");
+  const [backupPackStatus, setBackupPackStatus] = useState<"enabled" | "disabled" | "missing" | "loading">("loading");
 
   useEffect(() => {
     api
       .systemInfo()
       .then((info) => setSystemInfo(info as { data_dir?: string; db_size_mb?: number }))
       .catch(() => setSystemInfo(null));
+    let alive = true;
+    packsClient
+      .installed()
+      .then((res) => {
+        if (!alive) return;
+        const pack = res.packs.find((item) => item.manifest.id === BACKUP_PACK_ID);
+        setBackupPackStatus(pack?.status === "enabled" ? "enabled" : pack ? "disabled" : "missing");
+      })
+      .catch(() => {
+        if (alive) setBackupPackStatus("missing");
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
-
-  const runBackup = async () => {
-    setBacking(true);
-    setMsg("");
-    try {
-      await backupPack.export();
-      setMsg("备份已下载到本地。");
-    } catch (e) {
-      setMsg(`备份失败：${(e as Error).message}`);
-    } finally {
-      setBacking(false);
-    }
-  };
 
   return (
     <>
@@ -619,17 +621,17 @@ function DataSection() {
 
         <div className="cherry-settings-row">
           <div>
-            <div className="cherry-settings-row-label">立即备份</div>
+            <div className="cherry-settings-row-label">备份恢复 Pack</div>
             <div className="cherry-settings-row-desc">
-              会打包 ledger.db 与记忆索引到 data/backups/ 目录。
-              {msg && (
-                <div style={{ marginTop: 4, color: msg.includes("失败") ? "#ef4444" : "var(--yunque-accent)" }}>{msg}</div>
-              )}
+              备份能力属于可选增量包。主设置只显示状态和入口，导入、导出、回滚由 Pack Runtime 页面承载。
+              <div style={{ marginTop: 4, color: backupPackStatus === "enabled" ? "var(--yunque-accent)" : "var(--yunque-text-muted)" }}>
+                当前状态：{backupPackStatus === "loading" ? "检查中…" : backupPackStatus === "enabled" ? "已启用" : backupPackStatus === "disabled" ? "已安装但未启用" : "未安装"}
+              </div>
             </div>
           </div>
           <div className="cherry-settings-row-control">
-            <button type="button" className="cherry-btn primary" onClick={runBackup} disabled={backing}>
-              {backing ? "备份中…" : "开始备份"}
+            <button type="button" className="cherry-btn primary" onClick={() => router.push(backupPackStatus === "missing" ? "/packs" : "/packs/backup")}>
+              {backupPackStatus === "missing" ? "安装 Pack" : "打开备份 Pack"}
             </button>
           </div>
         </div>
