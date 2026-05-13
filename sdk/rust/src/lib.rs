@@ -1410,6 +1410,7 @@ pub struct AgentKit {
     pub system: SystemClient,
     pub auth: AuthClient,
     pub tasks: TasksClient,
+    pub documents: DocumentsClient,
     pub bots: BotsClient,
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
@@ -1490,6 +1491,7 @@ impl AgentKit {
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
             tasks: TasksClient::new(base_url.clone(), token.as_ref())?,
+            documents: DocumentsClient::new(base_url.clone(), token.as_ref())?,
             bots: BotsClient::new(base_url.clone(), token.as_ref())?,
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
@@ -1566,6 +1568,7 @@ impl AgentKit {
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tasks: TasksClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            documents: DocumentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             bots: BotsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5480,6 +5483,57 @@ pub struct UpdateTaskThreadStateRequest {
 }
 
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DocumentGenerateRequest {
+    pub format: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub sheet_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DocumentGenerateResponse {
+    #[serde(default)]
+    pub result: String,
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub format: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DocumentTemplatesResponse {
+    #[serde(default)]
+    pub templates: Vec<serde_json::Value>,
+}
+
+/// Lightweight Documents SDK client for template listing and document generation.
+#[derive(Debug, Clone)]
+pub struct DocumentsClient { base_url: String, http: reqwest::Client }
+
+impl DocumentsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn templates(&self) -> Result<DocumentTemplatesResponse, reqwest::Error> { self.get_json("/v1/documents/templates").await }
+    pub async fn generate(&self, request: &DocumentGenerateRequest) -> Result<DocumentGenerateResponse, reqwest::Error> { self.post_json("/v1/documents/generate", request).await }
+    pub async fn generate_docx(&self, content: impl Into<String>, path: impl Into<String>, title: impl Into<String>) -> Result<DocumentGenerateResponse, reqwest::Error> { self.generate(&DocumentGenerateRequest { format: "docx".to_string(), content: content.into(), path: path.into(), title: title.into(), ..Default::default() }).await }
+    pub async fn generate_xlsx(&self, content: impl Into<String>, path: impl Into<String>, title: impl Into<String>, sheet_name: impl Into<String>) -> Result<DocumentGenerateResponse, reqwest::Error> { self.generate(&DocumentGenerateRequest { format: "xlsx".to_string(), content: content.into(), path: path.into(), title: title.into(), sheet_name: sheet_name.into() }).await }
+    pub async fn generate_pptx(&self, content: impl Into<String>, path: impl Into<String>, title: impl Into<String>) -> Result<DocumentGenerateResponse, reqwest::Error> { self.generate(&DocumentGenerateRequest { format: "pptx".to_string(), content: content.into(), path: path.into(), title: title.into(), ..Default::default() }).await }
+    pub async fn generate_html(&self, content: impl Into<String>, path: impl Into<String>, title: impl Into<String>) -> Result<DocumentGenerateResponse, reqwest::Error> { self.generate(&DocumentGenerateRequest { format: "html".to_string(), content: content.into(), path: path.into(), title: title.into(), ..Default::default() }).await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct BotsResponse {
     #[serde(default)]
@@ -9348,6 +9402,17 @@ mod tests {
         assert_eq!(payload["scenario_id"], "open-page");
     }
 
+
+
+    #[test]
+    fn documents_helpers_build_urls_and_payloads() {
+        let client = DocumentsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/documents/templates"), "http://localhost:9090/v1/documents/templates");
+        let req = DocumentGenerateRequest { format: "docx".to_string(), content: "hello".to_string(), path: "out.docx".to_string(), title: "Report".to_string(), ..Default::default() };
+        assert_eq!(req.format, "docx");
+        let templates = DocumentTemplatesResponse { templates: vec![serde_json::json!({"id":"brief"})] };
+        assert_eq!(templates.templates[0]["id"], "brief");
+    }
 
     #[test]
     fn bots_helpers_build_urls_and_payloads() {

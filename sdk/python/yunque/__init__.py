@@ -2848,6 +2848,42 @@ state = _StateNamespace()
 
 
 
+# ── Document Generation ──
+
+class _DocumentsNamespace:
+    """Lightweight helpers for document template listing and DOCX/XLSX/PPTX/HTML generation."""
+
+    def templates(self) -> dict:
+        """List document generation templates."""
+        return _api_call("GET", "/v1/documents/templates")
+
+    def generate(self, format: str, content: str, *, path: str = "", title: str = "", sheet_name: str = "") -> dict:
+        """Generate a document in the requested format."""
+        body = {"format": format, "content": content}
+        if path:
+            body["path"] = path
+        if title:
+            body["title"] = title
+        if sheet_name:
+            body["sheet_name"] = sheet_name
+        return _api_call("POST", "/v1/documents/generate", body)
+
+    def generate_docx(self, content: str, *, path: str = "", title: str = "") -> dict:
+        return self.generate("docx", content, path=path, title=title)
+
+    def generate_xlsx(self, content: str, *, path: str = "", title: str = "", sheet_name: str = "") -> dict:
+        return self.generate("xlsx", content, path=path, title=title, sheet_name=sheet_name)
+
+    def generate_pptx(self, content: str, *, path: str = "", title: str = "") -> dict:
+        return self.generate("pptx", content, path=path, title=title)
+
+    def generate_html(self, content: str, *, path: str = "", title: str = "") -> dict:
+        return self.generate("html", content, path=path, title=title)
+
+
+documents = _DocumentsNamespace()
+
+
 # ── Bots and Inbox ──
 
 class _BotsNamespace:
@@ -2987,6 +3023,7 @@ class AgentKit:
         self.system = system
         self.auth = auth
         self.tasks = tasks
+        self.documents = documents
         self.bots = bots
         self.task_templates = task_templates
         self.task_gaps = task_gaps

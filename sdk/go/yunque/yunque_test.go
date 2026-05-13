@@ -3868,3 +3868,32 @@ func TestBotsNamespaceManagesBotsInboxAndChannels(t *testing.T) {
 	if NewAgentKit().Bots != Bots { t.Fatalf("agent kit should expose Bots namespace") }
 	if len(seen) != 11 { t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen) }
 }
+
+
+func TestDocumentsNamespaceGeneratesArtifacts(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/documents/templates":
+			_, _ = w.Write([]byte(`{"templates":[{"id":"brief","format":"docx"}]}`))
+		case "/v1/documents/generate":
+			var body DocumentGenerateRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Content == "" || body.Format == "" { t.Fatalf("unexpected document body: %+v", body) }
+			_, _ = w.Write([]byte(`{"result":"ok","path":"out.`+body.Format+`","format":"`+body.Format+`"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	templates, err := Documents.Templates(ctx); if err != nil { t.Fatal(err) }
+	docx, err := Documents.GenerateDocx(ctx, "hello", "out.docx", "Report"); if err != nil { t.Fatal(err) }
+	xlsx, err := Documents.GenerateXlsx(ctx, "a,b", "out.xlsx", "Sheet", "Data"); if err != nil { t.Fatal(err) }
+	pptx, err := Documents.GeneratePptx(ctx, "slides", "out.pptx", "Deck"); if err != nil { t.Fatal(err) }
+	html, err := Documents.GenerateHtml(ctx, "<p>hi</p>", "out.html", "HTML"); if err != nil { t.Fatal(err) }
+	if templates.Templates[0]["id"] != "brief" || docx.Format != "docx" || xlsx.Format != "xlsx" || pptx.Format != "pptx" || html.Format != "html" { t.Fatalf("unexpected document results") }
+	if NewAgentKit().Documents != Documents { t.Fatalf("agent kit should expose Documents namespace") }
+	if len(seen) != 5 { t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen) }
+}

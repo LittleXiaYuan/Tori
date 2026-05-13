@@ -45,6 +45,7 @@
     "permissions-facade",
     "auth-bootstrap",
     "tasks-runtime",
+    "document-generation",
     "bots-inbox",
     "proactive-reverie",
     "chat-runtime",
@@ -246,6 +247,10 @@
       "description": "Access the lightweight Tasks client or namespace for task CRUD and lifecycle operations."
     },
     {
+      "name": "documents",
+      "description": "Access the lightweight Documents client or namespace for template listing and DOCX/XLSX/PPTX/HTML generation."
+    },
+    {
       "name": "bots",
       "description": "Access the lightweight Bots and Inbox client or namespace for bot CRUD, inbox operations, and channel group reads."
     },
@@ -353,7 +358,8 @@
         "planner": "AgentKit.planner",
         "ide": "AgentKit.ide",
         "discovery": "createAgentKit().discovery",
-        "bots": "createAgentKit().bots"
+        "bots": "createAgentKit().bots",
+        "documents": "createAgentKit().documents"
       }
     },
     "go": {
@@ -422,7 +428,8 @@
         "planner": "AgentKit.Planner",
         "ide": "AgentKit.IDE",
         "discovery": "NewAgentKit().Discovery",
-        "bots": "yunque.NewAgentKit().Bots"
+        "bots": "yunque.NewAgentKit().Bots",
+        "documents": "yunque.NewAgentKit().Documents"
       }
     },
     "python": {
@@ -491,7 +498,8 @@
         "planner": "AgentKit.planner",
         "ide": "AgentKit.ide",
         "discovery": "create_agent_kit().discovery",
-        "bots": "yunque.create_agent_kit().bots"
+        "bots": "yunque.create_agent_kit().bots",
+        "documents": "yunque.create_agent_kit().documents"
       }
     },
     "rust": {
@@ -560,7 +568,8 @@
         "planner": "AgentKit::planner",
         "ide": "AgentKit::ide",
         "discovery": "AgentKit::discovery",
-        "bots": "AgentKit::bots"
+        "bots": "AgentKit::bots",
+        "documents": "AgentKit::documents"
       }
     }
   },

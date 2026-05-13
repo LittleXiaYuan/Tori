@@ -1064,6 +1064,7 @@ type AgentKit struct {
 	System        *systemNamespace
 	Auth          *authNamespace
 	Tasks         *tasksNamespace
+	Documents     *documentsNamespace
 	Bots          *botsNamespace
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
@@ -5748,6 +5749,63 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 }
 
 
+
+// ── Document Generation ──
+
+// Documents provides focused access to document template listing and generation helpers.
+var Documents = &documentsNamespace{}
+
+type documentsNamespace struct{}
+
+type DocumentGenerateRequest struct {
+	Format    string `json:"format"`
+	Content   string `json:"content"`
+	Path      string `json:"path,omitempty"`
+	Title     string `json:"title,omitempty"`
+	SheetName string `json:"sheet_name,omitempty"`
+}
+
+type DocumentGenerateResponse struct {
+	Result string `json:"result,omitempty"`
+	Path   string `json:"path"`
+	Format string `json:"format"`
+}
+
+type DocumentTemplate map[string]any
+
+type DocumentTemplatesResponse struct {
+	Templates []DocumentTemplate `json:"templates"`
+}
+
+func (d *documentsNamespace) Templates(ctx context.Context) (DocumentTemplatesResponse, error) {
+	var out DocumentTemplatesResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/documents/templates", nil, &out); err != nil { return DocumentTemplatesResponse{}, err }
+	if out.Templates == nil { out.Templates = []DocumentTemplate{} }
+	return out, nil
+}
+
+func (d *documentsNamespace) Generate(ctx context.Context, req DocumentGenerateRequest) (DocumentGenerateResponse, error) {
+	var out DocumentGenerateResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/documents/generate", req, &out); err != nil { return DocumentGenerateResponse{}, err }
+	return out, nil
+}
+
+func (d *documentsNamespace) GenerateDocx(ctx context.Context, content, path, title string) (DocumentGenerateResponse, error) {
+	return d.Generate(ctx, DocumentGenerateRequest{Format: "docx", Content: content, Path: path, Title: title})
+}
+
+func (d *documentsNamespace) GenerateXlsx(ctx context.Context, content, path, title, sheetName string) (DocumentGenerateResponse, error) {
+	return d.Generate(ctx, DocumentGenerateRequest{Format: "xlsx", Content: content, Path: path, Title: title, SheetName: sheetName})
+}
+
+func (d *documentsNamespace) GeneratePptx(ctx context.Context, content, path, title string) (DocumentGenerateResponse, error) {
+	return d.Generate(ctx, DocumentGenerateRequest{Format: "pptx", Content: content, Path: path, Title: title})
+}
+
+func (d *documentsNamespace) GenerateHtml(ctx context.Context, content, path, title string) (DocumentGenerateResponse, error) {
+	return d.Generate(ctx, DocumentGenerateRequest{Format: "html", Content: content, Path: path, Title: title})
+}
+
 // ── Bots and Inbox ──
 
 // Bots provides focused access to bot management, inbox operations, and channel groups.
@@ -5943,6 +6001,7 @@ func NewAgentKit() AgentKit {
 		System:        System,
 		Auth:          Auth,
 		Tasks:         Tasks,
+		Documents:     Documents,
 		Bots:          Bots,
 		Reverie:       Reverie,
 		Realtime:      Realtime,

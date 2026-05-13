@@ -2331,3 +2331,6 @@ The lightweight Persona SDK now also exposes persona mode listing, current-mode 
 ### Bots SDK
 
 The lightweight Bots SDK exposes bot management, inbox operations, and channel group discovery for external bot admin pages, plugin UIs, CLIs, sidecars, front-end pages, and automation scripts without importing the full platform client. It maps directly to `GET/POST /v1/bots`, `GET/PUT/DELETE /v1/bots/detail`, `GET/POST/DELETE /v1/inbox`, `POST /v1/inbox/read`, and `GET /v1/channels/groups`; Agent Kit also exposes this surface as `kit.bots` / `kit.Bots`.
+### Documents SDK
+
+The lightweight Documents SDK exposes document generation templates and DOCX/XLSX/PPTX/HTML generation helpers for external authoring pages, plugin UIs, CLIs, sidecars, front-end pages, and automation scripts without importing the full platform client. It maps directly to `GET /v1/documents/templates` and `POST /v1/documents/generate`; Agent Kit also exposes this surface as `kit.documents` / `kit.Documents`.
