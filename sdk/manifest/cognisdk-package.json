@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "domain": "cognisdk-package",
+  "description": "Local experimental Cognition SDK package and CLI surfaces for declarative Cogni Pack bundles, feedback proposals, schemas, review gates, and rollback-friendly automation.",
+  "principles": [
+    "Expose cognition state and pack bundle capabilities as a small Go SDK instead of platform-only internals.",
+    "Keep bundle review, golden tests, schema export, and promote flows non-mutating until a caller explicitly writes files.",
+    "Make package and CLI entrypoints directly usable by external projects, frontends, plugins, CI, and automation scripts."
+  ],
+  "goPackage": {
+    "importPath": "yunque-agent/pkg/cognisdk",
+    "implementationFiles": [
+      "pkg/cognisdk/types.go",
+      "pkg/cognisdk/engine.go",
+      "pkg/cognisdk/host.go",
+      "pkg/cognisdk/feedback.go",
+      "pkg/cognisdk/feedback_render.go",
+      "pkg/cognisdk/pack.go",
+      "pkg/cognisdk/pack_io.go",
+      "pkg/cognisdk/pack_bundle.go",
+      "pkg/cognisdk/pack_diff.go",
+      "pkg/cognisdk/pack_review.go",
+      "pkg/cognisdk/golden.go",
+      "pkg/cognisdk/schema.go"
+    ]
+  },
+  "capabilities": [
+    {
+      "name": "evaluate",
+      "symbols": [
+        "NewEngine",
+        "Evaluate",
+        "RenderMarkdown"
+      ]
+    },
+    {
+      "name": "hostAdapter",
+      "symbols": [
+        "NewHostAdapter",
+        "NewHostAdapterFromDir",
+        "NewHostAdapterFromBundle",
+        "BuildContext"
+      ]
+    },
+    {
+      "name": "feedbackProposal",
+      "symbols": [
+        "AuditFeedback",
+        "BuildFeedbackProposal",
+        "ProposeUpdates",
+        "RenderFeedbackProposalMarkdown"
+      ]
+    },
+    {
+      "name": "packManager",
+      "symbols": [
+        "NewPackManager",
+        "List",
+        "Enable",
+        "Disable",
+        "Merge",
+        "ValidatePack"
+      ]
+    },
+    {
+      "name": "packIO",
+      "symbols": [
+        "LoadPackManifest",
+        "LoadPacksFromDir",
+        "SavePackManifest",
+        "NewPackManagerFromDir"
+      ]
+    },
+    {
+      "name": "packBundle",
+      "symbols": [
+        "PackBundle",
+        "NewPackBundle",
+        "ExportBundle",
+        "LoadPackBundle",
+        "SavePackBundle",
+        "NewPackManagerFromBundle"
+      ]
+    },
+    {
+      "name": "packBundleDiff",
+      "symbols": [
+        "PackBundleDiff",
+        "DiffPackBundles",
+        "RenderPackBundleDiffMarkdown"
+      ]
+    },
+    {
+      "name": "packBundleReview",
+      "symbols": [
+        "PackBundleReview",
+        "ReviewPackBundleCandidate",
+        "RenderPackBundleReviewMarkdown"
+      ]
+    },
+    {
+      "name": "goldenGate",
+      "symbols": [
+        "RunGoldenTests",
+        "RunPackBundleGoldenTests",
+        "RenderGoldenTestSummaryMarkdown"
+      ]
+    },
+    {
+      "name": "jsonSchemas",
+      "symbols": [
+        "PackManifestJSONSchema",
+        "PackBundleJSONSchema",
+        "PackBundleDiffJSONSchema",
+        "PackBundleReviewJSONSchema",
+        "FeedbackProposalJSONSchema",
+        "JSONSchemaByName"
+      ]
+    }
+  ],
+  "cli": [
+    {
+      "name": "cognisdk-schema",
+      "file": "cmd/cognisdk-schema/main.go",
+      "commands": [
+        "list"
+      ],
+      "schemas": [
+        "pack-manifest",
+        "pack-bundle",
+        "pack-bundle-diff",
+        "pack-bundle-review",
+        "feedback-proposal"
+      ]
+    },
+    {
+      "name": "cognisdk-bundle",
+      "file": "cmd/cognisdk-bundle/main.go",
+      "commands": [
+        "init",
+        "diff",
+        "golden",
+        "review",
+        "promote"
+      ]
+    }
+  ],
+  "tests": [
+    "pkg/cognisdk/example_external_test.go",
+    "pkg/cognisdk/feedback_test.go",
+    "pkg/cognisdk/pack_bundle_test.go",
+    "pkg/cognisdk/pack_diff_test.go",
+    "pkg/cognisdk/pack_review_test.go",
+    "pkg/cognisdk/schema_test.go",
+    "cmd/cognisdk-schema/main_test.go",
+    "cmd/cognisdk-bundle/main_test.go"
+  ],
+  "docs": [
+    "docs/guide/cognisdk-feedback.md",
+    "docs/zh/guide/cognisdk-feedback.md"
+  ]
+}
