@@ -48,6 +48,7 @@ const chineseGuide = readText("docs/zh/guide/pack-runtime.md");
 const docsConfig = readText("docs/.vitepress/config.ts");
 const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
+const completionCheck = readText("scripts/check-pack-runtime-completion.mjs");
 for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
@@ -74,9 +75,18 @@ for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/pac
 for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
   if (!scaffoldCheck.includes(token)) fail(`check-pack-scaffold.mjs missing token: ${token}`);
 }
+for (const token of ["Pack Runtime completion audit", "RegisterBackendPack", "frontendSync()", "PruneArtifacts", "TypeScript packs SDK", "backup-pack 示例包"]) {
+  if (!completionCheck.includes(token)) fail(`check-pack-runtime-completion.mjs missing token: ${token}`);
+}
 const scaffoldCheckResult = spawnSync(process.execPath, ["scripts/check-pack-scaffold.mjs"], { cwd: repoRoot, encoding: "utf8" });
 if (scaffoldCheckResult.status !== 0) {
   fail(`check-pack-scaffold.mjs failed: ${scaffoldCheckResult.stderr || scaffoldCheckResult.stdout}`);
+}
+if (!process.env.PACK_COMPLETION_AUDIT_CHILD) {
+  const completionCheckResult = spawnSync(process.execPath, ["scripts/check-pack-runtime-completion.mjs"], { cwd: repoRoot, encoding: "utf8", env: { ...process.env, PACK_COMPLETION_AUDIT_CHILD: "1" } });
+  if (completionCheckResult.status !== 0) {
+    fail(`check-pack-runtime-completion.mjs failed: ${completionCheckResult.stderr || completionCheckResult.stdout}`);
+  }
 }
 
 if (!docsConfig.includes("/guide/pack-runtime") || !docsConfig.includes("/zh/guide/pack-runtime")) {
