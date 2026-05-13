@@ -1043,6 +1043,7 @@ type AgentKit struct {
 	Runtime       *runtimeNamespace
 	Subagents     *subagentsNamespace
 	Tools         *toolsNamespace
+	Sandbox       *sandboxNamespace
 	Audit         *auditNamespace
 	Trust         *trustNamespace
 	Iterate       *iterateNamespace
@@ -5752,6 +5753,53 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 
 
 
+
+// ── Sandbox Runtime ──
+
+// Sandbox provides focused access to sandbox command execution and desktop lifecycle helpers.
+var Sandbox = &sandboxNamespace{}
+
+type sandboxNamespace struct{}
+
+type SandboxExecRequest struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args,omitempty"`
+}
+
+type SandboxExecResponse map[string]any
+type SandboxProbeResponse map[string]any
+type DesktopSandboxResponse map[string]any
+
+func (s *sandboxNamespace) Exec(ctx context.Context, req SandboxExecRequest) (SandboxExecResponse, error) {
+	var out SandboxExecResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/exec", req, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (s *sandboxNamespace) Probe(ctx context.Context) (SandboxProbeResponse, error) {
+	var out SandboxProbeResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/probe", nil, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (s *sandboxNamespace) CreateDesktop(ctx context.Context) (DesktopSandboxResponse, error) {
+	var out DesktopSandboxResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop", map[string]any{}, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (s *sandboxNamespace) DesktopStatus(ctx context.Context) (DesktopSandboxResponse, error) {
+	var out DesktopSandboxResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/sandbox/desktop/status", nil, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
+func (s *sandboxNamespace) DestroyDesktop(ctx context.Context) (DesktopSandboxResponse, error) {
+	var out DesktopSandboxResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/sandbox/desktop/destroy", map[string]any{}, &out); err != nil { return nil, err }
+	return nonNilMap(out), nil
+}
+
 // ── WebChat Embed ──
 
 // WebChat provides focused access to embeddable WebChat widget helpers.
@@ -6023,6 +6071,7 @@ func NewAgentKit() AgentKit {
 		Runtime:       Runtime,
 		Subagents:     Subagents,
 		Tools:         Tools,
+		Sandbox:       Sandbox,
 		Audit:         Audit,
 		Trust:         Trust,
 		Iterate:       Iterate,

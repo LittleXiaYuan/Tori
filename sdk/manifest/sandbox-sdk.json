@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "domain": "sandbox-runtime",
+  "description": "Cross-language lightweight SDK entrypoints for sandbox command execution, cloud readiness probes, and desktop sandbox lifecycle without importing the full platform client.",
+  "principles": [
+    "Expose sandbox runtime operations as a focused SDK slice for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep privileged exec and desktop lifecycle calls explicit while preserving direct probe helpers for setup and health checks.",
+    "Make Sandbox access available through Agent Kit so automation scripts can compose tools, runtime, files, and sandbox helpers from one lightweight bundle."
+  ],
+  "routes": [
+    "POST /v1/sandbox/exec",
+    "GET /v1/sandbox/probe",
+    "POST /v1/sandbox/desktop",
+    "GET /v1/sandbox/desktop/status",
+    "POST /v1/sandbox/desktop/destroy",
+    "DELETE /v1/sandbox/desktop/destroy"
+  ],
+  "capabilities": [
+    {
+      "name": "exec",
+      "route": "POST /v1/sandbox/exec",
+      "readOnly": false,
+      "description": "Execute a command in the configured sandbox runtime."
+    },
+    {
+      "name": "probe",
+      "route": "GET /v1/sandbox/probe",
+      "readOnly": true,
+      "description": "Probe sandbox cloud and desktop readiness."
+    },
+    {
+      "name": "createDesktop",
+      "route": "POST /v1/sandbox/desktop",
+      "readOnly": false,
+      "description": "Create a desktop sandbox."
+    },
+    {
+      "name": "desktopStatus",
+      "route": "GET /v1/sandbox/desktop/status",
+      "readOnly": true,
+      "description": "Read desktop sandbox status."
+    },
+    {
+      "name": "destroyDesktop",
+      "route": "POST /v1/sandbox/desktop/destroy",
+      "readOnly": false,
+      "description": "Destroy the active desktop sandbox."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/sandbox.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "exec": "createSandboxClient().exec",
+        "probe": "createSandboxClient().probe",
+        "createDesktop": "createSandboxClient().createDesktop",
+        "desktopStatus": "createSandboxClient().desktopStatus",
+        "destroyDesktop": "createSandboxClient().destroyDesktop"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "exec": "yunque.Sandbox.Exec",
+        "probe": "yunque.Sandbox.Probe",
+        "createDesktop": "yunque.Sandbox.CreateDesktop",
+        "desktopStatus": "yunque.Sandbox.DesktopStatus",
+        "destroyDesktop": "yunque.Sandbox.DestroyDesktop"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "exec": "yunque.sandbox.exec",
+        "probe": "yunque.sandbox.probe",
+        "createDesktop": "yunque.sandbox.create_desktop",
+        "desktopStatus": "yunque.sandbox.desktop_status",
+        "destroyDesktop": "yunque.sandbox.destroy_desktop"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "exec": "SandboxClient::exec",
+        "probe": "SandboxClient::probe",
+        "createDesktop": "SandboxClient::create_desktop",
+        "desktopStatus": "SandboxClient::desktop_status",
+        "destroyDesktop": "SandboxClient::destroy_desktop"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

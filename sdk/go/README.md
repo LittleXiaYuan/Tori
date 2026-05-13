@@ -466,3 +466,6 @@ The lightweight Documents SDK exposes document generation templates and DOCX/XLS
 ### WebChat SDK
 
 The lightweight WebChat SDK exposes embeddable widget helpers (`widgetUrl`, `widgetScript`, `embedSnippet`) for external websites, front-end pages, plugin UIs, sidecars, and automation scripts without importing the full platform client. It maps to public `GET /v1/webchat/widget.js` plus local snippet generation; Agent Kit also exposes this surface as `kit.webchat` / `kit.WebChat`.
+### Sandbox SDK
+
+The lightweight Sandbox SDK exposes sandbox runtime helpers (`exec`, `probe`, `createDesktop`, `desktopStatus`, `destroyDesktop`) for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/sandbox/exec`, `/v1/sandbox/probe`, `/v1/sandbox/desktop`, `/v1/sandbox/desktop/status`, and `/v1/sandbox/desktop/destroy`; Agent Kit also exposes this surface as `kit.sandbox` / `kit.Sandbox`.

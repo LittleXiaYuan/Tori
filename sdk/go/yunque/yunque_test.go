@@ -3914,3 +3914,38 @@ func TestWebChatNamespaceBuildsWidgetHelpers(t *testing.T) {
 	if _, err := WebChat.EmbedSnippet(WebChatEmbedOptions{}); err == nil { t.Fatalf("expected missing APIKey error") }
 	if NewAgentKit().WebChat != WebChat { t.Fatalf("agent kit should expose WebChat namespace") }
 }
+
+
+func TestSandboxNamespaceManagesRuntime(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/sandbox/exec":
+			var body SandboxExecRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.Command != "python" || body.Args[0] != "-V" { t.Fatalf("unexpected sandbox exec body: %+v", body) }
+			_, _ = w.Write([]byte(`{"stdout":"ok","exit_code":0}`))
+		case "/v1/sandbox/probe":
+			_, _ = w.Write([]byte(`{"cloud_runner_ready":true}`))
+		case "/v1/sandbox/desktop":
+			_, _ = w.Write([]byte(`{"ok":true,"sandbox":{"id":"desk-1"}}`))
+		case "/v1/sandbox/desktop/status":
+			_, _ = w.Write([]byte(`{"ok":true,"running":true}`))
+		case "/v1/sandbox/desktop/destroy":
+			_, _ = w.Write([]byte(`{"ok":true,"message":"destroyed"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+	ctx := context.Background()
+	exec, err := Sandbox.Exec(ctx, SandboxExecRequest{Command: "python", Args: []string{"-V"}}); if err != nil { t.Fatal(err) }
+	probe, err := Sandbox.Probe(ctx); if err != nil { t.Fatal(err) }
+	created, err := Sandbox.CreateDesktop(ctx); if err != nil { t.Fatal(err) }
+	status, err := Sandbox.DesktopStatus(ctx); if err != nil { t.Fatal(err) }
+	destroyed, err := Sandbox.DestroyDesktop(ctx); if err != nil { t.Fatal(err) }
+	if exec["stdout"] != "ok" || probe["cloud_runner_ready"] != true || created["ok"] != true || status["running"] != true || destroyed["message"] != "destroyed" { t.Fatalf("unexpected sandbox results") }
+	if NewAgentKit().Sandbox != Sandbox { t.Fatalf("agent kit should expose Sandbox namespace") }
+	if len(seen) != 5 { t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen) }
+}

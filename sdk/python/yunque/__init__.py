@@ -2848,6 +2848,40 @@ state = _StateNamespace()
 
 
 
+# ── Sandbox Runtime ──
+
+class _SandboxNamespace:
+    """Lightweight helpers for sandbox command execution and desktop sandbox lifecycle."""
+
+    def exec(self, command: str, args: Optional[list[str]] = None) -> dict:
+        """Execute a command in the configured sandbox runtime."""
+        body = {"command": command}
+        if args is not None:
+            body["args"] = args
+        return _api_call("POST", "/v1/sandbox/exec", body)
+
+    def probe(self) -> dict:
+        """Probe sandbox cloud and desktop readiness."""
+        return _api_call("GET", "/v1/sandbox/probe")
+
+    def create_desktop(self) -> dict:
+        """Create a desktop sandbox."""
+        return _api_call("POST", "/v1/sandbox/desktop", {})
+
+    def desktop_status(self) -> dict:
+        """Read desktop sandbox status."""
+        return _api_call("GET", "/v1/sandbox/desktop/status")
+
+    def destroy_desktop(self, method: str = "POST") -> dict:
+        """Destroy the active desktop sandbox."""
+        if method.upper() not in {"POST", "DELETE"}:
+            raise ValueError("destroy_desktop method must be POST or DELETE")
+        return _api_call(method.upper(), "/v1/sandbox/desktop/destroy", {})
+
+
+sandbox = _SandboxNamespace()
+
+
 # ── WebChat Embed ──
 
 class _WebChatNamespace:
@@ -3059,6 +3093,7 @@ class AgentKit:
         self.runtime = runtime
         self.subagents = subagents
         self.tools = tools
+        self.sandbox = sandbox
         self.audit = audit
         self.trust = trust
         self.iterate = iterate
