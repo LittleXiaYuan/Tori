@@ -52,6 +52,15 @@ func (a *HostAdapter) Evaluate(ctx context.Context, input Input) Result {
 	return a.engine.Evaluate(ctx, input)
 }
 
+// ProposeUpdates converts audit feedback into non-mutating belief update
+// proposals through the underlying engine.
+func (a *HostAdapter) ProposeUpdates(ctx context.Context, result Result, feedback AuditFeedback) FeedbackProposal {
+	if a == nil || a.engine == nil {
+		return BuildFeedbackProposal(result, feedback)
+	}
+	return a.engine.ProposeUpdates(ctx, result, feedback)
+}
+
 // PackManager exposes the runtime pack manager.
 func (a *HostAdapter) PackManager() *PackManager {
 	if a == nil || a.engine == nil {
