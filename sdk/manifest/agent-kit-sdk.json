@@ -25,6 +25,7 @@
     "skill-market",
     "skillhub-incremental-packages",
     "plugins-management",
+    "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
     "conversation-fork",
@@ -138,6 +139,10 @@
     {
       "name": "plugins",
       "description": "Access the lightweight Plugins management client or namespace for plugin catalog, lifecycle, file editing, UI tabs, reload, and open-folder helpers."
+    },
+    {
+      "name": "skills",
+      "description": "Access the lightweight Runtime Skills client or namespace for skill catalog, scan, dynamic skill review, and session suggestions."
     },
     {
       "name": "dispatch",
@@ -389,7 +394,8 @@
         "sandbox": "createAgentKit().sandbox",
         "router": "createAgentKit().router",
         "skillhub": "createAgentKit().skillhub",
-        "plugins": "createAgentKit().plugins"
+        "plugins": "createAgentKit().plugins",
+        "skills": "createAgentKit().skills"
       }
     },
     "go": {
@@ -464,7 +470,8 @@
         "sandbox": "yunque.NewAgentKit().Sandbox",
         "router": "yunque.NewAgentKit().Router",
         "skillhub": "yunque.NewAgentKit().SkillHub",
-        "plugins": "yunque.NewAgentKit().Plugins"
+        "plugins": "yunque.NewAgentKit().Plugins",
+        "skills": "yunque.NewAgentKit().Skills"
       }
     },
     "python": {
@@ -539,7 +546,8 @@
         "sandbox": "yunque.create_agent_kit().sandbox",
         "router": "yunque.create_agent_kit().router",
         "skillhub": "yunque.create_agent_kit().skillhub",
-        "plugins": "yunque.create_agent_kit().plugins"
+        "plugins": "yunque.create_agent_kit().plugins",
+        "skills": "yunque.create_agent_kit().skills"
       }
     },
     "rust": {
@@ -614,7 +622,8 @@
         "sandbox": "AgentKit::sandbox",
         "router": "AgentKit::router",
         "skillhub": "AgentKit::skillhub",
-        "plugins": "AgentKit::plugins"
+        "plugins": "AgentKit::plugins",
+        "skills": "AgentKit::skills"
       }
     }
   },

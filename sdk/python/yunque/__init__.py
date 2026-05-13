@@ -3097,6 +3097,38 @@ class _PluginsNamespace:
 
 plugins = _PluginsNamespace()
 
+
+# ── Runtime Skills (/v1/skills) ──
+
+class _SkillsNamespace:
+    """Lightweight helpers for runtime skills catalog, scan, dynamic review, and suggestions."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/skills")
+
+    def scan(self) -> dict:
+        return _api_call("POST", "/v1/skills/scan")
+
+    def dynamic(self) -> dict:
+        return _api_call("GET", "/v1/skills/dynamic")
+
+    def approve(self, name: str, instruction: str = "") -> dict:
+        body = {"name": name}
+        if instruction:
+            body["instruction"] = instruction
+        return _api_call("POST", "/v1/skills/approve", body)
+
+    def reject(self, name: str) -> dict:
+        return _api_call("POST", "/v1/skills/reject", {"name": name})
+
+    def suggestions(self, session_id: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'session_id': session_id})}" if session_id else ""
+        return _api_call("GET", f"/v1/skill-suggestions{suffix}")
+
+
+skills = _SkillsNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3209,6 +3241,7 @@ class AgentKit:
         self.market = market
         self.skillhub = skillhub
         self.plugins = plugins
+        self.skills = skills
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork

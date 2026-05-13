@@ -1379,6 +1379,7 @@ pub struct AgentKit {
     pub market: SkillMarketClient,
     pub skillhub: SkillHubClient,
     pub plugins: PluginsClient,
+    pub skills: SkillsClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1465,6 +1466,7 @@ impl AgentKit {
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             skillhub: SkillHubClient::new(base_url.clone(), token.as_ref())?,
             plugins: PluginsClient::new(base_url.clone(), token.as_ref())?,
+            skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1541,6 +1543,7 @@ impl AgentKit {
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skillhub: SkillHubClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugins: PluginsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -7924,6 +7927,53 @@ pub struct SkillMarketTopOptions {
 pub type SkillMarketStatsResponse = serde_json::Map<String, serde_json::Value>;
 
 
+
+/// Lightweight Skills SDK client for runtime skill catalog, dynamic review, scan, and suggestions.
+#[derive(Debug, Clone)]
+pub struct SkillsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+pub type SkillsResponse = serde_json::Value;
+
+impl SkillsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        if !token.is_empty() {
+            let value = format!("Bearer {}", token);
+            if let Ok(header) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, header);
+            }
+        }
+        let http = reqwest::Client::builder().default_headers(headers).build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { base_url: base_url.into().trim_end_matches('/').to_string(), http }
+    }
+
+    fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    async fn get(&self, path: &str) -> Result<SkillsResponse, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post(&self, path: &str, body: serde_json::Value) -> Result<SkillsResponse, reqwest::Error> { self.http.post(self.url(path)).json(&body).send().await?.error_for_status()?.json().await }
+
+    pub async fn list(&self) -> Result<SkillsResponse, reqwest::Error> { self.get("/v1/skills").await }
+    pub async fn scan(&self) -> Result<SkillsResponse, reqwest::Error> { self.http.post(self.url("/v1/skills/scan")).send().await?.error_for_status()?.json().await }
+    pub async fn dynamic(&self) -> Result<SkillsResponse, reqwest::Error> { self.get("/v1/skills/dynamic").await }
+    pub async fn approve(&self, name: &str, instruction: Option<&str>) -> Result<SkillsResponse, reqwest::Error> {
+        let mut body = serde_json::json!({ "name": name });
+        if let Some(instruction) = instruction { if !instruction.is_empty() { body["instruction"] = serde_json::json!(instruction); } }
+        self.post("/v1/skills/approve", body).await
+    }
+    pub async fn reject(&self, name: &str) -> Result<SkillsResponse, reqwest::Error> { self.post("/v1/skills/reject", serde_json::json!({ "name": name })).await }
+    pub async fn suggestions(&self, session_id: Option<&str>) -> Result<SkillsResponse, reqwest::Error> {
+        let path = match session_id { Some(session_id) if !session_id.is_empty() => format!("/v1/skill-suggestions?session_id={}", url_encode_query_component(session_id)), _ => "/v1/skill-suggestions".to_string() };
+        self.get(&path).await
+    }
+}
+
 /// Lightweight Plugins SDK client for plugin catalog, lifecycle, file editing, UI, and reload.
 #[derive(Debug, Clone)]
 pub struct PluginsClient {
@@ -11096,6 +11146,13 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn skills_helpers_build_urls_and_queries() {
+        let client = SkillsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/skills"), "http://localhost:9090/v1/skills");
+        assert_eq!(client.url(&format!("/v1/skill-suggestions?session_id={}", url_encode_query_component("session one"))), "http://localhost:9090/v1/skill-suggestions?session_id=session+one");
+    }
 
     #[test]
     fn plugins_helpers_build_urls_and_queries() {

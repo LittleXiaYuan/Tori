@@ -401,6 +401,71 @@ func (p *pluginsNamespace) OpenFolder(ctx context.Context, name string) (Plugins
 	return out, nil
 }
 
+// ── Runtime Skills (/v1/skills) ──
+
+// Skills exposes runtime skill catalog, scan, dynamic review, and suggestion helpers.
+var Skills = &skillsNamespace{}
+
+type skillsNamespace struct{}
+type SkillsResponse map[string]any
+
+func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
+	var out SkillsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/skills", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillsNamespace) Scan(ctx context.Context) (SkillsResponse, error) {
+	var out SkillsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/skills/scan", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillsNamespace) Dynamic(ctx context.Context) (SkillsResponse, error) {
+	var out SkillsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/skills/dynamic", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillsNamespace) Approve(ctx context.Context, name, instruction string) (SkillsResponse, error) {
+	var out SkillsResponse
+	body := map[string]any{"name": name}
+	if instruction != "" {
+		body["instruction"] = instruction
+	}
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/skills/approve", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillsNamespace) Reject(ctx context.Context, name string) (SkillsResponse, error) {
+	var out SkillsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/skills/reject", map[string]any{"name": name}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillsNamespace) Suggestions(ctx context.Context, sessionID string) (SkillsResponse, error) {
+	var out SkillsResponse
+	path := "/v1/skill-suggestions"
+	if sessionID != "" {
+		values := url.Values{"session_id": []string{sessionID}}
+		path += "?" + values.Encode()
+	}
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── SkillHub Incremental Packages (/api/skillhub) ──
 
 // SkillHub exposes catalog, install, update, rollback, policy, and analytics helpers for incremental skill packages.
@@ -1371,6 +1436,7 @@ type AgentKit struct {
 	Market        *skillMarketNamespace
 	SkillHub      *skillHubNamespace
 	Plugins       *pluginsNamespace
+	Skills        *skillsNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
 	Fork          *forkNamespace
@@ -6480,6 +6546,7 @@ func NewAgentKit() AgentKit {
 		Market:        SkillMarket,
 		SkillHub:      SkillHub,
 		Plugins:       Plugins,
+		Skills:        Skills,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,
 		Fork:          Fork,
