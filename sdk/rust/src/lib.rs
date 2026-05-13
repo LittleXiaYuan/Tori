@@ -1407,6 +1407,7 @@ pub struct AgentKit {
     pub planner: PlannerClient,
     pub ide: IDEClient,
     pub discovery: DiscoveryClient,
+    pub router: RouterClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
     pub auth: AuthClient,
@@ -1490,6 +1491,7 @@ impl AgentKit {
             planner: PlannerClient::new(base_url.clone(), token.as_ref())?,
             ide: IDEClient::new(base_url.clone(), token.as_ref())?,
             discovery: DiscoveryClient::new(base_url.clone(), token.as_ref())?,
+            router: RouterClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
             auth: AuthClient::new(base_url.clone(), token.as_ref())?,
@@ -1569,6 +1571,7 @@ impl AgentKit {
             planner: PlannerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             ide: IDEClient::new_with_client(base_url.clone(), plugin_http.clone()),
             discovery: DiscoveryClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            router: RouterClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
             auth: AuthClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5965,6 +5968,41 @@ pub struct IDEReviewRequest {
     pub mode: String,
 }
 
+/// Lightweight Router SDK client for smart-router slot and routing statistics.
+#[derive(Debug, Clone)]
+pub struct RouterClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+pub type RouterStatsResponse = serde_json::Value;
+
+impl RouterClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { base_url: base_url.into().trim_end_matches('/').to_string(), http }
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    pub async fn stats(&self) -> Result<RouterStatsResponse, reqwest::Error> {
+        self.http.get(self.url("/v1/router/stats")).send().await?.error_for_status()?.json().await
+    }
+}
 
 /// Lightweight Discovery SDK client for identity resolution, embeddings, and web search.
 #[derive(Debug, Clone)]
@@ -10195,10 +10233,11 @@ mod tests {
         assert_eq!(apply["overrides"]["sandbox_tier"], "local");
     }
 
-
-
-
-
+    #[test]
+    fn router_helpers_build_urls() {
+        let client = RouterClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/router/stats"), "http://localhost:9090/v1/router/stats");
+    }
 
     #[test]
     fn discovery_helpers_build_urls_and_payloads() {

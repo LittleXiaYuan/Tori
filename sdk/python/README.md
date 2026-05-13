@@ -424,3 +424,7 @@ The lightweight WebChat SDK exposes embeddable widget helpers (`widgetUrl`, `wid
 ### Sandbox SDK
 
 The lightweight Sandbox SDK exposes sandbox runtime helpers (`exec`, `probe`, `createDesktop`, `desktopStatus`, `destroyDesktop`) for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/sandbox/exec`, `/v1/sandbox/probe`, `/v1/sandbox/desktop`, `/v1/sandbox/desktop/status`, and `/v1/sandbox/desktop/destroy`; Agent Kit also exposes this surface as `kit.sandbox` / `kit.Sandbox`.
+
+### Router SDK
+
+The lightweight Router SDK exposes smart-router statistics (`stats`) for external operator pages, plugin UIs, CLIs, sidecars, routing dashboards, and automation monitors without importing the full platform client. It maps directly to `GET /v1/router/stats`; Agent Kit also exposes this surface as `kit.router` / `kit.Router`.

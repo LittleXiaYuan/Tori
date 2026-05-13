@@ -3044,6 +3044,19 @@ class _BotsNamespace:
 
 bots = _BotsNamespace()
 
+
+# ── Smart Router ──
+
+class _RouterNamespace:
+    """Lightweight helpers for smart-router slot and routing statistics."""
+
+    def stats(self) -> dict:
+        """Read smart-router slot and routing statistics."""
+        return _api_call("GET", "/v1/router/stats")
+
+
+router = _RouterNamespace()
+
 # ── Agent Kit bundle ──
 
 class AgentKit:
@@ -3111,6 +3124,7 @@ class AgentKit:
         self.planner = planner
         self.ide = ide
         self.discovery = discovery
+        self.router = router
         self.settings = settings
         self.system = system
         self.auth = auth
