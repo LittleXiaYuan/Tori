@@ -518,18 +518,6 @@ func TestRunChecklistBundle(t *testing.T) {
 	}
 }
 
-func TestRenderApplyChecklistMarkdown(t *testing.T) {
-	markdown := renderApplyChecklistMarkdown([]cognisdk.PackBundleApplyChecklistItem{{
-		Kind:     cognisdk.PackBundleApplyActionVerifyDigest,
-		Label:    "Verify digest",
-		Required: true,
-		Message:  "verify current digest",
-	}})
-	if !strings.Contains(markdown, "Cogni Pack Bundle Apply Checklist") || !strings.Contains(markdown, "Verify digest") || !strings.Contains(markdown, "required") {
-		t.Fatalf("unexpected checklist markdown: %s", markdown)
-	}
-}
-
 func TestRunPlanBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")

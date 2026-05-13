@@ -236,14 +236,14 @@ func run(args []string) error {
 		checklist := cognisdk.FilterPackBundleApplyChecklistItems(cognisdk.BuildPackBundleApplyChecklist(plan), planOptions.Kinds...)
 		if planOptions.Out != "" {
 			if markdown {
-				if err := saveTextFile(renderApplyChecklistMarkdown(checklist), planOptions.Out); err != nil {
+				if err := saveTextFile(cognisdk.RenderPackBundleApplyChecklistMarkdown(checklist), planOptions.Out); err != nil {
 					return err
 				}
 			} else if err := saveJSONFile(checklist, planOptions.Out); err != nil {
 				return err
 			}
 		} else if markdown {
-			fmt.Print(renderApplyChecklistMarkdown(checklist))
+			fmt.Print(cognisdk.RenderPackBundleApplyChecklistMarkdown(checklist))
 		} else if err := printJSON(checklist); err != nil {
 			return err
 		}
@@ -537,33 +537,6 @@ func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string
 		}
 		if action.Message != "" {
 			out += fmt.Sprintf(": %s", action.Message)
-		}
-		out += "\n"
-	}
-	return out
-}
-
-func renderApplyChecklistMarkdown(items []cognisdk.PackBundleApplyChecklistItem) string {
-	var out string
-	out += "## Cogni Pack Bundle Apply Checklist\n\n"
-	if len(items) == 0 {
-		out += "No checklist items.\n"
-		return out
-	}
-	for _, item := range items {
-		mark := "[ ]"
-		if item.Done {
-			mark = "[x]"
-		}
-		out += fmt.Sprintf("- %s `%s` — %s", mark, item.Kind, item.Label)
-		if item.Required {
-			out += " required"
-		}
-		if item.Blocked {
-			out += " blocked"
-		}
-		if item.Message != "" {
-			out += fmt.Sprintf(": %s", item.Message)
 		}
 		out += "\n"
 	}

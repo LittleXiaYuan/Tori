@@ -226,6 +226,18 @@ func TestFilterPackBundleApplyChecklistItems(t *testing.T) {
 	}
 }
 
+func TestRenderPackBundleApplyChecklistMarkdown(t *testing.T) {
+	markdown := RenderPackBundleApplyChecklistMarkdown([]PackBundleApplyChecklistItem{{
+		Kind:     PackBundleApplyActionVerifyDigest,
+		Label:    "Verify digest",
+		Required: true,
+		Message:  "verify current digest",
+	}})
+	if !strings.Contains(markdown, "Cogni Pack Bundle Apply Checklist") || !strings.Contains(markdown, "Verify digest") || !strings.Contains(markdown, "required") {
+		t.Fatalf("unexpected checklist markdown: %s", markdown)
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",
