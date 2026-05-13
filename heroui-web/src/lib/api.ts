@@ -9,10 +9,10 @@ import type {
   ModelInfo, ConfigGroup, SetupCheck,
   SkillHubItem, SkillHubInstalledItem, SkillHubDetail, SkillUpdateInfo,
   SkillVersionInfo, SkillPolicy, PolicyCheckResult, MarketAnalytics,
-  BackupInfo, BackupRestoreResult, ConversationInfo,
+  ConversationInfo,
   TaskInfo, GapRecord, GapStats, StateGoal,
   StateSnapshot, ExperienceItem, ExperienceOutcome, ExperienceStats, TaskTemplate,
-  PluginUITab, PackListResponse, PackMutationResponse, PackBackendModulesResponse, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
+  PluginUITab, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
   CostTaskSummary, CostUsageEvent, CostBreakdown,
   TriggerItem, TriggerDef, TriggerRun, TriggerLogEvent, TriggerEventPayload,
   ApprovalRequest, ApprovalRule,
@@ -377,9 +377,6 @@ export const api = {
   detectDirs: () =>
     fetcher<{ dirs: Array<{ label: string; label_zh: string; path: string; exists: boolean; kind: string }>; default_paths: string[]; current_read: string; current_write: string }>("/api/settings/detect-dirs"),
 
-  // Backup & Restore
-  backupInfo: () => fetcher<BackupInfo>("/v1/backup/info"),
-
   // Conversations
   conversations: (archived = false) =>
     fetcher<{ sessions: ConversationInfo[]; count: number }>(`/v1/conversations?archived=${archived}`),
@@ -392,38 +389,6 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ session_id: sessionId, ...opts }),
     }),
-  backupExport: async () => {
-    const key = getApiKey();
-    const res = await fetch(`${BASE}/v1/backup/export`, {
-      headers: { ...(key ? { "X-API-Key": key } : {}) },
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const cd = res.headers.get("Content-Disposition");
-    const match = cd?.match(/filename="(.+)"/);
-    a.download = match?.[1] || "yunque-backup.zip";
-    a.click();
-    URL.revokeObjectURL(url);
-  },
-  backupImport: async (file: File) => {
-    const key = getApiKey();
-    const form = new FormData();
-    form.append("backup", file);
-    const res = await fetch(`${BASE}/v1/backup/import`, {
-      method: "POST",
-      headers: { ...(key ? { "X-API-Key": key } : {}) },
-      body: form,
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`${res.status}: ${text}`);
-    }
-    return res.json() as Promise<BackupRestoreResult>;
-  },
-
   // Speech (TTS/STT)
   tts: async (text: string, voice?: string): Promise<ArrayBuffer> => {
     const key = getApiKey();
@@ -650,26 +615,6 @@ export const api = {
   // Plugin UI
   pluginUITabs: () =>
     fetcher<{ tabs: PluginUITab[] }>("/v1/plugins/ui"),
-
-  // Pack Runtime: installed/enabled capability packs are the backend source of truth
-  packsInstalled: () =>
-    fetcher<PackListResponse>("/v1/packs/installed"),
-  packsEnabled: () =>
-    fetcher<PackListResponse>("/v1/packs/enabled"),
-  packBackendModules: () =>
-    fetcher<PackBackendModulesResponse>("/v1/packs/backend-modules"),
-  packInstall: (manifestPath: string, source?: string, download?: boolean) =>
-    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source, download }) }),
-  packInstallFromURL: (manifestUrl: string, source?: string, download?: boolean) =>
-    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_url: manifestUrl, source, download }) }),
-  packEnable: (id: string) =>
-    fetcher<PackMutationResponse>("/v1/packs/enable", { method: "POST", body: JSON.stringify({ id }) }),
-  packDisable: (id: string) =>
-    fetcher<PackMutationResponse>("/v1/packs/disable", { method: "POST", body: JSON.stringify({ id }) }),
-  packRollback: (id: string) =>
-    fetcher<PackMutationResponse>("/v1/packs/rollback", { method: "POST", body: JSON.stringify({ id }) }),
-  packPrune: () =>
-    fetcher<{ removed: string[]; kept: string[]; errors?: string[]; removed_count: number; kept_count: number }>("/v1/packs/prune", { method: "POST", body: JSON.stringify({}) }),
 
   // QQ Chat Analyzer (ext plugin)
   qqUpload: (content: string, filename?: string) =>
