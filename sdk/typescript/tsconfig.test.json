@@ -21,6 +21,8 @@
     "src/auth.ts",
     "src/backup.test.ts",
     "src/backup.ts",
+    "src/packs.test.ts",
+    "src/packs.ts",
     "src/airi.ts",
     "src/planner-recovery.ts",
     "src/planner.ts",

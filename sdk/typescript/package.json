@@ -23,6 +23,10 @@
       "types": "./src/backup.ts",
       "import": "./src/backup.ts"
     },
+    "./packs": {
+      "types": "./src/packs.ts",
+      "import": "./src/packs.ts"
+    },
     "./airi": {
       "types": "./src/airi.ts",
       "import": "./src/airi.ts"
