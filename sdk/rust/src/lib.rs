@@ -1530,6 +1530,7 @@ pub struct AgentKit {
     pub browser: BrowserClient,
     pub plugin: PluginApiClient,
     pub plugin_search: PluginSearchClient,
+    pub plugin_send: PluginSendClient,
 }
 
 impl AgentKit {
@@ -1638,7 +1639,8 @@ impl AgentKit {
             files: FilesClient::new(base_url.clone(), token.as_ref())?,
             browser: BrowserClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url.clone(), plugin_token.as_ref())?,
-            plugin_search: PluginSearchClient::new(base_url, plugin_token.as_ref())?,
+            plugin_search: PluginSearchClient::new(base_url.clone(), plugin_token.as_ref())?,
+            plugin_send: PluginSendClient::new(base_url, plugin_token.as_ref())?,
         })
     }
 
@@ -1746,7 +1748,8 @@ impl AgentKit {
             files: FilesClient::new_with_client(base_url.clone(), plugin_http.clone()),
             browser: BrowserClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            plugin_search: PluginSearchClient::new_with_client(base_url, plugin_http),
+            plugin_search: PluginSearchClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_send: PluginSendClient::new_with_client(base_url, plugin_http),
         }
     }
 }
@@ -9785,6 +9788,22 @@ impl PluginSearchClient {
     pub async fn search(&self, query: impl AsRef<str>, limit: i32) -> Result<PluginSearchResponse, reqwest::Error> { self.inner.search(query, limit).await }
 }
 
+
+/// Standalone PluginSend SDK client for plugin-scoped channel send.
+#[derive(Debug, Clone)]
+pub struct PluginSendClient { inner: PluginApiClient }
+
+impl PluginSendClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginApiClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginApiClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn send(&self, channel: impl AsRef<str>, target: impl AsRef<str>, content: impl AsRef<str>, format: impl AsRef<str>) -> Result<PluginSendResponse, reqwest::Error> { self.inner.send(channel, target, content, format).await }
+}
+
 /// Small Rust helper over the core `/v1/plugin-api/*` runtime capabilities.
 ///
 /// Use this when a Rust CLI, sidecar, or plugin runner only needs runtime
@@ -10498,6 +10517,9 @@ mod tests {
         assert_eq!(search.url("/v1/plugin-api/search"), "http://localhost:9090/v1/plugin-api/search");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_search.url("/v1/plugin-api/search"), "http://localhost:9090/v1/plugin-api/search");
+        let send = PluginSendClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(send.url("/v1/plugin-api/send"), "http://localhost:9090/v1/plugin-api/send");
+        assert_eq!(kit.plugin_send.url("/v1/plugin-api/send"), "http://localhost:9090/v1/plugin-api/send");
     }
 
     #[test]

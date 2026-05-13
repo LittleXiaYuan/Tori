@@ -3392,6 +3392,15 @@ class _PluginSearchNamespace:
 
 plugin_search = _PluginSearchNamespace()
 
+class _PluginSendNamespace:
+    """Standalone plugin-scoped channel send helper for plugins and automation scripts."""
+
+    def send(self, channel_type: str, target: str, content: str, format: str = "markdown") -> bool:
+        return send(channel_type, target, content, format)
+
+
+plugin_send = _PluginSendNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3584,6 +3593,7 @@ class AgentKit:
         self.plugin_files = plugin_files
         self.plugin_folder = plugin_folder
         self.plugin_search = plugin_search
+        self.plugin_send = plugin_send
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

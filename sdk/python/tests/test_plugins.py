@@ -48,6 +48,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_files, yunque.plugin_files)
         self.assertIs(yunque.create_agent_kit().plugin_folder, yunque.plugin_folder)
         self.assertIs(yunque.create_agent_kit().plugin_search, yunque.plugin_search)
+        self.assertIs(yunque.create_agent_kit().plugin_send, yunque.plugin_send)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-send",
+  "description": "Cross-language lightweight SDK for plugin-scoped channel sending without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose plugin-scoped channel send as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep channel sends directly callable through the existing plugin-authenticated runtime route.",
+    "Make PluginSend available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/send"
+  ],
+  "capabilities": [
+    {
+      "name": "send",
+      "route": "POST /v1/plugin-api/send",
+      "readOnly": false,
+      "description": "Send a message through a configured channel using a plugin-scoped token."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-send.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "send": "createPluginSendClient().send"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "send": "yunque.PluginSend.Send"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "send": "yunque.plugin_send.send"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "send": "PluginSendClient::send"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

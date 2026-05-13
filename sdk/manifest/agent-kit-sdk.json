@@ -35,6 +35,7 @@
     "plugin-files",
     "plugin-folder",
     "plugin-search",
+    "plugin-send",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -201,6 +202,10 @@
     {
       "name": "pluginSearch",
       "description": "Access the lightweight PluginSearch client or namespace for plugin-scoped web search."
+    },
+    {
+      "name": "pluginSend",
+      "description": "Access the lightweight PluginSend client or namespace for plugin-scoped channel sending."
     },
     {
       "name": "skills",
@@ -527,7 +532,8 @@
         "pluginReload": "createAgentKit().pluginReload",
         "pluginFiles": "createAgentKit().pluginFiles",
         "pluginFolder": "createAgentKit().pluginFolder",
-        "pluginSearch": "createAgentKit().pluginSearch"
+        "pluginSearch": "createAgentKit().pluginSearch",
+        "pluginSend": "createAgentKit().pluginSend"
       }
     },
     "go": {
@@ -625,7 +631,8 @@
         "pluginReload": "yunque.NewAgentKit().PluginReload",
         "pluginFiles": "yunque.NewAgentKit().PluginFiles",
         "pluginFolder": "yunque.NewAgentKit().PluginFolder",
-        "pluginSearch": "yunque.NewAgentKit().PluginSearch"
+        "pluginSearch": "yunque.NewAgentKit().PluginSearch",
+        "pluginSend": "yunque.NewAgentKit().PluginSend"
       }
     },
     "python": {
@@ -723,7 +730,8 @@
         "pluginReload": "yunque.create_agent_kit().plugin_reload",
         "pluginFiles": "yunque.create_agent_kit().plugin_files",
         "pluginFolder": "yunque.create_agent_kit().plugin_folder",
-        "pluginSearch": "yunque.create_agent_kit().plugin_search"
+        "pluginSearch": "yunque.create_agent_kit().plugin_search",
+        "pluginSend": "yunque.create_agent_kit().plugin_send"
       }
     },
     "rust": {
@@ -821,7 +829,8 @@
         "pluginReload": "AgentKit::plugin_reload",
         "pluginFiles": "AgentKit::plugin_files",
         "pluginFolder": "AgentKit::plugin_folder",
-        "pluginSearch": "AgentKit::plugin_search"
+        "pluginSearch": "AgentKit::plugin_search",
+        "pluginSend": "AgentKit::plugin_send"
       }
     }
   },
