@@ -43,6 +43,8 @@
     "src/cognis-workflows.ts",
     "src/cognis-bundles.ts",
     "src/cognisdk-schema.ts",
+    "src/cognisdk-package.test.ts",
+    "src/cognisdk-package.ts",
     "src/events.ts",
     "src/events-stream.ts",
     "src/events-parse.ts",
