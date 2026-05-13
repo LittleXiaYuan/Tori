@@ -31,3 +31,5 @@ export * from './plugin-llm';
 export * from './plugin-memory';
 
 export * from './plugin-knowledge';
+
+export * from './plugin-agent-memory';

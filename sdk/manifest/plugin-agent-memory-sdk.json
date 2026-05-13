@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "domain": "plugin-agent-memory",
+  "description": "Cross-language lightweight SDK for plugin-scoped access to shared Agent memory without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose shared Agent memory search and write as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep agent memory operations directly callable through existing plugin-authenticated runtime routes.",
+    "Make PluginAgentMemory available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/agent-memory/search",
+    "POST /v1/plugin-api/agent-memory/add"
+  ],
+  "capabilities": [
+    {
+      "name": "search",
+      "route": "POST /v1/plugin-api/agent-memory/search",
+      "readOnly": true,
+      "description": "Search shared Agent memory through a plugin-scoped token."
+    },
+    {
+      "name": "add",
+      "route": "POST /v1/plugin-api/agent-memory/add",
+      "readOnly": false,
+      "description": "Add a fact to shared Agent memory through a plugin-scoped token."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-agent-memory.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "search": "createPluginAgentMemoryClient().search",
+        "add": "createPluginAgentMemoryClient().add"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "search": "yunque.PluginAgentMemory.Search",
+        "add": "yunque.PluginAgentMemory.Add"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "search": "yunque.plugin_agent_memory.search",
+        "add": "yunque.plugin_agent_memory.add"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "search": "PluginAgentMemoryClient::search",
+        "add": "PluginAgentMemoryClient::add"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

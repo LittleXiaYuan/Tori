@@ -3443,6 +3443,17 @@ class _PluginKnowledgeNamespace:
 
 plugin_knowledge = _PluginKnowledgeNamespace()
 
+class _PluginAgentMemoryNamespace:
+    """Standalone shared Agent memory helper for plugins and automation scripts."""
+
+    def search(self, query: str, top_k: int = 5) -> str:
+        return agent_memory.search(query, top_k)
+
+    def add(self, fact: str, source: str = "") -> None:
+        agent_memory.add(fact, source)
+
+plugin_agent_memory = _PluginAgentMemoryNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3639,6 +3650,7 @@ class AgentKit:
         self.plugin_llm = plugin_llm
         self.plugin_memory = plugin_memory
         self.plugin_knowledge = plugin_knowledge
+        self.plugin_agent_memory = plugin_agent_memory
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
