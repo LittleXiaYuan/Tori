@@ -56,12 +56,28 @@ func run(args []string) error {
 		return cognisdk.SavePackBundle(bundle, args[1])
 
 	case "digest":
-		if len(args) != 2 {
-			return fmt.Errorf("usage: cognisdk-bundle digest <bundle.json>")
+		if len(args) != 2 && len(args) != 4 {
+			return fmt.Errorf("usage: cognisdk-bundle digest <bundle.json> [--expect sha256:...]")
 		}
 		bundle, err := cognisdk.LoadPackBundle(args[1])
 		if err != nil {
 			return err
+		}
+		if len(args) == 4 {
+			if args[2] != "--expect" {
+				return fmt.Errorf("unknown digest option %q", args[2])
+			}
+			check, err := cognisdk.VerifyPackBundleDigest(*bundle, args[3])
+			if err != nil {
+				return err
+			}
+			if err := printJSON(check); err != nil {
+				return err
+			}
+			if !check.Match {
+				return fmt.Errorf("bundle digest mismatch: expected %s, got %s", check.Expected, check.Actual)
+			}
+			return nil
 		}
 		digest, err := cognisdk.DigestPackBundle(*bundle)
 		if err != nil {
@@ -379,7 +395,7 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--fail-on-review] [--fail-on-blocked]")
-	fmt.Println("  cognisdk-bundle digest <bundle.json>")
+	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")

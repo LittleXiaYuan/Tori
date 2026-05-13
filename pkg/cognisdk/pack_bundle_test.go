@@ -145,3 +145,28 @@ func TestDigestPackBundleIsStableAcrossPackOrder(t *testing.T) {
 		t.Fatalf("digest changed with order: %s != %s", leftDigest, rightDigest)
 	}
 }
+
+func TestVerifyPackBundleDigest(t *testing.T) {
+	bundle, err := NewPackBundle("digest-check", BuiltinPacks(), []string{PackXiaoyuCompanion, PackYunqueWork})
+	if err != nil {
+		t.Fatalf("new bundle: %v", err)
+	}
+	digest, err := DigestPackBundle(bundle)
+	if err != nil {
+		t.Fatalf("digest bundle: %v", err)
+	}
+	check, err := VerifyPackBundleDigest(bundle, digest)
+	if err != nil {
+		t.Fatalf("verify digest: %v", err)
+	}
+	if !check.Match || check.Actual != digest || check.Expected != digest || check.BundleID != bundle.ID {
+		t.Fatalf("unexpected digest check: %#v", check)
+	}
+	mismatch, err := VerifyPackBundleDigest(bundle, "sha256:wrong")
+	if err != nil {
+		t.Fatalf("verify mismatch digest: %v", err)
+	}
+	if mismatch.Match {
+		t.Fatalf("expected digest mismatch: %#v", mismatch)
+	}
+}

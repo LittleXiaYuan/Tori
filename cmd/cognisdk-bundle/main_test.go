@@ -214,6 +214,23 @@ func TestRunDigestBundle(t *testing.T) {
 	if err := run([]string{"digest", bundlePath}); err != nil {
 		t.Fatalf("digest bundle: %v", err)
 	}
+	bundle, err := cognisdk.LoadPackBundle(bundlePath)
+	if err != nil {
+		t.Fatalf("load bundle: %v", err)
+	}
+	digest, err := cognisdk.DigestPackBundle(*bundle)
+	if err != nil {
+		t.Fatalf("compute digest: %v", err)
+	}
+	if err := run([]string{"digest", bundlePath, "--expect", digest}); err != nil {
+		t.Fatalf("digest expect match: %v", err)
+	}
+	if err := run([]string{"digest", bundlePath, "--expect", "sha256:wrong"}); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
+		t.Fatalf("expected digest mismatch error, got %v", err)
+	}
+	if err := run([]string{"digest", bundlePath, "--bad", digest}); err == nil || !strings.Contains(err.Error(), "unknown digest option") {
+		t.Fatalf("expected unknown digest option error, got %v", err)
+	}
 	if err := run([]string{"digest"}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle digest") {
 		t.Fatalf("expected digest usage error, got %v", err)
 	}
