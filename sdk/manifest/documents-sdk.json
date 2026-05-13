@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "domain": "document-generation",
+  "description": "Cross-language lightweight SDK entrypoints for document template listing and DOCX/XLSX/PPTX/HTML generation without importing the full platform client.",
+  "principles": [
+    "Expose document generation as a focused SDK slice for external authoring pages, plugin UIs, CLIs, sidecars, and automation scripts.",
+    "Keep template listing and format-specific generation helpers directly callable through authenticated routes.",
+    "Make Documents access available through Agent Kit so generated artifacts can be produced from one lightweight automation bundle."
+  ],
+  "routes": [
+    "GET /v1/documents/templates",
+    "POST /v1/documents/generate"
+  ],
+  "capabilities": [
+    {
+      "name": "templates",
+      "route": "GET /v1/documents/templates",
+      "readOnly": true,
+      "description": "List document generation templates."
+    },
+    {
+      "name": "generate",
+      "route": "POST /v1/documents/generate",
+      "readOnly": false,
+      "description": "Generate a document in a requested format."
+    },
+    {
+      "name": "generateDocx",
+      "route": "POST /v1/documents/generate",
+      "readOnly": false,
+      "description": "Generate a DOCX document."
+    },
+    {
+      "name": "generateXlsx",
+      "route": "POST /v1/documents/generate",
+      "readOnly": false,
+      "description": "Generate an XLSX spreadsheet."
+    },
+    {
+      "name": "generatePptx",
+      "route": "POST /v1/documents/generate",
+      "readOnly": false,
+      "description": "Generate a PPTX deck."
+    },
+    {
+      "name": "generateHtml",
+      "route": "POST /v1/documents/generate",
+      "readOnly": false,
+      "description": "Generate an HTML document."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/documents.ts",
+        "sdk/typescript/src/document-templates.ts",
+        "sdk/typescript/src/document-generate.ts",
+        "sdk/typescript/src/document-docx.ts",
+        "sdk/typescript/src/document-xlsx.ts",
+        "sdk/typescript/src/document-pptx.ts",
+        "sdk/typescript/src/document-html.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "templates": "createDocumentsClient().templates",
+        "generate": "createDocumentsClient().generate",
+        "generateDocx": "createDocumentsClient().generateDocx",
+        "generateXlsx": "createDocumentsClient().generateXlsx",
+        "generatePptx": "createDocumentsClient().generatePptx",
+        "generateHtml": "createDocumentsClient().generateHtml"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "templates": "yunque.Documents.Templates",
+        "generate": "yunque.Documents.Generate",
+        "generateDocx": "yunque.Documents.GenerateDocx",
+        "generateXlsx": "yunque.Documents.GenerateXlsx",
+        "generatePptx": "yunque.Documents.GeneratePptx",
+        "generateHtml": "yunque.Documents.GenerateHtml"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "templates": "yunque.documents.templates",
+        "generate": "yunque.documents.generate",
+        "generateDocx": "yunque.documents.generate_docx",
+        "generateXlsx": "yunque.documents.generate_xlsx",
+        "generatePptx": "yunque.documents.generate_pptx",
+        "generateHtml": "yunque.documents.generate_html"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "templates": "DocumentsClient::templates",
+        "generate": "DocumentsClient::generate",
+        "generateDocx": "DocumentsClient::generate_docx",
+        "generateXlsx": "DocumentsClient::generate_xlsx",
+        "generatePptx": "DocumentsClient::generate_pptx",
+        "generateHtml": "DocumentsClient::generate_html"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
