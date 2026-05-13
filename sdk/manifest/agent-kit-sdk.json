@@ -228,6 +228,10 @@
       "description": "Access the lightweight PluginCron client or namespace for plugin-scoped scheduled automation."
     },
     {
+      "name": "pluginExtensions",
+      "description": "Access the lightweight PluginExtensions client or namespace for plugin-contributed system extension registration and listing."
+    },
+    {
       "name": "skills",
       "description": "Access the lightweight Runtime Skills client or namespace for skill catalog, scan, dynamic skill review, and session suggestions."
     },
@@ -558,7 +562,8 @@
         "pluginMemory": "kit.pluginMemory",
         "pluginKnowledge": "kit.pluginKnowledge",
         "pluginAgentMemory": "kit.pluginAgentMemory",
-        "pluginCron": "kit.pluginCron"
+        "pluginCron": "kit.pluginCron",
+        "pluginExtensions": "kit.pluginExtensions"
       }
     },
     "go": {
@@ -662,7 +667,8 @@
         "pluginMemory": "kit.PluginMemory",
         "pluginKnowledge": "kit.PluginKnowledge",
         "pluginAgentMemory": "kit.PluginAgentMemory",
-        "pluginCron": "kit.PluginCron"
+        "pluginCron": "kit.PluginCron",
+        "pluginExtensions": "kit.PluginExtensions"
       }
     },
     "python": {
@@ -766,7 +772,8 @@
         "pluginMemory": "kit.plugin_memory",
         "pluginKnowledge": "kit.plugin_knowledge",
         "pluginAgentMemory": "kit.plugin_agent_memory",
-        "pluginCron": "kit.plugin_cron"
+        "pluginCron": "kit.plugin_cron",
+        "pluginExtensions": "kit.plugin_extensions"
       }
     },
     "rust": {
@@ -870,7 +877,8 @@
         "pluginMemory": "kit.plugin_memory",
         "pluginKnowledge": "kit.plugin_knowledge",
         "pluginAgentMemory": "kit.plugin_agent_memory",
-        "pluginCron": "kit.plugin_cron"
+        "pluginCron": "kit.plugin_cron",
+        "pluginExtensions": "kit.plugin_extensions"
       }
     }
   },

@@ -3468,6 +3468,32 @@ class _PluginCronNamespace:
 
 plugin_cron = _PluginCronNamespace()
 
+class _PluginExtensionsNamespace:
+    """Standalone plugin extension registration/listing helper for plugins and automation scripts."""
+
+    def register_provider(self, *args, **kwargs) -> dict:
+        return register_provider(*args, **kwargs)
+
+    def register_channel(self, *args, **kwargs) -> dict:
+        return register_channel(*args, **kwargs)
+
+    def register_search(self, *args, **kwargs) -> dict:
+        return register_search(*args, **kwargs)
+
+    def register_guardrail(self, *args, **kwargs) -> dict:
+        return register_guardrail(*args, **kwargs)
+
+    def register_embedding(self, *args, **kwargs) -> dict:
+        return register_embedding(*args, **kwargs)
+
+    def register_speech(self, *args, **kwargs) -> dict:
+        return register_speech(*args, **kwargs)
+
+    def list(self) -> list[dict]:
+        return list_extensions()
+
+plugin_extensions = _PluginExtensionsNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3666,6 +3692,7 @@ class AgentKit:
         self.plugin_knowledge = plugin_knowledge
         self.plugin_agent_memory = plugin_agent_memory
         self.plugin_cron = plugin_cron
+        self.plugin_extensions = plugin_extensions
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

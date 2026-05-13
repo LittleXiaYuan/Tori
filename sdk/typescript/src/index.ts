@@ -35,3 +35,5 @@ export * from './plugin-knowledge';
 export * from './plugin-agent-memory';
 
 export * from './plugin-cron';
+
+export * from './plugin-extensions';

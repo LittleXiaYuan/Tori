@@ -1636,6 +1636,7 @@ type AgentKit struct {
 	PluginKnowledge   *pluginKnowledgeNamespace
 	PluginAgentMemory *pluginAgentMemoryNamespace
 	PluginCron        *pluginCronNamespace
+	PluginExtensions  *pluginExtensionsNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1667,6 +1668,9 @@ var PluginAgentMemory = &pluginAgentMemoryNamespace{}
 // PluginCron exposes standalone plugin-scoped cron automation helpers for plugins and scripts.
 var PluginCron = &pluginCronNamespace{}
 
+// PluginExtensions exposes standalone system-extension registration helpers for plugins and scripts.
+var PluginExtensions = &pluginExtensionsNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
 type pluginSendNamespace struct{}
@@ -1675,6 +1679,7 @@ type pluginMemoryNamespace struct{}
 type pluginKnowledgeNamespace struct{}
 type pluginAgentMemoryNamespace struct{}
 type pluginCronNamespace struct{}
+type pluginExtensionsNamespace struct{}
 
 func (p *pluginMemoryNamespace) Get(ctx context.Context, key string) (string, error) {
 	return Memory.Get(ctx, key)
@@ -1741,6 +1746,49 @@ func (p *pluginCronNamespace) List(ctx context.Context, plugin string) ([]map[st
 		jobs = []map[string]any{}
 	}
 	return jobs, nil
+}
+
+func (p *pluginExtensionsNamespace) RegisterProvider(ctx context.Context, id, baseURL, model string, opts ...ProviderOpt) error {
+	return RegisterProvider(ctx, id, baseURL, model, opts...)
+}
+
+func (p *pluginExtensionsNamespace) RegisterChannel(ctx context.Context, name, webhookURL, sendEndpoint string) error {
+	return RegisterChannel(ctx, name, webhookURL, sendEndpoint)
+}
+
+func (p *pluginExtensionsNamespace) RegisterSearchEngine(ctx context.Context, name, baseURL, apiKey string) error {
+	return RegisterSearchEngine(ctx, name, baseURL, apiKey)
+}
+
+func (p *pluginExtensionsNamespace) RegisterGuardrail(ctx context.Context, name, description, phase string, keywords []string) error {
+	return RegisterGuardrail(ctx, name, description, phase, keywords)
+}
+
+func (p *pluginExtensionsNamespace) RegisterEmbedding(ctx context.Context, name, baseURL, model string, dimensions int) error {
+	return RegisterEmbedding(ctx, name, baseURL, model, dimensions)
+}
+
+func (p *pluginExtensionsNamespace) RegisterSpeech(ctx context.Context, name, speechType, baseURL, model string) error {
+	return RegisterSpeech(ctx, name, speechType, baseURL, model)
+}
+
+func (p *pluginExtensionsNamespace) List(ctx context.Context) ([]map[string]any, error) {
+	resp, err := apiCall(ctx, http.MethodGet, "/v1/plugin-api/extensions", nil)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(resp["extensions"])
+	if err != nil {
+		return nil, err
+	}
+	var extensions []map[string]any
+	if err := json.Unmarshal(raw, &extensions); err != nil {
+		return nil, err
+	}
+	if extensions == nil {
+		extensions = []map[string]any{}
+	}
+	return extensions, nil
 }
 
 // ── Mission Parse ──
@@ -7012,6 +7060,7 @@ func NewAgentKit() AgentKit {
 		PluginKnowledge:   PluginKnowledge,
 		PluginAgentMemory: PluginAgentMemory,
 		PluginCron:        PluginCron,
+		PluginExtensions:  PluginExtensions,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,

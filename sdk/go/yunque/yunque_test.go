@@ -2437,6 +2437,20 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 				t.Fatalf("unexpected plugin cron list query: %s", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"jobs":[{"id":"cron-1","name":"yunque:daily"}]}`))
+		case "/v1/plugin-api/register/provider":
+			_, _ = w.Write([]byte(`{"ok":true,"provider_id":"p1"}`))
+		case "/v1/plugin-api/register/channel":
+			_, _ = w.Write([]byte(`{"ok":true,"channel":"ops"}`))
+		case "/v1/plugin-api/register/search":
+			_, _ = w.Write([]byte(`{"ok":true,"search":"search"}`))
+		case "/v1/plugin-api/register/guardrail":
+			_, _ = w.Write([]byte(`{"ok":true,"guardrail":"guard"}`))
+		case "/v1/plugin-api/register/embedding":
+			_, _ = w.Write([]byte(`{"ok":true,"embedding":"embed"}`))
+		case "/v1/plugin-api/register/speech":
+			_, _ = w.Write([]byte(`{"ok":true,"speech":"tts"}`))
+		case "/v1/plugin-api/extensions":
+			_, _ = w.Write([]byte(`{"extensions":[{"type":"provider","id":"p1"}]}`))
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
 		}
@@ -2601,15 +2615,37 @@ func TestAgentKitGroupsStateReflectAndPluginRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := kit.PluginExtensions.RegisterProvider(context.Background(), "p1", "http://provider/v1", "demo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.PluginExtensions.RegisterChannel(context.Background(), "ops", "http://hook", "/send"); err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.PluginExtensions.RegisterSearchEngine(context.Background(), "search", "http://search", "key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.PluginExtensions.RegisterGuardrail(context.Background(), "guard", "Guard", "pre", []string{"block"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.PluginExtensions.RegisterEmbedding(context.Background(), "embed", "http://embed", "model", 768); err != nil {
+		t.Fatal(err)
+	}
+	if err := kit.PluginExtensions.RegisterSpeech(context.Background(), "tts", "tts", "http://tts", "model"); err != nil {
+		t.Fatal(err)
+	}
+	pluginExtensionsList, err := kit.PluginExtensions.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if focus != "sdk" || runtimeQueues["queues"] == nil || subagentsList.Subagents[0].ID != "sa-1" || toolList.Sessions[0].ID != "tool-1" || auditVerify["valid"] != true || trustScores["count"].(float64) != 1 || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" || len(standaloneResults) != 1 || pluginReply != "plugin llm reply" || pluginMemoryValue != "memory-value" || len(pluginKnowledgeResults) != 1 || pluginAgentMemoryContext != "agent memory context" || pluginCronID != "cron-1" || len(pluginCronJobs) != 1 || pluginCronJobs[0]["id"] != "cron-1" {
+	if focus != "sdk" || runtimeQueues["queues"] == nil || subagentsList.Subagents[0].ID != "sa-1" || toolList.Sessions[0].ID != "tool-1" || auditVerify["valid"] != true || trustScores["count"].(float64) != 1 || !strings.Contains(strategies, "SDK slices") || mission.Type != "cron" || jobs.Count != 1 || len(cronJobs.Jobs) != 1 || triggerDefs.Total != 1 || memoryResults.Count != 1 || graphStats.Entities != 2 || kbStats["sources"].(float64) != 2 || loraStatus["active_model"] != "adapter-a" || workflowList.Total != 1 || len(connectorList.Connectors) != 1 || connectorList.Connectors[0].ID != "github" || len(notifyChannels.Channels) != 1 || notifyChannels.Channels[0].ID != "feishu-main" || !orchStatus.Running || len(forkList.Forks) != 1 || costSummary["today_cost"].(float64) != 0.12 || providerList.Providers[0]["id"] != "deepseek" || cogniList["count"].(float64) != 1 || traceRecent.Events[0]["trace_id"] != "tr-1" || !heartbeatStatus["running"].(bool) || reverieStats["total"].(float64) != 2 || approvalList["total"].(float64) != 1 || rbacRoles["total"].(float64) != 1 || fileList.Files[0].Name != "report.md" || !browserStatus["connected"].(bool) || len(results) != 1 || results[0].Title != "Agent Kit" || len(standaloneResults) != 1 || pluginReply != "plugin llm reply" || pluginMemoryValue != "memory-value" || len(pluginKnowledgeResults) != 1 || pluginAgentMemoryContext != "agent memory context" || pluginCronID != "cron-1" || len(pluginCronJobs) != 1 || pluginCronJobs[0]["id"] != "cron-1" || len(pluginExtensionsList) != 1 || pluginExtensionsList[0]["id"] != "p1" {
 		t.Fatalf("unexpected kit results: focus=%q strategies=%q mission=%+v jobs=%+v results=%+v", focus, strategies, mission, jobs, results)
 	}
-	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Subagents != Subagents || kit.Tools != Tools || kit.Audit != Audit || kit.Trust != Trust || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.PluginSearch != PluginSearch || kit.PluginSend != PluginSend || kit.PluginLLM != PluginLLM || kit.PluginMemory != PluginMemory || kit.PluginKnowledge != PluginKnowledge || kit.PluginAgentMemory != PluginAgentMemory || kit.PluginCron != PluginCron || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
+	if kit.State != State || kit.Reflect != Reflect || kit.Missions != Missions || kit.Scheduler != Scheduler || kit.CronSystem != CronSystem || kit.Triggers != Triggers || kit.MemoryCore != MemoryCore || kit.Graph != Graph || kit.KnowledgeKB != KnowledgeKB || kit.LoRA != LoRA || kit.Workflows != Workflows || kit.Connectors != Connectors || kit.Notify != Notify || kit.Orchestrator != Orchestrator || kit.Fork != Fork || kit.Cost != Cost || kit.Providers != Providers || kit.Cognis != Cognis || kit.Trace != Trace || kit.Heartbeat != Heartbeat || kit.Events != Events || kit.Runtime != Runtime || kit.Subagents != Subagents || kit.Tools != Tools || kit.Audit != Audit || kit.Trust != Trust || kit.Reverie != Reverie || kit.Approvals != Approvals || kit.RBAC != RBAC || kit.Files != Files || kit.Browser != Browser || kit.Plugin != Plugin || kit.PluginSearch != PluginSearch || kit.PluginSend != PluginSend || kit.PluginLLM != PluginLLM || kit.PluginMemory != PluginMemory || kit.PluginKnowledge != PluginKnowledge || kit.PluginAgentMemory != PluginAgentMemory || kit.PluginCron != PluginCron || kit.PluginExtensions != PluginExtensions || kit.Memory != Memory || kit.AgentMemory != AgentMemory || kit.Knowledge != Knowledge || kit.Cron != Cron {
 		t.Fatalf("agent kit should reuse lightweight singleton namespaces")
 	}
-	if len(seen) != 40 {
-		t.Fatalf("expected 40 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 47 {
+		t.Fatalf("expected 47 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -4054,8 +4090,8 @@ func TestCognisHelpers(t *testing.T) {
 	if list["count"].(float64) != 1 || created["id"] != "reviewer" || !detail["enabled"].(bool) || removed["id"] != "reviewer" || enabled["status"] != "ok" || disabled["status"] != "ok" || reloaded["status"] != "ok" || traces["count"].(float64) != 1 || trace["count"].(float64) != 1 || stats["activations"].(float64) != 2 || !health["healthy"].(bool) || !verify["ok"].(bool) || alerts["count"].(float64) != 0 || scanned["status"] != "ok" || generated["status"] != "ok" || exported["bundle"] == nil || imported["status"] != "ok" || workflows["workflows"] == nil || ran["status"] != "ok" || !experience["enabled"].(bool) || recorded["status"] != "ok" || confirmed["status"] != "ok" || evolved["status"] != "ok" || evolution["generation"].(float64) != 2 || !federation["enabled"].(bool) || peers["peers"] == nil || discovered["status"] != "ok" || exposed["status"] != "ok" || unexposed["status"] != "ok" || economics["cost"].(float64) != 0 || kit.Cognis != Cognis {
 		t.Fatalf("unexpected cognis results")
 	}
-	if len(seen) != 40 {
-		t.Fatalf("expected 40 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 47 {
+		t.Fatalf("expected 47 requests, got %d: %v", len(seen), seen)
 	}
 }
 
