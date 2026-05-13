@@ -210,6 +210,36 @@ type PackBundleReview struct {
 	GoldenTests      GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
 }
 
+// PackBundleApplyActionKind is a machine-readable action type in a dry-run
+// bundle apply plan.
+type PackBundleApplyActionKind string
+
+const (
+	PackBundleApplyActionKeepRollback   PackBundleApplyActionKind = "keep_rollback"
+	PackBundleApplyActionVerifyDigest   PackBundleApplyActionKind = "verify_digest"
+	PackBundleApplyActionRequireReview  PackBundleApplyActionKind = "require_review"
+	PackBundleApplyActionStopBlocked    PackBundleApplyActionKind = "stop_blocked"
+	PackBundleApplyActionAddPack        PackBundleApplyActionKind = "add_pack"
+	PackBundleApplyActionReplacePack    PackBundleApplyActionKind = "replace_pack"
+	PackBundleApplyActionRemovePack     PackBundleApplyActionKind = "remove_pack"
+	PackBundleApplyActionEnablePack     PackBundleApplyActionKind = "enable_pack"
+	PackBundleApplyActionDisablePack    PackBundleApplyActionKind = "disable_pack"
+	PackBundleApplyActionNoop           PackBundleApplyActionKind = "noop"
+	PackBundleApplyActionWriteCandidate PackBundleApplyActionKind = "write_candidate"
+)
+
+// PackBundleApplyAction is a structured, frontend/script-friendly action entry
+// derived from the bundle diff and review gate.
+type PackBundleApplyAction struct {
+	Kind        PackBundleApplyActionKind `json:"kind" yaml:"kind"`
+	PackID      string                    `json:"pack_id,omitempty" yaml:"pack_id,omitempty"`
+	FromVersion string                    `json:"from_version,omitempty" yaml:"from_version,omitempty"`
+	ToVersion   string                    `json:"to_version,omitempty" yaml:"to_version,omitempty"`
+	Digest      string                    `json:"digest,omitempty" yaml:"digest,omitempty"`
+	BundleID    string                    `json:"bundle_id,omitempty" yaml:"bundle_id,omitempty"`
+	Message     string                    `json:"message" yaml:"message"`
+}
+
 // PackBundleApplyPlan describes a non-mutating promotion plan from one bundle
 // snapshot to another. It is intended for plugin UIs, CI jobs, and external
 // hosts that want exact review/rollback metadata before writing any files.
@@ -224,6 +254,7 @@ type PackBundleApplyPlan struct {
 	Blocked            bool                    `json:"blocked" yaml:"blocked"`
 	RollbackBundleID   string                  `json:"rollback_bundle_id,omitempty" yaml:"rollback_bundle_id,omitempty"`
 	RecommendedActions []string                `json:"recommended_actions" yaml:"recommended_actions"`
+	Actions            []PackBundleApplyAction `json:"actions" yaml:"actions"`
 	Diff               PackBundleDiff          `json:"diff" yaml:"diff"`
 	GoldenTests        GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
 }

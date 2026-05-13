@@ -169,7 +169,7 @@ func PackBundleApplyPlanJSONSchema() JSONSchema {
 		"title":                "Cognition SDK Pack Bundle Apply Plan",
 		"type":                 "object",
 		"additionalProperties": false,
-		"required":             []string{"from_id", "candidate_id", "outcome", "reason", "requires_review", "blocked", "recommended_actions", "diff", "golden_tests"},
+		"required":             []string{"from_id", "candidate_id", "outcome", "reason", "requires_review", "blocked", "recommended_actions", "actions", "diff", "golden_tests"},
 		"properties": map[string]any{
 			"from_id":             stringSchema(),
 			"candidate_id":        stringSchema(),
@@ -181,6 +181,7 @@ func PackBundleApplyPlanJSONSchema() JSONSchema {
 			"blocked":             map[string]any{"type": "boolean"},
 			"rollback_bundle_id":  stringSchema(),
 			"recommended_actions": stringArraySchema(),
+			"actions":             map[string]any{"type": "array", "items": packBundleApplyActionSchema()},
 			"diff":                PackBundleDiffJSONSchema(),
 			"golden_tests":        goldenTestSummarySchema(),
 		},
@@ -233,6 +234,35 @@ func SaveJSONSchema(schema JSONSchema, path string) error {
 		return fmt.Errorf("cognisdk.schema: write %q: %w", path, err)
 	}
 	return nil
+}
+
+func packBundleApplyActionSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"kind", "message"},
+		"properties": map[string]any{
+			"kind": enumSchema(
+				string(PackBundleApplyActionKeepRollback),
+				string(PackBundleApplyActionVerifyDigest),
+				string(PackBundleApplyActionRequireReview),
+				string(PackBundleApplyActionStopBlocked),
+				string(PackBundleApplyActionAddPack),
+				string(PackBundleApplyActionReplacePack),
+				string(PackBundleApplyActionRemovePack),
+				string(PackBundleApplyActionEnablePack),
+				string(PackBundleApplyActionDisablePack),
+				string(PackBundleApplyActionNoop),
+				string(PackBundleApplyActionWriteCandidate),
+			),
+			"pack_id":      stringSchema(),
+			"from_version": stringSchema(),
+			"to_version":   stringSchema(),
+			"digest":       stringSchema(),
+			"bundle_id":    stringSchema(),
+			"message":      stringSchema(),
+		},
+	}
 }
 
 func goldenTestSummarySchema() map[string]any {

@@ -121,6 +121,8 @@
       "name": "packBundleApplyPlan",
       "symbols": [
         "PackBundleApplyPlan",
+        "PackBundleApplyActionKind",
+        "PackBundleApplyAction",
         "PlanPackBundleApply",
         "RenderPackBundleApplyPlanMarkdown"
       ]
