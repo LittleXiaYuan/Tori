@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 
 function usage() {
-  console.error("Usage: node scripts/scaffold-pack.mjs <slug> [--name <display-name>] [--route /v1/<slug>/ping] [--sdk yunque-client/<slug>]");
+  console.error("Usage: node scripts/scaffold-pack.mjs <slug> [--name <display-name>] [--route /v1/<slug>/ping] [--sdk yunque-client/<slug>] [--dry-run] [--json]");
   process.exit(1);
 }
 
@@ -14,6 +14,9 @@ function argValue(flag) {
   const index = args.indexOf(flag);
   return index >= 0 ? args[index + 1] : undefined;
 }
+
+const dryRun = args.includes("--dry-run");
+const jsonOutput = args.includes("--json");
 
 const slug = args[0];
 if (!slug || slug.startsWith("--")) usage();
@@ -137,13 +140,33 @@ Next steps:
 5. Run \`node scripts/check-pack-contract.mjs\`.
 `;
 
-for (const dir of [packDir, handlerDir, pageDir]) mkdirSync(dir, { recursive: true });
-writeFileSync(resolve(packDir, "pack.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-writeFileSync(resolve(packDir, "README.md"), readme, "utf8");
-writeFileSync(resolve(handlerDir, "handler.go"), handler, "utf8");
-writeFileSync(resolve(pageDir, "page.tsx"), page, "utf8");
+const files = [
+  { path: resolve(packDir, "pack.json"), content: `${JSON.stringify(manifest, null, 2)}\n` },
+  { path: resolve(packDir, "README.md"), content: readme },
+  { path: resolve(handlerDir, "handler.go"), content: handler },
+  { path: resolve(pageDir, "page.tsx"), content: page },
+];
+const directories = [packDir, handlerDir, pageDir];
+const result = {
+  slug,
+  packId: packID,
+  dryRun,
+  manifest,
+  directories: directories.map((path) => relative(repoRoot, path).replaceAll("\\", "/")),
+  files: files.map((file) => relative(repoRoot, file.path).replaceAll("\\", "/")),
+};
 
-console.log(`Pack scaffold created: ${slug}`);
-console.log(`- ${packDir}`);
-console.log(`- ${handlerDir}`);
-console.log(`- ${pageDir}`);
+if (!dryRun) {
+  for (const dir of directories) mkdirSync(dir, { recursive: true });
+  for (const file of files) writeFileSync(file.path, file.content, "utf8");
+}
+
+if (jsonOutput) {
+  console.log(JSON.stringify(result, null, 2));
+} else if (dryRun) {
+  console.log(`Pack scaffold dry run: ${slug}`);
+  for (const file of result.files) console.log(`- ${file}`);
+} else {
+  console.log(`Pack scaffold created: ${slug}`);
+  for (const dir of result.directories) console.log(`- ${dir}`);
+}
