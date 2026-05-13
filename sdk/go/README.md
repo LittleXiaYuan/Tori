@@ -525,3 +525,13 @@ _ = status
 _ = models
 _ = reply
 ```
+
+### Breaker SDK
+
+The lightweight `yunque.Breaker` namespace exposes `/api/breaker/reset` for Go plugins, CLIs, sidecars, and automation binaries that need to reset LLM provider circuit breakers without importing platform internals. Agent Kit also exposes it as `yunque.NewAgentKit().Breaker`.
+
+```go
+reset, err := yunque.Breaker.Reset(ctx)
+_ = reset
+_ = err
+```

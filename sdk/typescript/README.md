@@ -2406,3 +2406,14 @@ const reply = await airi.chatCompletions({
 });
 const streamItems = airi.streamChatCompletions({ messages: [{ role: "user", content: "hi" }] });
 ```
+
+### Breaker SDK
+
+The lightweight Breaker SDK exposes `/api/breaker/reset` as a focused operational helper for admin pages, plugins, CLIs, sidecars, and automation scripts that need to recover LLM provider circuit breakers without importing the full platform client. Agent Kit also exposes it as `kit.breaker`.
+
+```ts
+import { createBreakerClient } from "yunque-client/breaker";
+
+const breaker = createBreakerClient({ baseUrl: "http://localhost:9090", token: "<token>" });
+await breaker.reset();
+```

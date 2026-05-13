@@ -1993,6 +1993,18 @@ class _ModelsNamespace:
 models = _ModelsNamespace()
 
 
+
+# ── Breaker facade ──
+
+class _BreakerNamespace:
+    """Lightweight facade for LLM circuit breaker operations."""
+
+    def reset(self) -> dict:
+        return providers.reset_breakers()
+
+
+breaker = _BreakerNamespace()
+
 # ── Cognis / Cognitive Kernel (/v1/cognis) ──
 
 class _CognisNamespace:
@@ -3428,6 +3440,7 @@ class AgentKit:
         self.fork = fork
         self.cost = cost
         self.providers = providers
+        self.breaker = breaker
         self.models = models
         self.cognis = cognis
         self.trace = trace

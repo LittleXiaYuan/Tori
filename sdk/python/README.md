@@ -477,3 +477,13 @@ models = yunque.airi.models()
 reply = yunque.airi.chat_completions([{"role": "user", "content": "你好"}], model="yunque-airi")
 items = yunque.airi.parse_stream('data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n')
 ```
+
+### Breaker SDK
+
+The lightweight `yunque.breaker` namespace exposes `/api/breaker/reset` for Python plugins, CLIs, sidecars, and automation scripts that need to reset LLM provider circuit breakers without importing the generated full client. Agent Kit also exposes it as `create_agent_kit().breaker`.
+
+```python
+import yunque
+
+yunque.breaker.reset()
+```

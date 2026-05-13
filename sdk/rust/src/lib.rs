@@ -1466,6 +1466,7 @@ pub struct AgentKit {
     pub fork: ForkClient,
     pub cost: CostClient,
     pub providers: ProvidersClient,
+    pub breaker: BreakerClient,
     pub models: ModelsClient,
     pub cognis: CognisClient,
     pub trace: TraceClient,
@@ -1560,6 +1561,7 @@ impl AgentKit {
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
             cost: CostClient::new(base_url.clone(), token.as_ref())?,
             providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
+            breaker: BreakerClient::new(base_url.clone(), token.as_ref())?,
             models: ModelsClient::new(base_url.clone(), token.as_ref())?,
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             trace: TraceClient::new(base_url.clone(), token.as_ref())?,
@@ -1647,6 +1649,7 @@ impl AgentKit {
             fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
             providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            breaker: BreakerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             models: ModelsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -2885,6 +2888,27 @@ pub struct LocalRegisterRequest {
     pub backend: String,
 }
 
+
+
+/// Lightweight Breaker SDK facade over provider circuit-breaker operations.
+#[derive(Debug, Clone)]
+pub struct BreakerClient {
+    inner: ProvidersClient,
+}
+
+impl BreakerClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: ProvidersClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: ProvidersClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn reset(&self) -> Result<ProviderActionResponse, reqwest::Error> {
+        self.inner.reset_breakers().await
+    }
+}
 
 /// Lightweight Models SDK facade over `/v1/models`.
 #[derive(Debug, Clone)]
@@ -10077,6 +10101,12 @@ mod tests {
     fn state_client_trims_base_url() {
         let client = StateClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.url("/v1/state"), "http://localhost:9090/v1/state");
+    }
+
+    #[test]
+    fn breaker_client_trims_base_url() {
+        let breaker = BreakerClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(breaker.inner.url("/api/breaker/reset"), "http://localhost:9090/api/breaker/reset");
     }
 
     #[test]
