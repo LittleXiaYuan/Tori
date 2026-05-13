@@ -104,6 +104,47 @@ func TestRunExportSchemaToFile(t *testing.T) {
 	}
 }
 
+func TestRunExportAllSchemas(t *testing.T) {
+	dir := t.TempDir()
+	outDir := filepath.Join(dir, "schemas")
+	catalogPath := filepath.Join(dir, "schema-artifacts.json")
+	if err := run([]string{"export", outDir, "--catalog", catalogPath}); err != nil {
+		t.Fatalf("export all schemas: %v", err)
+	}
+	catalogData, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("read schema artifact catalog: %v", err)
+	}
+	if !json.Valid(catalogData) {
+		t.Fatalf("schema artifact catalog is not valid json: %s", catalogData)
+	}
+	var artifacts []map[string]any
+	if err := json.Unmarshal(catalogData, &artifacts); err != nil {
+		t.Fatalf("unmarshal schema artifact catalog: %v", err)
+	}
+	if len(artifacts) == 0 || artifacts[0]["file"] == "" {
+		t.Fatalf("unexpected schema artifact catalog: %#v", artifacts)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "pack-bundle.schema.json")); err != nil {
+		t.Fatalf("expected exported pack-bundle schema: %v", err)
+	}
+}
+
+func TestRunExportAllSchemasRejectsBadArgs(t *testing.T) {
+	err := run([]string{"export"})
+	if err == nil || !strings.Contains(err.Error(), "usage: cognisdk-schema export") {
+		t.Fatalf("expected export usage error, got %v", err)
+	}
+	err = run([]string{"export", t.TempDir(), "--catalog"})
+	if err == nil || !strings.Contains(err.Error(), "--catalog requires a path") {
+		t.Fatalf("expected catalog path error, got %v", err)
+	}
+	err = run([]string{"export", t.TempDir(), "--bad"})
+	if err == nil || !strings.Contains(err.Error(), "unknown export option") {
+		t.Fatalf("expected export unknown option error, got %v", err)
+	}
+}
+
 func TestRunRejectsUnknownSchema(t *testing.T) {
 	err := run([]string{"missing-schema"})
 	if err == nil || !strings.Contains(err.Error(), "unknown schema") {

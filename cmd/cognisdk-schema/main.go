@@ -48,6 +48,27 @@ func run(args []string) error {
 		fmt.Print(text)
 		return nil
 	}
+	if args[0] == "export" {
+		exportOptions, err := parseExportOptions(args[1:])
+		if err != nil {
+			return err
+		}
+		artifacts, err := cognisdk.ExportJSONSchemaArtifacts(exportOptions.Dir)
+		if err != nil {
+			return err
+		}
+		if exportOptions.Catalog != "" {
+			data, err := json.MarshalIndent(artifacts, "", "  ")
+			if err != nil {
+				return err
+			}
+			return writeTextFile(exportOptions.Catalog, string(data)+"\n")
+		}
+		for _, artifact := range artifacts {
+			fmt.Println(artifact.File)
+		}
+		return nil
+	}
 
 	schema, ok := cognisdk.JSONSchemaByName(args[0])
 	if !ok {
@@ -70,6 +91,7 @@ func run(args []string) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-schema list [--json] [--with-schema] [--out schema-catalog.json]")
+	fmt.Println("  cognisdk-schema export <output-dir> [--catalog schema-artifacts.json]")
 	fmt.Println("  cognisdk-schema <schema-name> [output.json]")
 	fmt.Println("")
 	fmt.Println("Schema names:")
@@ -104,6 +126,37 @@ func parseListOptions(args []string) (listOptions, error) {
 	}
 	if opts.WithSchema && !opts.JSON {
 		return listOptions{}, fmt.Errorf("--with-schema requires --json")
+	}
+	return opts, nil
+}
+
+type exportOptions struct {
+	Dir     string
+	Catalog string
+}
+
+func parseExportOptions(args []string) (exportOptions, error) {
+	var opts exportOptions
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--catalog":
+			if i+1 >= len(args) {
+				return exportOptions{}, fmt.Errorf("--catalog requires a path")
+			}
+			opts.Catalog = args[i+1]
+			i++
+		default:
+			if strings.HasPrefix(args[i], "-") {
+				return exportOptions{}, fmt.Errorf("unknown export option %q", args[i])
+			}
+			if opts.Dir != "" {
+				return exportOptions{}, fmt.Errorf("usage: cognisdk-schema export <output-dir> [--catalog schema-artifacts.json]")
+			}
+			opts.Dir = args[i]
+		}
+	}
+	if opts.Dir == "" {
+		return exportOptions{}, fmt.Errorf("usage: cognisdk-schema export <output-dir> [--catalog schema-artifacts.json]")
 	}
 	return opts, nil
 }
