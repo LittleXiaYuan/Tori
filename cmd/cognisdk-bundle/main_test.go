@@ -280,6 +280,25 @@ func TestRunDigestBundle(t *testing.T) {
 	}
 }
 
+func TestRunActionKinds(t *testing.T) {
+	if err := run([]string{"action-kinds"}); err != nil {
+		t.Fatalf("action-kinds: %v", err)
+	}
+	if err := run([]string{"action-kinds", "--markdown"}); err != nil {
+		t.Fatalf("action-kinds markdown: %v", err)
+	}
+	if err := run([]string{"action-kinds", "extra"}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle action-kinds") {
+		t.Fatalf("expected action-kinds usage error, got %v", err)
+	}
+}
+
+func TestRenderApplyActionKindsMarkdown(t *testing.T) {
+	markdown := renderApplyActionKindsMarkdown([]cognisdk.PackBundleApplyActionKind{cognisdk.PackBundleApplyActionAddPack})
+	if !strings.Contains(markdown, "Cogni Pack Bundle Apply Action Kinds") || !strings.Contains(markdown, "add_pack") {
+		t.Fatalf("unexpected action kinds markdown: %s", markdown)
+	}
+}
+
 func TestRunActionsBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")
