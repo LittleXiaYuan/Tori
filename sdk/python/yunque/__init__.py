@@ -3454,6 +3454,20 @@ class _PluginAgentMemoryNamespace:
 
 plugin_agent_memory = _PluginAgentMemoryNamespace()
 
+class _PluginCronNamespace:
+    """Standalone plugin-scoped cron helper for plugins and automation scripts."""
+
+    def add(self, name: str, expr: str, message: str) -> str:
+        return cron.add(expr, name, message)
+
+    def remove(self, job_id: str) -> bool:
+        return cron.remove(job_id)
+
+    def list(self) -> list[dict]:
+        return cron.list()
+
+plugin_cron = _PluginCronNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3651,6 +3665,7 @@ class AgentKit:
         self.plugin_memory = plugin_memory
         self.plugin_knowledge = plugin_knowledge
         self.plugin_agent_memory = plugin_agent_memory
+        self.plugin_cron = plugin_cron
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
