@@ -4,7 +4,7 @@
   "description": "Local experimental Cognition SDK package and CLI surfaces for declarative Cogni Pack bundles, feedback proposals, schemas, review gates, and rollback-friendly automation.",
   "principles": [
     "Expose cognition state and pack bundle capabilities as a small Go SDK instead of platform-only internals.",
-    "Keep bundle review, golden tests, schema export, and promote flows non-mutating until a caller explicitly writes files.",
+    "Keep bundle review, digest checks, golden tests, schema export, and promote flows non-mutating until a caller explicitly writes files.",
     "Make package and CLI entrypoints directly usable by external projects, frontends, plugins, CI, and automation scripts."
   ],
   "goPackage": {
