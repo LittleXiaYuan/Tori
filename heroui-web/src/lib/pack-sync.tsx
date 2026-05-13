@@ -2,7 +2,27 @@
 
 import type React from "react";
 import { HardDriveDownload, Package, Puzzle } from "lucide-react";
-import { api, type InstalledPack, type PackFrontendMenu } from "@/lib/api";
+import { api, type InstalledPack, type PackDistributionManifest, type PackFrontendAssets, type PackFrontendMenu } from "@/lib/api";
+
+
+export interface PackSdkEntrypoint {
+  packId: string;
+  packName: string;
+  language: string;
+  importPath: string;
+}
+
+export interface PackRouteBinding {
+  pack: InstalledPack;
+  packId: string;
+  packName: string;
+  path: string;
+  component: string;
+  title?: string;
+  assets?: PackFrontendAssets;
+  distribution?: PackDistributionManifest;
+  sdk: PackSdkEntrypoint[];
+}
 
 export interface PackNavItem {
   href: string;
@@ -51,3 +71,48 @@ export function buildPackNavItems(packs: InstalledPack[]): PackNavItem[] {
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 }
 
+
+
+export function normalizePackRoutePath(path: string): string {
+  const trimmed = path.trim().replace(/\/+$/, "");
+  return trimmed || "/";
+}
+
+export function buildPackSdkEntrypoints(pack: InstalledPack): PackSdkEntrypoint[] {
+  return Object.entries(pack.manifest.sdk || {})
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0)
+    .map(([language, importPath]) => ({
+      packId: pack.manifest.id,
+      packName: pack.manifest.name,
+      language,
+      importPath,
+    }));
+}
+
+export function buildPackRouteBindings(packs: InstalledPack[]): PackRouteBinding[] {
+  return packs.flatMap((pack) => {
+    const sdk = buildPackSdkEntrypoints(pack);
+    return (pack.manifest.frontend?.routes || []).map((route) => ({
+      pack,
+      packId: pack.manifest.id,
+      packName: pack.manifest.name,
+      path: route.path,
+      component: route.component,
+      title: route.title,
+      assets: pack.manifest.frontend?.assets,
+      distribution: pack.manifest.distribution,
+      sdk,
+    }));
+  });
+}
+
+export function findPackRouteBinding(packs: InstalledPack[], pathname: string): PackRouteBinding | undefined {
+  const current = normalizePackRoutePath(pathname);
+  return buildPackRouteBindings(packs).find((route) => normalizePackRoutePath(route.path) === current);
+}
+
+
+export function packSdkImportSnippet(language: string, importPath: string): string {
+  if (language === "typescript") return `import * as packSdk from "${importPath}";`;
+  return `${language}:${importPath}`;
+}
