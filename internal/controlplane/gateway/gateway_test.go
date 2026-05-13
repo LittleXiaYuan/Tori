@@ -21,6 +21,10 @@ import (
 )
 
 func newTestGateway() (*Gateway, *tenant.Manager) {
+	return newTestGatewayWithConfig(GatewayConfig{})
+}
+
+func newTestGatewayWithConfig(cfg GatewayConfig) (*Gateway, *tenant.Manager) {
 	reg := skills.NewRegistry()
 	llmClient := llm.NewClient("http://localhost:0", "test", "test")
 	p := planner.NewPlanner(llmClient, reg, 8)
@@ -33,7 +37,15 @@ func newTestGateway() (*Gateway, *tenant.Manager) {
 	cs := session.NewStore(50)
 	pr := plugin.NewRegistry()
 	jwtCfg := &JWTConfig{Secret: "test-secret", Issuer: "test", Expiration: time.Hour}
-	gw := New(p, tm, mm, reg, sched, cs, pr, nil, nil, jwtCfg, nil, nil, nil)
+	cfg.Planner = p
+	cfg.Tenants = tm
+	cfg.Memory = mm
+	cfg.Skills = reg
+	cfg.Scheduler = sched
+	cfg.ConvStore = cs
+	cfg.Plugins = pr
+	cfg.JWTConfig = jwtCfg
+	gw := NewFromConfig(cfg)
 	gw.SetLedgerHealthChecker(fakeHealthChecker{})
 	return gw, tm
 }

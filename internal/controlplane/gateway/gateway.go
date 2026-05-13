@@ -132,6 +132,7 @@ type Gateway struct {
 
 	// ── Pack Runtime / Plugins / Skills ────────
 	packRegistry          *packruntime.Registry
+	backendPacks          []packruntime.BackendModule
 	registry              *skills.Registry
 	pluginReg             *plugin.Registry
 	pluginLoader          *plugin.Loader
@@ -377,6 +378,10 @@ type GatewayConfig struct {
 	Pipeline  *memory.Pipeline
 	Persona   *persona.Persona
 	Packs     *packruntime.Registry
+
+	// BackendPacks are optional capability-pack HTTP modules mounted by the
+	// Pack Runtime host. If omitted, Gateway mounts the built-in pack modules.
+	BackendPacks []packruntime.BackendModule
 }
 
 // New creates a new Gateway.
@@ -412,6 +417,7 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		pipeline:        cfg.Pipeline,
 		persona:         cfg.Persona,
 		packRegistry:    cfg.Packs,
+		backendPacks:    cfg.BackendPacks,
 		limiter:         NewRateLimiter(30, time.Minute),
 		usage:           NewUsageTracker(),
 		mux:             http.NewServeMux(),
