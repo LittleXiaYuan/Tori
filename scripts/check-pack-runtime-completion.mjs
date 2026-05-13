@@ -252,6 +252,8 @@ requireTokens("脚手架和可回滚工程化", scaffold + fullVerification + do
   "check-pack-scaffold.mjs",
   "-pack-client.ts",
   "-pack-client.test.ts",
+  "frontend.menus[].path",
+  "frontend.routes[].path",
   "distribution.packageUrl",
   "update.rollback=true",
   "GatewayConfig.BackendPacks",
