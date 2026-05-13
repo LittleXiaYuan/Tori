@@ -22,23 +22,26 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "list" {
-		if len(args) > 2 {
-			return fmt.Errorf("usage: cognisdk-schema list [--json]")
+		listOptions, err := parseListOptions(args[1:])
+		if err != nil {
+			return err
 		}
-		if len(args) == 2 {
-			if args[1] != "--json" {
-				return fmt.Errorf("unknown list option %q", args[1])
-			}
+		if listOptions.JSON {
 			data, err := json.MarshalIndent(cognisdk.JSONSchemaInfos(), "", "  ")
 			if err != nil {
 				return err
 			}
+			if listOptions.Out != "" {
+				return writeTextFile(listOptions.Out, string(data)+"\n")
+			}
 			fmt.Println(string(data))
 			return nil
 		}
-		for _, name := range cognisdk.JSONSchemaNames() {
-			fmt.Println(name)
+		text := strings.Join(cognisdk.JSONSchemaNames(), "\n") + "\n"
+		if listOptions.Out != "" {
+			return writeTextFile(listOptions.Out, text)
 		}
+		fmt.Print(text)
 		return nil
 	}
 
@@ -62,11 +65,42 @@ func run(args []string) error {
 
 func printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println("  cognisdk-schema list [--json]")
+	fmt.Println("  cognisdk-schema list [--json] [--out schema-catalog.json]")
 	fmt.Println("  cognisdk-schema <schema-name> [output.json]")
 	fmt.Println("")
 	fmt.Println("Schema names:")
 	for _, name := range cognisdk.JSONSchemaNames() {
 		fmt.Printf("  - %s\n", name)
 	}
+}
+
+type listOptions struct {
+	JSON bool
+	Out  string
+}
+
+func parseListOptions(args []string) (listOptions, error) {
+	var opts listOptions
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--json":
+			opts.JSON = true
+		case "--out":
+			if i+1 >= len(args) {
+				return listOptions{}, fmt.Errorf("--out requires a path")
+			}
+			opts.Out = args[i+1]
+			i++
+		default:
+			return listOptions{}, fmt.Errorf("unknown list option %q", args[i])
+		}
+	}
+	return opts, nil
+}
+
+func writeTextFile(path, value string) error {
+	if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+		return fmt.Errorf("write %q: %w", path, err)
+	}
+	return nil
 }

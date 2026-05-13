@@ -172,7 +172,8 @@
         "list"
       ],
       "flags": [
-        "--json"
+        "--json",
+        "--out"
       ],
       "schemas": [
         "pack-manifest",

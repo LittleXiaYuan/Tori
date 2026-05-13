@@ -17,14 +17,47 @@ func TestRunListSchemas(t *testing.T) {
 	}
 }
 
+func TestRunListSchemasOut(t *testing.T) {
+	dir := t.TempDir()
+	textOut := filepath.Join(dir, "schemas.txt")
+	jsonOut := filepath.Join(dir, "schemas.json")
+	if err := run([]string{"list", "--out", textOut}); err != nil {
+		t.Fatalf("list schemas out: %v", err)
+	}
+	textData, err := os.ReadFile(textOut)
+	if err != nil {
+		t.Fatalf("read list output: %v", err)
+	}
+	if !strings.Contains(string(textData), "pack-bundle") {
+		t.Fatalf("list output missing pack-bundle: %s", textData)
+	}
+	if err := run([]string{"list", "--json", "--out", jsonOut}); err != nil {
+		t.Fatalf("list schemas json out: %v", err)
+	}
+	jsonData, err := os.ReadFile(jsonOut)
+	if err != nil {
+		t.Fatalf("read list json output: %v", err)
+	}
+	if !json.Valid(jsonData) {
+		t.Fatalf("list json output is not valid json: %s", jsonData)
+	}
+	var infos []map[string]any
+	if err := json.Unmarshal(jsonData, &infos); err != nil {
+		t.Fatalf("unmarshal list json output: %v", err)
+	}
+	if len(infos) == 0 || infos[0]["name"] == "" {
+		t.Fatalf("unexpected list json output: %#v", infos)
+	}
+}
+
 func TestRunListRejectsUnknownOption(t *testing.T) {
 	err := run([]string{"list", "--bad"})
 	if err == nil || !strings.Contains(err.Error(), "unknown list option") {
 		t.Fatalf("expected unknown list option error, got %v", err)
 	}
-	err = run([]string{"list", "--json", "extra"})
-	if err == nil || !strings.Contains(err.Error(), "usage: cognisdk-schema list") {
-		t.Fatalf("expected list usage error, got %v", err)
+	err = run([]string{"list", "--out"})
+	if err == nil || !strings.Contains(err.Error(), "--out requires a path") {
+		t.Fatalf("expected list out path error, got %v", err)
 	}
 }
 
