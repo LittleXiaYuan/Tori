@@ -195,4 +195,20 @@ func TestBackupRoutesArePackGated(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected enabled pack route to be 200, got %d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/backup/info", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected registered backend pack method gate to be 405, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/backup/export", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected undeclared manifest route to be 404, got %d body=%s", w.Code, w.Body.String())
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	backuppack "yunque-agent/internal/packs/backup"
 	"yunque-agent/pkg/packruntime"
 )
 
@@ -31,13 +32,31 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
 	g.mux.HandleFunc("/v1/packs/rollback", g.requireAuth(g.handlePackRollback))
-	g.registerBackupPackRoutes()
+	g.registerBuiltinBackendPacks()
 }
 
-func (g *Gateway) registerBackupPackRoutes() {
-	g.mux.HandleFunc("/v1/backup/export", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/export", g.handleBackupExport)))
-	g.mux.HandleFunc("/v1/backup/import", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/import", g.handleBackupImport)))
-	g.mux.HandleFunc("/v1/backup/info", g.requireAuth(g.requirePackRoute("yunque.pack.backup", "/v1/backup/info", g.handleBackupInfo)))
+func (g *Gateway) registerBuiltinBackendPacks() {
+	g.registerBackendPack(backuppack.DefaultHandler())
+}
+
+func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
+	if module == nil {
+		return
+	}
+	packID := module.PackID()
+	for _, route := range module.Routes() {
+		route := route
+		if strings.TrimSpace(route.Path) == "" || route.Handler == nil {
+			continue
+		}
+		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if route.Method != "" && r.Method != route.Method {
+				writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+				return
+			}
+			route.Handler(w, r)
+		})))
+	}
 }
 
 func (g *Gateway) requirePackRoute(packID string, route string, next http.HandlerFunc) http.HandlerFunc {

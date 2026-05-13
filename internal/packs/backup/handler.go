@@ -20,7 +20,10 @@ import (
 	"yunque-agent/internal/appdir"
 	"yunque-agent/internal/apperror"
 	"yunque-agent/internal/version"
+	"yunque-agent/pkg/packruntime"
 )
+
+const PackID = "yunque.pack.backup"
 
 // Manifest describes the content of a backup archive.
 type Manifest struct {
@@ -68,6 +71,20 @@ func New(cfg Config) *Handler {
 // is being extracted.
 func DefaultHandler() *Handler {
 	return New(Config{})
+}
+
+// PackID returns the stable manifest id for the built-in backup pack.
+func (h *Handler) PackID() string {
+	return PackID
+}
+
+// Routes exposes the backup pack HTTP API to the Pack Runtime host.
+func (h *Handler) Routes() []packruntime.BackendRoute {
+	return []packruntime.BackendRoute{
+		{Method: http.MethodGet, Path: "/v1/backup/info", Handler: h.Info},
+		{Method: http.MethodGet, Path: "/v1/backup/export", Handler: h.Export},
+		{Method: http.MethodPost, Path: "/v1/backup/import", Handler: h.Import},
+	}
 }
 
 var relFiles = []string{
