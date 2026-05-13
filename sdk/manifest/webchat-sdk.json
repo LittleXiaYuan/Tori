@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "webchat-embed",
+  "description": "Cross-language lightweight SDK entrypoints for WebChat widget URL construction, embed snippet generation, and widget script fetching without importing the full platform client.",
+  "principles": [
+    "Expose embeddable WebChat wiring as a focused SDK slice for external websites, front-end pages, plugin UIs, sidecars, and automation scripts.",
+    "Keep widget URL construction and script tag generation local-first, with optional direct widget.js fetch through the public route.",
+    "Make WebChat access available through Agent Kit so external integrations can compose chat, realtime, files, and embed helpers from one lightweight bundle."
+  ],
+  "routes": [
+    "GET /v1/webchat/widget.js",
+    "local embed snippet"
+  ],
+  "capabilities": [
+    {
+      "name": "widgetUrl",
+      "route": "GET /v1/webchat/widget.js",
+      "readOnly": true,
+      "description": "Build the public WebChat widget script URL."
+    },
+    {
+      "name": "widgetScript",
+      "route": "GET /v1/webchat/widget.js",
+      "readOnly": true,
+      "description": "Fetch the self-contained widget JavaScript."
+    },
+    {
+      "name": "embedSnippet",
+      "route": "local embed snippet",
+      "readOnly": true,
+      "description": "Build a script tag for embedding WebChat on an external page."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/webchat.ts",
+        "sdk/typescript/src/webchat-widget.ts",
+        "sdk/typescript/src/webchat-embed.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "widgetUrl": "createWebChatClient().widgetUrl",
+        "widgetScript": "createWebChatClient().widgetScript",
+        "embedSnippet": "createWebChatClient().embedSnippet"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "widgetUrl": "yunque.WebChat.WidgetURL",
+        "widgetScript": "yunque.WebChat.WidgetScript",
+        "embedSnippet": "yunque.WebChat.EmbedSnippet"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "widgetUrl": "yunque.webchat.widget_url",
+        "widgetScript": "yunque.webchat.widget_script",
+        "embedSnippet": "yunque.webchat.embed_snippet"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "widgetUrl": "WebChatClient::widget_url",
+        "widgetScript": "WebChatClient::widget_script",
+        "embedSnippet": "WebChatClient::embed_snippet"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

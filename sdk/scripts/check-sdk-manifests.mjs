@@ -56,6 +56,7 @@ const checks = [
   ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
   ["Realtime SDK manifest", "sdk/scripts/check-realtime-sdk-manifest.mjs"],
   ["Chat SDK manifest", "sdk/scripts/check-chat-sdk-manifest.mjs"],
+  ["WebChat SDK manifest", "sdk/scripts/check-webchat-sdk-manifest.mjs"],
   ["Conversations SDK manifest", "sdk/scripts/check-conversations-sdk-manifest.mjs"],
   ["Approvals SDK manifest", "sdk/scripts/check-approvals-sdk-manifest.mjs"],
   ["RBAC SDK manifest", "sdk/scripts/check-rbac-sdk-manifest.mjs"],

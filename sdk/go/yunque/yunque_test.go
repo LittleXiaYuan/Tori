@@ -3897,3 +3897,20 @@ func TestDocumentsNamespaceGeneratesArtifacts(t *testing.T) {
 	if NewAgentKit().Documents != Documents { t.Fatalf("agent kit should expose Documents namespace") }
 	if len(seen) != 5 { t.Fatalf("expected 5 requests, got %d: %v", len(seen), seen) }
 }
+
+
+func TestWebChatNamespaceBuildsWidgetHelpers(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/webchat/widget.js" { t.Fatalf("unexpected request: %s", r.URL.String()) }
+		w.Header().Set("Content-Type", "application/javascript")
+		_, _ = w.Write([]byte("console.log('ok')"))
+	})
+	url := WebChat.WidgetURL()
+	snippet, err := WebChat.EmbedSnippet(WebChatEmbedOptions{APIKey: "key&1", Title: `Tori "Chat"`, Theme: "dark"})
+	if err != nil { t.Fatal(err) }
+	script, err := WebChat.WidgetScript(context.Background())
+	if err != nil { t.Fatal(err) }
+	if !strings.HasSuffix(url, "/v1/webchat/widget.js") || !strings.Contains(snippet, `data-api-key="key&amp;1"`) || !strings.Contains(snippet, `data-title="Tori &quot;Chat&quot;"`) || script != "console.log('ok')" { t.Fatalf("unexpected webchat helpers: %s %s %s", url, snippet, script) }
+	if _, err := WebChat.EmbedSnippet(WebChatEmbedOptions{}); err == nil { t.Fatalf("expected missing APIKey error") }
+	if NewAgentKit().WebChat != WebChat { t.Fatalf("agent kit should expose WebChat namespace") }
+}
