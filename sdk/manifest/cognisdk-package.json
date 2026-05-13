@@ -133,6 +133,7 @@
         "PackBundleApplyActionKindInfos",
         "DescribePackBundleApplyActionKind",
         "BuildPackBundleApplyChecklist",
+        "FilterPackBundleApplyChecklistItems",
         "FilterPackBundleApplyActions",
         "KnownPackBundleApplyActionKind",
         "Actions",

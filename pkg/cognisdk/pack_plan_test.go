@@ -205,6 +205,27 @@ func TestBuildPackBundleApplyChecklistBlocked(t *testing.T) {
 	}
 }
 
+func TestFilterPackBundleApplyChecklistItems(t *testing.T) {
+	items := []PackBundleApplyChecklistItem{
+		{Kind: PackBundleApplyActionKeepRollback, Message: "keep"},
+		{Kind: PackBundleApplyActionAddPack, Message: "add"},
+		{Kind: PackBundleApplyActionWriteCandidate, Message: "write"},
+	}
+	if got := FilterPackBundleApplyChecklistItems(items); len(got) != len(items) {
+		t.Fatalf("no-kind checklist filter changed items: %#v", got)
+	}
+	filtered := FilterPackBundleApplyChecklistItems(items, PackBundleApplyActionAddPack, PackBundleApplyActionWriteCandidate)
+	if len(filtered) != 2 {
+		t.Fatalf("expected two filtered checklist items, got %#v", filtered)
+	}
+	if filtered[0].Kind != PackBundleApplyActionAddPack || filtered[1].Kind != PackBundleApplyActionWriteCandidate {
+		t.Fatalf("unexpected filtered checklist items: %#v", filtered)
+	}
+	if got := FilterPackBundleApplyChecklistItems(items, PackBundleApplyActionRemovePack); len(got) != 0 {
+		t.Fatalf("expected empty checklist filter result, got %#v", got)
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",
