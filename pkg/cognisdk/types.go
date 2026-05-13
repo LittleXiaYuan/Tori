@@ -201,6 +201,8 @@ const (
 type PackBundleReview struct {
 	FromID           string                  `json:"from_id" yaml:"from_id"`
 	CandidateID      string                  `json:"candidate_id" yaml:"candidate_id"`
+	FromDigest       string                  `json:"from_digest,omitempty" yaml:"from_digest,omitempty"`
+	CandidateDigest  string                  `json:"candidate_digest,omitempty" yaml:"candidate_digest,omitempty"`
 	Outcome          PackBundleReviewOutcome `json:"outcome" yaml:"outcome"`
 	Reason           string                  `json:"reason" yaml:"reason"`
 	RollbackBundleID string                  `json:"rollback_bundle_id,omitempty" yaml:"rollback_bundle_id,omitempty"`
@@ -212,6 +214,7 @@ type PackBundleReview struct {
 type PackBundleSummary struct {
 	ID              string       `json:"id" yaml:"id"`
 	Version         int          `json:"version" yaml:"version"`
+	Digest          string       `json:"digest,omitempty" yaml:"digest,omitempty"`
 	PackCount       int          `json:"pack_count" yaml:"pack_count"`
 	EnabledCount    int          `json:"enabled_count" yaml:"enabled_count"`
 	DisabledCount   int          `json:"disabled_count" yaml:"disabled_count"`

@@ -25,6 +25,9 @@ func TestReviewPackBundleCandidateReady(t *testing.T) {
 	if review.RollbackBundleID != current.ID {
 		t.Fatalf("rollback bundle id = %q, want %q", review.RollbackBundleID, current.ID)
 	}
+	if !strings.HasPrefix(review.FromDigest, "sha256:") || !strings.HasPrefix(review.CandidateDigest, "sha256:") {
+		t.Fatalf("review missing bundle digests: %#v", review)
+	}
 	if review.GoldenTests.Failed != 0 {
 		t.Fatalf("expected golden tests to pass: %#v", review.GoldenTests)
 	}
