@@ -45,6 +45,7 @@
     "permissions-facade",
     "auth-bootstrap",
     "tasks-runtime",
+    "bots-inbox",
     "proactive-reverie",
     "chat-runtime",
     "conversation-sessions",
@@ -245,6 +246,10 @@
       "description": "Access the lightweight Tasks client or namespace for task CRUD and lifecycle operations."
     },
     {
+      "name": "bots",
+      "description": "Access the lightweight Bots and Inbox client or namespace for bot CRUD, inbox operations, and channel group reads."
+    },
+    {
       "name": "reverie",
       "description": "Access the lightweight Reverie proactive thought loop client or namespace."
     },
@@ -347,7 +352,8 @@
         "federation": "AgentKit.federation",
         "planner": "AgentKit.planner",
         "ide": "AgentKit.ide",
-        "discovery": "createAgentKit().discovery"
+        "discovery": "createAgentKit().discovery",
+        "bots": "createAgentKit().bots"
       }
     },
     "go": {
@@ -415,7 +421,8 @@
         "federation": "AgentKit.Federation",
         "planner": "AgentKit.Planner",
         "ide": "AgentKit.IDE",
-        "discovery": "NewAgentKit().Discovery"
+        "discovery": "NewAgentKit().Discovery",
+        "bots": "yunque.NewAgentKit().Bots"
       }
     },
     "python": {
@@ -483,7 +490,8 @@
         "federation": "AgentKit.federation",
         "planner": "AgentKit.planner",
         "ide": "AgentKit.ide",
-        "discovery": "create_agent_kit().discovery"
+        "discovery": "create_agent_kit().discovery",
+        "bots": "yunque.create_agent_kit().bots"
       }
     },
     "rust": {
@@ -551,7 +559,8 @@
         "federation": "AgentKit::federation",
         "planner": "AgentKit::planner",
         "ide": "AgentKit::ide",
-        "discovery": "AgentKit::discovery"
+        "discovery": "AgentKit::discovery",
+        "bots": "AgentKit::bots"
       }
     }
   },
