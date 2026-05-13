@@ -677,3 +677,7 @@ The lightweight Identity SDK exposes cross-channel identity resolution and profi
 ### Embeddings SDK
 
 The lightweight Embeddings SDK exposes embedding provider listing and text embedding helpers for external knowledge tools, plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/embeddings`; Agent Kit also exposes this surface as `kit.embeddings` / `kit.Embeddings`.
+
+### Search SDK
+
+The lightweight Search SDK exposes web search and search-provider listing helpers for external research tools, plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/search` and `/v1/search/providers`; Agent Kit also exposes this surface as `kit.search` / `kit.WebSearch`.
