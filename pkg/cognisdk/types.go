@@ -246,6 +246,22 @@ type PackBundleApplyActionKindInfo struct {
 	Description string                    `json:"description" yaml:"description"`
 }
 
+// PackBundleApplyChecklistItem is a host-facing checklist row derived from a
+// dry-run apply plan. It adds display metadata while preserving the original
+// action payload, so frontends and installers can render a guided flow without
+// mutating the active bundle.
+type PackBundleApplyChecklistItem struct {
+	Kind        PackBundleApplyActionKind     `json:"kind" yaml:"kind"`
+	Label       string                        `json:"label" yaml:"label"`
+	Description string                        `json:"description" yaml:"description"`
+	Required    bool                          `json:"required" yaml:"required"`
+	Done        bool                          `json:"done" yaml:"done"`
+	Blocked     bool                          `json:"blocked" yaml:"blocked"`
+	Message     string                        `json:"message" yaml:"message"`
+	Action      *PackBundleApplyAction        `json:"action,omitempty" yaml:"action,omitempty"`
+	Info        PackBundleApplyActionKindInfo `json:"info" yaml:"info"`
+}
+
 // PackBundleApplyAction is a structured, frontend/script-friendly action entry
 // derived from the bundle diff and review gate.
 type PackBundleApplyAction struct {

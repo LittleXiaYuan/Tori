@@ -250,6 +250,49 @@ func DescribePackBundleApplyActionKind(kind PackBundleApplyActionKind) (PackBund
 	return PackBundleApplyActionKindInfo{}, false
 }
 
+// BuildPackBundleApplyChecklist converts a dry-run apply plan into rows that
+// external installers, plugin UIs, and CI dashboards can render directly. The
+// checklist is descriptive only: it never writes files or marks actions done.
+func BuildPackBundleApplyChecklist(plan PackBundleApplyPlan) []PackBundleApplyChecklistItem {
+	items := make([]PackBundleApplyChecklistItem, 0, len(plan.Actions))
+	for _, action := range plan.Actions {
+		info, ok := DescribePackBundleApplyActionKind(action.Kind)
+		if !ok {
+			info = PackBundleApplyActionKindInfo{
+				Kind:        action.Kind,
+				Label:       string(action.Kind),
+				Description: "Unknown apply action kind.",
+			}
+		}
+		actionCopy := action
+		items = append(items, PackBundleApplyChecklistItem{
+			Kind:        action.Kind,
+			Label:       info.Label,
+			Description: info.Description,
+			Required:    applyActionKindRequired(action.Kind),
+			Done:        false,
+			Blocked:     action.Kind == PackBundleApplyActionStopBlocked || plan.Blocked,
+			Message:     action.Message,
+			Action:      &actionCopy,
+			Info:        info,
+		})
+	}
+	return items
+}
+
+func applyActionKindRequired(kind PackBundleApplyActionKind) bool {
+	switch kind {
+	case PackBundleApplyActionKeepRollback,
+		PackBundleApplyActionVerifyDigest,
+		PackBundleApplyActionRequireReview,
+		PackBundleApplyActionStopBlocked,
+		PackBundleApplyActionWriteCandidate:
+		return true
+	default:
+		return false
+	}
+}
+
 // FilterPackBundleApplyActions returns only actions whose Kind matches one of
 // the requested kinds. Passing no kinds returns the original action slice. The
 // helper is intentionally non-mutating so external installers, plugin hooks,

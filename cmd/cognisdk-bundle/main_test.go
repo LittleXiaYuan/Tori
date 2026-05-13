@@ -448,6 +448,65 @@ func TestRunActionsBundle(t *testing.T) {
 	}
 }
 
+func TestRunChecklistBundle(t *testing.T) {
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.json")
+	candidate := filepath.Join(dir, "candidate.json")
+	checklistOut := filepath.Join(dir, "checklist.json")
+	checklistMarkdownOut := filepath.Join(dir, "checklist.md")
+	if err := run([]string{"init", current}); err != nil {
+		t.Fatalf("init current: %v", err)
+	}
+	if err := run([]string{"init", candidate, "--builtin"}); err != nil {
+		t.Fatalf("init candidate: %v", err)
+	}
+	if err := run([]string{"checklist", current, candidate}); err != nil {
+		t.Fatalf("checklist bundle: %v", err)
+	}
+	if err := run([]string{"checklist", current, candidate, "--markdown"}); err != nil {
+		t.Fatalf("checklist bundle markdown: %v", err)
+	}
+	if err := run([]string{"checklist", current, candidate, "--out", checklistOut}); err != nil {
+		t.Fatalf("checklist bundle out: %v", err)
+	}
+	data, err := os.ReadFile(checklistOut)
+	if err != nil {
+		t.Fatalf("read checklist output: %v", err)
+	}
+	var checklist []cognisdk.PackBundleApplyChecklistItem
+	if err := json.Unmarshal(data, &checklist); err != nil {
+		t.Fatalf("checklist output is not json: %v", err)
+	}
+	if len(checklist) == 0 || checklist[0].Kind != cognisdk.PackBundleApplyActionKeepRollback || checklist[0].Label == "" {
+		t.Fatalf("unexpected checklist output: %#v", checklist)
+	}
+	if err := run([]string{"checklist", current, candidate, "--out", checklistMarkdownOut, "--markdown"}); err != nil {
+		t.Fatalf("checklist bundle markdown out: %v", err)
+	}
+	markdownData, err := os.ReadFile(checklistMarkdownOut)
+	if err != nil {
+		t.Fatalf("read checklist markdown output: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Cogni Pack Bundle Apply Checklist") {
+		t.Fatalf("checklist markdown missing heading: %s", markdownData)
+	}
+	if err := run([]string{"checklist", current}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle checklist") {
+		t.Fatalf("expected checklist usage error, got %v", err)
+	}
+}
+
+func TestRenderApplyChecklistMarkdown(t *testing.T) {
+	markdown := renderApplyChecklistMarkdown([]cognisdk.PackBundleApplyChecklistItem{{
+		Kind:     cognisdk.PackBundleApplyActionVerifyDigest,
+		Label:    "Verify digest",
+		Required: true,
+		Message:  "verify current digest",
+	}})
+	if !strings.Contains(markdown, "Cogni Pack Bundle Apply Checklist") || !strings.Contains(markdown, "Verify digest") || !strings.Contains(markdown, "required") {
+		t.Fatalf("unexpected checklist markdown: %s", markdown)
+	}
+}
+
 func TestRunPlanBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")

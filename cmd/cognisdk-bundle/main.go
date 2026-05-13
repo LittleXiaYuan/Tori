@@ -216,6 +216,39 @@ func run(args []string) error {
 		}
 		return enforcePlanGate(plan, planOptions)
 
+	case "checklist":
+		planOptions, normalizedArgs, err := parsePlanOptions(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
+		if len(args) != 3 {
+			return fmt.Errorf("usage: cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--fail-on-review] [--fail-on-blocked]")
+		}
+		current, candidate, err := loadPair(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		plan, err := cognisdk.PlanPackBundleApply(context.Background(), *current, *candidate)
+		if err != nil {
+			return err
+		}
+		checklist := cognisdk.BuildPackBundleApplyChecklist(plan)
+		if planOptions.Out != "" {
+			if markdown {
+				if err := saveTextFile(renderApplyChecklistMarkdown(checklist), planOptions.Out); err != nil {
+					return err
+				}
+			} else if err := saveJSONFile(checklist, planOptions.Out); err != nil {
+				return err
+			}
+		} else if markdown {
+			fmt.Print(renderApplyChecklistMarkdown(checklist))
+		} else if err := printJSON(checklist); err != nil {
+			return err
+		}
+		return enforcePlanGate(plan, planOptions)
+
 	case "plan":
 		planOptions, normalizedArgs, err := parsePlanOptions(args)
 		if err != nil {
@@ -510,6 +543,33 @@ func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string
 	return out
 }
 
+func renderApplyChecklistMarkdown(items []cognisdk.PackBundleApplyChecklistItem) string {
+	var out string
+	out += "## Cogni Pack Bundle Apply Checklist\n\n"
+	if len(items) == 0 {
+		out += "No checklist items.\n"
+		return out
+	}
+	for _, item := range items {
+		mark := "[ ]"
+		if item.Done {
+			mark = "[x]"
+		}
+		out += fmt.Sprintf("- %s `%s` — %s", mark, item.Kind, item.Label)
+		if item.Required {
+			out += " required"
+		}
+		if item.Blocked {
+			out += " blocked"
+		}
+		if item.Message != "" {
+			out += fmt.Sprintf(": %s", item.Message)
+		}
+		out += "\n"
+	}
+	return out
+}
+
 func emptyCLI(value string) string {
 	if value == "" {
 		return "unknown"
@@ -561,6 +621,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
 	fmt.Println("  cognisdk-bundle action-kinds [--details] [--markdown] [--out action-kinds.json]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
+	fmt.Println("  cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")

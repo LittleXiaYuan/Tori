@@ -169,6 +169,42 @@ func TestDescribePackBundleApplyActionKind(t *testing.T) {
 	}
 }
 
+func TestBuildPackBundleApplyChecklist(t *testing.T) {
+	plan := PackBundleApplyPlan{
+		Actions: []PackBundleApplyAction{
+			{Kind: PackBundleApplyActionKeepRollback, BundleID: "current", Message: "keep current"},
+			{Kind: PackBundleApplyActionAddPack, PackID: PackYunqueWork, Message: "add work"},
+			{Kind: PackBundleApplyActionWriteCandidate, BundleID: "candidate", Message: "write candidate"},
+		},
+	}
+	items := BuildPackBundleApplyChecklist(plan)
+	if len(items) != len(plan.Actions) {
+		t.Fatalf("checklist length = %d, want %d", len(items), len(plan.Actions))
+	}
+	if items[0].Kind != PackBundleApplyActionKeepRollback || !items[0].Required || items[0].Done || items[0].Blocked {
+		t.Fatalf("unexpected rollback item: %#v", items[0])
+	}
+	if items[1].Kind != PackBundleApplyActionAddPack || items[1].Required || items[1].Label == "" || items[1].Action == nil || items[1].Action.PackID != PackYunqueWork {
+		t.Fatalf("unexpected add_pack item: %#v", items[1])
+	}
+	if items[2].Kind != PackBundleApplyActionWriteCandidate || !items[2].Required {
+		t.Fatalf("unexpected write item: %#v", items[2])
+	}
+}
+
+func TestBuildPackBundleApplyChecklistBlocked(t *testing.T) {
+	plan := PackBundleApplyPlan{
+		Blocked: true,
+		Actions: []PackBundleApplyAction{
+			{Kind: PackBundleApplyActionStopBlocked, Message: "stop"},
+		},
+	}
+	items := BuildPackBundleApplyChecklist(plan)
+	if len(items) != 1 || !items[0].Required || !items[0].Blocked {
+		t.Fatalf("unexpected blocked checklist: %#v", items)
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",
