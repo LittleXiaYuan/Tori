@@ -374,5 +374,6 @@ func (g *Gateway) registerModesRoutes() {
 
 // Workflow routes moved to workflowapi sub-package.
 
-// LoRA and Cost routes are registered via sub-packages (loraapi, costapi)
-// in gateway.go routes() — see the "Extracted handler groups" section.
+// LoRA routes are mounted as an optional Pack Runtime backend module
+// (internal/packs/lora). Cost routes are still registered via costapi in
+// gateway.go routes() — see the "Extracted handler groups" section.

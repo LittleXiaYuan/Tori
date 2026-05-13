@@ -64,11 +64,11 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 	for _, route := range module.Routes() {
 		route := route
 		route.Path = strings.TrimSpace(route.Path)
-		route.Method = strings.ToUpper(strings.TrimSpace(route.Method))
+		methods := normalizeBackendRouteMethods(route)
 		if route.Path == "" || route.Handler == nil {
 			continue
 		}
-		if route.Method == "" {
+		if len(methods) == 0 {
 			panic(fmt.Sprintf("backend pack route %s from %s must declare an HTTP method", route.Path, packID))
 		}
 		if owner, ok := g.backendPackRoutes[route.Path]; ok {
@@ -78,15 +78,42 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 			panic(fmt.Sprintf("backend pack route conflict: %s already registered by %s, cannot register %s", route.Path, owner, packID))
 		}
 		g.backendPackRoutes[route.Path] = packID
-		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: route.Method, Path: route.Path}
-		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Method, route.Path, func(w http.ResponseWriter, r *http.Request) {
-			if route.Method != "" && r.Method != route.Method {
-				writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
-				return
-			}
+		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: methods[0], Methods: methods, Path: route.Path}
+		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, methods, route.Path, func(w http.ResponseWriter, r *http.Request) {
 			route.Handler(w, r)
 		})))
 	}
+}
+
+func normalizeBackendRouteMethods(route packruntime.BackendRoute) []string {
+	seen := map[string]bool{}
+	var methods []string
+	add := func(method string) {
+		method = strings.ToUpper(strings.TrimSpace(method))
+		if method == "" || seen[method] {
+			return
+		}
+		seen[method] = true
+		methods = append(methods, method)
+	}
+	add(route.Method)
+	for _, method := range route.Methods {
+		add(method)
+	}
+	return methods
+}
+
+func backendRouteMethodAllowed(methods []string, requestMethod string) bool {
+	requestMethod = strings.ToUpper(strings.TrimSpace(requestMethod))
+	if requestMethod == http.MethodHead {
+		requestMethod = http.MethodGet
+	}
+	for _, method := range methods {
+		if method == requestMethod {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Gateway) backendModuleInfos() []packruntime.BackendModuleInfo {
@@ -112,9 +139,17 @@ func (g *Gateway) backendModuleInfos() []packruntime.BackendModuleInfo {
 	return infos
 }
 
-func (g *Gateway) requirePackRoute(packID string, method string, route string, next http.HandlerFunc) http.HandlerFunc {
+func (g *Gateway) requirePackRoute(packID string, methods []string, route string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !g.packRouteEnabled(packID, method, route) {
+		if !backendRouteMethodAllowed(methods, r.Method) {
+			writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		manifestMethod := r.Method
+		if manifestMethod == http.MethodHead {
+			manifestMethod = http.MethodGet
+		}
+		if !g.packRouteEnabled(packID, manifestMethod, route) {
 			writeJSONStatus(w, http.StatusNotFound, map[string]any{
 				"error":   "pack route is not enabled",
 				"pack_id": packID,

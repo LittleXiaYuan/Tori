@@ -170,6 +170,7 @@ export interface PackMutationResponse {
 
 export interface PackBackendRouteInfo {
   method?: string;
+  methods?: string[];
   path: string;
 }
 

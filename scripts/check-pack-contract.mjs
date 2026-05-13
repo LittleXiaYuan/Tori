@@ -101,8 +101,10 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/gateway_setters.go")
   + "\n"
-  + readText("internal/controlplane/gateway/handlers_packs_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "route.Method = strings.ToUpper", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestRegisterBackendPackPanicsOnMissingRouteMethod", "TestPackBackendModulesExposeMountedRoutes", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "backuppack.DefaultHandler()", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/controlplane/gateway/handlers_packs_test.go")
+  + "\n"
+  + readText("internal/packs/lora/handler.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -110,7 +112,7 @@ if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
 }
 
 const backendContract = readText("pkg/packruntime/backend.go") + "\n" + readText("pkg/packruntime/registry.go");
-for (const token of ["type BackendRoute", "Method  string", "Path    string", "type BackendRouteInfo", "Method string `json:\"method,omitempty\"`", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
+for (const token of ["type BackendRoute", "Method  string", "Methods []string", "Path    string", "type BackendRouteInfo", "Method  string", "Methods []string", "json:\"methods,omitempty\"", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
   if (!backendContract.includes(token)) fail(`packruntime backend contract missing token: ${token}`);
 }
 
@@ -187,6 +189,28 @@ if (backupManifest) {
   for (const route of backupManifest.backend?.routes ?? []) {
     if (!backupSource.includes(route)) fail(`backup handler missing route declared in manifest: ${route}`);
   }
+}
+
+const loraManifest = readJSON("packs/examples/lora-pack/pack.json");
+const loraSource = readText("internal/packs/lora/handler.go");
+const loraPage = readText("heroui-web/src/app/packs/lora/page.tsx");
+const legacyLoraPage = readText("heroui-web/src/app/lora/page.tsx");
+if (loraManifest) {
+  if (!loraSource.includes(`const PackID = "${loraManifest.id}"`)) {
+    fail("lora pack handler PackID must match packs/examples/lora-pack/pack.json");
+  }
+  for (const route of loraManifest.backend?.routes ?? []) {
+    if (!loraSource.includes(route)) fail(`lora handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost", "http.MethodPut", "http.MethodPatch"]) {
+    if (!loraSource.includes(method)) fail(`lora handler missing method gate declaration: ${method}`);
+  }
+}
+if (loraPage.includes('from "@/lib/api"') || loraPage.includes("api.getLoRA") || !loraPage.includes("createLoRAPackClient")) {
+  fail("lora pack page must use lora-pack-client instead of monolithic api object");
+}
+if (!legacyLoraPage.includes('redirect("/packs/lora")')) {
+  fail("legacy /lora page should redirect to /packs/lora");
 }
 
 if (failures.length > 0) {

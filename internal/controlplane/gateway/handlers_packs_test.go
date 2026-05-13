@@ -329,6 +329,79 @@ func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
 	}
 }
 
+func TestBackendPackMultiMethodRouteInfoAndGate(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.multi-method",
+		Name:         "Multi Method Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Routes: []string{"/v1/multi-method/config"},
+			RouteSpecs: []packruntime.BackendRouteSpec{
+				{Method: http.MethodGet, Path: "/v1/multi-method/config"},
+				{Method: http.MethodPatch, Path: "/v1/multi-method/config"},
+			},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.multi-method",
+		routes: []packruntime.BackendRoute{{
+			Methods: []string{http.MethodGet, http.MethodPatch},
+			Path:    "/v1/multi-method/config",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"method": r.Method}) },
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("multi-method-pack")
+
+	for _, method := range []string{http.MethodGet, http.MethodPatch} {
+		req := httptest.NewRequest(method, "/v1/multi-method/config", nil)
+		req.Header.Set("X-API-Key", tenant.APIKey)
+		w := httptest.NewRecorder()
+		gw.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected %s multi-method route to pass, got %d body=%s", method, w.Code, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/multi-method/config", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected POST multi-method route to be 405, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/backend-modules", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("modules status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Modules []packruntime.BackendModuleInfo `json:"modules"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Modules) != 1 || len(body.Modules[0].Routes) != 1 {
+		t.Fatalf("unexpected modules body: %#v", body)
+	}
+	got := body.Modules[0].Routes[0]
+	if got.Method != http.MethodGet || strings.Join(got.Methods, ",") != "GET,PATCH" {
+		t.Fatalf("expected multi-method metadata to preserve primary and methods, got %#v", got)
+	}
+}
+
 func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {
 	root := t.TempDir()
 	registry, err := packruntime.NewRegistry(filepath.Join(root, "registry"))

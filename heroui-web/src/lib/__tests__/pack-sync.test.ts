@@ -10,7 +10,7 @@ import {
   normalizePackRoutePath,
   packSdkImportSnippet,
 } from "../pack-sync";
-import type { InstalledPack } from "../api";
+import type { InstalledPack } from "../pack-types";
 
 const backupPack: InstalledPack = {
   status: "enabled",
@@ -49,6 +49,29 @@ const laterPack: InstalledPack = {
       routes: [{ path: "/packs/later", component: "later/LaterPage" }],
     },
     sdk: {},
+  },
+};
+
+const loraPack: InstalledPack = {
+  status: "enabled",
+  source: "packs/examples/lora-pack",
+  manifest: {
+    id: "yunque.pack.lora",
+    name: "LoRA / LAA Evolution Pack",
+    version: "0.1.0",
+    optional: true,
+    backend: {
+      routes: ["/v1/lora/config"],
+      routeSpecs: [
+        { method: "GET", path: "/v1/lora/config" },
+        { method: "PATCH", path: "/v1/lora/config" },
+      ],
+    },
+    frontend: {
+      menus: [{ key: "lora", label: "LoRA 训练", path: "/packs/lora", icon: "circuit-board", order: 95 }],
+      routes: [{ path: "/packs/lora", component: "lora/LoRAPackPage", title: "LoRA 训练" }],
+    },
+    sdk: { typescript: "yunque-client/lora" },
   },
 };
 
@@ -91,7 +114,8 @@ describe("pack-sync frontend runtime", () => {
 
 
   it("builds backend route bindings from manifest routeSpecs", () => {
-    const [binding] = buildPackBackendRouteBindings([backupPack]);
+    const bindings = buildPackBackendRouteBindings([backupPack, loraPack]);
+    const [binding] = bindings;
 
     expect(binding).toMatchObject({
       packId: "yunque.pack.backup",
@@ -102,6 +126,7 @@ describe("pack-sync frontend runtime", () => {
     expect(binding?.pack).toBe(backupPack);
     expect(formatBackendRouteSpec(binding!)).toBe("GET /v1/backup/info");
     expect(formatBackendRouteSpec("/v1/legacy/info")).toBe("/v1/legacy/info");
+    expect(bindings.map(formatBackendRouteSpec)).toContain("PATCH /v1/lora/config");
   });
 
   it("normalizes and resolves route bindings by pathname", () => {

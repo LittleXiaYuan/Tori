@@ -7,6 +7,7 @@ import "net/http"
 // controlled by the installed pack manifest.
 type BackendRoute struct {
 	Method  string
+	Methods []string
 	Path    string
 	Handler http.HandlerFunc
 }
@@ -16,8 +17,9 @@ type BackendRoute struct {
 // consoles and SDKs can audit the mounted backend surface without gaining
 // executable references.
 type BackendRouteInfo struct {
-	Method string `json:"method,omitempty"`
-	Path   string `json:"path"`
+	Method  string   `json:"method,omitempty"`
+	Methods []string `json:"methods,omitempty"`
+	Path    string   `json:"path"`
 }
 
 // BackendModuleInfo describes a backend capability pack that has been mounted

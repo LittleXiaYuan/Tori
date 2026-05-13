@@ -61,7 +61,6 @@ import (
 	"yunque-agent/internal/controlplane/gateway/costapi"
 	"yunque-agent/internal/controlplane/gateway/forkapi"
 	"yunque-agent/internal/controlplane/gateway/gwshared"
-	"yunque-agent/internal/controlplane/gateway/loraapi"
 	"yunque-agent/internal/controlplane/gateway/notifyapi"
 	"yunque-agent/internal/controlplane/gateway/schedulerapi"
 	"yunque-agent/internal/controlplane/gateway/workflowapi"
@@ -654,12 +653,6 @@ func (g *Gateway) routes() {
 	g.registerOrchestratorRoutes() // orchestrator daemon control
 
 	// Extracted handler groups (sub-packages)
-	(&loraapi.Handler{
-		Scheduler: g.loraScheduler,
-		Metrics:   g.trainingMetrics,
-		Evolution: g.evolutionCoordinator,
-	}).RegisterRoutes(g.mux, g.requireAuth)
-
 	(&costapi.Handler{
 		Tracker: g.costTracker,
 	}).RegisterRoutes(g.mux, g.requireAuth)

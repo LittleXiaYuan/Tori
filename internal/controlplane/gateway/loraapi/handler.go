@@ -21,14 +21,14 @@ type Handler struct {
 
 // RegisterRoutes mounts all /v1/lora/* endpoints.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
-	mux.HandleFunc("/v1/lora/status", auth(h.handleStatus))
-	mux.HandleFunc("/v1/lora/history", auth(h.handleHistory))
-	mux.HandleFunc("/v1/lora/summary", auth(h.handleSummary))
-	mux.HandleFunc("/v1/lora/preview", auth(h.handlePreview))
-	mux.HandleFunc("/v1/lora/trigger", auth(h.handleTrigger))
-	mux.HandleFunc("/v1/lora/rollback", auth(h.handleRollback))
-	mux.HandleFunc("/v1/lora/evolution", auth(h.handleEvolution))
-	mux.HandleFunc("/v1/lora/config", auth(h.handleConfig))
+	mux.HandleFunc("/v1/lora/status", auth(h.HandleStatus))
+	mux.HandleFunc("/v1/lora/history", auth(h.HandleHistory))
+	mux.HandleFunc("/v1/lora/summary", auth(h.HandleSummary))
+	mux.HandleFunc("/v1/lora/preview", auth(h.HandlePreview))
+	mux.HandleFunc("/v1/lora/trigger", auth(h.HandleTrigger))
+	mux.HandleFunc("/v1/lora/rollback", auth(h.HandleRollback))
+	mux.HandleFunc("/v1/lora/evolution", auth(h.HandleEvolution))
+	mux.HandleFunc("/v1/lora/config", auth(h.HandleConfig))
 }
 
 func (h *Handler) metrics() *localbrain.TrainingMetrics {
@@ -41,7 +41,7 @@ func (h *Handler) metrics() *localbrain.TrainingMetrics {
 	return nil
 }
 
-func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -63,7 +63,7 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
-func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -83,7 +83,7 @@ func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleSummary(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -99,7 +99,7 @@ func (h *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"summary": m.Summary()})
 }
 
-func (h *Handler) handlePreview(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandlePreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -127,7 +127,7 @@ func (h *Handler) handlePreview(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"preview": preview})
 }
 
-func (h *Handler) handleTrigger(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleTrigger(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -168,7 +168,7 @@ func (h *Handler) handleTrigger(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "tenant_id": tenantID})
 }
 
-func (h *Handler) handleRollback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleRollback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -190,7 +190,7 @@ func (h *Handler) handleRollback(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
 }
 
-func (h *Handler) handleEvolution(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleEvolution(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "method not allowed")
 		return
@@ -204,7 +204,7 @@ func (h *Handler) handleEvolution(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"state": h.Evolution.State()})
 }
 
-func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleConfig(w http.ResponseWriter, r *http.Request) {
 	if h.Scheduler == nil {
 		apperror.WriteCode(w, apperror.CodeInternal, "LoRA scheduler not configured")
 		return
