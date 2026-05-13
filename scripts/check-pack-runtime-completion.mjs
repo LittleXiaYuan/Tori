@@ -67,6 +67,8 @@ const docs = [
   "packs/AUTHORING.md",
   "docs/guide/pack-runtime.md",
   "docs/zh/guide/pack-runtime.md",
+  "docs/guide/pack-runtime-state.md",
+  "docs/zh/guide/pack-runtime-state.md",
 ].map(read).join("\n");
 
 requireTokens("轻内核/manifest 协议", manifest + docs + backupManifest, [
@@ -159,6 +161,7 @@ requireTokens("TypeScript packs SDK", sdk, [
 ]);
 
 requireTokens("脚手架和可回滚工程化", scaffold + docs, [
+  "check-pack-runtime-completion.mjs",
   "scaffold-pack.mjs",
   "--dry-run",
   "--json",
