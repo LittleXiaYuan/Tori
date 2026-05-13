@@ -21,7 +21,7 @@ $env:YUNQUE_PLUGIN_NAME = "my-state-sidecar"
 Use `yunque.NewAgentKit()` when an external Go sidecar, CLI, or automation
 binary wants the common lightweight surfaces from one object: State Kernel,
 Reflection Experience, Mission Parse, Scheduler, Cron System, Triggers, Memory Kernel,
-Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Events, Reverie, Tori, Speech, Setup, and Plugin API Runtime. It reuses the same small
+Knowledge Graph, Knowledge Base, LoRA, Workflow, Connector, Notify, Cost, Providers, Cognis, Trace, Heartbeat, Events, Reverie, Tori, Upload, Speech, Setup, and Plugin API Runtime. It reuses the same small
 namespaces and does not require a generated full OpenAPI client.
 
 ```go
@@ -409,6 +409,11 @@ The lightweight Emotion SDK exposes emotion history and emotion stickers for ext
 ### Setup SDK
 
 The lightweight Setup SDK exposes first-run setup detection, provider health, setup templates, provider connectivity testing, template apply, and optional component installation helpers for external setup pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/setup/detect`, `/v1/setup/health`, `/v1/setup/templates`, `/v1/setup/test-provider`, `/v1/setup/apply`, and `/v1/setup/install-component`.
+
+### Upload SDK
+
+Upload SDK exposes standalone artifact upload helpers (`file` / `upload`) for external frontends, plugin pages, CLIs, sidecars, and automation scripts without importing the full platform or the broader Speech SDK. It maps directly to `/v1/upload` and returns parsed-file metadata plus optional analysis/actions/rich payloads from the gateway. Agent Kit also exposes this surface as `kit.upload` / `kit.Upload`.
+
 
 ### Speech SDK
 

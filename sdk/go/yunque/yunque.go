@@ -1503,6 +1503,7 @@ type AgentKit struct {
 	Permissions   *permissionsNamespace
 	Backup        *backupNamespace
 	Tori          *toriNamespace
+	Upload        *uploadNamespace
 	Speech        *speechNamespace
 	Setup         *setupNamespace
 	Admin         *adminNamespace
@@ -5227,6 +5228,63 @@ func (t *toriNamespace) Usage(ctx context.Context) (ToriUsageResponse, error) {
 	return out, nil
 }
 
+// ── Upload (/v1/upload) ──
+
+// Upload exposes a standalone artifact upload helper for external frontends, plugins, CLIs, sidecars, and automation scripts.
+var Upload = &uploadNamespace{}
+
+type uploadNamespace struct{}
+
+type UploadResponse map[string]any
+
+func (u *uploadNamespace) File(ctx context.Context, data []byte, filename string) (UploadResponse, error) {
+	return u.Upload(ctx, data, filename)
+}
+
+func (u *uploadNamespace) Upload(ctx context.Context, data []byte, filename string) (UploadResponse, error) {
+	if filename == "" {
+		filename = "upload.bin"
+	}
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := part.Write(data); err != nil {
+		return nil, err
+	}
+	if err := mw.Close(); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"/v1/upload", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if pluginToken != "" {
+		req.Header.Set("Authorization", "Bearer "+pluginToken)
+	}
+	req.Header.Set("X-Plugin-Name", pluginName)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("api /v1/upload HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
+	}
+	var out UploadResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Speech / Upload (/v1/speech, /v1/upload) ──
 
 // Speech exposes lightweight text-to-speech, speech-to-text, voices, upload, and STT stream helpers.
@@ -5254,7 +5312,6 @@ type SpeechSTTOptions struct {
 
 type SpeechSTTResponse map[string]any
 type SpeechVoicesResponse map[string]any
-type UploadResponse map[string]any
 
 func (s *speechNamespace) TTS(ctx context.Context, reqBody SpeechTTSRequest) (SpeechAudioResponse, error) {
 	data, err := json.Marshal(reqBody)
@@ -5338,47 +5395,7 @@ func (s *speechNamespace) Voices(ctx context.Context) (SpeechVoicesResponse, err
 }
 
 func (s *speechNamespace) Upload(ctx context.Context, data []byte, filename string) (UploadResponse, error) {
-	if filename == "" {
-		filename = "upload.bin"
-	}
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	part, err := mw.CreateFormFile("file", filename)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := part.Write(data); err != nil {
-		return nil, err
-	}
-	if err := mw.Close(); err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"/v1/upload", &buf)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	if pluginToken != "" {
-		req.Header.Set("Authorization", "Bearer "+pluginToken)
-	}
-	req.Header.Set("X-Plugin-Name", pluginName)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("api /v1/upload HTTP %d: %s", resp.StatusCode, apiErrorMessage(body))
-	}
-	var out UploadResponse
-	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return Upload.Upload(ctx, data, filename)
 }
 
 func (s *speechNamespace) STTStreamURL(language string, detectEmotion bool) string {
@@ -6713,6 +6730,7 @@ func NewAgentKit() AgentKit {
 		Permissions:   Permissions,
 		Backup:        Backup,
 		Tori:          Tori,
+		Upload:        Upload,
 		Speech:        Speech,
 		Setup:         Setup,
 		Admin:         Admin,

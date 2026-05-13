@@ -66,6 +66,7 @@
     "browser-automation",
     "realtime-websocket",
     "tori-account",
+    "artifact-upload",
     "speech-runtime",
     "first-run-setup",
     "admin-operator",
@@ -261,6 +262,10 @@
       "description": "Access the lightweight Tori binding/status/health/usage client or namespace."
     },
     {
+      "name": "upload",
+      "description": "Access the lightweight standalone Upload client or namespace for artifact upload and parsed-file metadata."
+    },
+    {
       "name": "speech",
       "description": "Access the lightweight Speech TTS/STT/voices/upload client or namespace."
     },
@@ -423,6 +428,7 @@
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
         "tori": "AgentKit.tori",
+        "upload": "AgentKit.upload",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
         "admin": "AgentKit.admin",
@@ -507,6 +513,7 @@
         "files": "AgentKit.Files",
         "browser": "AgentKit.Browser",
         "tori": "AgentKit.Tori",
+        "upload": "AgentKit.Upload",
         "speech": "AgentKit.Speech",
         "setup": "AgentKit.Setup",
         "admin": "AgentKit.Admin",
@@ -591,6 +598,7 @@
         "files": "AgentKit.files",
         "browser": "AgentKit.browser",
         "tori": "AgentKit.tori",
+        "upload": "AgentKit.upload",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
         "admin": "AgentKit.admin",
@@ -675,6 +683,7 @@
         "files": "AgentKit::files",
         "browser": "AgentKit::browser",
         "tori": "AgentKit.tori",
+        "upload": "AgentKit.upload",
         "speech": "AgentKit.speech",
         "setup": "AgentKit.setup",
         "admin": "AgentKit::admin",

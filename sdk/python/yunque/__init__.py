@@ -1258,6 +1258,18 @@ class _SpeechNamespace:
 
 speech = _SpeechNamespace()
 
+class _UploadNamespace:
+    """Standalone artifact upload helper for frontends, plugins, CLIs, and automation scripts."""
+
+    def file(self, data: bytes, filename: str = "upload.bin", content_type: str = "application/octet-stream") -> dict:
+        return _api_call_multipart("POST", "/v1/upload", "file", filename, data, content_type=content_type)
+
+    def upload(self, data: bytes, filename: str = "upload.bin", content_type: str = "application/octet-stream") -> dict:
+        return self.file(data, filename, content_type)
+
+
+upload = _UploadNamespace()
+
 # ── Setup / Onboarding (/v1/setup) ──
 
 class _SetupNamespace:
@@ -3471,6 +3483,7 @@ class AgentKit:
         self.permissions = permissions
         self.backup = backup
         self.tori = tori
+        self.upload = upload
         self.speech = speech
         self.setup = setup
         self.admin = admin

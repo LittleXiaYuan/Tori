@@ -4,6 +4,7 @@ export * from './sdk.gen';export * from './system';
 export * from './settings';
 export * from './backup';
 export * from './tori';
+export * from './upload';
 export * from './speech';
 export * from './setup';
 export * from './admin';

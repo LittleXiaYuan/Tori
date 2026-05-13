@@ -211,6 +211,35 @@ func TestSpeechHelpers(t *testing.T) {
 	}
 }
 
+func TestUploadHelpers(t *testing.T) {
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/upload" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatal(err)
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
+		body, _ := io.ReadAll(file)
+		if header.Filename != "apply.docx" || string(body) != "doc" {
+			t.Fatalf("unexpected upload file: %s %q", header.Filename, string(body))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"filename":"apply.docx","parse":{"status":"parsed"},"actions":[]}`))
+	})
+	out, err := Upload.File(context.Background(), []byte("doc"), "apply.docx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out["filename"] != "apply.docx" || NewAgentKit().Upload != Upload {
+		t.Fatalf("unexpected upload result")
+	}
+}
+
 func TestSetupHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

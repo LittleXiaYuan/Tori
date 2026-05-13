@@ -1488,6 +1488,7 @@ pub struct AgentKit {
     pub permissions: PermissionsClient,
     pub backup: BackupClient,
     pub tori: ToriClient,
+    pub upload: UploadClient,
     pub speech: SpeechClient,
     pub setup: SetupClient,
     pub admin: AdminClient,
@@ -1583,6 +1584,7 @@ impl AgentKit {
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
             backup: BackupClient::new(base_url.clone(), token.as_ref())?,
             tori: ToriClient::new(base_url.clone(), token.as_ref())?,
+            upload: UploadClient::new(base_url.clone(), token.as_ref())?,
             speech: SpeechClient::new(base_url.clone(), token.as_ref())?,
             setup: SetupClient::new(base_url.clone(), token.as_ref())?,
             admin: AdminClient::new(base_url.clone(), token.as_ref())?,
@@ -1674,6 +1676,7 @@ impl AgentKit {
             permissions: PermissionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             backup: BackupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tori: ToriClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            upload: UploadClient::new_with_client(base_url.clone(), plugin_http.clone()),
             speech: SpeechClient::new_with_client(base_url.clone(), plugin_http.clone()),
             setup: SetupClient::new_with_client(base_url.clone(), plugin_http.clone()),
             admin: AdminClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -6168,6 +6171,26 @@ pub struct SpeechSTTOptions {
 pub type SpeechSTTResponse = serde_json::Value;
 pub type SpeechVoicesResponse = serde_json::Value;
 pub type UploadResponse = serde_json::Value;
+
+/// Standalone Upload SDK client for artifact upload and parsed-file metadata.
+#[derive(Debug, Clone)]
+pub struct UploadClient { base_url: String, http: reqwest::Client }
+
+impl UploadClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new();
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn file(&self, data: Vec<u8>, filename: impl Into<String>) -> Result<UploadResponse, reqwest::Error> { self.upload(data, filename).await }
+    pub async fn upload(&self, data: Vec<u8>, filename: impl Into<String>) -> Result<UploadResponse, reqwest::Error> {
+        let part = reqwest::multipart::Part::bytes(data).file_name(filename.into());
+        let form = reqwest::multipart::Form::new().part("file", part);
+        self.http.post(self.url("/v1/upload")).multipart(form).send().await?.error_for_status()?.json().await
+    }
+}
 
 /// Lightweight Speech SDK client for TTS, STT, voice listing, upload, and STT stream URLs.
 #[derive(Debug, Clone)]
@@ -10918,6 +10941,14 @@ mod tests {
         let tts = serde_json::to_value(SpeechTTSRequest { text: "你好".to_string(), voice: Some("v1".to_string()), format: Some("wav".to_string()), emotion: Some("happy".to_string()) }).unwrap();
         assert_eq!(tts["text"], "你好");
         assert_eq!(tts["format"], "wav");
+    }
+
+    #[test]
+    fn upload_helpers_build_urls_and_agent_kit_surface() {
+        let client = UploadClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/upload"), "http://localhost:9090/v1/upload");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.upload.url("/v1/upload"), "http://localhost:9090/v1/upload");
     }
 
     #[test]
