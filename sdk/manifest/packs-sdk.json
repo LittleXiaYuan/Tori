@@ -11,6 +11,7 @@
     "GET /v1/packs",
     "GET /v1/packs/installed",
     "GET /v1/packs/enabled",
+    "GET /v1/packs/backend-modules",
     "POST /v1/packs/install",
     "POST /v1/packs/enable",
     "POST /v1/packs/disable",
@@ -34,6 +35,12 @@
       "route": "GET /v1/packs/enabled",
       "readOnly": true,
       "description": "Read enabled packs that should contribute frontend menus, routes, UI assets, and SDK entrypoints."
+    },
+    {
+      "name": "backendModules",
+      "route": "GET /v1/packs/backend-modules",
+      "readOnly": true,
+      "description": "Inspect backend pack modules and routes mounted in the host Gateway."
     },
     {
       "name": "install",
@@ -80,6 +87,7 @@
         "list": "createPacksClient().list",
         "installed": "createPacksClient().installed",
         "enabled": "createPacksClient().enabled",
+        "backendModules": "createPacksClient().backendModules",
         "install": "createPacksClient().install",
         "enable": "createPacksClient().enable",
         "disable": "createPacksClient().disable",

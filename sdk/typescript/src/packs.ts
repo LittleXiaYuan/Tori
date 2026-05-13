@@ -11,6 +11,9 @@ export type PackManifest = { id: string; name: string; version: string; descript
 export type InstalledPack = { manifest: PackManifest; status: PackStatus; source?: string; installedAt?: string; updatedAt?: string; previousVersion?: string; [key: string]: unknown };
 export type PacksListResponse = { packs: InstalledPack[]; enabled?: InstalledPack[]; count: number; [key: string]: unknown };
 export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [key: string]: unknown };
+export type PackBackendRouteInfo = { method?: string; path: string };
+export type PackBackendModuleInfo = { pack_id: string; routes: PackBackendRouteInfo[] };
+export type PackBackendModulesResponse = { modules: PackBackendModuleInfo[]; count: number; [key: string]: unknown };
 export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
@@ -27,6 +30,7 @@ export class PacksClient {
   installed(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/installed"); }
   list(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs"); }
   enabled(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/enabled"); }
+  backendModules(): Promise<PackBackendModulesResponse> { return this.json<PackBackendModulesResponse>("GET", "/v1/packs/backend-modules"); }
   install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, source: request.source }); }
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }

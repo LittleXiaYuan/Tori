@@ -247,6 +247,55 @@ func TestRegisterBackendPackPanicsOnRouteConflict(t *testing.T) {
 	gw.RegisterBackendPack(second)
 }
 
+func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.example",
+		Name:         "Example Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Routes: []string{"/v1/example-pack/ping"}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.example",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/example-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("backend-modules")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/backend-modules", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Count   int                             `json:"count"`
+		Modules []packruntime.BackendModuleInfo `json:"modules"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Count != 1 || len(body.Modules) != 1 {
+		t.Fatalf("unexpected modules body: %#v", body)
+	}
+	if body.Modules[0].PackID != "yunque.pack.example" || len(body.Modules[0].Routes) != 1 || body.Modules[0].Routes[0].Path != "/v1/example-pack/ping" {
+		t.Fatalf("unexpected module metadata: %#v", body.Modules[0])
+	}
+}
+
 func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {
 	root := t.TempDir()
 	registry, err := packruntime.NewRegistry(filepath.Join(root, "registry"))
