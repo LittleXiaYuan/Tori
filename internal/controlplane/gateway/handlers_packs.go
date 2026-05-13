@@ -36,7 +36,12 @@ func (g *Gateway) registerPackRoutes() {
 }
 
 func (g *Gateway) registerBuiltinBackendPacks() {
-	g.registerBackendPack(backuppack.DefaultHandler())
+	if len(g.backendPacks) == 0 {
+		g.RegisterBackendPack(backuppack.DefaultHandler())
+	}
+	for _, module := range g.backendPacks {
+		g.registerBackendPack(module)
+	}
 }
 
 func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {

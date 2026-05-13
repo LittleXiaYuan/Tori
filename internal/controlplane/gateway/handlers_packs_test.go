@@ -13,6 +13,15 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
+type testBackendPackModule struct {
+	id     string
+	routes []packruntime.BackendRoute
+}
+
+func (m testBackendPackModule) PackID() string { return m.id }
+
+func (m testBackendPackModule) Routes() []packruntime.BackendRoute { return m.routes }
+
 func TestPackRoutesExposeInstalledAndEnabledPacks(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
@@ -50,6 +59,65 @@ func TestPackRoutesExposeInstalledAndEnabledPacks(t *testing.T) {
 	}
 	if body.Count != 1 || len(body.Enabled) != 1 || body.Enabled[0].Manifest.SDK.TypeScript != "yunque-client/backup" {
 		t.Fatalf("unexpected body: %#v", body)
+	}
+}
+
+func TestBackendPackModuleCanBeInjectedFromGatewayConfig(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.example",
+		Name:         "Example Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Routes: []string{"/v1/example-pack/ping"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "example", Label: "示例包", Path: "/packs/example"}}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+
+	module := testBackendPackModule{
+		id: "yunque.pack.example",
+		routes: []packruntime.BackendRoute{{
+			Method: http.MethodGet,
+			Path:   "/v1/example-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"ok": true, "pack": "example"})
+			},
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("example-pack")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/example-pack/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected injected backend pack route to be 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/example-pack/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected injected backend pack method gate to be 405, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	if _, err := registry.Disable("yunque.pack.example"); err != nil {
+		t.Fatalf("Disable: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/example-pack/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected disabled injected backend pack route to be 404, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 
