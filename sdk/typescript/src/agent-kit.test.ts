@@ -183,7 +183,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[44]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[45]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[46]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[55]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[56]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

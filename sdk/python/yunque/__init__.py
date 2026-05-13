@@ -2313,6 +2313,47 @@ class _RealtimeNamespace:
 
 realtime = _RealtimeNamespace()
 
+
+# ── Airi Bridge (/v1/ext/airi/*) ──
+
+class _AiriNamespace:
+    """OpenAI-compatible helpers for the Airi desktop pet bridge."""
+
+    def status(self) -> dict:
+        return _api_call("GET", "/v1/ext/airi/status")
+
+    def models(self) -> dict:
+        return _api_call("GET", "/v1/ext/airi/models")
+
+    def chat_completions(self, messages: list[dict], *, model: str = "yunque-airi", stream: bool = False, **extra) -> dict:
+        body = {"model": model, "messages": messages, "stream": stream, **extra}
+        return _api_call("POST", "/v1/ext/airi/chat/completions", body)
+
+    def stream_request(self, messages: list[dict], *, model: str = "yunque-airi", **extra) -> dict:
+        return {"model": model, "messages": messages, "stream": True, **extra}
+
+    def parse_stream(self, text: str) -> list[dict]:
+        out: list[dict] = []
+        for frame in text.replace("\r\n", "\n").split("\n\n"):
+            data_lines = []
+            for line in frame.split("\n"):
+                if line.startswith("data:"):
+                    data_lines.append(line[5:].lstrip())
+            if not data_lines:
+                continue
+            raw = "\n".join(data_lines)
+            if raw == "[DONE]":
+                out.append({"kind": "done"})
+                continue
+            try:
+                out.append({"kind": "chunk", "chunk": json.loads(raw)})
+            except json.JSONDecodeError:
+                out.append({"kind": "raw", "raw": raw})
+        return out
+
+
+airi = _AiriNamespace()
+
 # ── Chat Runtime (/v1/chat, /v1/chat/stream, /v1/chat/agentic) ──
 
 class _ChatNamespace:
@@ -3428,6 +3469,7 @@ class AgentKit:
         self.embeddings = embeddings
         self.search_sdk = search_sdk
         self.router = router
+        self.airi = airi
         self.settings = settings
         self.system = system
         self.auth = auth

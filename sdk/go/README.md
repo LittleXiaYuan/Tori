@@ -509,3 +509,19 @@ The lightweight Modes SDK exposes persona modes, current-mode reads, and mode sw
 ### Interactions SDK
 
 The lightweight Interactions SDK exposes emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending helpers for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/emotion/*`, `/v1/instructions*`, `/v1/react`, and `/v1/sticker/send`; Agent Kit also exposes this surface as `kit.interactions` / `kit.Interactions`.
+
+### Airi Bridge SDK
+
+The lightweight `yunque.Airi` namespace exposes the Airi desktop pet bridge for Go plugins, CLIs, sidecars, and automation binaries without importing platform internals. It maps to `/v1/ext/airi/status`, `/v1/ext/airi/models`, and OpenAI-compatible `/v1/ext/airi/chat/completions`; Agent Kit also exposes it as `yunque.NewAgentKit().Airi`.
+
+```go
+status, _ := yunque.Airi.Status(ctx)
+models, _ := yunque.Airi.Models(ctx)
+reply, _ := yunque.Airi.ChatCompletions(ctx, yunque.AiriChatCompletionRequest{
+    Model: "yunque-airi",
+    Messages: []yunque.AiriChatMessage{{Role: "user", Content: "你好"}},
+})
+_ = status
+_ = models
+_ = reply
+```

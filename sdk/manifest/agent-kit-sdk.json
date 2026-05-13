@@ -75,7 +75,8 @@
     "discovery",
     "identity-resolution",
     "embeddings-runtime",
-    "web-search"
+    "web-search",
+    "airi-bridge"
   ],
   "capabilities": [
     {
@@ -349,6 +350,10 @@
     {
       "name": "plugin",
       "description": "Access the lightweight Plugin API Runtime client or namespace."
+    },
+    {
+      "name": "airi",
+      "description": "Access the lightweight Airi bridge client or namespace for status, OpenAI-compatible models, chat completions, and stream parsing."
     }
   ],
   "languages": {
@@ -431,7 +436,8 @@
         "identity": "createAgentKit().identity",
         "embeddings": "createAgentKit().embeddings",
         "search": "createAgentKit().search",
-        "modes": "createAgentKit().modes"
+        "modes": "createAgentKit().modes",
+        "airi": "createAgentKit().airi"
       }
     },
     "go": {
@@ -513,7 +519,8 @@
         "identity": "yunque.NewAgentKit().Identity",
         "embeddings": "yunque.NewAgentKit().Embeddings",
         "search": "yunque.NewAgentKit().WebSearch",
-        "modes": "yunque.NewAgentKit().Modes"
+        "modes": "yunque.NewAgentKit().Modes",
+        "airi": "yunque.NewAgentKit().Airi"
       }
     },
     "python": {
@@ -595,7 +602,8 @@
         "identity": "yunque.create_agent_kit().identity",
         "embeddings": "yunque.create_agent_kit().embeddings",
         "search": "yunque.create_agent_kit().search_sdk",
-        "modes": "yunque.create_agent_kit().modes"
+        "modes": "yunque.create_agent_kit().modes",
+        "airi": "yunque.create_agent_kit().airi"
       }
     },
     "rust": {
@@ -677,7 +685,8 @@
         "identity": "AgentKit::identity",
         "embeddings": "AgentKit::embeddings",
         "search": "AgentKit::search",
-        "modes": "AgentKit::modes"
+        "modes": "AgentKit::modes",
+        "airi": "AgentKit::airi"
       }
     }
   },
