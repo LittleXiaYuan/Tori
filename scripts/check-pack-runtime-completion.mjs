@@ -58,10 +58,13 @@ const frontend = [
   "heroui-web/src/app/packs/page.tsx",
   "heroui-web/src/app/packs/[...slug]/page.tsx",
   "heroui-web/src/app/packs/backup/page.tsx",
+  "heroui-web/src/lib/backup-pack-client.ts",
+  "heroui-web/src/lib/__tests__/backup-pack-client.test.ts",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
 ].map(read).join("\n");
 const legacyBackupPage = read("heroui-web/src/app/backup/page.tsx");
+const backupPackPage = read("heroui-web/src/app/packs/backup/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
@@ -144,7 +147,10 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "buildPackRouteBindings",
   "findPackRouteBinding",
   "pack-sync frontend runtime",
+  "createBackupPackClient",
+  "backup-pack-client",
   "Frontend Pack sync tests",
+  "Frontend backup pack client tests",
   "PackRuntimeRoutePage",
   "packsEnabled",
   "frontend?.menus",
@@ -164,6 +170,12 @@ if (frontendShell.includes('href: "/backup"') || frontendShell.includes('href: "
   fail("前端同步菜单/路由/资源/控制台", "backup pack must not be exposed as a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 } else {
   ok("前端轻内核导航", "backup entry is not hard-coded in sidebar/nav-items/command-palette");
+}
+
+if (backupPackPage.includes("api.backupInfo") || backupPackPage.includes("api.backupExport") || backupPackPage.includes("api.backupImport") || backupPackPage.includes('from "@/lib/api"')) {
+  fail("前端同步菜单/路由/资源/控制台", "backup pack page must use backup-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 pack 客户端拆分", "backup page uses backup-pack-client instead of monolithic api backup methods");
 }
 
 requireTokens("TypeScript packs SDK", sdk, [

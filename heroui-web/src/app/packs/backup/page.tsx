@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, Button, Spinner, Chip, Tooltip } from "@heroui/react";
-import { api, type BackupInfo, type BackupRestoreResult } from "@/lib/api";
+import { createBackupPackClient, type BackupInfo, type BackupRestoreResult } from "@/lib/backup-pack-client";
 import {
   HardDriveDownload, HardDriveUpload, FileArchive, Download, Upload,
   CheckCircle2, AlertTriangle, Loader2, Info,
@@ -18,6 +18,8 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
+const backupPack = createBackupPackClient();
+
 export default function BackupPage() {
   const [info, setInfo] = useState<BackupInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export default function BackupPage() {
   const fetchInfo = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.backupInfo();
+      const data = await backupPack.info();
       setInfo(data);
     } catch (e: unknown) {
       setError(formatErrorMessage(e, "加载备份信息失败"));
@@ -46,7 +48,7 @@ export default function BackupPage() {
       setExporting(true);
       setError(null);
       setResult(null);
-      await api.backupExport();
+      await backupPack.export();
     } catch (e: unknown) {
       setError(formatErrorMessage(e, "导出备份失败"));
     } finally {
@@ -59,7 +61,7 @@ export default function BackupPage() {
       setImporting(true);
       setError(null);
       setResult(null);
-      const res = await api.backupImport(file);
+      const res = await backupPack.import(file);
       setResult(res);
       fetchInfo();
     } catch (e: unknown) {
