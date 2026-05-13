@@ -13,7 +13,7 @@ type JSONSchema map[string]any
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "feedback-proposal"}
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -31,6 +31,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleReviewJSONSchema(), true
 	case "pack-bundle-apply-plan":
 		return PackBundleApplyPlanJSONSchema(), true
+	case "pack-bundle-apply-actions":
+		return PackBundleApplyActionsJSONSchema(), true
 	case "feedback-proposal":
 		return FeedbackProposalJSONSchema(), true
 	default:
@@ -185,6 +187,18 @@ func PackBundleApplyPlanJSONSchema() JSONSchema {
 			"diff":                PackBundleDiffJSONSchema(),
 			"golden_tests":        goldenTestSummarySchema(),
 		},
+	}
+}
+
+// PackBundleApplyActionsJSONSchema returns the schema for the script-friendly
+// actions array emitted by cognisdk-bundle actions.
+func PackBundleApplyActionsJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id":     "https://yunque.local/schemas/cognisdk/pack-bundle-apply-actions.json",
+		"title":   "Cognition SDK Pack Bundle Apply Actions",
+		"type":    "array",
+		"items":   packBundleApplyActionSchema(),
 	}
 }
 
