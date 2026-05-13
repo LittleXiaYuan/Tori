@@ -112,9 +112,25 @@ func TestFilterPackBundleApplyActions(t *testing.T) {
 	}
 }
 
-func TestKnownPackBundleApplyActionKind(t *testing.T) {
-	if !KnownPackBundleApplyActionKind(PackBundleApplyActionAddPack) {
-		t.Fatal("expected add_pack to be known")
+func TestPackBundleApplyActionKinds(t *testing.T) {
+	kinds := PackBundleApplyActionKinds()
+	if len(kinds) == 0 {
+		t.Fatal("expected action kinds")
+	}
+	seen := map[PackBundleApplyActionKind]bool{}
+	for _, kind := range kinds {
+		if seen[kind] {
+			t.Fatalf("duplicate action kind %q", kind)
+		}
+		seen[kind] = true
+		if !KnownPackBundleApplyActionKind(kind) {
+			t.Fatalf("listed action kind not known: %q", kind)
+		}
+	}
+	for _, want := range []PackBundleApplyActionKind{PackBundleApplyActionAddPack, PackBundleApplyActionVerifyDigest, PackBundleApplyActionWriteCandidate} {
+		if !seen[want] {
+			t.Fatalf("action kind list missing %q", want)
+		}
 	}
 	if KnownPackBundleApplyActionKind(PackBundleApplyActionKind("missing_kind")) {
 		t.Fatal("unexpected missing action kind accepted")

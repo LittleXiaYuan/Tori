@@ -153,6 +153,26 @@ func packBundleApplyActionMessages(actions []PackBundleApplyAction) []string {
 	return messages
 }
 
+// PackBundleApplyActionKinds returns the stable public action-kind vocabulary
+// emitted by PlanPackBundleApply. Callers may use it to populate plugin forms,
+// validate frontend filters, or generate automation allowlists without copying
+// constants by hand.
+func PackBundleApplyActionKinds() []PackBundleApplyActionKind {
+	return []PackBundleApplyActionKind{
+		PackBundleApplyActionKeepRollback,
+		PackBundleApplyActionVerifyDigest,
+		PackBundleApplyActionRequireReview,
+		PackBundleApplyActionStopBlocked,
+		PackBundleApplyActionAddPack,
+		PackBundleApplyActionReplacePack,
+		PackBundleApplyActionRemovePack,
+		PackBundleApplyActionEnablePack,
+		PackBundleApplyActionDisablePack,
+		PackBundleApplyActionNoop,
+		PackBundleApplyActionWriteCandidate,
+	}
+}
+
 // FilterPackBundleApplyActions returns only actions whose Kind matches one of
 // the requested kinds. Passing no kinds returns the original action slice. The
 // helper is intentionally non-mutating so external installers, plugin hooks,
@@ -178,20 +198,10 @@ func FilterPackBundleApplyActions(actions []PackBundleApplyAction, kinds ...Pack
 // KnownPackBundleApplyActionKind reports whether kind is part of the stable
 // public action vocabulary emitted by PlanPackBundleApply.
 func KnownPackBundleApplyActionKind(kind PackBundleApplyActionKind) bool {
-	switch kind {
-	case PackBundleApplyActionKeepRollback,
-		PackBundleApplyActionVerifyDigest,
-		PackBundleApplyActionRequireReview,
-		PackBundleApplyActionStopBlocked,
-		PackBundleApplyActionAddPack,
-		PackBundleApplyActionReplacePack,
-		PackBundleApplyActionRemovePack,
-		PackBundleApplyActionEnablePack,
-		PackBundleApplyActionDisablePack,
-		PackBundleApplyActionNoop,
-		PackBundleApplyActionWriteCandidate:
-		return true
-	default:
-		return false
+	for _, known := range PackBundleApplyActionKinds() {
+		if kind == known {
+			return true
+		}
 	}
+	return false
 }

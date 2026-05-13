@@ -127,6 +127,7 @@
         "PackBundleApplyAction",
         "PlanPackBundleApply",
         "RenderPackBundleApplyPlanMarkdown",
+        "PackBundleApplyActionKinds",
         "FilterPackBundleApplyActions",
         "KnownPackBundleApplyActionKind",
         "Actions",
