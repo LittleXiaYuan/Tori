@@ -41,9 +41,17 @@ if (!route.startsWith("/")) {
 const packDir = resolve(repoRoot, "packs/examples", slug);
 const handlerDir = resolve(repoRoot, "internal/packs", slug.replaceAll("-", ""));
 const pageDir = resolve(repoRoot, "heroui-web/src/app/packs", slug);
+const frontendClient = resolve(repoRoot, "heroui-web/src/lib", `${slug}-pack-client.ts`);
+const frontendClientTest = resolve(repoRoot, "heroui-web/src/lib/__tests__", `${slug}-pack-client.test.ts`);
 for (const dir of [packDir, handlerDir, pageDir]) {
   if (existsSync(dir)) {
     console.error(`Refusing to overwrite existing path: ${dir}`);
+    process.exit(1);
+  }
+}
+for (const file of [frontendClient, frontendClientTest]) {
+  if (existsSync(file)) {
+    console.error(`Refusing to overwrite existing path: ${file}`);
     process.exit(1);
   }
 }
@@ -117,9 +125,29 @@ func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 
 const page = `"use client";
 
+import { useEffect, useState } from "react";
 import { Card } from "@heroui/react";
+import { create${pascal}PackClient } from "@/lib/${slug}-pack-client";
+
+const ${slug.replace(/-([a-z0-9])/g, (_, char) => char.toUpperCase())}Pack = create${pascal}PackClient();
 
 export default function ${pascal}PackPage() {
+  const [status, setStatus] = useState("checking");
+
+  useEffect(() => {
+    let alive = true;
+    ${slug.replace(/-([a-z0-9])/g, (_, char) => char.toUpperCase())}Pack.ping()
+      .then((res) => {
+        if (alive) setStatus(res.ok ? "ready" : "unhealthy");
+      })
+      .catch(() => {
+        if (alive) setStatus("unavailable");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="page-root space-y-4 animate-fade-in-up">
       <Card className="section-card p-5">
@@ -127,10 +155,55 @@ export default function ${pascal}PackPage() {
         <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
           This page is synchronized from ${packID}. Replace it with the pack-specific UI.
         </div>
+        <div className="text-xs mt-3 font-mono" style={{ color: "var(--yunque-text-muted)" }}>
+          SDK/client entry: create${pascal}PackClient() → ${route}
+        </div>
+        <div className="text-xs mt-2" style={{ color: "var(--yunque-text-muted)" }}>
+          Backend route status: {status}
+        </div>
       </Card>
     </div>
   );
 }
+`;
+
+const client = `import { fetcher } from "./api-core";
+
+export interface ${pascal}PingResponse {
+  ok: boolean;
+  pack_id: string;
+}
+
+export interface ${pascal}PackClient {
+  ping(): Promise<${pascal}PingResponse>;
+}
+
+export function create${pascal}PackClient(): ${pascal}PackClient {
+  return {
+    ping: () => fetcher<${pascal}PingResponse>("${route}"),
+  };
+}
+`;
+
+const clientTest = `import { afterEach, describe, expect, it, vi } from "vitest";
+import { create${pascal}PackClient } from "../${slug}-pack-client";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("${slug}-pack-client", () => {
+  it("calls the pack-owned backend route", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, pack_id: "${packID}" }), { status: 200 }),
+    );
+
+    const result = await create${pascal}PackClient().ping();
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("${route}");
+    expect(result.pack_id).toBe("${packID}");
+  });
+});
 `;
 
 const readme = `# ${name}
@@ -150,8 +223,9 @@ Next steps:
 1. Wire \`internal/packs/${slug.replaceAll("-", "")}\` through \`GatewayConfig.BackendPacks\` or \`RegisterBackendPack\`.
 2. Replace the ping handler with real pack logic.
 3. Replace the frontend page with the pack UI.
-4. Add a focused SDK slice if \`${sdk}\` does not exist yet.
-5. Run \`node scripts/check-pack-contract.mjs\`.
+4. Extend \`heroui-web/src/lib/${slug}-pack-client.ts\` instead of adding methods to the monolithic frontend \`api\` object.
+5. Add a focused SDK slice if \`${sdk}\` does not exist yet.
+6. Run \`node scripts/check-pack-contract.mjs\` and \`npm run test --prefix heroui-web -- src/lib/__tests__/${slug}-pack-client.test.ts\`.
 `;
 
 const files = [
@@ -159,6 +233,8 @@ const files = [
   { path: resolve(packDir, "README.md"), content: readme },
   { path: resolve(handlerDir, "handler.go"), content: handler },
   { path: resolve(pageDir, "page.tsx"), content: page },
+  { path: frontendClient, content: client },
+  { path: frontendClientTest, content: clientTest },
 ];
 const directories = [packDir, handlerDir, pageDir];
 const result = {
