@@ -294,6 +294,9 @@ func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
 	if body.Modules[0].PackID != "yunque.pack.example" || len(body.Modules[0].Routes) != 1 || body.Modules[0].Routes[0].Path != "/v1/example-pack/ping" {
 		t.Fatalf("unexpected module metadata: %#v", body.Modules[0])
 	}
+	if body.Modules[0].Routes[0].Method != http.MethodGet {
+		t.Fatalf("expected mounted route method to be preserved, got %#v", body.Modules[0].Routes[0])
+	}
 }
 
 func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {

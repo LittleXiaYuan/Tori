@@ -134,6 +134,7 @@ type Gateway struct {
 	packRegistry          *packruntime.Registry
 	backendPacks          []packruntime.BackendModule
 	backendPackRoutes     map[string]string
+	backendPackRouteInfos map[string]packruntime.BackendRouteInfo
 	registry              *skills.Registry
 	pluginReg             *plugin.Registry
 	pluginLoader          *plugin.Loader
@@ -405,29 +406,30 @@ func NewFromConfig(cfg GatewayConfig) *Gateway {
 		met = observe.New()
 	}
 	g := &Gateway{
-		planner:           cfg.Planner,
-		tenants:           cfg.Tenants,
-		memory:            cfg.Memory,
-		registry:          cfg.Skills,
-		scheduler:         cfg.Scheduler,
-		convStore:         cfg.ConvStore,
-		pluginReg:         cfg.Plugins,
-		feishuAPI:         cfg.FeishuAPI,
-		learning:          cfg.Learning,
-		jwtCfg:            cfg.JWTConfig,
-		metrics:           met,
-		pipeline:          cfg.Pipeline,
-		persona:           cfg.Persona,
-		packRegistry:      cfg.Packs,
-		backendPacks:      cfg.BackendPacks,
-		backendPackRoutes: make(map[string]string),
-		limiter:           NewRateLimiter(30, time.Minute),
-		usage:             NewUsageTracker(),
-		mux:               http.NewServeMux(),
-		startTime:         time.Now(),
-		browserSessions:   NewBrowserSessionStore(),
-		modelMgr:          newModelManager(),
-		oauthPending:      make(map[string]*oauthPendingState),
+		planner:               cfg.Planner,
+		tenants:               cfg.Tenants,
+		memory:                cfg.Memory,
+		registry:              cfg.Skills,
+		scheduler:             cfg.Scheduler,
+		convStore:             cfg.ConvStore,
+		pluginReg:             cfg.Plugins,
+		feishuAPI:             cfg.FeishuAPI,
+		learning:              cfg.Learning,
+		jwtCfg:                cfg.JWTConfig,
+		metrics:               met,
+		pipeline:              cfg.Pipeline,
+		persona:               cfg.Persona,
+		packRegistry:          cfg.Packs,
+		backendPacks:          cfg.BackendPacks,
+		backendPackRoutes:     make(map[string]string),
+		backendPackRouteInfos: make(map[string]packruntime.BackendRouteInfo),
+		limiter:               NewRateLimiter(30, time.Minute),
+		usage:                 NewUsageTracker(),
+		mux:                   http.NewServeMux(),
+		startTime:             time.Now(),
+		browserSessions:       NewBrowserSessionStore(),
+		modelMgr:              newModelManager(),
+		oauthPending:          make(map[string]*oauthPendingState),
 	}
 	g.searchOn.Store(true)
 	g.routes()

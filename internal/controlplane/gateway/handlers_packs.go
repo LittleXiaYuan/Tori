@@ -56,9 +56,13 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 	if g.backendPackRoutes == nil {
 		g.backendPackRoutes = make(map[string]string)
 	}
+	if g.backendPackRouteInfos == nil {
+		g.backendPackRouteInfos = make(map[string]packruntime.BackendRouteInfo)
+	}
 	for _, route := range module.Routes() {
 		route := route
 		route.Path = strings.TrimSpace(route.Path)
+		route.Method = strings.TrimSpace(route.Method)
 		if route.Path == "" || route.Handler == nil {
 			continue
 		}
@@ -69,6 +73,7 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 			panic(fmt.Sprintf("backend pack route conflict: %s already registered by %s, cannot register %s", route.Path, owner, packID))
 		}
 		g.backendPackRoutes[route.Path] = packID
+		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: route.Method, Path: route.Path}
 		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, route.Path, func(w http.ResponseWriter, r *http.Request) {
 			if route.Method != "" && r.Method != route.Method {
 				writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
@@ -87,7 +92,11 @@ func (g *Gateway) backendModuleInfos() []packruntime.BackendModuleInfo {
 		if strings.TrimSpace(packID) == "" || strings.TrimSpace(path) == "" {
 			continue
 		}
-		byPack[packID] = append(byPack[packID], packruntime.BackendRouteInfo{Path: path})
+		info := g.backendPackRouteInfos[path]
+		if strings.TrimSpace(info.Path) == "" {
+			info.Path = path
+		}
+		byPack[packID] = append(byPack[packID], info)
 	}
 	infos := make([]packruntime.BackendModuleInfo, 0, len(byPack))
 	for packID, routes := range byPack {
