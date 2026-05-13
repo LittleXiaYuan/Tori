@@ -1630,6 +1630,7 @@ type AgentKit struct {
 	Browser           *browserNamespace
 	Plugin            *pluginRuntimeNamespace
 	PluginSearch      *pluginSearchNamespace
+	PluginSend        *pluginSendNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1643,8 +1644,12 @@ var Plugin = &pluginRuntimeNamespace{}
 // PluginSearch exposes standalone plugin-scoped web search for plugins and scripts.
 var PluginSearch = &pluginSearchNamespace{}
 
+// PluginSend exposes standalone plugin-scoped channel send for plugins and scripts.
+var PluginSend = &pluginSendNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
+type pluginSendNamespace struct{}
 
 // ── Mission Parse ──
 
@@ -6909,6 +6914,7 @@ func NewAgentKit() AgentKit {
 		Browser:           Browser,
 		Plugin:            Plugin,
 		PluginSearch:      PluginSearch,
+		PluginSend:        PluginSend,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,
@@ -6930,6 +6936,10 @@ func (p *pluginRuntimeNamespace) Search(ctx context.Context, query string, limit
 
 func (p *pluginSearchNamespace) Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	return Search(ctx, query, limit)
+}
+
+func (p *pluginSendNamespace) Send(ctx context.Context, channelType, target, content string) error {
+	return Send(ctx, channelType, target, content)
 }
 
 func (p *pluginRuntimeNamespace) Send(ctx context.Context, channelType, target, content string) error {

@@ -107,6 +107,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.pluginFiles.files("demo")).files[0]?.name, "plugin.json");
   assertEqual((await kit.pluginFolder.openFolder("demo")).ok, true);
   assertEqual((await kit.pluginSearch.search("agent", 2)).results.length, 1);
+  assertEqual((await kit.pluginSend.send("webhook", "ops", "hello", "text")).ok, true);
   assertEqual((await kit.skills.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsScan.scan()).skills_loaded, 2);
