@@ -60,6 +60,11 @@ const frontend = [
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
 ].map(read).join("\n");
+const frontendShell = [
+  "heroui-web/src/components/sidebar.tsx",
+  "heroui-web/src/lib/nav-items.tsx",
+  "heroui-web/src/components/command-palette.tsx",
+].map(read).join("\n");
 const sdk = [
   "sdk/typescript/src/packs.ts",
   "sdk/typescript/src/packs.test.ts",
@@ -151,6 +156,13 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "previousArtifacts",
   "SDK 调用入口",
 ]);
+
+
+if (frontendShell.includes('href: "/backup"') || frontendShell.includes('href: "/backup"') || frontendShell.includes('nav-backup')) {
+  fail("前端同步菜单/路由/资源/控制台", "backup pack must not be exposed as a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
+} else {
+  ok("前端轻内核导航", "backup entry is not hard-coded in sidebar/nav-items/command-palette");
+}
 
 requireTokens("TypeScript packs SDK", sdk, [
   "createPacksClient",

@@ -72,7 +72,6 @@ const categories: NavCategory[] = [
     { href: "/audit", label: "审计", labelEn: "Audit", icon: <Shield size={16} />, tier: "full" },
     { href: "/trust", label: "信任", labelEn: "Trust", icon: <ShieldCheck size={16} />, tier: "full" },
     { href: "/tenants", label: "租户", labelEn: "Tenants", icon: <Users size={16} />, tier: "full" },
-    { href: "/backup", label: "备份", labelEn: "Backup", icon: <HardDriveDownload size={16} />, tier: "full" },
     { href: "/bots", label: "Bot", labelEn: "Bots", icon: <Bot size={16} />, tier: "full" },
     { href: "/settings", label: "设置", labelEn: "Settings", icon: <Settings size={16} />, tier: "easy" },
   ]},
