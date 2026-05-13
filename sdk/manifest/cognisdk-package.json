@@ -165,8 +165,11 @@
         "FeedbackProposalJSONSchema",
         "JSONSchemaInfo",
         "JSONSchemaArtifact",
+        "JSONSchemaArtifactCheck",
         "JSONSchemaInfos",
         "ExportJSONSchemaArtifacts",
+        "VerifyJSONSchemaArtifacts",
+        "VerifyJSONSchemaArtifactCatalog",
         "JSONSchemaByName"
       ]
     }
@@ -177,7 +180,8 @@
       "file": "cmd/cognisdk-schema/main.go",
       "commands": [
         "list",
-        "export"
+        "export",
+        "verify"
       ],
       "flags": [
         "--json",

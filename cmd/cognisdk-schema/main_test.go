@@ -130,6 +130,56 @@ func TestRunExportAllSchemas(t *testing.T) {
 	}
 }
 
+func TestRunVerifyAllSchemas(t *testing.T) {
+	dir := t.TempDir()
+	outDir := filepath.Join(dir, "schemas")
+	catalogPath := filepath.Join(dir, "schema-artifacts.json")
+	verifyOut := filepath.Join(dir, "schema-checks.json")
+	if err := run([]string{"export", outDir, "--catalog", catalogPath}); err != nil {
+		t.Fatalf("export all schemas: %v", err)
+	}
+	if err := run([]string{"verify", outDir, "--catalog", catalogPath, "--out", verifyOut}); err != nil {
+		t.Fatalf("verify all schemas: %v", err)
+	}
+	data, err := os.ReadFile(verifyOut)
+	if err != nil {
+		t.Fatalf("read verify output: %v", err)
+	}
+	if !json.Valid(data) {
+		t.Fatalf("verify output is not valid json: %s", data)
+	}
+	var checks []map[string]any
+	if err := json.Unmarshal(data, &checks); err != nil {
+		t.Fatalf("unmarshal verify output: %v", err)
+	}
+	if len(checks) == 0 || checks[0]["match"] != true {
+		t.Fatalf("unexpected verify output: %#v", checks)
+	}
+}
+
+func TestRunVerifyWritesFailureReport(t *testing.T) {
+	dir := t.TempDir()
+	outDir := filepath.Join(dir, "schemas")
+	verifyOut := filepath.Join(dir, "schema-checks.json")
+	if err := run([]string{"export", outDir}); err != nil {
+		t.Fatalf("export all schemas: %v", err)
+	}
+	if err := os.Remove(filepath.Join(outDir, "pack-bundle.schema.json")); err != nil {
+		t.Fatalf("remove schema: %v", err)
+	}
+	err := run([]string{"verify", outDir, "--out", verifyOut})
+	if err == nil || !strings.Contains(err.Error(), "verify artifacts failed") {
+		t.Fatalf("expected verify failure, got %v", err)
+	}
+	data, readErr := os.ReadFile(verifyOut)
+	if readErr != nil {
+		t.Fatalf("read verify failure output: %v", readErr)
+	}
+	if !json.Valid(data) {
+		t.Fatalf("verify failure output is not valid json: %s", data)
+	}
+}
+
 func TestRunExportAllSchemasRejectsBadArgs(t *testing.T) {
 	err := run([]string{"export"})
 	if err == nil || !strings.Contains(err.Error(), "usage: cognisdk-schema export") {
@@ -142,6 +192,25 @@ func TestRunExportAllSchemasRejectsBadArgs(t *testing.T) {
 	err = run([]string{"export", t.TempDir(), "--bad"})
 	if err == nil || !strings.Contains(err.Error(), "unknown export option") {
 		t.Fatalf("expected export unknown option error, got %v", err)
+	}
+}
+
+func TestRunVerifyRejectsBadArgs(t *testing.T) {
+	err := run([]string{"verify"})
+	if err == nil || !strings.Contains(err.Error(), "usage: cognisdk-schema verify") {
+		t.Fatalf("expected verify usage error, got %v", err)
+	}
+	err = run([]string{"verify", t.TempDir(), "--catalog"})
+	if err == nil || !strings.Contains(err.Error(), "--catalog requires a path") {
+		t.Fatalf("expected verify catalog path error, got %v", err)
+	}
+	err = run([]string{"verify", t.TempDir(), "--out"})
+	if err == nil || !strings.Contains(err.Error(), "--out requires a path") {
+		t.Fatalf("expected verify out path error, got %v", err)
+	}
+	err = run([]string{"verify", t.TempDir(), "--bad"})
+	if err == nil || !strings.Contains(err.Error(), "unknown verify option") {
+		t.Fatalf("expected verify unknown option error, got %v", err)
 	}
 }
 

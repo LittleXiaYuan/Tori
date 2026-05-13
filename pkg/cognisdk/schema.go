@@ -33,6 +33,19 @@ type JSONSchemaArtifact struct {
 	File        string `json:"file" yaml:"file"`
 }
 
+// JSONSchemaArtifactCheck records verification evidence for one schema
+// artifact file. It is designed for CI, plugin installers, and frontend build
+// steps that need a machine-readable proof that an exported schema bundle is
+// complete before using it.
+type JSONSchemaArtifactCheck struct {
+	Name     string `json:"name" yaml:"name"`
+	File     string `json:"file" yaml:"file"`
+	Expected string `json:"expected" yaml:"expected"`
+	Actual   string `json:"actual,omitempty" yaml:"actual,omitempty"`
+	Match    bool   `json:"match" yaml:"match"`
+	Error    string `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
 	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "pack-bundle-apply-checklist", "feedback-proposal"}
@@ -371,6 +384,138 @@ func ExportJSONSchemaArtifacts(outputDir string) ([]JSONSchemaArtifact, error) {
 		})
 	}
 	return artifacts, nil
+}
+
+// VerifyJSONSchemaArtifacts checks that outputDir contains every public schema
+// artifact and that each file exactly matches the SDK's current canonical
+// schema document. The returned checks are stable and JSON-friendly; the error
+// is non-nil when any artifact is missing, invalid, unknown, or stale.
+func VerifyJSONSchemaArtifacts(outputDir string) ([]JSONSchemaArtifactCheck, error) {
+	infos := JSONSchemaInfos()
+	checks := make([]JSONSchemaArtifactCheck, 0, len(infos))
+	var failures []string
+	for _, info := range infos {
+		file := info.Name + ".schema.json"
+		check := JSONSchemaArtifactCheck{
+			Name:     info.Name,
+			File:     file,
+			Expected: info.Schema,
+		}
+		actual, match, err := verifyJSONSchemaArtifactFile(outputDir, file, info)
+		if err != nil {
+			check.Error = err.Error()
+			failures = append(failures, fmt.Sprintf("%s: %s", file, err.Error()))
+		}
+		check.Actual = actual
+		check.Match = match
+		if err == nil && !match {
+			failures = append(failures, fmt.Sprintf("%s: schema document mismatch", file))
+		}
+		checks = append(checks, check)
+	}
+	if len(failures) > 0 {
+		return checks, fmt.Errorf("cognisdk.schema: verify artifacts failed: %s", strings.Join(failures, "; "))
+	}
+	return checks, nil
+}
+
+// VerifyJSONSchemaArtifactCatalog checks a caller-provided artifact catalog and
+// then verifies the referenced files against the SDK's canonical schema
+// documents. The catalog is treated as data: entries must use known schema
+// names and relative filenames so a schema bundle remains portable.
+func VerifyJSONSchemaArtifactCatalog(outputDir string, artifacts []JSONSchemaArtifact) ([]JSONSchemaArtifactCheck, error) {
+	if len(artifacts) == 0 {
+		return nil, fmt.Errorf("cognisdk.schema: verify catalog: empty artifact catalog")
+	}
+	infosByName := map[string]JSONSchemaInfo{}
+	for _, info := range JSONSchemaInfos() {
+		infosByName[info.Name] = info
+	}
+	seen := map[string]bool{}
+	checks := make([]JSONSchemaArtifactCheck, 0, len(artifacts))
+	var failures []string
+	for _, artifact := range artifacts {
+		info, ok := infosByName[artifact.Name]
+		file := artifact.File
+		if file == "" {
+			file = artifact.Name + ".schema.json"
+		}
+		check := JSONSchemaArtifactCheck{
+			Name:     artifact.Name,
+			File:     file,
+			Expected: info.Schema,
+		}
+		switch {
+		case artifact.Name == "":
+			check.Error = "missing schema artifact name"
+		case !ok:
+			check.Error = "unknown schema artifact"
+		case seen[artifact.Name]:
+			check.Error = "duplicate schema artifact"
+		case !safeRelativeSchemaArtifactFile(file):
+			check.Error = "schema artifact file must be a relative filename"
+		case artifact.Schema != "" && artifact.Schema != info.Schema:
+			check.Error = "schema artifact id mismatch"
+		}
+		if check.Error != "" {
+			failures = append(failures, fmt.Sprintf("%s: %s", artifact.Name, check.Error))
+			checks = append(checks, check)
+			continue
+		}
+		seen[artifact.Name] = true
+		actual, match, err := verifyJSONSchemaArtifactFile(outputDir, file, info)
+		if err != nil {
+			check.Error = err.Error()
+			failures = append(failures, fmt.Sprintf("%s: %s", file, err.Error()))
+		}
+		check.Actual = actual
+		check.Match = match
+		if err == nil && !match {
+			failures = append(failures, fmt.Sprintf("%s: schema document mismatch", file))
+		}
+		checks = append(checks, check)
+	}
+	for _, info := range JSONSchemaInfos() {
+		if !seen[info.Name] {
+			failures = append(failures, fmt.Sprintf("%s: missing from artifact catalog", info.Name))
+		}
+	}
+	if len(failures) > 0 {
+		return checks, fmt.Errorf("cognisdk.schema: verify catalog failed: %s", strings.Join(failures, "; "))
+	}
+	return checks, nil
+}
+
+func verifyJSONSchemaArtifactFile(outputDir, file string, info JSONSchemaInfo) (string, bool, error) {
+	if !safeRelativeSchemaArtifactFile(file) {
+		return "", false, fmt.Errorf("schema artifact file must be a relative filename")
+	}
+	data, err := os.ReadFile(filepath.Join(outputDir, file))
+	if err != nil {
+		return "", false, fmt.Errorf("read: %w", err)
+	}
+	var actual JSONSchema
+	if err := json.Unmarshal(data, &actual); err != nil {
+		return "", false, fmt.Errorf("invalid json: %w", err)
+	}
+	actualID := schemaString(actual, "$id")
+	expected, ok := JSONSchemaByName(info.Name)
+	if !ok {
+		return actualID, false, fmt.Errorf("unknown schema %q", info.Name)
+	}
+	expectedData, err := json.Marshal(expected)
+	if err != nil {
+		return actualID, false, fmt.Errorf("marshal expected: %w", err)
+	}
+	actualData, err := json.Marshal(actual)
+	if err != nil {
+		return actualID, false, fmt.Errorf("marshal actual: %w", err)
+	}
+	return actualID, string(actualData) == string(expectedData), nil
+}
+
+func safeRelativeSchemaArtifactFile(file string) bool {
+	return file != "" && !filepath.IsAbs(file) && filepath.Clean(file) == file && !strings.HasPrefix(file, "..")
 }
 
 func packBundleApplyActionSchema() map[string]any {
