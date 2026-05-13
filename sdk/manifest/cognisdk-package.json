@@ -10,6 +10,7 @@
   "goPackage": {
     "importPath": "yunque-agent/pkg/cognisdk",
     "implementationFiles": [
+      "pkg/cognisdk/doc.go",
       "pkg/cognisdk/types.go",
       "pkg/cognisdk/engine.go",
       "pkg/cognisdk/host.go",
