@@ -3403,6 +3403,21 @@ class _SkillsSuggestionsNamespace:
 
 skills_suggestions = _SkillsSuggestionsNamespace()
 
+class _SkillsDynamicNamespace:
+    """Standalone dynamic skill review helper for external operator tools."""
+
+    def list(self) -> dict:
+        return skills.dynamic()
+
+    def approve(self, name: str, instruction: str = "") -> dict:
+        return skills.approve(name, instruction)
+
+    def reject(self, name: str) -> dict:
+        return skills.reject(name)
+
+
+skills_dynamic = _SkillsDynamicNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3520,6 +3535,7 @@ class AgentKit:
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
         self.skills_suggestions = skills_suggestions
+        self.skills_dynamic = skills_dynamic
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork

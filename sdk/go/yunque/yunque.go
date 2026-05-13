@@ -424,10 +424,14 @@ var SkillsScan = &skillsScanNamespace{}
 // SkillsSuggestions exposes session skill suggestions as a standalone slice.
 var SkillsSuggestions = &skillsSuggestionsNamespace{}
 
+// SkillsDynamic exposes dynamic skill review as a standalone operator slice.
+var SkillsDynamic = &skillsDynamicNamespace{}
+
 type skillsNamespace struct{}
 type skillsCatalogNamespace struct{}
 type skillsScanNamespace struct{}
 type skillsSuggestionsNamespace struct{}
+type skillsDynamicNamespace struct{}
 type SkillsResponse map[string]any
 
 func (s *skillsNamespace) List(ctx context.Context) (SkillsResponse, error) {
@@ -452,6 +456,18 @@ func (s *skillsNamespace) Scan(ctx context.Context) (SkillsResponse, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+func (s *skillsDynamicNamespace) List(ctx context.Context) (SkillsResponse, error) {
+	return Skills.Dynamic(ctx)
+}
+
+func (s *skillsDynamicNamespace) Approve(ctx context.Context, name, instruction string) (SkillsResponse, error) {
+	return Skills.Approve(ctx, name, instruction)
+}
+
+func (s *skillsDynamicNamespace) Reject(ctx context.Context, name string) (SkillsResponse, error) {
+	return Skills.Reject(ctx, name)
 }
 
 func (s *skillsNamespace) Dynamic(ctx context.Context) (SkillsResponse, error) {
@@ -1513,6 +1529,7 @@ type AgentKit struct {
 	SkillsCatalog     *skillsCatalogNamespace
 	SkillsScan        *skillsScanNamespace
 	SkillsSuggestions *skillsSuggestionsNamespace
+	SkillsDynamic     *skillsDynamicNamespace
 	Dispatch          *dispatchNamespace
 	Orchestrator      *orchestratorNamespace
 	Fork              *forkNamespace
@@ -6782,6 +6799,7 @@ func NewAgentKit() AgentKit {
 		SkillsCatalog:     SkillsCatalog,
 		SkillsScan:        SkillsScan,
 		SkillsSuggestions: SkillsSuggestions,
+		SkillsDynamic:     SkillsDynamic,
 		Dispatch:          Dispatch,
 		Orchestrator:      Orchestrator,
 		Fork:              Fork,

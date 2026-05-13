@@ -29,6 +29,7 @@
     "skills-catalog",
     "skills-scan",
     "skills-suggestions",
+    "skills-dynamic",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -171,6 +172,10 @@
     {
       "name": "skillsSuggestions",
       "description": "Access the lightweight SkillsSuggestions client or namespace for session skill suggestion reads."
+    },
+    {
+      "name": "skillsDynamic",
+      "description": "Access the lightweight SkillsDynamic client or namespace for dynamic skill review, approval, and rejection."
     },
     {
       "name": "skills",
@@ -485,6 +490,7 @@
         "skillsCatalog": "createAgentKit().skillsCatalog",
         "skillsScan": "createAgentKit().skillsScan",
         "skillsSuggestions": "createAgentKit().skillsSuggestions",
+        "skillsDynamic": "createAgentKit().skillsDynamic",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
@@ -577,6 +583,7 @@
         "skillsCatalog": "yunque.NewAgentKit().SkillsCatalog",
         "skillsScan": "yunque.NewAgentKit().SkillsScan",
         "skillsSuggestions": "yunque.NewAgentKit().SkillsSuggestions",
+        "skillsDynamic": "yunque.NewAgentKit().SkillsDynamic",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
@@ -669,6 +676,7 @@
         "skillsCatalog": "yunque.create_agent_kit().skills_catalog",
         "skillsScan": "yunque.create_agent_kit().skills_scan",
         "skillsSuggestions": "yunque.create_agent_kit().skills_suggestions",
+        "skillsDynamic": "yunque.create_agent_kit().skills_dynamic",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
@@ -761,6 +769,7 @@
         "skillsCatalog": "AgentKit::skills_catalog",
         "skillsScan": "AgentKit::skills_scan",
         "skillsSuggestions": "AgentKit::skills_suggestions",
+        "skillsDynamic": "AgentKit::skills_dynamic",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",
