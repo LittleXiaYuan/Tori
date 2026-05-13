@@ -1634,6 +1634,7 @@ type AgentKit struct {
 	PluginLLM         *pluginLLMNamespace
 	PluginMemory      *pluginMemoryNamespace
 	PluginKnowledge   *pluginKnowledgeNamespace
+	PluginAgentMemory *pluginAgentMemoryNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1659,12 +1660,16 @@ var PluginMemory = &pluginMemoryNamespace{}
 // PluginKnowledge exposes standalone plugin-scoped knowledge/RAG helpers for plugins and scripts.
 var PluginKnowledge = &pluginKnowledgeNamespace{}
 
+// PluginAgentMemory exposes standalone shared Agent memory helpers for plugins and scripts.
+var PluginAgentMemory = &pluginAgentMemoryNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
 type pluginSendNamespace struct{}
 type pluginLLMNamespace struct{}
 type pluginMemoryNamespace struct{}
 type pluginKnowledgeNamespace struct{}
+type pluginAgentMemoryNamespace struct{}
 
 
 func (p *pluginMemoryNamespace) Get(ctx context.Context, key string) (string, error) {
@@ -1694,6 +1699,15 @@ func (p *pluginKnowledgeNamespace) Search(ctx context.Context, query string, lim
 
 func (p *pluginKnowledgeNamespace) Ingest(ctx context.Context, content, filename string) error {
 	return Knowledge.Ingest(ctx, content, filename)
+}
+
+
+func (p *pluginAgentMemoryNamespace) Search(ctx context.Context, query string) (string, error) {
+	return AgentMemory.Search(ctx, query)
+}
+
+func (p *pluginAgentMemoryNamespace) Add(ctx context.Context, fact string) error {
+	return AgentMemory.Add(ctx, fact)
 }
 
 // ── Mission Parse ──
@@ -6963,6 +6977,7 @@ func NewAgentKit() AgentKit {
 		PluginLLM:         PluginLLM,
 		PluginMemory:      PluginMemory,
 		PluginKnowledge:   PluginKnowledge,
+		PluginAgentMemory: PluginAgentMemory,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,

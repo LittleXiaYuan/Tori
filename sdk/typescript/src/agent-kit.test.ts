@@ -85,6 +85,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/plugin-api/llm")) return jsonResponse({ reply: "plugin llm reply" });
       if (value.endsWith("/v1/plugin-api/memory/get")) return jsonResponse({ value: "memory-value" });
       if (value.endsWith("/v1/plugin-api/knowledge/search")) return jsonResponse({ results: [{ id: "chunk-1" }] });
+      if (value.endsWith("/v1/plugin-api/agent-memory/search")) return jsonResponse({ context: "agent memory context" });
       return jsonResponse({ ok: true });
     },
   });
@@ -114,6 +115,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.pluginLLM.complete({ messages: [{ role: "user", content: "hi" }] })).reply, "plugin llm reply");
   assertEqual((await kit.pluginMemory.get("key")).value, "memory-value");
   assertEqual((await kit.pluginKnowledge.search("sdk", 1)).results.length, 1);
+  assertEqual((await kit.pluginAgentMemory.search("preference", 2)).context, "agent memory context");
   assertEqual((await kit.skills.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsScan.scan()).skills_loaded, 2);
@@ -216,6 +218,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[58]?.init?.headers).get("authorization"), "Bearer plugin-token");
   assertEqual(new Headers(calls[59]?.init?.headers).get("authorization"), "Bearer plugin-token");
   assertEqual(new Headers(calls[60]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[61]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {
