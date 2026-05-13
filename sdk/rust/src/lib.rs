@@ -1377,6 +1377,7 @@ pub struct AgentKit {
     pub notify: NotifyClient,
     pub projects: ProjectsClient,
     pub market: SkillMarketClient,
+    pub skillhub: SkillHubClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1461,6 +1462,7 @@ impl AgentKit {
             notify: NotifyClient::new(base_url.clone(), token.as_ref())?,
             projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
+            skillhub: SkillHubClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1535,6 +1537,7 @@ impl AgentKit {
             notify: NotifyClient::new_with_client(base_url.clone(), plugin_http.clone()),
             projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skillhub: SkillHubClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -7917,6 +7920,150 @@ pub struct SkillMarketTopOptions {
 
 pub type SkillMarketStatsResponse = serde_json::Map<String, serde_json::Value>;
 
+/// Lightweight SkillHub SDK client for incremental skill packages.
+#[derive(Debug, Clone)]
+pub struct SkillHubClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+pub type SkillHubResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SkillHubQuery {
+    pub q: String,
+    pub limit: i32,
+    pub source: String,
+    pub cursor: String,
+}
+
+fn skillhub_query(base: &str, query: &SkillHubQuery) -> String {
+    let mut params: Vec<String> = Vec::new();
+    if !query.q.is_empty() {
+        params.push(format!("q={}", url_encode_query_component(&query.q)));
+    }
+    if query.limit > 0 {
+        params.push(format!("limit={}", query.limit));
+    }
+    if !query.source.is_empty() {
+        params.push(format!("source={}", url_encode_query_component(&query.source)));
+    }
+    if !query.cursor.is_empty() {
+        params.push(format!("cursor={}", url_encode_query_component(&query.cursor)));
+    }
+    if params.is_empty() {
+        base.to_string()
+    } else {
+        format!("{}?{}", base, params.join("&"))
+    }
+}
+
+impl SkillHubClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() {
+            let value = format!("Bearer {token}");
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, value);
+            }
+        }
+        Ok(Self::new_with_client(
+            base_url,
+            reqwest::Client::builder().default_headers(headers).build()?,
+        ))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self {
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            http,
+        }
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    async fn get(&self, path: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.http
+            .get(self.url(path))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    async fn post(&self, path: &str, body: serde_json::Value) -> Result<SkillHubResponse, reqwest::Error> {
+        self.http
+            .post(self.url(path))
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    }
+
+    pub async fn search(&self, query: &SkillHubQuery) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get(&skillhub_query("/api/skillhub/search", query)).await
+    }
+
+    pub async fn installed(&self) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get("/api/skillhub/installed").await
+    }
+
+    pub async fn install(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.post("/api/skillhub/install", serde_json::json!({ "slug": slug })).await
+    }
+
+    pub async fn uninstall(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.post("/api/skillhub/uninstall", serde_json::json!({ "slug": slug })).await
+    }
+
+    pub async fn trending(&self, query: &SkillHubQuery) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get(&skillhub_query("/api/skillhub/trending", query)).await
+    }
+
+    pub async fn detail(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get(&format!("/api/skillhub/detail?slug={}", url_encode_query_component(slug))).await
+    }
+
+    pub async fn check_updates(&self) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get("/api/skillhub/check-updates").await
+    }
+
+    pub async fn update(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.post("/api/skillhub/update", serde_json::json!({ "slug": slug })).await
+    }
+
+    pub async fn rollback(&self, slug: &str, version: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.post("/api/skillhub/rollback", serde_json::json!({ "slug": slug, "version": version })).await
+    }
+
+    pub async fn versions(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get(&format!("/api/skillhub/versions?slug={}", url_encode_query_component(slug))).await
+    }
+
+    pub async fn policy(&self) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get("/api/skillhub/policy").await
+    }
+
+    pub async fn update_policy(&self, policy: serde_json::Value) -> Result<SkillHubResponse, reqwest::Error> {
+        self.post("/api/skillhub/policy", policy).await
+    }
+
+    pub async fn policy_check(&self, slug: &str) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get(&format!("/api/skillhub/policy/check?slug={}", url_encode_query_component(slug))).await
+    }
+
+    pub async fn analytics(&self) -> Result<SkillHubResponse, reqwest::Error> {
+        self.get("/api/skillhub/analytics").await
+    }
+}
+
 /// Small Rust helper over host `/v1/market/*` skill marketplace endpoints.
 #[derive(Debug, Clone)]
 pub struct SkillMarketClient {
@@ -10879,6 +11026,15 @@ mod tests {
             client.url("/v1/orchestrator/status"),
             "http://localhost:9090/v1/orchestrator/status"
         );
+    }
+
+
+    #[test]
+    fn skillhub_helpers_build_urls_and_queries() {
+        let client = SkillHubClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/api/skillhub/installed"), "http://localhost:9090/api/skillhub/installed");
+        let query = SkillHubQuery { q: "browser skill".to_string(), limit: 5, source: "claw hub".to_string(), cursor: "".to_string() };
+        assert_eq!(skillhub_query("/api/skillhub/search", &query), "/api/skillhub/search?q=browser+skill&limit=5&source=claw+hub");
     }
 
     #[test]

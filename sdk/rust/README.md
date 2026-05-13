@@ -653,3 +653,7 @@ The lightweight Sandbox SDK exposes sandbox runtime helpers (`exec`, `probe`, `c
 ### Router SDK
 
 The lightweight Router SDK exposes smart-router statistics (`stats`) for external operator pages, plugin UIs, CLIs, sidecars, routing dashboards, and automation monitors without importing the full platform client. It maps directly to `GET /v1/router/stats`; Agent Kit also exposes this surface as `kit.router` / `kit.Router`.
+
+### SkillHub SDK
+
+The lightweight SkillHub SDK exposes incremental skill-package catalog, install, update, rollback, version, policy, and analytics helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/api/skillhub/*`; Agent Kit also exposes this surface as `kit.skillhub` / `kit.SkillHub`.

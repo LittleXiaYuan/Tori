@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "domain": "skillhub",
+  "description": "Cross-language lightweight SDK entrypoints for SkillHub incremental package catalog, install, update, rollback, policy, and analytics without importing the full platform client.",
+  "principles": [
+    "Expose installable skill packages as focused SDK helpers for external plugin UIs, CLIs, operator pages, sidecars, and automation scripts.",
+    "Keep incremental package lifecycle actions directly callable through the existing authenticated /api/skillhub routes.",
+    "Make SkillHub access available through Agent Kit while preserving rollback-oriented package operations."
+  ],
+  "routes": [
+    "GET /api/skillhub/search",
+    "POST /api/skillhub/install",
+    "GET /api/skillhub/installed",
+    "POST|DELETE /api/skillhub/uninstall",
+    "GET /api/skillhub/trending",
+    "GET /api/skillhub/detail",
+    "GET /api/skillhub/check-updates",
+    "POST /api/skillhub/update",
+    "POST /api/skillhub/rollback",
+    "GET /api/skillhub/versions",
+    "GET|POST /api/skillhub/policy",
+    "GET /api/skillhub/policy/check",
+    "GET /api/skillhub/analytics"
+  ],
+  "capabilities": [
+    { "name": "search", "route": "GET /api/skillhub/search", "readOnly": true, "description": "Search local and remote SkillHub package catalogs." },
+    { "name": "installed", "route": "GET /api/skillhub/installed", "readOnly": true, "description": "List installed SkillHub packages." },
+    { "name": "install", "route": "POST /api/skillhub/install", "readOnly": false, "description": "Install a package by slug through the security audit pipeline." },
+    { "name": "uninstall", "route": "POST|DELETE /api/skillhub/uninstall", "readOnly": false, "description": "Remove an installed SkillHub package." },
+    { "name": "trending", "route": "GET /api/skillhub/trending", "readOnly": true, "description": "Read trending packages from configured hubs." },
+    { "name": "detail", "route": "GET /api/skillhub/detail", "readOnly": true, "description": "Read package detail by slug." },
+    { "name": "checkUpdates", "route": "GET /api/skillhub/check-updates", "readOnly": true, "description": "Check installed packages for updates." },
+    { "name": "update", "route": "POST /api/skillhub/update", "readOnly": false, "description": "Update a package to the latest remote version." },
+    { "name": "rollback", "route": "POST /api/skillhub/rollback", "readOnly": false, "description": "Rollback a package to an archived version." },
+    { "name": "versions", "route": "GET /api/skillhub/versions", "readOnly": true, "description": "List archived versions for a package." },
+    { "name": "policy", "route": "GET|POST /api/skillhub/policy", "readOnly": false, "description": "Read or update SkillHub security policy." },
+    { "name": "policyCheck", "route": "GET /api/skillhub/policy/check", "readOnly": true, "description": "Dry-run a policy check for a package." },
+    { "name": "analytics", "route": "GET /api/skillhub/analytics", "readOnly": true, "description": "Read SkillHub marketplace analytics." }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/typescript/src/skillhub.ts", "sdk/typescript/src/agent-kit.ts"],
+      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "entrypoints": { "search": "createSkillHubClient().search", "installed": "createSkillHubClient().installed", "install": "createSkillHubClient().install", "uninstall": "createSkillHubClient().uninstall", "trending": "createSkillHubClient().trending", "detail": "createSkillHubClient().detail", "checkUpdates": "createSkillHubClient().checkUpdates", "update": "createSkillHubClient().update", "rollback": "createSkillHubClient().rollback", "versions": "createSkillHubClient().versions", "policy": "createSkillHubClient().policy", "policyCheck": "createSkillHubClient().policyCheck", "analytics": "createSkillHubClient().analytics" }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": ["sdk/go/yunque/yunque.go"],
+      "docs": ["sdk/go/README.md", "docs/plugins/sdk-go.md"],
+      "entrypoints": { "search": "yunque.SkillHub.Search", "installed": "yunque.SkillHub.Installed", "install": "yunque.SkillHub.Install", "uninstall": "yunque.SkillHub.Uninstall", "trending": "yunque.SkillHub.Trending", "detail": "yunque.SkillHub.Detail", "checkUpdates": "yunque.SkillHub.CheckUpdates", "update": "yunque.SkillHub.Update", "rollback": "yunque.SkillHub.Rollback", "versions": "yunque.SkillHub.Versions", "policy": "yunque.SkillHub.Policy", "policyCheck": "yunque.SkillHub.PolicyCheck", "analytics": "yunque.SkillHub.Analytics" }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": ["sdk/python/yunque/__init__.py"],
+      "docs": ["sdk/python/README.md", "docs/plugins/sdk-python.md"],
+      "entrypoints": { "search": "yunque.skillhub.search", "installed": "yunque.skillhub.installed", "install": "yunque.skillhub.install", "uninstall": "yunque.skillhub.uninstall", "trending": "yunque.skillhub.trending", "detail": "yunque.skillhub.detail", "checkUpdates": "yunque.skillhub.check_updates", "update": "yunque.skillhub.update", "rollback": "yunque.skillhub.rollback", "versions": "yunque.skillhub.versions", "policy": "yunque.skillhub.policy", "policyCheck": "yunque.skillhub.policy_check", "analytics": "yunque.skillhub.analytics" }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": ["sdk/rust/src/lib.rs"],
+      "docs": ["sdk/rust/README.md", "docs/plugins/sdk-rust.md"],
+      "entrypoints": { "search": "SkillHubClient::search", "installed": "SkillHubClient::installed", "install": "SkillHubClient::install", "uninstall": "SkillHubClient::uninstall", "trending": "SkillHubClient::trending", "detail": "SkillHubClient::detail", "checkUpdates": "SkillHubClient::check_updates", "update": "SkillHubClient::update", "rollback": "SkillHubClient::rollback", "versions": "SkillHubClient::versions", "policy": "SkillHubClient::policy", "policyCheck": "SkillHubClient::policy_check", "analytics": "SkillHubClient::analytics" }
+    }
+  },
+  "overviewDocs": ["docs/plugins/sdk-overview.md", "docs/plugins/overview.md", "docs/plugins/developing.md"]
+}

@@ -300,6 +300,145 @@ func filenameFromDisposition(disposition string) string {
 	return ""
 }
 
+// ── SkillHub Incremental Packages (/api/skillhub) ──
+
+// SkillHub exposes catalog, install, update, rollback, policy, and analytics helpers for incremental skill packages.
+var SkillHub = &skillHubNamespace{}
+
+type skillHubNamespace struct{}
+
+type SkillHubResponse map[string]any
+
+type SkillHubQuery struct {
+	Q      string
+	Limit  int
+	Source string
+	Cursor string
+}
+
+func skillHubQuery(base string, query SkillHubQuery) string {
+	values := url.Values{}
+	if query.Q != "" {
+		values.Set("q", query.Q)
+	}
+	if query.Limit > 0 {
+		values.Set("limit", strconv.Itoa(query.Limit))
+	}
+	if query.Source != "" {
+		values.Set("source", query.Source)
+	}
+	if query.Cursor != "" {
+		values.Set("cursor", query.Cursor)
+	}
+	if encoded := values.Encode(); encoded != "" {
+		return base + "?" + encoded
+	}
+	return base
+}
+
+func (s *skillHubNamespace) Search(ctx context.Context, query SkillHubQuery) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, skillHubQuery("/api/skillhub/search", query), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *skillHubNamespace) Installed(ctx context.Context) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/installed", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Install(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/skillhub/install", map[string]any{"slug": slug}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Uninstall(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/skillhub/uninstall", map[string]any{"slug": slug}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Trending(ctx context.Context, query SkillHubQuery) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, skillHubQuery("/api/skillhub/trending", query), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Detail(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	values := url.Values{"slug": []string{slug}}
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/detail?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) CheckUpdates(ctx context.Context) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/check-updates", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Update(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/skillhub/update", map[string]any{"slug": slug}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Rollback(ctx context.Context, slug, version string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/skillhub/rollback", map[string]any{"slug": slug, "version": version}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Versions(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	values := url.Values{"slug": []string{slug}}
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/versions?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Policy(ctx context.Context) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/policy", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) UpdatePolicy(ctx context.Context, policy map[string]any) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/api/skillhub/policy", policy, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) PolicyCheck(ctx context.Context, slug string) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	values := url.Values{"slug": []string{slug}}
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/policy/check?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (s *skillHubNamespace) Analytics(ctx context.Context) (SkillHubResponse, error) {
+	var out SkillHubResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/api/skillhub/analytics", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Smart Router (/v1/router) ──
 
 // Router exposes smart-router slot and routing statistics for external operator pages and automation monitors.
@@ -1129,6 +1268,7 @@ type AgentKit struct {
 	Notify        *notifyNamespace
 	Projects      *projectsNamespace
 	Market        *skillMarketNamespace
+	SkillHub      *skillHubNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
 	Fork          *forkNamespace
@@ -6236,6 +6376,7 @@ func NewAgentKit() AgentKit {
 		Notify:        Notify,
 		Projects:      Projects,
 		Market:        SkillMarket,
+		SkillHub:      SkillHub,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,
 		Fork:          Fork,
