@@ -144,6 +144,7 @@
         "PackBundleDiffJSONSchema",
         "PackBundleReviewJSONSchema",
         "PackBundleApplyPlanJSONSchema",
+        "PackBundleApplyActionsJSONSchema",
         "FeedbackProposalJSONSchema",
         "JSONSchemaByName"
       ]
@@ -163,6 +164,7 @@
         "pack-bundle-diff",
         "pack-bundle-review",
         "pack-bundle-apply-plan",
+        "pack-bundle-apply-actions",
         "feedback-proposal"
       ]
     },
