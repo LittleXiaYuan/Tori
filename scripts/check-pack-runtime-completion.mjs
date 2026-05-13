@@ -133,6 +133,8 @@ requireTokens("backup-pack 示例包", backup + backupManifest, [
 requireTokens("前端同步菜单/路由/资源/控制台", frontend, [
   "fetchEnabledPacks",
   "buildPackNavItems",
+  "buildPackRouteBindings",
+  "findPackRouteBinding",
   "PackRuntimeRoutePage",
   "packsEnabled",
   "frontend?.menus",

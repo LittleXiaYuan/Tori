@@ -6,25 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, Chip, Spinner } from "@heroui/react";
 import { Boxes, ExternalLink, PackageOpen, Route, ShieldCheck, TerminalSquare } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import { api, type InstalledPack, type PackFrontendRoute } from "@/lib/api";
+import { type InstalledPack } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/error-utils";
-
-function routeMatches(pathname: string, route: PackFrontendRoute): boolean {
-  const path = route.path.replace(/\/+$/, "") || "/";
-  const current = pathname.replace(/\/+$/, "") || "/";
-  return current === path;
-}
-
-function sdkEntries(pack: InstalledPack): Array<{ language: string; importPath: string }> {
-  return Object.entries(pack.manifest.sdk || {})
-    .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0)
-    .map(([language, importPath]) => ({ language, importPath }));
-}
-
-function importSnippet(language: string, importPath: string): string {
-  if (language === "typescript") return `import * as packSdk from "${importPath}";`;
-  return `${language}:${importPath}`;
-}
+import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, packSdkImportSnippet } from "@/lib/pack-sync";
 
 export default function PackRuntimeRoutePage() {
   const pathname = usePathname() || "/packs";
@@ -35,10 +19,10 @@ export default function PackRuntimeRoutePage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.packsEnabled()
+    fetchEnabledPacks()
       .then((res) => {
         if (cancelled) return;
-        setPacks(Array.isArray(res?.packs) ? res.packs : []);
+        setPacks(res);
         setError(null);
       })
       .catch((err) => {
@@ -52,13 +36,7 @@ export default function PackRuntimeRoutePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const match = useMemo(() => {
-    for (const pack of packs) {
-      const route = (pack.manifest.frontend?.routes || []).find((item) => routeMatches(pathname, item));
-      if (route) return { pack, route };
-    }
-    return null;
-  }, [packs, pathname]);
+  const match = useMemo(() => findPackRouteBinding(packs, pathname), [packs, pathname]);
 
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
@@ -88,17 +66,17 @@ export default function PackRuntimeRoutePage() {
     );
   }
 
-  const { pack, route } = match;
+  const { pack } = match;
   const manifest = pack.manifest;
-  const distribution = manifest.distribution;
-  const entries = sdkEntries(pack);
-  const assets = manifest.frontend?.assets;
+  const distribution = match.distribution;
+  const entries = match.sdk.length > 0 ? match.sdk : buildPackSdkEntrypoints(pack);
+  const assets = match.assets;
 
   return (
     <div className="page-root space-y-5 animate-fade-in-up">
       <PageHeader
         icon={<Boxes size={20} />}
-        title={route.title || manifest.name}
+        title={match.title || manifest.name}
         description="这是由后端 enabled pack registry 同步出来的通用 Pack 页面。专属页面尚未随前端包加载时，先展示 manifest、资源入口和 SDK 调用面。"
         actions={<Link href="/packs" className="inline-flex items-center rounded-xl px-4 py-2 text-sm" style={{ border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}>管理增量包</Link>}
       />
@@ -116,7 +94,7 @@ export default function PackRuntimeRoutePage() {
         </Card>
         <Card className="section-card p-4">
           <div className="kpi-label">前端组件</div>
-          <div className="text-sm font-mono mt-1" style={{ color: "var(--yunque-text)" }}>{route.component}</div>
+          <div className="text-sm font-mono mt-1" style={{ color: "var(--yunque-text)" }}>{match.component}</div>
           <div className="kpi-sub">asset: {assets?.entry || "-"}</div>
         </Card>
       </div>
@@ -128,7 +106,7 @@ export default function PackRuntimeRoutePage() {
           </div>
           <div className="text-xs space-y-2" style={{ color: "var(--yunque-text-muted)" }}>
             <div>当前路径：<code>{pathname}</code></div>
-            <div>声明组件：<code>{route.component}</code></div>
+            <div>声明组件：<code>{match.component}</code></div>
             <div>菜单入口：{(manifest.frontend?.menus || []).map((menu) => <code key={menu.key} className="mx-1">{menu.label}:{menu.path}</code>)}</div>
             <div>后端路由：{(manifest.backend?.routes || []).map((item) => <code key={item} className="mx-1">{item}</code>)}</div>
           </div>
@@ -156,7 +134,7 @@ export default function PackRuntimeRoutePage() {
           <div className="flex flex-wrap gap-2">
             {entries.map((entry) => (
               <code key={`${entry.language}:${entry.importPath}`} className="rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
-                {importSnippet(entry.language, entry.importPath)}
+                {packSdkImportSnippet(entry.language, entry.importPath)}
               </code>
             ))}
           </div>
