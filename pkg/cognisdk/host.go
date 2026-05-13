@@ -23,6 +23,15 @@ func NewHostAdapterFromDir(dir string) (*HostAdapter, []PackLoadError, error) {
 	return &HostAdapter{engine: &Engine{manager: pm}}, errs, nil
 }
 
+// NewHostAdapterFromBundle restores a host adapter from a portable pack bundle.
+func NewHostAdapterFromBundle(bundle PackBundle) (*HostAdapter, error) {
+	pm, err := NewPackManagerFromBundle(bundle)
+	if err != nil {
+		return nil, err
+	}
+	return &HostAdapter{engine: &Engine{manager: pm}}, nil
+}
+
 // Engine exposes the underlying engine for inspection.
 func (a *HostAdapter) Engine() *Engine {
 	if a == nil {
