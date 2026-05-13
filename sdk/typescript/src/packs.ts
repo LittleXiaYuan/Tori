@@ -11,6 +11,7 @@ export type PackManifest = { id: string; name: string; version: string; descript
 export type InstalledPack = { manifest: PackManifest; status: PackStatus; source?: string; installedAt?: string; updatedAt?: string; previousVersion?: string; [key: string]: unknown };
 export type PacksListResponse = { packs: InstalledPack[]; enabled?: InstalledPack[]; count: number; [key: string]: unknown };
 export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [key: string]: unknown };
+export type PackInstallRequest = { manifestPath: string; source?: string };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class PacksClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Packs request failed with HTTP ${status}`); this.name = "PacksClientError"; this.status = status; this.body = body; } }
@@ -26,6 +27,7 @@ export class PacksClient {
   installed(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/installed"); }
   list(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs"); }
   enabled(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/enabled"); }
+  install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, source: request.source }); }
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }
   rollback(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/rollback", id); }

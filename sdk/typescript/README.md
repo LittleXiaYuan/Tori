@@ -2341,6 +2341,7 @@ The lightweight Packs SDK reads `/v1/packs/installed` and `/v1/packs/enabled` so
 import { createPacksClient } from "yunque-client/packs";
 
 const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<api-key>" });
+await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
 const sync = await packs.frontendSync();
 console.log(sync.menus, sync.routes);
 await packs.disable("yunque.pack.backup");
