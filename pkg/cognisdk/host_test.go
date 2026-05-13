@@ -22,3 +22,38 @@ func TestHostAdapterBuildContext(t *testing.T) {
 		t.Fatalf("missing boundary phrase: %s", ctx)
 	}
 }
+
+func TestHostAdapterProposeUpdates(t *testing.T) {
+	adapter := NewHostAdapter(Config{})
+	result := adapter.Evaluate(context.Background(), Input{Message: "你会永远陪我吗？"})
+
+	proposal := adapter.ProposeUpdates(context.Background(), result, AuditFeedback{
+		ID:              "host-fb-1",
+		Kind:            FeedbackBoundaryViolation,
+		Message:         "不能承诺永久陪伴。",
+		TargetBeliefIDs: []string{"xy.boundary.no_forever_promise"},
+	})
+
+	if proposal.Outcome != FeedbackOutcomeReviewRequired {
+		t.Fatalf("outcome = %q, want review_required", proposal.Outcome)
+	}
+	if len(proposal.Proposals) != 1 {
+		t.Fatalf("expected one proposal, got %#v", proposal.Proposals)
+	}
+}
+
+func TestRenderFeedbackProposalMarkdown(t *testing.T) {
+	proposal := BuildFeedbackProposal(Result{}, AuditFeedback{
+		ID:       "render-fb-1",
+		Kind:     FeedbackPreference,
+		Message:  "以后先给可回滚清单。",
+		Evidence: []string{"外部脚本记录"},
+	})
+
+	markdown := RenderFeedbackProposalMarkdown(proposal)
+	for _, want := range []string{"## 反馈提案", "outcome: proposed", "Belief Update Proposals", "add_preference", "以后先给可回滚清单。"} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("rendered markdown missing %q:\n%s", want, markdown)
+		}
+	}
+}
