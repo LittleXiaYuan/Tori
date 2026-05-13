@@ -630,6 +630,19 @@ var Discovery = &discoveryNamespace{}
 // Identity provides focused access to cross-channel identity resolution and profiles.
 var Identity = &identityNamespace{}
 
+// Embeddings provides focused access to embedding provider listing and text embedding.
+var Embeddings = &embeddingsNamespace{}
+
+type embeddingsNamespace struct{}
+
+func (e *embeddingsNamespace) Providers(ctx context.Context) (DiscoveryEmbeddingProvidersResponse, error) {
+	return Discovery.EmbeddingProviders(ctx)
+}
+
+func (e *embeddingsNamespace) Embed(ctx context.Context, text, provider string) (DiscoveryEmbeddingResponse, error) {
+	return Discovery.Embed(ctx, text, provider)
+}
+
 type identityNamespace struct{}
 
 func (i *identityNamespace) Resolve(ctx context.Context, req DiscoveryResolveIdentityRequest) (DiscoveryIdentityProfile, error) {
@@ -1482,6 +1495,7 @@ type AgentKit struct {
 	IDE           *ideNamespace
 	Discovery     *discoveryNamespace
 	Identity      *identityNamespace
+	Embeddings    *embeddingsNamespace
 	Router        *routerNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
@@ -6611,6 +6625,7 @@ func NewAgentKit() AgentKit {
 		IDE:           IDE,
 		Discovery:     Discovery,
 		Identity:      Identity,
+		Embeddings:    Embeddings,
 		Router:        Router,
 		Settings:      Settings,
 		System:        System,

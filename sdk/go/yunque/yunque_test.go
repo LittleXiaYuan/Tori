@@ -4357,6 +4357,48 @@ func TestModelsNamespaceWrapsModelRegistry(t *testing.T) {
 	}
 }
 
+func TestEmbeddingsNamespaceWrapsDiscoveryEmbeddings(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(`{"providers":["local"]}`))
+		case http.MethodPost:
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["text"] != "hello" || body["provider"] != "local" {
+				t.Fatalf("unexpected embeddings body: %+v", body)
+			}
+			_, _ = w.Write([]byte(`{"embedding":[0.1,0.2],"dimensions":2}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	providers, err := Embeddings.Providers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	embedded, err := Embeddings.Embed(ctx, "hello", "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if providers["providers"] == nil || embedded["dimensions"].(float64) != 2 {
+		t.Fatalf("unexpected embeddings results")
+	}
+	if NewAgentKit().Embeddings != Embeddings {
+		t.Fatalf("agent kit should expose Embeddings namespace")
+	}
+	if len(seen) != 2 || seen[0] != "GET /v1/embeddings" || seen[1] != "POST /v1/embeddings" {
+		t.Fatalf("unexpected embeddings requests: %v", seen)
+	}
+}
+
 func TestIdentityNamespaceWrapsDiscoveryIdentity(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

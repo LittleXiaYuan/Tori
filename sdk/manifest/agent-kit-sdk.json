@@ -71,7 +71,8 @@
     "ide-supervisor",
     "plugin-api-runtime",
     "discovery",
-    "identity-resolution"
+    "identity-resolution",
+    "embeddings-runtime"
   ],
   "capabilities": [
     {
@@ -275,6 +276,10 @@
       "description": "Access the lightweight Identity client or namespace for cross-channel identity resolution and profile listing."
     },
     {
+      "name": "embeddings",
+      "description": "Access the lightweight Embeddings client or namespace for provider listing and text embedding."
+    },
+    {
       "name": "auth",
       "description": "Access the lightweight Auth client or namespace for setup status, password login/setup, token exchange, and Tori OAuth start URLs."
     },
@@ -407,7 +412,8 @@
         "plugins": "createAgentKit().plugins",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
-        "identity": "createAgentKit().identity"
+        "identity": "createAgentKit().identity",
+        "embeddings": "createAgentKit().embeddings"
       }
     },
     "go": {
@@ -485,7 +491,8 @@
         "plugins": "yunque.NewAgentKit().Plugins",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
-        "identity": "yunque.NewAgentKit().Identity"
+        "identity": "yunque.NewAgentKit().Identity",
+        "embeddings": "yunque.NewAgentKit().Embeddings"
       }
     },
     "python": {
@@ -563,7 +570,8 @@
         "plugins": "yunque.create_agent_kit().plugins",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
-        "identity": "yunque.create_agent_kit().identity"
+        "identity": "yunque.create_agent_kit().identity",
+        "embeddings": "yunque.create_agent_kit().embeddings"
       }
     },
     "rust": {
@@ -641,7 +649,8 @@
         "plugins": "AgentKit::plugins",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
-        "identity": "AgentKit::identity"
+        "identity": "AgentKit::identity",
+        "embeddings": "AgentKit::embeddings"
       }
     }
   },

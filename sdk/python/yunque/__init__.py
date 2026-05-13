@@ -1291,6 +1291,20 @@ class _IdentityNamespace:
 
 identity = _IdentityNamespace()
 
+# ── Embeddings facade (/v1/embeddings) ──
+
+class _EmbeddingsNamespace:
+    """Lightweight helpers for embedding provider listing and text embedding."""
+
+    def providers(self) -> dict:
+        return discovery.embedding_providers()
+
+    def embed(self, text: str, provider: str = "") -> dict:
+        return discovery.embed(text, provider)
+
+
+embeddings = _EmbeddingsNamespace()
+
 # ── IDE Supervisor (/v1/ide) ──
 
 class _IDENamespace:
@@ -3316,6 +3330,7 @@ class AgentKit:
         self.ide = ide
         self.discovery = discovery
         self.identity = identity
+        self.embeddings = embeddings
         self.router = router
         self.settings = settings
         self.system = system
