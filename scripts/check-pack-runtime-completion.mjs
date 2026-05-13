@@ -51,6 +51,7 @@ const gateway = [
 const backup = read("internal/packs/backup/handler.go");
 const backupManifest = read("packs/examples/backup-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
+const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
   "heroui-web/src/lib/pack-sync.tsx",
   "heroui-web/src/app/packs/page.tsx",
@@ -160,8 +161,9 @@ requireTokens("TypeScript packs SDK", sdk, [
   "distributions:",
 ]);
 
-requireTokens("脚手架和可回滚工程化", scaffold + docs, [
+requireTokens("脚手架和可回滚工程化", scaffold + fullVerification + docs, [
   "check-pack-runtime-completion.mjs",
+  "check-pack-runtime-all.mjs",
   "scaffold-pack.mjs",
   "--dry-run",
   "--json",
