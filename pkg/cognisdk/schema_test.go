@@ -1,0 +1,67 @@
+package cognisdk
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestJSONSchemasMarshal(t *testing.T) {
+	for name, schema := range map[string]JSONSchema{
+		"pack":     PackManifestJSONSchema(),
+		"bundle":   PackBundleJSONSchema(),
+		"feedback": FeedbackProposalJSONSchema(),
+	} {
+		data, err := json.Marshal(schema)
+		if err != nil {
+			t.Fatalf("marshal %s schema: %v", name, err)
+		}
+		if !json.Valid(data) {
+			t.Fatalf("%s schema did not produce valid json", name)
+		}
+		if schema["$schema"] == "" || schema["title"] == "" {
+			t.Fatalf("%s schema missing schema metadata: %#v", name, schema)
+		}
+	}
+}
+
+func TestPackBundleSchemaNamesCoreFields(t *testing.T) {
+	schema := PackBundleJSONSchema()
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("schema properties missing: %#v", schema)
+	}
+	for _, field := range []string{"version", "id", "packs", "enabled_packs", "metadata"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle schema missing %q", field)
+		}
+	}
+}
+
+func TestFeedbackProposalSchemaNamesReviewFields(t *testing.T) {
+	schema := FeedbackProposalJSONSchema()
+	props := schema["properties"].(map[string]any)
+	proposals := props["proposals"].(map[string]any)
+	item := proposals["items"].(map[string]any)
+	itemProps := item["properties"].(map[string]any)
+	for _, field := range []string{"action", "requires_review", "read_only_target", "confidence_delta"} {
+		if _, ok := itemProps[field]; !ok {
+			t.Fatalf("feedback proposal item schema missing %q", field)
+		}
+	}
+}
+
+func TestSaveJSONSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pack-bundle.schema.json")
+	if err := SaveJSONSchema(PackBundleJSONSchema(), path); err != nil {
+		t.Fatalf("save schema: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read saved schema: %v", err)
+	}
+	if !json.Valid(data) {
+		t.Fatalf("saved schema is not valid json: %s", data)
+	}
+}
