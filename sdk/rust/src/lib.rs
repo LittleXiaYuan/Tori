@@ -1385,6 +1385,7 @@ pub struct AgentKit {
     pub fork: ForkClient,
     pub cost: CostClient,
     pub providers: ProvidersClient,
+    pub models: ModelsClient,
     pub cognis: CognisClient,
     pub trace: TraceClient,
     pub heartbeat: HeartbeatClient,
@@ -1472,6 +1473,7 @@ impl AgentKit {
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
             cost: CostClient::new(base_url.clone(), token.as_ref())?,
             providers: ProvidersClient::new(base_url.clone(), token.as_ref())?,
+            models: ModelsClient::new(base_url.clone(), token.as_ref())?,
             cognis: CognisClient::new(base_url.clone(), token.as_ref())?,
             trace: TraceClient::new(base_url.clone(), token.as_ref())?,
             heartbeat: HeartbeatClient::new(base_url.clone(), token.as_ref())?,
@@ -1552,6 +1554,7 @@ impl AgentKit {
             fork: ForkClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cost: CostClient::new_with_client(base_url.clone(), plugin_http.clone()),
             providers: ProvidersClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            models: ModelsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             cognis: CognisClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trace: TraceClient::new_with_client(base_url.clone(), plugin_http.clone()),
             heartbeat: HeartbeatClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -2781,6 +2784,27 @@ pub struct LocalRegisterRequest {
     pub tier: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub backend: String,
+}
+
+
+/// Lightweight Models SDK facade over `/v1/models`.
+#[derive(Debug, Clone)]
+pub struct ModelsClient {
+    inner: ProvidersClient,
+}
+
+impl ModelsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: ProvidersClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: ProvidersClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn list(&self) -> Result<ModelsResponse, reqwest::Error> { self.inner.models().await }
+    pub async fn add(&self, model: &ModelEntry) -> Result<ModelEntry, reqwest::Error> { self.inner.add_model(model).await }
+    pub async fn delete(&self, id: &str) -> Result<ProviderActionResponse, reqwest::Error> { self.inner.delete_model(id).await }
 }
 
 /// Small Rust helper over host `/api/providers*`, `/v1/models`, and provider breaker endpoints.
@@ -10368,6 +10392,13 @@ mod tests {
             client.url("/v1/workers"),
             "http://localhost:9090/v1/workers"
         );
+    }
+
+    #[test]
+    fn models_facade_wraps_provider_model_paths() {
+        let client = ModelsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.inner.url("/v1/models"), "http://localhost:9090/v1/models");
+        assert_eq!(client.inner.url(&format!("/v1/models?id={}", url_encode_query_component("custom model"))), "http://localhost:9090/v1/models?id=custom+model");
     }
 
     #[test]

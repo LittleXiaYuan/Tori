@@ -1874,6 +1874,24 @@ class _ProvidersNamespace:
 providers = _ProvidersNamespace()
 
 
+# ── Models facade (/v1/models) ──
+
+class _ModelsNamespace:
+    """Lightweight helpers for model list, add, and delete operations."""
+
+    def list(self) -> dict:
+        return providers.models()
+
+    def add(self, model: dict) -> dict:
+        return providers.add_model(model)
+
+    def delete(self, model_id: str) -> dict:
+        return providers.delete_model(model_id)
+
+
+models = _ModelsNamespace()
+
+
 # ── Cognis / Cognitive Kernel (/v1/cognis) ──
 
 class _CognisNamespace:
@@ -3247,6 +3265,7 @@ class AgentKit:
         self.fork = fork
         self.cost = cost
         self.providers = providers
+        self.models = models
         self.cognis = cognis
         self.trace = trace
         self.heartbeat = heartbeat

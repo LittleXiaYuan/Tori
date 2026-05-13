@@ -31,6 +31,7 @@
     "conversation-fork",
     "cost-usage-quota",
     "llm-providers",
+    "model-registry",
     "smart-router",
     "cognis",
     "execution-trace",
@@ -163,6 +164,10 @@
     {
       "name": "providers",
       "description": "Access the lightweight LLM Providers, Models, runtime mode, session routing, and breaker client or namespace."
+    },
+    {
+      "name": "models",
+      "description": "Access the lightweight Models client or namespace for model registry list, add, and delete operations."
     },
     {
       "name": "router",
@@ -395,7 +400,8 @@
         "router": "createAgentKit().router",
         "skillhub": "createAgentKit().skillhub",
         "plugins": "createAgentKit().plugins",
-        "skills": "createAgentKit().skills"
+        "skills": "createAgentKit().skills",
+        "models": "createAgentKit().models"
       }
     },
     "go": {
@@ -471,7 +477,8 @@
         "router": "yunque.NewAgentKit().Router",
         "skillhub": "yunque.NewAgentKit().SkillHub",
         "plugins": "yunque.NewAgentKit().Plugins",
-        "skills": "yunque.NewAgentKit().Skills"
+        "skills": "yunque.NewAgentKit().Skills",
+        "models": "yunque.NewAgentKit().Models"
       }
     },
     "python": {
@@ -547,7 +554,8 @@
         "router": "yunque.create_agent_kit().router",
         "skillhub": "yunque.create_agent_kit().skillhub",
         "plugins": "yunque.create_agent_kit().plugins",
-        "skills": "yunque.create_agent_kit().skills"
+        "skills": "yunque.create_agent_kit().skills",
+        "models": "yunque.create_agent_kit().models"
       }
     },
     "rust": {
@@ -623,7 +631,8 @@
         "router": "AgentKit::router",
         "skillhub": "AgentKit::skillhub",
         "plugins": "AgentKit::plugins",
-        "skills": "AgentKit::skills"
+        "skills": "AgentKit::skills",
+        "models": "AgentKit::models"
       }
     }
   },

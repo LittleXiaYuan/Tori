@@ -39,6 +39,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/fork/list?session_id=s1")) return jsonResponse({ forks: [{ id: "fork_1", session_id: "s1", messages: [], created_at: "2026-05-12T00:00:00Z" }] });
       if (value.endsWith("/v1/cost/summary")) return jsonResponse({ today_cost: 0.12, month_cost: 1.5 });
       if (value.endsWith("/api/providers")) return jsonResponse({ providers: [{ id: "deepseek", model: "deepseek-chat" }], mode: "hybrid" });
+      if (value.endsWith("/v1/models")) return jsonResponse({ models: [{ id: "kimi", model_id: "moonshot-v1-8k" }] });
       if (value.endsWith("/v1/cognis")) return jsonResponse({ cognis: [{ id: "reviewer", name: "Code Reviewer" }], count: 1 });
       if (value.endsWith("/v1/trace/recent?limit=1")) return jsonResponse({ events: [{ trace_id: "tr-1" }], count: 1 });
       if (value.endsWith("/v1/heartbeat")) return jsonResponse({ running: true });
@@ -93,6 +94,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.fork.list("s1")).forks[0]?.id, "fork_1");
   assertEqual((await kit.cost.summary()).today_cost, 0.12);
   assertEqual((await kit.providers.listProviders()).providers[0]?.id, "deepseek");
+  assertEqual((await kit.models.listModels()).models[0]?.model_id, "moonshot-v1-8k");
   assertEqual((await kit.cognis.list()).cognis?.[0]?.id, "reviewer");
   assertEqual((await kit.trace.recent({ limit: 1 })).events[0]?.trace_id, "tr-1");
   assertEqual((await kit.heartbeat.status()).running, true);
@@ -171,7 +173,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(new Headers(calls[44]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[45]?.init?.headers).get("authorization"), "Bearer jwt-token");
   assertEqual(new Headers(calls[46]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[49]?.init?.headers).get("authorization"), "Bearer plugin-token");
+  assertEqual(new Headers(calls[50]?.init?.headers).get("authorization"), "Bearer plugin-token");
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

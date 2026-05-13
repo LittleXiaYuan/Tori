@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "domain": "models",
+  "description": "Cross-language lightweight SDK entrypoints for model registry list, add, and delete operations without importing the full platform client.",
+  "principles": [
+    "Expose model registry management as focused SDK helpers for external settings pages, CLIs, plugins, sidecars, and automation scripts.",
+    "Keep model list/add/delete directly callable through the existing authenticated /v1/models route.",
+    "Make Models access available through Agent Kit while preserving Providers as the broader provider/runtime-mode slice."
+  ],
+  "routes": [
+    "GET /v1/models",
+    "POST /v1/models",
+    "DELETE /v1/models"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/models",
+      "readOnly": true,
+      "description": "List registered and provider-derived models."
+    },
+    {
+      "name": "add",
+      "route": "POST /v1/models",
+      "readOnly": false,
+      "description": "Add or update a model registry entry."
+    },
+    {
+      "name": "delete",
+      "route": "DELETE /v1/models",
+      "readOnly": false,
+      "description": "Delete or hide a model registry entry by id."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/models.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createModelsClient().listModels",
+        "add": "createModelsClient().addModel",
+        "delete": "createModelsClient().deleteModel"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Models.List",
+        "add": "yunque.Models.Add",
+        "delete": "yunque.Models.Delete"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.models.list",
+        "add": "yunque.models.add",
+        "delete": "yunque.models.delete"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "ModelsClient::list",
+        "add": "ModelsClient::add",
+        "delete": "ModelsClient::delete"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
