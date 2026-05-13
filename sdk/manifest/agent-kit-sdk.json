@@ -32,6 +32,7 @@
     "skills-dynamic",
     "plugin-toggle",
     "plugin-reload",
+    "plugin-files",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -186,6 +187,10 @@
     {
       "name": "pluginReload",
       "description": "Access the lightweight PluginReload client or namespace for reloading the plugin registry."
+    },
+    {
+      "name": "pluginFiles",
+      "description": "Access the lightweight PluginFiles client or namespace for reading and saving plugin files."
     },
     {
       "name": "skills",
@@ -509,7 +514,8 @@
         "search": "createAgentKit().search",
         "modes": "createAgentKit().modes",
         "airi": "createAgentKit().airi",
-        "pluginReload": "createAgentKit().pluginReload"
+        "pluginReload": "createAgentKit().pluginReload",
+        "pluginFiles": "createAgentKit().pluginFiles"
       }
     },
     "go": {
@@ -604,7 +610,8 @@
         "search": "yunque.NewAgentKit().WebSearch",
         "modes": "yunque.NewAgentKit().Modes",
         "airi": "yunque.NewAgentKit().Airi",
-        "pluginReload": "yunque.NewAgentKit().PluginReload"
+        "pluginReload": "yunque.NewAgentKit().PluginReload",
+        "pluginFiles": "yunque.NewAgentKit().PluginFiles"
       }
     },
     "python": {
@@ -699,7 +706,8 @@
         "search": "yunque.create_agent_kit().search_sdk",
         "modes": "yunque.create_agent_kit().modes",
         "airi": "yunque.create_agent_kit().airi",
-        "pluginReload": "yunque.create_agent_kit().plugin_reload"
+        "pluginReload": "yunque.create_agent_kit().plugin_reload",
+        "pluginFiles": "yunque.create_agent_kit().plugin_files"
       }
     },
     "rust": {
@@ -794,7 +802,8 @@
         "search": "AgentKit::search",
         "modes": "AgentKit::modes",
         "airi": "AgentKit::airi",
-        "pluginReload": "AgentKit::plugin_reload"
+        "pluginReload": "AgentKit::plugin_reload",
+        "pluginFiles": "AgentKit::plugin_files"
       }
     }
   },

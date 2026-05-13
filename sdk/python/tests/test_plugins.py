@@ -13,7 +13,9 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugins.create("demo", description="Demo", language="python", template="blank", system_prompt="You are Demo", skills=[{"name": "run"}])
             yunque.plugins.delete("demo")
             yunque.plugins.files("demo")
+            yunque.plugin_files.files("demo")
             yunque.plugins.save_file("demo", "handler.py", "print('ok')", plugin="demo")
+            yunque.plugin_files.save_file("demo", "handler.py", "print('ok')", plugin="demo")
             yunque.plugins.ui()
             yunque.plugin_ui.ui()
             yunque.plugins.reload()
@@ -27,18 +29,21 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[3], ("POST", "/v1/plugins/create", {"name": "demo", "description": "Demo", "language": "python", "template": "blank", "system_prompt": "You are Demo", "skills": [{"name": "run"}]}))
         self.assertEqual(calls[4], ("DELETE", "/v1/plugins/delete?name=demo"))
         self.assertEqual(calls[5], ("GET", "/v1/plugins/files?name=demo"))
-        self.assertEqual(calls[6], ("PUT", "/v1/plugins/files?name=demo", {"file": "handler.py", "content": "print('ok')", "plugin": "demo"}))
-        self.assertEqual(calls[7], ("GET", "/v1/plugins/ui"))
-        self.assertEqual(calls[8], ("GET", "/v1/plugins/ui"))
-        self.assertEqual(calls[9], ("POST", "/v1/plugins/reload"))
-        self.assertEqual(calls[10], ("POST", "/v1/plugins/reload"))
-        self.assertEqual(calls[11], ("GET", "/v1/plugins/open-folder?name=demo"))
+        self.assertEqual(calls[6], ("GET", "/v1/plugins/files?name=demo"))
+        self.assertEqual(calls[7], ("PUT", "/v1/plugins/files?name=demo", {"file": "handler.py", "content": "print('ok')", "plugin": "demo"}))
+        self.assertEqual(calls[8], ("PUT", "/v1/plugins/files?name=demo", {"file": "handler.py", "content": "print('ok')", "plugin": "demo"}))
+        self.assertEqual(calls[9], ("GET", "/v1/plugins/ui"))
+        self.assertEqual(calls[10], ("GET", "/v1/plugins/ui"))
+        self.assertEqual(calls[11], ("POST", "/v1/plugins/reload"))
+        self.assertEqual(calls[12], ("POST", "/v1/plugins/reload"))
+        self.assertEqual(calls[13], ("GET", "/v1/plugins/open-folder?name=demo"))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
         self.assertIs(yunque.create_agent_kit().plugin_ui, yunque.plugin_ui)
         self.assertIs(yunque.create_agent_kit().plugin_toggle, yunque.plugin_toggle)
         self.assertIs(yunque.create_agent_kit().plugin_reload, yunque.plugin_reload)
+        self.assertIs(yunque.create_agent_kit().plugin_files, yunque.plugin_files)
 
 
 if __name__ == "__main__":

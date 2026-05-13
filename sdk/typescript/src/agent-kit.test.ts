@@ -104,6 +104,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual(((await kit.pluginUI.ui()).tabs[0] as { id?: string })?.id, "demo-tab");
   assertEqual((await kit.pluginToggle.toggle("demo", true)).enabled, true);
   assertEqual((await kit.pluginReload.reload()).status, "reloaded");
+  assertEqual((await kit.pluginFiles.files("demo")).files[0]?.name, "plugin.json");
   assertEqual((await kit.skills.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsScan.scan()).skills_loaded, 2);

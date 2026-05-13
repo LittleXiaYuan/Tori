@@ -696,6 +696,10 @@ The lightweight SkillHub SDK exposes incremental skill-package catalog, install,
 The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file editing, UI tabs, reload, and open-folder helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/plugins*`; Agent Kit also exposes this surface as `kit.plugins` / `kit.Plugins`.
 
 
+### PluginFiles SDK
+
+PluginFiles SDK exposes plugin file read/write helpers (`files`, `saveFile`) for external plugin editors, marketplaces, admin pages, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugins management slice. It maps directly to `GET /v1/plugins/files` and `PUT /v1/plugins/files`; Agent Kit also exposes this surface as `kit.pluginFiles` / `kit.PluginFiles` / `kit.plugin_files`.
+
 ### PluginReload SDK
 
 PluginReload SDK exposes plugin registry reload control (`reload`) for external plugin marketplaces, admin pages, CLIs, sidecars, and automation scripts without importing the full platform or broader Plugins management slice. It maps directly to `POST /v1/plugins/reload`; Agent Kit also exposes this surface as `kit.pluginReload` / `kit.PluginReload` / `kit.plugin_reload`.
