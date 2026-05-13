@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 
@@ -14,6 +17,7 @@ type packActionRequest struct {
 
 type packInstallRequest struct {
 	ManifestPath string `json:"manifest_path"`
+	ManifestURL  string `json:"manifest_url"`
 	Source       string `json:"source"`
 }
 
@@ -65,18 +69,14 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req packInstallRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ManifestPath == "" {
-		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path is required"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.ManifestPath == "" && req.ManifestURL == "") {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "manifest_path or manifest_url is required"})
 		return
 	}
-	manifest, err := packruntime.LoadManifest(req.ManifestPath)
+	manifest, source, err := loadPackInstallManifest(r, req)
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
-	}
-	source := req.Source
-	if source == "" {
-		source = filepath.Dir(req.ManifestPath)
 	}
 	pack, err := g.packRegistry.Install(manifest, source)
 	if err != nil {
@@ -84,6 +84,58 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"pack": pack, "status": pack.Status})
+}
+
+func loadPackInstallManifest(r *http.Request, req packInstallRequest) (packruntime.Manifest, string, error) {
+	source := req.Source
+	if req.ManifestURL != "" {
+		manifest, err := fetchPackManifest(r, req.ManifestURL)
+		if err != nil {
+			return packruntime.Manifest{}, "", err
+		}
+		if source == "" {
+			source = req.ManifestURL
+		}
+		return manifest, source, nil
+	}
+	manifest, err := packruntime.LoadManifest(req.ManifestPath)
+	if err != nil {
+		return packruntime.Manifest{}, "", err
+	}
+	if source == "" {
+		source = filepath.Dir(req.ManifestPath)
+	}
+	return manifest, source, nil
+}
+
+func fetchPackManifest(r *http.Request, manifestURL string) (packruntime.Manifest, error) {
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, manifestURL, nil)
+	if err != nil {
+		return packruntime.Manifest{}, fmt.Errorf("create pack manifest request: %w", err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return packruntime.Manifest{}, fmt.Errorf("download pack manifest: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return packruntime.Manifest{}, fmt.Errorf("download pack manifest: http %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return packruntime.Manifest{}, fmt.Errorf("read downloaded pack manifest: %w", err)
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return packruntime.Manifest{}, fmt.Errorf("downloaded pack manifest is empty")
+	}
+	var manifest packruntime.Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return packruntime.Manifest{}, fmt.Errorf("parse downloaded pack manifest: %w", err)
+	}
+	if err := manifest.Validate(); err != nil {
+		return packruntime.Manifest{}, err
+	}
+	return manifest, nil
 }
 
 func (g *Gateway) handlePackEnable(w http.ResponseWriter, r *http.Request) {
