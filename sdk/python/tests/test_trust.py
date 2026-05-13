@@ -26,6 +26,7 @@ class TrustTest(unittest.TestCase):
             yunque.trust.review_status()
             yunque.trust.skillgrow_patterns()
             yunque.skillgrow.patterns()
+            yunque.review.status()
 
         self.assertEqual(api_call.call_args_list[0].args, ("GET", "/api/trust/scores"))
         self.assertEqual(api_call.call_args_list[1].args, ("POST", "/api/trust/reset", {"slug": "shell"}))
@@ -34,9 +35,13 @@ class TrustTest(unittest.TestCase):
         self.assertEqual(api_call.call_args_list[4].args, ("GET", "/api/review/status"))
         self.assertEqual(api_call.call_args_list[5].args, ("GET", "/api/skillgrow/patterns"))
         self.assertEqual(api_call.call_args_list[6].args, ("GET", "/api/skillgrow/patterns"))
+        self.assertEqual(api_call.call_args_list[7].args, ("GET", "/api/review/status"))
 
     def test_agent_kit_exposes_skillgrow(self) -> None:
         self.assertIs(yunque.create_agent_kit().skillgrow, yunque.skillgrow)
+
+    def test_agent_kit_exposes_review(self) -> None:
+        self.assertIs(yunque.create_agent_kit().review, yunque.review)
 
 
 if __name__ == "__main__":

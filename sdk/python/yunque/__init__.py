@@ -916,6 +916,15 @@ class _SkillGrowNamespace:
 
 skillgrow = _SkillGrowNamespace()
 
+class _ReviewNamespace:
+    """Standalone review-gate helper for frontends, plugins, CLIs, and automation scripts."""
+
+    def status(self) -> dict:
+        return trust.review_status()
+
+
+review = _ReviewNamespace()
+
 # ── Self-iteration governance (/api/iterate/*) ──
 
 class _IterateNamespace:
@@ -3483,6 +3492,7 @@ class AgentKit:
         self.audit = audit
         self.trust = trust
         self.skillgrow = skillgrow
+        self.review = review
         self.iterate = iterate
         self.persona = persona
         self.modes = modes

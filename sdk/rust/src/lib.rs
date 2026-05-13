@@ -1479,6 +1479,7 @@ pub struct AgentKit {
     pub audit: AuditClient,
     pub trust: TrustClient,
     pub skillgrow: SkillGrowClient,
+    pub review: ReviewClient,
     pub iterate: IterateClient,
     pub persona: PersonaClient,
     pub modes: ModesClient,
@@ -1576,6 +1577,7 @@ impl AgentKit {
             audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
             skillgrow: SkillGrowClient::new(base_url.clone(), token.as_ref())?,
+            review: ReviewClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
             modes: ModesClient::new(base_url.clone(), token.as_ref())?,
@@ -1666,6 +1668,7 @@ impl AgentKit {
             audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skillgrow: SkillGrowClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            review: ReviewClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
             modes: ModesClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -4896,6 +4899,23 @@ impl SkillGrowClient {
     pub fn url(&self, path: &str) -> String { self.inner.url(path) }
     pub async fn patterns(&self) -> Result<SkillGrowPatternsResponse, reqwest::Error> {
         self.inner.skillgrow_patterns().await
+    }
+}
+
+/// Standalone Review SDK client for reading review-gate status.
+#[derive(Debug, Clone)]
+pub struct ReviewClient { inner: TrustClient }
+
+impl ReviewClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: TrustClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: TrustClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn status(&self) -> Result<ReviewStatusResponse, reqwest::Error> {
+        self.inner.review_status().await
     }
 }
 
@@ -11441,6 +11461,20 @@ mod tests {
         assert_eq!(
             kit.skillgrow.url("/api/skillgrow/patterns"),
             "http://localhost:9090/api/skillgrow/patterns"
+        );
+    }
+
+    #[test]
+    fn review_helpers_build_urls_and_agent_kit_surface() {
+        let client = ReviewClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/api/review/status"),
+            "http://localhost:9090/api/review/status"
+        );
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(
+            kit.review.url("/api/review/status"),
+            "http://localhost:9090/api/review/status"
         );
     }
 

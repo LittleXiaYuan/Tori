@@ -2259,6 +2259,11 @@ Browser SDK exposes lightweight `/v1/browser` and `/api/browser/ext` helpers (`s
 SkillGrow SDK exposes the focused skill-growth pattern reader (`patterns`) for external plugin UIs, admin panels, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/skillgrow/patterns`; Agent Kit also exposes this surface as `kit.skillgrow` / `kit.SkillGrow`.
 
 
+### Review SDK
+
+Review SDK exposes the focused review-gate status reader (`status`) for frontends, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform or broader Trust governance slice. It maps directly to `/api/review/status`; Agent Kit also exposes this surface as `kit.review` / `kit.Review`.
+
+
 ### Iterate SDK
 
 Use the lightweight Iterate SDK for self-iteration proposal review from admin pages, plugins, CLIs, or automation scripts without importing the full platform client. It wraps `GET /api/iterate/proposals`, `POST /api/iterate/approve`, `POST /api/iterate/reject`, `POST /api/iterate/trigger`, and `GET /api/iterate/status`; `createAgentKit(...).iterate.pendingProposals()` exposes the same proposal review surface.

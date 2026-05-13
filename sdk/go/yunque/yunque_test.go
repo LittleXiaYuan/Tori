@@ -1571,10 +1571,14 @@ func TestTrustHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scores["count"].(float64) != 1 || reset["slug"] != "shell" || grantAll["slug"] != "*" || status["enabled"] != true || patterns["count"].(float64) != 1 || skillGrowPatterns["count"].(float64) != 1 || NewAgentKit().Trust != Trust || NewAgentKit().SkillGrow != SkillGrow {
+	reviewStatus, err := Review.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scores["count"].(float64) != 1 || reset["slug"] != "shell" || grantAll["slug"] != "*" || status["enabled"] != true || patterns["count"].(float64) != 1 || skillGrowPatterns["count"].(float64) != 1 || reviewStatus["enabled"] != true || NewAgentKit().Trust != Trust || NewAgentKit().SkillGrow != SkillGrow || NewAgentKit().Review != Review {
 		t.Fatalf("unexpected trust results: scores=%+v reset=%+v grantAll=%+v status=%+v patterns=%+v", scores, reset, grantAll, status, patterns)
 	}
-	if len(seen) != 6 || seen[0] != "GET /api/trust/scores" || seen[4] != "GET /api/skillgrow/patterns" || seen[5] != "GET /api/skillgrow/patterns" {
+	if len(seen) != 7 || seen[0] != "GET /api/trust/scores" || seen[4] != "GET /api/skillgrow/patterns" || seen[5] != "GET /api/skillgrow/patterns" || seen[6] != "GET /api/review/status" {
 		t.Fatalf("unexpected trust requests: %v", seen)
 	}
 }
