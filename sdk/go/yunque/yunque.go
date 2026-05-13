@@ -627,6 +627,19 @@ func (r *routerNamespace) Stats(ctx context.Context) (RouterStatsResponse, error
 // Discovery exposes identity resolution, embeddings, and web-search helpers for external scripts, plugins, and UI widgets.
 var Discovery = &discoveryNamespace{}
 
+// Identity provides focused access to cross-channel identity resolution and profiles.
+var Identity = &identityNamespace{}
+
+type identityNamespace struct{}
+
+func (i *identityNamespace) Resolve(ctx context.Context, req DiscoveryResolveIdentityRequest) (DiscoveryIdentityProfile, error) {
+	return Discovery.ResolveIdentity(ctx, req)
+}
+
+func (i *identityNamespace) Profiles(ctx context.Context) (DiscoveryIdentityProfilesResponse, error) {
+	return Discovery.IdentityProfiles(ctx)
+}
+
 type discoveryNamespace struct{}
 
 type DiscoveryIdentityProfile map[string]any
@@ -1468,6 +1481,7 @@ type AgentKit struct {
 	Planner       *plannerNamespace
 	IDE           *ideNamespace
 	Discovery     *discoveryNamespace
+	Identity      *identityNamespace
 	Router        *routerNamespace
 	Settings      *settingsNamespace
 	System        *systemNamespace
@@ -6596,6 +6610,7 @@ func NewAgentKit() AgentKit {
 		Planner:       Planner,
 		IDE:           IDE,
 		Discovery:     Discovery,
+		Identity:      Identity,
 		Router:        Router,
 		Settings:      Settings,
 		System:        System,

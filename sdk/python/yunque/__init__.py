@@ -1276,6 +1276,21 @@ class _DiscoveryNamespace:
 
 discovery = _DiscoveryNamespace()
 
+
+# ── Identity facade (/v1/identity) ──
+
+class _IdentityNamespace:
+    """Lightweight helpers for cross-channel identity resolution and profile listing."""
+
+    def resolve(self, channel: str, user_id: str, display_name: str = "") -> dict:
+        return discovery.resolve_identity(channel, user_id, display_name)
+
+    def profiles(self) -> dict:
+        return discovery.identity_profiles()
+
+
+identity = _IdentityNamespace()
+
 # ── IDE Supervisor (/v1/ide) ──
 
 class _IDENamespace:
@@ -3300,6 +3315,7 @@ class AgentKit:
         self.planner = planner
         self.ide = ide
         self.discovery = discovery
+        self.identity = identity
         self.router = router
         self.settings = settings
         self.system = system
