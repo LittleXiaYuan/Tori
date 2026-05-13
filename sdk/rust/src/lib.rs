@@ -1378,6 +1378,7 @@ pub struct AgentKit {
     pub projects: ProjectsClient,
     pub market: SkillMarketClient,
     pub skillhub: SkillHubClient,
+    pub plugins: PluginsClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1463,6 +1464,7 @@ impl AgentKit {
             projects: ProjectsClient::new(base_url.clone(), token.as_ref())?,
             market: SkillMarketClient::new(base_url.clone(), token.as_ref())?,
             skillhub: SkillHubClient::new(base_url.clone(), token.as_ref())?,
+            plugins: PluginsClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1538,6 +1540,7 @@ impl AgentKit {
             projects: ProjectsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             market: SkillMarketClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skillhub: SkillHubClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugins: PluginsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -7920,6 +7923,71 @@ pub struct SkillMarketTopOptions {
 
 pub type SkillMarketStatsResponse = serde_json::Map<String, serde_json::Value>;
 
+
+/// Lightweight Plugins SDK client for plugin catalog, lifecycle, file editing, UI, and reload.
+#[derive(Debug, Clone)]
+pub struct PluginsClient {
+    base_url: String,
+    http: reqwest::Client,
+}
+
+pub type PluginsResponse = serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PluginCreateRequest {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub language: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub template: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub system_prompt: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<serde_json::Value>,
+}
+
+impl PluginsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref();
+        let mut headers = HeaderMap::new();
+        if !token.is_empty() {
+            let value = format!("Bearer {}", token);
+            if let Ok(header) = HeaderValue::from_str(&value) {
+                headers.insert(AUTHORIZATION, header);
+            }
+        }
+        let http = reqwest::Client::builder().default_headers(headers).build()?;
+        Ok(Self::new_with_client(base_url, http))
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { base_url: base_url.into().trim_end_matches('/').to_string(), http }
+    }
+
+    fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    async fn get(&self, path: &str) -> Result<PluginsResponse, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post(&self, path: &str, body: serde_json::Value) -> Result<PluginsResponse, reqwest::Error> { self.http.post(self.url(path)).json(&body).send().await?.error_for_status()?.json().await }
+
+    pub async fn list(&self) -> Result<PluginsResponse, reqwest::Error> { self.get("/v1/plugins").await }
+    pub async fn toggle(&self, name: &str, enabled: bool) -> Result<PluginsResponse, reqwest::Error> { self.post("/v1/plugins/toggle", serde_json::json!({ "name": name, "enabled": enabled })).await }
+    pub async fn create(&self, request: &PluginCreateRequest) -> Result<PluginsResponse, reqwest::Error> { self.http.post(self.url("/v1/plugins/create")).json(request).send().await?.error_for_status()?.json().await }
+    pub async fn delete(&self, name: &str) -> Result<PluginsResponse, reqwest::Error> { self.http.delete(self.url(&format!("/v1/plugins/delete?name={}", url_encode_query_component(name)))).send().await?.error_for_status()?.json().await }
+    pub async fn files(&self, name: &str) -> Result<PluginsResponse, reqwest::Error> { self.get(&format!("/v1/plugins/files?name={}", url_encode_query_component(name))).await }
+    pub async fn save_file(&self, name: &str, file: &str, content: &str, plugin: Option<&str>) -> Result<PluginsResponse, reqwest::Error> {
+        let mut body = serde_json::json!({ "file": file, "content": content });
+        if let Some(plugin) = plugin { body["plugin"] = serde_json::json!(plugin); }
+        self.http.put(self.url(&format!("/v1/plugins/files?name={}", url_encode_query_component(name)))).json(&body).send().await?.error_for_status()?.json().await
+    }
+    pub async fn ui(&self) -> Result<PluginsResponse, reqwest::Error> { self.get("/v1/plugins/ui").await }
+    pub async fn reload(&self) -> Result<PluginsResponse, reqwest::Error> { self.http.post(self.url("/v1/plugins/reload")).send().await?.error_for_status()?.json().await }
+    pub async fn open_folder(&self, name: Option<&str>) -> Result<PluginsResponse, reqwest::Error> {
+        let path = match name { Some(name) if !name.is_empty() => format!("/v1/plugins/open-folder?name={}", url_encode_query_component(name)), _ => "/v1/plugins/open-folder".to_string() };
+        self.get(&path).await
+    }
+}
+
 /// Lightweight SkillHub SDK client for incremental skill packages.
 #[derive(Debug, Clone)]
 pub struct SkillHubClient {
@@ -11028,6 +11096,13 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn plugins_helpers_build_urls_and_queries() {
+        let client = PluginsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/plugins"), "http://localhost:9090/v1/plugins");
+        assert_eq!(client.url(&format!("/v1/plugins/files?name={}", url_encode_query_component("demo plugin"))), "http://localhost:9090/v1/plugins/files?name=demo+plugin");
+    }
 
     #[test]
     fn skillhub_helpers_build_urls_and_queries() {

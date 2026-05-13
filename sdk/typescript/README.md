@@ -2348,3 +2348,7 @@ The lightweight Router SDK exposes smart-router statistics (`stats`) for externa
 ### SkillHub SDK
 
 The lightweight SkillHub SDK exposes incremental skill-package catalog, install, update, rollback, version, policy, and analytics helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/api/skillhub/*`; Agent Kit also exposes this surface as `kit.skillhub` / `kit.SkillHub`.
+
+### Plugins SDK
+
+The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file editing, UI tabs, reload, and open-folder helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/plugins*`; Agent Kit also exposes this surface as `kit.plugins` / `kit.Plugins`.

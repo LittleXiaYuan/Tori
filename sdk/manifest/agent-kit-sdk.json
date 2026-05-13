@@ -24,6 +24,7 @@
     "project-workspaces",
     "skill-market",
     "skillhub-incremental-packages",
+    "plugins-management",
     "mcp-dispatch",
     "ide-orchestrator",
     "conversation-fork",
@@ -133,6 +134,10 @@
     {
       "name": "skillhub",
       "description": "Access the lightweight SkillHub client or namespace for incremental package catalog, install, update, rollback, policy, and analytics."
+    },
+    {
+      "name": "plugins",
+      "description": "Access the lightweight Plugins management client or namespace for plugin catalog, lifecycle, file editing, UI tabs, reload, and open-folder helpers."
     },
     {
       "name": "dispatch",
@@ -383,7 +388,8 @@
         "webchat": "createAgentKit().webchat",
         "sandbox": "createAgentKit().sandbox",
         "router": "createAgentKit().router",
-        "skillhub": "createAgentKit().skillhub"
+        "skillhub": "createAgentKit().skillhub",
+        "plugins": "createAgentKit().plugins"
       }
     },
     "go": {
@@ -457,7 +463,8 @@
         "webchat": "yunque.NewAgentKit().WebChat",
         "sandbox": "yunque.NewAgentKit().Sandbox",
         "router": "yunque.NewAgentKit().Router",
-        "skillhub": "yunque.NewAgentKit().SkillHub"
+        "skillhub": "yunque.NewAgentKit().SkillHub",
+        "plugins": "yunque.NewAgentKit().Plugins"
       }
     },
     "python": {
@@ -531,7 +538,8 @@
         "webchat": "yunque.create_agent_kit().webchat",
         "sandbox": "yunque.create_agent_kit().sandbox",
         "router": "yunque.create_agent_kit().router",
-        "skillhub": "yunque.create_agent_kit().skillhub"
+        "skillhub": "yunque.create_agent_kit().skillhub",
+        "plugins": "yunque.create_agent_kit().plugins"
       }
     },
     "rust": {
@@ -605,7 +613,8 @@
         "webchat": "AgentKit::webchat",
         "sandbox": "AgentKit::sandbox",
         "router": "AgentKit::router",
-        "skillhub": "AgentKit::skillhub"
+        "skillhub": "AgentKit::skillhub",
+        "plugins": "AgentKit::plugins"
       }
     }
   },

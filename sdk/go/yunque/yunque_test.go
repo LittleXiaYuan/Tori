@@ -4219,3 +4219,59 @@ func TestSkillHubNamespaceManagesIncrementalPackages(t *testing.T) {
 		t.Fatalf("expected 14 requests, got %d: %v", len(seen), seen)
 	}
 }
+
+func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/plugins":
+			_, _ = w.Write([]byte(`{"plugins":[{"name":"demo","enabled":true}]}`))
+		case "/v1/plugins/toggle":
+			_, _ = w.Write([]byte(`{"name":"demo","enabled":true,"skills_count":1}`))
+		case "/v1/plugins/create":
+			_, _ = w.Write([]byte(`{"status":"created","name":"demo","dir":"plugins/demo"}`))
+		case "/v1/plugins/delete":
+			_, _ = w.Write([]byte(`{"status":"deleted","name":"demo"}`))
+		case "/v1/plugins/files":
+			if r.Method == http.MethodPut {
+				_, _ = w.Write([]byte(`{"status":"saved"}`))
+			} else {
+				_, _ = w.Write([]byte(`{"files":[{"name":"handler.py","content":"print('ok')","size":11}]}`))
+			}
+		case "/v1/plugins/ui":
+			_, _ = w.Write([]byte(`{"tabs":[]}`))
+		case "/v1/plugins/reload":
+			_, _ = w.Write([]byte(`{"status":"reloaded","skills":1}`))
+		case "/v1/plugins/open-folder":
+			_, _ = w.Write([]byte(`{"ok":true,"path":"plugins/demo"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Plugins.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	toggled, _ := Plugins.Toggle(ctx, "demo", true)
+	created, _ := Plugins.Create(ctx, PluginCreateRequest{Name: "demo", Description: "Demo", Language: "python"})
+	deleted, _ := Plugins.Delete(ctx, "demo")
+	files, _ := Plugins.Files(ctx, "demo")
+	saved, _ := Plugins.SaveFile(ctx, "demo", "handler.py", "print('ok')", "demo")
+	ui, _ := Plugins.UI(ctx)
+	reloaded, _ := Plugins.Reload(ctx)
+	opened, _ := Plugins.OpenFolder(ctx, "demo")
+
+	if list["plugins"] == nil || toggled["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
+		t.Fatalf("unexpected Plugins results")
+	}
+	if NewAgentKit().Plugins != Plugins {
+		t.Fatalf("agent kit should expose Plugins namespace")
+	}
+	if len(seen) != 9 {
+		t.Fatalf("expected 9 requests, got %d: %v", len(seen), seen)
+	}
+}

@@ -3046,6 +3046,57 @@ bots = _BotsNamespace()
 
 
 
+
+# ── Plugins Management (/v1/plugins) ──
+
+class _PluginsNamespace:
+    """Lightweight helpers for plugin catalog, lifecycle, files, UI tabs, and reload."""
+
+    def list(self) -> dict:
+        return _api_call("GET", "/v1/plugins")
+
+    def toggle(self, name: str, enabled: bool) -> dict:
+        return _api_call("POST", "/v1/plugins/toggle", {"name": name, "enabled": enabled})
+
+    def create(self, name: str, *, description: str = "", language: str = "python", template: str = "", system_prompt: str = "", skills: Optional[list[dict]] = None) -> dict:
+        body = {"name": name, "description": description, "language": language}
+        if template:
+            body["template"] = template
+        if system_prompt:
+            body["system_prompt"] = system_prompt
+        if skills is not None:
+            body["skills"] = skills
+        return _api_call("POST", "/v1/plugins/create", body)
+
+    def delete(self, name: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("DELETE", f"/v1/plugins/delete?{urlencode({'name': name})}")
+
+    def files(self, name: str) -> dict:
+        from urllib.parse import urlencode
+        return _api_call("GET", f"/v1/plugins/files?{urlencode({'name': name})}")
+
+    def save_file(self, name: str, file: str, content: str, *, plugin: str = "") -> dict:
+        from urllib.parse import urlencode
+        body = {"file": file, "content": content}
+        if plugin:
+            body["plugin"] = plugin
+        return _api_call("PUT", f"/v1/plugins/files?{urlencode({'name': name})}", body)
+
+    def ui(self) -> dict:
+        return _api_call("GET", "/v1/plugins/ui")
+
+    def reload(self) -> dict:
+        return _api_call("POST", "/v1/plugins/reload")
+
+    def open_folder(self, name: str = "") -> dict:
+        from urllib.parse import urlencode
+        suffix = f"?{urlencode({'name': name})}" if name else ""
+        return _api_call("GET", f"/v1/plugins/open-folder{suffix}")
+
+
+plugins = _PluginsNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3157,6 +3208,7 @@ class AgentKit:
         self.projects = projects
         self.market = market
         self.skillhub = skillhub
+        self.plugins = plugins
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork
