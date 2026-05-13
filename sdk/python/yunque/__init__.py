@@ -1058,6 +1058,21 @@ class _RuntimeNamespace:
 
 runtime = _RuntimeNamespace()
 
+class _RuntimeQueueNamespace:
+    """Standalone queue-only runtime helper for dashboards, plugins, CLIs, and automation monitors."""
+
+    def overview(self) -> dict:
+        return runtime.queues()
+
+    def session(self, session_id: str) -> dict:
+        return runtime.session_queue(session_id)
+
+    def cancel(self, session_id: str, task_id: str) -> dict:
+        return runtime.cancel_queued_task(session_id, task_id)
+
+
+runtime_queue = _RuntimeQueueNamespace()
+
 # ── Browser Automation (/v1/browser, /api/browser/ext) ──
 
 class _BrowserNamespace:
@@ -3486,6 +3501,7 @@ class AgentKit:
         self.files = files
         self.browser = browser
         self.runtime = runtime
+        self.runtime_queue = runtime_queue
         self.subagents = subagents
         self.tools = tools
         self.sandbox = sandbox

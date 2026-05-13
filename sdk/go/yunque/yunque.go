@@ -1488,6 +1488,7 @@ type AgentKit struct {
 	Heartbeat     *heartbeatNamespace
 	Events        *eventsNamespace
 	Runtime       *runtimeNamespace
+	RuntimeQueue  *runtimeQueueNamespace
 	Subagents     *subagentsNamespace
 	Tools         *toolsNamespace
 	Sandbox       *sandboxNamespace
@@ -5132,6 +5133,23 @@ func (r *runtimeNamespace) EventsStreamURL() string {
 	return strings.TrimRight(apiBase, "/") + "/v1/events/stream"
 }
 
+// RuntimeQueue exposes queue-only runtime helpers for dashboards, plugins, CLIs, and automation monitors.
+var RuntimeQueue = &runtimeQueueNamespace{}
+
+type runtimeQueueNamespace struct{}
+
+func (r *runtimeQueueNamespace) Overview(ctx context.Context) (RuntimeQueueOverviewResponse, error) {
+	return Runtime.Queues(ctx)
+}
+
+func (r *runtimeQueueNamespace) Session(ctx context.Context, sessionID string) (RuntimeQueueSessionResponse, error) {
+	return Runtime.SessionQueue(ctx, sessionID)
+}
+
+func (r *runtimeQueueNamespace) Cancel(ctx context.Context, sessionID, taskID string) (RuntimeQueueCancelResponse, error) {
+	return Runtime.CancelQueuedTask(ctx, sessionID, taskID)
+}
+
 // ── Browser ──
 
 type browserNamespace struct{}
@@ -6735,6 +6753,7 @@ func NewAgentKit() AgentKit {
 		Heartbeat:     Heartbeat,
 		Events:        Events,
 		Runtime:       Runtime,
+		RuntimeQueue:  RuntimeQueue,
 		Subagents:     Subagents,
 		Tools:         Tools,
 		Sandbox:       Sandbox,

@@ -65,6 +65,7 @@ const checks = [
   ["Heartbeat SDK manifest", "sdk/scripts/check-heartbeat-sdk-manifest.mjs"],
   ["Events SDK manifest", "sdk/scripts/check-events-sdk-manifest.mjs"],
   ["Runtime SDK manifest", "sdk/scripts/check-runtime-sdk-manifest.mjs"],
+  ["RuntimeQueue SDK manifest", "sdk/scripts/check-runtime-queue-sdk-manifest.mjs"],
   ["Subagents SDK manifest", "sdk/scripts/check-subagents-sdk-manifest.mjs"],
   ["Tools SDK manifest", "sdk/scripts/check-tools-sdk-manifest.mjs"],
   ["Sandbox SDK manifest", "sdk/scripts/check-sandbox-sdk-manifest.mjs"],
