@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { api, SearchResult } from "@/lib/api";
 import { NAV_ITEMS, NAV_GROUP_ORDER, type NavItem, type NavGroup } from "@/lib/nav-items";
+import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 
 interface CommandItem {
   id: string;
@@ -26,6 +27,7 @@ export default function CommandPalette() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
+  const [packItems, setPackItems] = useState<NavItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -48,6 +50,21 @@ export default function CommandPalette() {
         );
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchEnabledPacks()
+      .then((packs) => {
+        setPackItems(buildPackNavItems(packs).map((item) => ({
+          id: `pack-${item.packId}-${item.href}`,
+          href: item.href,
+          label: item.label,
+          group: "扩展",
+          icon: item.icon,
+          keywords: item.keywords,
+        })));
+      })
+      .catch(() => setPackItems([]));
   }, []);
 
   const close = useCallback(() => {
@@ -101,7 +118,7 @@ export default function CommandPalette() {
   }, [query]);
 
   const navCommands: CommandItem[] = useMemo(() => {
-    const all = [...NAV_ITEMS, ...extItems];
+    const all = [...NAV_ITEMS, ...packItems, ...extItems];
     const isEasy = typeof window !== "undefined" && localStorage.getItem("yunque_profile_mode") === "easy";
     const profileCmd: CommandItem = {
       id: "profile-toggle",
@@ -127,7 +144,7 @@ export default function CommandPalette() {
         },
       })),
     ];
-  }, [extItems, router, close]);
+  }, [extItems, packItems, router, close]);
 
   const q = query.toLowerCase();
   const filteredNav = q
@@ -176,11 +193,11 @@ export default function CommandPalette() {
 
   const navByGroup = useMemo(() => {
     const out: Record<string, NavItem[]> = {};
-    for (const it of [...NAV_ITEMS, ...extItems]) {
+    for (const it of [...NAV_ITEMS, ...packItems, ...extItems]) {
       (out[it.group] ??= []).push(it);
     }
     return out;
-  }, [extItems]);
+  }, [extItems, packItems]);
 
   if (!open) return null;
 

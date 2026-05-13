@@ -12,7 +12,7 @@ import type {
   BackupInfo, BackupRestoreResult, ConversationInfo,
   TaskInfo, GapRecord, GapStats, StateGoal,
   StateSnapshot, ExperienceItem, ExperienceOutcome, ExperienceStats, TaskTemplate,
-  PluginUITab, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
+  PluginUITab, PackListResponse, PackMutationResponse, QQAnalysis, LLMMessage, ThreadState, TaskThreadInfo, TaskWorkingMemory,
   CostTaskSummary, CostUsageEvent, CostBreakdown,
   TriggerItem, TriggerDef, TriggerRun, TriggerLogEvent, TriggerEventPayload,
   ApprovalRequest, ApprovalRule,
@@ -650,6 +650,20 @@ export const api = {
   // Plugin UI
   pluginUITabs: () =>
     fetcher<{ tabs: PluginUITab[] }>("/v1/plugins/ui"),
+
+  // Pack Runtime: installed/enabled capability packs are the backend source of truth
+  packsInstalled: () =>
+    fetcher<PackListResponse>("/v1/packs/installed"),
+  packsEnabled: () =>
+    fetcher<PackListResponse>("/v1/packs/enabled"),
+  packInstall: (manifestPath: string, source?: string) =>
+    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source }) }),
+  packEnable: (id: string) =>
+    fetcher<PackMutationResponse>("/v1/packs/enable", { method: "POST", body: JSON.stringify({ id }) }),
+  packDisable: (id: string) =>
+    fetcher<PackMutationResponse>("/v1/packs/disable", { method: "POST", body: JSON.stringify({ id }) }),
+  packRollback: (id: string) =>
+    fetcher<PackMutationResponse>("/v1/packs/rollback", { method: "POST", body: JSON.stringify({ id }) }),
 
   // QQ Chat Analyzer (ext plugin)
   qqUpload: (content: string, filename?: string) =>

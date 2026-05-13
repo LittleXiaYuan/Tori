@@ -16,6 +16,7 @@ import {
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 
 type ProfileMode = "easy" | "full";
 
@@ -127,6 +128,7 @@ export default function Sidebar() {
   const { locale, setLocale } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
+  const [packItems, setPackItems] = useState<NavItem[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
   const [version, setVersion] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -196,8 +198,29 @@ export default function Sidebar() {
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    fetchEnabledPacks()
+      .then((packs) => {
+        setPackItems(buildPackNavItems(packs).map((item) => ({
+          href: item.href,
+          label: item.label,
+          labelEn: item.labelEn,
+          icon: item.icon,
+          tier: "full",
+        })));
+      })
+      .catch(() => setPackItems([]));
+  }, []);
+
   const allCategories = useMemo(() => {
     let cats = categories;
+    if (packItems.length > 0) {
+      const packCategory: NavCategory = {
+        id: "packs", label: "增量包", labelEn: "Packs",
+        icon: <Package size={16} />, children: packItems, tier: "full",
+      };
+      cats = [...cats, packCategory];
+    }
     if (extItems.length > 0) {
       const extCategory: NavCategory = {
         id: "extensions", label: "扩展", labelEn: "Extensions",
@@ -206,7 +229,7 @@ export default function Sidebar() {
       cats = [...cats, extCategory];
     }
     return filterByProfile(cats, profileMode);
-  }, [extItems, profileMode]);
+  }, [extItems, packItems, profileMode]);
 
   useEffect(() => {
     if (!pathname) return;
