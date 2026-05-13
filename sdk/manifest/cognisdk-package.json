@@ -130,6 +130,7 @@
         "RenderPackBundleApplyPlanMarkdown",
         "PackBundleApplyActionKinds",
         "PackBundleApplyActionKindInfos",
+        "DescribePackBundleApplyActionKind",
         "FilterPackBundleApplyActions",
         "KnownPackBundleApplyActionKind",
         "Actions",

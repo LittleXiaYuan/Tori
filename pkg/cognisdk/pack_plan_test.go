@@ -156,6 +156,19 @@ func TestPackBundleApplyActionKindInfos(t *testing.T) {
 	}
 }
 
+func TestDescribePackBundleApplyActionKind(t *testing.T) {
+	info, ok := DescribePackBundleApplyActionKind(PackBundleApplyActionAddPack)
+	if !ok {
+		t.Fatal("expected add_pack description")
+	}
+	if info.Kind != PackBundleApplyActionAddPack || strings.TrimSpace(info.Label) == "" || strings.TrimSpace(info.Description) == "" {
+		t.Fatalf("unexpected add_pack info: %#v", info)
+	}
+	if _, ok := DescribePackBundleApplyActionKind(PackBundleApplyActionKind("missing_kind")); ok {
+		t.Fatal("unexpected missing action kind info")
+	}
+}
+
 func TestRenderPackBundleApplyPlanMarkdown(t *testing.T) {
 	plan := PackBundleApplyPlan{
 		FromID:             "current",
