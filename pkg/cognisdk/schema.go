@@ -88,6 +88,27 @@ func PackBundleDiffJSONSchema() JSONSchema {
 	}
 }
 
+// PackBundleReviewJSONSchema returns the schema for candidate bundle review reports.
+func PackBundleReviewJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-review.json",
+		"title":                "Cognition SDK Pack Bundle Review",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"from_id", "candidate_id", "outcome", "reason", "diff", "golden_tests"},
+		"properties": map[string]any{
+			"from_id":            stringSchema(),
+			"candidate_id":       stringSchema(),
+			"outcome":            enumSchema(string(PackBundleReviewReady), string(PackBundleReviewReview), string(PackBundleReviewBlocked)),
+			"reason":             stringSchema(),
+			"rollback_bundle_id": stringSchema(),
+			"diff":               PackBundleDiffJSONSchema(),
+			"golden_tests":       goldenTestSummarySchema(),
+		},
+	}
+}
+
 // FeedbackProposalJSONSchema returns the schema for non-mutating feedback
 // proposals returned by BuildFeedbackProposal or Engine.ProposeUpdates.
 func FeedbackProposalJSONSchema() JSONSchema {
@@ -134,6 +155,31 @@ func SaveJSONSchema(schema JSONSchema, path string) error {
 		return fmt.Errorf("cognisdk.schema: write %q: %w", path, err)
 	}
 	return nil
+}
+
+func goldenTestSummarySchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"passed", "failed", "results"},
+		"properties": map[string]any{
+			"passed": map[string]any{"type": "integer"},
+			"failed": map[string]any{"type": "integer"},
+			"results": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"additionalProperties": false,
+					"required":             []string{"name", "passed"},
+					"properties": map[string]any{
+						"name":   stringSchema(),
+						"passed": map[string]any{"type": "boolean"},
+						"errors": stringArraySchema(),
+					},
+				},
+			},
+		},
+	}
 }
 
 func packStatusSchema() map[string]any {

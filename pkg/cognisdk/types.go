@@ -187,6 +187,27 @@ type PackBundleDiff struct {
 	DisabledPacks []string     `json:"disabled_packs,omitempty" yaml:"disabled_packs,omitempty"`
 }
 
+// PackBundleReviewOutcome is the SDK's coarse recommendation for a candidate bundle.
+type PackBundleReviewOutcome string
+
+const (
+	PackBundleReviewReady   PackBundleReviewOutcome = "ready"
+	PackBundleReviewReview  PackBundleReviewOutcome = "review"
+	PackBundleReviewBlocked PackBundleReviewOutcome = "blocked"
+)
+
+// PackBundleReview combines diff, golden-test gate, and rollback metadata for
+// a candidate bundle. It never applies the candidate to a host.
+type PackBundleReview struct {
+	FromID           string                  `json:"from_id" yaml:"from_id"`
+	CandidateID      string                  `json:"candidate_id" yaml:"candidate_id"`
+	Outcome          PackBundleReviewOutcome `json:"outcome" yaml:"outcome"`
+	Reason           string                  `json:"reason" yaml:"reason"`
+	RollbackBundleID string                  `json:"rollback_bundle_id,omitempty" yaml:"rollback_bundle_id,omitempty"`
+	Diff             PackBundleDiff          `json:"diff" yaml:"diff"`
+	GoldenTests      GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
+}
+
 // PackBundle is a portable collection of declarative packs. It is still data
 // only: loading a bundle validates manifests but never executes code.
 type PackBundle struct {
