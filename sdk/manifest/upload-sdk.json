@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "domain": "upload",
+  "description": "Cross-language lightweight SDK for authenticated artifact upload and parsed-file metadata without importing the full platform client.",
+  "principles": [
+    "Expose upload as a focused incremental SDK slice for external frontends, plugin pages, CLIs, sidecars, and automation scripts.",
+    "Keep generic artifact upload independent from speech so callers can depend on only the multipart upload surface.",
+    "Return parsed-file metadata, analysis, actions, and rich payloads directly from the gateway response."
+  ],
+  "routes": [
+    "POST /v1/upload"
+  ],
+  "capabilities": [
+    {
+      "name": "file",
+      "route": "POST /v1/upload",
+      "readOnly": false,
+      "description": "Upload one file field as multipart/form-data and receive parsed-file metadata."
+    },
+    {
+      "name": "upload",
+      "route": "POST /v1/upload",
+      "readOnly": false,
+      "description": "Alias for file upload for scripts that prefer an action verb."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/upload.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "file": "createUploadClient().file",
+        "upload": "createUploadClient().upload"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "file": "yunque.Upload.File",
+        "upload": "yunque.Upload.Upload"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "file": "yunque.upload.file",
+        "upload": "yunque.upload.upload"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "file": "UploadClient::file",
+        "upload": "UploadClient::upload"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

@@ -59,5 +59,19 @@ class SpeechTest(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().speech, yunque.speech)
 
 
+class UploadTest(unittest.TestCase):
+    def test_upload_namespace_delegates_file_and_alias(self) -> None:
+        with patch.object(yunque, "_api_call_multipart", return_value={"filename": "apply.docx", "parse": {"status": "parsed"}}) as upload:
+            self.assertEqual(yunque.upload.file(b"doc", "apply.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")["parse"]["status"], "parsed")
+        upload.assert_called_once_with("POST", "/v1/upload", "file", "apply.docx", b"doc", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+        with patch.object(yunque, "_api_call_multipart", return_value={"filename": "note.txt", "actions": []}) as upload:
+            self.assertEqual(yunque.upload.upload(b"note", "note.txt", "text/plain")["filename"], "note.txt")
+        upload.assert_called_once_with("POST", "/v1/upload", "file", "note.txt", b"note", content_type="text/plain")
+
+    def test_agent_kit_exposes_upload(self) -> None:
+        self.assertIs(yunque.create_agent_kit().upload, yunque.upload)
+
+
 if __name__ == "__main__":
     unittest.main()

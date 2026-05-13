@@ -65,6 +65,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/react")) return jsonResponse({ status: "ok" });
       if (value.endsWith("/v1/rbac/check")) return jsonResponse({ allowed: true, subject_id: "u1", resource: "knowledge", action: "read" });
       if (value.endsWith("/v1/backup/info")) return jsonResponse({ file_count: 1, total_bytes: 12, files: { "memory.json": 12 } });
+      if (value.endsWith("/v1/upload")) return jsonResponse({ filename: "note.txt", size: 4, path: "note.txt", parse: { status: "parsed" } });
       if (value.endsWith("/api/settings/check")) return jsonResponse({ setup_needed: false });
       if (value.endsWith("/healthz")) return jsonResponse({ status: "ok", version: "dev" });
       if (value.endsWith("/v1/auth/status")) return jsonResponse({ password_set: true, authenticated: true });
@@ -128,6 +129,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.reactions.react({ channel_type: "wechat", target: "u1", message_id: "m1", emoji: "👍" })).status, "ok");
   assertEqual((await kit.permissions.check({ subject_id: "u1", resource: "knowledge", action: "read" })).allowed, true);
   assertEqual((await kit.backup.info()).file_count, 1);
+  assertEqual((await kit.upload.file(new Blob(["note"]), "note.txt")).parse?.status, "parsed");
   assertEqual((await kit.settings.check()).setup_needed, false);
   assertEqual((await kit.system.health()).status, "ok");
   assertEqual((await kit.auth.status()).authenticated, true);
