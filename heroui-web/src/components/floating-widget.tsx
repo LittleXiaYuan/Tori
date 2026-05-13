@@ -153,7 +153,7 @@ function sanitizeRoute(path: string | undefined) {
   const allowed = [
     "/dashboard", "/chat", "/settings", "/browser", "/workspace", "/workers",
     "/inbox", "/missions", "/plugins", "/knowledge", "/memory", "/tools",
-    "/providers", "/connectors", "/backup", "/trust", "/tenants", "/bots",
+    "/providers", "/connectors", "/packs/backup", "/trust", "/tenants", "/bots",
   ];
   return allowed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) ? path : "";
 }

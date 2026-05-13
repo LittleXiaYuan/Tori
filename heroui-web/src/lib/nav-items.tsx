@@ -58,7 +58,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-audit", href: "/audit", label: "审计", group: "系统", icon: <Shield size={16} />, keywords: "audit 日志 审计" },
   { id: "nav-trust", href: "/trust", label: "信任", group: "系统", icon: <ShieldCheck size={16} />, keywords: "trust 安全 信任" },
   { id: "nav-tenants", href: "/tenants", label: "租户", group: "系统", icon: <Users size={16} />, keywords: "tenants 租户 团队" },
-  { id: "nav-backup", href: "/backup", label: "备份", group: "系统", icon: <HardDriveDownload size={16} />, keywords: "backup 导出 备份" },
   { id: "nav-bots", href: "/bots", label: "Bot", group: "系统", icon: <Bot size={16} />, keywords: "bots bot 机器人" },
   { id: "nav-settings", href: "/settings", label: "设置", group: "系统", icon: <Settings size={16} />, keywords: "settings 偏好 设置" },
 ];
