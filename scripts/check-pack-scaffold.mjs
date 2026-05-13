@@ -47,6 +47,9 @@ if (payload) {
   if (payload.packId !== "yunque.pack.verifier-pack") fail("payload.packId must match yunque.pack.verifier-pack");
   if (payload.dryRun !== true) fail("payload.dryRun must be true");
   if (payload.manifest?.id !== "yunque.pack.verifier-pack") fail("manifest.id must match yunque.pack.verifier-pack");
+  if (!Array.isArray(payload.manifest?.backend?.routeSpecs) || payload.manifest.backend.routeSpecs[0]?.method !== "GET" || payload.manifest.backend.routeSpecs[0]?.path !== "/v1/verifier-pack/ping") {
+    fail("manifest.backend.routeSpecs must describe method/path metadata");
+  }
   if (!Array.isArray(payload.manifest?.frontend?.menus) || payload.manifest.frontend.menus.length === 0) {
     fail("manifest.frontend.menus must be present");
   }

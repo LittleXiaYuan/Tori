@@ -13,6 +13,7 @@ Copy-Item -Recurse packs/templates/backend-pack packs/examples/my-pack
 - `pack.json` 的 `id/name/version/description`；
 - `backend.capabilities`；
 - `backend.routes`；
+- `backend.routeSpecs`（method/path 元数据，用于 method-aware gate 和控制台审计）；
 - `frontend.menus`；
 - `frontend.routes`；
 - `sdk.typescript`。

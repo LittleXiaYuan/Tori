@@ -66,9 +66,16 @@ export interface PluginUITab {
 // packs. Frontend shells should render menus/routes from enabled packs instead
 // of hardcoding every new feature into the main app.
 
+export interface PackBackendRouteSpec {
+  method: string;
+  path: string;
+  description?: string;
+}
+
 export interface PackBackendManifest {
   capabilities?: string[];
   routes?: string[];
+  routeSpecs?: PackBackendRouteSpec[];
   permissions?: string[];
 }
 

@@ -499,6 +499,45 @@ func TestPackRoutesTogglePackStatus(t *testing.T) {
 	}
 }
 
+func TestBackendPackRouteSpecsGateByMethod(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.method-spec",
+		Name:         "Method Spec Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Routes:     []string{"/v1/method-spec/import"},
+			RouteSpecs: []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/method-spec/import"}},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.method-spec",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/method-spec/import",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("method-spec-pack")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/method-spec/import", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected method-aware manifest route gate to reject GET, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestBackupRoutesArePackGated(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

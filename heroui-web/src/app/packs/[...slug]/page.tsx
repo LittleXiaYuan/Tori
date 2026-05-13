@@ -8,7 +8,7 @@ import { Boxes, ExternalLink, PackageOpen, Route, ShieldCheck, TerminalSquare } 
 import PageHeader from "@/components/page-header";
 import { type InstalledPack } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, packSdkImportSnippet } from "@/lib/pack-sync";
+import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, formatBackendRouteSpec, packSdkImportSnippet } from "@/lib/pack-sync";
 
 export default function PackRuntimeRoutePage() {
   const pathname = usePathname() || "/packs";
@@ -108,7 +108,7 @@ export default function PackRuntimeRoutePage() {
             <div>当前路径：<code>{pathname}</code></div>
             <div>声明组件：<code>{match.component}</code></div>
             <div>菜单入口：{(manifest.frontend?.menus || []).map((menu) => <code key={menu.key} className="mx-1">{menu.label}:{menu.path}</code>)}</div>
-            <div>后端路由：{(manifest.backend?.routes || []).map((item) => <code key={item} className="mx-1">{item}</code>)}</div>
+            <div>后端路由：{(manifest.backend?.routeSpecs?.length ? manifest.backend.routeSpecs : manifest.backend?.routes || []).map((item) => <code key={typeof item === "string" ? item : `${item.method}:${item.path}`} className="mx-1">{formatBackendRouteSpec(item)}</code>)}</div>
           </div>
         </Card>
 

@@ -69,10 +69,10 @@ for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs
   }
 }
 
-for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
+for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "routeSpecs", "routeMethod", "--method", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
   if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
 }
-for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
+for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.backend.routeSpecs", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
   if (!scaffoldCheck.includes(token)) fail(`check-pack-scaffold.mjs missing token: ${token}`);
 }
 for (const token of ["Pack Runtime completion audit", "RegisterBackendPack", "frontendSync()", "PruneArtifacts", "TypeScript packs SDK", "backup-pack 示例包"]) {
@@ -97,10 +97,12 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/gateway.go")
   + "\n"
+  + readText("cmd/agent/init_tasks.go")
+  + "\n"
   + readText("internal/controlplane/gateway/gateway_setters.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_packs_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "route.Method = strings.ToUpper", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestRegisterBackendPackPanicsOnMissingRouteMethod", "TestPackBackendModulesExposeMountedRoutes", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "route.Method = strings.ToUpper", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestRegisterBackendPackPanicsOnMissingRouteMethod", "TestPackBackendModulesExposeMountedRoutes", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "backuppack.DefaultHandler()", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -136,6 +138,15 @@ for (const path of packFiles) {
   if (!Array.isArray(routes) || routes.length === 0) fail(`${path}: backend.routes must not be empty`);
   for (const route of routes) {
     if (typeof route !== "string" || !route.startsWith("/")) fail(`${path}: invalid backend route: ${route}`);
+  }
+  const routeSpecs = manifest.backend?.routeSpecs ?? [];
+  if (!Array.isArray(routeSpecs) || routeSpecs.length === 0) fail(`${path}: backend.routeSpecs must not be empty`);
+  const backendRouteSet = new Set(routes);
+  for (const [index, route] of routeSpecs.entries()) {
+    if (!route?.method || typeof route.method !== "string") fail(`${path}: backend.routeSpecs[${index}].method is required`);
+    if (route?.method && route.method !== route.method.toUpperCase()) fail(`${path}: backend.routeSpecs[${index}].method must be uppercase`);
+    if (!route?.path || typeof route.path !== "string" || !route.path.startsWith("/")) fail(`${path}: backend.routeSpecs[${index}].path must start with /`);
+    if (route?.path && !backendRouteSet.has(route.path)) fail(`${path}: backend.routeSpecs[${index}].path must also be present in backend.routes`);
   }
   const menus = manifest.frontend?.menus ?? [];
   if (!Array.isArray(menus) || menus.length === 0) fail(`${path}: frontend.menus must not be empty`);

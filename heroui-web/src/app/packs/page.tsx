@@ -21,10 +21,11 @@ import {
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import type { InstalledPack } from "@/lib/api";
+import type { InstalledPack, PackBackendRouteSpec } from "@/lib/api";
 import { createPacksClient } from "@/lib/packs-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { formatBackendRouteSpec } from "@/lib/pack-sync";
 
 const EXAMPLE_BACKUP_MANIFEST = "packs/examples/backup-pack/pack.json";
 const packsClient = createPacksClient();
@@ -48,6 +49,17 @@ async function copyText(text: string, label: string) {
   } catch {
     showToast("复制失败，请手动复制代码片段", "error");
   }
+}
+
+
+function declaredBackendRouteSpecs(pack: InstalledPack): PackBackendRouteSpec[] {
+  const specs = pack.manifest.backend?.routeSpecs || [];
+  if (specs.length > 0) return specs;
+  return (pack.manifest.backend?.routes || []).map((path) => ({ method: "*", path }));
+}
+
+function backendRouteKey(route: Pick<PackBackendRouteSpec, "method" | "path">): string {
+  return `${route.method.toUpperCase()} ${route.path}`;
 }
 
 function statusTone(status: string): { label: string; color: string; bg: string } {
@@ -233,9 +245,10 @@ export default function PacksPage() {
             const mountedRoutes = backendModule?.routes || [];
             const sdkEntries = Object.entries(manifest.sdk || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
             const distribution = manifest.distribution;
-            const declaredBackendRoutes = manifest.backend?.routes || [];
+            const declaredBackendSpecs = declaredBackendRouteSpecs(pack);
+            const mountedRouteKeySet = new Set(mountedRoutes.map((route) => backendRouteKey({ method: route.method || "*", path: route.path })));
             const mountedPathSet = new Set(mountedRoutes.map((route) => route.path));
-            const missingMountedRoutes = declaredBackendRoutes.filter((route) => !mountedPathSet.has(route));
+            const missingMountedRoutes = declaredBackendSpecs.filter((route) => !mountedRouteKeySet.has(backendRouteKey(route)) && !mountedPathSet.has(route.path));
             return (
               <Card key={manifest.id} className="section-card p-5 space-y-4 hover-lift">
                 <div className="flex items-start justify-between gap-3">
@@ -280,7 +293,7 @@ export default function PacksPage() {
                     <div className="flex flex-wrap gap-1.5">
                       {caps.length ? caps.map((cap) => <Chip key={cap} size="sm">{cap}</Chip>) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未声明</span>}
                       {mountedRoutes.length > 0 && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>已挂载 {mountedRoutes.length}</Chip>}
-                      {declaredBackendRoutes.length > 0 && mountedRoutes.length === 0 && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>未挂载</Chip>}
+                      {declaredBackendSpecs.length > 0 && mountedRoutes.length === 0 && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>未挂载</Chip>}
                     </div>
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
@@ -337,13 +350,13 @@ export default function PacksPage() {
                   </div>
                 )}
 
-                {(routes.length > 0 || declaredBackendRoutes.length > 0) && (
+                {(routes.length > 0 || declaredBackendSpecs.length > 0) && (
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-text-muted)" }}>
                     <CheckCircle2 size={13} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-success)" }} />
                     <span>
-                      Registry 已声明 {routes.length} 个前端路由、{declaredBackendRoutes.length} 个后端路由。
+                      Registry 已声明 {routes.length} 个前端路由、{declaredBackendSpecs.length} 个后端路由。
                       {routes.map((r) => <code key={`fe:${r.path}`} className="mx-1">{r.path}</code>)}
-                      {declaredBackendRoutes.map((route) => <code key={`be:${route}`} className="mx-1">{route}</code>)}
+                      {declaredBackendSpecs.map((route) => <code key={`be:${backendRouteKey(route)}`} className="mx-1">{formatBackendRouteSpec(route)}</code>)}
                     </span>
                   </div>
                 )}
@@ -351,7 +364,7 @@ export default function PacksPage() {
                 {missingMountedRoutes.length > 0 && (
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-warning)" }}>
                     <ShieldCheck size={13} className="mt-0.5 shrink-0" />
-                    <span>manifest 声明但尚未挂载：{missingMountedRoutes.map((route) => <code key={route} className="mx-1">{route}</code>)}</span>
+                    <span>manifest 声明但尚未挂载：{missingMountedRoutes.map((route) => <code key={backendRouteKey(route)} className="mx-1">{formatBackendRouteSpec(route)}</code>)}</span>
                   </div>
                 )}
               </Card>

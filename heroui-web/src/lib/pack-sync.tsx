@@ -3,7 +3,7 @@
 import type React from "react";
 import { HardDriveDownload, Package, Puzzle } from "lucide-react";
 import { createPacksClient } from "@/lib/packs-client";
-import type { InstalledPack, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/api";
+import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/api";
 
 
 export interface PackSdkEntrypoint {
@@ -23,6 +23,12 @@ export interface PackRouteBinding {
   assets?: PackFrontendAssets;
   distribution?: PackDistributionManifest;
   sdk: PackSdkEntrypoint[];
+}
+
+export interface PackBackendRouteBinding extends PackBackendRouteSpec {
+  pack: InstalledPack;
+  packId: string;
+  packName: string;
 }
 
 export interface PackNavItem {
@@ -90,6 +96,20 @@ export function buildPackSdkEntrypoints(pack: InstalledPack): PackSdkEntrypoint[
       language,
       importPath,
     }));
+}
+
+export function buildPackBackendRouteBindings(packs: InstalledPack[]): PackBackendRouteBinding[] {
+  return packs.flatMap((pack) => (pack.manifest.backend?.routeSpecs || []).map((route) => ({
+    ...route,
+    pack,
+    packId: pack.manifest.id,
+    packName: pack.manifest.name,
+  })));
+}
+
+export function formatBackendRouteSpec(route: string | PackBackendRouteSpec): string {
+  if (typeof route === "string") return route;
+  return `${route.method} ${route.path}`;
 }
 
 export function buildPackRouteBindings(packs: InstalledPack[]): PackRouteBinding[] {

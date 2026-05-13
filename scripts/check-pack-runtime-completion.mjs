@@ -47,6 +47,7 @@ const gateway = [
   "internal/controlplane/gateway/gateway.go",
   "internal/controlplane/gateway/gateway_setters.go",
   "internal/controlplane/gateway/handlers_packs_test.go",
+  "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
 const backup = read("internal/packs/backup/handler.go");
 const backupManifest = read("packs/examples/backup-pack/pack.json");
@@ -94,6 +95,8 @@ requireTokens("轻内核/manifest 协议", manifest + docs + backupManifest, [
   "SDKManifest",
   "DistributionManifest",
   "UpdateManifest",
+  "BackendRouteSpec",
+  "AllowsRoute",
   "frontend.menus",
   "frontend.routes",
   "sdk.typescript",
@@ -131,6 +134,7 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "http.StatusMethodNotAllowed",
   "route conflict",
   "handlePackBackendModules",
+  "backuppack.DefaultHandler()",
 ]);
 
 requireTokens("backup-pack 示例包", backup + backupManifest, [
@@ -162,6 +166,8 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "enabled()",
   "frontend?.menus",
   "frontend?.routes",
+  "routeSpecs",
+  "buildPackBackendRouteBindings",
   "/v1/packs/enabled",
   "manifest.distribution",
   "backendModules()",
@@ -236,6 +242,7 @@ requireTokens("TypeScript packs SDK", sdk, [
   "frontendSync()",
   "routeBinding(path",
   "PackRouteBinding",
+  "PackBackendRouteBinding",
   "PackDistributionManifest",
   "PackPruneResponse",
   "download?: boolean",

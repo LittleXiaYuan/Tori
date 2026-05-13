@@ -20,6 +20,23 @@
     "permissions": [
       "backup:read",
       "backup:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/backup/info",
+        "description": "Read backup pack runtime status."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/backup/export",
+        "description": "Export a backup archive."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/backup/import",
+        "description": "Import backup payload data."
+      }
     ]
   },
   "frontend": {

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
+  buildPackBackendRouteBindings,
   buildPackNavItems,
   buildPackRouteBindings,
   buildPackSdkEntrypoints,
   fetchEnabledPacks,
   findPackRouteBinding,
+  formatBackendRouteSpec,
   normalizePackRoutePath,
   packSdkImportSnippet,
 } from "../pack-sync";
@@ -18,7 +20,7 @@ const backupPack: InstalledPack = {
     name: "Backup Pack",
     version: "0.1.0",
     optional: true,
-    backend: { routes: ["/v1/backup/info"] },
+    backend: { routes: ["/v1/backup/info"], routeSpecs: [{ method: "GET", path: "/v1/backup/info", description: "Read backup status" }] },
     frontend: {
       menus: [{ key: "backup", label: "备份恢复", path: "/packs/backup", icon: "backup", order: 20 }],
       routes: [{ path: "/packs/backup", component: "backup/BackupPage", title: "备份恢复" }],
@@ -41,7 +43,7 @@ const laterPack: InstalledPack = {
     name: "Later Pack",
     version: "0.1.0",
     optional: true,
-    backend: { routes: ["/v1/later/info"] },
+    backend: { routes: ["/v1/later/info"], routeSpecs: [{ method: "GET", path: "/v1/later/info" }] },
     frontend: {
       menus: [{ key: "later", label: "后置包", path: "/packs/later", icon: "package", order: 90 }],
       routes: [{ path: "/packs/later", component: "later/LaterPage" }],
@@ -85,6 +87,21 @@ describe("pack-sync frontend runtime", () => {
     });
     expect(binding?.pack).toBe(backupPack);
     expect(binding?.sdk[0]?.importPath).toBe("yunque-client/backup");
+  });
+
+
+  it("builds backend route bindings from manifest routeSpecs", () => {
+    const [binding] = buildPackBackendRouteBindings([backupPack]);
+
+    expect(binding).toMatchObject({
+      packId: "yunque.pack.backup",
+      packName: "Backup Pack",
+      method: "GET",
+      path: "/v1/backup/info",
+    });
+    expect(binding?.pack).toBe(backupPack);
+    expect(formatBackendRouteSpec(binding!)).toBe("GET /v1/backup/info");
+    expect(formatBackendRouteSpec("/v1/legacy/info")).toBe("/v1/legacy/info");
   });
 
   it("normalizes and resolves route bindings by pathname", () => {
