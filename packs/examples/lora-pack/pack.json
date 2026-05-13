@@ -1,0 +1,127 @@
+{
+  "id": "yunque.pack.lora",
+  "name": "LoRA / LAA Evolution Pack",
+  "version": "0.1.0",
+  "description": "将 LoRA/LAA 训练状态、数据预检、触发、回滚、配置和进化快照作为可选增量包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "lora.status",
+      "lora.history",
+      "lora.summary",
+      "lora.preview",
+      "lora.trigger",
+      "lora.rollback",
+      "lora.evolution",
+      "lora.config"
+    ],
+    "routes": [
+      "/v1/lora/status",
+      "/v1/lora/history",
+      "/v1/lora/summary",
+      "/v1/lora/preview",
+      "/v1/lora/trigger",
+      "/v1/lora/rollback",
+      "/v1/lora/evolution",
+      "/v1/lora/config"
+    ],
+    "permissions": [
+      "lora:read",
+      "lora:write"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/lora/status",
+        "description": "Read LoRA scheduler state and active adapter."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/lora/history",
+        "description": "Read recent LoRA training records."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/lora/summary",
+        "description": "Read aggregate LoRA training metrics."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/lora/preview",
+        "description": "Preview usable training samples before triggering LoRA."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/lora/trigger",
+        "description": "Trigger a scheduler training check for the current tenant."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/lora/rollback",
+        "description": "Rollback to the previous adapter."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/lora/evolution",
+        "description": "Read LAA evolution coordinator state."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/lora/config",
+        "description": "Read LoRA scheduler configuration."
+      },
+      {
+        "method": "PUT",
+        "path": "/v1/lora/config",
+        "description": "Replace LoRA scheduler configuration fields."
+      },
+      {
+        "method": "PATCH",
+        "path": "/v1/lora/config",
+        "description": "Patch LoRA scheduler configuration fields."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "lora",
+        "label": "LoRA 训练",
+        "path": "/packs/lora",
+        "icon": "circuit-board",
+        "order": 95
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/lora",
+        "component": "lora/LoRAPackPage",
+        "title": "LoRA 训练"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "lora/LoRAPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/lora"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/lora-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/lora-pack/lora-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/lora-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

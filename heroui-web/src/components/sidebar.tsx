@@ -10,7 +10,7 @@ import {
   Terminal, Cpu, ChevronDown, HelpCircle, LayoutDashboard, Wrench,
   SmilePlus, HeartPulse, Lightbulb, Bot, GraduationCap,
   MessageSquareText, Users, Share2, Menu, X, Languages,
-  PanelLeftClose, PanelLeftOpen, FolderGit2, Boxes, CircuitBoard,
+  PanelLeftClose, PanelLeftOpen, FolderGit2, Boxes,
   Sparkles, Layers,
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
@@ -62,7 +62,6 @@ const categories: NavCategory[] = [
     { href: "/emotions", label: "情绪", labelEn: "Emotions", icon: <SmilePlus size={16} />, tier: "full" },
     { href: "/reflect", label: "反思", labelEn: "Reflection", icon: <Lightbulb size={16} />, tier: "full" },
     { href: "/reverie", label: "思考记录", labelEn: "Reverie", icon: <BrainCircuit size={16} />, tier: "full" },
-    { href: "/lora", label: "LoRA 训练", labelEn: "LoRA", icon: <CircuitBoard size={16} />, tier: "full" },
     { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} />, tier: "full" },
   ]},
   { id: "system", label: "系统", labelEn: "System", icon: <ShieldCheck size={16} />, children: [

@@ -1,5 +1,5 @@
 import { fetcher } from "./api-core";
-import type { PackBackendModulesResponse, PackListResponse, PackMutationResponse } from "./api-types";
+import type { PackBackendModulesResponse, PackListResponse, PackMutationResponse } from "./pack-types";
 
 export interface PacksPruneResponse {
   removed: string[];

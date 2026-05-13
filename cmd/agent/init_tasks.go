@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +41,7 @@ import (
 	"yunque-agent/internal/integrations/mineru"
 	iledger "yunque-agent/internal/ledger"
 	backuppack "yunque-agent/internal/packs/backup"
+	lorapack "yunque-agent/internal/packs/lora"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
@@ -83,6 +86,7 @@ func initTasks(app *agentrt.App) error {
 	if err != nil {
 		slog.Warn("pack runtime registry disabled", "err", err)
 	} else {
+		ensureBuiltinPacks(packRegistry)
 		gw.SetPackRegistry(packRegistry)
 		app.Set("pack_runtime_registry", packRegistry)
 		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()))
@@ -126,21 +130,17 @@ func initTasks(app *agentrt.App) error {
 	gw.SetPasswordStore(passwordStore)
 	app.Set(agentrt.CompGateway, gw)
 
-	if v, ok := app.Get("lora_scheduler"); ok {
-		if s, ok := v.(*localbrain.LoRAScheduler); ok {
-			gw.SetLoRAScheduler(s)
-		}
-	}
-	if v, ok := app.Get("training_metrics"); ok {
-		if m, ok := v.(*localbrain.TrainingMetrics); ok {
-			gw.SetTrainingMetrics(m)
-		}
-	}
-	if v, ok := app.Get("evolution_coordinator"); ok {
-		if ec, ok := v.(*localbrain.EvolutionCoordinator); ok {
-			gw.SetEvolutionCoordinator(ec)
-		}
-	}
+	loraScheduler := appLoRAScheduler(app)
+	trainingMetrics := appTrainingMetrics(app)
+	evolutionCoordinator := appEvolutionCoordinator(app)
+	gw.SetLoRAScheduler(loraScheduler)
+	gw.SetTrainingMetrics(trainingMetrics)
+	gw.SetEvolutionCoordinator(evolutionCoordinator)
+	gw.RegisterBackendPack(lorapack.NewHandler(lorapack.Options{
+		Scheduler: loraScheduler,
+		Metrics:   trainingMetrics,
+		Evolution: evolutionCoordinator,
+	}))
 
 	// ── Phase 3: Perception (Identity/Emotion/Speech/Embeddings) ──
 	perception, err := initPerceptionWiring(app, gw)
@@ -334,6 +334,78 @@ func initSubagentHandoff(app *agentrt.App, gw *gateway.Gateway, p *planner.Plann
 
 	p.SetHandoffRegistry(handoffReg)
 	gw.SetHandoffRegistry(handoffReg)
+}
+
+func appLoRAScheduler(app *agentrt.App) *localbrain.LoRAScheduler {
+	if v, ok := app.Get("lora_scheduler"); ok {
+		if s, ok := v.(*localbrain.LoRAScheduler); ok {
+			return s
+		}
+	}
+	return nil
+}
+
+func appTrainingMetrics(app *agentrt.App) *localbrain.TrainingMetrics {
+	if v, ok := app.Get("training_metrics"); ok {
+		if m, ok := v.(*localbrain.TrainingMetrics); ok {
+			return m
+		}
+	}
+	return nil
+}
+
+func appEvolutionCoordinator(app *agentrt.App) *localbrain.EvolutionCoordinator {
+	if v, ok := app.Get("evolution_coordinator"); ok {
+		if ec, ok := v.(*localbrain.EvolutionCoordinator); ok {
+			return ec
+		}
+	}
+	return nil
+}
+
+func ensureBuiltinPacks(registry *packruntime.Registry) {
+	if registry == nil {
+		return
+	}
+	for _, manifestPath := range []string{
+		"packs/examples/backup-pack/pack.json",
+		"packs/examples/lora-pack/pack.json",
+	} {
+		manifest, err := loadBuiltinPackManifest(manifestPath)
+		if err != nil {
+			slog.Warn("builtin pack manifest skipped", "path", manifestPath, "err", err)
+			continue
+		}
+		if _, ok := registry.Get(manifest.ID); ok {
+			continue
+		}
+		if _, err := registry.Install(manifest, manifestPath); err != nil {
+			slog.Warn("builtin pack install failed", "id", manifest.ID, "path", manifestPath, "err", err)
+			continue
+		}
+		slog.Info("builtin pack manifest installed", "id", manifest.ID, "state", manifest.DefaultState)
+	}
+}
+
+func loadBuiltinPackManifest(manifestPath string) (packruntime.Manifest, error) {
+	var lastErr error
+	for _, candidate := range builtinPackManifestCandidates(manifestPath) {
+		manifest, err := packruntime.LoadManifest(candidate)
+		if err == nil {
+			return manifest, nil
+		}
+		lastErr = err
+	}
+	return packruntime.Manifest{}, lastErr
+}
+
+func builtinPackManifestCandidates(manifestPath string) []string {
+	candidates := []string{manifestPath, filepath.Join("..", "..", manifestPath)}
+	if _, file, _, ok := runtime.Caller(0); ok {
+		repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+		candidates = append(candidates, filepath.Join(repoRoot, manifestPath))
+	}
+	return candidates
 }
 
 func initSkillRegistration(app *agentrt.App, gw *gateway.Gateway, searchReg *websearch.Registry, knowledgeStore *knowledge.Store) {

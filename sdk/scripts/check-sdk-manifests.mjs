@@ -45,6 +45,7 @@ const checks = [
   ["Graph SDK manifest", "sdk/scripts/check-graph-sdk-manifest.mjs"],
   ["Knowledge SDK manifest", "sdk/scripts/check-knowledge-sdk-manifest.mjs"],
   ["LoRA SDK manifest", "sdk/scripts/check-lora-sdk-manifest.mjs"],
+  ["LoRA Pack SDK manifest", "sdk/scripts/check-lora-pack-sdk-manifest.mjs"],
   ["Workflow SDK manifest", "sdk/scripts/check-workflow-sdk-manifest.mjs"],
   ["Connectors SDK manifest", "sdk/scripts/check-connectors-sdk-manifest.mjs"],
   ["Notify SDK manifest", "sdk/scripts/check-notify-sdk-manifest.mjs"],

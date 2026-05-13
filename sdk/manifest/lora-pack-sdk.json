@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "domain": "lora-pack",
+  "description": "LoRA/LAA capability pack manifest binding for Pack Runtime frontend sync and lightweight SDK import discovery.",
+  "principles": [
+    "Expose LoRA/LAA as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Keep backend method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import the existing yunque-client/lora slice only when the LoRA pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/lora-pack/pack.json",
+  "sdkImport": "yunque-client/lora",
+  "routes": [
+    "GET /v1/lora/status",
+    "GET /v1/lora/history",
+    "GET /v1/lora/summary",
+    "GET /v1/lora/preview",
+    "POST /v1/lora/trigger",
+    "POST /v1/lora/rollback",
+    "GET /v1/lora/evolution",
+    "GET /v1/lora/config",
+    "PUT /v1/lora/config",
+    "PATCH /v1/lora/config"
+  ],
+  "frontend": {
+    "menuPath": "/packs/lora",
+    "component": "lora/LoRAPackPage",
+    "client": "heroui-web/src/lib/lora-pack-client.ts"
+  }
+}

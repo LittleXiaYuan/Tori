@@ -9,7 +9,7 @@ import {
   Shield, ShieldCheck, BarChart3, Globe, Blocks, HardDriveDownload,
   Terminal, Cpu, LayoutDashboard, Wrench, SmilePlus, HeartPulse,
   Lightbulb, Share2, Bot,
-  FolderGit2, Boxes, CircuitBoard, Users, Workflow,
+  FolderGit2, Boxes, Users, Workflow,
 } from "lucide-react";
 
 export type NavGroup = "概览" | "工作" | "智能" | "系统" | "扩展";
@@ -48,7 +48,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-emotions", href: "/emotions", label: "情绪", group: "智能", icon: <SmilePlus size={16} />, keywords: "emotion 情感 情绪" },
   { id: "nav-reflect", href: "/reflect", label: "反思", group: "智能", icon: <Lightbulb size={16} />, keywords: "reflect 反思 思考" },
   { id: "nav-reverie", href: "/reverie", label: "思考记录", group: "智能", icon: <BrainCircuit size={16} />, keywords: "reverie 思考 记录" },
-  { id: "nav-lora", href: "/lora", label: "LoRA 训练", group: "智能", icon: <CircuitBoard size={16} />, keywords: "lora 训练 fine-tune" },
   { id: "nav-heartbeat", href: "/heartbeat", label: "心跳", group: "智能", icon: <HeartPulse size={16} />, keywords: "heartbeat 心跳" },
 
   { id: "nav-models", href: "/models", label: "模型", group: "系统", icon: <Cpu size={16} />, keywords: "models 模型 LLM" },

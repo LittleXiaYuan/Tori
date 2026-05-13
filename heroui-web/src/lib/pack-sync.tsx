@@ -1,9 +1,9 @@
 "use client";
 
 import type React from "react";
-import { HardDriveDownload, Package, Puzzle } from "lucide-react";
+import { CircuitBoard, HardDriveDownload, Package, Puzzle } from "lucide-react";
 import { createPacksClient } from "@/lib/packs-client";
-import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/api";
+import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/pack-types";
 
 
 export interface PackSdkEntrypoint {
@@ -44,6 +44,9 @@ export interface PackNavItem {
 
 const packIconMap: Record<string, React.ReactNode> = {
   backup: <HardDriveDownload size={16} />,
+  "circuit-board": <CircuitBoard size={16} />,
+  circuit: <CircuitBoard size={16} />,
+  lora: <CircuitBoard size={16} />,
   package: <Package size={16} />,
   plugin: <Puzzle size={16} />,
   puzzle: <Puzzle size={16} />,

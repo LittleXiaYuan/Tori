@@ -118,5 +118,8 @@
     "docs/guide/pack-runtime.md",
     "docs/zh/guide/pack-runtime.md",
     "packs/AUTHORING.md"
+  ],
+  "packBindings": [
+    "sdk/manifest/lora-pack-sdk.json"
   ]
 }
