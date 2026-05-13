@@ -1529,6 +1529,7 @@ pub struct AgentKit {
     pub files: FilesClient,
     pub browser: BrowserClient,
     pub plugin: PluginApiClient,
+    pub plugin_search: PluginSearchClient,
 }
 
 impl AgentKit {
@@ -1636,7 +1637,8 @@ impl AgentKit {
             rbac: RBACClient::new(base_url.clone(), token.as_ref())?,
             files: FilesClient::new(base_url.clone(), token.as_ref())?,
             browser: BrowserClient::new(base_url.clone(), token.as_ref())?,
-            plugin: PluginApiClient::new(base_url, plugin_token.as_ref())?,
+            plugin: PluginApiClient::new(base_url.clone(), plugin_token.as_ref())?,
+            plugin_search: PluginSearchClient::new(base_url, plugin_token.as_ref())?,
         })
     }
 
@@ -1743,7 +1745,8 @@ impl AgentKit {
             rbac: RBACClient::new_with_client(base_url.clone(), plugin_http.clone()),
             files: FilesClient::new_with_client(base_url.clone(), plugin_http.clone()),
             browser: BrowserClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            plugin: PluginApiClient::new_with_client(base_url, plugin_http),
+            plugin: PluginApiClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_search: PluginSearchClient::new_with_client(base_url, plugin_http),
         }
     }
 }
@@ -9766,6 +9769,22 @@ impl MissionsClient {
     }
 }
 
+
+/// Standalone PluginSearch SDK client for plugin-scoped web search.
+#[derive(Debug, Clone)]
+pub struct PluginSearchClient { inner: PluginApiClient }
+
+impl PluginSearchClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginApiClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginApiClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn search(&self, query: impl AsRef<str>, limit: i32) -> Result<PluginSearchResponse, reqwest::Error> { self.inner.search(query, limit).await }
+}
+
 /// Small Rust helper over the core `/v1/plugin-api/*` runtime capabilities.
 ///
 /// Use this when a Rust CLI, sidecar, or plugin runner only needs runtime
@@ -9845,7 +9864,9 @@ impl PluginApiClient {
             .await
     }
 
-    /// Send a channel message via `/v1/plugin-api/send`.
+
+
+/// Send a channel message via `/v1/plugin-api/send`.
     pub async fn send(
         &self,
         channel: impl AsRef<str>,
@@ -10473,6 +10494,10 @@ mod tests {
             client.url("/v1/plugin-api/llm"),
             "http://localhost:9090/v1/plugin-api/llm"
         );
+        let search = PluginSearchClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(search.url("/v1/plugin-api/search"), "http://localhost:9090/v1/plugin-api/search");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.plugin_search.url("/v1/plugin-api/search"), "http://localhost:9090/v1/plugin-api/search");
     }
 
     #[test]

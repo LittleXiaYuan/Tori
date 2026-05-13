@@ -34,6 +34,7 @@
     "plugin-reload",
     "plugin-files",
     "plugin-folder",
+    "plugin-search",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -196,6 +197,10 @@
     {
       "name": "pluginFolder",
       "description": "Access the lightweight PluginFolder client or namespace for opening root or named plugin folders."
+    },
+    {
+      "name": "pluginSearch",
+      "description": "Access the lightweight PluginSearch client or namespace for plugin-scoped web search."
     },
     {
       "name": "skills",
@@ -521,7 +526,8 @@
         "airi": "createAgentKit().airi",
         "pluginReload": "createAgentKit().pluginReload",
         "pluginFiles": "createAgentKit().pluginFiles",
-        "pluginFolder": "createAgentKit().pluginFolder"
+        "pluginFolder": "createAgentKit().pluginFolder",
+        "pluginSearch": "createAgentKit().pluginSearch"
       }
     },
     "go": {
@@ -618,7 +624,8 @@
         "airi": "yunque.NewAgentKit().Airi",
         "pluginReload": "yunque.NewAgentKit().PluginReload",
         "pluginFiles": "yunque.NewAgentKit().PluginFiles",
-        "pluginFolder": "yunque.NewAgentKit().PluginFolder"
+        "pluginFolder": "yunque.NewAgentKit().PluginFolder",
+        "pluginSearch": "yunque.NewAgentKit().PluginSearch"
       }
     },
     "python": {
@@ -715,7 +722,8 @@
         "airi": "yunque.create_agent_kit().airi",
         "pluginReload": "yunque.create_agent_kit().plugin_reload",
         "pluginFiles": "yunque.create_agent_kit().plugin_files",
-        "pluginFolder": "yunque.create_agent_kit().plugin_folder"
+        "pluginFolder": "yunque.create_agent_kit().plugin_folder",
+        "pluginSearch": "yunque.create_agent_kit().plugin_search"
       }
     },
     "rust": {
@@ -812,7 +820,8 @@
         "airi": "AgentKit::airi",
         "pluginReload": "AgentKit::plugin_reload",
         "pluginFiles": "AgentKit::plugin_files",
-        "pluginFolder": "AgentKit::plugin_folder"
+        "pluginFolder": "AgentKit::plugin_folder",
+        "pluginSearch": "AgentKit::plugin_search"
       }
     }
   },

@@ -1629,6 +1629,7 @@ type AgentKit struct {
 	Files             *filesNamespace
 	Browser           *browserNamespace
 	Plugin            *pluginRuntimeNamespace
+	PluginSearch      *pluginSearchNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1639,7 +1640,11 @@ type AgentKit struct {
 // AgentKit-style callers.
 var Plugin = &pluginRuntimeNamespace{}
 
+// PluginSearch exposes standalone plugin-scoped web search for plugins and scripts.
+var PluginSearch = &pluginSearchNamespace{}
+
 type pluginRuntimeNamespace struct{}
+type pluginSearchNamespace struct{}
 
 // ── Mission Parse ──
 
@@ -6903,6 +6908,7 @@ func NewAgentKit() AgentKit {
 		Files:             Files,
 		Browser:           Browser,
 		Plugin:            Plugin,
+		PluginSearch:      PluginSearch,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,
@@ -6919,6 +6925,10 @@ func (p *pluginRuntimeNamespace) Chat(ctx context.Context, messages []Message, t
 }
 
 func (p *pluginRuntimeNamespace) Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
+	return Search(ctx, query, limit)
+}
+
+func (p *pluginSearchNamespace) Search(ctx context.Context, query string, limit int) ([]SearchResult, error) {
 	return Search(ctx, query, limit)
 }
 

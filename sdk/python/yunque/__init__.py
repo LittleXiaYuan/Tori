@@ -3383,6 +3383,15 @@ class _PluginFolderNamespace:
 
 plugin_folder = _PluginFolderNamespace()
 
+class _PluginSearchNamespace:
+    """Standalone plugin-scoped search helper for plugins and automation scripts."""
+
+    def search(self, query: str, limit: int = 5) -> list[dict]:
+        return search(query, limit)
+
+
+plugin_search = _PluginSearchNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3574,6 +3583,7 @@ class AgentKit:
         self.plugin_reload = plugin_reload
         self.plugin_files = plugin_files
         self.plugin_folder = plugin_folder
+        self.plugin_search = plugin_search
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

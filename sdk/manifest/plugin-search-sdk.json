@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-search",
+  "description": "Cross-language lightweight SDK for plugin-scoped web search without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose plugin-scoped search as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep search directly callable through the existing plugin-authenticated runtime route.",
+    "Make PluginSearch available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/search"
+  ],
+  "capabilities": [
+    {
+      "name": "search",
+      "route": "POST /v1/plugin-api/search",
+      "readOnly": true,
+      "description": "Search configured providers using a plugin-scoped token."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-search.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "search": "createPluginSearchClient().search"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "search": "yunque.PluginSearch.Search"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "search": "yunque.plugin_search.search"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "search": "PluginSearchClient::search"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
