@@ -386,8 +386,12 @@ var PluginUI = &pluginUINamespace{}
 // PluginToggle exposes standalone plugin enable/disable control for operator tools.
 var PluginToggle = &pluginToggleNamespace{}
 
+// PluginReload exposes standalone plugin registry reload control for operator tools.
+var PluginReload = &pluginReloadNamespace{}
+
 type pluginUINamespace struct{}
 type pluginToggleNamespace struct{}
+type pluginReloadNamespace struct{}
 
 func (p *pluginUINamespace) UI(ctx context.Context) (PluginsResponse, error) {
 	return Plugins.UI(ctx)
@@ -395,6 +399,10 @@ func (p *pluginUINamespace) UI(ctx context.Context) (PluginsResponse, error) {
 
 func (p *pluginToggleNamespace) Toggle(ctx context.Context, name string, enabled bool) (PluginsResponse, error) {
 	return Plugins.Toggle(ctx, name, enabled)
+}
+
+func (p *pluginReloadNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
+	return Plugins.Reload(ctx)
 }
 
 func (p *pluginsNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
@@ -1534,6 +1542,7 @@ type AgentKit struct {
 	Plugins           *pluginsNamespace
 	PluginUI          *pluginUINamespace
 	PluginToggle      *pluginToggleNamespace
+	PluginReload      *pluginReloadNamespace
 	Skills            *skillsNamespace
 	SkillsCatalog     *skillsCatalogNamespace
 	SkillsScan        *skillsScanNamespace
@@ -6805,6 +6814,7 @@ func NewAgentKit() AgentKit {
 		Plugins:           Plugins,
 		PluginUI:          PluginUI,
 		PluginToggle:      PluginToggle,
+		PluginReload:      PluginReload,
 		Skills:            Skills,
 		SkillsCatalog:     SkillsCatalog,
 		SkillsScan:        SkillsScan,

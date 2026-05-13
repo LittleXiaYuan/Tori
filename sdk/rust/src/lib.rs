@@ -1462,6 +1462,7 @@ pub struct AgentKit {
     pub plugins: PluginsClient,
     pub plugin_ui: PluginUIClient,
     pub plugin_toggle: PluginToggleClient,
+    pub plugin_reload: PluginReloadClient,
     pub skills: SkillsClient,
     pub skills_catalog: SkillsCatalogClient,
     pub skills_scan: SkillsScanClient,
@@ -1567,6 +1568,7 @@ impl AgentKit {
             plugins: PluginsClient::new(base_url.clone(), token.as_ref())?,
             plugin_ui: PluginUIClient::new(base_url.clone(), token.as_ref())?,
             plugin_toggle: PluginToggleClient::new(base_url.clone(), token.as_ref())?,
+            plugin_reload: PluginReloadClient::new(base_url.clone(), token.as_ref())?,
             skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
             skills_catalog: SkillsCatalogClient::new(base_url.clone(), token.as_ref())?,
             skills_scan: SkillsScanClient::new(base_url.clone(), token.as_ref())?,
@@ -1662,6 +1664,7 @@ impl AgentKit {
             plugins: PluginsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_ui: PluginUIClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_toggle: PluginToggleClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_reload: PluginReloadClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_catalog: SkillsCatalogClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_scan: SkillsScanClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -8625,6 +8628,21 @@ impl PluginToggleClient {
     pub async fn toggle(&self, name: &str, enabled: bool) -> Result<PluginsResponse, reqwest::Error> { self.inner.toggle(name, enabled).await }
 }
 
+/// Standalone PluginReload SDK client for plugin registry reload control.
+#[derive(Debug, Clone)]
+pub struct PluginReloadClient { inner: PluginsClient }
+
+impl PluginReloadClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginsClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginsClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn reload(&self) -> Result<PluginsResponse, reqwest::Error> { self.inner.reload().await }
+}
+
 impl PluginUIClient {
     pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
         Ok(Self { inner: PluginsClient::new(base_url, token)? })
@@ -11895,11 +11913,14 @@ mod tests {
     }
 
     #[test]
-    fn plugin_toggle_helpers_build_urls_and_agent_kit_surface() {
+    fn plugin_reload_and_toggle_helpers_build_urls_and_agent_kit_surface() {
         let toggle = PluginToggleClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(toggle.url("/v1/plugins/toggle"), "http://localhost:9090/v1/plugins/toggle");
+        let reload = PluginReloadClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(reload.url("/v1/plugins/reload"), "http://localhost:9090/v1/plugins/reload");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_toggle.url("/v1/plugins/toggle"), "http://localhost:9090/v1/plugins/toggle");
+        assert_eq!(kit.plugin_reload.url("/v1/plugins/reload"), "http://localhost:9090/v1/plugins/reload");
     }
 
     #[test]

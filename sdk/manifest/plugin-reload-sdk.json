@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-reload",
+  "description": "Cross-language lightweight SDK for reloading the plugin registry without importing the full platform client or broader Plugins management slice.",
+  "principles": [
+    "Expose plugin registry reload as a focused operator SDK slice for plugin marketplaces, admin pages, CLIs, sidecars, and automation scripts.",
+    "Keep plugin reloads directly callable through the existing authenticated gateway route.",
+    "Make PluginReload available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugins/reload"
+  ],
+  "capabilities": [
+    {
+      "name": "reload",
+      "route": "POST /v1/plugins/reload",
+      "readOnly": false,
+      "description": "Reload the plugin registry and refresh discovered plugin-provided skills."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-reload.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "reload": "createPluginReloadClient().reload"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "reload": "yunque.PluginReload.Reload"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "reload": "yunque.plugin_reload.reload"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "reload": "PluginReloadClient::reload"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
