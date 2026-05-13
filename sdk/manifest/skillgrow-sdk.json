@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "skillgrow",
+  "description": "Cross-language lightweight SDK for reading detected skill-growth patterns without importing the full platform client or the broader Trust governance slice.",
+  "principles": [
+    "Expose skill growth as a focused incremental SDK slice for plugin UIs, admin panels, CLIs, sidecars, and automation scripts.",
+    "Keep the pattern read surface directly callable through the existing authenticated gateway route.",
+    "Make SkillGrow available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "GET /api/skillgrow/patterns"
+  ],
+  "capabilities": [
+    {
+      "name": "patterns",
+      "route": "GET /api/skillgrow/patterns",
+      "readOnly": true,
+      "description": "Read detected skill-growth patterns for review, training, and automation workflows."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/skillgrow.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "patterns": "createSkillGrowClient().patterns"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "patterns": "yunque.SkillGrow.Patterns"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "patterns": "yunque.skillgrow.patterns"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "patterns": "SkillGrowClient::patterns"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}

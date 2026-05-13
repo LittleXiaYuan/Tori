@@ -44,6 +44,7 @@
     "sandbox-runtime",
     "audit-governance",
     "trust-governance",
+    "skill-growth",
     "self-iteration",
     "persona-runtime",
     "persona-modes",
@@ -224,6 +225,10 @@
     {
       "name": "trust",
       "description": "Access the lightweight Trust client or namespace for trust scores, review gate status, and skill-growth patterns."
+    },
+    {
+      "name": "skillgrow",
+      "description": "Access the lightweight SkillGrow client or namespace for detected skill-growth pattern reads."
     },
     {
       "name": "iterate",
@@ -410,6 +415,7 @@
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
         "trust": "AgentKit.trust",
+        "skillgrow": "AgentKit.skillgrow",
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
@@ -495,6 +501,7 @@
         "tools": "AgentKit.Tools",
         "audit": "AgentKit.Audit",
         "trust": "AgentKit.Trust",
+        "skillgrow": "AgentKit.SkillGrow",
         "iterate": "AgentKit.Iterate",
         "persona": "AgentKit.Persona",
         "emotion": "AgentKit.Emotion",
@@ -580,6 +587,7 @@
         "tools": "AgentKit.tools",
         "audit": "AgentKit.audit",
         "trust": "AgentKit.trust",
+        "skillgrow": "AgentKit.skillgrow",
         "iterate": "AgentKit.iterate",
         "persona": "AgentKit.persona",
         "emotion": "AgentKit.emotion",
@@ -665,6 +673,7 @@
         "tools": "AgentKit::tools",
         "audit": "AgentKit::audit",
         "trust": "AgentKit::trust",
+        "skillgrow": "AgentKit::skillgrow",
         "iterate": "AgentKit::iterate",
         "persona": "AgentKit::persona",
         "emotion": "AgentKit::emotion",

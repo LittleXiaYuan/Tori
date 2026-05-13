@@ -1478,6 +1478,7 @@ pub struct AgentKit {
     pub sandbox: SandboxClient,
     pub audit: AuditClient,
     pub trust: TrustClient,
+    pub skillgrow: SkillGrowClient,
     pub iterate: IterateClient,
     pub persona: PersonaClient,
     pub modes: ModesClient,
@@ -1574,6 +1575,7 @@ impl AgentKit {
             sandbox: SandboxClient::new(base_url.clone(), token.as_ref())?,
             audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
+            skillgrow: SkillGrowClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
             modes: ModesClient::new(base_url.clone(), token.as_ref())?,
@@ -1663,6 +1665,7 @@ impl AgentKit {
             sandbox: SandboxClient::new_with_client(base_url.clone(), plugin_http.clone()),
             audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skillgrow: SkillGrowClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
             modes: ModesClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -4876,6 +4879,23 @@ impl TrustClient {
             .error_for_status()?
             .json()
             .await
+    }
+}
+
+/// Standalone SkillGrow SDK client for reading detected skill-growth patterns.
+#[derive(Debug, Clone)]
+pub struct SkillGrowClient { inner: TrustClient }
+
+impl SkillGrowClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: TrustClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: TrustClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn patterns(&self) -> Result<SkillGrowPatternsResponse, reqwest::Error> {
+        self.inner.skillgrow_patterns().await
     }
 }
 
@@ -11408,6 +11428,20 @@ mod tests {
             serde_json::from_str(r#"{"scores":{"shell":{"score":80,"level":"review"}},"count":1}"#)
                 .unwrap();
         assert_eq!(scores["scores"]["shell"]["score"], 80);
+    }
+
+    #[test]
+    fn skillgrow_helpers_build_urls_and_agent_kit_surface() {
+        let client = SkillGrowClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(
+            client.url("/api/skillgrow/patterns"),
+            "http://localhost:9090/api/skillgrow/patterns"
+        );
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(
+            kit.skillgrow.url("/api/skillgrow/patterns"),
+            "http://localhost:9090/api/skillgrow/patterns"
+        );
     }
 
     #[test]
