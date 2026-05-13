@@ -148,14 +148,26 @@ func run(args []string) error {
 		return printJSON(summary)
 
 	case "action-kinds":
+		actionKindsOptions, normalizedArgs, err := parseActionKindsOptions(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
 		if len(args) != 1 {
-			return fmt.Errorf("usage: cognisdk-bundle action-kinds")
+			return fmt.Errorf("usage: cognisdk-bundle action-kinds [--markdown] [--out action-kinds.json]")
+		}
+		kinds := cognisdk.PackBundleApplyActionKinds()
+		if actionKindsOptions.Out != "" {
+			if markdown {
+				return saveTextFile(renderApplyActionKindsMarkdown(kinds), actionKindsOptions.Out)
+			}
+			return saveJSONFile(kinds, actionKindsOptions.Out)
 		}
 		if markdown {
-			fmt.Print(renderApplyActionKindsMarkdown(cognisdk.PackBundleApplyActionKinds()))
+			fmt.Print(renderApplyActionKindsMarkdown(kinds))
 			return nil
 		}
-		return printJSON(cognisdk.PackBundleApplyActionKinds())
+		return printJSON(kinds)
 
 	case "actions":
 		planOptions, normalizedArgs, err := parseActionsOptions(args)
@@ -287,6 +299,31 @@ type planCLIOptions struct {
 type digestCLIOptions struct {
 	Expect string
 	Out    string
+}
+
+type actionKindsCLIOptions struct {
+	Out string
+}
+
+func parseActionKindsOptions(args []string) (actionKindsCLIOptions, []string, error) {
+	var opts actionKindsCLIOptions
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				return actionKindsCLIOptions{}, nil, fmt.Errorf("--out requires a path")
+			}
+			opts.Out = args[i+1]
+			i++
+		default:
+			if len(args[i]) > 0 && args[i][0] == '-' {
+				return actionKindsCLIOptions{}, nil, fmt.Errorf("unknown action-kinds option %q", args[i])
+			}
+			normalized = append(normalized, args[i])
+		}
+	}
+	return opts, normalized, nil
 }
 
 func parseDigestOptions(args []string) (digestCLIOptions, []string, error) {
@@ -492,7 +529,7 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
-	fmt.Println("  cognisdk-bundle action-kinds [--markdown]")
+	fmt.Println("  cognisdk-bundle action-kinds [--markdown] [--out action-kinds.json]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")

@@ -281,11 +281,44 @@ func TestRunDigestBundle(t *testing.T) {
 }
 
 func TestRunActionKinds(t *testing.T) {
+	dir := t.TempDir()
+	jsonOut := filepath.Join(dir, "action-kinds.json")
+	markdownOut := filepath.Join(dir, "action-kinds.md")
 	if err := run([]string{"action-kinds"}); err != nil {
 		t.Fatalf("action-kinds: %v", err)
 	}
 	if err := run([]string{"action-kinds", "--markdown"}); err != nil {
 		t.Fatalf("action-kinds markdown: %v", err)
+	}
+	if err := run([]string{"action-kinds", "--out", jsonOut}); err != nil {
+		t.Fatalf("action-kinds out: %v", err)
+	}
+	jsonData, err := os.ReadFile(jsonOut)
+	if err != nil {
+		t.Fatalf("read action kinds json: %v", err)
+	}
+	var kinds []cognisdk.PackBundleApplyActionKind
+	if err := json.Unmarshal(jsonData, &kinds); err != nil {
+		t.Fatalf("action kinds output is not json: %v", err)
+	}
+	if len(kinds) == 0 || kinds[0] != cognisdk.PackBundleApplyActionKeepRollback {
+		t.Fatalf("unexpected action kinds output: %#v", kinds)
+	}
+	if err := run([]string{"action-kinds", "--out", markdownOut, "--markdown"}); err != nil {
+		t.Fatalf("action-kinds markdown out: %v", err)
+	}
+	markdownData, err := os.ReadFile(markdownOut)
+	if err != nil {
+		t.Fatalf("read action kinds markdown: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Cogni Pack Bundle Apply Action Kinds") {
+		t.Fatalf("action kinds markdown missing heading: %s", markdownData)
+	}
+	if err := run([]string{"action-kinds", "--out"}); err == nil || !strings.Contains(err.Error(), "--out requires a path") {
+		t.Fatalf("expected action-kinds out path error, got %v", err)
+	}
+	if err := run([]string{"action-kinds", "--bad"}); err == nil || !strings.Contains(err.Error(), "unknown action-kinds option") {
+		t.Fatalf("expected action-kinds unknown option error, got %v", err)
 	}
 	if err := run([]string{"action-kinds", "extra"}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle action-kinds") {
 		t.Fatalf("expected action-kinds usage error, got %v", err)
