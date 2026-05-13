@@ -152,3 +152,46 @@ func packBundleApplyActionMessages(actions []PackBundleApplyAction) []string {
 	}
 	return messages
 }
+
+// FilterPackBundleApplyActions returns only actions whose Kind matches one of
+// the requested kinds. Passing no kinds returns the original action slice. The
+// helper is intentionally non-mutating so external installers, plugin hooks,
+// and automation scripts can safely derive their owned action view from a full
+// apply plan.
+func FilterPackBundleApplyActions(actions []PackBundleApplyAction, kinds ...PackBundleApplyActionKind) []PackBundleApplyAction {
+	if len(kinds) == 0 {
+		return actions
+	}
+	allowed := make(map[PackBundleApplyActionKind]bool, len(kinds))
+	for _, kind := range kinds {
+		allowed[kind] = true
+	}
+	filtered := make([]PackBundleApplyAction, 0, len(actions))
+	for _, action := range actions {
+		if allowed[action.Kind] {
+			filtered = append(filtered, action)
+		}
+	}
+	return filtered
+}
+
+// KnownPackBundleApplyActionKind reports whether kind is part of the stable
+// public action vocabulary emitted by PlanPackBundleApply.
+func KnownPackBundleApplyActionKind(kind PackBundleApplyActionKind) bool {
+	switch kind {
+	case PackBundleApplyActionKeepRollback,
+		PackBundleApplyActionVerifyDigest,
+		PackBundleApplyActionRequireReview,
+		PackBundleApplyActionStopBlocked,
+		PackBundleApplyActionAddPack,
+		PackBundleApplyActionReplacePack,
+		PackBundleApplyActionRemovePack,
+		PackBundleApplyActionEnablePack,
+		PackBundleApplyActionDisablePack,
+		PackBundleApplyActionNoop,
+		PackBundleApplyActionWriteCandidate:
+		return true
+	default:
+		return false
+	}
+}

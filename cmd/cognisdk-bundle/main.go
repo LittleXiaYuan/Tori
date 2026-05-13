@@ -164,7 +164,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		actions := filterApplyActions(plan.Actions, planOptions.Kinds)
+		actions := cognisdk.FilterPackBundleApplyActions(plan.Actions, planOptions.Kinds...)
 		if planOptions.Out != "" {
 			if markdown {
 				if err := saveTextFile(renderApplyActionsMarkdown(actions), planOptions.Out); err != nil {
@@ -322,7 +322,7 @@ func parseActionsOptions(args []string) (planCLIOptions, []string, error) {
 				return planCLIOptions{}, nil, fmt.Errorf("--kind requires an action kind")
 			}
 			kind := cognisdk.PackBundleApplyActionKind(args[i+1])
-			if !isKnownApplyActionKind(kind) {
+			if !cognisdk.KnownPackBundleApplyActionKind(kind) {
 				return planCLIOptions{}, nil, fmt.Errorf("unknown action kind %q", args[i+1])
 			}
 			opts.Kinds = append(opts.Kinds, kind)
@@ -389,42 +389,6 @@ func parsePromoteOptions(args []string) (bool, string, []string, error) {
 		}
 	}
 	return allowReview, reviewOut, normalized, nil
-}
-
-func filterApplyActions(actions []cognisdk.PackBundleApplyAction, kinds []cognisdk.PackBundleApplyActionKind) []cognisdk.PackBundleApplyAction {
-	if len(kinds) == 0 {
-		return actions
-	}
-	allowed := make(map[cognisdk.PackBundleApplyActionKind]bool, len(kinds))
-	for _, kind := range kinds {
-		allowed[kind] = true
-	}
-	filtered := make([]cognisdk.PackBundleApplyAction, 0, len(actions))
-	for _, action := range actions {
-		if allowed[action.Kind] {
-			filtered = append(filtered, action)
-		}
-	}
-	return filtered
-}
-
-func isKnownApplyActionKind(kind cognisdk.PackBundleApplyActionKind) bool {
-	switch kind {
-	case cognisdk.PackBundleApplyActionKeepRollback,
-		cognisdk.PackBundleApplyActionVerifyDigest,
-		cognisdk.PackBundleApplyActionRequireReview,
-		cognisdk.PackBundleApplyActionStopBlocked,
-		cognisdk.PackBundleApplyActionAddPack,
-		cognisdk.PackBundleApplyActionReplacePack,
-		cognisdk.PackBundleApplyActionRemovePack,
-		cognisdk.PackBundleApplyActionEnablePack,
-		cognisdk.PackBundleApplyActionDisablePack,
-		cognisdk.PackBundleApplyActionNoop,
-		cognisdk.PackBundleApplyActionWriteCandidate:
-		return true
-	default:
-		return false
-	}
 }
 
 func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string {
