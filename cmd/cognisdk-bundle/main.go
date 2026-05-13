@@ -217,13 +217,13 @@ func run(args []string) error {
 		return enforcePlanGate(plan, planOptions)
 
 	case "checklist":
-		planOptions, normalizedArgs, err := parsePlanOptions(args)
+		planOptions, normalizedArgs, err := parseActionsOptions(args)
 		if err != nil {
 			return err
 		}
 		args = normalizedArgs
 		if len(args) != 3 {
-			return fmt.Errorf("usage: cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--fail-on-review] [--fail-on-blocked]")
+			return fmt.Errorf("usage: cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 		}
 		current, candidate, err := loadPair(args[1], args[2])
 		if err != nil {
@@ -233,7 +233,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		checklist := cognisdk.BuildPackBundleApplyChecklist(plan)
+		checklist := cognisdk.FilterPackBundleApplyChecklistItems(cognisdk.BuildPackBundleApplyChecklist(plan), planOptions.Kinds...)
 		if planOptions.Out != "" {
 			if markdown {
 				if err := saveTextFile(renderApplyChecklistMarkdown(checklist), planOptions.Out); err != nil {
@@ -621,7 +621,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
 	fmt.Println("  cognisdk-bundle action-kinds [--details] [--markdown] [--out action-kinds.json]")
 	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
-	fmt.Println("  cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--fail-on-review] [--fail-on-blocked]")
+	fmt.Println("  cognisdk-bundle checklist <current.json> <candidate.json> [--markdown] [--out checklist.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")

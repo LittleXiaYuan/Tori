@@ -280,6 +280,27 @@ func BuildPackBundleApplyChecklist(plan PackBundleApplyPlan) []PackBundleApplyCh
 	return items
 }
 
+// FilterPackBundleApplyChecklistItems returns only checklist rows whose Kind
+// matches one of the requested kinds. Passing no kinds returns the original
+// checklist slice. This mirrors FilterPackBundleApplyActions for UI flows that
+// render only the installer's owned steps.
+func FilterPackBundleApplyChecklistItems(items []PackBundleApplyChecklistItem, kinds ...PackBundleApplyActionKind) []PackBundleApplyChecklistItem {
+	if len(kinds) == 0 {
+		return items
+	}
+	allowed := make(map[PackBundleApplyActionKind]bool, len(kinds))
+	for _, kind := range kinds {
+		allowed[kind] = true
+	}
+	filtered := make([]PackBundleApplyChecklistItem, 0, len(items))
+	for _, item := range items {
+		if allowed[item.Kind] {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 func applyActionKindRequired(kind PackBundleApplyActionKind) bool {
 	switch kind {
 	case PackBundleApplyActionKeepRollback,

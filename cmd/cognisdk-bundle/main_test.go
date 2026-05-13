@@ -480,6 +480,29 @@ func TestRunChecklistBundle(t *testing.T) {
 	if len(checklist) == 0 || checklist[0].Kind != cognisdk.PackBundleApplyActionKeepRollback || checklist[0].Label == "" {
 		t.Fatalf("unexpected checklist output: %#v", checklist)
 	}
+	filteredOut := filepath.Join(dir, "checklist-add-pack.json")
+	if err := run([]string{"checklist", current, candidate, "--kind", "add_pack", "--out", filteredOut}); err != nil {
+		t.Fatalf("checklist kind filter out: %v", err)
+	}
+	filteredData, err := os.ReadFile(filteredOut)
+	if err != nil {
+		t.Fatalf("read filtered checklist output: %v", err)
+	}
+	var filtered []cognisdk.PackBundleApplyChecklistItem
+	if err := json.Unmarshal(filteredData, &filtered); err != nil {
+		t.Fatalf("filtered checklist output is not json: %v", err)
+	}
+	if len(filtered) == 0 {
+		t.Fatal("expected filtered add_pack checklist items")
+	}
+	for _, item := range filtered {
+		if item.Kind != cognisdk.PackBundleApplyActionAddPack {
+			t.Fatalf("unexpected filtered checklist item: %#v", item)
+		}
+	}
+	if err := run([]string{"checklist", current, candidate, "--kind", "missing_kind"}); err == nil || !strings.Contains(err.Error(), "unknown action kind") {
+		t.Fatalf("expected checklist unknown action kind error, got %v", err)
+	}
 	if err := run([]string{"checklist", current, candidate, "--out", checklistMarkdownOut, "--markdown"}); err != nil {
 		t.Fatalf("checklist bundle markdown out: %v", err)
 	}
