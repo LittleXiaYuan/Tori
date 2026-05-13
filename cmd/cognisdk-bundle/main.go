@@ -148,13 +148,13 @@ func run(args []string) error {
 		return printJSON(summary)
 
 	case "actions":
-		planOptions, normalizedArgs, err := parsePlanOptions(args)
+		planOptions, normalizedArgs, err := parseActionsOptions(args)
 		if err != nil {
 			return err
 		}
 		args = normalizedArgs
 		if len(args) != 3 {
-			return fmt.Errorf("usage: cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--fail-on-review] [--fail-on-blocked]")
+			return fmt.Errorf("usage: cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
 		}
 		current, candidate, err := loadPair(args[1], args[2])
 		if err != nil {
@@ -164,17 +164,18 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		actions := filterApplyActions(plan.Actions, planOptions.Kinds)
 		if planOptions.Out != "" {
 			if markdown {
-				if err := saveTextFile(renderApplyActionsMarkdown(plan.Actions), planOptions.Out); err != nil {
+				if err := saveTextFile(renderApplyActionsMarkdown(actions), planOptions.Out); err != nil {
 					return err
 				}
-			} else if err := saveJSONFile(plan.Actions, planOptions.Out); err != nil {
+			} else if err := saveJSONFile(actions, planOptions.Out); err != nil {
 				return err
 			}
 		} else if markdown {
-			fmt.Print(renderApplyActionsMarkdown(plan.Actions))
-		} else if err := printJSON(plan.Actions); err != nil {
+			fmt.Print(renderApplyActionsMarkdown(actions))
+		} else if err := printJSON(actions); err != nil {
 			return err
 		}
 		return enforcePlanGate(plan, planOptions)
@@ -268,6 +269,7 @@ func run(args []string) error {
 
 type planCLIOptions struct {
 	Out           string
+	Kinds         []cognisdk.PackBundleApplyActionKind
 	FailOnReview  bool
 	FailOnBlocked bool
 }
@@ -298,6 +300,38 @@ func parseDigestOptions(args []string) (digestCLIOptions, []string, error) {
 			if len(args[i]) > 0 && args[i][0] == '-' {
 				return digestCLIOptions{}, nil, fmt.Errorf("unknown digest option %q", args[i])
 			}
+			normalized = append(normalized, args[i])
+		}
+	}
+	return opts, normalized, nil
+}
+
+func parseActionsOptions(args []string) (planCLIOptions, []string, error) {
+	var opts planCLIOptions
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				return planCLIOptions{}, nil, fmt.Errorf("--out requires a path")
+			}
+			opts.Out = args[i+1]
+			i++
+		case "--kind":
+			if i+1 >= len(args) {
+				return planCLIOptions{}, nil, fmt.Errorf("--kind requires an action kind")
+			}
+			kind := cognisdk.PackBundleApplyActionKind(args[i+1])
+			if !isKnownApplyActionKind(kind) {
+				return planCLIOptions{}, nil, fmt.Errorf("unknown action kind %q", args[i+1])
+			}
+			opts.Kinds = append(opts.Kinds, kind)
+			i++
+		case "--fail-on-review":
+			opts.FailOnReview = true
+		case "--fail-on-blocked":
+			opts.FailOnBlocked = true
+		default:
 			normalized = append(normalized, args[i])
 		}
 	}
@@ -355,6 +389,42 @@ func parsePromoteOptions(args []string) (bool, string, []string, error) {
 		}
 	}
 	return allowReview, reviewOut, normalized, nil
+}
+
+func filterApplyActions(actions []cognisdk.PackBundleApplyAction, kinds []cognisdk.PackBundleApplyActionKind) []cognisdk.PackBundleApplyAction {
+	if len(kinds) == 0 {
+		return actions
+	}
+	allowed := make(map[cognisdk.PackBundleApplyActionKind]bool, len(kinds))
+	for _, kind := range kinds {
+		allowed[kind] = true
+	}
+	filtered := make([]cognisdk.PackBundleApplyAction, 0, len(actions))
+	for _, action := range actions {
+		if allowed[action.Kind] {
+			filtered = append(filtered, action)
+		}
+	}
+	return filtered
+}
+
+func isKnownApplyActionKind(kind cognisdk.PackBundleApplyActionKind) bool {
+	switch kind {
+	case cognisdk.PackBundleApplyActionKeepRollback,
+		cognisdk.PackBundleApplyActionVerifyDigest,
+		cognisdk.PackBundleApplyActionRequireReview,
+		cognisdk.PackBundleApplyActionStopBlocked,
+		cognisdk.PackBundleApplyActionAddPack,
+		cognisdk.PackBundleApplyActionReplacePack,
+		cognisdk.PackBundleApplyActionRemovePack,
+		cognisdk.PackBundleApplyActionEnablePack,
+		cognisdk.PackBundleApplyActionDisablePack,
+		cognisdk.PackBundleApplyActionNoop,
+		cognisdk.PackBundleApplyActionWriteCandidate:
+		return true
+	default:
+		return false
+	}
 }
 
 func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string {
@@ -435,8 +505,8 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
-	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--fail-on-review] [--fail-on-blocked]")
-	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...]")
+	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--kind action_kind] [--fail-on-review] [--fail-on-blocked]")
+	fmt.Println("  cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")

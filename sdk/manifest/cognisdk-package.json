@@ -194,6 +194,7 @@
         "--allow-review",
         "--review-out",
         "--out",
+        "--kind",
         "--fail-on-review",
         "--fail-on-blocked",
         "--expect"
