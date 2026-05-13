@@ -1494,6 +1494,7 @@ type AgentKit struct {
 	Trust         *trustNamespace
 	Iterate       *iterateNamespace
 	Persona       *personaNamespace
+	Modes         *modesNamespace
 	Emotion       *emotionNamespace
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
@@ -3067,6 +3068,23 @@ var Iterate = &iterateNamespace{}
 
 // Persona provides focused access to persona identity, skills, and presets.
 var Persona = &personaNamespace{}
+
+// Modes provides focused access to persona mode listing, current mode, and switching.
+var Modes = &modesNamespace{}
+
+type modesNamespace struct{}
+
+func (m *modesNamespace) List(ctx context.Context, tenantID, sessionID string) (PersonaModesResponse, error) {
+	return Persona.Modes(ctx, tenantID, sessionID)
+}
+
+func (m *modesNamespace) Current(ctx context.Context, tenantID, sessionID string) (PersonaCurrentModeResponse, error) {
+	return Persona.CurrentMode(ctx, tenantID, sessionID)
+}
+
+func (m *modesNamespace) Set(ctx context.Context, req SetPersonaModeRequest) (PersonaSetModeResponse, error) {
+	return Persona.SetMode(ctx, req)
+}
 
 // Emotion provides focused access to emotion history and sticker mappings.
 var Emotion = &emotionNamespace{}
@@ -6625,6 +6643,7 @@ func NewAgentKit() AgentKit {
 		Trust:         Trust,
 		Iterate:       Iterate,
 		Persona:       Persona,
+		Modes:         Modes,
 		Emotion:       Emotion,
 		Instructions:  Instructions,
 		Reactions:     Reactions,

@@ -501,3 +501,7 @@ The lightweight Embeddings SDK exposes embedding provider listing and text embed
 ### Search SDK
 
 The lightweight Search SDK exposes web search and search-provider listing helpers for external research tools, plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/search` and `/v1/search/providers`; Agent Kit also exposes this surface as `kit.search` / `kit.WebSearch`.
+
+### Modes SDK
+
+The lightweight Modes SDK exposes persona modes, current-mode reads, and mode switching helpers for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/persona/modes`, `/v1/persona/mode/current`, and `/v1/persona/mode`; Agent Kit also exposes this surface as `kit.modes` / `kit.Modes`.

@@ -1218,6 +1218,47 @@ func TestPersonaModesHelpers(t *testing.T) {
 	}
 }
 
+func TestModesNamespaceWrapsPersonaModes(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/persona/modes":
+			_, _ = w.Write([]byte(`{"modes":[{"mode":"coder","active":true}],"total":1}`))
+		case "/v1/persona/mode/current":
+			_, _ = w.Write([]byte(`{"mode":"coder","name":"Coder"}`))
+		case "/v1/persona/mode":
+			_, _ = w.Write([]byte(`{"success":true,"current_mode":"operator"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	listed, err := Modes.List(ctx, "tenant-1", "session-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := Modes.Current(ctx, "tenant-1", "session-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := Modes.Set(ctx, SetPersonaModeRequest{TenantID: "tenant-1", SessionID: "session-1", Mode: "operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listed["modes"] == nil || current["mode"] != "coder" || set["success"] != true {
+		t.Fatalf("unexpected modes results")
+	}
+	if NewAgentKit().Modes != Modes {
+		t.Fatalf("agent kit should expose Modes namespace")
+	}
+	if len(seen) != 3 || seen[0] != "GET /v1/persona/modes?session_id=session-1&tenant_id=tenant-1" || seen[1] != "GET /v1/persona/mode/current?session_id=session-1&tenant_id=tenant-1" || seen[2] != "POST /v1/persona/mode" {
+		t.Fatalf("unexpected modes requests: %v", seen)
+	}
+}
+
 func TestPersonaHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
