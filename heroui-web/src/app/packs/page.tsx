@@ -6,6 +6,7 @@ import {
   ArchiveRestore,
   Boxes,
   CheckCircle2,
+  DatabaseZap,
   Download,
   ExternalLink,
   PackageCheck,
@@ -39,17 +40,22 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 
 export default function PacksPage() {
   const { data, loading, refresh } = useApiData(async () => api.packsInstalled(), { packs: [], count: 0 });
+  const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => api.packBackendModules(), { modules: [], count: 0 });
   const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
   const [manifestUrl, setManifestUrl] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
   const packs = data?.packs || [];
+  const backendModules = backendModulesData?.modules || [];
+  const backendModuleByPack = useMemo(() => new Map(backendModules.map((module) => [module.pack_id, module])), [backendModules]);
   const stats = useMemo(() => ({
     total: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
     rollbackable: packs.filter((p) => p.manifest.update?.rollback).length,
     frontendMenus: packs.reduce((n, p) => n + (p.manifest.frontend?.menus?.length || 0), 0),
-  }), [packs]);
+    backendModules: backendModules.length,
+    backendRoutes: backendModules.reduce((n, m) => n + (m.routes?.length || 0), 0),
+  }), [packs, backendModules]);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);
@@ -57,6 +63,7 @@ export default function PacksPage() {
       await op();
       showToast("Pack registry 已更新，前端菜单会跟随已启用包同步。", "success");
       await refresh();
+      await refreshBackendModules();
     } catch (e) {
       showToast(formatErrorMessage(e, "Pack 操作失败"), "error");
     } finally {
@@ -80,7 +87,7 @@ export default function PacksPage() {
         icon={<Boxes size={20} />}
         title="增量包运行时"
         description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。"
-        onRefresh={refresh}
+        onRefresh={() => { void refresh(); void refreshBackendModules(); }}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -97,8 +104,8 @@ export default function PacksPage() {
           <div className="kpi-value">{stats.rollbackable}</div>
         </Card>
         <Card className="section-card p-4">
-          <div className="kpi-label">前端入口</div>
-          <div className="kpi-value">{stats.frontendMenus}</div>
+          <div className="kpi-label">后端模块 / 路由</div>
+          <div className="kpi-value">{stats.backendModules}/{stats.backendRoutes}</div>
         </Card>
       </div>
 
@@ -136,6 +143,42 @@ export default function PacksPage() {
         </div>
       </Card>
 
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <DatabaseZap size={15} /> 后端模块 Registry
+            </div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              对齐 pack manifest 与 Gateway 实际挂载路由；这里为空时，说明前端能看到包，但后端能力还没有通过 RegisterBackendPack 接入。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>
+            {backendModulesLoading ? "同步中" : `${stats.backendModules} modules / ${stats.backendRoutes} routes`}
+          </Chip>
+        </div>
+        {backendModules.length === 0 ? (
+          <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+            暂无已挂载 backend pack module。请确认 Gateway 启动时已注册内置 pack，或外部包已调用 RegisterBackendPack。
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {backendModules.map((module) => (
+              <div key={module.pack_id} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+                <div className="text-xs font-mono mb-2" style={{ color: "var(--yunque-text)" }}>{module.pack_id}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {module.routes.map((route) => (
+                    <Chip key={route.path} size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+                      {route.method ? `${route.method} ` : ""}{route.path}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       {packs.length === 0 ? (
         <Card className="section-card p-12 text-center">
           <Boxes size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
@@ -155,6 +198,11 @@ export default function PacksPage() {
             const menus = manifest.frontend?.menus || [];
             const routes = manifest.frontend?.routes || [];
             const caps = manifest.backend?.capabilities || [];
+            const backendModule = backendModuleByPack.get(manifest.id);
+            const mountedRoutes = backendModule?.routes || [];
+            const declaredBackendRoutes = manifest.backend?.routes || [];
+            const mountedPathSet = new Set(mountedRoutes.map((route) => route.path));
+            const missingMountedRoutes = declaredBackendRoutes.filter((route) => !mountedPathSet.has(route));
             return (
               <Card key={manifest.id} className="section-card p-5 space-y-4 hover-lift">
                 <div className="flex items-start justify-between gap-3">
@@ -198,6 +246,8 @@ export default function PacksPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {caps.length ? caps.map((cap) => <Chip key={cap} size="sm">{cap}</Chip>) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未声明</span>}
+                      {mountedRoutes.length > 0 && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>已挂载 {mountedRoutes.length}</Chip>}
+                      {declaredBackendRoutes.length > 0 && mountedRoutes.length === 0 && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>未挂载</Chip>}
                     </div>
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
@@ -224,14 +274,21 @@ export default function PacksPage() {
                   </div>
                 </div>
 
-                {routes.length > 0 && (
+                {(routes.length > 0 || declaredBackendRoutes.length > 0) && (
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-text-muted)" }}>
                     <CheckCircle2 size={13} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-success)" }} />
                     <span>
-                      Registry 已声明 {routes.length} 个前端路由：
-                      {" "}
-                      {routes.map((r) => <code key={r.path} className="mx-1">{r.path}</code>)}
+                      Registry 已声明 {routes.length} 个前端路由、{declaredBackendRoutes.length} 个后端路由。
+                      {routes.map((r) => <code key={`fe:${r.path}`} className="mx-1">{r.path}</code>)}
+                      {declaredBackendRoutes.map((route) => <code key={`be:${route}`} className="mx-1">{route}</code>)}
                     </span>
+                  </div>
+                )}
+
+                {missingMountedRoutes.length > 0 && (
+                  <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-warning)" }}>
+                    <ShieldCheck size={13} className="mt-0.5 shrink-0" />
+                    <span>manifest 声明但尚未挂载：{missingMountedRoutes.map((route) => <code key={route} className="mx-1">{route}</code>)}</span>
                   </div>
                 )}
               </Card>
