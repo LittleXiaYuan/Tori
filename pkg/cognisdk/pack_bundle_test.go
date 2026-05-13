@@ -2,6 +2,7 @@ package cognisdk
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +65,35 @@ func TestValidatePackBundleRejectsMissingEnabledPack(t *testing.T) {
 	bundle.EnabledPacks = []string{"missing-pack"}
 	if err := ValidatePackBundle(bundle); err == nil {
 		t.Fatal("expected missing enabled pack to fail")
+	}
+}
+
+func TestRunPackBundleGoldenTests(t *testing.T) {
+	bundle, err := NewPackBundle("golden-bundle", BuiltinPacks(), []string{PackXiaoyuCompanion, PackYunqueWork})
+	if err != nil {
+		t.Fatalf("new bundle: %v", err)
+	}
+	summary, err := RunPackBundleGoldenTests(t.Context(), bundle)
+	if err != nil {
+		t.Fatalf("run bundle golden tests: %v", err)
+	}
+	if summary.Failed != 0 {
+		t.Fatalf("expected no failures: %#v", summary)
+	}
+	if summary.Passed == 0 || len(summary.Results) == 0 {
+		t.Fatalf("expected bundle golden tests to run: %#v", summary)
+	}
+}
+
+func TestRenderGoldenTestSummaryMarkdown(t *testing.T) {
+	summary := GoldenTestSummary{Passed: 1, Failed: 1, Results: []GoldenTestResult{
+		{Name: "ok", Passed: true},
+		{Name: "bad", Passed: false, Errors: []string{"mode mismatch"}},
+	}}
+	markdown := RenderGoldenTestSummaryMarkdown(summary)
+	for _, want := range []string{"Cogni Pack Golden Tests", "passed: 1", "failed: 1", "[FAIL] bad", "mode mismatch"} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("golden summary markdown missing %q:\n%s", want, markdown)
+		}
 	}
 }
