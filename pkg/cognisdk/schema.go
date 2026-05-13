@@ -11,9 +11,38 @@ import (
 // and automation scripts that exchange Cognition SDK artifacts.
 type JSONSchema map[string]any
 
+// JSONSchemaInfo is a compact catalog entry for schema pickers, plugin
+// settings, and automation UIs that need to discover SDK artifact contracts
+// without embedding a hand-written list.
+type JSONSchemaInfo struct {
+	Name   string `json:"name" yaml:"name"`
+	Title  string `json:"title" yaml:"title"`
+	Schema string `json:"schema" yaml:"schema"`
+}
+
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
 	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "feedback-proposal"}
+}
+
+// JSONSchemaInfos returns stable schema catalog metadata for non-Go callers
+// that want to populate selectors or validate integration contracts before
+// exporting a specific schema by name.
+func JSONSchemaInfos() []JSONSchemaInfo {
+	names := JSONSchemaNames()
+	infos := make([]JSONSchemaInfo, 0, len(names))
+	for _, name := range names {
+		schema, ok := JSONSchemaByName(name)
+		if !ok {
+			continue
+		}
+		infos = append(infos, JSONSchemaInfo{
+			Name:   name,
+			Title:  schemaString(schema, "title"),
+			Schema: schemaString(schema, "$id"),
+		})
+	}
+	return infos
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -490,4 +519,9 @@ func stringMapSchema() map[string]any {
 
 func enumSchema(values ...string) map[string]any {
 	return map[string]any{"type": "string", "enum": values}
+}
+
+func schemaString(schema JSONSchema, key string) string {
+	value, _ := schema[key].(string)
+	return value
 }

@@ -158,6 +158,8 @@
         "PackBundleApplyActionsJSONSchema",
         "PackBundleApplyActionKindsJSONSchema",
         "FeedbackProposalJSONSchema",
+        "JSONSchemaInfo",
+        "JSONSchemaInfos",
         "JSONSchemaByName"
       ]
     }
@@ -168,6 +170,9 @@
       "file": "cmd/cognisdk-schema/main.go",
       "commands": [
         "list"
+      ],
+      "flags": [
+        "--json"
       ],
       "schemas": [
         "pack-manifest",

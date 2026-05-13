@@ -122,6 +122,22 @@ func TestJSONSchemaByName(t *testing.T) {
 	}
 }
 
+func TestJSONSchemaInfos(t *testing.T) {
+	infos := JSONSchemaInfos()
+	names := JSONSchemaNames()
+	if len(infos) != len(names) {
+		t.Fatalf("schema infos length = %d, want %d", len(infos), len(names))
+	}
+	for i, info := range infos {
+		if info.Name != names[i] {
+			t.Fatalf("schema info[%d] name = %q, want %q", i, info.Name, names[i])
+		}
+		if info.Title == "" || info.Schema == "" {
+			t.Fatalf("schema info missing title or schema id: %#v", info)
+		}
+	}
+}
+
 func TestPackBundleSummarySchemaNamesInspectFields(t *testing.T) {
 	schema := PackBundleSummaryJSONSchema()
 	props := schema["properties"].(map[string]any)

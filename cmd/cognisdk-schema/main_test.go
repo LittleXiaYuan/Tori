@@ -12,6 +12,20 @@ func TestRunListSchemas(t *testing.T) {
 	if err := run([]string{"list"}); err != nil {
 		t.Fatalf("list schemas: %v", err)
 	}
+	if err := run([]string{"list", "--json"}); err != nil {
+		t.Fatalf("list schemas json: %v", err)
+	}
+}
+
+func TestRunListRejectsUnknownOption(t *testing.T) {
+	err := run([]string{"list", "--bad"})
+	if err == nil || !strings.Contains(err.Error(), "unknown list option") {
+		t.Fatalf("expected unknown list option error, got %v", err)
+	}
+	err = run([]string{"list", "--json", "extra"})
+	if err == nil || !strings.Contains(err.Error(), "usage: cognisdk-schema list") {
+		t.Fatalf("expected list usage error, got %v", err)
+	}
 }
 
 func TestRunExportSchemaToFile(t *testing.T) {
