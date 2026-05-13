@@ -19,6 +19,7 @@
       "pkg/cognisdk/pack.go",
       "pkg/cognisdk/pack_io.go",
       "pkg/cognisdk/pack_bundle.go",
+      "pkg/cognisdk/pack_summary.go",
       "pkg/cognisdk/pack_diff.go",
       "pkg/cognisdk/pack_review.go",
       "pkg/cognisdk/golden.go",
@@ -84,6 +85,14 @@
       ]
     },
     {
+      "name": "packBundleSummary",
+      "symbols": [
+        "PackBundleSummary",
+        "SummarizePackBundle",
+        "RenderPackBundleSummaryMarkdown"
+      ]
+    },
+    {
       "name": "packBundleDiff",
       "symbols": [
         "PackBundleDiff",
@@ -112,6 +121,7 @@
       "symbols": [
         "PackManifestJSONSchema",
         "PackBundleJSONSchema",
+        "PackBundleSummaryJSONSchema",
         "PackBundleDiffJSONSchema",
         "PackBundleReviewJSONSchema",
         "FeedbackProposalJSONSchema",
@@ -129,6 +139,7 @@
       "schemas": [
         "pack-manifest",
         "pack-bundle",
+        "pack-bundle-summary",
         "pack-bundle-diff",
         "pack-bundle-review",
         "feedback-proposal"
@@ -139,6 +150,7 @@
       "file": "cmd/cognisdk-bundle/main.go",
       "commands": [
         "init",
+        "inspect",
         "diff",
         "golden",
         "review",
