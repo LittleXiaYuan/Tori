@@ -208,6 +208,10 @@
       "description": "Access the lightweight PluginSend client or namespace for plugin-scoped channel sending."
     },
     {
+      "name": "pluginLLM",
+      "description": "Access the lightweight PluginLLM client or namespace for plugin-scoped LLM completion."
+    },
+    {
       "name": "skills",
       "description": "Access the lightweight Runtime Skills client or namespace for skill catalog, scan, dynamic skill review, and session suggestions."
     },
@@ -533,7 +537,8 @@
         "pluginFiles": "createAgentKit().pluginFiles",
         "pluginFolder": "createAgentKit().pluginFolder",
         "pluginSearch": "createAgentKit().pluginSearch",
-        "pluginSend": "createAgentKit().pluginSend"
+        "pluginSend": "createAgentKit().pluginSend",
+        "pluginLLM": "kit.pluginLLM"
       }
     },
     "go": {
@@ -632,7 +637,8 @@
         "pluginFiles": "yunque.NewAgentKit().PluginFiles",
         "pluginFolder": "yunque.NewAgentKit().PluginFolder",
         "pluginSearch": "yunque.NewAgentKit().PluginSearch",
-        "pluginSend": "yunque.NewAgentKit().PluginSend"
+        "pluginSend": "yunque.NewAgentKit().PluginSend",
+        "pluginLLM": "kit.PluginLLM"
       }
     },
     "python": {
@@ -731,7 +737,8 @@
         "pluginFiles": "yunque.create_agent_kit().plugin_files",
         "pluginFolder": "yunque.create_agent_kit().plugin_folder",
         "pluginSearch": "yunque.create_agent_kit().plugin_search",
-        "pluginSend": "yunque.create_agent_kit().plugin_send"
+        "pluginSend": "yunque.create_agent_kit().plugin_send",
+        "pluginLLM": "kit.plugin_llm"
       }
     },
     "rust": {
@@ -830,7 +837,8 @@
         "pluginFiles": "AgentKit::plugin_files",
         "pluginFolder": "AgentKit::plugin_folder",
         "pluginSearch": "AgentKit::plugin_search",
-        "pluginSend": "AgentKit::plugin_send"
+        "pluginSend": "AgentKit::plugin_send",
+        "pluginLLM": "kit.plugin_llm"
       }
     }
   },

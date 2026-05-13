@@ -22,6 +22,10 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugin_reload.reload()
             yunque.plugins.open_folder("demo")
             yunque.plugin_folder.open_folder("demo")
+            yunque.plugin_search.search("agent", 2)
+            yunque.plugin_send.send("webhook", "ops", "hello")
+            yunque.plugin_llm.complete([{"role": "user", "content": "hi"}], temperature=0.2, model="demo")
+            yunque.plugin_llm.llm("system", "user", model="demo", temperature=0.3)
 
         calls = [call.args for call in api_call.call_args_list]
         self.assertEqual(calls[0], ("GET", "/v1/plugins"))
@@ -39,6 +43,10 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[12], ("POST", "/v1/plugins/reload"))
         self.assertEqual(calls[13], ("GET", "/v1/plugins/open-folder?name=demo"))
         self.assertEqual(calls[14], ("GET", "/v1/plugins/open-folder?name=demo"))
+        self.assertEqual(calls[15], ("POST", "/v1/plugin-api/search", {"query": "agent", "limit": 2}))
+        self.assertEqual(calls[16], ("POST", "/v1/plugin-api/send", {"channel": "webhook", "target": "ops", "content": "hello", "format": "markdown"}))
+        self.assertEqual(calls[17], ("POST", "/v1/plugin-api/llm", {"messages": [{"role": "user", "content": "hi"}], "temperature": 0.2, "model": "demo"}))
+        self.assertEqual(calls[18], ("POST", "/v1/plugin-api/llm", {"messages": [{"role": "system", "content": "system"}, {"role": "user", "content": "user"}], "temperature": 0.3, "model": "demo"}))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
@@ -49,6 +57,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_folder, yunque.plugin_folder)
         self.assertIs(yunque.create_agent_kit().plugin_search, yunque.plugin_search)
         self.assertIs(yunque.create_agent_kit().plugin_send, yunque.plugin_send)
+        self.assertIs(yunque.create_agent_kit().plugin_llm, yunque.plugin_llm)
 
 
 if __name__ == "__main__":

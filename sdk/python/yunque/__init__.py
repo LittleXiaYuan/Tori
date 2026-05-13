@@ -3401,6 +3401,17 @@ class _PluginSendNamespace:
 
 plugin_send = _PluginSendNamespace()
 
+class _PluginLLMNamespace:
+    """Standalone plugin-scoped LLM completion helper for plugins and automation scripts."""
+
+    def complete(self, messages: list[dict], temperature: float = 0.7, model: str = "") -> str:
+        return chat(messages, temperature, model)
+
+    def llm(self, prompt: str, user_input: str = "", model: str = "", temperature: float = 0.7) -> str:
+        return llm(prompt, user_input, model, temperature)
+
+plugin_llm = _PluginLLMNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3594,6 +3605,7 @@ class AgentKit:
         self.plugin_folder = plugin_folder
         self.plugin_search = plugin_search
         self.plugin_send = plugin_send
+        self.plugin_llm = plugin_llm
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
