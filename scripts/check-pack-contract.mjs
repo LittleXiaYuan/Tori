@@ -45,6 +45,7 @@ const authoring = readText("packs/AUTHORING.md");
 const englishGuide = readText("docs/guide/pack-runtime.md");
 const chineseGuide = readText("docs/zh/guide/pack-runtime.md");
 const docsConfig = readText("docs/.vitepress/config.ts");
+const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
@@ -54,14 +55,19 @@ for (const token of [
   "frontend.menus",
   "frontend.routes",
   "sdk.typescript",
+  "scripts/scaffold-pack.mjs",
 ]) {
   if (!authoring.includes(token)) fail(`AUTHORING.md missing token: ${token}`);
 }
 
 for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs/zh/guide/pack-runtime.md", chineseGuide]]) {
-  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs"]) {
+  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs", "scaffold-pack.mjs"]) {
     if (!text.includes(token)) fail(`${name} missing token: ${token}`);
   }
+}
+
+for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "RegisterBackendPack"]) {
+  if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
 }
 
 if (!docsConfig.includes("/guide/pack-runtime") || !docsConfig.includes("/zh/guide/pack-runtime")) {
