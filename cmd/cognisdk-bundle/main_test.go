@@ -219,6 +219,53 @@ func TestRunDigestBundle(t *testing.T) {
 	}
 }
 
+func TestRunActionsBundle(t *testing.T) {
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.json")
+	candidate := filepath.Join(dir, "candidate.json")
+	actionsOut := filepath.Join(dir, "actions.json")
+	actionsMarkdownOut := filepath.Join(dir, "actions.md")
+	if err := run([]string{"init", current}); err != nil {
+		t.Fatalf("init current: %v", err)
+	}
+	if err := run([]string{"init", candidate, "--builtin"}); err != nil {
+		t.Fatalf("init candidate: %v", err)
+	}
+	if err := run([]string{"actions", current, candidate}); err != nil {
+		t.Fatalf("actions bundle: %v", err)
+	}
+	if err := run([]string{"actions", current, candidate, "--markdown"}); err != nil {
+		t.Fatalf("actions bundle markdown: %v", err)
+	}
+	if err := run([]string{"actions", current, candidate, "--out", actionsOut}); err != nil {
+		t.Fatalf("actions bundle out: %v", err)
+	}
+	data, err := os.ReadFile(actionsOut)
+	if err != nil {
+		t.Fatalf("read actions output: %v", err)
+	}
+	var actions []cognisdk.PackBundleApplyAction
+	if err := json.Unmarshal(data, &actions); err != nil {
+		t.Fatalf("actions output is not json: %v", err)
+	}
+	if len(actions) == 0 || actions[0].Kind != cognisdk.PackBundleApplyActionKeepRollback {
+		t.Fatalf("unexpected actions output: %#v", actions)
+	}
+	if err := run([]string{"actions", current, candidate, "--out", actionsMarkdownOut, "--markdown"}); err != nil {
+		t.Fatalf("actions bundle markdown out: %v", err)
+	}
+	markdownData, err := os.ReadFile(actionsMarkdownOut)
+	if err != nil {
+		t.Fatalf("read actions markdown output: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Cogni Pack Bundle Apply Actions") {
+		t.Fatalf("actions markdown missing heading: %s", markdownData)
+	}
+	if err := run([]string{"actions", current}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle actions") {
+		t.Fatalf("expected actions usage error, got %v", err)
+	}
+}
+
 func TestRunPlanBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")
