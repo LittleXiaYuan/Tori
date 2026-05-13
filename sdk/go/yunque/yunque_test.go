@@ -3035,8 +3035,8 @@ func TestDispatchNamespaceManagesWorkersQueueAndConfig(t *testing.T) {
 	if workers.Count != 1 || worker.Type != "cursor" || removed.Status != "removed" || queue["message"] == "" || enqueued.Status != "enqueued" || config.Type != "cursor" || kit.Dispatch != Dispatch {
 		t.Fatalf("unexpected dispatch results")
 	}
-	if len(seen) != 6 {
-		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3244,8 +3244,8 @@ func TestNotifyNamespaceManagesChannelsAndShare(t *testing.T) {
 	if channels.Channels[0].ID != "feishu-main" || !added.OK || !removed.OK || !toggled.OK || !tested.OK || shared.Share["code"] != "yq_abc" {
 		t.Fatalf("unexpected notify results")
 	}
-	if len(seen) != 6 {
-		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -3725,8 +3725,8 @@ func TestForkHelpers(t *testing.T) {
 	if root["id"] != "fork_1" || got.ID != "fork_1" || len(created.Messages) != 1 || !removed.Deleted || branched.ParentID != "fork_1" || len(list.Forks) != 1 {
 		t.Fatalf("unexpected fork results")
 	}
-	if len(seen) != 6 {
-		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 
@@ -4560,20 +4560,21 @@ func TestSkillsNamespaceManagesRuntimeSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	catalog, _ := SkillsCatalog.List(ctx)
 	scan, _ := Skills.Scan(ctx)
 	dynamic, _ := Skills.Dynamic(ctx)
 	approved, _ := Skills.Approve(ctx, "draft_doc", "use safely")
 	rejected, _ := Skills.Reject(ctx, "old_skill")
 	suggestions, _ := Skills.Suggestions(ctx, "sess-1")
 
-	if list["count"].(float64) != 1 || scan["status"] != "scanned" || dynamic["skills"] == nil || approved["status"] != "ok" || rejected["name"] != "old_skill" || suggestions["suggestions"] == nil {
+	if list["count"].(float64) != 1 || catalog["skills"] == nil || scan["status"] != "scanned" || dynamic["skills"] == nil || approved["status"] != "ok" || rejected["name"] != "old_skill" || suggestions["suggestions"] == nil {
 		t.Fatalf("unexpected Skills results")
 	}
-	if NewAgentKit().Skills != Skills {
-		t.Fatalf("agent kit should expose Skills namespace")
+	if NewAgentKit().Skills != Skills || NewAgentKit().SkillsCatalog != SkillsCatalog {
+		t.Fatalf("agent kit should expose Skills and SkillsCatalog namespaces")
 	}
-	if len(seen) != 6 {
-		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 7 {
+		t.Fatalf("expected 7 requests, got %d: %v", len(seen), seen)
 	}
 }
 

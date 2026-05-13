@@ -1462,6 +1462,7 @@ pub struct AgentKit {
     pub plugins: PluginsClient,
     pub plugin_ui: PluginUIClient,
     pub skills: SkillsClient,
+    pub skills_catalog: SkillsCatalogClient,
     pub dispatch: DispatchClient,
     pub orchestrator: OrchestratorClient,
     pub fork: ForkClient,
@@ -1562,6 +1563,7 @@ impl AgentKit {
             plugins: PluginsClient::new(base_url.clone(), token.as_ref())?,
             plugin_ui: PluginUIClient::new(base_url.clone(), token.as_ref())?,
             skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
+            skills_catalog: SkillsCatalogClient::new(base_url.clone(), token.as_ref())?,
             dispatch: DispatchClient::new(base_url.clone(), token.as_ref())?,
             orchestrator: OrchestratorClient::new(base_url.clone(), token.as_ref())?,
             fork: ForkClient::new(base_url.clone(), token.as_ref())?,
@@ -1652,6 +1654,7 @@ impl AgentKit {
             plugins: PluginsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_ui: PluginUIClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            skills_catalog: SkillsCatalogClient::new_with_client(base_url.clone(), plugin_http.clone()),
             dispatch: DispatchClient::new_with_client(base_url.clone(), plugin_http.clone()),
             orchestrator: OrchestratorClient::new_with_client(
                 base_url.clone(),
@@ -8426,7 +8429,7 @@ impl SkillsClient {
         Self { base_url: base_url.into().trim_end_matches('/').to_string(), http }
     }
 
-    fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
     async fn get(&self, path: &str) -> Result<SkillsResponse, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
     async fn post(&self, path: &str, body: serde_json::Value) -> Result<SkillsResponse, reqwest::Error> { self.http.post(self.url(path)).json(&body).send().await?.error_for_status()?.json().await }
 
@@ -8443,6 +8446,26 @@ impl SkillsClient {
         let path = match session_id { Some(session_id) if !session_id.is_empty() => format!("/v1/skill-suggestions?session_id={}", url_encode_query_component(session_id)), _ => "/v1/skill-suggestions".to_string() };
         self.get(&path).await
     }
+}
+
+/// Standalone read-only SkillsCatalog SDK client for runtime skill catalog listing.
+#[derive(Debug, Clone)]
+pub struct SkillsCatalogClient {
+    inner: SkillsClient,
+}
+
+impl SkillsCatalogClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: SkillsClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: SkillsClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+
+    pub async fn list(&self) -> Result<SkillsResponse, reqwest::Error> { self.inner.list().await }
 }
 
 /// Lightweight Plugins SDK client for plugin catalog, lifecycle, file editing, UI, and reload.
@@ -8487,7 +8510,7 @@ impl PluginsClient {
         Self { base_url: base_url.into().trim_end_matches('/').to_string(), http }
     }
 
-    fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
     async fn get(&self, path: &str) -> Result<PluginsResponse, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
     async fn post(&self, path: &str, body: serde_json::Value) -> Result<PluginsResponse, reqwest::Error> { self.http.post(self.url(path)).json(&body).send().await?.error_for_status()?.json().await }
 
@@ -11791,6 +11814,14 @@ mod tests {
         assert_eq!(ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_ui.url("/v1/plugins/ui"), "http://localhost:9090/v1/plugins/ui");
+    }
+
+    #[test]
+    fn skills_catalog_helpers_build_urls_and_agent_kit_surface() {
+        let catalog = SkillsCatalogClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(catalog.url("/v1/skills"), "http://localhost:9090/v1/skills");
+        let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
+        assert_eq!(kit.skills_catalog.url("/v1/skills"), "http://localhost:9090/v1/skills");
     }
 
     #[test]

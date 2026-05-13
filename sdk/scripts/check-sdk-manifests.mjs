@@ -52,6 +52,7 @@ const checks = [
   ["SkillHub SDK manifest", "sdk/scripts/check-skillhub-sdk-manifest.mjs"],
   ["Plugins SDK manifest", "sdk/scripts/check-plugins-sdk-manifest.mjs"],
   ["PluginUI SDK manifest", "sdk/scripts/check-plugin-ui-sdk-manifest.mjs"],
+  ["SkillsCatalog SDK manifest", "sdk/scripts/check-skills-catalog-sdk-manifest.mjs"],
   ["Skills SDK manifest", "sdk/scripts/check-skills-sdk-manifest.mjs"],
   ["Dispatch SDK manifest", "sdk/scripts/check-dispatch-sdk-manifest.mjs"],
   ["Orchestrator SDK manifest", "sdk/scripts/check-orchestrator-sdk-manifest.mjs"],
