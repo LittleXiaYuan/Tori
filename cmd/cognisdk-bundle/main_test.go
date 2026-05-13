@@ -148,6 +148,8 @@ func TestRunPlanBundle(t *testing.T) {
 	dir := t.TempDir()
 	current := filepath.Join(dir, "current.json")
 	candidate := filepath.Join(dir, "candidate.json")
+	planOut := filepath.Join(dir, "plan.json")
+	planMarkdownOut := filepath.Join(dir, "plan.md")
 	if err := run([]string{"init", current}); err != nil {
 		t.Fatalf("init current: %v", err)
 	}
@@ -159,6 +161,33 @@ func TestRunPlanBundle(t *testing.T) {
 	}
 	if err := run([]string{"plan", current, candidate, "--markdown"}); err != nil {
 		t.Fatalf("plan bundle markdown: %v", err)
+	}
+	if err := run([]string{"plan", current, candidate, "--out", planOut}); err != nil {
+		t.Fatalf("plan bundle out: %v", err)
+	}
+	data, err := os.ReadFile(planOut)
+	if err != nil {
+		t.Fatalf("read plan output: %v", err)
+	}
+	var plan cognisdk.PackBundleApplyPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatalf("plan output is not json: %v", err)
+	}
+	if plan.Outcome != cognisdk.PackBundleReviewReady || plan.CandidateDigest == "" {
+		t.Fatalf("unexpected plan output: %#v", plan)
+	}
+	if err := run([]string{"plan", current, candidate, "--out", planMarkdownOut, "--markdown"}); err != nil {
+		t.Fatalf("plan bundle markdown out: %v", err)
+	}
+	markdownData, err := os.ReadFile(planMarkdownOut)
+	if err != nil {
+		t.Fatalf("read markdown plan output: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Cogni Pack Bundle Apply Plan") {
+		t.Fatalf("markdown plan output missing heading: %s", markdownData)
+	}
+	if err := run([]string{"plan", current, candidate, "--out"}); err == nil || !strings.Contains(err.Error(), "--out requires a path") {
+		t.Fatalf("expected plan out path error, got %v", err)
 	}
 	if err := run([]string{"plan", current}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle plan") {
 		t.Fatalf("expected plan usage error, got %v", err)

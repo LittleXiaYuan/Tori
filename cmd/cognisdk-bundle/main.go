@@ -123,8 +123,13 @@ func run(args []string) error {
 		return printJSON(summary)
 
 	case "plan":
+		planOut, normalizedArgs, err := parseOutputOption(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
 		if len(args) != 3 {
-			return fmt.Errorf("usage: cognisdk-bundle plan <current.json> <candidate.json> [--markdown]")
+			return fmt.Errorf("usage: cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json]")
 		}
 		current, candidate, err := loadPair(args[1], args[2])
 		if err != nil {
@@ -133,6 +138,12 @@ func run(args []string) error {
 		plan, err := cognisdk.PlanPackBundleApply(context.Background(), *current, *candidate)
 		if err != nil {
 			return err
+		}
+		if planOut != "" {
+			if markdown {
+				return saveTextFile(cognisdk.RenderPackBundleApplyPlanMarkdown(plan), planOut)
+			}
+			return saveJSONFile(plan, planOut)
 		}
 		if markdown {
 			fmt.Print(cognisdk.RenderPackBundleApplyPlanMarkdown(plan))
@@ -195,6 +206,24 @@ func run(args []string) error {
 	}
 }
 
+func parseOutputOption(args []string) (string, []string, error) {
+	out := ""
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				return "", nil, fmt.Errorf("--out requires a path")
+			}
+			out = args[i+1]
+			i++
+		default:
+			normalized = append(normalized, args[i])
+		}
+	}
+	return out, normalized, nil
+}
+
 func parsePromoteOptions(args []string) (bool, string, []string, error) {
 	allowReview := false
 	reviewOut := ""
@@ -214,6 +243,13 @@ func parsePromoteOptions(args []string) (bool, string, []string, error) {
 		}
 	}
 	return allowReview, reviewOut, normalized, nil
+}
+
+func saveTextFile(value string, path string) error {
+	if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+		return fmt.Errorf("write %q: %w", path, err)
+	}
+	return nil
 }
 
 func saveJSONFile(value any, path string) error {
@@ -255,7 +291,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
-	fmt.Println("  cognisdk-bundle plan <current.json> <candidate.json> [--markdown]")
+	fmt.Println("  cognisdk-bundle plan <current.json> <candidate.json> [--markdown] [--out plan.json]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review] [--review-out review.json]")
 }
