@@ -2397,6 +2397,11 @@ SkillsCatalog SDK exposes read-only runtime skills catalog listing (`list`) for 
 
 SkillsScan SDK exposes runtime skill scanning (`scan`) for external operator pages, plugin tools, CLIs, sidecars, and automation scripts without importing the full platform or broader Skills management slice. It maps directly to `POST /v1/skills/scan`; Agent Kit also exposes this surface as `kit.skillsScan` / `kit.SkillsScan` / `kit.skills_scan`.
 
+
+### SkillsSuggestions SDK
+
+SkillsSuggestions SDK exposes session skill suggestions (`suggestions`) for external chat pages, plugin tools, CLIs, sidecars, and automation scripts without importing the full platform or broader Skills management slice. It maps directly to `GET /v1/skill-suggestions`; Agent Kit also exposes this surface as `kit.skillsSuggestions` / `kit.SkillsSuggestions` / `kit.skills_suggestions`.
+
 ### Skills SDK
 
 The lightweight Runtime Skills SDK exposes skill catalog, scan, dynamic skill review, approve/reject, and session suggestion helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/skills*` and `/v1/skill-suggestions`; Agent Kit also exposes this surface as `kit.skills` / `kit.Skills`.

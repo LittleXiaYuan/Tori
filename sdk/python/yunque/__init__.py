@@ -3394,6 +3394,15 @@ class _SkillsScanNamespace:
 
 skills_scan = _SkillsScanNamespace()
 
+class _SkillsSuggestionsNamespace:
+    """Standalone session skill suggestions helper for external pages and scripts."""
+
+    def suggestions(self, session_id: str = "") -> dict:
+        return skills.suggestions(session_id)
+
+
+skills_suggestions = _SkillsSuggestionsNamespace()
+
 # ── SkillHub Incremental Packages (/api/skillhub) ──
 
 class _SkillHubNamespace:
@@ -3510,6 +3519,7 @@ class AgentKit:
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
+        self.skills_suggestions = skills_suggestions
         self.dispatch = dispatch
         self.orchestrator = orchestrator
         self.fork = fork

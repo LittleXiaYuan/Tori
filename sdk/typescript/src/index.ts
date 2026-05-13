@@ -18,3 +18,4 @@ export * from './plugin-ui';
 export * from './skills-catalog';
 
 export * from './skills-scan';
+export * from './skills-suggestions';
