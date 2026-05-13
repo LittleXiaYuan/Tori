@@ -127,9 +127,9 @@ export interface InstalledPack {
   manifest: PackManifest;
   status: "enabled" | "disabled" | "rolled_back" | string;
   source: string;
-  installed_at: string;
-  updated_at: string;
-  previous_version?: string;
+  installedAt?: string;
+  updatedAt?: string;
+  previousVersion?: string;
 }
 
 export interface PackListResponse {

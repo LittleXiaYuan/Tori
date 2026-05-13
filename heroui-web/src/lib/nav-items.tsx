@@ -36,6 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-projects", href: "/projects", label: "项目", group: "工作", icon: <FolderGit2 size={16} />, keywords: "projects 项目 repo" },
   { id: "nav-skills", href: "/skills", label: "技能", group: "工作", icon: <Package size={16} />, keywords: "skills 技能" },
   { id: "nav-plugins", href: "/plugins", label: "插件", group: "工作", icon: <Puzzle size={16} />, keywords: "plugins 插件" },
+  { id: "nav-packs", href: "/packs", label: "增量包", group: "工作", icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 热插拔 可选能力" },
   { id: "nav-cognis", href: "/cognis", label: "智体", group: "工作", icon: <Boxes size={16} />, keywords: "cognis 智体 agent" },
   { id: "nav-tools", href: "/tools", label: "终端", group: "工作", icon: <Wrench size={16} />, keywords: "tools terminal shell 工具" },
   { id: "nav-browser", href: "/browser", label: "浏览器", group: "工作", icon: <Globe size={16} />, keywords: "browser 浏览器 connector" },
