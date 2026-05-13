@@ -1631,6 +1631,7 @@ type AgentKit struct {
 	Plugin            *pluginRuntimeNamespace
 	PluginSearch      *pluginSearchNamespace
 	PluginSend        *pluginSendNamespace
+	PluginLLM         *pluginLLMNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1647,9 +1648,13 @@ var PluginSearch = &pluginSearchNamespace{}
 // PluginSend exposes standalone plugin-scoped channel send for plugins and scripts.
 var PluginSend = &pluginSendNamespace{}
 
+// PluginLLM exposes standalone plugin-scoped LLM completion for plugins and scripts.
+var PluginLLM = &pluginLLMNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
 type pluginSendNamespace struct{}
+type pluginLLMNamespace struct{}
 
 // ── Mission Parse ──
 
@@ -6915,6 +6920,7 @@ func NewAgentKit() AgentKit {
 		Plugin:            Plugin,
 		PluginSearch:      PluginSearch,
 		PluginSend:        PluginSend,
+		PluginLLM:         PluginLLM,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,
@@ -6940,6 +6946,14 @@ func (p *pluginSearchNamespace) Search(ctx context.Context, query string, limit 
 
 func (p *pluginSendNamespace) Send(ctx context.Context, channelType, target, content string) error {
 	return Send(ctx, channelType, target, content)
+}
+
+func (p *pluginLLMNamespace) LLM(ctx context.Context, systemPrompt, userInput string) (string, error) {
+	return LLM(ctx, systemPrompt, userInput)
+}
+
+func (p *pluginLLMNamespace) Chat(ctx context.Context, messages []Message, temperature float64) (string, error) {
+	return Chat(ctx, messages, temperature)
 }
 
 func (p *pluginRuntimeNamespace) Send(ctx context.Context, channelType, target, content string) error {

@@ -1531,6 +1531,7 @@ pub struct AgentKit {
     pub plugin: PluginApiClient,
     pub plugin_search: PluginSearchClient,
     pub plugin_send: PluginSendClient,
+    pub plugin_llm: PluginLLMClient,
 }
 
 impl AgentKit {
@@ -1640,7 +1641,8 @@ impl AgentKit {
             browser: BrowserClient::new(base_url.clone(), token.as_ref())?,
             plugin: PluginApiClient::new(base_url.clone(), plugin_token.as_ref())?,
             plugin_search: PluginSearchClient::new(base_url.clone(), plugin_token.as_ref())?,
-            plugin_send: PluginSendClient::new(base_url, plugin_token.as_ref())?,
+            plugin_send: PluginSendClient::new(base_url.clone(), plugin_token.as_ref())?,
+            plugin_llm: PluginLLMClient::new(base_url, plugin_token.as_ref())?,
         })
     }
 
@@ -1749,7 +1751,8 @@ impl AgentKit {
             browser: BrowserClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin: PluginApiClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_search: PluginSearchClient::new_with_client(base_url.clone(), plugin_http.clone()),
-            plugin_send: PluginSendClient::new_with_client(base_url, plugin_http),
+            plugin_send: PluginSendClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_llm: PluginLLMClient::new_with_client(base_url, plugin_http),
         }
     }
 }
@@ -9773,6 +9776,24 @@ impl MissionsClient {
 }
 
 
+
+/// Standalone PluginLLM SDK client for plugin-scoped LLM completion.
+#[derive(Debug, Clone)]
+pub struct PluginLLMClient { inner: PluginApiClient }
+
+impl PluginLLMClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginApiClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginApiClient::new_with_client(base_url, http) }
+    }
+
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn complete(&self, request: &PluginLLMRequest) -> Result<PluginLLMResponse, reqwest::Error> { self.inner.llm(request).await }
+}
+
 /// Standalone PluginSearch SDK client for plugin-scoped web search.
 #[derive(Debug, Clone)]
 pub struct PluginSearchClient { inner: PluginApiClient }
@@ -10520,6 +10541,9 @@ mod tests {
         let send = PluginSendClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(send.url("/v1/plugin-api/send"), "http://localhost:9090/v1/plugin-api/send");
         assert_eq!(kit.plugin_send.url("/v1/plugin-api/send"), "http://localhost:9090/v1/plugin-api/send");
+        let llm = PluginLLMClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(llm.url("/v1/plugin-api/llm"), "http://localhost:9090/v1/plugin-api/llm");
+        assert_eq!(kit.plugin_llm.url("/v1/plugin-api/llm"), "http://localhost:9090/v1/plugin-api/llm");
     }
 
     #[test]

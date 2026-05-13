@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "domain": "plugin-llm",
+  "description": "Cross-language lightweight SDK for plugin-scoped LLM completion without importing the full platform client or broader Plugin API runtime slice.",
+  "principles": [
+    "Expose plugin-scoped LLM completion as a focused SDK slice for plugins, external frontends, CLIs, sidecars, and automation scripts.",
+    "Keep completions directly callable through the existing plugin-authenticated runtime route.",
+    "Make PluginLLM available through Agent Kit while preserving a standalone composable facade."
+  ],
+  "routes": [
+    "POST /v1/plugin-api/llm"
+  ],
+  "capabilities": [
+    {
+      "name": "complete",
+      "route": "POST /v1/plugin-api/llm",
+      "readOnly": false,
+      "description": "Call the configured LLM through a plugin-scoped token."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugin-llm.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "complete": "createPluginLLMClient().complete"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "complete": "yunque.PluginLLM.Chat"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "complete": "yunque.plugin_llm.complete"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "complete": "PluginLLMClient::complete"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
