@@ -177,6 +177,91 @@ type MergedPack struct {
 	GoldenTests      []GoldenTest
 }
 
+// FeedbackKind classifies audit feedback from a user, reviewer, or host.
+type FeedbackKind string
+
+const (
+	FeedbackCorrection        FeedbackKind = "correction"
+	FeedbackPreference        FeedbackKind = "preference"
+	FeedbackBoundaryViolation FeedbackKind = "boundary_violation"
+	FeedbackPraise            FeedbackKind = "praise"
+	FeedbackRejection         FeedbackKind = "rejection"
+)
+
+// FeedbackSeverity is intentionally coarse so hosts can map UI controls,
+// audit events, or CLI flags without importing platform internals.
+type FeedbackSeverity string
+
+const (
+	FeedbackSeverityLow    FeedbackSeverity = "low"
+	FeedbackSeverityMedium FeedbackSeverity = "medium"
+	FeedbackSeverityHigh   FeedbackSeverity = "high"
+)
+
+// AuditFeedback is the SDK-level learning signal after a turn.
+// It is observation only: the SDK may produce proposals, but never writes
+// memory, ledger rows, packs, or durable beliefs by itself.
+type AuditFeedback struct {
+	ID              string           `json:"id,omitempty" yaml:"id,omitempty"`
+	Time            time.Time        `json:"time,omitempty" yaml:"time,omitempty"`
+	Kind            FeedbackKind     `json:"kind" yaml:"kind"`
+	Severity        FeedbackSeverity `json:"severity,omitempty" yaml:"severity,omitempty"`
+	UserID          string           `json:"user_id,omitempty" yaml:"user_id,omitempty"`
+	Channel         string           `json:"channel,omitempty" yaml:"channel,omitempty"`
+	Message         string           `json:"message" yaml:"message"`
+	Evidence        []string         `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	TargetBeliefIDs []string         `json:"target_belief_ids,omitempty" yaml:"target_belief_ids,omitempty"`
+	Tags            []string         `json:"tags,omitempty" yaml:"tags,omitempty"`
+}
+
+// BeliefUpdateAction describes the proposed host-side operation.
+type BeliefUpdateAction string
+
+const (
+	BeliefUpdateAddPreference BeliefUpdateAction = "add_preference"
+	BeliefUpdateReinforce     BeliefUpdateAction = "reinforce"
+	BeliefUpdateWeaken        BeliefUpdateAction = "weaken"
+	BeliefUpdateReviewOnly    BeliefUpdateAction = "review_only"
+)
+
+// FeedbackOutcome gives callers a stable summary without inspecting every
+// proposal. ReviewRequired means a human or host policy must decide whether
+// anything becomes durable.
+type FeedbackOutcome string
+
+const (
+	FeedbackOutcomeNoAction       FeedbackOutcome = "no_action"
+	FeedbackOutcomeProposed       FeedbackOutcome = "proposed"
+	FeedbackOutcomeReviewRequired FeedbackOutcome = "review_required"
+)
+
+// BeliefUpdateProposal is a non-mutating change request for the host's
+// Memory/Ledger/Audit layer. Root, value, and boundary beliefs should normally
+// remain read-only; the SDK marks such proposals review-only.
+type BeliefUpdateProposal struct {
+	ID               string             `json:"id" yaml:"id"`
+	Action           BeliefUpdateAction `json:"action" yaml:"action"`
+	BeliefID         string             `json:"belief_id,omitempty" yaml:"belief_id,omitempty"`
+	Kind             BeliefKind         `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Statement        string             `json:"statement,omitempty" yaml:"statement,omitempty"`
+	ConfidenceDelta  float64            `json:"confidence_delta,omitempty" yaml:"confidence_delta,omitempty"`
+	Reason           string             `json:"reason" yaml:"reason"`
+	RequiresReview   bool               `json:"requires_review" yaml:"requires_review"`
+	ReadOnlyTarget   bool               `json:"read_only_target,omitempty" yaml:"read_only_target,omitempty"`
+	SourceFeedbackID string             `json:"source_feedback_id,omitempty" yaml:"source_feedback_id,omitempty"`
+	Evidence         []string           `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+}
+
+// FeedbackProposal is the full SDK output for an audit feedback event.
+type FeedbackProposal struct {
+	ID          string                 `json:"id" yaml:"id"`
+	Time        time.Time              `json:"time" yaml:"time"`
+	Outcome     FeedbackOutcome        `json:"outcome" yaml:"outcome"`
+	Summary     string                 `json:"summary" yaml:"summary"`
+	Proposals   []BeliefUpdateProposal `json:"proposals,omitempty" yaml:"proposals,omitempty"`
+	AuditEvents []AuditEvent           `json:"audit_events,omitempty" yaml:"audit_events,omitempty"`
+}
+
 // AuditEvent is returned to the host; persistence is a later integration.
 type AuditEvent struct {
 	Time     time.Time         `json:"time" yaml:"time"`
