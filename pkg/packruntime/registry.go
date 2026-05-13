@@ -27,13 +27,14 @@ const (
 )
 
 type InstalledPack struct {
-	Manifest        Manifest       `json:"manifest"`
-	Status          PackStatus     `json:"status"`
-	Source          string         `json:"source,omitempty"`
-	Artifacts       *PackArtifacts `json:"artifacts,omitempty"`
-	InstalledAt     time.Time      `json:"installedAt"`
-	UpdatedAt       time.Time      `json:"updatedAt"`
-	PreviousVersion string         `json:"previousVersion,omitempty"`
+	Manifest          Manifest       `json:"manifest"`
+	Status            PackStatus     `json:"status"`
+	Source            string         `json:"source,omitempty"`
+	Artifacts         *PackArtifacts `json:"artifacts,omitempty"`
+	PreviousArtifacts *PackArtifacts `json:"previousArtifacts,omitempty"`
+	InstalledAt       time.Time      `json:"installedAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	PreviousVersion   string         `json:"previousVersion,omitempty"`
 }
 
 type PackArtifacts struct {
@@ -107,9 +108,10 @@ func (r *Registry) InstallWithArtifacts(manifest Manifest, source string, artifa
 	for i, pack := range r.snapshot.Packs {
 		if pack.Manifest.ID == manifest.ID {
 			pack.PreviousVersion = pack.Manifest.Version
+			pack.PreviousArtifacts = clonePackArtifacts(pack.Artifacts)
 			pack.Manifest = manifest
 			pack.Source = source
-			pack.Artifacts = artifacts
+			pack.Artifacts = clonePackArtifacts(artifacts)
 			pack.UpdatedAt = now
 			if manifest.DefaultState == "enabled" || pack.Status == PackStatusEnabled {
 				pack.Status = PackStatusEnabled
@@ -119,7 +121,7 @@ func (r *Registry) InstallWithArtifacts(manifest Manifest, source string, artifa
 			return pack, r.save()
 		}
 	}
-	pack := InstalledPack{Manifest: manifest, Status: status, Source: source, Artifacts: artifacts, InstalledAt: now, UpdatedAt: now}
+	pack := InstalledPack{Manifest: manifest, Status: status, Source: source, Artifacts: clonePackArtifacts(artifacts), InstalledAt: now, UpdatedAt: now}
 	r.snapshot.Packs = append(r.snapshot.Packs, pack)
 	r.snapshot.Version++
 	return pack, r.save()
@@ -209,6 +211,14 @@ func safeArtifactSegment(value string) string {
 	return out
 }
 
+func clonePackArtifacts(artifacts *PackArtifacts) *PackArtifacts {
+	if artifacts == nil {
+		return nil
+	}
+	clone := *artifacts
+	return &clone
+}
+
 func (r *Registry) Enable(id string) (InstalledPack, error) {
 	return r.setStatus(id, PackStatusEnabled)
 }
@@ -228,6 +238,7 @@ func (r *Registry) Rollback(id string) (InstalledPack, error) {
 			return InstalledPack{}, fmt.Errorf("pack %q has no previous version", id)
 		}
 		pack.Manifest.Version, pack.PreviousVersion = pack.PreviousVersion, pack.Manifest.Version
+		pack.Artifacts, pack.PreviousArtifacts = clonePackArtifacts(pack.PreviousArtifacts), clonePackArtifacts(pack.Artifacts)
 		pack.UpdatedAt = r.now().UTC()
 		r.snapshot.Packs[i] = pack
 		r.snapshot.Version++

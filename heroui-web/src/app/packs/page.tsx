@@ -299,6 +299,7 @@ export default function PacksPage() {
                       <div>前端资源：<span className="font-mono">{distribution?.frontendUrl || "-"}</span></div>
                       <div>校验：<span className="font-mono">{pack.artifacts?.sha256 ? pack.artifacts.sha256.slice(0, 12) + "…" : distribution?.sha256 ? distribution.sha256.slice(0, 12) + "…" : "-"}</span></div>
                       <div>缓存：<span className="font-mono">{pack.artifacts?.packagePath || "-"}</span></div>
+                      <div>上一缓存：<span className="font-mono">{pack.previousArtifacts?.packagePath || "-"}</span></div>
                     </div>
                   </div>
                 </div>

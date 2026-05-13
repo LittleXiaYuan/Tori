@@ -144,6 +144,7 @@ export interface InstalledPack {
   status: "enabled" | "disabled" | "rolled_back" | string;
   source: string;
   artifacts?: PackArtifacts;
+  previousArtifacts?: PackArtifacts;
   installedAt?: string;
   updatedAt?: string;
   previousVersion?: string;
