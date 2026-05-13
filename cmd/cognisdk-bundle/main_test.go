@@ -143,3 +143,24 @@ func TestRunDigestBundle(t *testing.T) {
 		t.Fatalf("expected digest usage error, got %v", err)
 	}
 }
+
+func TestRunPlanBundle(t *testing.T) {
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.json")
+	candidate := filepath.Join(dir, "candidate.json")
+	if err := run([]string{"init", current}); err != nil {
+		t.Fatalf("init current: %v", err)
+	}
+	if err := run([]string{"init", candidate, "--builtin"}); err != nil {
+		t.Fatalf("init candidate: %v", err)
+	}
+	if err := run([]string{"plan", current, candidate}); err != nil {
+		t.Fatalf("plan bundle: %v", err)
+	}
+	if err := run([]string{"plan", current, candidate, "--markdown"}); err != nil {
+		t.Fatalf("plan bundle markdown: %v", err)
+	}
+	if err := run([]string{"plan", current}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle plan") {
+		t.Fatalf("expected plan usage error, got %v", err)
+	}
+}

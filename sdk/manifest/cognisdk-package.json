@@ -23,6 +23,7 @@
       "pkg/cognisdk/pack_summary.go",
       "pkg/cognisdk/pack_diff.go",
       "pkg/cognisdk/pack_review.go",
+      "pkg/cognisdk/pack_plan.go",
       "pkg/cognisdk/golden.go",
       "pkg/cognisdk/schema.go"
     ]
@@ -117,6 +118,14 @@
       ]
     },
     {
+      "name": "packBundleApplyPlan",
+      "symbols": [
+        "PackBundleApplyPlan",
+        "PlanPackBundleApply",
+        "RenderPackBundleApplyPlanMarkdown"
+      ]
+    },
+    {
       "name": "goldenGate",
       "symbols": [
         "RunGoldenTests",
@@ -132,6 +141,7 @@
         "PackBundleSummaryJSONSchema",
         "PackBundleDiffJSONSchema",
         "PackBundleReviewJSONSchema",
+        "PackBundleApplyPlanJSONSchema",
         "FeedbackProposalJSONSchema",
         "JSONSchemaByName"
       ]
@@ -150,6 +160,7 @@
         "pack-bundle-summary",
         "pack-bundle-diff",
         "pack-bundle-review",
+        "pack-bundle-apply-plan",
         "feedback-proposal"
       ]
     },
@@ -163,6 +174,7 @@
         "diff",
         "golden",
         "review",
+        "plan",
         "promote"
       ],
       "flags": [
@@ -179,6 +191,7 @@
     "pkg/cognisdk/pack_bundle_test.go",
     "pkg/cognisdk/pack_diff_test.go",
     "pkg/cognisdk/pack_review_test.go",
+    "pkg/cognisdk/pack_plan_test.go",
     "pkg/cognisdk/schema_test.go",
     "cmd/cognisdk-schema/main_test.go",
     "cmd/cognisdk-bundle/main_test.go"
