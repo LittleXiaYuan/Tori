@@ -33,7 +33,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 }
 ```
 
-然后在 Gateway 构造时通过 `GatewayConfig.BackendPacks` 注入，或在路由注册前调用 `RegisterBackendPack`。
+然后在 Gateway 构造时通过 `GatewayConfig.BackendPacks` 注入，或在 Gateway 构造后调用 `RegisterBackendPack` 挂载。
 
 ## 验证
 
@@ -45,4 +45,3 @@ node scripts/check-pack-contract.mjs
 完整契约见：
 
 - `packs/AUTHORING.md`
-

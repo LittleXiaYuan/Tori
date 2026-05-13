@@ -68,14 +68,16 @@ import (
 // SetPackRegistry attaches the Pack Runtime registry used by /v1/packs and frontend sync.
 func (g *Gateway) SetPackRegistry(r *packruntime.Registry) { g.packRegistry = r }
 
-// RegisterBackendPack appends a backend capability pack module for future
-// route mounting. It must be called before Gateway routes are registered.
-// Prefer GatewayConfig.BackendPacks for newly constructed Gateways.
+// RegisterBackendPack mounts a backend capability pack module through the
+// Pack Runtime route gate. It can be called after Gateway construction, which
+// lets optional packages be installed or wired without adding fixed Gateway
+// business routes.
 func (g *Gateway) RegisterBackendPack(module packruntime.BackendModule) {
 	if module == nil {
 		return
 	}
 	g.backendPacks = append(g.backendPacks, module)
+	g.registerBackendPack(module)
 }
 
 // SetHeartbeat attaches a heartbeat service.

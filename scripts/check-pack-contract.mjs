@@ -72,9 +72,14 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/gateway.go")
   + "\n"
-  + readText("internal/controlplane/gateway/gateway_setters.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute"]) {
+  + readText("internal/controlplane/gateway/gateway_setters.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_packs_test.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
+}
+if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
+  fail("RegisterBackendPack must remain usable after Gateway construction");
 }
 
 const backendContract = readText("pkg/packruntime/backend.go");

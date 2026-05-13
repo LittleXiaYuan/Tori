@@ -121,6 +121,58 @@ func TestBackendPackModuleCanBeInjectedFromGatewayConfig(t *testing.T) {
 	}
 }
 
+func TestRegisterBackendPackMountsModuleAfterGatewayConstruction(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.runtime-added",
+		Name:         "Runtime Added Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Routes: []string{"/v1/runtime-added/ping"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "runtime-added", Label: "运行时包", Path: "/packs/runtime-added"}}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("runtime-added-pack")
+
+	module := testBackendPackModule{
+		id: "yunque.pack.runtime-added",
+		routes: []packruntime.BackendRoute{{
+			Method: http.MethodGet,
+			Path:   "/v1/runtime-added/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"ok": true, "pack": "runtime-added"})
+			},
+		}},
+	}
+	gw.RegisterBackendPack(module)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runtime-added/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected runtime registered backend pack route to be 200, got %d body=%s", w.Code, w.Body.String())
+	}
+
+	if _, err := registry.Disable("yunque.pack.runtime-added"); err != nil {
+		t.Fatalf("Disable: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/runtime-added/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected disabled runtime registered backend pack route to be 404, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {
 	root := t.TempDir()
 	registry, err := packruntime.NewRegistry(filepath.Join(root, "registry"))
