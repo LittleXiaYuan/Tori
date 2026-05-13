@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "domain": "cogni-kernel-pack",
+  "description": "Cogni Kernel capability pack manifest binding for Pack Runtime route gates, frontend sync, and lightweight SDK import discovery.",
+  "principles": [
+    "Expose Cogni declarations, traces, health, experience, evolution, federation, and economics as a Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Keep backend method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import the existing yunque-client/cognis slice only when the Cogni Kernel pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/cogni-kernel-pack/pack.json",
+  "sdkImport": "yunque-client/cognis",
+  "routes": [
+    "GET /v1/cognis",
+    "POST /v1/cognis",
+    "GET /v1/cognis/",
+    "POST /v1/cognis/",
+    "DELETE /v1/cognis/"
+  ],
+  "frontend": {
+    "menuPath": "/packs/cognis",
+    "component": "cognis/CogniKernelPackPage",
+    "client": "heroui-web/src/lib/cogni-kernel-pack-client.ts",
+    "legacyPath": "heroui-web/src/app/cognis/page.tsx"
+  }
+}

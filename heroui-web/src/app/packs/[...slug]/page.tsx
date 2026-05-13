@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, Chip, Spinner } from "@heroui/react";
 import { Boxes, ExternalLink, PackageOpen, Route, ShieldCheck, TerminalSquare } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import { type InstalledPack } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/error-utils";
+import type { InstalledPack } from "@/lib/pack-types";
 import { buildPackSdkEntrypoints, fetchEnabledPacks, findPackRouteBinding, formatBackendRouteSpec, packSdkImportSnippet } from "@/lib/pack-sync";
 
 export default function PackRuntimeRoutePage() {

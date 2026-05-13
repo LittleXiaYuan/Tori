@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupAndLoRA(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelAndLoRA(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -21,6 +21,16 @@ func TestEnsureBuiltinPacksInstallsBackupAndLoRA(t *testing.T) {
 	if backup.Status != packruntime.PackStatusEnabled {
 		t.Fatalf("expected backup default enabled, got %s", backup.Status)
 	}
+	cogni, ok := registry.Get("yunque.pack.cogni-kernel")
+	if !ok {
+		t.Fatal("expected Cogni Kernel builtin pack to be installed")
+	}
+	if cogni.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Cogni Kernel default enabled, got %s", cogni.Status)
+	}
+	if cogni.Manifest.SDK.TypeScript != "yunque-client/cognis" {
+		t.Fatalf("unexpected Cogni Kernel SDK import: %s", cogni.Manifest.SDK.TypeScript)
+	}
 	lora, ok := registry.Get("yunque.pack.lora")
 	if !ok {
 		t.Fatal("expected LoRA builtin pack to be installed")
@@ -33,7 +43,7 @@ func TestEnsureBuiltinPacksInstallsBackupAndLoRA(t *testing.T) {
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 2 {
+	if got := len(registry.List()); got != 3 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

@@ -18,7 +18,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import {
   BookOpen,
-  Boxes,
   Brain,
   LayoutGrid,
   LogOut,
@@ -36,6 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import { loadTheme, patchAndApply } from "@/lib/theme-engine";
 import AccountRailFlyout from "@/components/layout/account-rail-flyout";
 import { WindowControls } from "@/components/title-bar";
+import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
 import type { NavItem } from "@/lib/nav-items";
 
 const FLY_ENTER_DELAY_MS = 300;
@@ -57,7 +57,6 @@ const QUICK_LINKS: QuickLink[] = [
   { href: "/missions",  icon: <Zap size={16} />,           zh: "任务",   en: "Missions" },
   { href: "/knowledge", icon: <BookOpen size={16} />,      zh: "知识库", en: "Knowledge" },
   { href: "/memory",    icon: <Brain size={16} />,         zh: "记忆",   en: "Memory" },
-  { href: "/cognis",    icon: <Boxes size={16} />,         zh: "智体",   en: "Cognis" },
 ];
 
 export default function AccountRail() {
@@ -69,6 +68,7 @@ export default function AccountRail() {
   const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
+  const [packItems, setPackItems] = useState<NavItem[]>([]);
   const [anchorTop, setAnchorTop] = useState(0);
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,6 +92,23 @@ export default function AccountRail() {
         );
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchEnabledPacks()
+      .then((packs) => {
+        setPackItems(
+          buildPackNavItems(packs).map((item) => ({
+            id: `pack-${item.packId}-${item.href}`,
+            href: item.href,
+            label: item.label,
+            group: "扩展" as const,
+            icon: item.icon,
+            keywords: item.keywords,
+          })),
+        );
+      })
+      .catch(() => setPackItems([]));
   }, []);
 
   // hover 进入/离开延时控制
@@ -436,7 +453,7 @@ export default function AccountRail() {
 
     <AccountRailFlyout
       open={flyoutOpen}
-      extItems={extItems}
+      extItems={[...packItems, ...extItems]}
       anchorTop={anchorTop}
       onMouseEnter={cancelCloseFlyout}
       onMouseLeave={scheduleCloseFlyout}

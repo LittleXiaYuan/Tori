@@ -165,10 +165,6 @@ func (g *Gateway) registerSystemRoutes() {
 	// Modules (hot-pluggable subsystems)
 	g.mux.HandleFunc("/v1/modules", g.requireAuth(g.handleModules))
 
-	// Cogni declarative AI-cognition shells (hot-pluggable)
-	g.mux.HandleFunc("/v1/cognis", g.requireAuth(g.handleCognis))
-	g.mux.HandleFunc("/v1/cognis/", g.requireAuth(g.handleCognis))
-
 	// NL Config — natural language → structured configuration
 	g.mux.HandleFunc("/v1/nl-config", g.requireAuth(g.handleNLConfig))
 	g.mux.HandleFunc("/v1/nl-config/", g.requireAuth(g.handleNLConfig))

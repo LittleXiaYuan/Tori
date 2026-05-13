@@ -6,11 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"yunque-agent/internal/controlplane/tenant"
+	cognikernelpack "yunque-agent/internal/packs/cognikernel"
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/packruntime"
 )
 
 func TestCogniExperienceConfirmPattern(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
 	tenant := tm.Register("cogni-experience-confirm")
 
 	reg := cogni.NewRegistry()
@@ -53,7 +56,7 @@ func TestCogniExperienceConfirmPattern(t *testing.T) {
 }
 
 func TestCogniExperienceConfirmPatternNotFound(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusEnabled)
 	tenant := tm.Register("cogni-experience-confirm-missing")
 
 	reg := cogni.NewRegistry()
@@ -74,4 +77,63 @@ func TestCogniExperienceConfirmPatternNotFound(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
+}
+
+func TestCogniKernelPackGateReturnsNotFoundWhenDisabled(t *testing.T) {
+	gw, tm := newTestGatewayWithCogniKernelPack(t, packruntime.PackStatusDisabled)
+	tenant := tm.Register("cogni-pack-disabled")
+
+	reg := cogni.NewRegistry()
+	if err := reg.Add(&cogni.Declaration{ID: "reviewer"}, "test"); err != nil {
+		t.Fatalf("add cogni declaration: %v", err)
+	}
+	gw.SetCogniRegistry(reg, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("disabled Cogni Kernel pack should gate /v1/cognis, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func newTestGatewayWithCogniKernelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
+	t.Helper()
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           cognikernelpack.PackID,
+		Name:         "Cogni Kernel Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Routes: []string{"/v1/cognis", "/v1/cognis/"},
+			RouteSpecs: []packruntime.BackendRouteSpec{
+				{Method: http.MethodGet, Path: "/v1/cognis"},
+				{Method: http.MethodPost, Path: "/v1/cognis"},
+				{Method: http.MethodGet, Path: "/v1/cognis/"},
+				{Method: http.MethodPost, Path: "/v1/cognis/"},
+				{Method: http.MethodDelete, Path: "/v1/cognis/"},
+			},
+		},
+		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "cognis", Label: "智体内核", Path: "/packs/cognis"}}},
+		SDK:      packruntime.SDKManifest{TypeScript: "yunque-client/cognis"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if status == packruntime.PackStatusDisabled {
+		if _, err := registry.Disable(cognikernelpack.PackID); err != nil {
+			t.Fatalf("Disable: %v", err)
+		}
+	}
+	gw, tm := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	gw.RegisterBackendPack(cognikernelpack.NewHandler(gw))
+	return gw, tm
 }
