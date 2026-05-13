@@ -87,3 +87,22 @@ func TestPackBundleReviewSchemaNamesGateFields(t *testing.T) {
 		}
 	}
 }
+
+func TestJSONSchemaByName(t *testing.T) {
+	names := JSONSchemaNames()
+	if len(names) == 0 {
+		t.Fatal("expected schema names")
+	}
+	for _, name := range names {
+		schema, ok := JSONSchemaByName(name)
+		if !ok {
+			t.Fatalf("schema name %q not found", name)
+		}
+		if schema["title"] == "" {
+			t.Fatalf("schema %q missing title", name)
+		}
+	}
+	if _, ok := JSONSchemaByName("missing"); ok {
+		t.Fatal("unexpected schema for missing name")
+	}
+}
