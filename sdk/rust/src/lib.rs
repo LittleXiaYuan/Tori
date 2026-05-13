@@ -1411,6 +1411,7 @@ pub struct AgentKit {
     pub planner: PlannerClient,
     pub ide: IDEClient,
     pub discovery: DiscoveryClient,
+    pub identity: IdentityClient,
     pub router: RouterClient,
     pub settings: SettingsClient,
     pub system: SystemClient,
@@ -1499,6 +1500,7 @@ impl AgentKit {
             planner: PlannerClient::new(base_url.clone(), token.as_ref())?,
             ide: IDEClient::new(base_url.clone(), token.as_ref())?,
             discovery: DiscoveryClient::new(base_url.clone(), token.as_ref())?,
+            identity: IdentityClient::new(base_url.clone(), token.as_ref())?,
             router: RouterClient::new(base_url.clone(), token.as_ref())?,
             settings: SettingsClient::new(base_url.clone(), token.as_ref())?,
             system: SystemClient::new(base_url.clone(), token.as_ref())?,
@@ -1583,6 +1585,7 @@ impl AgentKit {
             planner: PlannerClient::new_with_client(base_url.clone(), plugin_http.clone()),
             ide: IDEClient::new_with_client(base_url.clone(), plugin_http.clone()),
             discovery: DiscoveryClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            identity: IdentityClient::new_with_client(base_url.clone(), plugin_http.clone()),
             router: RouterClient::new_with_client(base_url.clone(), plugin_http.clone()),
             settings: SettingsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             system: SystemClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -6035,6 +6038,26 @@ impl RouterClient {
     pub async fn stats(&self) -> Result<RouterStatsResponse, reqwest::Error> {
         self.http.get(self.url("/v1/router/stats")).send().await?.error_for_status()?.json().await
     }
+}
+
+
+/// Lightweight Identity SDK facade over `/v1/identity/*`.
+#[derive(Debug, Clone)]
+pub struct IdentityClient {
+    inner: DiscoveryClient,
+}
+
+impl IdentityClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: DiscoveryClient::new(base_url, token)? })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: DiscoveryClient::new_with_client(base_url, http) }
+    }
+
+    pub async fn resolve(&self, request: &DiscoveryResolveIdentityRequest) -> Result<DiscoveryIdentityProfile, reqwest::Error> { self.inner.resolve_identity(request).await }
+    pub async fn profiles(&self) -> Result<DiscoveryIdentityProfilesResponse, reqwest::Error> { self.inner.identity_profiles().await }
 }
 
 /// Lightweight Discovery SDK client for identity resolution, embeddings, and web search.
@@ -10533,6 +10556,13 @@ mod tests {
     fn router_helpers_build_urls() {
         let client = RouterClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(client.url("/v1/router/stats"), "http://localhost:9090/v1/router/stats");
+    }
+
+    #[test]
+    fn identity_facade_wraps_discovery_identity_paths() {
+        let client = IdentityClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.inner.url("/v1/identity/resolve"), "http://localhost:9090/v1/identity/resolve");
+        assert_eq!(client.inner.url("/v1/identity/profiles"), "http://localhost:9090/v1/identity/profiles");
     }
 
     #[test]

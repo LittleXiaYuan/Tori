@@ -4356,3 +4356,38 @@ func TestModelsNamespaceWrapsModelRegistry(t *testing.T) {
 		t.Fatalf("unexpected model requests: %v", seen)
 	}
 }
+
+func TestIdentityNamespaceWrapsDiscoveryIdentity(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/identity/resolve":
+			_, _ = w.Write([]byte(`{"unified_id":"wechat:u1","display_name":"小云"}`))
+		case "/v1/identity/profiles":
+			_, _ = w.Write([]byte(`{"profiles":[{"unified_id":"wechat:u1"}]}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	resolved, err := Identity.Resolve(ctx, DiscoveryResolveIdentityRequest{Channel: "wechat", UserID: "u1", DisplayName: "小云"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := Identity.Profiles(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved["unified_id"] != "wechat:u1" || profiles["profiles"] == nil {
+		t.Fatalf("unexpected Identity results")
+	}
+	if NewAgentKit().Identity != Identity {
+		t.Fatalf("agent kit should expose Identity namespace")
+	}
+	if len(seen) != 2 || seen[0] != "POST /v1/identity/resolve" || seen[1] != "GET /v1/identity/profiles" {
+		t.Fatalf("unexpected identity requests: %v", seen)
+	}
+}

@@ -15,6 +15,7 @@ const checks = [
   ["Planner SDK manifest", "sdk/scripts/check-planner-sdk-manifest.mjs"],
   ["IDE SDK manifest", "sdk/scripts/check-ide-sdk-manifest.mjs"],
   ["Discovery SDK manifest", "sdk/scripts/check-discovery-sdk-manifest.mjs"],
+  ["Identity SDK manifest", "sdk/scripts/check-identity-sdk-manifest.mjs"],
   ["Tasks SDK manifest", "sdk/scripts/check-tasks-sdk-manifest.mjs"],
   ["Documents SDK manifest", "sdk/scripts/check-documents-sdk-manifest.mjs"],
   ["Bots SDK manifest", "sdk/scripts/check-bots-sdk-manifest.mjs"],
