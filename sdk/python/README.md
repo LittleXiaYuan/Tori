@@ -440,3 +440,7 @@ The lightweight Plugins SDK exposes plugin catalog, toggle, create, delete, file
 ### Skills SDK
 
 The lightweight Runtime Skills SDK exposes skill catalog, scan, dynamic skill review, approve/reject, and session suggestion helpers for external plugin UIs, operator pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/skills*` and `/v1/skill-suggestions`; Agent Kit also exposes this surface as `kit.skills` / `kit.Skills`.
+
+### Models SDK
+
+The lightweight Models SDK exposes model registry list, add, and delete helpers for external settings pages, operator panels, plugins, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/models`; Agent Kit also exposes this surface as `kit.models` / `kit.Models`.

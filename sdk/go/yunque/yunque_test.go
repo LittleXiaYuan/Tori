@@ -4320,3 +4320,39 @@ func TestSkillsNamespaceManagesRuntimeSkills(t *testing.T) {
 		t.Fatalf("expected 6 requests, got %d: %v", len(seen), seen)
 	}
 }
+
+func TestModelsNamespaceWrapsModelRegistry(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(`{"models":[{"id":"kimi","model_id":"moonshot-v1-8k"}]}`))
+		case http.MethodPost:
+			_, _ = w.Write([]byte(`{"id":"custom","model_id":"custom-model"}`))
+		case http.MethodDelete:
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	list, err := Models.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added, _ := Models.Add(ctx, ModelEntry{"id": "custom", "model_id": "custom-model"})
+	deleted, _ := Models.Delete(ctx, "custom")
+
+	if list.Models[0]["model_id"] != "moonshot-v1-8k" || added["model_id"] != "custom-model" || deleted["status"] != "ok" {
+		t.Fatalf("unexpected Models results")
+	}
+	if NewAgentKit().Models != Models {
+		t.Fatalf("agent kit should expose Models namespace")
+	}
+	if len(seen) != 3 || seen[0] != "GET /v1/models" || seen[2] != "DELETE /v1/models?id=custom" {
+		t.Fatalf("unexpected model requests: %v", seen)
+	}
+}

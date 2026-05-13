@@ -1442,6 +1442,7 @@ type AgentKit struct {
 	Fork          *forkNamespace
 	Cost          *costNamespace
 	Providers     *providersNamespace
+	Models        *modelsNamespace
 	Cognis        *cognisNamespace
 	Trace         *traceNamespace
 	Heartbeat     *heartbeatNamespace
@@ -2972,6 +2973,23 @@ var Cost = &costNamespace{}
 
 // Providers provides focused access to LLM provider, model, mode, and breaker endpoints.
 var Providers = &providersNamespace{}
+
+// Models provides focused access to model list, add, and delete helpers.
+var Models = &modelsNamespace{}
+
+type modelsNamespace struct{}
+
+func (m *modelsNamespace) List(ctx context.Context) (ModelsResponse, error) {
+	return Providers.Models(ctx)
+}
+
+func (m *modelsNamespace) Add(ctx context.Context, model ModelEntry) (ModelEntry, error) {
+	return Providers.AddModel(ctx, model)
+}
+
+func (m *modelsNamespace) Delete(ctx context.Context, id string) (ProviderActionResponse, error) {
+	return Providers.DeleteModel(ctx, id)
+}
 
 // Cognis provides focused access to Cogni registry, observability, experience,
 // evolution, and federation endpoints.
@@ -6552,6 +6570,7 @@ func NewAgentKit() AgentKit {
 		Fork:          Fork,
 		Cost:          Cost,
 		Providers:     Providers,
+		Models:        Models,
 		Cognis:        Cognis,
 		Trace:         Trace,
 		Heartbeat:     Heartbeat,
