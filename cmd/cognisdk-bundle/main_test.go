@@ -15,6 +15,7 @@ func TestRunInitAndPromoteReadyBundle(t *testing.T) {
 	current := filepath.Join(dir, "current.json")
 	candidate := filepath.Join(dir, "candidate.json")
 	promoted := filepath.Join(dir, "promoted.json")
+	reviewOut := filepath.Join(dir, "review.json")
 
 	if err := run([]string{"init", current}); err != nil {
 		t.Fatalf("init current: %v", err)
@@ -22,7 +23,7 @@ func TestRunInitAndPromoteReadyBundle(t *testing.T) {
 	if err := run([]string{"init", candidate, "--builtin"}); err != nil {
 		t.Fatalf("init candidate: %v", err)
 	}
-	if err := run([]string{"promote", current, candidate, promoted}); err != nil {
+	if err := run([]string{"promote", current, candidate, promoted, "--review-out", reviewOut}); err != nil {
 		t.Fatalf("promote candidate: %v", err)
 	}
 	bundle, err := cognisdk.LoadPackBundle(promoted)
@@ -31,6 +32,17 @@ func TestRunInitAndPromoteReadyBundle(t *testing.T) {
 	}
 	if bundle.ID != "builtin-cogni-pack-bundle" {
 		t.Fatalf("promoted bundle id = %q", bundle.ID)
+	}
+	reviewData, err := os.ReadFile(reviewOut)
+	if err != nil {
+		t.Fatalf("read review output: %v", err)
+	}
+	var review cognisdk.PackBundleReview
+	if err := json.Unmarshal(reviewData, &review); err != nil {
+		t.Fatalf("review output is not json: %v", err)
+	}
+	if review.Outcome != cognisdk.PackBundleReviewReady {
+		t.Fatalf("review outcome = %q", review.Outcome)
 	}
 }
 
@@ -94,5 +106,12 @@ func TestRunGoldenOutputsJSON(t *testing.T) {
 	}
 	if len(bundle.Packs) == 0 {
 		t.Fatal("expected builtin candidate packs")
+	}
+}
+
+func TestRunPromoteReviewOutRequiresPath(t *testing.T) {
+	err := run([]string{"promote", "current.json", "candidate.json", "out.json", "--review-out"})
+	if err == nil || !strings.Contains(err.Error(), "--review-out requires a path") {
+		t.Fatalf("expected review-out path error, got %v", err)
 	}
 }

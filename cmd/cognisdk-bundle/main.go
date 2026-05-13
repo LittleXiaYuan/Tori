@@ -90,13 +90,13 @@ func run(args []string) error {
 		return printJSON(summary)
 
 	case "promote":
-		allowReview := false
-		if len(args) > 0 && args[len(args)-1] == "--allow-review" {
-			allowReview = true
-			args = args[:len(args)-1]
+		allowReview, reviewOut, normalizedArgs, err := parsePromoteOptions(args)
+		if err != nil {
+			return err
 		}
+		args = normalizedArgs
 		if len(args) != 4 {
-			return fmt.Errorf("usage: cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review]")
+			return fmt.Errorf("usage: cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review] [--review-out review.json]")
 		}
 		current, candidate, err := loadPair(args[1], args[2])
 		if err != nil {
@@ -108,6 +108,11 @@ func run(args []string) error {
 		}
 		if review.Outcome == cognisdk.PackBundleReviewBlocked {
 			return fmt.Errorf("candidate bundle blocked: %s", review.Reason)
+		}
+		if reviewOut != "" {
+			if err := saveJSONFile(review, reviewOut); err != nil {
+				return err
+			}
 		}
 		if review.Outcome == cognisdk.PackBundleReviewReview && !allowReview {
 			return fmt.Errorf("candidate bundle requires review: %s", review.Reason)
@@ -139,6 +144,38 @@ func run(args []string) error {
 	}
 }
 
+func parsePromoteOptions(args []string) (bool, string, []string, error) {
+	allowReview := false
+	reviewOut := ""
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--allow-review":
+			allowReview = true
+		case "--review-out":
+			if i+1 >= len(args) {
+				return false, "", nil, fmt.Errorf("--review-out requires a path")
+			}
+			reviewOut = args[i+1]
+			i++
+		default:
+			normalized = append(normalized, args[i])
+		}
+	}
+	return allowReview, reviewOut, normalized, nil
+}
+
+func saveJSONFile(value any, path string) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write %q: %w", path, err)
+	}
+	return nil
+}
+
 func loadPair(currentPath, candidatePath string) (*cognisdk.PackBundle, *cognisdk.PackBundle, error) {
 	current, err := cognisdk.LoadPackBundle(currentPath)
 	if err != nil {
@@ -166,5 +203,5 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
-	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review]")
+	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review] [--review-out review.json]")
 }
