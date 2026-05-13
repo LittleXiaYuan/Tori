@@ -15,6 +15,8 @@ const expectedFiles = [
   "packs/examples/verifier-pack/README.md",
   "internal/packs/verifierpack/handler.go",
   "heroui-web/src/app/packs/verifier-pack/page.tsx",
+  "heroui-web/src/lib/verifier-pack-pack-client.ts",
+  "heroui-web/src/lib/__tests__/verifier-pack-pack-client.test.ts",
 ];
 
 for (const file of expectedFiles) {
@@ -56,6 +58,10 @@ if (payload) {
   if (!payload.manifest?.distribution?.frontendUrl) fail("manifest.distribution.frontendUrl must be present");
   if (!payload.manifest?.distribution?.sha256) fail("manifest.distribution.sha256 must be present");
   if (payload.manifest?.update?.rollback !== true) fail("manifest.update.rollback must be true");
+  const clientFile = "heroui-web/src/lib/verifier-pack-pack-client.ts";
+  const clientTestFile = "heroui-web/src/lib/__tests__/verifier-pack-pack-client.test.ts";
+  if (!payload.files?.includes(clientFile)) fail(`payload.files missing ${clientFile}`);
+  if (!payload.files?.includes(clientTestFile)) fail(`payload.files missing ${clientTestFile}`);
   for (const file of expectedFiles) {
     if (!payload.files?.includes(file)) fail(`payload.files missing ${file}`);
   }
