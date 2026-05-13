@@ -67,6 +67,27 @@ func PackBundleJSONSchema() JSONSchema {
 	}
 }
 
+// PackBundleDiffJSONSchema returns the schema for non-mutating bundle review diffs.
+func PackBundleDiffJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-diff.json",
+		"title":                "Cognition SDK Pack Bundle Diff",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"from_id", "to_id"},
+		"properties": map[string]any{
+			"from_id":        stringSchema(),
+			"to_id":          stringSchema(),
+			"added_packs":    map[string]any{"type": "array", "items": packStatusSchema()},
+			"removed_packs":  map[string]any{"type": "array", "items": packStatusSchema()},
+			"changed_packs":  map[string]any{"type": "array", "items": packChangeSchema()},
+			"enabled_packs":  stringArraySchema(),
+			"disabled_packs": stringArraySchema(),
+		},
+	}
+}
+
 // FeedbackProposalJSONSchema returns the schema for non-mutating feedback
 // proposals returned by BuildFeedbackProposal or Engine.ProposeUpdates.
 func FeedbackProposalJSONSchema() JSONSchema {
@@ -113,6 +134,36 @@ func SaveJSONSchema(schema JSONSchema, path string) error {
 		return fmt.Errorf("cognisdk.schema: write %q: %w", path, err)
 	}
 	return nil
+}
+
+func packStatusSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"id", "version", "type", "enabled"},
+		"properties": map[string]any{
+			"id":           stringSchema(),
+			"version":      stringSchema(),
+			"type":         stringSchema(),
+			"display_name": stringSchema(),
+			"enabled":      map[string]any{"type": "boolean"},
+			"provides":     stringArraySchema(),
+		},
+	}
+}
+
+func packChangeSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"id"},
+		"properties": map[string]any{
+			"id":           stringSchema(),
+			"from_version": stringSchema(),
+			"to_version":   stringSchema(),
+			"reason":       stringSchema(),
+		},
+	}
 }
 
 func beliefNodeSchema() map[string]any {
