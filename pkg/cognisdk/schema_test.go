@@ -13,6 +13,7 @@ func TestJSONSchemasMarshal(t *testing.T) {
 		"bundle":   PackBundleJSONSchema(),
 		"feedback": FeedbackProposalJSONSchema(),
 		"summary":  PackBundleSummaryJSONSchema(),
+		"digest":   PackBundleDigestCheckJSONSchema(),
 		"diff":     PackBundleDiffJSONSchema(),
 		"review":   PackBundleReviewJSONSchema(),
 		"plan":     PackBundleApplyPlanJSONSchema(),
@@ -68,6 +69,16 @@ func TestSaveJSONSchema(t *testing.T) {
 	}
 	if !json.Valid(data) {
 		t.Fatalf("saved schema is not valid json: %s", data)
+	}
+}
+
+func TestPackBundleDigestCheckSchemaNamesFields(t *testing.T) {
+	schema := PackBundleDigestCheckJSONSchema()
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"bundle_id", "expected", "actual", "match"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle digest check schema missing %q", field)
+		}
 	}
 }
 

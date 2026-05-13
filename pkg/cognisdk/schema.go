@@ -13,7 +13,7 @@ type JSONSchema map[string]any
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "feedback-proposal"}
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -25,6 +25,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleJSONSchema(), true
 	case "pack-bundle-summary":
 		return PackBundleSummaryJSONSchema(), true
+	case "pack-bundle-digest-check":
+		return PackBundleDigestCheckJSONSchema(), true
 	case "pack-bundle-diff":
 		return PackBundleDiffJSONSchema(), true
 	case "pack-bundle-review":
@@ -115,6 +117,25 @@ func PackBundleSummaryJSONSchema() JSONSchema {
 			"disabled_count":    map[string]any{"type": "integer"},
 			"golden_test_count": map[string]any{"type": "integer"},
 			"packs":             map[string]any{"type": "array", "items": packStatusSchema()},
+		},
+	}
+}
+
+// PackBundleDigestCheckJSONSchema returns the schema for digest assertion
+// results emitted by VerifyPackBundleDigest and cognisdk-bundle digest --expect.
+func PackBundleDigestCheckJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-digest-check.json",
+		"title":                "Cognition SDK Pack Bundle Digest Check",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"bundle_id", "expected", "actual", "match"},
+		"properties": map[string]any{
+			"bundle_id": stringSchema(),
+			"expected":  stringSchema(),
+			"actual":    stringSchema(),
+			"match":     map[string]any{"type": "boolean"},
 		},
 	}
 }
