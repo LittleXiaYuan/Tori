@@ -1632,6 +1632,7 @@ type AgentKit struct {
 	PluginSearch      *pluginSearchNamespace
 	PluginSend        *pluginSendNamespace
 	PluginLLM         *pluginLLMNamespace
+	PluginMemory      *pluginMemoryNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1651,10 +1652,35 @@ var PluginSend = &pluginSendNamespace{}
 // PluginLLM exposes standalone plugin-scoped LLM completion for plugins and scripts.
 var PluginLLM = &pluginLLMNamespace{}
 
+// PluginMemory exposes standalone plugin-private KV memory for plugins and scripts.
+var PluginMemory = &pluginMemoryNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
 type pluginSendNamespace struct{}
 type pluginLLMNamespace struct{}
+type pluginMemoryNamespace struct{}
+
+
+func (p *pluginMemoryNamespace) Get(ctx context.Context, key string) (string, error) {
+	return Memory.Get(ctx, key)
+}
+
+func (p *pluginMemoryNamespace) Set(ctx context.Context, key, value string) error {
+	return Memory.Set(ctx, key, value)
+}
+
+func (p *pluginMemoryNamespace) Delete(ctx context.Context, key string) error {
+	return Memory.Delete(ctx, key)
+}
+
+func (p *pluginMemoryNamespace) List(ctx context.Context, prefix string) (map[string]string, error) {
+	return Memory.List(ctx, prefix)
+}
+
+func (p *pluginMemoryNamespace) Search(ctx context.Context, query string, limit int) ([]string, error) {
+	return Memory.Search(ctx, query, limit)
+}
 
 // ── Mission Parse ──
 
@@ -6921,6 +6947,7 @@ func NewAgentKit() AgentKit {
 		PluginSearch:      PluginSearch,
 		PluginSend:        PluginSend,
 		PluginLLM:         PluginLLM,
+		PluginMemory:      PluginMemory,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,

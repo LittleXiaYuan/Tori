@@ -3412,6 +3412,26 @@ class _PluginLLMNamespace:
 
 plugin_llm = _PluginLLMNamespace()
 
+class _PluginMemoryNamespace:
+    """Standalone plugin-private memory helper for plugins and automation scripts."""
+
+    def get(self, key: str, default: str = "") -> str:
+        return memory.get(key, default)
+
+    def set(self, key: str, value: str) -> None:
+        memory.set(key, value)
+
+    def delete(self, key: str) -> None:
+        memory.delete(key)
+
+    def list(self, prefix: str = "") -> dict[str, str]:
+        return memory.list(prefix)
+
+    def search(self, query: str, limit: int = 10) -> list[str]:
+        return memory.search(query, limit)
+
+plugin_memory = _PluginMemoryNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3606,6 +3626,7 @@ class AgentKit:
         self.plugin_search = plugin_search
         self.plugin_send = plugin_send
         self.plugin_llm = plugin_llm
+        self.plugin_memory = plugin_memory
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan

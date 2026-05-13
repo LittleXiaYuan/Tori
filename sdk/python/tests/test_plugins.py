@@ -26,6 +26,11 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugin_send.send("webhook", "ops", "hello")
             yunque.plugin_llm.complete([{"role": "user", "content": "hi"}], temperature=0.2, model="demo")
             yunque.plugin_llm.llm("system", "user", model="demo", temperature=0.3)
+            yunque.plugin_memory.get("foo")
+            yunque.plugin_memory.set("foo", "bar")
+            yunque.plugin_memory.delete("foo")
+            yunque.plugin_memory.list("f")
+            yunque.plugin_memory.search("bar", 3)
 
         calls = [call.args for call in api_call.call_args_list]
         self.assertEqual(calls[0], ("GET", "/v1/plugins"))
@@ -47,6 +52,11 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[16], ("POST", "/v1/plugin-api/send", {"channel": "webhook", "target": "ops", "content": "hello", "format": "markdown"}))
         self.assertEqual(calls[17], ("POST", "/v1/plugin-api/llm", {"messages": [{"role": "user", "content": "hi"}], "temperature": 0.2, "model": "demo"}))
         self.assertEqual(calls[18], ("POST", "/v1/plugin-api/llm", {"messages": [{"role": "system", "content": "system"}, {"role": "user", "content": "user"}], "temperature": 0.3, "model": "demo"}))
+        self.assertEqual(calls[19], ("POST", "/v1/plugin-api/memory/get", {"key": "foo"}))
+        self.assertEqual(calls[20], ("POST", "/v1/plugin-api/memory/set", {"key": "foo", "value": "bar"}))
+        self.assertEqual(calls[21], ("POST", "/v1/plugin-api/memory/delete", {"key": "foo"}))
+        self.assertEqual(calls[22], ("POST", "/v1/plugin-api/memory/list", {"prefix": "f"}))
+        self.assertEqual(calls[23], ("POST", "/v1/plugin-api/memory/search", {"query": "bar", "limit": 3}))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
@@ -58,6 +68,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_search, yunque.plugin_search)
         self.assertIs(yunque.create_agent_kit().plugin_send, yunque.plugin_send)
         self.assertIs(yunque.create_agent_kit().plugin_llm, yunque.plugin_llm)
+        self.assertIs(yunque.create_agent_kit().plugin_memory, yunque.plugin_memory)
 
 
 if __name__ == "__main__":
