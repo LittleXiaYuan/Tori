@@ -49,6 +49,7 @@
     "bots-inbox",
     "proactive-reverie",
     "chat-runtime",
+    "webchat-embed",
     "conversation-sessions",
     "human-approvals",
     "rbac-governance",
@@ -263,6 +264,10 @@
       "description": "Access the lightweight Chat runtime client or namespace for /v1/chat, /v1/chat/stream, and /v1/chat/agentic."
     },
     {
+      "name": "webchat",
+      "description": "Access the lightweight WebChat client or namespace for widget URLs, embed snippets, and widget script fetches."
+    },
+    {
       "name": "conversations",
       "description": "Access the lightweight Conversations client or namespace for session lists, messages, metadata management, and replay."
     },
@@ -359,7 +364,8 @@
         "ide": "AgentKit.ide",
         "discovery": "createAgentKit().discovery",
         "bots": "createAgentKit().bots",
-        "documents": "createAgentKit().documents"
+        "documents": "createAgentKit().documents",
+        "webchat": "createAgentKit().webchat"
       }
     },
     "go": {
@@ -429,7 +435,8 @@
         "ide": "AgentKit.IDE",
         "discovery": "NewAgentKit().Discovery",
         "bots": "yunque.NewAgentKit().Bots",
-        "documents": "yunque.NewAgentKit().Documents"
+        "documents": "yunque.NewAgentKit().Documents",
+        "webchat": "yunque.NewAgentKit().WebChat"
       }
     },
     "python": {
@@ -499,7 +506,8 @@
         "ide": "AgentKit.ide",
         "discovery": "create_agent_kit().discovery",
         "bots": "yunque.create_agent_kit().bots",
-        "documents": "yunque.create_agent_kit().documents"
+        "documents": "yunque.create_agent_kit().documents",
+        "webchat": "yunque.create_agent_kit().webchat"
       }
     },
     "rust": {
@@ -569,7 +577,8 @@
         "ide": "AgentKit::ide",
         "discovery": "AgentKit::discovery",
         "bots": "AgentKit::bots",
-        "documents": "AgentKit::documents"
+        "documents": "AgentKit::documents",
+        "webchat": "AgentKit::webchat"
       }
     }
   },

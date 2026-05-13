@@ -2334,3 +2334,6 @@ The lightweight Bots SDK exposes bot management, inbox operations, and channel g
 ### Documents SDK
 
 The lightweight Documents SDK exposes document generation templates and DOCX/XLSX/PPTX/HTML generation helpers for external authoring pages, plugin UIs, CLIs, sidecars, front-end pages, and automation scripts without importing the full platform client. It maps directly to `GET /v1/documents/templates` and `POST /v1/documents/generate`; Agent Kit also exposes this surface as `kit.documents` / `kit.Documents`.
+### WebChat SDK
+
+The lightweight WebChat SDK exposes embeddable widget helpers (`widgetUrl`, `widgetScript`, `embedSnippet`) for external websites, front-end pages, plugin UIs, sidecars, and automation scripts without importing the full platform client. It maps to public `GET /v1/webchat/widget.js` plus local snippet generation; Agent Kit also exposes this surface as `kit.webchat` / `kit.WebChat`.

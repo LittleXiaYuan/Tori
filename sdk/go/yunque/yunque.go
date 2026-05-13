@@ -1069,6 +1069,7 @@ type AgentKit struct {
 	Reverie       *reverieNamespace
 	Realtime      *realtimeNamespace
 	Chat          *chatNamespace
+	WebChat       *webchatNamespace
 	Conversations *conversationsNamespace
 	Approvals     *approvalsNamespace
 	RBAC          *rbacNamespace
@@ -5750,6 +5751,48 @@ func (s *schedulerNamespace) Remove(ctx context.Context, id string) (SchedulerRe
 
 
 
+
+// ── WebChat Embed ──
+
+// WebChat provides focused access to embeddable WebChat widget helpers.
+var WebChat = &webchatNamespace{}
+
+type webchatNamespace struct{}
+
+type WebChatEmbedOptions struct {
+	APIKey      string
+	APIBase     string
+	Title       string
+	Placeholder string
+	Position    string
+	Theme       string
+	TenantID    string
+	ScriptPath  string
+}
+
+func (w *webchatNamespace) WidgetURL() string {
+	return strings.TrimRight(apiBase, "/") + "/v1/webchat/widget.js"
+}
+
+func (w *webchatNamespace) EmbedSnippet(opts WebChatEmbedOptions) (string, error) {
+	if opts.APIKey == "" { return "", fmt.Errorf("EmbedSnippet requires APIKey") }
+	if opts.ScriptPath == "" { opts.ScriptPath = w.WidgetURL() }
+	if opts.APIBase == "" { opts.APIBase = strings.TrimRight(apiBase, "/") }
+	attrs := [][2]string{{"src", opts.ScriptPath}, {"data-api-key", opts.APIKey}, {"data-api-base", opts.APIBase}, {"data-title", opts.Title}, {"data-placeholder", opts.Placeholder}, {"data-position", opts.Position}, {"data-theme", opts.Theme}, {"data-tenant-id", opts.TenantID}}
+	parts := make([]string, 0, len(attrs))
+	for _, attr := range attrs { if attr[1] != "" { parts = append(parts, fmt.Sprintf(`%s="%s"`, attr[0], htmlAttrEscape(attr[1]))) } }
+	return "<script " + strings.Join(parts, " ") + "></script>", nil
+}
+
+func (w *webchatNamespace) WidgetScript(ctx context.Context) (string, error) {
+	return apiCallText(ctx, http.MethodGet, "/v1/webchat/widget.js", nil)
+}
+
+func htmlAttrEscape(value string) string {
+	replacer := strings.NewReplacer("&", "&amp;", `"`, "&quot;", "<", "&lt;", ">", "&gt;")
+	return replacer.Replace(value)
+}
+
 // ── Document Generation ──
 
 // Documents provides focused access to document template listing and generation helpers.
@@ -6006,6 +6049,7 @@ func NewAgentKit() AgentKit {
 		Reverie:       Reverie,
 		Realtime:      Realtime,
 		Chat:          ChatSDK,
+		WebChat:       WebChat,
 		Conversations: Conversations,
 		Approvals:     Approvals,
 		RBAC:          RBAC,

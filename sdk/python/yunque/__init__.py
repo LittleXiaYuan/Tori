@@ -2848,6 +2848,62 @@ state = _StateNamespace()
 
 
 
+# ── WebChat Embed ──
+
+class _WebChatNamespace:
+    """Lightweight helpers for embeddable WebChat widget URLs and snippets."""
+
+    def widget_url(self, base_url: str = "") -> str:
+        """Return the public widget.js URL."""
+        return (base_url or _API_BASE).rstrip("/") + "/v1/webchat/widget.js"
+
+    def embed_snippet(self, api_key: str, *, api_base: str = "", title: str = "", placeholder: str = "",
+                      position: str = "", theme: str = "", tenant_id: str = "", script_path: str = "") -> str:
+        """Build the script tag used to embed WebChat on an external page."""
+        if not api_key:
+            raise ValueError("embed_snippet requires api_key")
+        attrs = {
+            "src": script_path or self.widget_url(api_base or _API_BASE),
+            "data-api-key": api_key,
+            "data-api-base": api_base or _API_BASE.rstrip("/"),
+            "data-title": title,
+            "data-placeholder": placeholder,
+            "data-position": position,
+            "data-theme": theme,
+            "data-tenant-id": tenant_id,
+        }
+        rendered = " ".join(f'{key}="{_html_attr(str(value))}"' for key, value in attrs.items() if value)
+        return f"<script {rendered}></script>"
+
+    def widget_script(self, origin: str = "") -> str:
+        """Fetch the public WebChat widget JavaScript."""
+        headers = {"Origin": origin} if origin else None
+        return _api_text("GET", "/v1/webchat/widget.js", headers=headers)
+
+
+def _html_attr(value: str) -> str:
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _api_text(method: str, path: str, body: Any = None, headers: Optional[dict] = None, timeout: int = 30) -> str:
+    url = _API_BASE.rstrip("/") + path
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method)
+    if _TOKEN:
+        req.add_header("Authorization", f"Bearer {_TOKEN}")
+    req.add_header("X-Plugin-Name", _PLUGIN_NAME)
+    if headers:
+        for key, value in headers.items():
+            req.add_header(key, value)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8")
+
+
+webchat = _WebChatNamespace()
+
+
 # ── Document Generation ──
 
 class _DocumentsNamespace:
@@ -2994,6 +3050,7 @@ class AgentKit:
         self.reverie = reverie
         self.realtime = realtime
         self.chat = chat_sdk
+        self.webchat = webchat
         self.conversations = conversations
         self.approvals = approvals
         self.rbac = rbac

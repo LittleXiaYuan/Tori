@@ -1415,6 +1415,7 @@ pub struct AgentKit {
     pub reverie: ReverieClient,
     pub realtime: RealtimeClient,
     pub chat: ChatClient,
+    pub webchat: WebChatClient,
     pub conversations: ConversationsClient,
     pub approvals: ApprovalsClient,
     pub rbac: RBACClient,
@@ -1496,6 +1497,7 @@ impl AgentKit {
             reverie: ReverieClient::new(base_url.clone(), token.as_ref())?,
             realtime: RealtimeClient::new(base_url.clone(), token.as_ref())?,
             chat: ChatClient::new(base_url.clone(), token.as_ref())?,
+            webchat: WebChatClient::new(base_url.clone(), token.as_ref())?,
             conversations: ConversationsClient::new(base_url.clone(), token.as_ref())?,
             approvals: ApprovalsClient::new(base_url.clone(), token.as_ref())?,
             rbac: RBACClient::new(base_url.clone(), token.as_ref())?,
@@ -1573,6 +1575,7 @@ impl AgentKit {
             reverie: ReverieClient::new_with_client(base_url.clone(), plugin_http.clone()),
             realtime: RealtimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             chat: ChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            webchat: WebChatClient::new_with_client(base_url.clone(), plugin_http.clone()),
             conversations: ConversationsClient::new_with_client(
                 base_url.clone(),
                 plugin_http.clone(),
@@ -5483,6 +5486,47 @@ pub struct UpdateTaskThreadStateRequest {
 }
 
 
+
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct WebChatEmbedOptions {
+    pub api_key: String,
+    pub api_base: String,
+    pub title: String,
+    pub placeholder: String,
+    pub position: String,
+    pub theme: String,
+    pub tenant_id: String,
+    pub script_path: String,
+}
+
+/// Lightweight WebChat SDK client for widget URLs, embed snippets, and widget script fetches.
+#[derive(Debug, Clone)]
+pub struct WebChatClient { base_url: String, http: reqwest::Client }
+
+impl WebChatClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub fn widget_url(&self) -> String { self.url("/v1/webchat/widget.js") }
+    pub fn embed_snippet(&self, options: &WebChatEmbedOptions) -> Result<String, String> {
+        if options.api_key.is_empty() { return Err("embed_snippet requires api_key".to_string()); }
+        let script_path = if options.script_path.is_empty() { self.widget_url() } else { options.script_path.clone() };
+        let api_base = if options.api_base.is_empty() { self.base_url.clone() } else { options.api_base.clone() };
+        let attrs = [("src", script_path), ("data-api-key", options.api_key.clone()), ("data-api-base", api_base), ("data-title", options.title.clone()), ("data-placeholder", options.placeholder.clone()), ("data-position", options.position.clone()), ("data-theme", options.theme.clone()), ("data-tenant-id", options.tenant_id.clone())];
+        let rendered = attrs.iter().filter(|(_, value)| !value.is_empty()).map(|(key, value)| format!("{}=\"{}\"", key, html_attr_escape(value))).collect::<Vec<_>>().join(" ");
+        Ok(format!("<script {rendered}></script>"))
+    }
+    pub async fn widget_script(&self) -> Result<String, reqwest::Error> { self.http.get(self.widget_url()).send().await?.error_for_status()?.text().await }
+}
+
+fn html_attr_escape(value: &str) -> String {
+    value.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;").replace('>', "&gt;")
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct DocumentGenerateRequest {
@@ -9403,6 +9447,16 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn webchat_helpers_build_urls_and_snippets() {
+        let client = WebChatClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.widget_url(), "http://localhost:9090/v1/webchat/widget.js");
+        let snippet = client.embed_snippet(&WebChatEmbedOptions { api_key: "key&1".to_string(), title: "Tori \"Chat\"".to_string(), ..Default::default() }).expect("snippet");
+        assert!(snippet.contains("data-api-key=\"key&amp;1\""));
+        assert!(snippet.contains("data-title=\"Tori &quot;Chat&quot;\""));
+    }
 
     #[test]
     fn documents_helpers_build_urls_and_payloads() {
