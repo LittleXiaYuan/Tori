@@ -68,10 +68,10 @@ for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs
   }
 }
 
-for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
+for (const token of ["packs/examples", "internal/packs", "heroui-web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
   if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
 }
-for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.update.rollback"]) {
+for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
   if (!scaffoldCheck.includes(token)) fail(`check-pack-scaffold.mjs missing token: ${token}`);
 }
 const scaffoldCheckResult = spawnSync(process.execPath, ["scripts/check-pack-scaffold.mjs"], { cwd: repoRoot, encoding: "utf8" });
@@ -137,6 +137,9 @@ for (const path of packFiles) {
   const frontendRoutes = manifest.frontend?.routes ?? [];
   if (!Array.isArray(frontendRoutes) || frontendRoutes.length === 0) fail(`${path}: frontend.routes must not be empty`);
   if (!manifest.sdk?.typescript) fail(`${path}: sdk.typescript is required for lightweight external callers`);
+  if (!manifest.distribution?.packageUrl) fail(`${path}: distribution.packageUrl is required for downloadable incremental packs`);
+  if (!manifest.distribution?.frontendUrl) fail(`${path}: distribution.frontendUrl is required for frontend synchronized updates`);
+  if (!manifest.distribution?.sha256) fail(`${path}: distribution.sha256 is required for package verification`);
   if (manifest.update?.rollback !== true) fail(`${path}: update.rollback should be true for reversible pack updates`);
 }
 

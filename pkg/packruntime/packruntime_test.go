@@ -25,7 +25,14 @@ func backupManifest(version string) Manifest {
 			Routes: []FrontendRoute{{Path: "/packs/backup", Component: "backup/BackupPage", Title: "备份恢复"}},
 			Assets: FrontendAssets{Type: "builtin", Entry: "backup/BackupPage"},
 		},
-		SDK:    SDKManifest{TypeScript: "yunque-client/backup"},
+		SDK: SDKManifest{TypeScript: "yunque-client/backup"},
+		Distribution: DistributionManifest{
+			ManifestURL: "https://packs.yunque.local/backup/pack.json",
+			PackageURL:  "https://packs.yunque.local/backup/backup-pack-0.1.0.tgz",
+			FrontendURL: "https://packs.yunque.local/backup/frontend/remoteEntry.js",
+			SHA256:      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			SizeBytes:   4096,
+		},
 		Update: UpdateManifest{Channel: "stable", Rollback: true},
 	}
 }
@@ -43,6 +50,25 @@ func TestManifestValidateAndRoundTrip(t *testing.T) {
 	}
 	if loaded.ID != manifest.ID || loaded.SDK.TypeScript != "yunque-client/backup" {
 		t.Fatalf("unexpected manifest roundtrip: %#v", loaded)
+	}
+	if loaded.Distribution.PackageURL == "" || loaded.Distribution.SHA256 == "" || loaded.Distribution.FrontendURL == "" {
+		t.Fatalf("expected distribution metadata to roundtrip: %#v", loaded.Distribution)
+	}
+}
+
+func TestManifestValidateRequiresChecksumForPackageURL(t *testing.T) {
+	manifest := backupManifest("0.1.0")
+	manifest.Distribution.SHA256 = ""
+	if err := manifest.Validate(); err == nil {
+		t.Fatalf("expected distribution checksum validation error")
+	}
+}
+
+func TestManifestValidateRejectsNegativeDistributionSize(t *testing.T) {
+	manifest := backupManifest("0.1.0")
+	manifest.Distribution.SizeBytes = -1
+	if err := manifest.Validate(); err == nil {
+		t.Fatalf("expected distribution size validation error")
 	}
 }
 

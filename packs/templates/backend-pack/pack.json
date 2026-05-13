@@ -7,18 +7,37 @@
   "optional": true,
   "defaultState": "disabled",
   "backend": {
-    "capabilities": ["example.ping"],
-    "routes": ["/v1/example-pack/ping"],
-    "permissions": ["example:read"]
+    "capabilities": [
+      "example.ping"
+    ],
+    "routes": [
+      "/v1/example-pack/ping"
+    ],
+    "permissions": [
+      "example:read"
+    ]
   },
   "frontend": {
     "menus": [
-      { "key": "example-pack", "label": "示例包", "path": "/packs/example", "icon": "package", "order": 120 }
+      {
+        "key": "example-pack",
+        "label": "示例包",
+        "path": "/packs/example",
+        "icon": "package",
+        "order": 120
+      }
     ],
     "routes": [
-      { "path": "/packs/example", "component": "example/ExamplePackPage", "title": "示例包" }
+      {
+        "path": "/packs/example",
+        "component": "example/ExamplePackPage",
+        "title": "示例包"
+      }
     ],
-    "assets": { "type": "builtin", "entry": "example/ExamplePackPage" }
+    "assets": {
+      "type": "builtin",
+      "entry": "example/ExamplePackPage"
+    }
   },
   "sdk": {
     "typescript": "yunque-client/example-pack"
@@ -30,5 +49,12 @@
   "metadata": {
     "template": "backend-pack",
     "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/example-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/example-pack/example-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/example-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
   }
 }

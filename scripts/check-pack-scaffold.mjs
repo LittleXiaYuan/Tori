@@ -52,6 +52,9 @@ if (payload) {
     fail("manifest.frontend.routes must be present");
   }
   if (!payload.manifest?.sdk?.typescript) fail("manifest.sdk.typescript must be present");
+  if (!payload.manifest?.distribution?.packageUrl) fail("manifest.distribution.packageUrl must be present");
+  if (!payload.manifest?.distribution?.frontendUrl) fail("manifest.distribution.frontendUrl must be present");
+  if (!payload.manifest?.distribution?.sha256) fail("manifest.distribution.sha256 must be present");
   if (payload.manifest?.update?.rollback !== true) fail("manifest.update.rollback must be true");
   for (const file of expectedFiles) {
     if (!payload.files?.includes(file)) fail(`payload.files missing ${file}`);
