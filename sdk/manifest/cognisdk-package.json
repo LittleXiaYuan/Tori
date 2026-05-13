@@ -163,7 +163,9 @@
         "PackBundleApplyChecklistJSONSchema",
         "FeedbackProposalJSONSchema",
         "JSONSchemaInfo",
+        "JSONSchemaArtifact",
         "JSONSchemaInfos",
+        "ExportJSONSchemaArtifacts",
         "JSONSchemaByName"
       ]
     }
@@ -173,12 +175,14 @@
       "name": "cognisdk-schema",
       "file": "cmd/cognisdk-schema/main.go",
       "commands": [
-        "list"
+        "list",
+        "export"
       ],
       "flags": [
         "--json",
         "--with-schema",
-        "--out"
+        "--out",
+        "--catalog"
       ],
       "schemas": [
         "pack-manifest",

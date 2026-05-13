@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,6 +20,17 @@ type JSONSchemaInfo struct {
 	Title       string `json:"title" yaml:"title"`
 	Schema      string `json:"schema" yaml:"schema"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// JSONSchemaArtifact records one exported schema file. It lets automation
+// scripts and plugin packagers know exactly which files were written without
+// re-deriving paths from schema names.
+type JSONSchemaArtifact struct {
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title" yaml:"title"`
+	Schema      string `json:"schema" yaml:"schema"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	File        string `json:"file" yaml:"file"`
 }
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
@@ -329,6 +341,36 @@ func SaveJSONSchema(schema JSONSchema, path string) error {
 		return fmt.Errorf("cognisdk.schema: write %q: %w", path, err)
 	}
 	return nil
+}
+
+// ExportJSONSchemaArtifacts writes every public Cognition SDK JSON Schema into
+// outputDir and returns a catalog of the created files. The returned File
+// values are relative filenames, so callers can move the directory as a small
+// portable schema artifact bundle.
+func ExportJSONSchemaArtifacts(outputDir string) ([]JSONSchemaArtifact, error) {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return nil, fmt.Errorf("cognisdk.schema: create %q: %w", outputDir, err)
+	}
+	infos := JSONSchemaInfos()
+	artifacts := make([]JSONSchemaArtifact, 0, len(infos))
+	for _, info := range infos {
+		schema, ok := JSONSchemaByName(info.Name)
+		if !ok {
+			continue
+		}
+		file := info.Name + ".schema.json"
+		if err := SaveJSONSchema(schema, filepath.Join(outputDir, file)); err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, JSONSchemaArtifact{
+			Name:        info.Name,
+			Title:       info.Title,
+			Schema:      info.Schema,
+			Description: info.Description,
+			File:        file,
+		})
+	}
+	return artifacts, nil
 }
 
 func packBundleApplyActionSchema() map[string]any {

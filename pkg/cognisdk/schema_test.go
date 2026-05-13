@@ -74,6 +74,29 @@ func TestSaveJSONSchema(t *testing.T) {
 	}
 }
 
+func TestExportJSONSchemaArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	artifacts, err := ExportJSONSchemaArtifacts(dir)
+	if err != nil {
+		t.Fatalf("export schemas: %v", err)
+	}
+	if len(artifacts) != len(JSONSchemaNames()) {
+		t.Fatalf("artifact length = %d, want %d", len(artifacts), len(JSONSchemaNames()))
+	}
+	for _, artifact := range artifacts {
+		if artifact.Name == "" || artifact.File == "" || artifact.Title == "" {
+			t.Fatalf("artifact missing fields: %#v", artifact)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, artifact.File))
+		if err != nil {
+			t.Fatalf("read exported schema %s: %v", artifact.File, err)
+		}
+		if !json.Valid(data) {
+			t.Fatalf("exported schema is not valid json: %s", data)
+		}
+	}
+}
+
 func TestPackBundleDigestCheckSchemaNamesFields(t *testing.T) {
 	schema := PackBundleDigestCheckJSONSchema()
 	props := schema["properties"].(map[string]any)
