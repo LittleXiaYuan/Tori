@@ -983,6 +983,47 @@ func TestTasksHelpers(t *testing.T) {
 	}
 }
 
+func TestInteractionsNamespaceBundlesRuntimeInteractions(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/emotion/history":
+			_, _ = w.Write([]byte(`{"entries":[{"emotion":"happy"}],"total":1}`))
+		case "/v1/emotion/stickers":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case "/v1/instructions":
+			if r.Method == http.MethodGet {
+				_, _ = w.Write([]byte(`{"instructions":[{"instruction_id":"i1"}],"total":1}`))
+			} else {
+				_, _ = w.Write([]byte(`{"instruction_id":"i1","content":"keep concise"}`))
+			}
+		case "/v1/react", "/v1/sticker/send":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	history, _ := Interactions.EmotionHistory(ctx, EmotionHistoryOptions{SessionID: "s1", Limit: 1})
+	stickers, _ := Interactions.Stickers(ctx)
+	listed, _ := Interactions.Instructions(ctx, "style")
+	created, _ := Interactions.CreateInstruction(ctx, UserInstruction{"content": "keep concise"})
+	reacted, _ := Interactions.React(ctx, ReactRequest{ChannelType: "telegram", Target: "chat1", MessageID: "m1", Emoji: "👍"})
+	sent, _ := Interactions.SendSticker(ctx, SendStickerRequest{ChannelType: "telegram", Target: "chat1", PackageID: "pkg", StickerID: "stk"})
+	if history["total"].(float64) != 1 || stickers["status"] != "ok" || listed["total"].(float64) != 1 || created["instruction_id"] != "i1" || reacted["status"] != "ok" || sent["status"] != "ok" {
+		t.Fatalf("unexpected interactions results")
+	}
+	if NewAgentKit().Interactions != Interactions {
+		t.Fatalf("agent kit should expose Interactions namespace")
+	}
+	if len(seen) != 6 {
+		t.Fatalf("expected 6 interaction requests, got %d: %v", len(seen), seen)
+	}
+}
+
 func TestPermissionsHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {

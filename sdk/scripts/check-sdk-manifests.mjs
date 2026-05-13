@@ -23,6 +23,7 @@ const checks = [
   ["Bots SDK manifest", "sdk/scripts/check-bots-sdk-manifest.mjs"],
   ["Permissions SDK manifest", "sdk/scripts/check-permissions-sdk-manifest.mjs"],
   ["Reactions SDK manifest", "sdk/scripts/check-reactions-sdk-manifest.mjs"],
+  ["Interactions SDK manifest", "sdk/scripts/check-interactions-sdk-manifest.mjs"],
   ["Instructions SDK manifest", "sdk/scripts/check-instructions-sdk-manifest.mjs"],
   ["Emotion SDK manifest", "sdk/scripts/check-emotion-sdk-manifest.mjs"],
   ["Audit SDK manifest", "sdk/scripts/check-audit-sdk-manifest.mjs"],

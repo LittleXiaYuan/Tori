@@ -1400,6 +1400,7 @@ pub struct AgentKit {
     pub persona: PersonaClient,
     pub modes: ModesClient,
     pub emotion: EmotionClient,
+    pub interactions: InteractionsClient,
     pub instructions: InstructionsClient,
     pub reactions: ReactionsClient,
     pub permissions: PermissionsClient,
@@ -1492,6 +1493,7 @@ impl AgentKit {
             persona: PersonaClient::new(base_url.clone(), token.as_ref())?,
             modes: ModesClient::new(base_url.clone(), token.as_ref())?,
             emotion: EmotionClient::new(base_url.clone(), token.as_ref())?,
+            interactions: InteractionsClient::new(base_url.clone(), token.as_ref())?,
             instructions: InstructionsClient::new(base_url.clone(), token.as_ref())?,
             reactions: ReactionsClient::new(base_url.clone(), token.as_ref())?,
             permissions: PermissionsClient::new(base_url.clone(), token.as_ref())?,
@@ -1577,6 +1579,7 @@ impl AgentKit {
             persona: PersonaClient::new_with_client(base_url.clone(), plugin_http.clone()),
             modes: ModesClient::new_with_client(base_url.clone(), plugin_http.clone()),
             emotion: EmotionClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            interactions: InteractionsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             instructions: InstructionsClient::new_with_client(
                 base_url.clone(),
                 plugin_http.clone(),
@@ -3725,6 +3728,46 @@ pub struct SendStickerRequest {
 }
 
 pub type ReactionStatusResponse = serde_json::Value;
+
+#[derive(Debug, Clone)]
+pub struct InteractionsClient {
+    emotion: EmotionClient,
+    instructions: InstructionsClient,
+    reactions: ReactionsClient,
+}
+
+impl InteractionsClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let base_url = base_url.into();
+        let token = token.as_ref().to_string();
+        Ok(Self {
+            emotion: EmotionClient::new(base_url.clone(), &token)?,
+            instructions: InstructionsClient::new(base_url.clone(), &token)?,
+            reactions: ReactionsClient::new(base_url, &token)?,
+        })
+    }
+
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        let base_url = base_url.into();
+        Self {
+            emotion: EmotionClient::new_with_client(base_url.clone(), http.clone()),
+            instructions: InstructionsClient::new_with_client(base_url.clone(), http.clone()),
+            reactions: ReactionsClient::new_with_client(base_url, http),
+        }
+    }
+
+    pub async fn emotion_history(&self, query: &EmotionHistoryQuery) -> Result<EmotionHistoryResponse, reqwest::Error> { self.emotion.history(query).await }
+    pub async fn stickers(&self) -> Result<StickerMapResponse, reqwest::Error> { self.emotion.stickers().await }
+    pub async fn register_stickers(&self, request: &RegisterStickersRequest) -> Result<EmotionStatusResponse, reqwest::Error> { self.emotion.register_stickers(request).await }
+    pub async fn clear_stickers(&self, request: &ClearStickersRequest) -> Result<EmotionStatusResponse, reqwest::Error> { self.emotion.clear_stickers(request).await }
+    pub async fn instructions(&self, category: &str) -> Result<InstructionsResponse, reqwest::Error> { self.instructions.list(category).await }
+    pub async fn create_instruction(&self, instruction: &UserInstruction) -> Result<UserInstruction, reqwest::Error> { self.instructions.create(instruction).await }
+    pub async fn update_instruction(&self, instruction: &UserInstruction) -> Result<InstructionStatusResponse, reqwest::Error> { self.instructions.update(instruction).await }
+    pub async fn delete_instruction(&self, id: &str) -> Result<InstructionStatusResponse, reqwest::Error> { self.instructions.delete(id).await }
+    pub async fn reorder_instructions(&self, ids: &[String]) -> Result<InstructionStatusResponse, reqwest::Error> { self.instructions.reorder(ids).await }
+    pub async fn react(&self, request: &ReactRequest) -> Result<ReactionStatusResponse, reqwest::Error> { self.reactions.react(request).await }
+    pub async fn send_sticker(&self, request: &SendStickerRequest) -> Result<ReactionStatusResponse, reqwest::Error> { self.reactions.send_sticker(request).await }
+}
 
 #[derive(Debug, Clone)]
 pub struct ReactionsClient {
@@ -10849,6 +10892,14 @@ mod tests {
         .unwrap();
         assert_eq!(check["resource"], "knowledge");
         assert_eq!(check["action"], "read");
+    }
+
+    #[test]
+    fn interactions_facade_wraps_runtime_interaction_paths() {
+        let client = InteractionsClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.emotion.url("/v1/emotion/history"), "http://localhost:9090/v1/emotion/history");
+        assert_eq!(client.instructions.url("/v1/instructions"), "http://localhost:9090/v1/instructions");
+        assert_eq!(client.reactions.url("/v1/react"), "http://localhost:9090/v1/react");
     }
 
     #[test]

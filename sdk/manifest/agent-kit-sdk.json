@@ -49,6 +49,7 @@
     "emotion-runtime",
     "user-instructions",
     "reactions-runtime",
+    "runtime-interactions",
     "permissions-facade",
     "auth-bootstrap",
     "tasks-runtime",
@@ -242,6 +243,10 @@
       "description": "Access the lightweight Reactions client or namespace for emoji reactions and sticker sending."
     },
     {
+      "name": "interactions",
+      "description": "Access the lightweight Interactions client or namespace for emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending."
+    },
+    {
       "name": "permissions",
       "description": "Access the lightweight Permissions client or namespace for permission checks and current-role reads."
     },
@@ -394,6 +399,7 @@
         "emotion": "AgentKit.emotion",
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
+        "interactions": "createAgentKit().interactions",
         "permissions": "AgentKit.permissions",
         "auth": "AgentKit.auth",
         "tasks": "AgentKit.tasks",
@@ -475,6 +481,7 @@
         "emotion": "AgentKit.Emotion",
         "instructions": "AgentKit.Instructions",
         "reactions": "AgentKit.Reactions",
+        "interactions": "yunque.NewAgentKit().Interactions",
         "permissions": "AgentKit.Permissions",
         "auth": "AgentKit.Auth",
         "tasks": "AgentKit.tasks",
@@ -556,6 +563,7 @@
         "emotion": "AgentKit.emotion",
         "instructions": "AgentKit.instructions",
         "reactions": "AgentKit.reactions",
+        "interactions": "yunque.create_agent_kit().interactions",
         "permissions": "AgentKit.permissions",
         "auth": "AgentKit.auth",
         "tasks": "AgentKit.tasks",
@@ -637,6 +645,7 @@
         "emotion": "AgentKit::emotion",
         "instructions": "AgentKit::instructions",
         "reactions": "AgentKit::reactions",
+        "interactions": "AgentKit::interactions",
         "permissions": "AgentKit::permissions",
         "auth": "AgentKit::auth",
         "tasks": "AgentKit::tasks",

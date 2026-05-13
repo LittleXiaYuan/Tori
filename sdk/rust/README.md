@@ -685,3 +685,7 @@ The lightweight Search SDK exposes web search and search-provider listing helper
 ### Modes SDK
 
 The lightweight Modes SDK exposes persona modes, current-mode reads, and mode switching helpers for external operator pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/persona/modes`, `/v1/persona/mode/current`, and `/v1/persona/mode`; Agent Kit also exposes this surface as `kit.modes` / `kit.Modes`.
+
+### Interactions SDK
+
+The lightweight Interactions SDK exposes emotion history, sticker mappings, user instructions, emoji reactions, and sticker sending helpers for external plugin UIs, front-end admin pages, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/emotion/*`, `/v1/instructions*`, `/v1/react`, and `/v1/sticker/send`; Agent Kit also exposes this surface as `kit.interactions` / `kit.Interactions`.

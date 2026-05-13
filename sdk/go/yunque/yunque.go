@@ -1496,6 +1496,7 @@ type AgentKit struct {
 	Persona       *personaNamespace
 	Modes         *modesNamespace
 	Emotion       *emotionNamespace
+	Interactions  *interactionsNamespace
 	Instructions  *instructionsNamespace
 	Reactions     *reactionsNamespace
 	Permissions   *permissionsNamespace
@@ -3094,6 +3095,55 @@ var Instructions = &instructionsNamespace{}
 
 // Reactions provides focused access to emoji reactions and sticker sending.
 var Reactions = &reactionsNamespace{}
+
+// Interactions bundles emotion, instruction, reaction, and sticker helpers for external callers.
+var Interactions = &interactionsNamespace{}
+
+type interactionsNamespace struct{}
+
+func (i *interactionsNamespace) EmotionHistory(ctx context.Context, opts EmotionHistoryOptions) (EmotionHistoryResponse, error) {
+	return Emotion.History(ctx, opts)
+}
+
+func (i *interactionsNamespace) Stickers(ctx context.Context) (StickerMapResponse, error) {
+	return Emotion.Stickers(ctx)
+}
+
+func (i *interactionsNamespace) RegisterStickers(ctx context.Context, req RegisterStickersRequest) (EmotionStatusResponse, error) {
+	return Emotion.RegisterStickers(ctx, req)
+}
+
+func (i *interactionsNamespace) ClearStickers(ctx context.Context, req ClearStickersRequest) (EmotionStatusResponse, error) {
+	return Emotion.ClearStickers(ctx, req)
+}
+
+func (i *interactionsNamespace) Instructions(ctx context.Context, category string) (InstructionsResponse, error) {
+	return Instructions.List(ctx, category)
+}
+
+func (i *interactionsNamespace) CreateInstruction(ctx context.Context, instruction UserInstruction) (UserInstruction, error) {
+	return Instructions.Create(ctx, instruction)
+}
+
+func (i *interactionsNamespace) UpdateInstruction(ctx context.Context, instruction UserInstruction) (InstructionStatusResponse, error) {
+	return Instructions.Update(ctx, instruction)
+}
+
+func (i *interactionsNamespace) DeleteInstruction(ctx context.Context, id string) (InstructionStatusResponse, error) {
+	return Instructions.Delete(ctx, id)
+}
+
+func (i *interactionsNamespace) ReorderInstructions(ctx context.Context, ids []string) (InstructionStatusResponse, error) {
+	return Instructions.Reorder(ctx, ids)
+}
+
+func (i *interactionsNamespace) React(ctx context.Context, req ReactRequest) (ReactionStatusResponse, error) {
+	return Reactions.React(ctx, req)
+}
+
+func (i *interactionsNamespace) SendSticker(ctx context.Context, req SendStickerRequest) (ReactionStatusResponse, error) {
+	return Reactions.SendSticker(ctx, req)
+}
 
 // Permissions provides focused access to permission checks and current roles.
 var Permissions = &permissionsNamespace{}
@@ -6645,6 +6695,7 @@ func NewAgentKit() AgentKit {
 		Persona:       Persona,
 		Modes:         Modes,
 		Emotion:       Emotion,
+		Interactions:  Interactions,
 		Instructions:  Instructions,
 		Reactions:     Reactions,
 		Permissions:   Permissions,
