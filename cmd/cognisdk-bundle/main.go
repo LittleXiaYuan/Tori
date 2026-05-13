@@ -122,6 +122,38 @@ func run(args []string) error {
 		}
 		return printJSON(summary)
 
+	case "actions":
+		planOptions, normalizedArgs, err := parsePlanOptions(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
+		if len(args) != 3 {
+			return fmt.Errorf("usage: cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--fail-on-review] [--fail-on-blocked]")
+		}
+		current, candidate, err := loadPair(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		plan, err := cognisdk.PlanPackBundleApply(context.Background(), *current, *candidate)
+		if err != nil {
+			return err
+		}
+		if planOptions.Out != "" {
+			if markdown {
+				if err := saveTextFile(renderApplyActionsMarkdown(plan.Actions), planOptions.Out); err != nil {
+					return err
+				}
+			} else if err := saveJSONFile(plan.Actions, planOptions.Out); err != nil {
+				return err
+			}
+		} else if markdown {
+			fmt.Print(renderApplyActionsMarkdown(plan.Actions))
+		} else if err := printJSON(plan.Actions); err != nil {
+			return err
+		}
+		return enforcePlanGate(plan, planOptions)
+
 	case "plan":
 		planOptions, normalizedArgs, err := parsePlanOptions(args)
 		if err != nil {
@@ -268,6 +300,42 @@ func parsePromoteOptions(args []string) (bool, string, []string, error) {
 	return allowReview, reviewOut, normalized, nil
 }
 
+func renderApplyActionsMarkdown(actions []cognisdk.PackBundleApplyAction) string {
+	var out string
+	out += "## Cogni Pack Bundle Apply Actions\n\n"
+	if len(actions) == 0 {
+		out += "No actions.\n"
+		return out
+	}
+	for _, action := range actions {
+		out += fmt.Sprintf("- `%s`", action.Kind)
+		if action.PackID != "" {
+			out += fmt.Sprintf(" pack=%s", action.PackID)
+		}
+		if action.BundleID != "" {
+			out += fmt.Sprintf(" bundle=%s", action.BundleID)
+		}
+		if action.Digest != "" {
+			out += fmt.Sprintf(" digest=%s", action.Digest)
+		}
+		if action.FromVersion != "" || action.ToVersion != "" {
+			out += fmt.Sprintf(" version=%s->%s", emptyCLI(action.FromVersion), emptyCLI(action.ToVersion))
+		}
+		if action.Message != "" {
+			out += fmt.Sprintf(": %s", action.Message)
+		}
+		out += "\n"
+	}
+	return out
+}
+
+func emptyCLI(value string) string {
+	if value == "" {
+		return "unknown"
+	}
+	return value
+}
+
 func saveTextFile(value string, path string) error {
 	if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
 		return fmt.Errorf("write %q: %w", path, err)
@@ -310,6 +378,7 @@ func printJSON(value any) error {
 func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-bundle init <output.json> [--builtin]")
+	fmt.Println("  cognisdk-bundle actions <current.json> <candidate.json> [--markdown] [--out actions.json] [--fail-on-review] [--fail-on-blocked]")
 	fmt.Println("  cognisdk-bundle digest <bundle.json>")
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
