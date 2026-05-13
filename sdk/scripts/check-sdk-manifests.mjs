@@ -78,6 +78,7 @@ const checks = [
   ["Models SDK manifest", "sdk/scripts/check-models-sdk-manifest.mjs"],
   ["Router SDK manifest", "sdk/scripts/check-router-sdk-manifest.mjs"],
   ["Cognis SDK manifest", "sdk/scripts/check-cognis-sdk-manifest.mjs"],
+  ["Cognition SDK package manifest", "sdk/scripts/check-cognisdk-package-manifest.mjs"],
   ["Trace SDK manifest", "sdk/scripts/check-trace-sdk-manifest.mjs"],
   ["Heartbeat SDK manifest", "sdk/scripts/check-heartbeat-sdk-manifest.mjs"],
   ["Events SDK manifest", "sdk/scripts/check-events-sdk-manifest.mjs"],
