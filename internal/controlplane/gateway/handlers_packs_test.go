@@ -173,6 +173,80 @@ func TestRegisterBackendPackMountsModuleAfterGatewayConstruction(t *testing.T) {
 	}
 }
 
+func TestRegisterBackendPackIsIdempotentForSamePackRoute(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.idempotent",
+		Name:         "Idempotent Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Routes: []string{"/v1/idempotent-pack/ping"}},
+		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "idempotent-pack", Label: "幂等包", Path: "/packs/idempotent"}}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("idempotent-pack")
+	module := testBackendPackModule{
+		id: "yunque.pack.idempotent",
+		routes: []packruntime.BackendRoute{{
+			Method: http.MethodGet,
+			Path:   "/v1/idempotent-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"ok": true})
+			},
+		}},
+	}
+
+	gw.RegisterBackendPack(module)
+	gw.RegisterBackendPack(module)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/idempotent-pack/ping", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected idempotent route to stay mounted, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestRegisterBackendPackPanicsOnRouteConflict(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	gw, _ := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	first := testBackendPackModule{
+		id: "yunque.pack.first",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/conflicting-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {},
+		}},
+	}
+	second := testBackendPackModule{
+		id: "yunque.pack.second",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/conflicting-pack/ping",
+			Handler: func(w http.ResponseWriter, r *http.Request) {},
+		}},
+	}
+
+	gw.RegisterBackendPack(first)
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("expected route conflict panic")
+		}
+	}()
+	gw.RegisterBackendPack(second)
+}
+
 func TestPackRoutesInstallPackFromManifestPath(t *testing.T) {
 	root := t.TempDir()
 	registry, err := packruntime.NewRegistry(filepath.Join(root, "registry"))
