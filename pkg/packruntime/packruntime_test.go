@@ -1,7 +1,14 @@
 package packruntime
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -69,6 +76,59 @@ func TestManifestValidateRejectsNegativeDistributionSize(t *testing.T) {
 	manifest.Distribution.SizeBytes = -1
 	if err := manifest.Validate(); err == nil {
 		t.Fatalf("expected distribution size validation error")
+	}
+}
+
+func TestRegistryCachesDistributionPackage(t *testing.T) {
+	registry, err := NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	payload := []byte("pack artifact payload")
+	sha := sha256.Sum256(payload)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/backup-pack-0.1.0.tgz" {
+			t.Fatalf("unexpected package path: %s", r.URL.Path)
+		}
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+	manifest := backupManifest("0.1.0")
+	manifest.Distribution.PackageURL = srv.URL + "/backup-pack-0.1.0.tgz"
+	manifest.Distribution.SHA256 = hex.EncodeToString(sha[:])
+	artifacts, err := registry.CacheDistribution(context.Background(), manifest)
+	if err != nil {
+		t.Fatalf("CacheDistribution: %v", err)
+	}
+	if artifacts == nil || artifacts.SHA256 != manifest.Distribution.SHA256 || artifacts.SizeBytes != int64(len(payload)) {
+		t.Fatalf("unexpected artifacts: %#v", artifacts)
+	}
+	if !strings.Contains(artifacts.PackagePath, filepath.Join("artifacts", "yunque.pack.backup", "0.1.0")) {
+		t.Fatalf("unexpected artifact path: %s", artifacts.PackagePath)
+	}
+	cached, err := os.ReadFile(artifacts.PackagePath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(cached) != string(payload) {
+		t.Fatalf("unexpected cached payload: %q", cached)
+	}
+}
+
+func TestRegistryCacheDistributionRejectsSHA256Mismatch(t *testing.T) {
+	registry, err := NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("different payload"))
+	}))
+	defer srv.Close()
+	manifest := backupManifest("0.1.0")
+	manifest.Distribution.PackageURL = srv.URL + "/backup-pack-0.1.0.tgz"
+	manifest.Distribution.SHA256 = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	if _, err := registry.CacheDistribution(context.Background(), manifest); err == nil {
+		t.Fatalf("expected sha256 mismatch")
 	}
 }
 
