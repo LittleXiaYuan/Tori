@@ -69,6 +69,28 @@ func run(args []string) error {
 		}
 		return nil
 	}
+	if args[0] == "verify" {
+		verifyOptions, err := parseVerifyOptions(args[1:])
+		if err != nil {
+			return err
+		}
+		checks, err := verifySchemaArtifacts(verifyOptions)
+		data, marshalErr := json.MarshalIndent(checks, "", "  ")
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if verifyOptions.Out != "" {
+			if writeErr := writeTextFile(verifyOptions.Out, string(data)+"\n"); writeErr != nil {
+				return writeErr
+			}
+		} else {
+			fmt.Println(string(data))
+		}
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 
 	schema, ok := cognisdk.JSONSchemaByName(args[0])
 	if !ok {
@@ -92,6 +114,7 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  cognisdk-schema list [--json] [--with-schema] [--out schema-catalog.json]")
 	fmt.Println("  cognisdk-schema export <output-dir> [--catalog schema-artifacts.json]")
+	fmt.Println("  cognisdk-schema verify <schema-dir> [--catalog schema-artifacts.json] [--out check.json]")
 	fmt.Println("  cognisdk-schema <schema-name> [output.json]")
 	fmt.Println("")
 	fmt.Println("Schema names:")
@@ -159,6 +182,59 @@ func parseExportOptions(args []string) (exportOptions, error) {
 		return exportOptions{}, fmt.Errorf("usage: cognisdk-schema export <output-dir> [--catalog schema-artifacts.json]")
 	}
 	return opts, nil
+}
+
+type verifyOptions struct {
+	Dir     string
+	Catalog string
+	Out     string
+}
+
+func parseVerifyOptions(args []string) (verifyOptions, error) {
+	var opts verifyOptions
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--catalog":
+			if i+1 >= len(args) {
+				return verifyOptions{}, fmt.Errorf("--catalog requires a path")
+			}
+			opts.Catalog = args[i+1]
+			i++
+		case "--out":
+			if i+1 >= len(args) {
+				return verifyOptions{}, fmt.Errorf("--out requires a path")
+			}
+			opts.Out = args[i+1]
+			i++
+		default:
+			if strings.HasPrefix(args[i], "-") {
+				return verifyOptions{}, fmt.Errorf("unknown verify option %q", args[i])
+			}
+			if opts.Dir != "" {
+				return verifyOptions{}, fmt.Errorf("usage: cognisdk-schema verify <schema-dir> [--catalog schema-artifacts.json] [--out check.json]")
+			}
+			opts.Dir = args[i]
+		}
+	}
+	if opts.Dir == "" {
+		return verifyOptions{}, fmt.Errorf("usage: cognisdk-schema verify <schema-dir> [--catalog schema-artifacts.json] [--out check.json]")
+	}
+	return opts, nil
+}
+
+func verifySchemaArtifacts(opts verifyOptions) ([]cognisdk.JSONSchemaArtifactCheck, error) {
+	if opts.Catalog == "" {
+		return cognisdk.VerifyJSONSchemaArtifacts(opts.Dir)
+	}
+	data, err := os.ReadFile(opts.Catalog)
+	if err != nil {
+		return nil, fmt.Errorf("read catalog %q: %w", opts.Catalog, err)
+	}
+	var artifacts []cognisdk.JSONSchemaArtifact
+	if err := json.Unmarshal(data, &artifacts); err != nil {
+		return nil, fmt.Errorf("parse catalog %q: %w", opts.Catalog, err)
+	}
+	return cognisdk.VerifyJSONSchemaArtifactCatalog(opts.Dir, artifacts)
 }
 
 type schemaCatalogEntry struct {

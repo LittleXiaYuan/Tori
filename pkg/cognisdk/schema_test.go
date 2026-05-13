@@ -97,6 +97,88 @@ func TestExportJSONSchemaArtifacts(t *testing.T) {
 	}
 }
 
+func TestVerifyJSONSchemaArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := ExportJSONSchemaArtifacts(dir); err != nil {
+		t.Fatalf("export schemas: %v", err)
+	}
+	checks, err := VerifyJSONSchemaArtifacts(dir)
+	if err != nil {
+		t.Fatalf("verify schemas: %v", err)
+	}
+	if len(checks) != len(JSONSchemaNames()) {
+		t.Fatalf("checks length = %d, want %d", len(checks), len(JSONSchemaNames()))
+	}
+	for _, check := range checks {
+		if check.Name == "" || check.File == "" || check.Expected == "" || check.Actual == "" {
+			t.Fatalf("check missing fields: %#v", check)
+		}
+		if !check.Match || check.Error != "" {
+			t.Fatalf("check did not match: %#v", check)
+		}
+	}
+}
+
+func TestVerifyJSONSchemaArtifactsDetectsStaleFile(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := ExportJSONSchemaArtifacts(dir); err != nil {
+		t.Fatalf("export schemas: %v", err)
+	}
+	path := filepath.Join(dir, "pack-bundle.schema.json")
+	if err := os.WriteFile(path, []byte(`{"$id":"stale","title":"stale"}`), 0o644); err != nil {
+		t.Fatalf("write stale schema: %v", err)
+	}
+	checks, err := VerifyJSONSchemaArtifacts(dir)
+	if err == nil {
+		t.Fatal("expected stale schema verification error")
+	}
+	found := false
+	for _, check := range checks {
+		if check.Name == "pack-bundle" {
+			found = true
+			if check.Match {
+				t.Fatalf("stale schema unexpectedly matched: %#v", check)
+			}
+			if check.Actual != "stale" {
+				t.Fatalf("stale schema actual id = %q", check.Actual)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("missing pack-bundle check")
+	}
+}
+
+func TestVerifyJSONSchemaArtifactCatalog(t *testing.T) {
+	dir := t.TempDir()
+	artifacts, err := ExportJSONSchemaArtifacts(dir)
+	if err != nil {
+		t.Fatalf("export schemas: %v", err)
+	}
+	checks, err := VerifyJSONSchemaArtifactCatalog(dir, artifacts)
+	if err != nil {
+		t.Fatalf("verify schema catalog: %v", err)
+	}
+	if len(checks) != len(artifacts) {
+		t.Fatalf("checks length = %d, want %d", len(checks), len(artifacts))
+	}
+}
+
+func TestVerifyJSONSchemaArtifactCatalogRejectsIncompleteCatalog(t *testing.T) {
+	dir := t.TempDir()
+	artifacts, err := ExportJSONSchemaArtifacts(dir)
+	if err != nil {
+		t.Fatalf("export schemas: %v", err)
+	}
+	checks, err := VerifyJSONSchemaArtifactCatalog(dir, artifacts[:1])
+	if err == nil {
+		t.Fatal("expected incomplete catalog error")
+	}
+	if len(checks) != 1 || !checks[0].Match {
+		t.Fatalf("unexpected checks for incomplete catalog: %#v", checks)
+	}
+}
+
 func TestPackBundleDigestCheckSchemaNamesFields(t *testing.T) {
 	schema := PackBundleDigestCheckJSONSchema()
 	props := schema["properties"].(map[string]any)
