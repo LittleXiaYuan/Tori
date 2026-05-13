@@ -22,6 +22,20 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "list" {
+		if len(args) > 2 {
+			return fmt.Errorf("usage: cognisdk-schema list [--json]")
+		}
+		if len(args) == 2 {
+			if args[1] != "--json" {
+				return fmt.Errorf("unknown list option %q", args[1])
+			}
+			data, err := json.MarshalIndent(cognisdk.JSONSchemaInfos(), "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
+			return nil
+		}
 		for _, name := range cognisdk.JSONSchemaNames() {
 			fmt.Println(name)
 		}
@@ -48,7 +62,7 @@ func run(args []string) error {
 
 func printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println("  cognisdk-schema list")
+	fmt.Println("  cognisdk-schema list [--json]")
 	fmt.Println("  cognisdk-schema <schema-name> [output.json]")
 	fmt.Println("")
 	fmt.Println("Schema names:")
