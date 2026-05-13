@@ -34,6 +34,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/api/skillhub/installed")) return jsonResponse({ skills: [{ slug: "browser", version: "1.0.0" }], count: 1 });
       if (value.endsWith("/v1/plugins")) return jsonResponse({ plugins: [{ name: "demo", enabled: true }] });
       if (value.endsWith("/v1/plugins/ui")) return jsonResponse({ tabs: [{ id: "demo-tab" }] });
+      if (value.endsWith("/v1/plugins/toggle")) return jsonResponse({ name: "demo", enabled: true, skills_count: 1 });
       if (value.endsWith("/v1/skills")) return jsonResponse({ skills: [{ name: "web.search", description: "search" }], count: 1 });
       if (value.endsWith("/v1/skills/scan")) return jsonResponse({ status: "scanned", skills_loaded: 2 });
       if (value.endsWith("/v1/skill-suggestions?session_id=s1")) return jsonResponse({ suggestions: [{ name: "summarize" }] });
@@ -101,6 +102,7 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.skillhub.installed()).count, 1);
   assertEqual((await kit.plugins.list()).plugins[0]?.name, "demo");
   assertEqual(((await kit.pluginUI.ui()).tabs[0] as { id?: string })?.id, "demo-tab");
+  assertEqual((await kit.pluginToggle.toggle("demo", true)).enabled, true);
   assertEqual((await kit.skills.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsCatalog.list()).skills[0]?.name, "web.search");
   assertEqual((await kit.skillsScan.scan()).skills_loaded, 2);

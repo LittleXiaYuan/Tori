@@ -30,6 +30,7 @@
     "skills-scan",
     "skills-suggestions",
     "skills-dynamic",
+    "plugin-toggle",
     "runtime-skills",
     "mcp-dispatch",
     "ide-orchestrator",
@@ -176,6 +177,10 @@
     {
       "name": "skillsDynamic",
       "description": "Access the lightweight SkillsDynamic client or namespace for dynamic skill review, approval, and rejection."
+    },
+    {
+      "name": "pluginToggle",
+      "description": "Access the lightweight PluginToggle client or namespace for enabling and disabling plugins."
     },
     {
       "name": "skills",
@@ -491,6 +496,7 @@
         "skillsScan": "createAgentKit().skillsScan",
         "skillsSuggestions": "createAgentKit().skillsSuggestions",
         "skillsDynamic": "createAgentKit().skillsDynamic",
+        "pluginToggle": "createAgentKit().pluginToggle",
         "skills": "createAgentKit().skills",
         "models": "createAgentKit().models",
         "identity": "createAgentKit().identity",
@@ -584,6 +590,7 @@
         "skillsScan": "yunque.NewAgentKit().SkillsScan",
         "skillsSuggestions": "yunque.NewAgentKit().SkillsSuggestions",
         "skillsDynamic": "yunque.NewAgentKit().SkillsDynamic",
+        "pluginToggle": "yunque.NewAgentKit().PluginToggle",
         "skills": "yunque.NewAgentKit().Skills",
         "models": "yunque.NewAgentKit().Models",
         "identity": "yunque.NewAgentKit().Identity",
@@ -677,6 +684,7 @@
         "skillsScan": "yunque.create_agent_kit().skills_scan",
         "skillsSuggestions": "yunque.create_agent_kit().skills_suggestions",
         "skillsDynamic": "yunque.create_agent_kit().skills_dynamic",
+        "pluginToggle": "yunque.create_agent_kit().plugin_toggle",
         "skills": "yunque.create_agent_kit().skills",
         "models": "yunque.create_agent_kit().models",
         "identity": "yunque.create_agent_kit().identity",
@@ -770,6 +778,7 @@
         "skillsScan": "AgentKit::skills_scan",
         "skillsSuggestions": "AgentKit::skills_suggestions",
         "skillsDynamic": "AgentKit::skills_dynamic",
+        "pluginToggle": "AgentKit::plugin_toggle",
         "skills": "AgentKit::skills",
         "models": "AgentKit::models",
         "identity": "AgentKit::identity",

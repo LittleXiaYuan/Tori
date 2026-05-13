@@ -1462,7 +1462,7 @@ func TestPersonaHelpers(t *testing.T) {
 	if state["identity"] != "Tori" || updated["status"] != "ok" || skills["skills"] == nil || presets["active"] != "default" || NewAgentKit().Persona != Persona {
 		t.Fatalf("unexpected persona results: state=%+v updated=%+v skills=%+v presets=%+v", state, updated, skills, presets)
 	}
-	if len(seen) != 10 || seen[0] != "GET /v1/persona" || seen[9] != "DELETE /v1/persona/presets/custom" {
+	if len(seen) != 11 || seen[0] != "GET /v1/persona" || seen[9] != "DELETE /v1/persona/presets/custom" {
 		t.Fatalf("unexpected persona requests: %v", seen)
 	}
 }
@@ -4512,6 +4512,7 @@ func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	toggled, _ := Plugins.Toggle(ctx, "demo", true)
+	toggledStandalone, _ := PluginToggle.Toggle(ctx, "demo", true)
 	created, _ := Plugins.Create(ctx, PluginCreateRequest{Name: "demo", Description: "Demo", Language: "python"})
 	deleted, _ := Plugins.Delete(ctx, "demo")
 	files, _ := Plugins.Files(ctx, "demo")
@@ -4521,14 +4522,14 @@ func TestPluginsNamespaceManagesPluginLifecycle(t *testing.T) {
 	reloaded, _ := Plugins.Reload(ctx)
 	opened, _ := Plugins.OpenFolder(ctx, "demo")
 
-	if list["plugins"] == nil || toggled["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || pluginUI["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
+	if list["plugins"] == nil || toggled["enabled"] != true || toggledStandalone["enabled"] != true || created["name"] != "demo" || deleted["status"] != "deleted" || files["files"] == nil || saved["status"] != "saved" || ui["tabs"] == nil || pluginUI["tabs"] == nil || reloaded["skills"].(float64) != 1 || opened["ok"] != true {
 		t.Fatalf("unexpected Plugins results")
 	}
-	if NewAgentKit().Plugins != Plugins || NewAgentKit().PluginUI != PluginUI {
+	if NewAgentKit().Plugins != Plugins || NewAgentKit().PluginUI != PluginUI || NewAgentKit().PluginToggle != PluginToggle {
 		t.Fatalf("agent kit should expose Plugins namespace")
 	}
-	if len(seen) != 10 {
-		t.Fatalf("expected 10 requests, got %d: %v", len(seen), seen)
+	if len(seen) != 11 {
+		t.Fatalf("expected 11 requests, got %d: %v", len(seen), seen)
 	}
 }
 
