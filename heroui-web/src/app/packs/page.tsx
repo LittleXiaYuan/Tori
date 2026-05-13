@@ -6,6 +6,7 @@ import {
   ArchiveRestore,
   Boxes,
   CheckCircle2,
+  ClipboardCopy,
   DatabaseZap,
   Download,
   ExternalLink,
@@ -31,6 +32,20 @@ function formatTime(value?: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleString();
+}
+
+function sdkImportSnippet(language: string, entry: string): string {
+  if (language === "typescript") return `import * as packSdk from "${entry}";`;
+  return `${language}:${entry}`;
+}
+
+async function copyText(text: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`${label} 已复制`, "success");
+  } catch {
+    showToast("复制失败，请手动复制代码片段", "error");
+  }
 }
 
 function statusTone(status: string): { label: string; color: string; bg: string } {
@@ -279,7 +294,25 @@ export default function PacksPage() {
                 {sdkEntries.length > 0 && (
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-text-muted)" }}>
                     <TerminalSquare size={13} className="mt-0.5 shrink-0" style={{ color: "var(--yunque-accent)" }} />
-                    <span>SDK 调用入口：{sdkEntries.map(([language, entry]) => <code key={language} className="mx-1">{language}:{entry}</code>)}</span>
+                    <span className="space-y-1">
+                      <span className="block">SDK 调用入口：</span>
+                      {sdkEntries.map(([language, entry]) => {
+                        const snippet = sdkImportSnippet(language, entry);
+                        return (
+                          <button
+                            key={language}
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 mr-1 mt-1 text-left hover:opacity-80"
+                            style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}
+                            onClick={() => void copyText(snippet, `${language} SDK import`)}
+                            title="复制 SDK import 示例"
+                          >
+                            <ClipboardCopy size={11} />
+                            <code>{snippet}</code>
+                          </button>
+                        );
+                      })}
+                    </span>
                   </div>
                 )}
 

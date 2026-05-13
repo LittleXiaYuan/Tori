@@ -2344,6 +2344,8 @@ const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<ap
 await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
 const modules = await packs.backendModules();\nconst sync = await packs.frontendSync();
 console.log(sync.menus, sync.routes, sync.sdk);
+// TypeScript pack SDK import example:
+// import * as packSdk from sync.sdk.find((entry) => entry.language === "typescript")!.importPath;
 await packs.disable("yunque.pack.backup");
 ```
 
