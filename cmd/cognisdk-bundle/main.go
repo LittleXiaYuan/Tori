@@ -56,22 +56,28 @@ func run(args []string) error {
 		return cognisdk.SavePackBundle(bundle, args[1])
 
 	case "digest":
-		if len(args) != 2 && len(args) != 4 {
-			return fmt.Errorf("usage: cognisdk-bundle digest <bundle.json> [--expect sha256:...]")
+		digestOptions, normalizedArgs, err := parseDigestOptions(args)
+		if err != nil {
+			return err
+		}
+		args = normalizedArgs
+		if len(args) != 2 {
+			return fmt.Errorf("usage: cognisdk-bundle digest <bundle.json> [--expect sha256:...] [--out digest-check.json]")
 		}
 		bundle, err := cognisdk.LoadPackBundle(args[1])
 		if err != nil {
 			return err
 		}
-		if len(args) == 4 {
-			if args[2] != "--expect" {
-				return fmt.Errorf("unknown digest option %q", args[2])
-			}
-			check, err := cognisdk.VerifyPackBundleDigest(*bundle, args[3])
+		if digestOptions.Expect != "" {
+			check, err := cognisdk.VerifyPackBundleDigest(*bundle, digestOptions.Expect)
 			if err != nil {
 				return err
 			}
-			if err := printJSON(check); err != nil {
+			if digestOptions.Out != "" {
+				if err := saveJSONFile(check, digestOptions.Out); err != nil {
+					return err
+				}
+			} else if err := printJSON(check); err != nil {
 				return err
 			}
 			if !check.Match {
@@ -82,6 +88,9 @@ func run(args []string) error {
 		digest, err := cognisdk.DigestPackBundle(*bundle)
 		if err != nil {
 			return err
+		}
+		if digestOptions.Out != "" {
+			return saveTextFile(digest+"\n", digestOptions.Out)
 		}
 		fmt.Println(digest)
 		return nil
@@ -261,6 +270,38 @@ type planCLIOptions struct {
 	Out           string
 	FailOnReview  bool
 	FailOnBlocked bool
+}
+
+type digestCLIOptions struct {
+	Expect string
+	Out    string
+}
+
+func parseDigestOptions(args []string) (digestCLIOptions, []string, error) {
+	var opts digestCLIOptions
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--expect":
+			if i+1 >= len(args) {
+				return digestCLIOptions{}, nil, fmt.Errorf("--expect requires a digest")
+			}
+			opts.Expect = args[i+1]
+			i++
+		case "--out":
+			if i+1 >= len(args) {
+				return digestCLIOptions{}, nil, fmt.Errorf("--out requires a path")
+			}
+			opts.Out = args[i+1]
+			i++
+		default:
+			if len(args[i]) > 0 && args[i][0] == '-' {
+				return digestCLIOptions{}, nil, fmt.Errorf("unknown digest option %q", args[i])
+			}
+			normalized = append(normalized, args[i])
+		}
+	}
+	return opts, normalized, nil
 }
 
 func parsePlanOptions(args []string) (planCLIOptions, []string, error) {

@@ -208,6 +208,9 @@ func TestRunInspectBundle(t *testing.T) {
 func TestRunDigestBundle(t *testing.T) {
 	dir := t.TempDir()
 	bundlePath := filepath.Join(dir, "bundle.json")
+	digestOut := filepath.Join(dir, "digest.txt")
+	checkOut := filepath.Join(dir, "digest-check.json")
+	mismatchOut := filepath.Join(dir, "digest-mismatch.json")
 	if err := run([]string{"init", bundlePath, "--builtin"}); err != nil {
 		t.Fatalf("init bundle: %v", err)
 	}
@@ -222,14 +225,55 @@ func TestRunDigestBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compute digest: %v", err)
 	}
+	if err := run([]string{"digest", bundlePath, "--out", digestOut}); err != nil {
+		t.Fatalf("digest out: %v", err)
+	}
+	digestData, err := os.ReadFile(digestOut)
+	if err != nil {
+		t.Fatalf("read digest output: %v", err)
+	}
+	if strings.TrimSpace(string(digestData)) != digest {
+		t.Fatalf("digest output = %q, want %q", strings.TrimSpace(string(digestData)), digest)
+	}
 	if err := run([]string{"digest", bundlePath, "--expect", digest}); err != nil {
 		t.Fatalf("digest expect match: %v", err)
 	}
-	if err := run([]string{"digest", bundlePath, "--expect", "sha256:wrong"}); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
+	if err := run([]string{"digest", bundlePath, "--expect", digest, "--out", checkOut}); err != nil {
+		t.Fatalf("digest expect out: %v", err)
+	}
+	checkData, err := os.ReadFile(checkOut)
+	if err != nil {
+		t.Fatalf("read digest check output: %v", err)
+	}
+	var check cognisdk.PackBundleDigestCheck
+	if err := json.Unmarshal(checkData, &check); err != nil {
+		t.Fatalf("digest check output is not json: %v", err)
+	}
+	if !check.Match || check.Actual != digest || check.Expected != digest {
+		t.Fatalf("unexpected digest check: %#v", check)
+	}
+	if err := run([]string{"digest", bundlePath, "--expect", "sha256:wrong", "--out", mismatchOut}); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
 		t.Fatalf("expected digest mismatch error, got %v", err)
+	}
+	mismatchData, err := os.ReadFile(mismatchOut)
+	if err != nil {
+		t.Fatalf("mismatch output should be written before failure: %v", err)
+	}
+	var mismatch cognisdk.PackBundleDigestCheck
+	if err := json.Unmarshal(mismatchData, &mismatch); err != nil {
+		t.Fatalf("mismatch digest check output is not json: %v", err)
+	}
+	if mismatch.Match || mismatch.Actual != digest || mismatch.Expected != "sha256:wrong" {
+		t.Fatalf("unexpected mismatch digest check: %#v", mismatch)
 	}
 	if err := run([]string{"digest", bundlePath, "--bad", digest}); err == nil || !strings.Contains(err.Error(), "unknown digest option") {
 		t.Fatalf("expected unknown digest option error, got %v", err)
+	}
+	if err := run([]string{"digest", bundlePath, "--expect"}); err == nil || !strings.Contains(err.Error(), "--expect requires a digest") {
+		t.Fatalf("expected expect path error, got %v", err)
+	}
+	if err := run([]string{"digest", bundlePath, "--out"}); err == nil || !strings.Contains(err.Error(), "--out requires a path") {
+		t.Fatalf("expected digest out path error, got %v", err)
 	}
 	if err := run([]string{"digest"}); err == nil || !strings.Contains(err.Error(), "usage: cognisdk-bundle digest") {
 		t.Fatalf("expected digest usage error, got %v", err)
