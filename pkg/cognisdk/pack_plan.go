@@ -237,6 +237,19 @@ func PackBundleApplyActionKindInfos() []PackBundleApplyActionKindInfo {
 	}
 }
 
+// DescribePackBundleApplyActionKind returns UI/plugin metadata for one action
+// kind. It is a convenience lookup for hosts that validate a CLI flag,
+// populate a single settings row, or render contextual help next to a filtered
+// action list without keeping their own copy of the vocabulary.
+func DescribePackBundleApplyActionKind(kind PackBundleApplyActionKind) (PackBundleApplyActionKindInfo, bool) {
+	for _, info := range PackBundleApplyActionKindInfos() {
+		if info.Kind == kind {
+			return info, true
+		}
+	}
+	return PackBundleApplyActionKindInfo{}, false
+}
+
 // FilterPackBundleApplyActions returns only actions whose Kind matches one of
 // the requested kinds. Passing no kinds returns the original action slice. The
 // helper is intentionally non-mutating so external installers, plugin hooks,
