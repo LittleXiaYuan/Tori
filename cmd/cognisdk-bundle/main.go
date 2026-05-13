@@ -122,6 +122,24 @@ func run(args []string) error {
 		}
 		return printJSON(summary)
 
+	case "plan":
+		if len(args) != 3 {
+			return fmt.Errorf("usage: cognisdk-bundle plan <current.json> <candidate.json> [--markdown]")
+		}
+		current, candidate, err := loadPair(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		plan, err := cognisdk.PlanPackBundleApply(context.Background(), *current, *candidate)
+		if err != nil {
+			return err
+		}
+		if markdown {
+			fmt.Print(cognisdk.RenderPackBundleApplyPlanMarkdown(plan))
+			return nil
+		}
+		return printJSON(plan)
+
 	case "promote":
 		allowReview, reviewOut, normalizedArgs, err := parsePromoteOptions(args)
 		if err != nil {
@@ -237,6 +255,7 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle inspect <bundle.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
+	fmt.Println("  cognisdk-bundle plan <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review] [--review-out review.json]")
 }

@@ -13,7 +13,7 @@ type JSONSchema map[string]any
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "feedback-proposal"}
 }
 
 // JSONSchemaByName returns a schema by its stable CLI/API name.
@@ -29,6 +29,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleDiffJSONSchema(), true
 	case "pack-bundle-review":
 		return PackBundleReviewJSONSchema(), true
+	case "pack-bundle-apply-plan":
+		return PackBundleApplyPlanJSONSchema(), true
 	case "feedback-proposal":
 		return FeedbackProposalJSONSchema(), true
 	default:
@@ -155,6 +157,32 @@ func PackBundleReviewJSONSchema() JSONSchema {
 			"rollback_bundle_id": stringSchema(),
 			"diff":               PackBundleDiffJSONSchema(),
 			"golden_tests":       goldenTestSummarySchema(),
+		},
+	}
+}
+
+// PackBundleApplyPlanJSONSchema returns the schema for non-mutating bundle apply plans.
+func PackBundleApplyPlanJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://yunque.local/schemas/cognisdk/pack-bundle-apply-plan.json",
+		"title":                "Cognition SDK Pack Bundle Apply Plan",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"from_id", "candidate_id", "outcome", "reason", "requires_review", "blocked", "recommended_actions", "diff", "golden_tests"},
+		"properties": map[string]any{
+			"from_id":             stringSchema(),
+			"candidate_id":        stringSchema(),
+			"from_digest":         stringSchema(),
+			"candidate_digest":    stringSchema(),
+			"outcome":             enumSchema(string(PackBundleReviewReady), string(PackBundleReviewReview), string(PackBundleReviewBlocked)),
+			"reason":              stringSchema(),
+			"requires_review":     map[string]any{"type": "boolean"},
+			"blocked":             map[string]any{"type": "boolean"},
+			"rollback_bundle_id":  stringSchema(),
+			"recommended_actions": stringArraySchema(),
+			"diff":                PackBundleDiffJSONSchema(),
+			"golden_tests":        goldenTestSummarySchema(),
 		},
 	}
 }

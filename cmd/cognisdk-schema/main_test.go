@@ -16,7 +16,7 @@ func TestRunListSchemas(t *testing.T) {
 
 func TestRunExportSchemaToFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "review.schema.json")
-	if err := run([]string{"pack-bundle-review", path}); err != nil {
+	if err := run([]string{"pack-bundle-apply-plan", path}); err != nil {
 		t.Fatalf("export schema: %v", err)
 	}
 	data, err := os.ReadFile(path)
@@ -30,7 +30,7 @@ func TestRunExportSchemaToFile(t *testing.T) {
 	if err := json.Unmarshal(data, &schema); err != nil {
 		t.Fatalf("unmarshal schema: %v", err)
 	}
-	if schema["title"] != "Cognition SDK Pack Bundle Review" {
+	if schema["title"] != "Cognition SDK Pack Bundle Apply Plan" {
 		t.Fatalf("unexpected schema title: %#v", schema["title"])
 	}
 }

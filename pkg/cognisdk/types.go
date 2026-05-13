@@ -210,6 +210,24 @@ type PackBundleReview struct {
 	GoldenTests      GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
 }
 
+// PackBundleApplyPlan describes a non-mutating promotion plan from one bundle
+// snapshot to another. It is intended for plugin UIs, CI jobs, and external
+// hosts that want exact review/rollback metadata before writing any files.
+type PackBundleApplyPlan struct {
+	FromID             string                  `json:"from_id" yaml:"from_id"`
+	CandidateID        string                  `json:"candidate_id" yaml:"candidate_id"`
+	FromDigest         string                  `json:"from_digest,omitempty" yaml:"from_digest,omitempty"`
+	CandidateDigest    string                  `json:"candidate_digest,omitempty" yaml:"candidate_digest,omitempty"`
+	Outcome            PackBundleReviewOutcome `json:"outcome" yaml:"outcome"`
+	Reason             string                  `json:"reason" yaml:"reason"`
+	RequiresReview     bool                    `json:"requires_review" yaml:"requires_review"`
+	Blocked            bool                    `json:"blocked" yaml:"blocked"`
+	RollbackBundleID   string                  `json:"rollback_bundle_id,omitempty" yaml:"rollback_bundle_id,omitempty"`
+	RecommendedActions []string                `json:"recommended_actions" yaml:"recommended_actions"`
+	Diff               PackBundleDiff          `json:"diff" yaml:"diff"`
+	GoldenTests        GoldenTestSummary       `json:"golden_tests" yaml:"golden_tests"`
+}
+
 // PackBundleSummary is a compact inspection view for a portable bundle.
 type PackBundleSummary struct {
 	ID              string       `json:"id" yaml:"id"`

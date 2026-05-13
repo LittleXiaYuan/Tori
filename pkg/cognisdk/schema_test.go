@@ -15,6 +15,7 @@ func TestJSONSchemasMarshal(t *testing.T) {
 		"summary":  PackBundleSummaryJSONSchema(),
 		"diff":     PackBundleDiffJSONSchema(),
 		"review":   PackBundleReviewJSONSchema(),
+		"plan":     PackBundleApplyPlanJSONSchema(),
 	} {
 		data, err := json.Marshal(schema)
 		if err != nil {
@@ -114,6 +115,16 @@ func TestPackBundleSummarySchemaNamesInspectFields(t *testing.T) {
 	for _, field := range []string{"digest", "pack_count", "enabled_count", "disabled_count", "golden_test_count", "packs"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("bundle summary schema missing %q", field)
+		}
+	}
+}
+
+func TestPackBundleApplyPlanSchemaNamesFields(t *testing.T) {
+	schema := PackBundleApplyPlanJSONSchema()
+	props := schema["properties"].(map[string]any)
+	for _, field := range []string{"from_digest", "candidate_digest", "requires_review", "blocked", "rollback_bundle_id", "recommended_actions", "diff", "golden_tests"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle apply plan schema missing %q", field)
 		}
 	}
 }
