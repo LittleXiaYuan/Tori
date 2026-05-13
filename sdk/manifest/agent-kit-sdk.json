@@ -224,6 +224,10 @@
       "description": "Access the lightweight PluginAgentMemory client or namespace for shared Agent memory search and write."
     },
     {
+      "name": "pluginCron",
+      "description": "Access the lightweight PluginCron client or namespace for plugin-scoped scheduled automation."
+    },
+    {
       "name": "skills",
       "description": "Access the lightweight Runtime Skills client or namespace for skill catalog, scan, dynamic skill review, and session suggestions."
     },
@@ -553,7 +557,8 @@
         "pluginLLM": "kit.pluginLLM",
         "pluginMemory": "kit.pluginMemory",
         "pluginKnowledge": "kit.pluginKnowledge",
-        "pluginAgentMemory": "kit.pluginAgentMemory"
+        "pluginAgentMemory": "kit.pluginAgentMemory",
+        "pluginCron": "kit.pluginCron"
       }
     },
     "go": {
@@ -656,7 +661,8 @@
         "pluginLLM": "kit.PluginLLM",
         "pluginMemory": "kit.PluginMemory",
         "pluginKnowledge": "kit.PluginKnowledge",
-        "pluginAgentMemory": "kit.PluginAgentMemory"
+        "pluginAgentMemory": "kit.PluginAgentMemory",
+        "pluginCron": "kit.PluginCron"
       }
     },
     "python": {
@@ -759,7 +765,8 @@
         "pluginLLM": "kit.plugin_llm",
         "pluginMemory": "kit.plugin_memory",
         "pluginKnowledge": "kit.plugin_knowledge",
-        "pluginAgentMemory": "kit.plugin_agent_memory"
+        "pluginAgentMemory": "kit.plugin_agent_memory",
+        "pluginCron": "kit.plugin_cron"
       }
     },
     "rust": {
@@ -862,7 +869,8 @@
         "pluginLLM": "kit.plugin_llm",
         "pluginMemory": "kit.plugin_memory",
         "pluginKnowledge": "kit.plugin_knowledge",
-        "pluginAgentMemory": "kit.plugin_agent_memory"
+        "pluginAgentMemory": "kit.plugin_agent_memory",
+        "pluginCron": "kit.plugin_cron"
       }
     }
   },

@@ -6,7 +6,7 @@ import sdk.python.yunque as yunque
 
 class PluginsSDKTests(unittest.TestCase):
     def test_management_lifecycle_file_ui_and_reload_routes(self):
-        with patch.object(yunque, "_api_call", return_value={"ok": True}) as api_call:
+        with patch.object(yunque, "_PLUGIN_NAME", "yunque"), patch.object(yunque, "_api_call", return_value={"ok": True}) as api_call:
             yunque.plugins.list()
             yunque.plugins.toggle("demo", True)
             yunque.plugin_toggle.toggle("demo", True)
@@ -35,6 +35,9 @@ class PluginsSDKTests(unittest.TestCase):
             yunque.plugin_knowledge.ingest("content", source="doc", filename="a.md")
             yunque.plugin_agent_memory.search("pref", 4)
             yunque.plugin_agent_memory.add("likes sdk", source="test")
+            yunque.plugin_cron.add("daily", "0 8 * * *", "ping")
+            yunque.plugin_cron.remove("cron-1")
+            yunque.plugin_cron.list()
 
         calls = [call.args for call in api_call.call_args_list]
         self.assertEqual(calls[0], ("GET", "/v1/plugins"))
@@ -65,6 +68,9 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertEqual(calls[25], ("POST", "/v1/plugin-api/knowledge/ingest", {"content": "content", "source": "doc", "filename": "a.md"}))
         self.assertEqual(calls[26], ("POST", "/v1/plugin-api/agent-memory/search", {"query": "pref", "top_k": 4}))
         self.assertEqual(calls[27], ("POST", "/v1/plugin-api/agent-memory/add", {"fact": "likes sdk", "source": "test"}))
+        self.assertEqual(calls[28], ("POST", "/v1/plugin-api/cron/add", {"expression": "0 8 * * *", "name": "yunque:daily", "message": "ping"}))
+        self.assertEqual(calls[29], ("POST", "/v1/plugin-api/cron/remove", {"id": "cron-1"}))
+        self.assertEqual(calls[30], ("GET", "/v1/plugin-api/cron/list?plugin=yunque"))
 
     def test_agent_kit_exposes_plugins_namespace(self):
         self.assertIs(yunque.create_agent_kit().plugins, yunque.plugins)
@@ -79,6 +85,7 @@ class PluginsSDKTests(unittest.TestCase):
         self.assertIs(yunque.create_agent_kit().plugin_memory, yunque.plugin_memory)
         self.assertIs(yunque.create_agent_kit().plugin_knowledge, yunque.plugin_knowledge)
         self.assertIs(yunque.create_agent_kit().plugin_agent_memory, yunque.plugin_agent_memory)
+        self.assertIs(yunque.create_agent_kit().plugin_cron, yunque.plugin_cron)
 
 
 if __name__ == "__main__":

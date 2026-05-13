@@ -1635,6 +1635,7 @@ type AgentKit struct {
 	PluginMemory      *pluginMemoryNamespace
 	PluginKnowledge   *pluginKnowledgeNamespace
 	PluginAgentMemory *pluginAgentMemoryNamespace
+	PluginCron        *pluginCronNamespace
 	Memory            *memoryNamespace
 	AgentMemory       *agentMemoryNamespace
 	Knowledge         *knowledgeNamespace
@@ -1663,6 +1664,9 @@ var PluginKnowledge = &pluginKnowledgeNamespace{}
 // PluginAgentMemory exposes standalone shared Agent memory helpers for plugins and scripts.
 var PluginAgentMemory = &pluginAgentMemoryNamespace{}
 
+// PluginCron exposes standalone plugin-scoped cron automation helpers for plugins and scripts.
+var PluginCron = &pluginCronNamespace{}
+
 type pluginRuntimeNamespace struct{}
 type pluginSearchNamespace struct{}
 type pluginSendNamespace struct{}
@@ -1670,7 +1674,7 @@ type pluginLLMNamespace struct{}
 type pluginMemoryNamespace struct{}
 type pluginKnowledgeNamespace struct{}
 type pluginAgentMemoryNamespace struct{}
-
+type pluginCronNamespace struct{}
 
 func (p *pluginMemoryNamespace) Get(ctx context.Context, key string) (string, error) {
 	return Memory.Get(ctx, key)
@@ -1692,7 +1696,6 @@ func (p *pluginMemoryNamespace) Search(ctx context.Context, query string, limit 
 	return Memory.Search(ctx, query, limit)
 }
 
-
 func (p *pluginKnowledgeNamespace) Search(ctx context.Context, query string, limit int) ([]map[string]any, error) {
 	return Knowledge.Search(ctx, query, limit)
 }
@@ -1701,13 +1704,43 @@ func (p *pluginKnowledgeNamespace) Ingest(ctx context.Context, content, filename
 	return Knowledge.Ingest(ctx, content, filename)
 }
 
-
 func (p *pluginAgentMemoryNamespace) Search(ctx context.Context, query string) (string, error) {
 	return AgentMemory.Search(ctx, query)
 }
 
 func (p *pluginAgentMemoryNamespace) Add(ctx context.Context, fact string) error {
 	return AgentMemory.Add(ctx, fact)
+}
+
+func (p *pluginCronNamespace) Add(ctx context.Context, expr, name, message string) (string, error) {
+	return Cron.Add(ctx, expr, name, message)
+}
+
+func (p *pluginCronNamespace) Remove(ctx context.Context, id string) error {
+	return Cron.Remove(ctx, id)
+}
+
+func (p *pluginCronNamespace) List(ctx context.Context, plugin string) ([]map[string]any, error) {
+	path := "/v1/plugin-api/cron/list"
+	if strings.TrimSpace(plugin) != "" {
+		path += "?plugin=" + url.QueryEscape(plugin)
+	}
+	resp, err := apiCall(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(resp["jobs"])
+	if err != nil {
+		return nil, err
+	}
+	var jobs []map[string]any
+	if err := json.Unmarshal(raw, &jobs); err != nil {
+		return nil, err
+	}
+	if jobs == nil {
+		jobs = []map[string]any{}
+	}
+	return jobs, nil
 }
 
 // ── Mission Parse ──
@@ -6978,6 +7011,7 @@ func NewAgentKit() AgentKit {
 		PluginMemory:      PluginMemory,
 		PluginKnowledge:   PluginKnowledge,
 		PluginAgentMemory: PluginAgentMemory,
+		PluginCron:        PluginCron,
 		Memory:            Memory,
 		AgentMemory:       AgentMemory,
 		Knowledge:         Knowledge,
