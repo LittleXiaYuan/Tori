@@ -10,13 +10,14 @@ export type PackSdkEntrypoint = { packId: string; packName: string; language: st
 export type PackDistributionManifest = { manifestUrl?: string; packageUrl?: string; frontendUrl?: string; sha256?: string; sizeBytes?: number; [key: string]: unknown };
 export type PackUpdateManifest = { channel?: string; rollback?: boolean; [key: string]: unknown };
 export type PackManifest = { id: string; name: string; version: string; description?: string; requiresCore?: string; optional?: boolean; defaultState?: string; backend?: PackBackendManifest; frontend?: PackFrontendManifest; sdk?: PackSdkManifest; distribution?: PackDistributionManifest; update?: PackUpdateManifest; metadata?: Record<string, string>; [key: string]: unknown };
-export type InstalledPack = { manifest: PackManifest; status: PackStatus; source?: string; installedAt?: string; updatedAt?: string; previousVersion?: string; [key: string]: unknown };
+export type PackArtifacts = { packagePath?: string; sha256?: string; sizeBytes?: number; cachedAt?: string; [key: string]: unknown };
+export type InstalledPack = { manifest: PackManifest; status: PackStatus; source?: string; artifacts?: PackArtifacts; installedAt?: string; updatedAt?: string; previousVersion?: string; [key: string]: unknown };
 export type PacksListResponse = { packs: InstalledPack[]; enabled?: InstalledPack[]; count: number; [key: string]: unknown };
 export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [key: string]: unknown };
 export type PackBackendRouteInfo = { method?: string; path: string };
 export type PackBackendModuleInfo = { pack_id: string; routes: PackBackendRouteInfo[] };
 export type PackBackendModulesResponse = { modules: PackBackendModuleInfo[]; count: number; [key: string]: unknown };
-export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string };
+export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string; download?: boolean };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class PacksClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Packs request failed with HTTP ${status}`); this.name = "PacksClientError"; this.status = status; this.body = body; } }
@@ -33,7 +34,7 @@ export class PacksClient {
   list(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs"); }
   enabled(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/enabled"); }
   backendModules(): Promise<PackBackendModulesResponse> { return this.json<PackBackendModulesResponse>("GET", "/v1/packs/backend-modules"); }
-  install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, source: request.source }); }
+  install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, source: request.source, download: request.download }); }
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }
   rollback(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/rollback", id); }

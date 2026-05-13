@@ -22,6 +22,7 @@ type packInstallRequest struct {
 	ManifestPath string `json:"manifest_path"`
 	ManifestURL  string `json:"manifest_url"`
 	Source       string `json:"source"`
+	Download     bool   `json:"download"`
 }
 
 func (g *Gateway) registerPackRoutes() {
@@ -189,7 +190,15 @@ func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	pack, err := g.packRegistry.Install(manifest, source)
+	var artifacts *packruntime.PackArtifacts
+	if req.Download {
+		artifacts, err = g.packRegistry.CacheDistribution(r.Context(), manifest)
+		if err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+	}
+	pack, err := g.packRegistry.InstallWithArtifacts(manifest, source, artifacts)
 	if err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return

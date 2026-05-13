@@ -59,6 +59,7 @@ export default function PacksPage() {
   const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => api.packBackendModules(), { modules: [], count: 0 });
   const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
   const [manifestUrl, setManifestUrl] = useState("");
+  const [downloadArtifact, setDownloadArtifact] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   const packs = data?.packs || [];
@@ -87,8 +88,8 @@ export default function PacksPage() {
     }
   };
 
-  const install = () => run("install", () => api.packInstall(manifestPath));
-  const installFromURL = () => run("install-url", () => api.packInstallFromURL(manifestUrl));
+  const install = () => run("install", () => api.packInstall(manifestPath, undefined, false));
+  const installFromURL = () => run("install-url", () => api.packInstallFromURL(manifestUrl, undefined, downloadArtifact));
   const enable = (id: string) => run(`enable:${id}`, () => api.packEnable(id));
   const disable = (id: string) => run(`disable:${id}`, () => api.packDisable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => api.packRollback(id));
@@ -152,9 +153,15 @@ export default function PacksPage() {
               <Label>manifest_url</Label>
               <Input placeholder="https://packs.example/backup-pack/pack.json" />
             </TextField>
-            <Button variant="outline" className="md:self-end" isDisabled={!manifestUrl || busy === "install-url"} onPress={installFromURL}>
-              <Download size={14} /> 下载安装
-            </Button>
+            <div className="flex flex-col gap-2 md:self-end">
+              <label className="text-xs flex items-center gap-2" style={{ color: "var(--yunque-text-muted)" }}>
+                <input type="checkbox" checked={downloadArtifact} onChange={(event) => setDownloadArtifact(event.target.checked)} />
+                下载并校验 distribution.packageUrl
+              </label>
+              <Button variant="outline" isDisabled={!manifestUrl || busy === "install-url"} onPress={installFromURL}>
+                <Download size={14} /> 下载安装
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
@@ -290,7 +297,8 @@ export default function PacksPage() {
                       <div>上一版本：{pack.previousVersion || "-"}</div>
                       <div>增量包：<span className="font-mono">{distribution?.packageUrl || "-"}</span></div>
                       <div>前端资源：<span className="font-mono">{distribution?.frontendUrl || "-"}</span></div>
-                      <div>校验：<span className="font-mono">{distribution?.sha256 ? distribution.sha256.slice(0, 12) + "…" : "-"}</span></div>
+                      <div>校验：<span className="font-mono">{pack.artifacts?.sha256 ? pack.artifacts.sha256.slice(0, 12) + "…" : distribution?.sha256 ? distribution.sha256.slice(0, 12) + "…" : "-"}</span></div>
+                      <div>缓存：<span className="font-mono">{pack.artifacts?.packagePath || "-"}</span></div>
                     </div>
                   </div>
                 </div>

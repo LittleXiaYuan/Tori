@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -345,6 +347,8 @@ func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
+	payload := []byte("remote backup artifact")
+	sha := sha256.Sum256(payload)
 	manifest := packruntime.Manifest{
 		ID:           "yunque.pack.remote-backup",
 		Name:         "Remote Backup Pack",
@@ -354,18 +358,25 @@ func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
 		Backend:      packruntime.BackendManifest{Capabilities: []string{"backup.info"}, Routes: []string{"/v1/backup/info"}},
 		Frontend:     packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "backup", Label: "备份恢复", Path: "/packs/backup"}}},
 		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/backup"},
+		Distribution: packruntime.DistributionManifest{SHA256: hex.EncodeToString(sha[:])},
 		Update:       packruntime.UpdateManifest{Rollback: true},
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/pack.json" {
-			t.Fatalf("unexpected manifest URL path: %s", r.URL.Path)
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/pack.json":
+			manifest.Distribution.PackageURL = srv.URL + "/remote-backup-0.2.0.tgz"
+			_ = json.NewEncoder(w).Encode(manifest)
+		case "/remote-backup-0.2.0.tgz":
+			_, _ = w.Write(payload)
+		default:
+			t.Fatalf("unexpected URL path: %s", r.URL.Path)
 		}
-		_ = json.NewEncoder(w).Encode(manifest)
 	}))
 	defer srv.Close()
 	gw := NewFromConfig(GatewayConfig{Packs: registry})
 
-	body := bytes.NewBufferString(`{"manifest_url":` + strconv.Quote(srv.URL+"/pack.json") + `}`)
+	body := bytes.NewBufferString(`{"manifest_url":` + strconv.Quote(srv.URL+"/pack.json") + `,"download":true}`)
 	req := httptest.NewRequest(http.MethodPost, "/v1/packs/install", body)
 	req = req.WithContext(ctxWithTenant(req.Context(), "t1"))
 	w := httptest.NewRecorder()
@@ -376,6 +387,9 @@ func TestPackRoutesInstallPackFromManifestURL(t *testing.T) {
 	pack, ok := registry.Get("yunque.pack.remote-backup")
 	if !ok || pack.Status != packruntime.PackStatusEnabled || pack.Source != srv.URL+"/pack.json" {
 		t.Fatalf("unexpected downloaded pack: %#v", pack)
+	}
+	if pack.Artifacts == nil || pack.Artifacts.SHA256 != hex.EncodeToString(sha[:]) || pack.Artifacts.SizeBytes != int64(len(payload)) {
+		t.Fatalf("expected downloaded artifacts to be recorded: %#v", pack.Artifacts)
 	}
 }
 

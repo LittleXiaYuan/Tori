@@ -132,10 +132,18 @@ export interface PackManifest {
   metadata?: Record<string, string>;
 }
 
+export interface PackArtifacts {
+  packagePath?: string;
+  sha256?: string;
+  sizeBytes?: number;
+  cachedAt?: string;
+}
+
 export interface InstalledPack {
   manifest: PackManifest;
   status: "enabled" | "disabled" | "rolled_back" | string;
   source: string;
+  artifacts?: PackArtifacts;
   installedAt?: string;
   updatedAt?: string;
   previousVersion?: string;

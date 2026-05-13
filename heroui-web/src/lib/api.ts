@@ -658,10 +658,10 @@ export const api = {
     fetcher<PackListResponse>("/v1/packs/enabled"),
   packBackendModules: () =>
     fetcher<PackBackendModulesResponse>("/v1/packs/backend-modules"),
-  packInstall: (manifestPath: string, source?: string) =>
-    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source }) }),
-  packInstallFromURL: (manifestUrl: string, source?: string) =>
-    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_url: manifestUrl, source }) }),
+  packInstall: (manifestPath: string, source?: string, download?: boolean) =>
+    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_path: manifestPath, source, download }) }),
+  packInstallFromURL: (manifestUrl: string, source?: string, download?: boolean) =>
+    fetcher<PackMutationResponse>("/v1/packs/install", { method: "POST", body: JSON.stringify({ manifest_url: manifestUrl, source, download }) }),
   packEnable: (id: string) =>
     fetcher<PackMutationResponse>("/v1/packs/enable", { method: "POST", body: JSON.stringify({ id }) }),
   packDisable: (id: string) =>
