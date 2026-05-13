@@ -2324,3 +2324,7 @@ The lightweight IDE SDK exposes IDE supervisor status and structured code review
 ### Discovery SDK
 
 The lightweight Discovery SDK exposes identity, embeddings, and search as a reusable incremental package surface for external projects, plugin UIs, front-end pages, CLIs, sidecars, and automation scripts. It maps directly to `POST /v1/identity/resolve`, `GET /v1/identity/profiles`, `GET/POST /v1/embeddings`, `GET /v1/search`, and `GET /v1/search/providers`, so callers can resolve identities, list profiles, inspect embedding providers, embed text, search the web, and list search providers without coupling to the full 云雀 platform. Agent Kit also exposes this surface as `kit.discovery` / `kit.Discovery`.
+
+### Persona Modes SDK
+
+The lightweight Persona SDK now also exposes persona mode listing, current-mode reads, and mode switching as reusable incremental helpers for external admin pages, plugin UIs, CLIs, sidecars, and automation scripts. It maps directly to `GET /v1/persona/modes`, `POST /v1/persona/mode`, and `GET /v1/persona/mode/current`, and Agent Kit exposes these helpers as `kit.persona` / `kit.Persona`.

@@ -1111,6 +1111,44 @@ func TestEmotionHelpers(t *testing.T) {
 	}
 }
 
+
+func TestPersonaModesHelpers(t *testing.T) {
+	var seen []string
+	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.String())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/persona/modes":
+			if r.URL.Query().Get("tenant_id") != "tenant-1" || r.URL.Query().Get("session_id") != "session-1" { t.Fatalf("unexpected persona modes query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"modes":[{"mode":"study"}],"total":1}`))
+		case "/v1/persona/mode":
+			var body SetPersonaModeRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil { t.Fatal(err) }
+			if body.TenantID != "tenant-1" || body.Mode != "focus" || body.SessionID != "session-1" { t.Fatalf("unexpected persona mode body: %+v", body) }
+			_, _ = w.Write([]byte(`{"success":true,"current_mode":"focus"}`))
+		case "/v1/persona/mode/current":
+			if r.URL.Query().Get("tenant_id") != "tenant-1" { t.Fatalf("unexpected current mode query: %s", r.URL.RawQuery) }
+			_, _ = w.Write([]byte(`{"mode":"study","name":"Study","description":"Study mode"}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	})
+
+	ctx := context.Background()
+	modes, err := Persona.Modes(ctx, "tenant-1", "session-1")
+	if err != nil { t.Fatal(err) }
+	set, err := Persona.SetMode(ctx, SetPersonaModeRequest{TenantID: "tenant-1", Mode: "focus", SessionID: "session-1"})
+	if err != nil { t.Fatal(err) }
+	current, err := Persona.CurrentMode(ctx, "tenant-1", "")
+	if err != nil { t.Fatal(err) }
+	if modes["total"].(float64) != 1 || set["current_mode"] != "focus" || current["mode"] != "study" || NewAgentKit().Persona != Persona {
+		t.Fatalf("unexpected persona mode results")
+	}
+	if len(seen) != 3 || seen[0] != "GET /v1/persona/modes?session_id=session-1&tenant_id=tenant-1" && seen[0] != "GET /v1/persona/modes?tenant_id=tenant-1&session_id=session-1" || seen[1] != "POST /v1/persona/mode" || seen[2] != "GET /v1/persona/mode/current?tenant_id=tenant-1" {
+		t.Fatalf("unexpected persona mode requests: %v", seen)
+	}
+}
+
 func TestPersonaHelpers(t *testing.T) {
 	var seen []string
 	withTestAPI(t, func(w http.ResponseWriter, r *http.Request) {
