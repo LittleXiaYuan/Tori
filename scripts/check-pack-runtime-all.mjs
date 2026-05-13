@@ -1,0 +1,141 @@
+#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+const repoRoot = resolve(import.meta.dirname, "..");
+const npmCli = resolve(dirname(process.execPath), "node_modules/npm/bin/npm-cli.js");
+const windowsToolPaths = new Map([
+  ["go", "C:/Program Files/Go/bin/go.exe"],
+]);
+
+const checks = [
+  {
+    name: "Pack Runtime completion audit",
+    command: process.execPath,
+    args: ["scripts/check-pack-runtime-completion.mjs"],
+  },
+  {
+    name: "Pack manifest/backend/frontend contract",
+    command: process.execPath,
+    args: ["scripts/check-pack-contract.mjs"],
+  },
+  {
+    name: "Pack scaffold contract",
+    command: process.execPath,
+    args: ["scripts/check-pack-scaffold.mjs"],
+  },
+  {
+    name: "Packs SDK manifest",
+    command: process.execPath,
+    args: ["sdk/scripts/check-packs-sdk-manifest.mjs"],
+  },
+  {
+    name: "All SDK manifests",
+    command: process.execPath,
+    args: ["sdk/scripts/check-sdk-manifests.mjs"],
+  },
+  {
+    name: "Pack Runtime Go tests",
+    command: "go",
+    args: [
+      "test",
+      "./pkg/packruntime",
+      "./internal/packs/backup",
+      "./internal/controlplane/gateway",
+      "./cmd/agent",
+      "-run",
+      "Test(PackRoutes|BackupRoutes|BackendPack|RegisterBackendPack|Manifest|Registry)|^$",
+      "-count=1",
+    ],
+  },
+  {
+    name: "Frontend typecheck",
+    command: process.execPath,
+    args: [npmCli, "run", "typecheck", "--prefix", "heroui-web"],
+  },
+  {
+    name: "TypeScript SDK typecheck",
+    command: process.execPath,
+    args: [npmCli, "run", "typecheck"],
+    cwd: "sdk/typescript",
+  },
+  {
+    name: "TypeScript SDK test typecheck",
+    command: process.execPath,
+    args: [npmCli, "run", "typecheck:test"],
+    cwd: "sdk/typescript",
+  },
+  {
+    name: "TypeScript packs SDK contract",
+    command: process.execPath,
+    args: [npmCli, "run", "check:pack"],
+    cwd: "sdk/typescript",
+  },
+  {
+    name: "TypeScript packs SDK incremental tests",
+    command: process.execPath,
+    args: ["scripts/run-incremental-tests.mjs", "packs"],
+    cwd: "sdk/typescript",
+  },
+  {
+    name: "Pack Runtime docs build",
+    command: process.execPath,
+    args: [npmCli, "run", "build"],
+    cwd: "docs",
+  },
+];
+
+
+function resolveCommand(command) {
+  if (process.platform !== "win32") return command;
+  return windowsToolPaths.get(command) ?? command;
+}
+
+function runCheck(check) {
+  const cwd = resolve(repoRoot, check.cwd ?? ".");
+  console.log(`\n=== ${check.name} ===`);
+  console.log(`cwd: ${cwd}`);
+  const command = resolveCommand(check.command);
+  console.log(`$ ${command} ${check.args.join(" ")}`);
+
+  if (!existsSync(cwd)) {
+    console.error(`missing cwd: ${cwd}`);
+    return 1;
+  }
+
+  const result = spawnSync(command, check.args, {
+    cwd,
+    env: { ...process.env, GOWORK: "off" },
+    stdio: "inherit",
+  });
+
+  if (result.error) {
+    console.error(result.error);
+    return 1;
+  }
+
+  return result.status ?? 1;
+}
+
+const startedAt = Date.now();
+const failed = [];
+
+for (const check of checks) {
+  const status = runCheck(check);
+  if (status !== 0) {
+    failed.push({ name: check.name, status });
+    break;
+  }
+}
+
+const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+
+if (failed.length > 0) {
+  console.error("\nPack Runtime full verification failed:");
+  for (const item of failed) console.error(`- ${item.name}: exit ${item.status}`);
+  console.error(`Elapsed: ${elapsed}s`);
+  process.exit(1);
+}
+
+console.log(`\nPack Runtime full verification passed in ${elapsed}s.`);
