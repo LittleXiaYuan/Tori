@@ -1464,6 +1464,7 @@ pub struct AgentKit {
     pub plugin_toggle: PluginToggleClient,
     pub plugin_reload: PluginReloadClient,
     pub plugin_files: PluginFilesClient,
+    pub plugin_folder: PluginFolderClient,
     pub skills: SkillsClient,
     pub skills_catalog: SkillsCatalogClient,
     pub skills_scan: SkillsScanClient,
@@ -1571,6 +1572,7 @@ impl AgentKit {
             plugin_toggle: PluginToggleClient::new(base_url.clone(), token.as_ref())?,
             plugin_reload: PluginReloadClient::new(base_url.clone(), token.as_ref())?,
             plugin_files: PluginFilesClient::new(base_url.clone(), token.as_ref())?,
+            plugin_folder: PluginFolderClient::new(base_url.clone(), token.as_ref())?,
             skills: SkillsClient::new(base_url.clone(), token.as_ref())?,
             skills_catalog: SkillsCatalogClient::new(base_url.clone(), token.as_ref())?,
             skills_scan: SkillsScanClient::new(base_url.clone(), token.as_ref())?,
@@ -1668,6 +1670,7 @@ impl AgentKit {
             plugin_toggle: PluginToggleClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_reload: PluginReloadClient::new_with_client(base_url.clone(), plugin_http.clone()),
             plugin_files: PluginFilesClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            plugin_folder: PluginFolderClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills: SkillsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_catalog: SkillsCatalogClient::new_with_client(base_url.clone(), plugin_http.clone()),
             skills_scan: SkillsScanClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -8662,6 +8665,21 @@ impl PluginFilesClient {
     pub async fn save_file(&self, name: &str, file: &str, content: &str, plugin: Option<&str>) -> Result<PluginsResponse, reqwest::Error> { self.inner.save_file(name, file, content, plugin).await }
 }
 
+/// Standalone PluginFolder SDK client for opening plugin folders.
+#[derive(Debug, Clone)]
+pub struct PluginFolderClient { inner: PluginsClient }
+
+impl PluginFolderClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        Ok(Self { inner: PluginsClient::new(base_url, token)? })
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self {
+        Self { inner: PluginsClient::new_with_client(base_url, http) }
+    }
+    pub fn url(&self, path: &str) -> String { self.inner.url(path) }
+    pub async fn open_folder(&self, name: Option<&str>) -> Result<PluginsResponse, reqwest::Error> { self.inner.open_folder(name).await }
+}
+
 impl PluginUIClient {
     pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
         Ok(Self { inner: PluginsClient::new(base_url, token)? })
@@ -11932,17 +11950,20 @@ mod tests {
     }
 
     #[test]
-    fn plugin_files_reload_and_toggle_helpers_build_urls_and_agent_kit_surface() {
+    fn plugin_folder_files_reload_and_toggle_helpers_build_urls_and_agent_kit_surface() {
         let toggle = PluginToggleClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(toggle.url("/v1/plugins/toggle"), "http://localhost:9090/v1/plugins/toggle");
         let reload = PluginReloadClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(reload.url("/v1/plugins/reload"), "http://localhost:9090/v1/plugins/reload");
         let files = PluginFilesClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
         assert_eq!(files.url("/v1/plugins/files?name=demo"), "http://localhost:9090/v1/plugins/files?name=demo");
+        let folder = PluginFolderClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(folder.url("/v1/plugins/open-folder?name=demo"), "http://localhost:9090/v1/plugins/open-folder?name=demo");
         let kit = AgentKit::new_with_clients("http://localhost:9090/", reqwest::Client::new(), reqwest::Client::new(), reqwest::Client::new());
         assert_eq!(kit.plugin_toggle.url("/v1/plugins/toggle"), "http://localhost:9090/v1/plugins/toggle");
         assert_eq!(kit.plugin_reload.url("/v1/plugins/reload"), "http://localhost:9090/v1/plugins/reload");
         assert_eq!(kit.plugin_files.url("/v1/plugins/files?name=demo"), "http://localhost:9090/v1/plugins/files?name=demo");
+        assert_eq!(kit.plugin_folder.url("/v1/plugins/open-folder?name=demo"), "http://localhost:9090/v1/plugins/open-folder?name=demo");
     }
 
     #[test]

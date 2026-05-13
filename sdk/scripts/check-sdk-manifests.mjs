@@ -55,6 +55,7 @@ const checks = [
   ["PluginToggle SDK manifest", "sdk/scripts/check-plugin-toggle-sdk-manifest.mjs"],
   ["PluginReload SDK manifest", "sdk/scripts/check-plugin-reload-sdk-manifest.mjs"],
   ["PluginFiles SDK manifest", "sdk/scripts/check-plugin-files-sdk-manifest.mjs"],
+  ["PluginFolder SDK manifest", "sdk/scripts/check-plugin-folder-sdk-manifest.mjs"],
   ["SkillsCatalog SDK manifest", "sdk/scripts/check-skills-catalog-sdk-manifest.mjs"],
   ["SkillsScan SDK manifest", "sdk/scripts/check-skills-scan-sdk-manifest.mjs"],
   ["SkillsSuggestions SDK manifest", "sdk/scripts/check-skills-suggestions-sdk-manifest.mjs"],

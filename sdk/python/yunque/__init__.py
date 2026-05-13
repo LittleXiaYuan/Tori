@@ -3374,6 +3374,15 @@ class _PluginFilesNamespace:
 
 plugin_files = _PluginFilesNamespace()
 
+class _PluginFolderNamespace:
+    """Standalone plugin folder opener for external operator tools."""
+
+    def open_folder(self, name: str = "") -> dict:
+        return plugins.open_folder(name)
+
+
+plugin_folder = _PluginFolderNamespace()
+
 
 # ── Runtime Skills (/v1/skills) ──
 
@@ -3564,6 +3573,7 @@ class AgentKit:
         self.plugin_toggle = plugin_toggle
         self.plugin_reload = plugin_reload
         self.plugin_files = plugin_files
+        self.plugin_folder = plugin_folder
         self.skills = skills
         self.skills_catalog = skills_catalog
         self.skills_scan = skills_scan
