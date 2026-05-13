@@ -88,6 +88,35 @@ func run(args []string) error {
 			return nil
 		}
 		return printJSON(summary)
+
+	case "promote":
+		allowReview := false
+		if len(args) > 0 && args[len(args)-1] == "--allow-review" {
+			allowReview = true
+			args = args[:len(args)-1]
+		}
+		if len(args) != 4 {
+			return fmt.Errorf("usage: cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review]")
+		}
+		current, candidate, err := loadPair(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		review, err := cognisdk.ReviewPackBundleCandidate(context.Background(), *current, *candidate)
+		if err != nil {
+			return err
+		}
+		if review.Outcome == cognisdk.PackBundleReviewBlocked {
+			return fmt.Errorf("candidate bundle blocked: %s", review.Reason)
+		}
+		if review.Outcome == cognisdk.PackBundleReviewReview && !allowReview {
+			return fmt.Errorf("candidate bundle requires review: %s", review.Reason)
+		}
+		if err := cognisdk.SavePackBundle(*candidate, args[3]); err != nil {
+			return err
+		}
+		fmt.Printf("promoted %s to %s (outcome=%s)\n", candidate.ID, args[3], review.Outcome)
+		return nil
 	case "review":
 		if len(args) != 3 {
 			return fmt.Errorf("usage: cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
@@ -137,4 +166,5 @@ func printUsage() {
 	fmt.Println("  cognisdk-bundle diff <current.json> <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle golden <candidate.json> [--markdown]")
 	fmt.Println("  cognisdk-bundle review <current.json> <candidate.json> [--markdown]")
+	fmt.Println("  cognisdk-bundle promote <current.json> <candidate.json> <output.json> [--allow-review]")
 }
