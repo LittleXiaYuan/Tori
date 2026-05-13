@@ -300,6 +300,107 @@ func filenameFromDisposition(disposition string) string {
 	return ""
 }
 
+// ── Plugins Management (/v1/plugins) ──
+
+// Plugins exposes plugin catalog, lifecycle, file editing, UI, reload, and folder helpers.
+var Plugins = &pluginsNamespace{}
+
+type pluginsNamespace struct{}
+type PluginsResponse map[string]any
+
+type PluginCreateRequest struct {
+	Name         string           `json:"name"`
+	Description  string           `json:"description,omitempty"`
+	Language     string           `json:"language,omitempty"`
+	Template     string           `json:"template,omitempty"`
+	SystemPrompt string           `json:"system_prompt,omitempty"`
+	Skills       []map[string]any `json:"skills,omitempty"`
+}
+
+func (p *pluginsNamespace) List(ctx context.Context) (PluginsResponse, error) {
+	var out PluginsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/plugins", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) Toggle(ctx context.Context, name string, enabled bool) (PluginsResponse, error) {
+	var out PluginsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/plugins/toggle", map[string]any{"name": name, "enabled": enabled}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) Create(ctx context.Context, request PluginCreateRequest) (PluginsResponse, error) {
+	var out PluginsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/plugins/create", request, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) Delete(ctx context.Context, name string) (PluginsResponse, error) {
+	var out PluginsResponse
+	values := url.Values{"name": []string{name}}
+	if err := apiCallInto(ctx, http.MethodDelete, "/v1/plugins/delete?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) Files(ctx context.Context, name string) (PluginsResponse, error) {
+	var out PluginsResponse
+	values := url.Values{"name": []string{name}}
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/plugins/files?"+values.Encode(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) SaveFile(ctx context.Context, name, file, content string, plugin string) (PluginsResponse, error) {
+	var out PluginsResponse
+	values := url.Values{"name": []string{name}}
+	body := map[string]any{"file": file, "content": content}
+	if plugin != "" {
+		body["plugin"] = plugin
+	}
+	if err := apiCallInto(ctx, http.MethodPut, "/v1/plugins/files?"+values.Encode(), body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) UI(ctx context.Context) (PluginsResponse, error) {
+	var out PluginsResponse
+	if err := apiCallInto(ctx, http.MethodGet, "/v1/plugins/ui", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) Reload(ctx context.Context) (PluginsResponse, error) {
+	var out PluginsResponse
+	if err := apiCallInto(ctx, http.MethodPost, "/v1/plugins/reload", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (p *pluginsNamespace) OpenFolder(ctx context.Context, name string) (PluginsResponse, error) {
+	var out PluginsResponse
+	path := "/v1/plugins/open-folder"
+	if name != "" {
+		values := url.Values{"name": []string{name}}
+		path += "?" + values.Encode()
+	}
+	if err := apiCallInto(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── SkillHub Incremental Packages (/api/skillhub) ──
 
 // SkillHub exposes catalog, install, update, rollback, policy, and analytics helpers for incremental skill packages.
@@ -1269,6 +1370,7 @@ type AgentKit struct {
 	Projects      *projectsNamespace
 	Market        *skillMarketNamespace
 	SkillHub      *skillHubNamespace
+	Plugins       *pluginsNamespace
 	Dispatch      *dispatchNamespace
 	Orchestrator  *orchestratorNamespace
 	Fork          *forkNamespace
@@ -6377,6 +6479,7 @@ func NewAgentKit() AgentKit {
 		Projects:      Projects,
 		Market:        SkillMarket,
 		SkillHub:      SkillHub,
+		Plugins:       Plugins,
 		Dispatch:      Dispatch,
 		Orchestrator:  Orchestrator,
 		Fork:          Fork,

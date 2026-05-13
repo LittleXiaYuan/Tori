@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "domain": "plugins",
+  "description": "Cross-language lightweight SDK entrypoints for plugin catalog, lifecycle, file editing, UI tabs, reload, and open-folder helpers without importing the full platform client.",
+  "principles": [
+    "Expose plugin management as focused SDK helpers for external plugin UIs, CLIs, operator pages, sidecars, and automation scripts.",
+    "Keep plugin lifecycle and file editing directly callable through the existing authenticated /v1/plugins routes.",
+    "Make plugin management available through Agent Kit while keeping the plugin runtime API as a separate focused slice."
+  ],
+  "routes": [
+    "GET /v1/plugins",
+    "POST /v1/plugins/toggle",
+    "POST /v1/plugins/create",
+    "DELETE /v1/plugins/delete",
+    "GET|PUT /v1/plugins/files",
+    "GET /v1/plugins/ui",
+    "POST /v1/plugins/reload",
+    "GET /v1/plugins/open-folder"
+  ],
+  "capabilities": [
+    {
+      "name": "list",
+      "route": "GET /v1/plugins",
+      "readOnly": true,
+      "description": "List all plugins including disabled plugins."
+    },
+    {
+      "name": "toggle",
+      "route": "POST /v1/plugins/toggle",
+      "readOnly": false,
+      "description": "Enable or disable a plugin."
+    },
+    {
+      "name": "create",
+      "route": "POST /v1/plugins/create",
+      "readOnly": false,
+      "description": "Create a plugin from a lightweight template."
+    },
+    {
+      "name": "delete",
+      "route": "DELETE /v1/plugins/delete",
+      "readOnly": false,
+      "description": "Delete a plugin by name."
+    },
+    {
+      "name": "files",
+      "route": "GET /v1/plugins/files",
+      "readOnly": true,
+      "description": "Read editable files for a plugin."
+    },
+    {
+      "name": "saveFile",
+      "route": "PUT /v1/plugins/files",
+      "readOnly": false,
+      "description": "Save a plugin file."
+    },
+    {
+      "name": "ui",
+      "route": "GET /v1/plugins/ui",
+      "readOnly": true,
+      "description": "List UI tabs contributed by enabled plugins."
+    },
+    {
+      "name": "reload",
+      "route": "POST /v1/plugins/reload",
+      "readOnly": false,
+      "description": "Reload plugins and rebuild skills."
+    },
+    {
+      "name": "openFolder",
+      "route": "GET /v1/plugins/open-folder",
+      "readOnly": true,
+      "description": "Open or resolve the plugins folder for an operator workflow."
+    }
+  ],
+  "languages": {
+    "typescript": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/typescript/src/plugins.ts",
+        "sdk/typescript/src/agent-kit.ts"
+      ],
+      "docs": [
+        "sdk/typescript/README.md",
+        "docs/plugins/sdk-typescript.md"
+      ],
+      "entrypoints": {
+        "list": "createPluginsClient().list",
+        "toggle": "createPluginsClient().toggle",
+        "create": "createPluginsClient().create",
+        "delete": "createPluginsClient().delete",
+        "files": "createPluginsClient().files",
+        "saveFile": "createPluginsClient().saveFile",
+        "ui": "createPluginsClient().ui",
+        "reload": "createPluginsClient().reload",
+        "openFolder": "createPluginsClient().openFolder"
+      }
+    },
+    "go": {
+      "package": "yunque-agent/sdk/go/yunque",
+      "implementationFiles": [
+        "sdk/go/yunque/yunque.go"
+      ],
+      "docs": [
+        "sdk/go/README.md",
+        "docs/plugins/sdk-go.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.Plugins.List",
+        "toggle": "yunque.Plugins.Toggle",
+        "create": "yunque.Plugins.Create",
+        "delete": "yunque.Plugins.Delete",
+        "files": "yunque.Plugins.Files",
+        "saveFile": "yunque.Plugins.SaveFile",
+        "ui": "yunque.Plugins.UI",
+        "reload": "yunque.Plugins.Reload",
+        "openFolder": "yunque.Plugins.OpenFolder"
+      }
+    },
+    "python": {
+      "package": "yunque",
+      "implementationFiles": [
+        "sdk/python/yunque/__init__.py"
+      ],
+      "docs": [
+        "sdk/python/README.md",
+        "docs/plugins/sdk-python.md"
+      ],
+      "entrypoints": {
+        "list": "yunque.plugins.list",
+        "toggle": "yunque.plugins.toggle",
+        "create": "yunque.plugins.create",
+        "delete": "yunque.plugins.delete",
+        "files": "yunque.plugins.files",
+        "saveFile": "yunque.plugins.save_file",
+        "ui": "yunque.plugins.ui",
+        "reload": "yunque.plugins.reload",
+        "openFolder": "yunque.plugins.open_folder"
+      }
+    },
+    "rust": {
+      "package": "yunque-client",
+      "implementationFiles": [
+        "sdk/rust/src/lib.rs"
+      ],
+      "docs": [
+        "sdk/rust/README.md",
+        "docs/plugins/sdk-rust.md"
+      ],
+      "entrypoints": {
+        "list": "PluginsClient::list",
+        "toggle": "PluginsClient::toggle",
+        "create": "PluginsClient::create",
+        "delete": "PluginsClient::delete",
+        "files": "PluginsClient::files",
+        "saveFile": "PluginsClient::save_file",
+        "ui": "PluginsClient::ui",
+        "reload": "PluginsClient::reload",
+        "openFolder": "PluginsClient::open_folder"
+      }
+    }
+  },
+  "overviewDocs": [
+    "docs/plugins/sdk-overview.md",
+    "docs/plugins/overview.md",
+    "docs/plugins/developing.md"
+  ]
+}
