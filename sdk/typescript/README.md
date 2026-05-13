@@ -2335,14 +2335,14 @@ The lightweight Tori SDK exposes Tori account bind/status/unbind, bound-instance
 
 ### Pack Runtime SDK
 
-The lightweight Packs SDK reads `/v1/packs/installed` and `/v1/packs/enabled` so the frontend shell can synchronize menus, routes, UI assets, and SDK entrypoints from the backend pack registry instead of hard-coding every capability in the main app.
+The lightweight Packs SDK reads `/v1/packs/installed`, `/v1/packs/enabled`, and `/v1/packs/backend-modules` so the frontend shell can synchronize menus, routes, UI assets, and SDK entrypoints from the backend pack registry instead of hard-coding every capability in the main app.
 
 ```ts
 import { createPacksClient } from "yunque-client/packs";
 
 const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<api-key>" });
 await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
-const sync = await packs.frontendSync();
+const modules = await packs.backendModules();\nconst sync = await packs.frontendSync();
 console.log(sync.menus, sync.routes);
 await packs.disable("yunque.pack.backup");
 ```

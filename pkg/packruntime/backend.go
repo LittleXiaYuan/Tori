@@ -11,6 +11,22 @@ type BackendRoute struct {
 	Handler http.HandlerFunc
 }
 
+// BackendRouteInfo is the serializable route metadata exposed by the host for
+// pack runtime introspection. It intentionally omits the handler so external
+// consoles and SDKs can audit the mounted backend surface without gaining
+// executable references.
+type BackendRouteInfo struct {
+	Method string `json:"method,omitempty"`
+	Path   string `json:"path"`
+}
+
+// BackendModuleInfo describes a backend capability pack that has been mounted
+// into the host Gateway.
+type BackendModuleInfo struct {
+	PackID string             `json:"pack_id"`
+	Routes []BackendRouteInfo `json:"routes"`
+}
+
 // BackendModule is implemented by backend capability packs that can be mounted
 // into the host Gateway without hard-coding their individual routes there.
 type BackendModule interface {

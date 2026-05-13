@@ -28,6 +28,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/installed", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/enabled", g.requireAuth(g.handlePacksEnabled))
+	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
@@ -76,6 +77,25 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 			route.Handler(w, r)
 		})))
 	}
+}
+
+func (g *Gateway) backendModuleInfos() []packruntime.BackendModuleInfo {
+	g.routesMu.RLock()
+	defer g.routesMu.RUnlock()
+	byPack := make(map[string][]packruntime.BackendRouteInfo)
+	for path, packID := range g.backendPackRoutes {
+		if strings.TrimSpace(packID) == "" || strings.TrimSpace(path) == "" {
+			continue
+		}
+		byPack[packID] = append(byPack[packID], packruntime.BackendRouteInfo{Path: path})
+	}
+	infos := make([]packruntime.BackendModuleInfo, 0, len(byPack))
+	for packID, routes := range byPack {
+		slices.SortFunc(routes, func(a, b packruntime.BackendRouteInfo) int { return strings.Compare(a.Path, b.Path) })
+		infos = append(infos, packruntime.BackendModuleInfo{PackID: packID, Routes: routes})
+	}
+	slices.SortFunc(infos, func(a, b packruntime.BackendModuleInfo) int { return strings.Compare(a.PackID, b.PackID) })
+	return infos
 }
 
 func (g *Gateway) requirePackRoute(packID string, route string, next http.HandlerFunc) http.HandlerFunc {
@@ -130,6 +150,15 @@ func (g *Gateway) handlePacksEnabled(w http.ResponseWriter, r *http.Request) {
 	}
 	packs := registry.Enabled()
 	writeJSON(w, map[string]any{"packs": packs, "count": len(packs)})
+}
+
+func (g *Gateway) handlePackBackendModules(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	modules := g.backendModuleInfos()
+	writeJSON(w, map[string]any{"modules": modules, "count": len(modules)})
 }
 
 func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {
