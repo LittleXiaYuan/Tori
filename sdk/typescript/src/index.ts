@@ -2,10 +2,13 @@
 export * from './types.gen';
 export * from './sdk.gen';export * from './system';
 export * from './settings';
-export * from './backup';
 export * from './tori';
-export * from './upload';
-export * from './speech';
+export { BackupClient, BackupClientError, createBackupClient } from './backup';
+export type { BackupClientOptions } from './backup';
+export { UploadClient, UploadClientError, createUploadClient } from './upload';
+export type { UploadAction, UploadClientOptions, UploadParseMetadata, UploadRequest, UploadResponse as UploadFileResponse } from './upload';
+export { SpeechClient, SpeechClientError, createSpeechClient } from './speech';
+export type { AudioBody, SpeechAudioResponse, SpeechClientOptions, SpeechSTTOptions, SpeechSTTResponse, SpeechTTSRequest, SpeechVoicesResponse, UploadResponse as SpeechUploadResponse } from './speech';
 export * from './setup';
 export * from './admin';
 export * from './federation';
