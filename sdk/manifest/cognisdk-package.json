@@ -142,6 +142,12 @@
         "golden",
         "review",
         "promote"
+      ],
+      "flags": [
+        "--builtin",
+        "--markdown",
+        "--allow-review",
+        "--review-out"
       ]
     }
   ],

@@ -39,6 +39,9 @@ for (const cli of manifest.cli ?? []) {
   for (const command of cli.commands ?? []) {
     if (!text.includes(`"${command}"`)) fail(`${cli.name} missing command ${command}`);
   }
+  for (const flag of cli.flags ?? []) {
+    if (!text.includes(`"${flag}"`) && !text.includes(flag)) fail(`${cli.name} missing flag ${flag}`);
+  }
   if (cli.schemas?.length) {
     const schemaSource = readRepoFile("pkg/cognisdk/schema.go");
     for (const schemaName of cli.schemas) {
@@ -62,4 +65,5 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log(`Cognition SDK package manifest ok: ${(manifest.capabilities ?? []).length} capabilities, ${(manifest.cli ?? []).length} cli tools`);
+const flagCount = (manifest.cli ?? []).reduce((sum, cli) => sum + (cli.flags?.length ?? 0), 0);
+console.log(`Cognition SDK package manifest ok: ${(manifest.capabilities ?? []).length} capabilities, ${(manifest.cli ?? []).length} cli tools, ${flagCount} cli flags`);
