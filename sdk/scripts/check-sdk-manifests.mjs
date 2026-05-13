@@ -53,6 +53,7 @@ const checks = [
   ["Runtime SDK manifest", "sdk/scripts/check-runtime-sdk-manifest.mjs"],
   ["Subagents SDK manifest", "sdk/scripts/check-subagents-sdk-manifest.mjs"],
   ["Tools SDK manifest", "sdk/scripts/check-tools-sdk-manifest.mjs"],
+  ["Sandbox SDK manifest", "sdk/scripts/check-sandbox-sdk-manifest.mjs"],
   ["Reverie SDK manifest", "sdk/scripts/check-reverie-sdk-manifest.mjs"],
   ["Realtime SDK manifest", "sdk/scripts/check-realtime-sdk-manifest.mjs"],
   ["Chat SDK manifest", "sdk/scripts/check-chat-sdk-manifest.mjs"],

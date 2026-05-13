@@ -1389,6 +1389,7 @@ pub struct AgentKit {
     pub runtime: RuntimeClient,
     pub subagents: SubagentsClient,
     pub tools: ToolsClient,
+    pub sandbox: SandboxClient,
     pub audit: AuditClient,
     pub trust: TrustClient,
     pub iterate: IterateClient,
@@ -1471,6 +1472,7 @@ impl AgentKit {
             runtime: RuntimeClient::new(base_url.clone(), token.as_ref())?,
             subagents: SubagentsClient::new(base_url.clone(), token.as_ref())?,
             tools: ToolsClient::new(base_url.clone(), token.as_ref())?,
+            sandbox: SandboxClient::new(base_url.clone(), token.as_ref())?,
             audit: AuditClient::new(base_url.clone(), token.as_ref())?,
             trust: TrustClient::new(base_url.clone(), token.as_ref())?,
             iterate: IterateClient::new(base_url.clone(), token.as_ref())?,
@@ -1546,6 +1548,7 @@ impl AgentKit {
             runtime: RuntimeClient::new_with_client(base_url.clone(), plugin_http.clone()),
             subagents: SubagentsClient::new_with_client(base_url.clone(), plugin_http.clone()),
             tools: ToolsClient::new_with_client(base_url.clone(), plugin_http.clone()),
+            sandbox: SandboxClient::new_with_client(base_url.clone(), plugin_http.clone()),
             audit: AuditClient::new_with_client(base_url.clone(), plugin_http.clone()),
             trust: TrustClient::new_with_client(base_url.clone(), plugin_http.clone()),
             iterate: IterateClient::new_with_client(base_url.clone(), plugin_http.clone()),
@@ -5487,6 +5490,39 @@ pub struct UpdateTaskThreadStateRequest {
 
 
 
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct SandboxExecRequest {
+    pub command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+}
+
+pub type SandboxExecResponse = serde_json::Value;
+pub type SandboxProbeResponse = serde_json::Value;
+pub type DesktopSandboxResponse = serde_json::Value;
+
+/// Lightweight Sandbox SDK client for command execution and desktop lifecycle helpers.
+#[derive(Debug, Clone)]
+pub struct SandboxClient { base_url: String, http: reqwest::Client }
+
+impl SandboxClient {
+    pub fn new(base_url: impl Into<String>, token: impl AsRef<str>) -> Result<Self, reqwest::Error> {
+        let token = token.as_ref(); let mut headers = HeaderMap::new(); headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if !token.is_empty() { let value = format!("Bearer {token}"); if let Ok(value) = HeaderValue::from_str(&value) { headers.insert(AUTHORIZATION, value); } }
+        Ok(Self::new_with_client(base_url, reqwest::Client::builder().default_headers(headers).build()?))
+    }
+    pub fn new_with_client(base_url: impl Into<String>, http: reqwest::Client) -> Self { Self { base_url: trim_base_url(base_url.into()), http } }
+    pub fn url(&self, path: &str) -> String { format!("{}{}", self.base_url, path) }
+    pub async fn exec(&self, request: &SandboxExecRequest) -> Result<SandboxExecResponse, reqwest::Error> { self.post_json("/v1/sandbox/exec", request).await }
+    pub async fn probe(&self) -> Result<SandboxProbeResponse, reqwest::Error> { self.get_json("/v1/sandbox/probe").await }
+    pub async fn create_desktop(&self) -> Result<DesktopSandboxResponse, reqwest::Error> { self.post_json("/v1/sandbox/desktop", &serde_json::json!({})).await }
+    pub async fn desktop_status(&self) -> Result<DesktopSandboxResponse, reqwest::Error> { self.get_json("/v1/sandbox/desktop/status").await }
+    pub async fn destroy_desktop(&self) -> Result<DesktopSandboxResponse, reqwest::Error> { self.post_json("/v1/sandbox/desktop/destroy", &serde_json::json!({})).await }
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, reqwest::Error> { self.http.get(self.url(path)).send().await?.error_for_status()?.json().await }
+    async fn post_json<T: for<'de> Deserialize<'de>, B: Serialize + ?Sized>(&self, path: &str, body: &B) -> Result<T, reqwest::Error> { self.http.post(self.url(path)).json(body).send().await?.error_for_status()?.json().await }
+}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WebChatEmbedOptions {
@@ -9448,6 +9484,17 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn sandbox_helpers_build_urls_and_payloads() {
+        let client = SandboxClient::new_with_client("http://localhost:9090/", reqwest::Client::new());
+        assert_eq!(client.url("/v1/sandbox/probe"), "http://localhost:9090/v1/sandbox/probe");
+        let req = SandboxExecRequest { command: "python".to_string(), args: vec!["-V".to_string()] };
+        let value = serde_json::to_value(&req).unwrap();
+        assert_eq!(value["command"], "python");
+        assert_eq!(value["args"][0], "-V");
+    }
 
     #[test]
     fn webchat_helpers_build_urls_and_snippets() {

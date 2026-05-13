@@ -35,6 +35,7 @@
     "runtime-operations",
     "subagent-orchestration",
     "tool-processes",
+    "sandbox-runtime",
     "audit-governance",
     "trust-governance",
     "self-iteration",
@@ -174,6 +175,10 @@
     {
       "name": "tools",
       "description": "Access the lightweight Tools client or namespace for process execution sessions, listing, polling, and kill controls."
+    },
+    {
+      "name": "sandbox",
+      "description": "Access the lightweight Sandbox client or namespace for exec, readiness probes, and desktop sandbox lifecycle helpers."
     },
     {
       "name": "audit",
@@ -365,7 +370,8 @@
         "discovery": "createAgentKit().discovery",
         "bots": "createAgentKit().bots",
         "documents": "createAgentKit().documents",
-        "webchat": "createAgentKit().webchat"
+        "webchat": "createAgentKit().webchat",
+        "sandbox": "createAgentKit().sandbox"
       }
     },
     "go": {
@@ -436,7 +442,8 @@
         "discovery": "NewAgentKit().Discovery",
         "bots": "yunque.NewAgentKit().Bots",
         "documents": "yunque.NewAgentKit().Documents",
-        "webchat": "yunque.NewAgentKit().WebChat"
+        "webchat": "yunque.NewAgentKit().WebChat",
+        "sandbox": "yunque.NewAgentKit().Sandbox"
       }
     },
     "python": {
@@ -507,7 +514,8 @@
         "discovery": "create_agent_kit().discovery",
         "bots": "yunque.create_agent_kit().bots",
         "documents": "yunque.create_agent_kit().documents",
-        "webchat": "yunque.create_agent_kit().webchat"
+        "webchat": "yunque.create_agent_kit().webchat",
+        "sandbox": "yunque.create_agent_kit().sandbox"
       }
     },
     "rust": {
@@ -578,7 +586,8 @@
         "discovery": "AgentKit::discovery",
         "bots": "AgentKit::bots",
         "documents": "AgentKit::documents",
-        "webchat": "AgentKit::webchat"
+        "webchat": "AgentKit::webchat",
+        "sandbox": "AgentKit::sandbox"
       }
     }
   },
