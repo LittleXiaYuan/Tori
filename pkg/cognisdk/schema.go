@@ -22,7 +22,7 @@ type JSONSchemaInfo struct {
 
 // JSONSchemaNames returns stable names accepted by JSONSchemaByName.
 func JSONSchemaNames() []string {
-	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "feedback-proposal"}
+	return []string{"pack-manifest", "pack-bundle", "pack-bundle-summary", "pack-bundle-digest-check", "pack-bundle-diff", "pack-bundle-review", "pack-bundle-apply-plan", "pack-bundle-apply-actions", "pack-bundle-apply-action-kinds", "pack-bundle-apply-checklist", "feedback-proposal"}
 }
 
 // JSONSchemaInfos returns stable schema catalog metadata for non-Go callers
@@ -66,6 +66,8 @@ func JSONSchemaByName(name string) (JSONSchema, bool) {
 		return PackBundleApplyActionsJSONSchema(), true
 	case "pack-bundle-apply-action-kinds":
 		return PackBundleApplyActionKindsJSONSchema(), true
+	case "pack-bundle-apply-checklist":
+		return PackBundleApplyChecklistJSONSchema(), true
 	case "feedback-proposal":
 		return FeedbackProposalJSONSchema(), true
 	default:
@@ -266,6 +268,19 @@ func PackBundleApplyActionKindsJSONSchema() JSONSchema {
 	}
 }
 
+// PackBundleApplyChecklistJSONSchema returns the schema for the UI-friendly
+// checklist emitted by BuildPackBundleApplyChecklist and cognisdk-bundle
+// checklist.
+func PackBundleApplyChecklistJSONSchema() JSONSchema {
+	return JSONSchema{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id":     "https://yunque.local/schemas/cognisdk/pack-bundle-apply-checklist.json",
+		"title":   "Cognition SDK Pack Bundle Apply Checklist",
+		"type":    "array",
+		"items":   packBundleApplyChecklistItemSchema(),
+	}
+}
+
 // FeedbackProposalJSONSchema returns the schema for non-mutating feedback
 // proposals returned by BuildFeedbackProposal or Engine.ProposeUpdates.
 func FeedbackProposalJSONSchema() JSONSchema {
@@ -340,6 +355,25 @@ func packBundleApplyActionKindInfoSchema() map[string]any {
 			"kind":        enumSchema(packBundleApplyActionKindStrings()...),
 			"label":       stringSchema(),
 			"description": stringSchema(),
+		},
+	}
+}
+
+func packBundleApplyChecklistItemSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"kind", "label", "description", "required", "done", "blocked", "message", "info"},
+		"properties": map[string]any{
+			"kind":        enumSchema(packBundleApplyActionKindStrings()...),
+			"label":       stringSchema(),
+			"description": stringSchema(),
+			"required":    map[string]any{"type": "boolean"},
+			"done":        map[string]any{"type": "boolean"},
+			"blocked":     map[string]any{"type": "boolean"},
+			"message":     stringSchema(),
+			"action":      packBundleApplyActionSchema(),
+			"info":        packBundleApplyActionKindInfoSchema(),
 		},
 	}
 }

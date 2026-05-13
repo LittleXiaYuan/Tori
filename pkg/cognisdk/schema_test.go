@@ -9,16 +9,17 @@ import (
 
 func TestJSONSchemasMarshal(t *testing.T) {
 	for name, schema := range map[string]JSONSchema{
-		"pack":     PackManifestJSONSchema(),
-		"bundle":   PackBundleJSONSchema(),
-		"feedback": FeedbackProposalJSONSchema(),
-		"summary":  PackBundleSummaryJSONSchema(),
-		"digest":   PackBundleDigestCheckJSONSchema(),
-		"diff":     PackBundleDiffJSONSchema(),
-		"review":   PackBundleReviewJSONSchema(),
-		"plan":     PackBundleApplyPlanJSONSchema(),
-		"actions":  PackBundleApplyActionsJSONSchema(),
-		"kinds":    PackBundleApplyActionKindsJSONSchema(),
+		"pack":      PackManifestJSONSchema(),
+		"bundle":    PackBundleJSONSchema(),
+		"feedback":  FeedbackProposalJSONSchema(),
+		"summary":   PackBundleSummaryJSONSchema(),
+		"digest":    PackBundleDigestCheckJSONSchema(),
+		"diff":      PackBundleDiffJSONSchema(),
+		"review":    PackBundleReviewJSONSchema(),
+		"plan":      PackBundleApplyPlanJSONSchema(),
+		"actions":   PackBundleApplyActionsJSONSchema(),
+		"kinds":     PackBundleApplyActionKindsJSONSchema(),
+		"checklist": PackBundleApplyChecklistJSONSchema(),
 	} {
 		data, err := json.Marshal(schema)
 		if err != nil {
@@ -205,5 +206,19 @@ func TestPackBundleApplyActionKindsSchema(t *testing.T) {
 	enumValues := kindSchema["enum"].([]string)
 	if len(enumValues) != len(PackBundleApplyActionKinds()) {
 		t.Fatalf("action kind info enum length = %d, want %d", len(enumValues), len(PackBundleApplyActionKinds()))
+	}
+}
+
+func TestPackBundleApplyChecklistSchema(t *testing.T) {
+	schema := PackBundleApplyChecklistJSONSchema()
+	if schema["type"] != "array" {
+		t.Fatalf("checklist schema type = %#v", schema["type"])
+	}
+	item := schema["items"].(map[string]any)
+	props := item["properties"].(map[string]any)
+	for _, field := range []string{"kind", "label", "description", "required", "done", "blocked", "message", "action", "info"} {
+		if _, ok := props[field]; !ok {
+			t.Fatalf("bundle apply checklist item schema missing %q", field)
+		}
 	}
 }

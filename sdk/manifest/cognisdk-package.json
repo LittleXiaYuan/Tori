@@ -159,6 +159,7 @@
         "PackBundleApplyPlanJSONSchema",
         "PackBundleApplyActionsJSONSchema",
         "PackBundleApplyActionKindsJSONSchema",
+        "PackBundleApplyChecklistJSONSchema",
         "FeedbackProposalJSONSchema",
         "JSONSchemaInfo",
         "JSONSchemaInfos",
@@ -187,6 +188,7 @@
         "pack-bundle-apply-plan",
         "pack-bundle-apply-actions",
         "pack-bundle-apply-action-kinds",
+        "pack-bundle-apply-checklist",
         "feedback-proposal"
       ]
     },
