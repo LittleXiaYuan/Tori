@@ -47,6 +47,9 @@ func RenderPackBundleSummaryMarkdown(summary PackBundleSummary) string {
 	b.WriteString("## Cogni Pack Bundle Summary\n\n")
 	fmt.Fprintf(&b, "- id: %s\n", emptyAs(summary.ID, "unknown"))
 	fmt.Fprintf(&b, "- version: %d\n", summary.Version)
+	if summary.Digest != "" {
+		fmt.Fprintf(&b, "- digest: %s\n", summary.Digest)
+	}
 	fmt.Fprintf(&b, "- packs: %d\n", summary.PackCount)
 	fmt.Fprintf(&b, "- enabled: %d\n", summary.EnabledCount)
 	fmt.Fprintf(&b, "- disabled: %d\n", summary.DisabledCount)

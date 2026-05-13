@@ -46,6 +46,12 @@ func RenderPackBundleReviewMarkdown(review PackBundleReview) string {
 	b.WriteString("## Cogni Pack Bundle Review\n\n")
 	fmt.Fprintf(&b, "- current: %s\n", emptyAs(review.FromID, "unknown"))
 	fmt.Fprintf(&b, "- candidate: %s\n", emptyAs(review.CandidateID, "unknown"))
+	if review.FromDigest != "" {
+		fmt.Fprintf(&b, "- current_digest: %s\n", review.FromDigest)
+	}
+	if review.CandidateDigest != "" {
+		fmt.Fprintf(&b, "- candidate_digest: %s\n", review.CandidateDigest)
+	}
 	fmt.Fprintf(&b, "- outcome: %s\n", emptyAs(string(review.Outcome), string(PackBundleReviewReview)))
 	if review.RollbackBundleID != "" {
 		fmt.Fprintf(&b, "- rollback_bundle: %s\n", review.RollbackBundleID)
