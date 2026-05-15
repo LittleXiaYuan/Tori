@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRAAndBrowserIntent(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentAndRPAReplay(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -52,8 +52,19 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRAAndBrowserIntent(t *test
 		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
 	}
 
+	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
+	if !ok {
+		t.Fatal("expected RPA Replay builtin pack to be installed")
+	}
+	if rpaReplay.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected RPA Replay default disabled, got %s", rpaReplay.Status)
+	}
+	if rpaReplay.Manifest.SDK.TypeScript != "yunque-client/rpa-replay" {
+		t.Fatalf("unexpected RPA Replay SDK import: %s", rpaReplay.Manifest.SDK.TypeScript)
+	}
+
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 4 {
+	if got := len(registry.List()); got != 5 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

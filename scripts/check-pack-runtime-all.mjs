@@ -45,10 +45,11 @@ const checks = [
       "./internal/packs/lora",
       "./internal/packs/cognikernel",
       "./internal/packs/browserintent",
+      "./internal/packs/rpareplay",
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|RPAReplay|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },
@@ -94,6 +95,12 @@ const checks = [
     cwd: "heroui-web",
   },
   {
+    name: "Frontend RPA Replay pack client tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/rpa-replay-pack-client.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
     name: "Frontend shell pack entry tests",
     command: process.execPath,
     args: [npmCli, "run", "test", "--", "src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx"],
@@ -120,7 +127,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "rpa-replay"],
     cwd: "sdk/typescript",
   },
   {

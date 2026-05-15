@@ -543,6 +543,10 @@
       "types": "./src/browser.ts",
       "import": "./src/browser.ts"
     },
+    "./rpa-replay": {
+      "types": "./src/rpa-replay.ts",
+      "import": "./src/rpa-replay.ts"
+    },
     "./browser-status": {
       "types": "./src/browser-status.ts",
       "import": "./src/browser-status.ts"

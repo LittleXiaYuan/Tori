@@ -1,0 +1,117 @@
+{
+  "id": "yunque.pack.rpa-replay",
+  "name": "RPA Replay Pack",
+  "version": "0.1.0",
+  "description": "将 RPA 录制、轨迹存储、参数化回放计划和证据包导出作为可选增量包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "rpa.status",
+      "rpa.trace.store",
+      "rpa.trace.detail",
+      "rpa.recording.start",
+      "rpa.recording.stop",
+      "rpa.replay.dry_run",
+      "rpa.evidence.export"
+    ],
+    "routes": [
+      "/v1/rpa-replay/status",
+      "/v1/rpa-replay/traces",
+      "/v1/rpa-replay/traces/",
+      "/v1/rpa-replay/recordings/start",
+      "/v1/rpa-replay/recordings/stop",
+      "/v1/rpa-replay/replay",
+      "/v1/rpa-replay/evidence/"
+    ],
+    "permissions": [
+      "rpa:read",
+      "rpa:write",
+      "rpa:execute"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/rpa-replay/status",
+        "description": "Read RPA replay pack shell status and trace-store readiness."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/rpa-replay/traces",
+        "description": "List recorded RPA trace summaries."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rpa-replay/traces",
+        "description": "Create or import an RPA trace definition."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/rpa-replay/traces/",
+        "description": "Read one RPA trace by slug."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rpa-replay/recordings/start",
+        "description": "Start a recording session shell for a future ActionTracer integration."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rpa-replay/recordings/stop",
+        "description": "Stop a recording session and persist explicit steps as a trace."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rpa-replay/replay",
+        "description": "Build a parameter-substituted dry-run replay plan for a trace."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/rpa-replay/evidence/",
+        "description": "Export a JSON evidence pack for one trace."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "rpa-replay",
+        "label": "RPA 回放",
+        "path": "/packs/rpa-replay",
+        "icon": "workflow",
+        "order": 90
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/rpa-replay",
+        "component": "rpa/RPAReplayPackPage",
+        "title": "RPA 回放"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "rpa/RPAReplayPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/rpa-replay"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/drafts/RPA-RECORD-REPLAY.md",
+    "stage": "pack-shell-before-executor",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/rpa-replay-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/rpa-replay-pack/rpa-replay-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/rpa-replay-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

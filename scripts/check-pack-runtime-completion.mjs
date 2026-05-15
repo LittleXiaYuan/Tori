@@ -50,6 +50,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_cogni.go",
   "internal/controlplane/gateway/handlers_browser_pack.go",
   "internal/controlplane/gateway/handlers_browser_pack_test.go",
+  "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_cogni_experience_test.go",
   "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
@@ -61,6 +62,8 @@ const cogniKernelPack = read("internal/packs/cognikernel/handler.go");
 const cogniKernelManifest = read("packs/examples/cogni-kernel-pack/pack.json");
 const browserIntentPack = read("internal/packs/browserintent/handler.go");
 const browserIntentManifest = read("packs/examples/browser-intent-pack/pack.json");
+const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
+const rpaReplayManifest = read("packs/examples/rpa-replay-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
@@ -83,6 +86,9 @@ const frontend = [
   "heroui-web/src/app/packs/browser/page.tsx",
   "heroui-web/src/lib/browser-intent-pack-client.ts",
   "heroui-web/src/lib/__tests__/browser-intent-pack-client.test.ts",
+  "heroui-web/src/app/packs/rpa-replay/page.tsx",
+  "heroui-web/src/lib/rpa-replay-pack-client.ts",
+  "heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts",
   "heroui-web/src/lib/pack-types.ts",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
@@ -95,6 +101,7 @@ const legacyCogniPage = read("heroui-web/src/app/cognis/page.tsx");
 const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
 const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
 const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
+const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
@@ -107,10 +114,14 @@ const sdk = [
   "sdk/manifest/lora-pack-sdk.json",
   "sdk/manifest/cogni-kernel-pack-sdk.json",
   "sdk/manifest/browser-intent-pack-sdk.json",
+  "sdk/manifest/rpa-replay-pack-sdk.json",
+  "sdk/typescript/src/rpa-replay.ts",
+  "sdk/typescript/src/rpa-replay.test.ts",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
   "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
 ].map(read).join("\n");
 const docs = [
   "packs/AUTHORING.md",
@@ -156,6 +167,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/lora-pack/pack.json",
   "packs/examples/cogni-kernel-pack/pack.json",
   "packs/examples/browser-intent-pack/pack.json",
+  "packs/examples/rpa-replay-pack/pack.json",
 ]);
 
 requireTokens("后端 backend pack module registry / route gates", backend + gateway, [
@@ -244,6 +256,32 @@ requireTokens("browser-intent 蓝图能力包", browserIntentPack + browserInten
   "rollback",
 ]);
 
+requireTokens("rpa-replay 蓝图能力包", rpaReplayPack + rpaReplayManifest + frontend + gateway + sdk, [
+  'const PackID = "yunque.pack.rpa-replay"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/rpa-replay/status",
+  "/v1/rpa-replay/traces",
+  "/v1/rpa-replay/recordings/start",
+  "/v1/rpa-replay/recordings/stop",
+  "/v1/rpa-replay/replay",
+  "/v1/rpa-replay/evidence/",
+  "executor_ready",
+  "cfg.DataPath(\"rpa-replay\")",
+  "rpa.replay.dry_run",
+  "json-evidence-pack",
+  "http.MethodPost",
+  "yunque-client/rpa-replay",
+  "RPA Replay Pack",
+  "createRPAReplayPackClient",
+  "createRPAReplayClient",
+  "rpa-replay-pack-client",
+  "TestRPAReplayPackGateReturnsNotFoundWhenDisabled",
+  "/packs/rpa-replay",
+  "pack-shell-before-executor",
+  "distribution",
+  "rollback",
+]);
+
 requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerification, [
   "fetchEnabledPacks",
   "buildPackNavItems",
@@ -261,6 +299,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend LoRA pack client tests",
   "Frontend Cogni Kernel pack client tests",
   "Frontend Browser Intent pack client tests",
+  "Frontend RPA Replay pack client tests",
   "Frontend shell pack entry tests",
   "PackRuntimeRoutePage",
   "enabled()",
@@ -345,6 +384,12 @@ if (browserPackPage.includes("api.browser") || browserPackPage.includes('from "@
   ok("前端 Browser Intent pack 客户端拆分", "Browser Intent page uses browser-intent-pack-client instead of monolithic api browser methods");
 }
 
+if (rpaReplayPackPage.includes("api.rpa") || rpaReplayPackPage.includes('from "@/lib/api"') || !rpaReplayPackPage.includes("createRPAReplayPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "RPA Replay pack page must use rpa-replay-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 RPA Replay pack 客户端拆分", "RPA Replay page uses rpa-replay-pack-client instead of monolithic api RPA methods");
+}
+
 const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
 if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
@@ -409,12 +454,16 @@ const forbiddenMonolithicPackMethods = [
   "browserExtAction:",
   "browserExtScenarios:",
   "browserExtRunScenario:",
+  "rpaReplayStatus:",
+  "createRPAReplayTrace:",
+  "rpaReplay:",
+  "rpaReplayEvidence:",
 ];
 const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) => monolithicApi.includes(token));
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/rpa methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -441,6 +490,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "PackBackendRouteBinding",
   "PackDistributionManifest",
   "PackPruneResponse",
+  "createRPAReplayClient",
+  "RPAReplayClientError",
   "download?: boolean",
   "distributions:",
   "routeBindings:",
@@ -469,6 +520,7 @@ runCheck("packs sdk checker", process.execPath, ["sdk/scripts/check-packs-sdk-ma
 runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pack-sdk-manifest.mjs"]);
 runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"]);
 runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
+runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 
 if (failures.length > 0) {
   console.error("Pack Runtime completion audit failed:");

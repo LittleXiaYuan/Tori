@@ -43,6 +43,7 @@ import (
 	backuppack "yunque-agent/internal/packs/backup"
 	browserintentpack "yunque-agent/internal/packs/browserintent"
 	lorapack "yunque-agent/internal/packs/lora"
+	rpareplaypack "yunque-agent/internal/packs/rpareplay"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
@@ -67,20 +68,23 @@ func initTasks(app *agentrt.App) error {
 
 	// ── Phase 2: Gateway ──
 	gw := gateway.NewFromConfig(gateway.GatewayConfig{
-		Planner:      p,
-		Tenants:      tenantMgr,
-		Memory:       app.MemManager,
-		Skills:       app.SkillRegistry,
-		Scheduler:    sa.sched,
-		ConvStore:    sa.convStore,
-		Plugins:      app.PluginReg,
-		FeishuAPI:    sa.feishuAPI,
-		Learning:     learningLoop,
-		JWTConfig:    sa.jwtCfg,
-		Metrics:      app.Metrics,
-		Pipeline:     app.MemPipeline,
-		Persona:      botPersona,
-		BackendPacks: []packruntime.BackendModule{backuppack.DefaultHandler()},
+		Planner:   p,
+		Tenants:   tenantMgr,
+		Memory:    app.MemManager,
+		Skills:    app.SkillRegistry,
+		Scheduler: sa.sched,
+		ConvStore: sa.convStore,
+		Plugins:   app.PluginReg,
+		FeishuAPI: sa.feishuAPI,
+		Learning:  learningLoop,
+		JWTConfig: sa.jwtCfg,
+		Metrics:   app.Metrics,
+		Pipeline:  app.MemPipeline,
+		Persona:   botPersona,
+		BackendPacks: []packruntime.BackendModule{
+			backuppack.DefaultHandler(),
+			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
+		},
 	})
 	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
 	packRegistry, err := packruntime.NewRegistry(cfg.DataPath("packs"))
@@ -374,6 +378,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/cogni-kernel-pack/pack.json",
 		"packs/examples/lora-pack/pack.json",
 		"packs/examples/browser-intent-pack/pack.json",
+		"packs/examples/rpa-replay-pack/pack.json",
 	} {
 		manifest, err := loadBuiltinPackManifest(manifestPath)
 		if err != nil {
