@@ -175,6 +175,7 @@ const approvalPlan = {
   approval_gate_plan_ready: true,
   approval_gate_ready: false,
   requires_approval: true,
+  approval_queue_plan_ready: true,
   approval_queue_ready: false,
   writes_approval_queue: false,
   writes_files: false,
@@ -188,10 +189,41 @@ const approvalPlan = {
   plugin: remoteInstallPlan.plugin,
   package: remoteInstallPlan.package,
   signature_verification: remoteInstallPlan.signature_verification,
+  approval_queue_entry: {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    approval_queue_plan_ready: true,
+    approval_queue_ready: false,
+    writes_approval_queue: false,
+    requires_approval: true,
+    status: "blocked_until_approval_queue",
+    queue_name: "wasm_remote_install",
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision: "requires_approval",
+    decision_states: ["pending", "approved", "denied", "expired"],
+    risk_tier: "high",
+    requested_by: "operator",
+    reason: "preview approval gate",
+    approvers: ["security"],
+    required_fields: ["request_id", "decision"],
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    signature_gate_status: "blocked_until_signature_verifier",
+    canonical_payload_sha256: "payload-digest",
+    artifact: "approval-queue-entry.json",
+    downloads: false,
+    writes_files: false,
+    network_access: false,
+    installs_plugin: false,
+    checks: [],
+    labels: ["approval-queue", "plan-only", "no-queue-write"],
+  },
   checks: [],
   approvers: ["security"],
   artifacts: [
     "approval-gate-plan.json",
+    "approval-queue-entry.json",
     "remote-install-plan.json",
     "signature-verification.json",
   ],
@@ -223,6 +255,8 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           signature_verify_ready: false,
           approval_gate_plan_ready: true,
           approval_gate_ready: false,
+          approval_queue_plan_ready: true,
+          approval_queue_ready: false,
           plugin_count: 1,
           loaded_count: 0,
           capabilities: [
@@ -231,6 +265,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
             "wasm.module.integrity_gate",
             "wasm.remote_install.plan",
             "wasm.remote_install.signature_verification_plan",
+            "wasm.remote_install.approval_queue_plan",
             "wasm.remote_install.approval_plan",
           ],
         });
@@ -274,6 +309,8 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.signature_verify_ready, false);
   assertEqual(status.approval_gate_plan_ready, true);
   assertEqual(status.approval_gate_ready, false);
+  assertEqual(status.approval_queue_plan_ready, true);
+  assertEqual(status.approval_queue_ready, false);
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
   assert(status.capabilities.includes("wasm.module.integrity_gate"));
@@ -282,6 +319,9 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
     status.capabilities.includes(
       "wasm.remote_install.signature_verification_plan",
     ),
+  );
+  assert(
+    status.capabilities.includes("wasm.remote_install.approval_queue_plan"),
   );
   assert(status.capabilities.includes("wasm.remote_install.approval_plan"));
   assertEqual(plugins.count, 1);
@@ -409,10 +449,19 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   assertEqual(gatePlanned.plan.approval_gate_plan_ready, true);
   assertEqual(gatePlanned.plan.approval_gate_ready, false);
   assertEqual(gatePlanned.plan.requires_approval, true);
+  assertEqual(gatePlanned.plan.approval_queue_plan_ready, true);
   assertEqual(gatePlanned.plan.writes_approval_queue, false);
   assertEqual(
     gatePlanned.plan.signature_verification.signature_verification_plan_ready,
     true,
+  );
+  assertEqual(
+    gatePlanned.plan.approval_queue_entry.approval_queue_plan_ready,
+    true,
+  );
+  assertEqual(
+    gatePlanned.plan.approval_queue_entry.writes_approval_queue,
+    false,
   );
   assertEqual(detail.plugin.slug, "calculator");
   assertEqual(unloaded.status, "unloaded");
@@ -500,6 +549,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
           "module-integrity-gate.json",
           "remote-install-plan.json",
           "signature-verification.json",
+          "approval-queue-entry.json",
           "approval-gate-plan.json",
         ],
         plugin: { slug: "calculator" },
@@ -523,6 +573,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     "module-integrity-gate.json",
     "remote-install-plan.json",
     "signature-verification.json",
+    "approval-queue-entry.json",
     "approval-gate-plan.json",
   ]);
   assertEqual(evidence.host_abi_plan.status, "plan_only");
@@ -533,6 +584,11 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
   assertEqual(evidence.signature_verification.signature_verify_ready, false);
   assertEqual(evidence.signature_verification.allows_install, false);
   assertEqual(evidence.approval_gate_plan.requires_approval, true);
+  assertEqual(evidence.approval_gate_plan.approval_queue_plan_ready, true);
+  assertEqual(
+    evidence.approval_gate_plan.approval_queue_entry.artifact,
+    "approval-queue-entry.json",
+  );
   assertEqual(
     calls[0]?.url,
     "http://localhost:9090/v1/wasm-plugin/evidence/calculator",

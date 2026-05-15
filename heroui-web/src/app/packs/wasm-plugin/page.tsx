@@ -587,6 +587,7 @@ export default function WASMPluginPackPage() {
                 >
                   plan-only 契约：固定“远程签名 WASM
                   包安装必须先审批”的边界，只生成 approval-gate-plan.json
+                  / approval-queue-entry.json
                   预览，不写审批队列、不下载、不联网、不安装。
                 </div>
               </div>
@@ -634,6 +635,26 @@ export default function WASMPluginPackPage() {
                 {String(remoteApprovalPlan?.writes_approval_queue ?? false)}
               </Chip>
               <Chip size="sm">
+                approval_queue_plan_ready:{" "}
+                {String(
+                  remoteApprovalPlan?.approval_queue_plan_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_queue_ready:{" "}
+                {String(remoteApprovalPlan?.approval_queue_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                queue_status:{" "}
+                {remoteApprovalPlan?.approval_queue_entry?.status ||
+                  "blocked_until_approval_queue"}
+              </Chip>
+              <Chip size="sm">
+                request_id:{" "}
+                {remoteApprovalPlan?.approval_queue_entry?.request_id ||
+                  "pending"}
+              </Chip>
+              <Chip size="sm">
                 signature_gate:{" "}
                 {remoteApprovalPlan?.signature_verification?.status ||
                   "pending"}
@@ -650,6 +671,7 @@ export default function WASMPluginPackPage() {
                 {String(remoteApprovalPlan?.installs_plugin ?? false)}
               </Chip>
               <Chip size="sm">artifact: approval-gate-plan.json</Chip>
+              <Chip size="sm">artifact: approval-queue-entry.json</Chip>
             </div>
             {remoteApprovalPlan && (
               <TextField

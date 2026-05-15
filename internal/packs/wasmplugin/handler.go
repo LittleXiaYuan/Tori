@@ -180,6 +180,7 @@ type RemoteInstallApprovalPlanReport struct {
 	ApprovalGatePlanReady    bool                      `json:"approval_gate_plan_ready"`
 	ApprovalGateReady        bool                      `json:"approval_gate_ready"`
 	RequiresApproval         bool                      `json:"requires_approval"`
+	ApprovalQueuePlanReady   bool                      `json:"approval_queue_plan_ready"`
 	ApprovalQueueReady       bool                      `json:"approval_queue_ready"`
 	WritesApprovalQueue      bool                      `json:"writes_approval_queue"`
 	WritesFiles              bool                      `json:"writes_files"`
@@ -193,6 +194,7 @@ type RemoteInstallApprovalPlanReport struct {
 	Plugin                   RemoteInstallPluginPlan   `json:"plugin"`
 	Package                  RemoteInstallPackagePlan  `json:"package"`
 	SignatureVerification    SignatureVerificationPlan `json:"signature_verification"`
+	ApprovalQueueEntry       ApprovalQueueEntryPlan    `json:"approval_queue_entry"`
 	Checks                   []RemoteInstallCheck      `json:"checks"`
 	Approvers                []string                  `json:"approvers,omitempty"`
 	Artifacts                []string                  `json:"artifacts"`
@@ -201,6 +203,39 @@ type RemoteInstallApprovalPlanReport struct {
 	Metadata                 map[string]string         `json:"metadata,omitempty"`
 	RemoteInstallPlanSummary RemoteInstallPlanReport   `json:"remote_install_plan_summary"`
 	Notes                    []string                  `json:"notes,omitempty"`
+}
+
+type ApprovalQueueEntryPlan struct {
+	PackID                 string                   `json:"pack_id"`
+	GeneratedAt            time.Time                `json:"generated_at"`
+	ApprovalQueuePlanReady bool                     `json:"approval_queue_plan_ready"`
+	ApprovalQueueReady     bool                     `json:"approval_queue_ready"`
+	WritesApprovalQueue    bool                     `json:"writes_approval_queue"`
+	RequiresApproval       bool                     `json:"requires_approval"`
+	Status                 string                   `json:"status"`
+	QueueName              string                   `json:"queue_name"`
+	RequestID              string                   `json:"request_id"`
+	RequestKey             string                   `json:"request_key"`
+	Decision               string                   `json:"decision"`
+	DecisionStates         []string                 `json:"decision_states"`
+	RiskTier               string                   `json:"risk_tier"`
+	RequestedBy            string                   `json:"requested_by,omitempty"`
+	Reason                 string                   `json:"reason,omitempty"`
+	Approvers              []string                 `json:"approvers,omitempty"`
+	RequiredFields         []string                 `json:"required_fields"`
+	Plugin                 RemoteInstallPluginPlan  `json:"plugin"`
+	Package                RemoteInstallPackagePlan `json:"package"`
+	SignatureGateStatus    string                   `json:"signature_gate_status"`
+	CanonicalPayloadSHA256 string                   `json:"canonical_payload_sha256"`
+	Artifact               string                   `json:"artifact"`
+	Downloads              bool                     `json:"downloads"`
+	WritesFiles            bool                     `json:"writes_files"`
+	NetworkAccess          bool                     `json:"network_access"`
+	InstallsPlugin         bool                     `json:"installs_plugin"`
+	Checks                 []RemoteInstallCheck     `json:"checks"`
+	Labels                 []string                 `json:"labels"`
+	Metadata               map[string]string        `json:"metadata,omitempty"`
+	Notes                  []string                 `json:"notes,omitempty"`
 }
 
 type RemoteInstallPluginPlan struct {
@@ -434,6 +469,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"signature_verify_ready":            false,
 		"approval_gate_plan_ready":          true,
 		"approval_gate_ready":               false,
+		"approval_queue_plan_ready":         true,
+		"approval_queue_ready":              false,
 		"plugin_count":                      len(plugins),
 		"loaded_count":                      loaded,
 		"plugin_dir":                        h.pluginDir,
@@ -449,10 +486,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.module.integrity_gate",
 			"wasm.remote_install.plan",
 			"wasm.remote_install.signature_verification_plan",
+			"wasm.remote_install.approval_queue_plan",
 			"wasm.remote_install.approval_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, and approval queue entry contract preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -676,7 +714,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":                PackID,
 		"exported_at":            h.now().UTC(),
 		"format":                 "json-wasm-plugin-evidence",
-		"files":                  []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "sandbox-stats.json"},
+		"files":                  []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "sandbox-stats.json"},
 		"plugin":                 plugin,
 		"plan":                   permissionPlan(plugin.Permissions),
 		"host_abi_plan":          hostABIPlan(plugin.Permissions),
@@ -1158,9 +1196,11 @@ func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRe
 	checks := append([]RemoteInstallCheck{}, installPlan.Checks...)
 	checks = append(checks,
 		RemoteInstallCheck{Name: "approval_required", Required: true, Ready: true, Reason: "remote signed WASM package install must pass approval before any download or write-back"},
+		RemoteInstallCheck{Name: "approval_queue_plan_ready", Required: true, Ready: true, Reason: "deterministic approval queue entry contract is generated without persistence writes"},
 		RemoteInstallCheck{Name: "approval_queue_ready", Required: true, Ready: false, Reason: "approval queue persistence is not wired in this plan-only slice"},
 		RemoteInstallCheck{Name: "approver_present", Required: false, Ready: len(approvers) > 0, Reason: boolReason(len(approvers) > 0, "approver hints are provided for later queue routing", "approver hints are optional until approval queue routing lands")},
 	)
+	queueEntry := h.buildApprovalQueueEntryPlan(installPlan, req, riskTier, approvers)
 	return RemoteInstallApprovalPlanReport{
 		PackID:                   PackID,
 		GeneratedAt:              h.now().UTC(),
@@ -1168,6 +1208,7 @@ func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRe
 		ApprovalGatePlanReady:    true,
 		ApprovalGateReady:        false,
 		RequiresApproval:         true,
+		ApprovalQueuePlanReady:   queueEntry.ApprovalQueuePlanReady,
 		ApprovalQueueReady:       false,
 		WritesApprovalQueue:      false,
 		WritesFiles:              false,
@@ -1181,15 +1222,81 @@ func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRe
 		Plugin:                   installPlan.Plugin,
 		Package:                  installPlan.Package,
 		SignatureVerification:    installPlan.SignatureVerification,
+		ApprovalQueueEntry:       queueEntry,
 		Checks:                   checks,
 		Approvers:                approvers,
-		Artifacts:                []string{"approval-gate-plan.json", "remote-install-plan.json", "signature-verification.json"},
-		Actions:                  []string{"would create an approval request only after approval queue persistence is wired", "would require an explicit approval decision before remote package download starts", "would keep package download, signature verification gate, install write-back, and plugin registration blocked while approval_gate_ready=false"},
-		Labels:                   []string{"remote-install", "approval-gate", "plan-only", "requires-approval", "no-queue-write", "no-download", "no-file-write"},
+		Artifacts:                []string{"approval-gate-plan.json", "approval-queue-entry.json", "remote-install-plan.json", "signature-verification.json"},
+		Actions:                  []string{"would create an approval request only after approval queue persistence is wired", "would use approval-queue-entry.json as the later queue write contract", "would require an explicit approval decision before remote package download starts", "would keep package download, signature verification gate, install write-back, and plugin registration blocked while approval_gate_ready=false"},
+		Labels:                   []string{"remote-install", "approval-gate", "approval-queue-plan", "plan-only", "requires-approval", "no-queue-write", "no-download", "no-file-write"},
 		Metadata:                 cleanStringMap(req.Metadata),
 		RemoteInstallPlanSummary: installPlan,
-		Notes:                    []string{"Preview only: this route does not write an approval queue entry, download packages, fetch manifests, verify signatures, or install plugins.", "Use this deterministic approval gate plan as the contract for the later remote installer approval workflow slice."},
+		Notes:                    []string{"Preview only: this route does not write an approval queue entry, download packages, fetch manifests, verify signatures, or install plugins.", "approval_queue_plan_ready=true only means approval-queue-entry.json is shaped; approval_queue_ready=false and writes_approval_queue=false until persistence and decision routing land.", "Use this deterministic approval gate plan as the contract for the later remote installer approval workflow slice."},
 	}, nil
+}
+
+func (h *Handler) buildApprovalQueueEntryPlan(installPlan RemoteInstallPlanReport, req RemoteInstallApprovalPlanRequest, riskTier string, approvers []string) ApprovalQueueEntryPlan {
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "remote signed WASM package install requires approval"
+	}
+	metadata := cleanStringMap(req.Metadata)
+	requestKeyPayload := strings.Join([]string{
+		"pack_id=" + PackID,
+		"slug=" + installPlan.Plugin.Slug,
+		"version=" + installPlan.Plugin.Version,
+		"package_url=" + installPlan.Package.PackageURL,
+		"manifest_url=" + installPlan.Package.ManifestURL,
+		"cache_key=" + installPlan.Package.CacheKey,
+		"signature_payload=" + installPlan.SignatureVerification.CanonicalPayloadSHA256,
+		"requested_by=" + requestedBy,
+		"risk_tier=" + riskTier,
+	}, "\n")
+	requestKey := sha256Hex(requestKeyPayload)
+	checks := []RemoteInstallCheck{
+		{Name: "approval_queue_entry_shape", Required: true, Ready: true, Reason: "approval-queue-entry.json includes the future queue write fields"},
+		{Name: "request_id_deterministic", Required: true, Ready: true, Reason: "request id is derived from pack, plugin, package, requester, and signature payload"},
+		{Name: "approval_queue_persistence", Required: true, Ready: false, Reason: "approval queue persistence is not wired in this plan-only slice"},
+		{Name: "decision_route_wired", Required: true, Ready: false, Reason: "approval decision route is not wired to remote installer yet"},
+	}
+	return ApprovalQueueEntryPlan{
+		PackID:                 PackID,
+		GeneratedAt:            h.now().UTC(),
+		ApprovalQueuePlanReady: true,
+		ApprovalQueueReady:     false,
+		WritesApprovalQueue:    false,
+		RequiresApproval:       true,
+		Status:                 "blocked_until_approval_queue",
+		QueueName:              "wasm_remote_install",
+		RequestID:              "wasm-remote-install-" + requestKey[:16],
+		RequestKey:             requestKey,
+		Decision:               "requires_approval",
+		DecisionStates:         []string{"pending", "approved", "denied", "expired"},
+		RiskTier:               riskTier,
+		RequestedBy:            requestedBy,
+		Reason:                 reason,
+		Approvers:              approvers,
+		RequiredFields:         []string{"request_id", "pack_id", "plugin.slug", "plugin.version", "package.package_url", "signature_verification.canonical_payload_sha256", "risk_tier", "requested_by", "decision"},
+		Plugin:                 installPlan.Plugin,
+		Package:                installPlan.Package,
+		SignatureGateStatus:    installPlan.SignatureVerification.Status,
+		CanonicalPayloadSHA256: installPlan.SignatureVerification.CanonicalPayloadSHA256,
+		Artifact:               "approval-queue-entry.json",
+		Downloads:              false,
+		WritesFiles:            false,
+		NetworkAccess:          false,
+		InstallsPlugin:         false,
+		Checks:                 checks,
+		Labels:                 []string{"remote-install", "approval-queue", "plan-only", "no-queue-write", "no-download", "no-file-write"},
+		Metadata:               metadata,
+		Notes: []string{
+			"Preview only: this entry is not persisted and does not approve, deny, download, verify, install, or write files.",
+			"Use request_key to deduplicate later approval queue write-back without changing this plan-only route.",
+		},
+	}
 }
 
 func (h *Handler) buildSignatureVerificationPlan(plugin RemoteInstallPluginPlan, pkg RemoteInstallPackagePlan) SignatureVerificationPlan {

@@ -20,6 +20,7 @@
       "wasm.module.integrity_gate",
       "wasm.remote_install.plan",
       "wasm.remote_install.signature_verification_plan",
+      "wasm.remote_install.approval_queue_plan",
       "wasm.remote_install.approval_plan",
       "wasm.evidence.export"
     ],

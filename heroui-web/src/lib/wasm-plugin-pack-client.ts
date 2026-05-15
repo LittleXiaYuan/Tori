@@ -3,6 +3,7 @@ import { fetcher } from "./api-core";
 export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "remote-install-plan.json",
   "approval-gate-plan.json",
+  "approval-queue-entry.json",
   "signature-verification.json",
 ] as const;
 
@@ -23,6 +24,12 @@ export const WASM_PLUGIN_REMOTE_SIGNATURE_VERIFICATION_CAPABILITY =
 
 export const WASM_PLUGIN_REMOTE_SIGNATURE_BLOCKED_STATUS =
   "blocked_until_signature_verifier";
+
+export const WASM_PLUGIN_APPROVAL_QUEUE_ENTRY_ARTIFACT =
+  "approval-queue-entry.json";
+
+export const WASM_PLUGIN_APPROVAL_QUEUE_BLOCKED_STATUS =
+  "blocked_until_approval_queue";
 
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
@@ -70,6 +77,8 @@ export interface WASMPluginStatus {
   signature_verify_ready: boolean;
   approval_gate_plan_ready: boolean;
   approval_gate_ready: boolean;
+  approval_queue_plan_ready: boolean;
+  approval_queue_ready: boolean;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -290,6 +299,7 @@ export interface WASMPluginRemoteInstallApprovalPlan {
   approval_gate_plan_ready: boolean;
   approval_gate_ready: boolean;
   requires_approval: boolean;
+  approval_queue_plan_ready: boolean;
   approval_queue_ready: boolean;
   writes_approval_queue: boolean;
   writes_files: boolean;
@@ -303,6 +313,7 @@ export interface WASMPluginRemoteInstallApprovalPlan {
   plugin: WASMPluginRemoteInstallPluginPlan;
   package: WASMPluginRemoteInstallPackagePlan;
   signature_verification: WASMPluginSignatureVerificationPlan;
+  approval_queue_entry: WASMPluginApprovalQueueEntryPlan;
   checks: WASMPluginRemoteInstallCheck[];
   approvers?: string[];
   artifacts: string[];
@@ -310,6 +321,39 @@ export interface WASMPluginRemoteInstallApprovalPlan {
   labels: string[];
   metadata?: Record<string, string>;
   remote_install_plan_summary: WASMPluginRemoteInstallPlan;
+  notes?: string[];
+}
+
+export interface WASMPluginApprovalQueueEntryPlan {
+  pack_id: string;
+  generated_at: string;
+  approval_queue_plan_ready: boolean;
+  approval_queue_ready: boolean;
+  writes_approval_queue: boolean;
+  requires_approval: boolean;
+  status: string;
+  queue_name: string;
+  request_id: string;
+  request_key: string;
+  decision: string;
+  decision_states: string[];
+  risk_tier: string;
+  requested_by?: string;
+  reason?: string;
+  approvers?: string[];
+  required_fields: string[];
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  signature_gate_status: string;
+  canonical_payload_sha256: string;
+  artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  checks: WASMPluginRemoteInstallCheck[];
+  labels: string[];
+  metadata?: Record<string, string>;
   notes?: string[];
 }
 
