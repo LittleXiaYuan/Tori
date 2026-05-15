@@ -18,6 +18,7 @@
     "POST /v1/wasm-plugin/plugins/unload",
     "POST /v1/wasm-plugin/execute",
     "POST /v1/wasm-plugin/remote-install/plan",
+    "POST /v1/wasm-plugin/remote-install/approval/plan",
     "GET /v1/wasm-plugin/evidence/"
   ],
   "frontend": {

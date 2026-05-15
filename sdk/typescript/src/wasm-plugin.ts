@@ -10,6 +10,7 @@
 
 export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "remote-install-plan.json",
+  "approval-gate-plan.json",
   "signature-verification.json",
 ] as const;
 
@@ -52,6 +53,8 @@ export type WASMPluginStatusResponse = {
   abi_ready: boolean;
   remote_install_plan_ready: boolean;
   remote_install_ready: boolean;
+  approval_gate_plan_ready: boolean;
+  approval_gate_ready: boolean;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -168,6 +171,24 @@ export type WASMPluginRemoteInstallPlanRequest = {
   tags?: string[];
 };
 
+export type WASMPluginRemoteInstallApprovalPlanRequest = {
+  slug?: string;
+  name?: string;
+  version?: string;
+  package_url: string;
+  manifest_url?: string;
+  module_path?: string;
+  sha256?: string;
+  signature?: string;
+  public_key_id?: string;
+  entrypoint?: string;
+  requested_by?: string;
+  reason?: string;
+  risk_tier?: string;
+  approvers?: string[];
+  metadata?: Record<string, string>;
+};
+
 export type WASMPluginRemoteInstallPluginPlan = {
   slug: string;
   name: string;
@@ -225,6 +246,39 @@ export type WASMPluginRemoteInstallPlanResponse = {
   plan: WASMPluginRemoteInstallPlan;
 };
 
+export type WASMPluginRemoteInstallApprovalPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_gate_plan_ready: boolean;
+  approval_gate_ready: boolean;
+  requires_approval: boolean;
+  approval_queue_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_files: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  decision: string;
+  risk_tier: string;
+  requested_by?: string;
+  reason?: string;
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  approvers?: string[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  remote_install_plan_summary: WASMPluginRemoteInstallPlan;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallApprovalPlanResponse = {
+  plan: WASMPluginRemoteInstallApprovalPlan;
+};
+
 export type WASMPluginExecuteResult = {
   slug: string;
   dry_run: boolean;
@@ -255,6 +309,7 @@ export type WASMPluginEvidenceResponse = {
   plan: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
   remote_install_plan: WASMPluginRemoteInstallPlan;
+  approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
   sandbox?: Record<string, unknown>;
 };
 
@@ -404,6 +459,16 @@ export class WASMPluginClient {
     return this.request<WASMPluginRemoteInstallPlanResponse>(
       "POST",
       "/v1/wasm-plugin/remote-install/plan",
+      input,
+    );
+  }
+
+  remoteInstallApprovalPlan(
+    input: WASMPluginRemoteInstallApprovalPlanRequest,
+  ): Promise<WASMPluginRemoteInstallApprovalPlanResponse> {
+    return this.request<WASMPluginRemoteInstallApprovalPlanResponse>(
+      "POST",
+      "/v1/wasm-plugin/remote-install/approval/plan",
       input,
     );
   }

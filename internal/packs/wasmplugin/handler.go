@@ -126,6 +126,24 @@ type RemoteInstallPlanRequest struct {
 	Tags         []string          `json:"tags,omitempty"`
 }
 
+type RemoteInstallApprovalPlanRequest struct {
+	Slug        string            `json:"slug,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Version     string            `json:"version,omitempty"`
+	PackageURL  string            `json:"package_url"`
+	ManifestURL string            `json:"manifest_url,omitempty"`
+	ModulePath  string            `json:"module_path,omitempty"`
+	SHA256      string            `json:"sha256,omitempty"`
+	Signature   string            `json:"signature,omitempty"`
+	PublicKeyID string            `json:"public_key_id,omitempty"`
+	Entrypoint  string            `json:"entrypoint,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	RiskTier    string            `json:"risk_tier,omitempty"`
+	Approvers   []string          `json:"approvers,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
 type RemoteInstallPlanReport struct {
 	PackID                 string                   `json:"pack_id"`
 	GeneratedAt            time.Time                `json:"generated_at"`
@@ -148,6 +166,35 @@ type RemoteInstallPlanReport struct {
 	Reason                 string                   `json:"reason,omitempty"`
 	Metadata               map[string]string        `json:"metadata,omitempty"`
 	Notes                  []string                 `json:"notes,omitempty"`
+}
+
+type RemoteInstallApprovalPlanReport struct {
+	PackID                   string                   `json:"pack_id"`
+	GeneratedAt              time.Time                `json:"generated_at"`
+	Status                   string                   `json:"status"`
+	ApprovalGatePlanReady    bool                     `json:"approval_gate_plan_ready"`
+	ApprovalGateReady        bool                     `json:"approval_gate_ready"`
+	RequiresApproval         bool                     `json:"requires_approval"`
+	ApprovalQueueReady       bool                     `json:"approval_queue_ready"`
+	WritesApprovalQueue      bool                     `json:"writes_approval_queue"`
+	WritesFiles              bool                     `json:"writes_files"`
+	Downloads                bool                     `json:"downloads"`
+	NetworkAccess            bool                     `json:"network_access"`
+	InstallsPlugin           bool                     `json:"installs_plugin"`
+	Decision                 string                   `json:"decision"`
+	RiskTier                 string                   `json:"risk_tier"`
+	RequestedBy              string                   `json:"requested_by,omitempty"`
+	Reason                   string                   `json:"reason,omitempty"`
+	Plugin                   RemoteInstallPluginPlan  `json:"plugin"`
+	Package                  RemoteInstallPackagePlan `json:"package"`
+	Checks                   []RemoteInstallCheck     `json:"checks"`
+	Approvers                []string                 `json:"approvers,omitempty"`
+	Artifacts                []string                 `json:"artifacts"`
+	Actions                  []string                 `json:"actions"`
+	Labels                   []string                 `json:"labels"`
+	Metadata                 map[string]string        `json:"metadata,omitempty"`
+	RemoteInstallPlanSummary RemoteInstallPlanReport  `json:"remote_install_plan_summary"`
+	Notes                    []string                 `json:"notes,omitempty"`
 }
 
 type RemoteInstallPluginPlan struct {
@@ -283,6 +330,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins/unload", Handler: h.Unload},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/execute", Handler: h.Execute},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/plan", Handler: h.RemoteInstallPlan},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/plan", Handler: h.RemoteInstallApprovalPlan},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -311,6 +359,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"abi_ready":                 false,
 		"remote_install_plan_ready": true,
 		"remote_install_ready":      false,
+		"approval_gate_plan_ready":  true,
+		"approval_gate_ready":       false,
 		"plugin_count":              len(plugins),
 		"loaded_count":              loaded,
 		"plugin_dir":                h.pluginDir,
@@ -323,9 +373,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.permission.plan",
 			"wasm.host_abi.plan",
 			"wasm.remote_install.plan",
+			"wasm.remote_install.approval_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview and remote signed package install plan preview are available as non-destructive contracts; runtime host function binding/enforcement, package download, signature verification, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, remote signed package install plan preview, and approval gate plan preview are available as non-destructive contracts; runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -497,6 +548,24 @@ func (h *Handler) RemoteInstallPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) RemoteInstallApprovalPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallApprovalPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install approval plan payload")
+		return
+	}
+	plan, err := h.buildRemoteInstallApprovalPlan(req, true)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -512,11 +581,12 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":             PackID,
 		"exported_at":         h.now().UTC(),
 		"format":              "json-wasm-plugin-evidence",
-		"files":               []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "remote-install-plan.json", "sandbox-stats.json"},
+		"files":               []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "remote-install-plan.json", "approval-gate-plan.json", "sandbox-stats.json"},
 		"plugin":              plugin,
 		"plan":                permissionPlan(plugin.Permissions),
 		"host_abi_plan":       hostABIPlan(plugin.Permissions),
 		"remote_install_plan": h.remoteInstallPlanForPlugin(plugin),
+		"approval_gate_plan":  h.remoteInstallApprovalPlanForPlugin(plugin),
 		"sandbox":             h.sandbox.Stats(),
 	})
 }
@@ -722,6 +792,23 @@ func (h *Handler) remoteInstallPlanForPlugin(plugin Plugin) RemoteInstallPlanRep
 	return plan
 }
 
+func (h *Handler) remoteInstallApprovalPlanForPlugin(plugin Plugin) RemoteInstallApprovalPlanReport {
+	plan, _ := h.buildRemoteInstallApprovalPlan(RemoteInstallApprovalPlanRequest{
+		Slug:        plugin.Slug,
+		Name:        plugin.Name,
+		Version:     plugin.Version,
+		PackageURL:  fmt.Sprintf("https://packs.yunque.local/wasm-plugin/%s-%s.tgz", plugin.Slug, plugin.Version),
+		ManifestURL: fmt.Sprintf("https://packs.yunque.local/wasm-plugin/%s/manifest.json", plugin.Slug),
+		ModulePath:  plugin.ModulePath,
+		SHA256:      plugin.SHA256,
+		Entrypoint:  plugin.Entrypoint,
+		RequestedBy: "evidence-export",
+		Reason:      "evidence export preview for remote signed package approval gate contract",
+		RiskTier:    "high",
+	}, false)
+	return plan
+}
+
 func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePackageURL bool) (RemoteInstallPlanReport, error) {
 	packageURL := strings.TrimSpace(req.PackageURL)
 	if packageURL == "" && requirePackageURL {
@@ -831,6 +918,66 @@ func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePa
 			"Preview only: this route does not download packages, fetch manifests, verify signatures, or write plugin metadata.",
 			"Use this deterministic plan as the contract for the later remote signed package installer slice.",
 		},
+	}, nil
+}
+
+func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRequest, requirePackageURL bool) (RemoteInstallApprovalPlanReport, error) {
+	installPlan, err := h.buildRemoteInstallPlan(RemoteInstallPlanRequest{
+		Slug:        req.Slug,
+		Name:        req.Name,
+		Version:     req.Version,
+		PackageURL:  req.PackageURL,
+		ManifestURL: req.ManifestURL,
+		ModulePath:  req.ModulePath,
+		SHA256:      req.SHA256,
+		Signature:   req.Signature,
+		PublicKeyID: req.PublicKeyID,
+		Entrypoint:  req.Entrypoint,
+		RequestedBy: req.RequestedBy,
+		Reason:      req.Reason,
+		Metadata:    req.Metadata,
+	}, requirePackageURL)
+	if err != nil {
+		return RemoteInstallApprovalPlanReport{}, err
+	}
+	riskTier := strings.ToLower(strings.TrimSpace(req.RiskTier))
+	if riskTier == "" {
+		riskTier = "high"
+	}
+	approvers := cleanList(req.Approvers)
+	checks := append([]RemoteInstallCheck{}, installPlan.Checks...)
+	checks = append(checks,
+		RemoteInstallCheck{Name: "approval_required", Required: true, Ready: true, Reason: "remote signed WASM package install must pass approval before any download or write-back"},
+		RemoteInstallCheck{Name: "approval_queue_ready", Required: true, Ready: false, Reason: "approval queue persistence is not wired in this plan-only slice"},
+		RemoteInstallCheck{Name: "approver_present", Required: false, Ready: len(approvers) > 0, Reason: boolReason(len(approvers) > 0, "approver hints are provided for later queue routing", "approver hints are optional until approval queue routing lands")},
+	)
+	return RemoteInstallApprovalPlanReport{
+		PackID:                   PackID,
+		GeneratedAt:              h.now().UTC(),
+		Status:                   "plan_only",
+		ApprovalGatePlanReady:    true,
+		ApprovalGateReady:        false,
+		RequiresApproval:         true,
+		ApprovalQueueReady:       false,
+		WritesApprovalQueue:      false,
+		WritesFiles:              false,
+		Downloads:                false,
+		NetworkAccess:            false,
+		InstallsPlugin:           false,
+		Decision:                 "requires_approval",
+		RiskTier:                 riskTier,
+		RequestedBy:              strings.TrimSpace(req.RequestedBy),
+		Reason:                   strings.TrimSpace(req.Reason),
+		Plugin:                   installPlan.Plugin,
+		Package:                  installPlan.Package,
+		Checks:                   checks,
+		Approvers:                approvers,
+		Artifacts:                []string{"approval-gate-plan.json", "remote-install-plan.json", "signature-verification.json"},
+		Actions:                  []string{"would create an approval request only after approval queue persistence is wired", "would require an explicit approval decision before remote package download starts", "would keep package download, signature verification, install write-back, and plugin registration blocked while approval_gate_ready=false"},
+		Labels:                   []string{"remote-install", "approval-gate", "plan-only", "requires-approval", "no-queue-write", "no-download", "no-file-write"},
+		Metadata:                 cleanStringMap(req.Metadata),
+		RemoteInstallPlanSummary: installPlan,
+		Notes:                    []string{"Preview only: this route does not write an approval queue entry, download packages, fetch manifests, verify signatures, or install plugins.", "Use this deterministic approval gate plan as the contract for the later remote installer approval workflow slice."},
 	}, nil
 }
 

@@ -38,8 +38,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,14 +53,15 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":              {http.MethodGet},
-		"/v1/wasm-plugin/plugins":             {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":            {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":        {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload":      {http.MethodPost},
-		"/v1/wasm-plugin/execute":             {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/plan": {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":           {http.MethodGet},
+		"/v1/wasm-plugin/status":                       {http.MethodGet},
+		"/v1/wasm-plugin/plugins":                      {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":                     {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":                 {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":               {http.MethodPost},
+		"/v1/wasm-plugin/execute":                      {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan":          {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/plan": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":                    {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -133,6 +134,25 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"metadata":{"ticket":"WASM-1"}}`))
+	h.RemoteInstallApprovalPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") {
+		t.Fatalf("remote install approval plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var approvalPlanResp struct {
+		Plan RemoteInstallApprovalPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&approvalPlanResp); err != nil {
+		t.Fatalf("decode remote install approval plan: %v", err)
+	}
+	if !approvalPlanResp.Plan.ApprovalGatePlanReady || approvalPlanResp.Plan.ApprovalGateReady || !approvalPlanResp.Plan.RequiresApproval || approvalPlanResp.Plan.WritesApprovalQueue || approvalPlanResp.Plan.Downloads || approvalPlanResp.Plan.WritesFiles || approvalPlanResp.Plan.NetworkAccess || approvalPlanResp.Plan.InstallsPlugin {
+		t.Fatalf("remote approval plan should be plan-only and non-destructive: %#v", approvalPlanResp.Plan)
+	}
+	if approvalPlanResp.Plan.Decision != "requires_approval" || approvalPlanResp.Plan.RiskTier != "critical" || approvalPlanResp.Plan.RequestedBy != "operator" || len(approvalPlanResp.Plan.Approvers) != 2 {
+		t.Fatalf("remote approval plan should capture approval routing metadata: %#v", approvalPlanResp.Plan)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"hello"}`))
 	h.Execute(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "last_input") || fake.calls != 1 {
@@ -151,12 +171,13 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		HostABIPlan       HostABIPlan             `json:"host_abi_plan"`
-		RemoteInstallPlan RemoteInstallPlanReport `json:"remote_install_plan"`
+		HostABIPlan       HostABIPlan                     `json:"host_abi_plan"`
+		RemoteInstallPlan RemoteInstallPlanReport         `json:"remote_install_plan"`
+		ApprovalGatePlan  RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -166,6 +187,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !evidenceResp.RemoteInstallPlan.RemoteInstallPlanReady || evidenceResp.RemoteInstallPlan.RemoteInstallReady {
 		t.Fatalf("evidence should include remote install plan preview: %#v", evidenceResp.RemoteInstallPlan)
+	}
+	if !evidenceResp.ApprovalGatePlan.ApprovalGatePlanReady || evidenceResp.ApprovalGatePlan.ApprovalGateReady || !evidenceResp.ApprovalGatePlan.RequiresApproval {
+		t.Fatalf("evidence should include approval gate plan preview: %#v", evidenceResp.ApprovalGatePlan)
 	}
 }
 

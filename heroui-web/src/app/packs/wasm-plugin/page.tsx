@@ -27,6 +27,7 @@ import { formatErrorMessage } from "@/lib/error-utils";
 import {
   createWASMPluginPackClient,
   type WASMPluginExecuteResult,
+  type WASMPluginRemoteInstallApprovalPlan,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginStatus,
   type WASMPluginSummary,
@@ -97,6 +98,30 @@ function sampleRemoteInstallPlan(slug: string) {
   );
 }
 
+function sampleRemoteApprovalPlan(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      name: "Calculator Remote WASM",
+      version: "0.2.0",
+      package_url: `https://packs.yunque.local/wasm/${slug}-0.2.0.tgz`,
+      manifest_url: `https://packs.yunque.local/wasm/${slug}.json`,
+      module_path: `${slug}.wasm`,
+      sha256:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      signature: "sig-ed25519-preview",
+      public_key_id: "yunque-root-2026",
+      requested_by: "operator",
+      reason: "remote WASM package must be approved before install wiring",
+      risk_tier: "high",
+      approvers: ["security", "platform"],
+      metadata: { ticket: "WASM-REMOTE-APPROVAL-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -108,6 +133,7 @@ export default function WASMPluginPackPage() {
     | "execute"
     | "evidence"
     | "remote-install"
+    | "remote-approval"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +146,11 @@ export default function WASMPluginPackPage() {
   );
   const [remoteInstallPlan, setRemoteInstallPlan] =
     useState<WASMPluginRemoteInstallPlan | null>(null);
+  const [remoteApprovalJSON, setRemoteApprovalJSON] = useState(() =>
+    sampleRemoteApprovalPlan("calculator-remote"),
+  );
+  const [remoteApprovalPlan, setRemoteApprovalPlan] =
+    useState<WASMPluginRemoteInstallApprovalPlan | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -188,6 +219,21 @@ export default function WASMPluginPackPage() {
       showToast("已生成远程签名包安装计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成远程签名包安装计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planRemoteApproval = async () => {
+    setBusy("remote-approval");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteApprovalJSON);
+      const res = await wasmPluginPack.remoteInstallApprovalPlan(payload);
+      setRemoteApprovalPlan(res.plan);
+      showToast("已生成远程安装审批 gate 计划", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成远程安装审批 gate 计划失败"));
     } finally {
       setBusy(null);
     }
@@ -320,6 +366,10 @@ export default function WASMPluginPackPage() {
                 remote_install_ready:{" "}
                 {String(status?.remote_install_ready ?? false)}
               </Chip>
+              <Chip size="sm">
+                approval_gate_ready:{" "}
+                {String(status?.approval_gate_ready ?? false)}
+              </Chip>
               <span
                 className="text-xs"
                 style={{ color: "var(--yunque-text-muted)" }}
@@ -333,9 +383,9 @@ export default function WASMPluginPackPage() {
             >
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
               dry-run、权限计划、Host ABI plan
-              preview、远程签名包安装计划和证据包放进可选
-              Pack。真实下载、签名验证、install 写回、Host ABI 权限强执行和
-              TinyGo 示例会在后续切片继续接入。
+              preview、远程签名包安装计划、远程安装审批 gate
+              计划和证据包放进可选 Pack。真实下载、签名验证、审批队列写回、install
+              写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
@@ -357,7 +407,7 @@ export default function WASMPluginPackPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-7">
         <Card className="section-card p-4">
           <div className="kpi-label">插件数量</div>
           <div className="kpi-value">
@@ -387,6 +437,12 @@ export default function WASMPluginPackPage() {
           <div className="kpi-label">远程安装</div>
           <div className="kpi-value text-lg">
             {status?.remote_install_plan_ready ? "plan" : "pending"}
+          </div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">审批 Gate</div>
+          <div className="kpi-value text-lg">
+            {status?.approval_gate_plan_ready ? "plan" : "pending"}
           </div>
         </Card>
         <Card className="section-card p-4">
@@ -473,6 +529,94 @@ export default function WASMPluginPackPage() {
                 校验 / 注册插件
               </Button>
             </div>
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  远程安装审批 Gate 计划
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  plan-only 契约：固定“远程签名 WASM
+                  包安装必须先审批”的边界，只生成 approval-gate-plan.json
+                  预览，不写审批队列、不下载、不联网、不安装。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-approval"}
+                onPress={planRemoteApproval}
+              >
+                生成审批计划
+              </Button>
+            </div>
+            <TextField
+              value={remoteApprovalJSON}
+              onChange={setRemoteApprovalJSON}
+            >
+              <TextArea
+                rows={8}
+                aria-label="WASM remote install approval gate plan JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                approval_gate_plan_ready:{" "}
+                {String(
+                  remoteApprovalPlan?.approval_gate_plan_ready ??
+                    status?.approval_gate_plan_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_gate_ready:{" "}
+                {String(
+                  remoteApprovalPlan?.approval_gate_ready ??
+                    status?.approval_gate_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                requires_approval:{" "}
+                {String(remoteApprovalPlan?.requires_approval ?? true)}
+              </Chip>
+              <Chip size="sm">
+                writes_approval_queue:{" "}
+                {String(remoteApprovalPlan?.writes_approval_queue ?? false)}
+              </Chip>
+              <Chip size="sm">
+                downloads: {String(remoteApprovalPlan?.downloads ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteApprovalPlan?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteApprovalPlan?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">artifact: approval-gate-plan.json</Chip>
+            </div>
+            {remoteApprovalPlan && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteApprovalPlan, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM remote install approval gate plan result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
           </Card>
 
           <Card className="section-card p-4">
