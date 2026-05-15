@@ -22,6 +22,7 @@
       "wasm.remote_install.signature_verification_plan",
       "wasm.remote_install.approval_queue_plan",
       "wasm.remote_install.approval_plan",
+      "wasm.remote_install.approval_decision_plan",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -33,6 +34,7 @@
       "/v1/wasm-plugin/execute",
       "/v1/wasm-plugin/remote-install/plan",
       "/v1/wasm-plugin/remote-install/approval/plan",
+      "/v1/wasm-plugin/remote-install/approval/decision/plan",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -86,6 +88,11 @@
         "method": "POST",
         "path": "/v1/wasm-plugin/remote-install/approval/plan",
         "description": "Preview a non-destructive approval gate plan required before remote signed WASM package install."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/approval/decision/plan",
+        "description": "Preview a non-destructive approval decision application plan without mutating the approval queue or installer state."
       },
       {
         "method": "GET",
