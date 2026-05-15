@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelAndLoRA(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRAAndBrowserIntent(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -41,9 +41,19 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelAndLoRA(t *testing.T) {
 	if lora.Manifest.SDK.TypeScript != "yunque-client/lora" {
 		t.Fatalf("unexpected LoRA SDK import: %s", lora.Manifest.SDK.TypeScript)
 	}
+	browserIntent, ok := registry.Get("yunque.pack.browser-intent")
+	if !ok {
+		t.Fatal("expected Browser Intent builtin pack to be installed")
+	}
+	if browserIntent.Status != packruntime.PackStatusEnabled {
+		t.Fatalf("expected Browser Intent default enabled, got %s", browserIntent.Status)
+	}
+	if browserIntent.Manifest.SDK.TypeScript != "yunque-client/browser" {
+		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
+	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 3 {
+	if got := len(registry.List()); got != 4 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

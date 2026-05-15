@@ -98,7 +98,7 @@ export function BrowserResumeBanner({
               size="sm"
               variant="ghost"
               className="rounded-full px-3"
-              onPress={() => window.open("/browser", "_blank", "noopener,noreferrer")}
+              onPress={() => window.open("/packs/browser", "_blank", "noopener,noreferrer")}
             >
               Open browser setup
             </Button>

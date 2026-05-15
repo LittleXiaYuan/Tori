@@ -20,7 +20,7 @@ import type {
   TrustEntry, RBACRole,
   IterateProposal, IterateStatus, SkillGrowPattern,
   WorkflowDef, WorkflowInstance,
-  ProviderInfo, ProviderTestResult, BrowserStatus, BrowserConfig, OPPItem, BrowserScenario, ScenarioStepResult,
+  ProviderInfo, ProviderTestResult,
   CostSummary, CostHistoryEntry, CostAlert, CostBudget,
   GraphEntity, GraphRelation, GraphStats, MemorySearchResult,
   SystemInfo, CacheStats, RouterStats, PersonaMode, SearchResult,
@@ -774,34 +774,6 @@ export const api = {
 
   reviewStatus: () =>
     fetcher<{ enabled: boolean; trust_enabled: boolean }>("/api/review/status"),
-
-  // Browser automation
-  browserNavigate: (url: string) =>
-    fetcher<{ screenshot?: string }>("/v1/browser/navigate", { method: "POST", body: JSON.stringify({ url }) }),
-  browserScreenshot: () =>
-    fetcher<{ screenshot?: string }>("/v1/browser/screenshot"),
-  browserOcr: (mode: string) =>
-    fetcher<{ text?: string; result?: string }>("/v1/browser/ocr", { method: "POST", body: JSON.stringify({ mode }) }),
-  browserStatus: () =>
-    fetcher<BrowserStatus>("/v1/browser/status"),
-  browserConfig: () =>
-    fetcher<BrowserConfig>("/v1/browser/config"),
-  browserScreenshotLatest: () =>
-    fetcher<{ screenshot?: string; timestamp?: string }>("/v1/browser/screenshot/latest"),
-  browserOPPPending: () =>
-    fetcher<{ items: OPPItem[]; total: number }>("/v1/browser/opp/pending"),
-  browserOPPDecide: (id: string, decision: "allow" | "deny") =>
-    fetcher<{ status: string }>("/v1/browser/opp/decide", { method: "POST", body: JSON.stringify({ id, decision }) }),
-
-  // Browser Extension (Connector)
-  browserExtStatus: () =>
-    fetcher<{ connected: boolean; version?: string; pending?: number }>("/api/browser/ext/status"),
-  browserExtAction: (action: Record<string, unknown>) =>
-    fetcher<{ ok: boolean; error?: string; screenshot?: string }>("/api/browser/ext/action", { method: "POST", body: JSON.stringify(action) }),
-  browserExtScenarios: () =>
-    fetcher<{ scenarios: BrowserScenario[] }>("/api/browser/ext/scenarios"),
-  browserExtRunScenario: (scenarioId: string) =>
-    fetcher<{ ok: boolean; scenario: string; results: ScenarioStepResult[] }>("/api/browser/ext/scenarios/run", { method: "POST", body: JSON.stringify({ scenario_id: scenarioId }) }),
 
   // Document generation
   docgenExport: (params: { title: string; content: string; format: string }) =>

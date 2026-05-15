@@ -12,6 +12,7 @@ import {
   ArrowRight, Blocks, Maximize2, Minimize2,
 } from "lucide-react";
 import { api, type ConversationInfo, type EmotionResult, type NotifyChannel, type StickerSuggestion, type PresetInfo, type SkillInfo } from "@/lib/api";
+import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
 import type { SkillSuggestion as SkillGrowthSuggestion } from "@/lib/api-types";
 import MarkdownRenderer from "@/components/markdown-renderer";
 import { ExecutionTrace, type AgentEvent } from "@/components/execution-trace";
@@ -65,6 +66,8 @@ import { ChatStreamTimeoutError, parseAgenticChatStream } from "@/lib/chat-sse";
 import { buildHiddenContextAttachments } from "@/lib/chat-attachments";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
 import { formatErrorMessage } from "@/lib/error-utils";
+
+const browserIntentClient = createBrowserIntentPackClient();
 
 export default function ChatPage() {
   const router = useRouter();
@@ -311,7 +314,7 @@ export default function ChatPage() {
     if (slashBrowserCommand) {
       setSuggestedTab("browser");
       setShowComputer(true);
-      const extStatus = await api.browserExtStatus().catch(() => ({ connected: false }));
+      const extStatus = await browserIntentClient.extensionStatus().catch(() => ({ connected: false }));
       if (!extStatus.connected) {
         setShowConnectors(true);
         setResumePromptForBrowser(text);
@@ -328,15 +331,15 @@ export default function ChatPage() {
             "The browser extension is not connected yet.",
             "I opened the browser install guide for you. Connect **Yunque Browser Connector**, then run this command again.",
             "",
-            "Open the workspace here: [/browser](/browser)",
+            "Open the workspace here: [/packs/browser](/packs/browser)",
           ].join("\n"),
           id: newId(),
           browserRequirement: {
             required: true,
             reason: "browser_connector_required",
             message: "This command needs the live Yunque Browser Connector before it can operate your real browser tab.",
-            install_path: "/browser",
-            settings_path: "/browser",
+            install_path: "/packs/browser",
+            settings_path: "/packs/browser",
           },
           traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-slash", command: slashBrowserCommand.command }, "reflect")],
         };
@@ -345,7 +348,7 @@ export default function ChatPage() {
         setActiveSlashCommand(null);
         setShowSlashMenu(false);
         if (typeof window !== "undefined") {
-          window.setTimeout(() => window.open("/browser", "_blank", "noopener,noreferrer"), 80);
+          window.setTimeout(() => window.open("/packs/browser", "_blank", "noopener,noreferrer"), 80);
         }
         return;
       }
@@ -380,7 +383,7 @@ export default function ChatPage() {
       ));
 
       try {
-        const result = await api.browserExtAction(builtAction.action);
+        const result = await browserIntentClient.extensionAction(builtAction.action);
         if (!result?.ok) {
           throw new Error(result?.error || "Browser action failed.");
         }
@@ -965,7 +968,7 @@ export default function ChatPage() {
             onResume={() => continueBlockedBrowserTask()}
             onRefresh={() => {
               syncBridgeState();
-              api.browserExtStatus()
+              browserIntentClient.extensionStatus()
                 .then((status) => {
                   setBridgeNotice({
                     tone: status.connected ? "success" : "info",
@@ -1013,7 +1016,7 @@ export default function ChatPage() {
               onShare={handleShare}
               onBrowserRefresh={() => {
                 syncBridgeState();
-                api.browserExtStatus()
+                browserIntentClient.extensionStatus()
                   .then((status) => setBridgeNotice({ tone: status.connected ? "success" : "info", text: status.connected ? "Browser connector is ready." : "Browser connector is still offline." }))
                   .catch(() => setBridgeNotice({ tone: "error", text: "Unable to refresh browser connector status." }));
               }}

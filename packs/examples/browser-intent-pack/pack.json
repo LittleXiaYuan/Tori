@@ -1,0 +1,151 @@
+{
+  "id": "yunque.pack.browser-intent",
+  "name": "Browser Intent Pack",
+  "version": "0.1.0",
+  "description": "将浏览器连接、截图、OCR、OPP 预览和扩展场景执行作为可选浏览器意图层增量包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "enabled",
+  "backend": {
+    "capabilities": [
+      "browser.status",
+      "browser.config",
+      "browser.navigate",
+      "browser.capture",
+      "browser.ocr",
+      "browser.opp",
+      "browser.extension.status",
+      "browser.extension.session",
+      "browser.extension.action",
+      "browser.extension.scenarios"
+    ],
+    "routes": [
+      "/v1/browser/status",
+      "/v1/browser/config",
+      "/v1/browser/navigate",
+      "/v1/browser/screenshot",
+      "/v1/browser/ocr",
+      "/v1/browser/screenshot/latest",
+      "/v1/browser/opp/pending",
+      "/v1/browser/opp/decide",
+      "/api/browser/ext/status",
+      "/api/browser/ext/session",
+      "/api/browser/ext/action",
+      "/api/browser/ext/scenarios",
+      "/api/browser/ext/scenarios/run"
+    ],
+    "permissions": [
+      "browser:read",
+      "browser:write",
+      "browser:connect"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/browser/status",
+        "description": "Read browser extension connection status for the current tenant."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/browser/config",
+        "description": "Read browser connector runtime mode and basic configuration."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/browser/navigate",
+        "description": "Navigate the connected browser to a URL."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/browser/screenshot",
+        "description": "Capture a screenshot from the connected browser."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/browser/ocr",
+        "description": "Extract page content from the connected browser."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/browser/screenshot/latest",
+        "description": "Read the latest browser screenshot snapshot."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/browser/opp/pending",
+        "description": "Read pending browser OPP approval items."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/browser/opp/decide",
+        "description": "Resolve a browser OPP approval item."
+      },
+      {
+        "method": "GET",
+        "path": "/api/browser/ext/status",
+        "description": "Read browser connector extension status."
+      },
+      {
+        "method": "POST",
+        "path": "/api/browser/ext/session",
+        "description": "Issue a short-lived browser connector WebSocket session ticket."
+      },
+      {
+        "method": "POST",
+        "path": "/api/browser/ext/action",
+        "description": "Send a raw action to the connected browser extension."
+      },
+      {
+        "method": "GET",
+        "path": "/api/browser/ext/scenarios",
+        "description": "List preset browser automation scenarios."
+      },
+      {
+        "method": "POST",
+        "path": "/api/browser/ext/scenarios/run",
+        "description": "Run a preset browser automation scenario."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "browser-intent",
+        "label": "浏览器意图",
+        "path": "/packs/browser",
+        "icon": "globe",
+        "order": 85
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/browser",
+        "component": "browser/BrowserIntentPackPage",
+        "title": "浏览器意图"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "browser/BrowserIntentPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/browser"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/BROWSER-INTENT-LAYER.md",
+    "stage": "bridge-gateway-to-pack",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/browser-intent-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/browser-intent-pack/browser-intent-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/browser-intent-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

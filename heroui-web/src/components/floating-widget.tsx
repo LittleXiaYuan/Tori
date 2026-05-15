@@ -66,7 +66,7 @@ function describePath(pathname: string | null) {
   if (path.startsWith("/settings/connectors")) return "连接器设置";
   if (path.startsWith("/settings/notifications")) return "通知设置";
   if (path.startsWith("/settings")) return "设置";
-  if (path.startsWith("/browser")) return "浏览器工作区";
+  if (path.startsWith("/packs/browser")) return "浏览器工作区";
   if (path.startsWith("/workspace")) return "Workspace";
   if (path.startsWith("/workers")) return "AI IDE 协作";
   if (path.startsWith("/inbox")) return "收件箱";
@@ -151,7 +151,7 @@ function parseAssistantResult(reply: string): PageAssistantResult {
 function sanitizeRoute(path: string | undefined) {
   if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/api/")) return "";
   const allowed = [
-    "/dashboard", "/chat", "/settings", "/browser", "/workspace", "/workers",
+    "/dashboard", "/chat", "/settings", "/packs/browser", "/workspace", "/workers",
     "/inbox", "/missions", "/plugins", "/knowledge", "/memory", "/tools",
     "/providers", "/connectors", "/packs/backup", "/trust", "/tenants", "/bots",
   ];
@@ -314,7 +314,7 @@ function inferLocalAction(text: string): PageAssistantResult | null {
     return { reply: "已为你打开通知设置页。", actions: [{ type: "navigate", path: "/settings/notifications" }] };
   }
   if ((q.includes("浏览器") || q.includes("云电脑")) && (q.includes("打开") || q.includes("去"))) {
-    return { reply: "已为你打开浏览器工作区。", actions: [{ type: "navigate", path: "/browser" }] };
+    return { reply: "已为你打开浏览器工作区。", actions: [{ type: "navigate", path: "/packs/browser" }] };
   }
   if ((q.includes("workspace") || q.includes("工作区") || q.includes("文件")) && (q.includes("打开") || q.includes("去"))) {
     return { reply: "已为你打开 Workspace。", actions: [{ type: "navigate", path: "/workspace" }] };

@@ -78,10 +78,20 @@ func (g *Gateway) registerBackendPack(module packruntime.BackendModule) {
 			panic(fmt.Sprintf("backend pack route conflict: %s already registered by %s, cannot register %s", route.Path, owner, packID))
 		}
 		g.backendPackRoutes[route.Path] = packID
-		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: methods[0], Methods: methods, Path: route.Path}
-		g.mux.HandleFunc(route.Path, g.requireAuth(g.requirePackRoute(packID, methods, route.Path, func(w http.ResponseWriter, r *http.Request) {
+		g.backendPackRouteInfos[route.Path] = packruntime.BackendRouteInfo{Method: methods[0], Methods: methods, Path: route.Path, Auth: string(route.Auth)}
+		authed := g.backendPackAuth(route.Auth, g.requirePackRoute(packID, methods, route.Path, func(w http.ResponseWriter, r *http.Request) {
 			route.Handler(w, r)
-		})))
+		}))
+		g.mux.HandleFunc(route.Path, authed)
+	}
+}
+
+func (g *Gateway) backendPackAuth(mode packruntime.BackendRouteAuthMode, next http.HandlerFunc) http.HandlerFunc {
+	switch mode {
+	case packruntime.BackendRouteAuthPassthrough:
+		return next
+	default:
+		return g.requireAuth(next)
 	}
 }
 

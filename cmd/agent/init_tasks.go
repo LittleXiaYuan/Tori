@@ -41,6 +41,7 @@ import (
 	"yunque-agent/internal/integrations/mineru"
 	iledger "yunque-agent/internal/ledger"
 	backuppack "yunque-agent/internal/packs/backup"
+	browserintentpack "yunque-agent/internal/packs/browserintent"
 	lorapack "yunque-agent/internal/packs/lora"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/packruntime"
@@ -136,6 +137,7 @@ func initTasks(app *agentrt.App) error {
 	gw.SetLoRAScheduler(loraScheduler)
 	gw.SetTrainingMetrics(trainingMetrics)
 	gw.SetEvolutionCoordinator(evolutionCoordinator)
+	gw.RegisterBackendPack(browserintentpack.NewHandler(gw))
 	gw.RegisterBackendPack(lorapack.NewHandler(lorapack.Options{
 		Scheduler: loraScheduler,
 		Metrics:   trainingMetrics,
@@ -371,6 +373,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/backup-pack/pack.json",
 		"packs/examples/cogni-kernel-pack/pack.json",
 		"packs/examples/lora-pack/pack.json",
+		"packs/examples/browser-intent-pack/pack.json",
 	} {
 		manifest, err := loadBuiltinPackManifest(manifestPath)
 		if err != nil {

@@ -48,6 +48,8 @@ const gateway = [
   "internal/controlplane/gateway/gateway_setters.go",
   "internal/controlplane/gateway/handlers_packs_test.go",
   "internal/controlplane/gateway/handlers_cogni.go",
+  "internal/controlplane/gateway/handlers_browser_pack.go",
+  "internal/controlplane/gateway/handlers_browser_pack_test.go",
   "internal/controlplane/gateway/handlers_cogni_experience_test.go",
   "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
@@ -57,6 +59,8 @@ const loraPack = read("internal/packs/lora/handler.go");
 const loraManifest = read("packs/examples/lora-pack/pack.json");
 const cogniKernelPack = read("internal/packs/cognikernel/handler.go");
 const cogniKernelManifest = read("packs/examples/cogni-kernel-pack/pack.json");
+const browserIntentPack = read("internal/packs/browserintent/handler.go");
+const browserIntentManifest = read("packs/examples/browser-intent-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
@@ -76,6 +80,9 @@ const frontend = [
   "heroui-web/src/lib/__tests__/lora-pack-client.test.ts",
   "heroui-web/src/lib/cogni-kernel-pack-client.ts",
   "heroui-web/src/lib/__tests__/cogni-kernel-pack-client.test.ts",
+  "heroui-web/src/app/packs/browser/page.tsx",
+  "heroui-web/src/lib/browser-intent-pack-client.ts",
+  "heroui-web/src/lib/__tests__/browser-intent-pack-client.test.ts",
   "heroui-web/src/lib/pack-types.ts",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
@@ -86,6 +93,8 @@ const legacyLoRAPage = read("heroui-web/src/app/lora/page.tsx");
 const loraPackPage = read("heroui-web/src/app/packs/lora/page.tsx");
 const legacyCogniPage = read("heroui-web/src/app/cognis/page.tsx");
 const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
+const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
+const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
@@ -97,9 +106,11 @@ const sdk = [
   "sdk/manifest/packs-sdk.json",
   "sdk/manifest/lora-pack-sdk.json",
   "sdk/manifest/cogni-kernel-pack-sdk.json",
+  "sdk/manifest/browser-intent-pack-sdk.json",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
 ].map(read).join("\n");
 const docs = [
   "packs/AUTHORING.md",
@@ -144,6 +155,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "loadBuiltinPackManifest",
   "packs/examples/lora-pack/pack.json",
   "packs/examples/cogni-kernel-pack/pack.json",
+  "packs/examples/browser-intent-pack/pack.json",
 ]);
 
 requireTokens("后端 backend pack module registry / route gates", backend + gateway, [
@@ -154,6 +166,8 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "BackendPacks",
   "backendPackRoutes",
   "backendPackRouteInfos",
+  "backendPackAuth",
+  "BackendRouteAuthPassthrough",
   "requirePackRoute",
   "packRouteEnabled",
   "normalizeBackendRouteMethods",
@@ -210,6 +224,26 @@ requireTokens("cogni-kernel 蓝图能力包", cogniKernelPack + cogniKernelManif
   "rollback",
 ]);
 
+requireTokens("browser-intent 蓝图能力包", browserIntentPack + browserIntentManifest + frontend + gateway, [
+  'const PackID = "yunque.pack.browser-intent"',
+  "type BrowserGateway interface",
+  "HandleBrowserIntentPack",
+  "HandleBrowserIntentSession",
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/browser/status",
+  "/api/browser/ext/session",
+  "/api/browser/ext/scenarios/run",
+  "http.MethodPost",
+  "yunque-client/browser",
+  "Browser Intent Pack",
+  "createBrowserIntentPackClient",
+  "browser-intent-pack-client",
+  "TestBrowserIntentPackGateReturnsNotFoundWhenDisabled",
+  "/packs/browser",
+  "distribution",
+  "rollback",
+]);
+
 requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerification, [
   "fetchEnabledPacks",
   "buildPackNavItems",
@@ -226,6 +260,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend backup pack client tests",
   "Frontend LoRA pack client tests",
   "Frontend Cogni Kernel pack client tests",
+  "Frontend Browser Intent pack client tests",
   "Frontend shell pack entry tests",
   "PackRuntimeRoutePage",
   "enabled()",
@@ -292,6 +327,24 @@ if (cogniPackPage.includes("api.listCognis") || cogniPackPage.includes("api.relo
   ok("前端 Cogni Kernel pack 客户端拆分", "Cogni Kernel page uses cogni-kernel-pack-client instead of monolithic api Cogni methods");
 }
 
+if (!legacyBrowserPage.includes('redirect("/packs/browser")')) {
+  fail("前端同步菜单/路由/资源/控制台", "legacy /browser page must redirect to the Browser Intent pack route");
+} else {
+  ok("前端 Browser Intent pack 路由兼容", "legacy /browser redirects to /packs/browser");
+}
+
+if (frontendShell.includes('href: "/browser"') || frontendShell.includes("nav-browser")) {
+  fail("前端同步菜单/路由/资源/控制台", "Browser Intent must not be exposed as a hard-coded main-shell nav item; use enabled-pack sync");
+} else {
+  ok("前端轻内核导航", "Browser Intent entry is not hard-coded in sidebar/nav-items/command-palette");
+}
+
+if (browserPackPage.includes("api.browser") || browserPackPage.includes('from "@/lib/api"') || !browserPackPage.includes("createBrowserIntentPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "Browser Intent pack page must use browser-intent-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Browser Intent pack 客户端拆分", "Browser Intent page uses browser-intent-pack-client instead of monolithic api browser methods");
+}
+
 const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
 if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
@@ -344,12 +397,24 @@ const forbiddenMonolithicPackMethods = [
   "getCogniEvolution:",
   "getCogniFederation:",
   "exposeCogni:",
+  "browserNavigate:",
+  "browserScreenshot:",
+  "browserOcr:",
+  "browserStatus:",
+  "browserConfig:",
+  "browserScreenshotLatest:",
+  "browserOPPPending:",
+  "browserOPPDecide:",
+  "browserExtStatus:",
+  "browserExtAction:",
+  "browserExtScenarios:",
+  "browserExtRunScenario:",
 ];
 const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) => monolithicApi.includes(token));
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -403,6 +468,7 @@ runCheck("scaffold checker", process.execPath, ["scripts/check-pack-scaffold.mjs
 runCheck("packs sdk checker", process.execPath, ["sdk/scripts/check-packs-sdk-manifest.mjs"]);
 runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pack-sdk-manifest.mjs"]);
 runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"]);
+runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
 
 if (failures.length > 0) {
   console.error("Pack Runtime completion audit failed:");

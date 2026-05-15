@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "domain": "browser-intent-pack",
+  "description": "Browser Intent capability pack manifest binding for Pack Runtime route gates, frontend sync, and lightweight browser SDK import discovery.",
+  "principles": [
+    "Expose browser connection, capture, OCR, OPP, extension session/action, and scenario execution as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Keep browser method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import yunque-client/browser only when the Browser Intent pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/browser-intent-pack/pack.json",
+  "sdkImport": "yunque-client/browser",
+  "routes": [
+    "GET /v1/browser/status",
+    "GET /v1/browser/config",
+    "POST /v1/browser/navigate",
+    "GET /v1/browser/screenshot",
+    "GET /v1/browser/screenshot/latest",
+    "POST /v1/browser/ocr",
+    "GET /v1/browser/opp/pending",
+    "POST /v1/browser/opp/decide",
+    "GET /api/browser/ext/status",
+    "POST /api/browser/ext/session",
+    "POST /api/browser/ext/action",
+    "GET /api/browser/ext/scenarios",
+    "POST /api/browser/ext/scenarios/run"
+  ],
+  "frontend": {
+    "menuPath": "/packs/browser",
+    "component": "browser/BrowserIntentPackPage",
+    "client": "heroui-web/src/lib/browser-intent-pack-client.ts",
+    "legacyPath": "heroui-web/src/app/browser/page.tsx"
+  }
+}

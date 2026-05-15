@@ -767,7 +767,7 @@ export function ChatMessageList({
               <BrowserConnectCard
                 requirement={msg.browserRequirement}
                 connected={Boolean(bridgeState?.connected)}
-                onOpenSetup={() => window.open(msg.browserRequirement?.install_path || "/browser", "_blank", "noopener,noreferrer")}
+                onOpenSetup={() => window.open(msg.browserRequirement?.install_path || "/packs/browser", "_blank", "noopener,noreferrer")}
                 onRefresh={onBrowserRefresh}
                 onContinue={bridgeState?.connected ? () => {
                   const prevPrompt = messages[idx - 1]?.role === "user" ? messages[idx - 1]?.content : resumePromptForBrowser;
