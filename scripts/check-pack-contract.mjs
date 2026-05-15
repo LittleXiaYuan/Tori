@@ -164,6 +164,10 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go")
   + "\n"
+  + readText("internal/packs/cognitivecanary/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go")
+  + "\n"
   + readText("internal/packs/rpareplay/handler.go")
   + "\n"
   + readText("internal/packs/sbomdrift/handler.go")
@@ -181,7 +185,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/cognitive-canary-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "cognitivecanarypack.New", "cfg.DataPath(\"cognitive-canary\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -256,6 +260,8 @@ for (const path of packFiles) {
   if (!manifest.distribution?.sha256) fail(`${path}: distribution.sha256 is required for package verification`);
   if (manifest.update?.rollback !== true) fail(`${path}: update.rollback should be true for reversible pack updates`);
 }
+
+const apiSource = readText("heroui-web/src/lib/api.ts");
 
 const backupManifest = readJSON("packs/examples/backup-pack/pack.json");
 const backupSource = readText("internal/packs/backup/handler.go");
@@ -357,7 +363,6 @@ if (!browserIntentBridge.includes("HandleBrowserIntentPack") || !browserIntentBr
 if (browserIntentPage.includes('from "@/lib/api"') || browserIntentPage.includes("api.browser") || !browserIntentPage.includes("createBrowserIntentPackClient")) {
   fail("Browser Intent pack page must use browser-intent-pack-client instead of monolithic api object");
 }
-const apiSource = readText("heroui-web/src/lib/api.ts");
 for (const token of ["browserNavigate:", "browserScreenshot:", "browserOcr:", "browserStatus:", "browserConfig:", "browserExtStatus:", "browserExtAction:", "browserExtScenarios:", "browserExtRunScenario:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Browser Intent method: ${token}`);
 }
@@ -424,6 +429,56 @@ for (const token of ["json-chaos-probe-evidence", "safe_probe_ready", "scheduler
 }
 for (const token of ["chaosProbeStatus:", "chaosProbeRun:", "chaosProbeEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Chaos Probe method: ${token}`);
+}
+
+
+const cognitiveCanaryManifest = readJSON("packs/examples/cognitive-canary-pack/pack.json");
+const cognitiveCanarySource = readText("internal/packs/cognitivecanary/handler.go");
+const cognitiveCanaryGateTest = readText("internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go");
+const cognitiveCanaryPage = readText("heroui-web/src/app/packs/cognitive-canary/page.tsx");
+const cognitiveCanaryClient = readText("heroui-web/src/lib/cognitive-canary-pack-client.ts");
+const cognitiveCanaryClientTest = readText("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
+const cognitiveCanarySdk = readText("sdk/typescript/src/cognitive-canary.ts") + "\n" + readText("sdk/typescript/src/cognitive-canary.test.ts");
+if (cognitiveCanaryManifest) {
+  if (!cognitiveCanarySource.includes(`const PackID = "${cognitiveCanaryManifest.id}"`)) {
+    fail("Cognitive Canary pack handler PackID must match packs/examples/cognitive-canary-pack/pack.json");
+  }
+  for (const route of cognitiveCanaryManifest.backend?.routes ?? []) {
+    if (!cognitiveCanarySource.includes(route)) fail(`Cognitive Canary handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!cognitiveCanarySource.includes(method)) fail(`Cognitive Canary handler missing method gate declaration: ${method}`);
+  }
+  if (cognitiveCanaryManifest.frontend?.menus?.[0]?.path !== "/packs/cognitive-canary") fail("Cognitive Canary menu path must stay under /packs/cognitive-canary");
+  if (cognitiveCanaryManifest.frontend?.routes?.[0]?.component !== "ops/CognitiveCanaryPackPage") fail("Cognitive Canary frontend route component drifted");
+  if (cognitiveCanaryManifest.sdk?.typescript !== "yunque-client/cognitive-canary") fail("Cognitive Canary SDK import must stay yunque-client/cognitive-canary");
+  if (cognitiveCanaryManifest.defaultState !== "disabled") fail("Cognitive Canary pack must remain default disabled before shadow traffic and auto rollback readiness");
+  if (cognitiveCanaryManifest.metadata?.stage !== "pack-shell-before-shadow-traffic") fail("Cognitive Canary pack stage must remain pack-shell-before-shadow-traffic");
+  if (cognitiveCanaryManifest.metadata?.blueprint !== "doc/COGNITIVE-CANARY.md") fail("Cognitive Canary pack blueprint pointer drifted");
+}
+if (cognitiveCanaryPage.includes('from "@/lib/api"') || cognitiveCanaryPage.includes("api.cognitiveCanary") || !cognitiveCanaryPage.includes("createCognitiveCanaryPackClient")) {
+  fail("Cognitive Canary pack page must use cognitive-canary-pack-client instead of monolithic api object");
+}
+for (const token of ["createCognitiveCanaryPackClient", "/v1/cognitive-canary/status", "/v1/cognitive-canary/scenarios", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/reports", "/v1/cognitive-canary/evidence/", 'method: "POST"']) {
+  if (!cognitiveCanaryClient.includes(token)) fail(`cognitive-canary-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("cognitive-canary")')) {
+  fail("Cognitive Canary runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestCognitiveCanary", "StatusMethodNotAllowed", "/v1/cognitive-canary/evaluate"]) {
+  if (!cognitiveCanaryGateTest.includes(token)) fail(`Cognitive Canary gateway gate test missing token: ${token}`);
+}
+for (const token of ["createCognitiveCanaryClient", "CognitiveCanaryClientError", "/v1/cognitive-canary/status", "/v1/cognitive-canary/evidence/"]) {
+  if (!cognitiveCanarySdk.includes(token)) fail(`Cognitive Canary TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/evidence/canary-1"]) {
+  if (!cognitiveCanaryClientTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
+}
+for (const token of ["json-cognitive-canary-evidence", "shadow_traffic_ready", "judge_pipeline_ready", "quality_sli_ready", "auto_rollback_ready"]) {
+  if (!cognitiveCanarySource.includes(token)) fail(`Cognitive Canary handler missing cognitive quality shell token: ${token}`);
+}
+for (const token of ["cognitiveCanaryStatus:", "cognitiveCanaryEvaluate:", "cognitiveCanaryEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Cognitive Canary method: ${token}`);
 }
 
 

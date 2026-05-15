@@ -43,6 +43,7 @@ import (
 	backuppack "yunque-agent/internal/packs/backup"
 	browserintentpack "yunque-agent/internal/packs/browserintent"
 	chaosprobepack "yunque-agent/internal/packs/chaosprobe"
+	cognitivecanarypack "yunque-agent/internal/packs/cognitivecanary"
 	guardrailfuzzerpack "yunque-agent/internal/packs/guardrailfuzzer"
 	lorapack "yunque-agent/internal/packs/lora"
 	rpareplaypack "yunque-agent/internal/packs/rpareplay"
@@ -89,6 +90,7 @@ func initTasks(app *agentrt.App) error {
 		BackendPacks: []packruntime.BackendModule{
 			backuppack.DefaultHandler(),
 			chaosprobepack.New(chaosprobepack.Config{DataDir: cfg.DataPath("chaos-probe")}),
+			cognitivecanarypack.New(cognitivecanarypack.Config{DataDir: cfg.DataPath("cognitive-canary")}),
 			guardrailfuzzerpack.New(guardrailfuzzerpack.Config{DataDir: cfg.DataPath("guardrail-fuzzer")}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
@@ -389,6 +391,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/lora-pack/pack.json",
 		"packs/examples/browser-intent-pack/pack.json",
 		"packs/examples/chaos-probe-pack/pack.json",
+		"packs/examples/cognitive-canary-pack/pack.json",
 		"packs/examples/guardrail-fuzzer-pack/pack.json",
 		"packs/examples/rpa-replay-pack/pack.json",
 		"packs/examples/sbom-drift-pack/pack.json",

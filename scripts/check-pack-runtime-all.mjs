@@ -46,6 +46,7 @@ const checks = [
       "./internal/packs/cognikernel",
       "./internal/packs/browserintent",
       "./internal/packs/chaosprobe",
+      "./internal/packs/cognitivecanary",
       "./internal/packs/guardrailfuzzer",
       "./internal/packs/rpareplay",
       "./internal/packs/sbomdrift",
@@ -54,7 +55,7 @@ const checks = [
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|GuardrailFuzzer|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|CognitiveCanary|GuardrailFuzzer|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },
@@ -103,6 +104,12 @@ const checks = [
     name: "Frontend Chaos Probe pack client tests",
     command: process.execPath,
     args: [npmCli, "run", "test", "--", "src/lib/__tests__/chaos-probe-pack-client.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
+    name: "Frontend Cognitive Canary pack client tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/cognitive-canary-pack-client.test.ts"],
     cwd: "heroui-web",
   },
   {
@@ -162,7 +169,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "guardrail-fuzzer", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "cognitive-canary", "guardrail-fuzzer", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
     cwd: "sdk/typescript",
   },
   {
