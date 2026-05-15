@@ -214,6 +214,35 @@ type RetentionPlanReport struct {
 	Notes                    []string             `json:"notes,omitempty"`
 }
 
+type RetentionPrunePlanRequest struct {
+	Namespace    string   `json:"namespace,omitempty"`
+	CandidateIDs []string `json:"candidate_ids,omitempty"`
+	Reason       string   `json:"reason,omitempty"`
+	RequestedBy  string   `json:"requested_by,omitempty"`
+	DryRun       bool     `json:"dry_run,omitempty"`
+}
+
+type RetentionPrunePlanReport struct {
+	PackID                   string               `json:"pack_id"`
+	Namespace                string               `json:"namespace"`
+	GeneratedAt              time.Time            `json:"generated_at"`
+	DryRun                   bool                 `json:"dry_run"`
+	Status                   string               `json:"status"`
+	ApprovalRequired         bool                 `json:"approval_required"`
+	PruneReady               bool                 `json:"prune_ready"`
+	TemporalPruneReady       bool                 `json:"temporal_prune_ready"`
+	CandidateCount           int                  `json:"candidate_count"`
+	SelectedCandidateCount   int                  `json:"selected_candidate_count"`
+	ReclaimableBytes         int                  `json:"reclaimable_bytes"`
+	ActionCount              int                  `json:"action_count"`
+	RequestedBy              string               `json:"requested_by,omitempty"`
+	Reason                   string               `json:"reason,omitempty"`
+	RetentionPlanGeneratedAt time.Time            `json:"retention_plan_generated_at"`
+	Candidates               []RetentionCandidate `json:"candidates"`
+	Actions                  []string             `json:"actions"`
+	Notes                    []string             `json:"notes,omitempty"`
+}
+
 type MerkleAuditRecord struct {
 	Seq       uint64    `json:"seq"`
 	Timestamp time.Time `json:"timestamp"`
@@ -300,6 +329,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff", Handler: h.Diff},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan", Handler: h.RollbackPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
@@ -326,6 +356,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.drift.diff",
 		"memory.rollback.plan",
 		"memory.retention.plan",
+		"memory.retention.prune_plan",
 		"memory.audit.links.schema",
 		"memory.evidence.export",
 	}
@@ -342,6 +373,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		MemoryPersisterWritebackReady: h.memoryPersisterWriteback,
 		RollbackWritebackReady:        false,
 		RetentionPlanReady:            true,
+		RetentionPrunePlanReady:       true,
 		RetentionPruneReady:           false,
 		KVAuditLinkSchemaReady:        true,
 		KVAuditLinkageReady:           false,
@@ -365,6 +397,7 @@ type statusResponse struct {
 	MemoryPersisterWritebackReady bool             `json:"memory_persister_writeback_ready"`
 	RollbackWritebackReady        bool             `json:"rollback_writeback_ready"`
 	RetentionPlanReady            bool             `json:"retention_plan_ready"`
+	RetentionPrunePlanReady       bool             `json:"retention_prune_plan_ready"`
 	RetentionPruneReady           bool             `json:"retention_prune_ready"`
 	KVAuditLinkSchemaReady        bool             `json:"kv_audit_link_schema_ready"`
 	KVAuditLinkageReady           bool             `json:"kv_audit_linkage_ready"`
@@ -527,6 +560,24 @@ func (h *Handler) RetentionPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) RetentionPrunePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RetentionPrunePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid retention prune-plan payload")
+		return
+	}
+	plan, err := h.buildRetentionPrunePlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -579,7 +630,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "retention-prune-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -587,6 +638,11 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		payload["retention_plan_error"] = err.Error()
 	} else {
 		payload["retention_plan"] = retentionPlan
+		payload["retention_prune_plan"] = h.buildRetentionPrunePlanFromRetention(retentionPlan, RetentionPrunePlanRequest{
+			Namespace: retentionPlan.Namespace,
+			Reason:    "evidence-export-preview",
+			DryRun:    true,
+		})
 	}
 	auditLinks := h.buildKVAuditLinksReport(snapshot.Namespace)
 	payload["kv_audit_link_schema"] = auditLinks
@@ -616,7 +672,7 @@ func (h *Handler) statusNotes() []string {
 	} else {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
 	}
-	notes = append(notes, "Retention planning is dry-run only and currently targets pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
+	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
 	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
@@ -905,6 +961,70 @@ func (h *Handler) buildRetentionPlan(namespace string) (RetentionPlanReport, err
 			"Pack-local snapshot retention uses retention_days and max_snapshots_per_namespace; native Ledger kv_history purge and cron scheduling remain follow-up wiring.",
 		},
 	}, nil
+}
+
+func (h *Handler) buildRetentionPrunePlan(req RetentionPrunePlanRequest) (RetentionPrunePlanReport, error) {
+	retentionPlan, err := h.buildRetentionPlan(req.Namespace)
+	if err != nil {
+		return RetentionPrunePlanReport{}, err
+	}
+	return h.buildRetentionPrunePlanFromRetention(retentionPlan, req), nil
+}
+
+func (h *Handler) buildRetentionPrunePlanFromRetention(retentionPlan RetentionPlanReport, req RetentionPrunePlanRequest) RetentionPrunePlanReport {
+	selectedIDs := map[string]bool{}
+	for _, id := range req.CandidateIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed != "" {
+			selectedIDs[trimmed] = true
+		}
+	}
+
+	selected := make([]RetentionCandidate, 0, len(retentionPlan.Candidates))
+	reclaimableBytes := 0
+	for _, candidate := range retentionPlan.Candidates {
+		if len(selectedIDs) > 0 && !selectedIDs[candidate.ID] {
+			continue
+		}
+		selected = append(selected, candidate)
+		reclaimableBytes += candidate.SizeBytes
+	}
+
+	actions := make([]string, 0, len(selected)+1)
+	for _, candidate := range selected {
+		actions = append(actions, fmt.Sprintf("requires approval before deleting pack-local snapshot %s/%s", candidate.Namespace, candidate.ID))
+	}
+	if len(actions) == 0 {
+		actions = append(actions, "no retention prune candidate selected; no write action will be executed")
+	}
+
+	status := "approval_plan"
+	if len(selected) == 0 {
+		status = "no_op"
+	}
+	return RetentionPrunePlanReport{
+		PackID:                   PackID,
+		Namespace:                retentionPlan.Namespace,
+		GeneratedAt:              h.now().UTC(),
+		DryRun:                   true,
+		Status:                   status,
+		ApprovalRequired:         len(selected) > 0,
+		PruneReady:               false,
+		TemporalPruneReady:       false,
+		CandidateCount:           retentionPlan.CandidateCount,
+		SelectedCandidateCount:   len(selected),
+		ReclaimableBytes:         reclaimableBytes,
+		ActionCount:              len(actions),
+		RequestedBy:              strings.TrimSpace(req.RequestedBy),
+		Reason:                   strings.TrimSpace(req.Reason),
+		RetentionPlanGeneratedAt: retentionPlan.GeneratedAt,
+		Candidates:               selected,
+		Actions:                  actions,
+		Notes: []string{
+			"Retention prune-plan is non-destructive and does not delete pack-local snapshots or Ledger temporal KV entries.",
+			"Execution must remain blocked until explicit approval, native kv_history pruning, and audit write-back are wired in a later slice.",
+		},
+	}
 }
 
 func (h *Handler) saveSnapshot(snapshot Snapshot) error {

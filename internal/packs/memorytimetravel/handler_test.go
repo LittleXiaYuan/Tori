@@ -34,8 +34,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 10 {
-		t.Fatalf("expected 10 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 11 {
+		t.Fatalf("expected 11 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -52,16 +52,17 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/memory-time-travel/status":         {http.MethodGet},
-		"/v1/memory-time-travel/snapshots":      {http.MethodGet, http.MethodPost},
-		"/v1/memory-time-travel/snapshots/":     {http.MethodGet},
-		"/v1/memory-time-travel/snapshot-at":    {http.MethodPost},
-		"/v1/memory-time-travel/diff":           {http.MethodPost},
-		"/v1/memory-time-travel/rollback-plan":  {http.MethodPost},
-		"/v1/memory-time-travel/retention/plan": {http.MethodGet},
-		"/v1/memory-time-travel/audit/links":    {http.MethodGet},
-		"/v1/memory-time-travel/audit/verify":   {http.MethodGet},
-		"/v1/memory-time-travel/evidence/":      {http.MethodGet},
+		"/v1/memory-time-travel/status":               {http.MethodGet},
+		"/v1/memory-time-travel/snapshots":            {http.MethodGet, http.MethodPost},
+		"/v1/memory-time-travel/snapshots/":           {http.MethodGet},
+		"/v1/memory-time-travel/snapshot-at":          {http.MethodPost},
+		"/v1/memory-time-travel/diff":                 {http.MethodPost},
+		"/v1/memory-time-travel/rollback-plan":        {http.MethodPost},
+		"/v1/memory-time-travel/retention/plan":       {http.MethodGet},
+		"/v1/memory-time-travel/retention/prune-plan": {http.MethodPost},
+		"/v1/memory-time-travel/audit/links":          {http.MethodGet},
+		"/v1/memory-time-travel/audit/verify":         {http.MethodGet},
+		"/v1/memory-time-travel/evidence/":            {http.MethodGet},
 	}
 	for path, methods := range expected {
 		got := strings.Join(byPath[path], ",")
@@ -127,7 +128,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -211,7 +212,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -239,6 +240,50 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	h.SnapshotDetail(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("retention plan must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelRetentionPrunePlanRequiresApprovalAndDoesNotDelete(t *testing.T) {
+	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+	h := New(Config{
+		DataDir: t.TempDir(),
+		Now:     func() time.Time { return now },
+		Policy:  RetentionPolicy{RetentionDays: 7, MaxSnapshotsPerNamespace: 2},
+	})
+
+	now = now.AddDate(0, 0, -10)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"old-baseline","namespace":"memory_snapshot","values":{"goal":"ship"}}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save old snapshot status=%d body=%s", w.Code, w.Body.String())
+	}
+	now = time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/retention/prune-plan", strings.NewReader(`{"namespace":"memory_snapshot","candidate_ids":["old-baseline"],"requested_by":"operator","reason":"policy review","dry_run":true}`))
+	h.RetentionPrunePlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention prune plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan RetentionPrunePlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode retention prune plan: %v", err)
+	}
+	if !got.Plan.DryRun || got.Plan.Status != "approval_plan" || !got.Plan.ApprovalRequired || got.Plan.PruneReady || got.Plan.SelectedCandidateCount != 1 {
+		t.Fatalf("unexpected retention prune plan: %#v", got.Plan)
+	}
+	if !strings.Contains(got.Plan.Actions[0], "requires approval before deleting pack-local snapshot memory-snapshot/old-baseline") {
+		t.Fatalf("unexpected prune action: %#v", got.Plan.Actions)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/snapshots/old-baseline", nil)
+	h.SnapshotDetail(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention prune plan must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -341,11 +386,12 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files             []string            `json:"files"`
-		RetentionPlan     RetentionPlanReport `json:"retention_plan"`
-		KVAuditLinkSchema KVAuditLinksReport  `json:"kv_audit_link_schema"`
-		KVAuditLinks      []KVAuditProofLink  `json:"kv_audit_links"`
-		AuditVerification MerkleVerification  `json:"audit_verification"`
+		Files              []string                 `json:"files"`
+		RetentionPlan      RetentionPlanReport      `json:"retention_plan"`
+		RetentionPrunePlan RetentionPrunePlanReport `json:"retention_prune_plan"`
+		KVAuditLinkSchema  KVAuditLinksReport       `json:"kv_audit_link_schema"`
+		KVAuditLinks       []KVAuditProofLink       `json:"kv_audit_links"`
+		AuditVerification  MerkleVerification       `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -358,6 +404,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "audit-links.json") || !got.KVAuditLinkSchema.SchemaReady || got.KVAuditLinkSchema.LinkageReady || len(got.KVAuditLinks) != 0 {
 		t.Fatalf("evidence should include KV audit link schema placeholder: files=%#v schema=%#v links=%#v", got.Files, got.KVAuditLinkSchema, got.KVAuditLinks)
+	}
+	if !containsString(got.Files, "retention-prune-plan.json") || !got.RetentionPrunePlan.DryRun || got.RetentionPrunePlan.PruneReady {
+		t.Fatalf("evidence should include dry-run retention prune plan: files=%#v plan=%#v", got.Files, got.RetentionPrunePlan)
 	}
 	if !containsString(got.Files, "retention-plan.json") || !got.RetentionPlan.DryRun {
 		t.Fatalf("evidence should include dry-run retention plan: files=%#v plan=%#v", got.Files, got.RetentionPlan)
