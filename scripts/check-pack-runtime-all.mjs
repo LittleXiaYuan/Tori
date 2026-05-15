@@ -45,6 +45,7 @@ const checks = [
       "./internal/packs/lora",
       "./internal/packs/cognikernel",
       "./internal/packs/browserintent",
+      "./internal/packs/guardrailfuzzer",
       "./internal/packs/rpareplay",
       "./internal/packs/sbomdrift",
       "./internal/packs/skillanomaly",
@@ -52,7 +53,7 @@ const checks = [
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|GuardrailFuzzer|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },
@@ -95,6 +96,12 @@ const checks = [
     name: "Frontend Browser Intent pack client tests",
     command: process.execPath,
     args: [npmCli, "run", "test", "--", "src/lib/__tests__/browser-intent-pack-client.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
+    name: "Frontend Guardrail Fuzzer pack client tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts"],
     cwd: "heroui-web",
   },
   {
@@ -148,7 +155,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "guardrail-fuzzer", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
     cwd: "sdk/typescript",
   },
   {

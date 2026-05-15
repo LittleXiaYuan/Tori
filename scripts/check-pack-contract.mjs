@@ -71,6 +71,17 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Skill Anomaly token: ${token}`);
 }
 for (const token of [
+  "packs/examples/guardrail-fuzzer-pack",
+  "yunque.pack.guardrail-fuzzer",
+  "pack-shell-before-ci-fuzz",
+  "yunque-client/guardrail-fuzzer",
+  "Guardrail Fuzzer Pack shell 闭环",
+  "CI 定时 fuzz",
+  "规则写回",
+]) {
+  if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Guardrail Fuzzer token: ${token}`);
+}
+for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
   "GatewayConfig.BackendPacks",
@@ -144,6 +155,10 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go")
   + "\n"
+  + readText("internal/packs/guardrailfuzzer/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go")
+  + "\n"
   + readText("internal/packs/skillanomaly/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go")
@@ -151,7 +166,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -434,6 +449,56 @@ for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-d
 }
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes SBOM Drift method: ${token}`);
+}
+
+
+const guardrailFuzzerManifest = readJSON("packs/examples/guardrail-fuzzer-pack/pack.json");
+const guardrailFuzzerSource = readText("internal/packs/guardrailfuzzer/handler.go");
+const guardrailFuzzerGateTest = readText("internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go");
+const guardrailFuzzerPage = readText("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
+const guardrailFuzzerClient = readText("heroui-web/src/lib/guardrail-fuzzer-pack-client.ts");
+const guardrailFuzzerClientTest = readText("heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
+const guardrailFuzzerSdk = readText("sdk/typescript/src/guardrail-fuzzer.ts") + "\n" + readText("sdk/typescript/src/guardrail-fuzzer.test.ts");
+if (guardrailFuzzerManifest) {
+  if (!guardrailFuzzerSource.includes(`const PackID = "${guardrailFuzzerManifest.id}"`)) {
+    fail("Guardrail Fuzzer pack handler PackID must match packs/examples/guardrail-fuzzer-pack/pack.json");
+  }
+  for (const route of guardrailFuzzerManifest.backend?.routes ?? []) {
+    if (!guardrailFuzzerSource.includes(route)) fail(`Guardrail Fuzzer handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!guardrailFuzzerSource.includes(method)) fail(`Guardrail Fuzzer handler missing method gate declaration: ${method}`);
+  }
+  if (guardrailFuzzerManifest.frontend?.menus?.[0]?.path !== "/packs/guardrail-fuzzer") fail("Guardrail Fuzzer menu path must stay under /packs/guardrail-fuzzer");
+  if (guardrailFuzzerManifest.frontend?.routes?.[0]?.component !== "security/GuardrailFuzzerPackPage") fail("Guardrail Fuzzer frontend route component drifted");
+  if (guardrailFuzzerManifest.sdk?.typescript !== "yunque-client/guardrail-fuzzer") fail("Guardrail Fuzzer SDK import must stay yunque-client/guardrail-fuzzer");
+  if (guardrailFuzzerManifest.defaultState !== "disabled") fail("Guardrail Fuzzer pack must remain default disabled before CI fuzz gates are wired");
+  if (guardrailFuzzerManifest.metadata?.stage !== "pack-shell-before-ci-fuzz") fail("Guardrail Fuzzer pack stage must remain pack-shell-before-ci-fuzz");
+  if (guardrailFuzzerManifest.metadata?.blueprint !== "doc/GUARDRAIL-FUZZER.md") fail("Guardrail Fuzzer pack blueprint pointer drifted");
+}
+if (guardrailFuzzerPage.includes('from "@/lib/api"') || guardrailFuzzerPage.includes("api.guardrailFuzzer") || !guardrailFuzzerPage.includes("createGuardrailFuzzerPackClient")) {
+  fail("Guardrail Fuzzer pack page must use guardrail-fuzzer-pack-client instead of monolithic api object");
+}
+for (const token of ["createGuardrailFuzzerPackClient", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/evidence/", 'method: "POST"']) {
+  if (!guardrailFuzzerClient.includes(token)) fail(`guardrail-fuzzer-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("guardrail-fuzzer")')) {
+  fail("Guardrail Fuzzer runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestGuardrailFuzzer", "StatusMethodNotAllowed", "/v1/guardrail-fuzzer/run"]) {
+  if (!guardrailFuzzerGateTest.includes(token)) fail(`Guardrail Fuzzer gateway gate test missing token: ${token}`);
+}
+for (const token of ["createGuardrailFuzzerClient", "GuardrailFuzzerClientError", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/evidence/"]) {
+  if (!guardrailFuzzerSdk.includes(token)) fail(`Guardrail Fuzzer TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
+  if (!guardrailFuzzerClientTest.includes(token)) fail(`Guardrail Fuzzer frontend client test missing token: ${token}`);
+}
+for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "base64_wrap", "double_url_encode", "ci_gate_ready", "rule_writeback_ready"]) {
+  if (!guardrailFuzzerSource.includes(token)) fail(`Guardrail Fuzzer handler missing fuzzer shell token: ${token}`);
+}
+for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrailFuzzerEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Guardrail Fuzzer method: ${token}`);
 }
 
 

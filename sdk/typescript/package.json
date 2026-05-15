@@ -1414,6 +1414,10 @@
     "./sandbox": {
       "types": "./src/sandbox.ts",
       "import": "./src/sandbox.ts"
+    },
+    "./guardrail-fuzzer": {
+      "types": "./src/guardrail-fuzzer.ts",
+      "import": "./src/guardrail-fuzzer.ts"
     }
   },
   "files": [
