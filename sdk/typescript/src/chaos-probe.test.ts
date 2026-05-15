@@ -37,7 +37,7 @@ test("ChaosProbeClient reads status and probes with bearer token", async () => {
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.chaos-probe", stage: "pack-shell-before-scheduler", safe_probe_ready: true, scheduler_ready: false, degrade_engine_ready: false, alert_writeback_ready: false, probe_count: 1, report_count: 0, policy: {}, capabilities: [] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.chaos-probe", stage: "pack-shell-before-scheduler", safe_probe_ready: true, scheduler_plan_ready: true, scheduler_ready: false, metrics_plan_ready: true, prometheus_ready: false, degrade_writeback_plan_ready: true, degrade_engine_ready: false, alert_writeback_plan_ready: true, alert_writeback_ready: false, probe_count: 1, report_count: 0, policy: {}, capabilities: [] });
       return jsonResponse({ probes: [{ id: "runtime-healthz-probe", name: "Runtime healthz probe", category: "network", description: "local", safe: true, enabled: true, interval_seconds: 30, weight: 1 }], count: 1 });
     },
   });
@@ -80,25 +80,30 @@ test("ChaosProbeClient saves probes, runs checks, and reads report detail", asyn
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
-test("ChaosProbeClient lists reports and exports evidence packs", async () => {
+test("ChaosProbeClient lists reports, plans scheduler, and exports evidence packs", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createChaosProbeClient({
     baseUrl: "http://localhost:9090",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
       if (String(url).endsWith("/reports")) return jsonResponse({ reports: [{ id: "chaos-1", created_at: "now", probe_count: 1, pass_count: 1, degraded_count: 0, fail_count: 0, health_score: 100, degrade_level: 0, gate_status: "pass" }], count: 1 });
+      if (String(url).includes("/scheduler/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.chaos-probe", generated_at: "now", status: "schedule_plan", report_id: "chaos-1", interval: "5m", scheduler_plan_ready: true, scheduler_ready: false, metrics_plan_ready: true, prometheus_ready: false, degrade_writeback_plan_ready: true, degrade_engine_ready: false, alert_writeback_plan_ready: true, alert_writeback_ready: false, health_score: 100, degrade_level: 0, gate_status: "pass", metrics: [], actions: [] } });
       return jsonResponse({ pack_id: "yunque.pack.chaos-probe", exported_at: "now", format: "json-chaos-probe-evidence", files: ["chaos-report.json"], report: { id: "chaos-1", results: [] } });
     },
   });
 
   const reports = await client.reports();
+  const plan = await client.schedulerPlan({ report_id: "chaos-1", interval: "5m" });
   const evidence = await client.evidence("chaos-1");
 
   assertEqual(reports.count, 1);
+  assertEqual(plan.plan.scheduler_ready, false);
   assertEqual(evidence.format, "json-chaos-probe-evidence");
   assertDeepEqual(evidence.files, ["chaos-report.json"]);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/chaos-probe/reports");
-  assertEqual(calls[1]?.url, "http://localhost:9090/v1/chaos-probe/evidence/chaos-1");
+  assertEqual(calls[1]?.url, "http://localhost:9090/v1/chaos-probe/scheduler/plan");
+  assertEqual(calls[1]?.init?.body, JSON.stringify({ report_id: "chaos-1", interval: "5m" }));
+  assertEqual(calls[2]?.url, "http://localhost:9090/v1/chaos-probe/evidence/chaos-1");
 });
 
 test("ChaosProbeClient throws ChaosProbeClientError with nested gateway messages", async () => {

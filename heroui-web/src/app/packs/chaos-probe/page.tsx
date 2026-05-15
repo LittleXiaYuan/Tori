@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { Activity, AlertTriangle, Download, Play, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Download, Play, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createChaosProbePackClient, type ChaosProbeDefinition, type ChaosProbeReport, type ChaosProbeReportSummary, type ChaosProbeStatus } from "@/lib/chaos-probe-pack-client";
+import { createChaosProbePackClient, type ChaosProbeDefinition, type ChaosProbeReport, type ChaosProbeReportSummary, type ChaosProbeSchedulerPlan, type ChaosProbeStatus } from "@/lib/chaos-probe-pack-client";
 
 const chaosProbePack = createChaosProbePackClient();
 
@@ -54,11 +54,12 @@ export default function ChaosProbePackPage() {
   const [reports, setReports] = useState<ChaosProbeReportSummary[]>([]);
   const [probes, setProbes] = useState<ChaosProbeDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"probes" | "run" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"probes" | "run" | "scheduler" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [definitionJSON, setDefinitionJSON] = useState(sampleDefinitions);
   const [probeIDs, setProbeIDs] = useState("runtime-healthz-probe,guardrail-probe");
   const [report, setReport] = useState<ChaosProbeReport | null>(null);
+  const [schedulerPlan, setSchedulerPlan] = useState<ChaosProbeSchedulerPlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
   const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
@@ -135,6 +136,20 @@ export default function ChaosProbePackPage() {
     }
   };
 
+  const planScheduler = async () => {
+    setBusy("scheduler");
+    setError(null);
+    try {
+      const res = await chaosProbePack.schedulerPlan({ report_id: selectedReport?.id || reports[0]?.id, interval: "5m", requested_by: "pack-console" });
+      setSchedulerPlan(res.plan);
+      showToast("已生成 scheduler / metrics / alert write-back 计划", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 Chaos Probe 调度计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -153,7 +168,7 @@ export default function ChaosProbePackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.chaos-probe"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先把安全探针 registry、one-shot run、健康评分、降级建议和证据包放进可选 Pack。后台调度、Prometheus metrics、告警路由和自动降级写回后续接入。
+              当前切片已把安全探针 registry、one-shot run、健康评分、降级建议、scheduler/metrics/alert write-back 计划和证据包放进可选 Pack。真实后台调度、Prometheus metrics 发布、告警发送和自动降级写回后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -170,7 +185,7 @@ export default function ChaosProbePackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Safe probes</div><div className="kpi-value">{status?.probe_count ?? probes.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Reports</div><div className="kpi-value">{status?.report_count ?? reports.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Health</div><div className="kpi-value">{Math.round(selectedReport?.health_score ?? reports[0]?.health_score ?? status?.last_report?.health_score ?? 100)}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Gate</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{selectedReport?.gate_status || reports[0]?.gate_status || "ready"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Scheduler Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.scheduler_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
@@ -204,10 +219,11 @@ export default function ChaosProbePackPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold"><Play size={16} />Safe probe run</div>
-                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell，只运行安全 one-shot local probes；scheduler / metrics / alert write-back 后续接。</div>
+                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段仍不创建真实后台任务，只生成 scheduler / Prometheus metrics / alert / degrade write-back 计划。</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <TextField className="min-w-64" value={probeIDs} onChange={setProbeIDs}><Input placeholder="probe ids" /></TextField>
+                <Button variant="outline" isPending={busy === "scheduler"} onPress={planScheduler}><CalendarClock size={14} />调度计划</Button>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedReport && reports.length === 0}><Download size={14} />导出证据包</Button>
                 <Button className="btn-accent" isPending={busy === "run"} onPress={runProbes}>运行探针</Button>
               </div>
@@ -224,6 +240,24 @@ export default function ChaosProbePackPage() {
               <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>运行后会展示 health score / degrade level / remediation 细节。</div>
             )}
           </Card>
+
+          {schedulerPlan && (
+            <Card className="section-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><CalendarClock size={16} />Scheduler / Metrics / Alert write-back 计划</div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Chip size="sm">{schedulerPlan.status}</Chip>
+                <Chip size="sm">interval: {schedulerPlan.interval}</Chip>
+                <Chip size="sm">scheduler_ready: {String(schedulerPlan.scheduler_ready)}</Chip>
+                <Chip size="sm">prometheus_ready: {String(schedulerPlan.prometheus_ready)}</Chip>
+              </div>
+              <TextField value={JSON.stringify(schedulerPlan, null, 2)} onChange={() => undefined}>
+                <TextArea rows={12} aria-label="Chaos Probe Scheduler Plan JSON" className="font-mono text-xs" readOnly />
+              </TextField>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                非破坏性计划：不会创建 scheduler job、不会发布 Prometheus 指标、不会发送告警，也不会写入 runtime degrade state。
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

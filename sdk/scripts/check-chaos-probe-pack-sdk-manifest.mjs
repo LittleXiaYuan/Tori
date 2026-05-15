@@ -32,6 +32,14 @@ const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${ro
 for (const route of manifest.routes ?? []) {
   if (!routeSpecs.has(route)) fail(`Chaos Probe pack manifest missing routeSpec: ${route}`);
 }
+for (const capability of [
+  "chaos_probe.scheduler.plan",
+  "chaos_probe.metrics.plan",
+  "chaos_probe.degrade.writeback.plan",
+  "chaos_probe.alert.writeback.plan",
+]) {
+  if (!pack.backend?.capabilities?.includes(capability)) fail(`Chaos Probe pack manifest missing capability: ${capability}`);
+}
 
 const client = readRepoFile(manifest.frontend.client);
 for (const token of [
@@ -39,8 +47,15 @@ for (const token of [
   "/v1/chaos-probe/status",
   "/v1/chaos-probe/probes",
   "/v1/chaos-probe/run",
+  "/v1/chaos-probe/scheduler/plan",
   "/v1/chaos-probe/reports",
   "/v1/chaos-probe/evidence/",
+  "scheduler_plan_ready",
+  "metrics_plan_ready",
+  "prometheus_ready",
+  "degrade_writeback_plan_ready",
+  "alert_writeback_plan_ready",
+  "schedulerPlan",
   "method: \"POST\"",
 ]) {
   if (!client.includes(token)) fail(`chaos-probe-pack-client missing token: ${token}`);
@@ -53,9 +68,12 @@ if (!page.includes("createChaosProbePackClient") || page.includes('from "@/lib/a
 for (const token of ["Chaos Probe", "保存 Definitions", "运行探针", "导出证据包", "Pack shell"]) {
   if (!page.includes(token)) fail(`Chaos Probe pack page missing product token: ${token}`);
 }
+for (const token of ["调度计划", "scheduler_ready", "prometheus_ready", "runtime degrade state"]) {
+  if (!page.includes(token)) fail(`Chaos Probe pack page missing scheduler-plan token: ${token}`);
+}
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts");
-for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/evidence/chaos-1"]) {
+for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/evidence/chaos-1"]) {
   if (!frontendTest.includes(token)) fail(`Chaos Probe frontend client test missing token: ${token}`);
 }
 
@@ -66,9 +84,22 @@ const backend = readRepoFile("internal/packs/chaosprobe/handler.go")
 for (const token of [
   "const PackID = \"yunque.pack.chaos-probe\"",
   "safe_probe_ready",
+  "scheduler_plan_ready",
   "scheduler_ready",
+  "metrics_plan_ready",
+  "prometheus_ready",
+  "degrade_writeback_plan_ready",
   "degrade_engine_ready",
+  "alert_writeback_plan_ready",
   "alert_writeback_ready",
+  "chaos.scheduler.plan",
+  "chaos.metrics.plan",
+  "chaos.degrade.plan",
+  "chaos.alert.writeback.plan",
+  "/v1/chaos-probe/scheduler/plan",
+  "scheduler-plan.json",
+  "metrics-plan.json",
+  "degrade-writeback-plan.json",
   "json-chaos-probe-evidence",
   "cfg.DataPath(\"chaos-probe\")",
   "chaosprobepack.New",
@@ -86,7 +117,14 @@ for (const token of [
   "ChaosProbeClientError",
   "/v1/chaos-probe/status",
   "/v1/chaos-probe/run",
+  "/v1/chaos-probe/scheduler/plan",
   "/v1/chaos-probe/evidence/",
+  "schedulerPlan",
+  "scheduler_plan_ready",
+  "metrics_plan_ready",
+  "prometheus_ready",
+  "degrade_writeback_plan_ready",
+  "alert_writeback_plan_ready",
   "Chaos Probe request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Chaos Probe SDK slice missing token: ${token}`);
