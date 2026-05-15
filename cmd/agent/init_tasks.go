@@ -45,6 +45,7 @@ import (
 	lorapack "yunque-agent/internal/packs/lora"
 	rpareplaypack "yunque-agent/internal/packs/rpareplay"
 	sbomdriftpack "yunque-agent/internal/packs/sbomdrift"
+	wasmpluginpack "yunque-agent/internal/packs/wasmplugin"
 	"yunque-agent/pkg/document"
 	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/plugin"
@@ -86,6 +87,7 @@ func initTasks(app *agentrt.App) error {
 			backuppack.DefaultHandler(),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
+			wasmpluginpack.New(wasmpluginpack.Config{PluginDir: cfg.DataPath("plugins"), DataDir: cfg.DataPath("wasm-plugin")}),
 		},
 	})
 	gw.SetPlannerResumeJobStore(cfg.DataPath("planner", "resume_plan_jobs.jsonl"))
@@ -382,6 +384,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/browser-intent-pack/pack.json",
 		"packs/examples/rpa-replay-pack/pack.json",
 		"packs/examples/sbom-drift-pack/pack.json",
+		"packs/examples/wasm-plugin-pack/pack.json",
 	} {
 		manifest, err := loadBuiltinPackManifest(manifestPath)
 		if err != nil {

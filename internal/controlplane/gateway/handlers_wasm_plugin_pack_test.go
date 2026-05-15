@@ -1,0 +1,134 @@
+package gateway
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"yunque-agent/internal/controlplane/tenant"
+	wasmpluginpack "yunque-agent/internal/packs/wasmplugin"
+	"yunque-agent/pkg/packruntime"
+)
+
+func TestWASMPluginPackGateReturnsNotFoundWhenDisabled(t *testing.T) {
+	gw, tm := newTestGatewayWithWASMPluginPack(t, packruntime.PackStatusDisabled)
+	tenant := tm.Register("wasm-plugin-disabled")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/status", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("disabled WASM Plugin pack should gate status, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWASMPluginPackRoutesStatusWhenEnabled(t *testing.T) {
+	gw, tm := newTestGatewayWithWASMPluginPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("wasm-plugin-enabled")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/status", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") {
+		t.Fatalf("enabled WASM Plugin pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWASMPluginPackRouteSpecsGateByMethod(t *testing.T) {
+	gw, tm := newTestGatewayWithWASMPluginPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("wasm-plugin-method-gate")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/execute", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/wasm-plugin/execute should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
+	gw, tm := newTestGatewayWithWASMPluginPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("wasm-plugin-flow")
+
+	body := `{"slug":"calculator","name":"Calculator","module_path":"calculator.wasm","entrypoint":"plugin_exec","permissions":{"ledger_kv":true,"http_fetch":false},"capabilities":["math.add"]}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/plugins", strings.NewReader(body))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), "calculator") {
+		t.Fatalf("install plugin status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/plugins/load", strings.NewReader(`{"slug":"calculator"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "loaded") {
+		t.Fatalf("load plugin status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"{}","dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || !strings.Contains(w.Body.String(), "plugin_exec") {
+		t.Fatalf("dry-run execute status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func newTestGatewayWithWASMPluginPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
+	t.Helper()
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           wasmpluginpack.PackID,
+		Name:         "WASM Plugin Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Routes: []string{
+				"/v1/wasm-plugin/status",
+				"/v1/wasm-plugin/plugins",
+				"/v1/wasm-plugin/plugins/",
+				"/v1/wasm-plugin/plugins/load",
+				"/v1/wasm-plugin/plugins/unload",
+				"/v1/wasm-plugin/execute",
+				"/v1/wasm-plugin/evidence/",
+			},
+			RouteSpecs: []packruntime.BackendRouteSpec{
+				{Method: http.MethodGet, Path: "/v1/wasm-plugin/status"},
+				{Method: http.MethodGet, Path: "/v1/wasm-plugin/plugins"},
+				{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins"},
+				{Method: http.MethodGet, Path: "/v1/wasm-plugin/plugins/"},
+				{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins/load"},
+				{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins/unload"},
+				{Method: http.MethodPost, Path: "/v1/wasm-plugin/execute"},
+				{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/"},
+			},
+		},
+		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "wasm-plugin", Label: "WASM 插件", Path: "/packs/wasm-plugin"}}},
+		SDK:      packruntime.SDKManifest{TypeScript: "yunque-client/wasm-plugin"},
+		Update:   packruntime.UpdateManifest{Rollback: true},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if status == packruntime.PackStatusEnabled {
+		if _, err := registry.Enable(wasmpluginpack.PackID); err != nil {
+			t.Fatalf("Enable: %v", err)
+		}
+	}
+	gw, tm := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	gw.RegisterBackendPack(wasmpluginpack.New(wasmpluginpack.Config{PluginDir: t.TempDir(), DataDir: t.TempDir()}))
+	return gw, tm
+}

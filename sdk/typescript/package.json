@@ -551,6 +551,10 @@
       "types": "./src/sbom-drift.ts",
       "import": "./src/sbom-drift.ts"
     },
+    "./wasm-plugin": {
+      "types": "./src/wasm-plugin.ts",
+      "import": "./src/wasm-plugin.ts"
+    },
     "./browser-status": {
       "types": "./src/browser-status.ts",
       "import": "./src/browser-status.ts"

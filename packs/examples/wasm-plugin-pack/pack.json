@@ -1,0 +1,120 @@
+{
+  "id": "yunque.pack.wasm-plugin",
+  "name": "WASM Plugin Pack",
+  "version": "0.1.0",
+  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行和权限证据包作为高风险可选能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "wasm.status",
+      "wasm.plugin.install",
+      "wasm.plugin.list",
+      "wasm.plugin.detail",
+      "wasm.plugin.load",
+      "wasm.plugin.unload",
+      "wasm.plugin.execute",
+      "wasm.evidence.export"
+    ],
+    "routes": [
+      "/v1/wasm-plugin/status",
+      "/v1/wasm-plugin/plugins",
+      "/v1/wasm-plugin/plugins/",
+      "/v1/wasm-plugin/plugins/load",
+      "/v1/wasm-plugin/plugins/unload",
+      "/v1/wasm-plugin/execute",
+      "/v1/wasm-plugin/evidence/"
+    ],
+    "permissions": [
+      "wasm:read",
+      "wasm:write",
+      "wasm:execute",
+      "wasm:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/wasm-plugin/status",
+        "description": "Read WASM plugin pack shell status and sandbox readiness."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/wasm-plugin/plugins",
+        "description": "List registered WASM plugin metadata."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/plugins",
+        "description": "Register or dry-run validate a WASM plugin manifest."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/wasm-plugin/plugins/",
+        "description": "Read one WASM plugin manifest by slug."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/plugins/load",
+        "description": "Mark a registered WASM plugin as loaded and ready to execute."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/plugins/unload",
+        "description": "Unload a WASM plugin without removing its metadata."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/execute",
+        "description": "Execute or dry-run plan a loaded WASM plugin in the sandbox."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/wasm-plugin/evidence/",
+        "description": "Export a JSON evidence pack for one WASM plugin and its permission plan."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "wasm-plugin",
+        "label": "WASM 插件",
+        "path": "/packs/wasm-plugin",
+        "icon": "cpu",
+        "order": 97
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/wasm-plugin",
+        "component": "wasm/WASMPluginPackPage",
+        "title": "WASM 插件"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "wasm/WASMPluginPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/wasm-plugin"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/WASM-PLUGIN-ENGINE.md",
+    "stage": "pack-shell-before-runtime-hosts",
+    "risk": "high",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/wasm-plugin-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/wasm-plugin-pack/wasm-plugin-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/wasm-plugin-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}
