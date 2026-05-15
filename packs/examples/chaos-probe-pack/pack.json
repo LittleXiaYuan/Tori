@@ -1,0 +1,112 @@
+{
+  "id": "yunque.pack.chaos-probe",
+  "name": "Chaos Probe Pack",
+  "version": "0.1.0",
+  "description": "将安全混沌探针、健康评分、降级建议和证据包导出作为可选运维韧性能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "chaos_probe.status",
+      "chaos_probe.probes.list",
+      "chaos_probe.probes.save",
+      "chaos_probe.run",
+      "chaos_probe.report.list",
+      "chaos_probe.report.detail",
+      "chaos_probe.evidence.export"
+    ],
+    "routes": [
+      "/v1/chaos-probe/status",
+      "/v1/chaos-probe/probes",
+      "/v1/chaos-probe/run",
+      "/v1/chaos-probe/reports",
+      "/v1/chaos-probe/reports/",
+      "/v1/chaos-probe/evidence/"
+    ],
+    "permissions": [
+      "chaos_probe:read",
+      "chaos_probe:write",
+      "chaos_probe:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/chaos-probe/status",
+        "description": "Read chaos probe pack shell status, readiness and latest health summary."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/chaos-probe/probes",
+        "description": "List safe local probe definitions used by one-shot health checks."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/chaos-probe/probes",
+        "description": "Save or merge safe local probe definitions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/chaos-probe/run",
+        "description": "Run selected safe probes and generate a health/degrade report."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/chaos-probe/reports",
+        "description": "List saved chaos probe reports."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/chaos-probe/reports/",
+        "description": "Read one saved chaos probe report by id."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/chaos-probe/evidence/",
+        "description": "Export a JSON evidence pack for one chaos probe report."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "chaos-probe",
+        "label": "Chaos Probe",
+        "path": "/packs/chaos-probe",
+        "icon": "activity",
+        "order": 98
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/chaos-probe",
+        "component": "ops/ChaosProbePackPage",
+        "title": "Chaos Probe"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "ops/ChaosProbePackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/chaos-probe"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/CHAOS-PROBE.md",
+    "stage": "pack-shell-before-scheduler",
+    "risk": "ops-governance",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/chaos-probe-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/chaos-probe-pack/chaos-probe-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/chaos-probe-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

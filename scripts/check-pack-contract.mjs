@@ -51,6 +51,17 @@ const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
 const completionCheck = readText("scripts/check-pack-runtime-completion.mjs");
 for (const token of [
+  "packs/examples/chaos-probe-pack",
+  "yunque.pack.chaos-probe",
+  "pack-shell-before-scheduler",
+  "yunque-client/chaos-probe",
+  "Chaos Probe Pack shell 闭环",
+  "Prometheus 指标",
+  "降级状态机",
+]) {
+  if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Chaos Probe token: ${token}`);
+}
+for (const token of [
   "packs/examples/wasm-plugin-pack",
   "yunque.pack.wasm-plugin",
   "pack-shell-before-runtime-hosts",
@@ -149,6 +160,10 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/packs/browserintent/handler.go")
   + "\n"
+  + readText("internal/packs/chaosprobe/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go")
+  + "\n"
   + readText("internal/packs/rpareplay/handler.go")
   + "\n"
   + readText("internal/packs/sbomdrift/handler.go")
@@ -166,7 +181,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -359,6 +374,56 @@ const hardcodedBrowserShell = [
 ].map(readText).join("\n");
 if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) {
   fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
+}
+
+
+const chaosProbeManifest = readJSON("packs/examples/chaos-probe-pack/pack.json");
+const chaosProbeSource = readText("internal/packs/chaosprobe/handler.go");
+const chaosProbeGateTest = readText("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go");
+const chaosProbePage = readText("heroui-web/src/app/packs/chaos-probe/page.tsx");
+const chaosProbeClient = readText("heroui-web/src/lib/chaos-probe-pack-client.ts");
+const chaosProbeClientTest = readText("heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts");
+const chaosProbeSdk = readText("sdk/typescript/src/chaos-probe.ts") + "\n" + readText("sdk/typescript/src/chaos-probe.test.ts");
+if (chaosProbeManifest) {
+  if (!chaosProbeSource.includes(`const PackID = "${chaosProbeManifest.id}"`)) {
+    fail("Chaos Probe pack handler PackID must match packs/examples/chaos-probe-pack/pack.json");
+  }
+  for (const route of chaosProbeManifest.backend?.routes ?? []) {
+    if (!chaosProbeSource.includes(route)) fail(`Chaos Probe handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!chaosProbeSource.includes(method)) fail(`Chaos Probe handler missing method gate declaration: ${method}`);
+  }
+  if (chaosProbeManifest.frontend?.menus?.[0]?.path !== "/packs/chaos-probe") fail("Chaos Probe menu path must stay under /packs/chaos-probe");
+  if (chaosProbeManifest.frontend?.routes?.[0]?.component !== "ops/ChaosProbePackPage") fail("Chaos Probe frontend route component drifted");
+  if (chaosProbeManifest.sdk?.typescript !== "yunque-client/chaos-probe") fail("Chaos Probe SDK import must stay yunque-client/chaos-probe");
+  if (chaosProbeManifest.defaultState !== "disabled") fail("Chaos Probe pack must remain default disabled before scheduler and degrade write-back readiness");
+  if (chaosProbeManifest.metadata?.stage !== "pack-shell-before-scheduler") fail("Chaos Probe pack stage must remain pack-shell-before-scheduler");
+  if (chaosProbeManifest.metadata?.blueprint !== "doc/CHAOS-PROBE.md") fail("Chaos Probe pack blueprint pointer drifted");
+}
+if (chaosProbePage.includes('from "@/lib/api"') || chaosProbePage.includes("api.chaosProbe") || !chaosProbePage.includes("createChaosProbePackClient")) {
+  fail("Chaos Probe pack page must use chaos-probe-pack-client instead of monolithic api object");
+}
+for (const token of ["createChaosProbePackClient", "/v1/chaos-probe/status", "/v1/chaos-probe/probes", "/v1/chaos-probe/run", "/v1/chaos-probe/reports", "/v1/chaos-probe/evidence/", 'method: "POST"']) {
+  if (!chaosProbeClient.includes(token)) fail(`chaos-probe-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("chaos-probe")')) {
+  fail("Chaos Probe runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestChaosProbe", "StatusMethodNotAllowed", "/v1/chaos-probe/run"]) {
+  if (!chaosProbeGateTest.includes(token)) fail(`Chaos Probe gateway gate test missing token: ${token}`);
+}
+for (const token of ["createChaosProbeClient", "ChaosProbeClientError", "/v1/chaos-probe/status", "/v1/chaos-probe/evidence/"]) {
+  if (!chaosProbeSdk.includes(token)) fail(`Chaos Probe TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/evidence/chaos-1"]) {
+  if (!chaosProbeClientTest.includes(token)) fail(`Chaos Probe frontend client test missing token: ${token}`);
+}
+for (const token of ["json-chaos-probe-evidence", "safe_probe_ready", "scheduler_ready", "degrade_engine_ready", "alert_writeback_ready"]) {
+  if (!chaosProbeSource.includes(token)) fail(`Chaos Probe handler missing ops resilience shell token: ${token}`);
+}
+for (const token of ["chaosProbeStatus:", "chaosProbeRun:", "chaosProbeEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Chaos Probe method: ${token}`);
 }
 
 

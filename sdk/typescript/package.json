@@ -543,6 +543,10 @@
       "types": "./src/browser.ts",
       "import": "./src/browser.ts"
     },
+    "./chaos-probe": {
+      "types": "./src/chaos-probe.ts",
+      "import": "./src/chaos-probe.ts"
+    },
     "./rpa-replay": {
       "types": "./src/rpa-replay.ts",
       "import": "./src/rpa-replay.ts"

@@ -50,6 +50,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_cogni.go",
   "internal/controlplane/gateway/handlers_browser_pack.go",
   "internal/controlplane/gateway/handlers_browser_pack_test.go",
+  "internal/controlplane/gateway/handlers_chaos_probe_pack_test.go",
   "internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go",
   "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_sbom_drift_pack_test.go",
@@ -66,6 +67,8 @@ const cogniKernelPack = read("internal/packs/cognikernel/handler.go");
 const cogniKernelManifest = read("packs/examples/cogni-kernel-pack/pack.json");
 const browserIntentPack = read("internal/packs/browserintent/handler.go");
 const browserIntentManifest = read("packs/examples/browser-intent-pack/pack.json");
+const chaosProbePack = read("internal/packs/chaosprobe/handler.go");
+const chaosProbeManifest = read("packs/examples/chaos-probe-pack/pack.json");
 const guardrailFuzzerPack = read("internal/packs/guardrailfuzzer/handler.go");
 const guardrailFuzzerManifest = read("packs/examples/guardrail-fuzzer-pack/pack.json");
 const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
@@ -98,6 +101,9 @@ const frontend = [
   "heroui-web/src/app/packs/browser/page.tsx",
   "heroui-web/src/lib/browser-intent-pack-client.ts",
   "heroui-web/src/lib/__tests__/browser-intent-pack-client.test.ts",
+  "heroui-web/src/app/packs/chaos-probe/page.tsx",
+  "heroui-web/src/lib/chaos-probe-pack-client.ts",
+  "heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
   "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx",
   "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
   "heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts",
@@ -125,6 +131,7 @@ const legacyCogniPage = read("heroui-web/src/app/cognis/page.tsx");
 const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
 const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
 const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
+const chaosProbePackPage = read("heroui-web/src/app/packs/chaos-probe/page.tsx");
 const guardrailFuzzerPackPage = read("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
 const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
@@ -142,6 +149,7 @@ const sdk = [
   "sdk/manifest/lora-pack-sdk.json",
   "sdk/manifest/cogni-kernel-pack-sdk.json",
   "sdk/manifest/browser-intent-pack-sdk.json",
+  "sdk/manifest/chaos-probe-pack-sdk.json",
   "sdk/manifest/guardrail-fuzzer-pack-sdk.json",
   "sdk/manifest/rpa-replay-pack-sdk.json",
   "sdk/manifest/sbom-drift-pack-sdk.json",
@@ -157,10 +165,13 @@ const sdk = [
   "sdk/typescript/src/skill-anomaly.test.ts",
   "sdk/typescript/src/wasm-plugin.ts",
   "sdk/typescript/src/wasm-plugin.test.ts",
+  "sdk/typescript/src/chaos-probe.ts",
+  "sdk/typescript/src/chaos-probe.test.ts",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
   "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs",
   "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs",
   "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
   "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs",
@@ -212,6 +223,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/lora-pack/pack.json",
   "packs/examples/cogni-kernel-pack/pack.json",
   "packs/examples/browser-intent-pack/pack.json",
+  "packs/examples/chaos-probe-pack/pack.json",
   "packs/examples/guardrail-fuzzer-pack/pack.json",
   "packs/examples/rpa-replay-pack/pack.json",
   "packs/examples/sbom-drift-pack/pack.json",
@@ -301,6 +313,33 @@ requireTokens("browser-intent 蓝图能力包", browserIntentPack + browserInten
   "browser-intent-pack-client",
   "TestBrowserIntentPackGateReturnsNotFoundWhenDisabled",
   "/packs/browser",
+  "distribution",
+  "rollback",
+]);
+
+requireTokens("chaos-probe 蓝图能力包", chaosProbePack + chaosProbeManifest + frontend + gateway + sdk + docs, [
+  'const PackID = "yunque.pack.chaos-probe"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/chaos-probe/status",
+  "/v1/chaos-probe/probes",
+  "/v1/chaos-probe/run",
+  "/v1/chaos-probe/reports",
+  "/v1/chaos-probe/evidence/",
+  "safe_probe_ready",
+  "scheduler_ready",
+  "degrade_engine_ready",
+  "alert_writeback_ready",
+  "cfg.DataPath(\"chaos-probe\")",
+  "json-chaos-probe-evidence",
+  "http.MethodPost",
+  "yunque-client/chaos-probe",
+  "Chaos Probe Pack",
+  "createChaosProbePackClient",
+  "createChaosProbeClient",
+  "chaos-probe-pack-client",
+  "TestChaosProbePackGateReturnsNotFoundWhenDisabled",
+  "/packs/chaos-probe",
+  "pack-shell-before-scheduler",
   "distribution",
   "rollback",
 ]);
@@ -450,6 +489,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend LoRA pack client tests",
   "Frontend Cogni Kernel pack client tests",
   "Frontend Browser Intent pack client tests",
+  "Frontend Chaos Probe pack client tests",
   "Frontend Guardrail Fuzzer pack client tests",
   "Frontend RPA Replay pack client tests",
   "Frontend SBOM Drift pack client tests",
@@ -537,6 +577,12 @@ if (browserPackPage.includes("api.browser") || browserPackPage.includes('from "@
   fail("前端同步菜单/路由/资源/控制台", "Browser Intent pack page must use browser-intent-pack-client instead of the monolithic api object");
 } else {
   ok("前端 Browser Intent pack 客户端拆分", "Browser Intent page uses browser-intent-pack-client instead of monolithic api browser methods");
+}
+
+if (chaosProbePackPage.includes("api.chaosProbe") || chaosProbePackPage.includes('from "@/lib/api"') || !chaosProbePackPage.includes("createChaosProbePackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "Chaos Probe pack page must use chaos-probe-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Chaos Probe pack 客户端拆分", "Chaos Probe page uses chaos-probe-pack-client instead of monolithic api chaos probe methods");
 }
 
 if (guardrailFuzzerPackPage.includes("api.guardrailFuzzer") || guardrailFuzzerPackPage.includes('from "@/lib/api"') || !guardrailFuzzerPackPage.includes("createGuardrailFuzzerPackClient")) {
@@ -633,6 +679,9 @@ const forbiddenMonolithicPackMethods = [
   "browserExtAction:",
   "browserExtScenarios:",
   "browserExtRunScenario:",
+  "chaosProbeStatus:",
+  "chaosProbeRun:",
+  "chaosProbeEvidence:",
   "guardrailFuzzerStatus:",
   "guardrailFuzzerRun:",
   "guardrailFuzzerEvidence:",
@@ -657,7 +706,7 @@ const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) =>
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser/guardrail-fuzzer/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/chaos-probe/guardrail-fuzzer/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -684,6 +733,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "PackBackendRouteBinding",
   "PackDistributionManifest",
   "PackPruneResponse",
+  "createChaosProbeClient",
+  "ChaosProbeClientError",
   "createGuardrailFuzzerClient",
   "GuardrailFuzzerClientError",
   "createRPAReplayClient",
@@ -722,6 +773,7 @@ runCheck("packs sdk checker", process.execPath, ["sdk/scripts/check-packs-sdk-ma
 runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pack-sdk-manifest.mjs"]);
 runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"]);
 runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
+runCheck("chaos probe pack sdk checker", process.execPath, ["sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs"]);
 runCheck("guardrail fuzzer pack sdk checker", process.execPath, ["sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"]);
 runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 runCheck("sbom drift pack sdk checker", process.execPath, ["sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"]);
