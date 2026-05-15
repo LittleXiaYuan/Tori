@@ -108,25 +108,70 @@ type ExecuteRequest struct {
 }
 
 type ExecuteResult struct {
-	Slug       string            `json:"slug"`
-	DryRun     bool              `json:"dry_run"`
-	Entrypoint string            `json:"entrypoint"`
-	Success    bool              `json:"success"`
-	ExitCode   int               `json:"exit_code"`
-	Stdout     string            `json:"stdout,omitempty"`
-	Stderr     string            `json:"stderr,omitempty"`
-	Duration   string            `json:"duration,omitempty"`
-	MemUsed    uint32            `json:"mem_used_bytes,omitempty"`
-	Exports    []string          `json:"exports,omitempty"`
-	KVWrites   map[string]string `json:"kv_writes,omitempty"`
-	Plan       []PermissionCheck `json:"plan,omitempty"`
-	Notes      []string          `json:"notes,omitempty"`
+	Slug        string            `json:"slug"`
+	DryRun      bool              `json:"dry_run"`
+	Entrypoint  string            `json:"entrypoint"`
+	Success     bool              `json:"success"`
+	ExitCode    int               `json:"exit_code"`
+	Stdout      string            `json:"stdout,omitempty"`
+	Stderr      string            `json:"stderr,omitempty"`
+	Duration    string            `json:"duration,omitempty"`
+	MemUsed     uint32            `json:"mem_used_bytes,omitempty"`
+	Exports     []string          `json:"exports,omitempty"`
+	KVWrites    map[string]string `json:"kv_writes,omitempty"`
+	Plan        []PermissionCheck `json:"plan,omitempty"`
+	HostABIPlan HostABIPlan       `json:"host_abi_plan"`
+	Notes       []string          `json:"notes,omitempty"`
 }
 
 type PermissionCheck struct {
 	Name    string `json:"name"`
 	Allowed bool   `json:"allowed"`
 	Reason  string `json:"reason,omitempty"`
+}
+
+type HostABIPlan struct {
+	PlanReady        bool                  `json:"plan_ready"`
+	Ready            bool                  `json:"ready"`
+	Status           string                `json:"status"`
+	EnforcementReady bool                  `json:"enforcement_ready"`
+	WritesFiles      bool                  `json:"writes_files"`
+	NetworkAccess    bool                  `json:"network_access"`
+	Functions        []HostABIFunctionPlan `json:"functions"`
+	Summary          HostABISummary        `json:"summary"`
+	ResourceLimits   HostABIResourceLimits `json:"resource_limits"`
+	Labels           []string              `json:"labels"`
+	Notes            []string              `json:"notes,omitempty"`
+}
+
+type HostABIFunctionPlan struct {
+	Name             string   `json:"name"`
+	Category         string   `json:"category"`
+	Permission       string   `json:"permission"`
+	Enabled          bool     `json:"enabled"`
+	EnforcementReady bool     `json:"enforcement_ready"`
+	WritesFiles      bool     `json:"writes_files"`
+	NetworkAccess    bool     `json:"network_access"`
+	Constraints      []string `json:"constraints,omitempty"`
+	Reason           string   `json:"reason,omitempty"`
+}
+
+type HostABISummary struct {
+	FunctionCount     int  `json:"function_count"`
+	EnabledCount      int  `json:"enabled_count"`
+	LedgerKV          bool `json:"ledger_kv"`
+	MemorySearch      bool `json:"memory_search"`
+	HTTPFetch         bool `json:"http_fetch"`
+	EnvGet            bool `json:"env_get"`
+	AllowedHostCount  int  `json:"allowed_host_count"`
+	EnvAllowlistCount int  `json:"env_allowlist_count"`
+}
+
+type HostABIResourceLimits struct {
+	MaxMemoryMB    int      `json:"max_memory_mb"`
+	TimeoutSeconds int      `json:"timeout_seconds"`
+	AllowedHosts   []string `json:"allowed_hosts"`
+	EnvAllowlist   []string `json:"env_allowlist"`
 }
 
 var safeSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
@@ -186,23 +231,25 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":       PackID,
-		"stage":         "pack-shell-before-runtime-hosts",
-		"runtime_ready": true,
-		"abi_ready":     false,
-		"plugin_count":  len(plugins),
-		"loaded_count":  loaded,
-		"plugin_dir":    h.pluginDir,
-		"store_dir":     h.dataDir,
-		"sandbox":       h.sandbox.Stats(),
+		"pack_id":        PackID,
+		"stage":          "pack-shell-before-runtime-hosts",
+		"runtime_ready":  true,
+		"abi_plan_ready": true,
+		"abi_ready":      false,
+		"plugin_count":   len(plugins),
+		"loaded_count":   loaded,
+		"plugin_dir":     h.pluginDir,
+		"store_dir":      h.dataDir,
+		"sandbox":        h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
 			"wasm.plugin.lifecycle",
 			"wasm.sandbox.execute",
 			"wasm.permission.plan",
+			"wasm.host_abi.plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission enforcement and remote signed package install remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview is available as a non-destructive contract; runtime host function binding/enforcement and remote signed package install remain follow-up wiring."},
 	})
 }
 
@@ -227,7 +274,7 @@ func (h *Handler) Plugins(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.DryRun {
-			writeJSON(w, http.StatusOK, map[string]any{"plugin": plugin, "status": "validated", "plan": permissionPlan(plugin.Permissions)})
+			writeJSON(w, http.StatusOK, map[string]any{"plugin": plugin, "status": "validated", "plan": permissionPlan(plugin.Permissions), "host_abi_plan": hostABIPlan(plugin.Permissions)})
 			return
 		}
 		if err := h.savePlugin(plugin); err != nil {
@@ -321,9 +368,9 @@ func (h *Handler) Execute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "plugin is not loaded", "plugin": plugin.Slug})
 		return
 	}
-	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions)}
+	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions), HostABIPlan: hostABIPlan(plugin.Permissions)}
 	if req.DryRun {
-		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, and entrypoint selection."}
+		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, Host ABI plan, and entrypoint selection."}
 		writeJSON(w, http.StatusOK, map[string]any{"result": result})
 		return
 	}
@@ -368,13 +415,14 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-wasm-plugin-evidence",
-		"files":       []string{"plugin.json", "permission-plan.json", "sandbox-stats.json"},
-		"plugin":      plugin,
-		"plan":        permissionPlan(plugin.Permissions),
-		"sandbox":     h.sandbox.Stats(),
+		"pack_id":       PackID,
+		"exported_at":   h.now().UTC(),
+		"format":        "json-wasm-plugin-evidence",
+		"files":         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "sandbox-stats.json"},
+		"plugin":        plugin,
+		"plan":          permissionPlan(plugin.Permissions),
+		"host_abi_plan": hostABIPlan(plugin.Permissions),
+		"sandbox":       h.sandbox.Stats(),
 	})
 }
 
@@ -451,6 +499,115 @@ func permissionPlan(policy PluginPermissionPolicy) []PermissionCheck {
 		{Name: "env_get", Allowed: len(policy.EnvAllowlist) > 0, Reason: fmt.Sprintf("allowlist entries: %d", len(policy.EnvAllowlist))},
 	}
 	return checks
+}
+
+func hostABIPlan(policy PluginPermissionPolicy) HostABIPlan {
+	policy = normalizePolicy(policy)
+	envEnabled := len(policy.EnvAllowlist) > 0
+	functions := []HostABIFunctionPlan{
+		{
+			Name:             "ledger_kv_get",
+			Category:         "ledger_kv",
+			Permission:       "ledger_kv",
+			Enabled:          policy.LedgerKV,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    false,
+			Constraints:      []string{"namespace/key scope must be enforced by the future host binding"},
+			Reason:           boolReason(policy.LedgerKV, "ledger KV read ABI requested by plugin policy", "ledger KV ABI disabled by plugin policy"),
+		},
+		{
+			Name:             "ledger_kv_put",
+			Category:         "ledger_kv",
+			Permission:       "ledger_kv",
+			Enabled:          policy.LedgerKV,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    false,
+			Constraints:      []string{"writes must stay inside Ledger KV namespaces after enforcement is wired"},
+			Reason:           boolReason(policy.LedgerKV, "ledger KV write ABI requested by plugin policy", "ledger KV ABI disabled by plugin policy"),
+		},
+		{
+			Name:             "ledger_memory_search",
+			Category:         "memory_search",
+			Permission:       "memory_search",
+			Enabled:          policy.MemorySearch,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    false,
+			Constraints:      []string{"read-only search must apply tenant and memory-scope filters in the future host binding"},
+			Reason:           boolReason(policy.MemorySearch, "memory search ABI requested by plugin policy", "memory search ABI disabled by plugin policy"),
+		},
+		{
+			Name:             "http_fetch",
+			Category:         "http_fetch",
+			Permission:       "http_fetch",
+			Enabled:          policy.HTTPFetch,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    policy.HTTPFetch,
+			Constraints:      []string{fmt.Sprintf("allowed_hosts=%s", strings.Join(policy.AllowedHosts, ","))},
+			Reason:           boolReason(policy.HTTPFetch, fmt.Sprintf("HTTP fetch ABI requested with %d allowed host(s)", len(policy.AllowedHosts)), "network ABI disabled by plugin policy"),
+		},
+		{
+			Name:             "log_write",
+			Category:         "telemetry",
+			Permission:       "telemetry",
+			Enabled:          true,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    false,
+			Constraints:      []string{"structured logs must be redacted and rate-limited by the future host binding"},
+			Reason:           "telemetry ABI is planned for diagnostics only; host binding is not wired yet",
+		},
+		{
+			Name:             "env_get",
+			Category:         "env_get",
+			Permission:       "env_get",
+			Enabled:          envEnabled,
+			EnforcementReady: false,
+			WritesFiles:      false,
+			NetworkAccess:    false,
+			Constraints:      []string{fmt.Sprintf("env_allowlist=%s", strings.Join(policy.EnvAllowlist, ","))},
+			Reason:           fmt.Sprintf("environment allowlist entries: %d", len(policy.EnvAllowlist)),
+		},
+	}
+	enabled := 0
+	for _, fn := range functions {
+		if fn.Enabled {
+			enabled++
+		}
+	}
+	return HostABIPlan{
+		PlanReady:        true,
+		Ready:            false,
+		Status:           "plan_only",
+		EnforcementReady: false,
+		WritesFiles:      false,
+		NetworkAccess:    policy.HTTPFetch,
+		Functions:        functions,
+		Summary: HostABISummary{
+			FunctionCount:     len(functions),
+			EnabledCount:      enabled,
+			LedgerKV:          policy.LedgerKV,
+			MemorySearch:      policy.MemorySearch,
+			HTTPFetch:         policy.HTTPFetch,
+			EnvGet:            envEnabled,
+			AllowedHostCount:  len(policy.AllowedHosts),
+			EnvAllowlistCount: len(policy.EnvAllowlist),
+		},
+		ResourceLimits: HostABIResourceLimits{
+			MaxMemoryMB:    policy.MaxMemoryMB,
+			TimeoutSeconds: policy.TimeoutSeconds,
+			AllowedHosts:   append([]string{}, policy.AllowedHosts...),
+			EnvAllowlist:   append([]string{}, policy.EnvAllowlist...),
+		},
+		Labels: []string{"host-abi", "plan-only", "no-enforcement", "no-file-write"},
+		Notes: []string{
+			"Preview only: this pack does not bind wazero host functions or enforce Host ABI permissions in this slice.",
+			"Use this deterministic plan as the contract for the later Host ABI permission enforcement slice.",
+		},
+	}
 }
 
 func boolReason(ok bool, yes string, no string) string {
