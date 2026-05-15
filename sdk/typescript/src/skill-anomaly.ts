@@ -2,7 +2,8 @@
  * Lightweight Skill Anomaly Pack SDK slice.
  *
  * This keeps skill behavior profiles, anomaly dry-runs, NeedsApproval plans,
- * and evidence export usable without importing the full generated OpenAPI SDK:
+ * audit-hook / Trust mutation plans, and evidence export usable without
+ * importing the full generated OpenAPI SDK:
  *
  *   import { createSkillAnomalyClient } from "yunque-client/skill-anomaly";
  */
@@ -52,7 +53,11 @@ export type SkillAnomalyStatusResponse = {
   pack_id: string;
   stage: string;
   detector_ready: boolean;
+  audit_hook_plan_ready: boolean;
   audit_hook_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
   profile_count: number;
   active_profiles: number;
   anomaly_count: number;
@@ -93,6 +98,11 @@ export type SkillAnomalyObservationRequest = {
   dry_run?: boolean;
 };
 
+export type SkillAnomalyAuditHookPlanRequest = SkillAnomalyObservationRequest & {
+  requested_by?: string;
+  reason?: string;
+};
+
 export type SkillAnomalyEventsResponse = {
   events: SkillAnomalyEvent[];
   count: number;
@@ -117,6 +127,54 @@ export type SkillAnomalyDetectResponse = {
   result: SkillAnomalyResult;
 };
 
+export type SkillAnomalyAuditRecordPlan = {
+  event_type: string;
+  action: string;
+  subject: string;
+  severity: string;
+  merkle_append_ready: boolean;
+  payload: Record<string, unknown>;
+};
+
+export type SkillAnomalyTrustMutationPlan = {
+  target_skill: string;
+  mutation: string;
+  delta: number;
+  record_failure_ready: boolean;
+  reason: string;
+};
+
+export type SkillAnomalyApprovalQueuePlan = {
+  required: boolean;
+  queue_writeback_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+};
+
+export type SkillAnomalyAuditHookPlan = {
+  pack_id: string;
+  skill_slug: string;
+  generated_at: string;
+  dry_run: boolean;
+  status: string;
+  approval_required: boolean;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
+  detection: SkillAnomalyResult;
+  audit_record: SkillAnomalyAuditRecordPlan;
+  trust_mutation: SkillAnomalyTrustMutationPlan;
+  approval_queue: SkillAnomalyApprovalQueuePlan;
+  actions: string[];
+  notes?: string[];
+};
+
+export type SkillAnomalyAuditHookPlanResponse = {
+  plan: SkillAnomalyAuditHookPlan;
+};
+
 export type SkillAnomalyEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -125,6 +183,9 @@ export type SkillAnomalyEvidenceResponse = {
   profile: SkillAnomalyProfile;
   events: SkillAnomalyEvent[];
   policy: SkillAnomalyPolicy;
+  audit_hook_plan?: SkillAnomalyAuditHookPlan;
+  trust_mutation_plan?: SkillAnomalyTrustMutationPlan;
+  approval_queue_plan?: SkillAnomalyApprovalQueuePlan;
 };
 
 export type SkillAnomalyClientOptions = {
@@ -238,6 +299,10 @@ export class SkillAnomalyClient {
 
   detect(input: SkillAnomalyObservationRequest): Promise<SkillAnomalyDetectResponse> {
     return this.request<SkillAnomalyDetectResponse>("POST", "/v1/skill-anomaly/detect", input);
+  }
+
+  auditHookPlan(input: SkillAnomalyAuditHookPlanRequest): Promise<SkillAnomalyAuditHookPlanResponse> {
+    return this.request<SkillAnomalyAuditHookPlanResponse>("POST", "/v1/skill-anomaly/audit-hook/plan", input);
   }
 
   evidence(skillSlug: string): Promise<SkillAnomalyEvidenceResponse> {

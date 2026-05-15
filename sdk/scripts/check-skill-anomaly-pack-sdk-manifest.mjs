@@ -39,6 +39,7 @@ for (const token of [
   "/v1/skill-anomaly/events",
   "/v1/skill-anomaly/profiles",
   "/v1/skill-anomaly/detect",
+  "/v1/skill-anomaly/audit-hook/plan",
   "/v1/skill-anomaly/evidence/",
   "method: \"POST\"",
 ]) {
@@ -65,8 +66,15 @@ const backend = readRepoFile("internal/packs/skillanomaly/handler.go")
 for (const token of [
   "const PackID = \"yunque.pack.skill-anomaly\"",
   "detector_ready",
+  "audit_hook_plan_ready",
   "audit_hook_ready",
+  "trust_mutation_plan_ready",
+  "approval_writeback_ready",
+  "skill.audit_hook.plan",
+  "skill.trust_mutation.plan",
   "json-skill-anomaly-evidence",
+  "audit-hook-plan.json",
+  "trust-mutation-plan.json",
   "cfg.DataPath(\"skill-anomaly\")",
   "skillanomalypack.New",
   "packs/examples/skill-anomaly-pack/pack.json",
@@ -83,6 +91,7 @@ for (const token of [
   "SkillAnomalyClientError",
   "/v1/skill-anomaly/status",
   "/v1/skill-anomaly/detect",
+  "/v1/skill-anomaly/audit-hook/plan",
   "/v1/skill-anomaly/evidence/",
   "Skill Anomaly request failed",
 ]) {

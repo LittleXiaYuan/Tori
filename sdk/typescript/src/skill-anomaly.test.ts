@@ -61,6 +61,7 @@ test("SkillAnomalyClient observes, detects, lists events, and reads profile deta
       calls.push({ url: String(url), init });
       if (String(url).endsWith("/events") && init?.method === "POST") return jsonResponse({ event: { skill_slug: "text_processing" }, result: { score: 0 }, status: "observed" }, { status: 201 });
       if (String(url).endsWith("/detect")) return jsonResponse({ result: { skill_slug: "text_processing", score: 7, severity: "needs_approval", needs_approval: true, block: true } });
+      if (String(url).endsWith("/audit-hook/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.skill-anomaly", skill_slug: "text_processing", status: "approval_plan", audit_hook_ready: false, trust_mutation_ready: false, approval_writeback_ready: false, trust_mutation: { delta: -10 } } });
       if (String(url).includes("/profiles/text_processing")) return jsonResponse({ profile: { skill_slug: "text_processing", recent: [] } });
       return jsonResponse({ events: [{ skill_slug: "text_processing", action: "read_file" }], count: 1 });
     },
@@ -68,19 +69,24 @@ test("SkillAnomalyClient observes, detects, lists events, and reads profile deta
 
   const observed = await client.observe({ skill_slug: "text_processing", action: "read_file", params: { path: "notes.md" }, success: true });
   const detected = await client.detect({ skill_slug: "text_processing", action: "shell_exec", params: { command: "whoami" }, dry_run: true });
+  const auditPlan = await client.auditHookPlan({ skill_slug: "text_processing", action: "shell_exec", params: { command: "whoami" }, dry_run: true, requested_by: "operator" });
   const profile = await client.profile("text_processing");
   const events = await client.events({ skill_slug: "text_processing", limit: 10 });
 
   assertEqual(observed.status, "observed");
   assertEqual(detected.result.severity, "needs_approval");
+  assertEqual(auditPlan.plan.status, "approval_plan");
   assertEqual(profile.profile.skill_slug, "text_processing");
   assertEqual(events.count, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/skill-anomaly/events");
   assertEqual(calls[0]?.init?.method, "POST");
   assertEqual(calls[0]?.init?.body, JSON.stringify({ skill_slug: "text_processing", action: "read_file", params: { path: "notes.md" }, success: true }));
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/skill-anomaly/detect");
-  assertEqual(calls[2]?.url, "http://localhost:9090/v1/skill-anomaly/profiles/text_processing");
-  assertEqual(calls[3]?.url, "http://localhost:9090/v1/skill-anomaly/events?skill_slug=text_processing&limit=10");
+  assertEqual(calls[2]?.url, "http://localhost:9090/v1/skill-anomaly/audit-hook/plan");
+  assertEqual(calls[2]?.init?.method, "POST");
+  assertEqual(calls[2]?.init?.body, JSON.stringify({ skill_slug: "text_processing", action: "shell_exec", params: { command: "whoami" }, dry_run: true, requested_by: "operator" }));
+  assertEqual(calls[3]?.url, "http://localhost:9090/v1/skill-anomaly/profiles/text_processing");
+  assertEqual(calls[4]?.url, "http://localhost:9090/v1/skill-anomaly/events?skill_slug=text_processing&limit=10");
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
@@ -90,14 +96,15 @@ test("SkillAnomalyClient exports profile evidence packs", async () => {
     baseUrl: "http://localhost:9090",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      return jsonResponse({ pack_id: "yunque.pack.skill-anomaly", exported_at: "now", format: "json-skill-anomaly-evidence", files: ["profile.json"], profile: { skill_slug: "text_processing" }, events: [], policy: {} });
+      return jsonResponse({ pack_id: "yunque.pack.skill-anomaly", exported_at: "now", format: "json-skill-anomaly-evidence", files: ["profile.json", "audit-hook-plan.json", "trust-mutation-plan.json"], profile: { skill_slug: "text_processing" }, events: [], policy: {}, audit_hook_plan: { status: "no_op" }, trust_mutation_plan: { delta: 0 } });
     },
   });
 
   const evidence = await client.evidence("text_processing");
 
   assertEqual(evidence.format, "json-skill-anomaly-evidence");
-  assertDeepEqual(evidence.files, ["profile.json"]);
+  assertDeepEqual(evidence.files, ["profile.json", "audit-hook-plan.json", "trust-mutation-plan.json"]);
+  assert(evidence.audit_hook_plan);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/skill-anomaly/evidence/text_processing");
 });
 

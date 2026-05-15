@@ -733,7 +733,7 @@ if (skillAnomalyManifest) {
 if (skillAnomalyPage.includes('from "@/lib/api"') || skillAnomalyPage.includes("api.skillAnomaly") || !skillAnomalyPage.includes("createSkillAnomalyPackClient")) {
   fail("Skill Anomaly pack page must use skill-anomaly-pack-client instead of monolithic api object");
 }
-for (const token of ["createSkillAnomalyPackClient", "/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/evidence/", 'method: "POST"']) {
+for (const token of ["createSkillAnomalyPackClient", "/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/evidence/", 'method: "POST"']) {
   if (!skillAnomalyClient.includes(token)) fail(`skill-anomaly-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("skill-anomaly")')) {
@@ -742,7 +742,7 @@ if (!gatewaySource.includes('cfg.DataPath("skill-anomaly")')) {
 for (const token of ["TestSkillAnomaly", "StatusNotFound", "StatusMethodNotAllowed", "/v1/skill-anomaly/detect"]) {
   if (!skillAnomalyGateTest.includes(token)) fail(`Skill Anomaly gateway gate test missing token: ${token}`);
 }
-for (const token of ["createSkillAnomalyClient", "SkillAnomalyClientError", "/v1/skill-anomaly/status", "/v1/skill-anomaly/evidence/"]) {
+for (const token of ["createSkillAnomalyClient", "SkillAnomalyClientError", "/v1/skill-anomaly/status", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/evidence/"]) {
   if (!skillAnomalySdk.includes(token)) fail(`Skill Anomaly TypeScript SDK missing token: ${token}`);
 }
 for (const token of ["/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/evidence/text_processing"]) {
