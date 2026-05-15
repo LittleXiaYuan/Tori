@@ -101,6 +101,8 @@ for (const token of [
   "Ledger KV kv_history",
   "Merkle audit-chain",
   "Memory Persister write-back",
+  "KV audit proof-link schema",
+  "/v1/memory-time-travel/audit/links",
 ]) {
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Memory Time Travel token: ${token}`);
 }
@@ -667,7 +669,7 @@ if (memoryTimeTravelManifest) {
 if (memoryTimeTravelPage.includes('from "@/lib/api"') || memoryTimeTravelPage.includes("api.memoryTimeTravel") || !memoryTimeTravelPage.includes("createMemoryTimeTravelPackClient")) {
   fail("Memory Time Travel pack page must use memory-time-travel-pack-client instead of monolithic api object");
 }
-for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/retention/plan", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", 'method: "POST"']) {
+for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/retention/plan", "/v1/memory-time-travel/audit/links", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", 'method: "POST"']) {
   if (!memoryTimeTravelClient.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
@@ -676,13 +678,13 @@ if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
 for (const token of ["TestMemoryTimeTravel", "StatusMethodNotAllowed", "/v1/memory-time-travel/diff"]) {
   if (!memoryTimeTravelGateTest.includes(token)) fail(`Memory Time Travel gateway gate test missing token: ${token}`);
 }
-for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientError", "/v1/memory-time-travel/status", "/v1/memory-time-travel/retention/plan", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", "retentionPlan", "auditVerify"]) {
+for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientError", "/v1/memory-time-travel/status", "/v1/memory-time-travel/retention/plan", "/v1/memory-time-travel/audit/links", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", "retentionPlan", "auditLinks", "auditVerify"]) {
   if (!memoryTimeTravelSdk.includes(token)) fail(`Memory Time Travel TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!memoryTimeTravelClientTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
-for (const token of ["json-memory-time-travel-evidence", "retention-plan.json", "retention_plan", "retention_plan_ready", "retention_prune_ready", "memory.retention.plan", "max_snapshots_per_namespace", "audit-verification.json", "audit_verification", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "memory.audit.verify", "MerkleVerifier", "VerifyMerkleAuditChain", "rollback_writeback_ready"]) {
+for (const token of ["json-memory-time-travel-evidence", "retention-plan.json", "retention_plan", "retention_plan_ready", "retention_prune_ready", "memory.retention.plan", "max_snapshots_per_namespace", "audit-links.json", "kv_audit_link_schema", "kv_audit_links", "kv_audit_link_schema_ready", "kv_audit_linkage_ready", "memory.audit.links.schema", "audit-verification.json", "audit_verification", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "memory.audit.verify", "MerkleVerifier", "VerifyMerkleAuditChain", "rollback_writeback_ready"]) {
   if (!memoryTimeTravelSource.includes(token)) fail(`Memory Time Travel handler missing memory governance shell token: ${token}`);
 }
 for (const token of ["NewTemporalKVStore", "PutRawVersionedAt", "GetRawAt", "ListVersions", "SnapshotRawAt", "__kv_history__", "TestTemporalKVStorePutVersionedAndGetRawAt", "TestTemporalKVStoreListVersionsAndSnapshotRawAt"]) {

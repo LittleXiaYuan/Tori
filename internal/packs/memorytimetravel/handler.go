@@ -2,9 +2,9 @@
 // Memory Time Travel capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
 // point-in-time reconstruction, drift diff summaries, rollback plans, retention
-// dry-run planning, JSON evidence export, and read-only Merkle audit-chain
-// verification while native Ledger KV kv_history write-back remains a later
-// slice.
+// dry-run planning, JSON evidence export, read-only Merkle audit-chain
+// verification, and a conservative KV audit proof-link schema placeholder while
+// native Ledger KV kv_history write-back remains a later slice.
 package memorytimetravel
 
 import (
@@ -236,6 +236,32 @@ type MerkleVerification struct {
 	Notes         []string            `json:"notes,omitempty"`
 }
 
+type KVAuditProofLink struct {
+	Namespace   string    `json:"namespace"`
+	Key         string    `json:"key"`
+	SnapshotID  string    `json:"snapshot_id,omitempty"`
+	KVVersionAt time.Time `json:"kv_version_at,omitempty"`
+	ValueHash   string    `json:"value_hash,omitempty"`
+	AuditSeq    uint64    `json:"audit_seq,omitempty"`
+	AuditHash   string    `json:"audit_hash,omitempty"`
+	ProofStatus string    `json:"proof_status"`
+	Notes       []string  `json:"notes,omitempty"`
+}
+
+type KVAuditLinksReport struct {
+	PackID                  string             `json:"pack_id"`
+	Namespace               string             `json:"namespace"`
+	GeneratedAt             time.Time          `json:"generated_at"`
+	SchemaReady             bool               `json:"schema_ready"`
+	LinkageReady            bool               `json:"linkage_ready"`
+	NativeKVHistoryReady    bool               `json:"native_kv_history_ready"`
+	MerkleVerificationReady bool               `json:"merkle_verification_ready"`
+	Source                  string             `json:"source"`
+	KVAuditLinks            []KVAuditProofLink `json:"kv_audit_links"`
+	RequiredFields          []string           `json:"required_fields"`
+	Notes                   []string           `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a Memory Time Travel pack handler.
@@ -274,6 +300,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff", Handler: h.Diff},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan", Handler: h.RollbackPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
+		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
 	}
@@ -299,6 +326,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.drift.diff",
 		"memory.rollback.plan",
 		"memory.retention.plan",
+		"memory.audit.links.schema",
 		"memory.evidence.export",
 	}
 	if h.merkleVerifier != nil {
@@ -315,6 +343,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		RollbackWritebackReady:        false,
 		RetentionPlanReady:            true,
 		RetentionPruneReady:           false,
+		KVAuditLinkSchemaReady:        true,
+		KVAuditLinkageReady:           false,
 		SnapshotCount:                 len(snapshots),
 		NamespaceCount:                len(namespaces),
 		StoreDir:                      h.dataDir,
@@ -336,6 +366,8 @@ type statusResponse struct {
 	RollbackWritebackReady        bool             `json:"rollback_writeback_ready"`
 	RetentionPlanReady            bool             `json:"retention_plan_ready"`
 	RetentionPruneReady           bool             `json:"retention_prune_ready"`
+	KVAuditLinkSchemaReady        bool             `json:"kv_audit_link_schema_ready"`
+	KVAuditLinkageReady           bool             `json:"kv_audit_linkage_ready"`
 	SnapshotCount                 int              `json:"snapshot_count"`
 	NamespaceCount                int              `json:"namespace_count"`
 	StoreDir                      string           `json:"store_dir"`
@@ -495,6 +527,15 @@ func (h *Handler) RetentionPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	report := h.buildKVAuditLinksReport(r.URL.Query().Get("namespace"))
+	writeJSON(w, http.StatusOK, map[string]any{"links": report})
+}
+
 func (h *Handler) AuditVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -538,7 +579,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -547,6 +588,9 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	} else {
 		payload["retention_plan"] = retentionPlan
 	}
+	auditLinks := h.buildKVAuditLinksReport(snapshot.Namespace)
+	payload["kv_audit_link_schema"] = auditLinks
+	payload["kv_audit_links"] = auditLinks.KVAuditLinks
 	if h.merkleVerifier != nil {
 		auditVerification, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), 10)
 		if err != nil {
@@ -573,12 +617,45 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
 	}
 	notes = append(notes, "Retention planning is dry-run only and currently targets pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
+	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
 	} else {
 		notes = append(notes, "Merkle audit-chain verification is not attached to this pack instance yet.")
 	}
 	return notes
+}
+
+func (h *Handler) buildKVAuditLinksReport(namespace string) KVAuditLinksReport {
+	normalizedNamespace := "all"
+	if strings.TrimSpace(namespace) != "" {
+		normalizedNamespace = normalizeNamespace(namespace)
+	}
+	return KVAuditLinksReport{
+		PackID:                  PackID,
+		Namespace:               normalizedNamespace,
+		GeneratedAt:             h.now().UTC(),
+		SchemaReady:             true,
+		LinkageReady:            false,
+		NativeKVHistoryReady:    false,
+		MerkleVerificationReady: h.merkleVerifier != nil,
+		Source:                  "schema-placeholder-before-native-kv-history",
+		KVAuditLinks:            []KVAuditProofLink{},
+		RequiredFields: []string{
+			"namespace",
+			"key",
+			"kv_version_at",
+			"value_hash",
+			"audit_seq",
+			"audit_hash",
+			"proof_status",
+		},
+		Notes: []string{
+			"This report intentionally exposes only the stable KV audit proof-link schema.",
+			"kv_audit_links is empty until native Ledger kv_history rows can be joined with Merkle audit records.",
+			"The current Merkle verification route remains read-only audit-chain verification, not per-KV proof validation.",
+		},
+	}
 }
 
 func (h *Handler) temporalSnapshotValues(ctx context.Context, namespace string, at time.Time) (map[string]string, error) {

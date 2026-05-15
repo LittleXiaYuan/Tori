@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, Clock3, Download, GitCompare, History, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, Clock3, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -34,10 +34,11 @@ function sampleValues() {
 export default function MemoryTimeTravelPackPage() {
   const [status, setStatus] = useState<MemoryTimeTravelStatus | null>(null);
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
+  const [auditLinks, setAuditLinks] = useState<MemoryTimeTravelKVAuditLinksReport | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | "retention" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | "audit-links" | "retention" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -196,6 +197,20 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const loadAuditLinks = async () => {
+    setBusy("audit-links");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.auditLinks(namespace);
+      setAuditLinks(res.links);
+      showToast("已读取 KV audit proof-link schema 占位", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "读取 KV audit proof-link schema 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -214,7 +229,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、retention dry-run plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron 和真实写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、retention dry-run plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -231,7 +246,7 @@ export default function MemoryTimeTravelPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">命名空间</div><div className="kpi-value">{status?.namespace_count ?? 0}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">阶段</div><div className="kpi-value text-lg">{status?.stage || "pack-shell"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">KV audit links</div><div className="kpi-value text-lg">{status?.kv_audit_link_schema_ready ? "schema" : "pending"}</div></Card>
       </div>
 
       <Card className="section-card p-4">
@@ -259,6 +274,35 @@ export default function MemoryTimeTravelPackPage() {
         ) : (
           <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
             尚未生成保留计划。此入口当前只做 dry-run，用于上线前确认策略不会误删记忆快照。
+          </div>
+        )}
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><Link2 size={16} />KV audit proof-link schema</div>
+            <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              先暴露逐条 KV 证明链接的稳定 schema，用于后续原生 Ledger kv_history 与 Merkle audit record 关联；当前不会声称已有 per-KV proof。
+            </div>
+          </div>
+          <Button variant="outline" isPending={busy === "audit-links"} onPress={loadAuditLinks}><Link2 size={14} />读取 schema</Button>
+        </div>
+        {auditLinks ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[240px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>{auditLinks.schema_ready ? "schema ready" : "pending"}</Chip>
+              <div className="mt-3 text-2xl font-semibold">{auditLinks.kv_audit_links.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>links · linkage {auditLinks.linkage_ready ? "ready" : "not wired"}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>native kv_history {auditLinks.native_kv_history_ready ? "ready" : "not wired"}</div>
+            </div>
+            <TextField value={JSON.stringify(auditLinks, null, 2)} onChange={() => undefined}>
+              <TextArea rows={8} aria-label="Memory Time Travel KV audit links JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+            尚未读取 KV audit proof-link schema。这个入口当前只返回 schema/空 links，为后续 native kv_history + Merkle 证明关联预留稳定契约。
           </div>
         )}
       </Card>

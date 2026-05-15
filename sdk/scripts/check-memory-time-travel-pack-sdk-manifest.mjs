@@ -42,6 +42,7 @@ for (const token of [
   "/v1/memory-time-travel/diff",
   "/v1/memory-time-travel/rollback-plan",
   "/v1/memory-time-travel/retention/plan",
+  "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "method: \"POST\"",
@@ -56,9 +57,12 @@ if (!page.includes("createMemoryTimeTravelPackClient") || page.includes('from "@
 for (const token of ["Memory Time Travel", "保存快照", "生成 diff", "导出证据包", "Retention dry-run plan", "Merkle 审计链验证", "Pack shell"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing product token: ${token}`);
 }
+for (const token of ["KV audit proof-link schema", "loadAuditLinks", "native kv_history"]) {
+  if (!page.includes(token)) fail(`Memory Time Travel pack page missing KV audit link token: ${token}`);
+}
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -80,9 +84,16 @@ for (const token of [
   "retention_plan_ready",
   "retention_prune_ready",
   "memory.retention.plan",
+  "audit-links.json",
+  "kv_audit_link_schema",
+  "kv_audit_links",
+  "kv_audit_link_schema_ready",
+  "kv_audit_linkage_ready",
+  "memory.audit.links.schema",
   "MerkleVerifier",
   "VerifyMerkleAuditChain",
   "/v1/memory-time-travel/retention/plan",
+  "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "rollback_writeback_ready",
   "json-memory-time-travel-evidence",
@@ -103,10 +114,13 @@ for (const token of [
   "/v1/memory-time-travel/status",
   "/v1/memory-time-travel/diff",
   "/v1/memory-time-travel/retention/plan",
+  "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "retentionPlan",
+  "auditLinks",
   "auditVerify",
+  "kv_audit_link_schema",
   "Memory Time Travel request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Memory Time Travel SDK slice missing token: ${token}`);

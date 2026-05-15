@@ -45,6 +45,8 @@ export interface MemoryTimeTravelStatus {
   rollback_writeback_ready: boolean;
   retention_plan_ready?: boolean;
   retention_prune_ready?: boolean;
+  kv_audit_link_schema_ready?: boolean;
+  kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
   store_dir?: string;
@@ -73,6 +75,32 @@ export interface MemoryTimeTravelAuditVerification {
   last_seq?: number;
   checked_at: string;
   recent_records?: MemoryTimeTravelAuditRecord[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVAuditProofLink {
+  namespace: string;
+  key: string;
+  snapshot_id?: string;
+  kv_version_at?: string;
+  value_hash?: string;
+  audit_seq?: number;
+  audit_hash?: string;
+  proof_status: string;
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVAuditLinksReport {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  schema_ready: boolean;
+  linkage_ready: boolean;
+  native_kv_history_ready: boolean;
+  merkle_verification_ready: boolean;
+  source: string;
+  kv_audit_links: MemoryTimeTravelKVAuditProofLink[];
+  required_fields: string[];
   notes?: string[];
 }
 
@@ -192,8 +220,9 @@ export interface MemoryTimeTravelPackClient {
   diff(input: MemoryTimeTravelDiffInput): Promise<{ diff: MemoryTimeTravelDiffReport }>;
   rollbackPlan(input: MemoryTimeTravelRollbackPlanInput): Promise<{ plan: MemoryTimeTravelRollbackPlan }>;
   retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
+  auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
+  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
 }
 
 function enc(value: string): string {
@@ -235,10 +264,12 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       }),
     retentionPlan: (namespace) =>
       fetcher<{ plan: MemoryTimeTravelRetentionPlan }>(`/v1/memory-time-travel/retention/plan${query({ namespace })}`),
+    auditLinks: (namespace) =>
+      fetcher<{ links: MemoryTimeTravelKVAuditLinksReport }>(`/v1/memory-time-travel/audit/links${query({ namespace })}`),
     auditVerify: (limit) =>
       fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
+      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
         `/v1/memory-time-travel/evidence/${enc(id)}`,
       ),
   };
