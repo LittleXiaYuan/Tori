@@ -126,12 +126,41 @@ const remoteInstallPlan = {
   package: {
     manifest_url: "https://packs.yunque.local/wasm/calculator-remote.json",
     package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
-    expected_sha256: "0123456789abcdef",
+    expected_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     signature: "sig",
+    signature_algorithm: "ed25519",
     public_key_id: "root",
+    trust_root: "yunque-pack-root",
     manifest_artifact: "calculator-remote-remote-manifest.json",
     package_artifact: "calculator-remote.tgz",
     cache_key: "cache-key",
+  },
+  signature_verification: {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    signature_verification_plan_ready: true,
+    verification_gate_ready: false,
+    signature_verify_ready: false,
+    required: true,
+    allows_install: false,
+    blocked: true,
+    status: "blocked_until_signature_verifier",
+    algorithm: "ed25519",
+    signature_provided: true,
+    public_key_id_present: true,
+    public_key_id: "root",
+    trust_root: "yunque-pack-root",
+    expected_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    expected_sha256_format_valid: true,
+    canonical_payload_sha256: "payload-digest",
+    artifact: "signature-verification.json",
+    downloads: false,
+    writes_files: false,
+    network_access: false,
+    checks: [],
+    labels: ["signature-verification", "plan-only", "blocked"],
   },
   checks: [],
   artifacts: ["remote-install-plan.json", "signature-verification.json"],
@@ -158,6 +187,7 @@ const approvalPlan = {
   reason: "preview approval gate",
   plugin: remoteInstallPlan.plugin,
   package: remoteInstallPlan.package,
+  signature_verification: remoteInstallPlan.signature_verification,
   checks: [],
   approvers: ["security"],
   artifacts: [
@@ -189,6 +219,8 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           module_integrity_gate_ready: true,
           remote_install_plan_ready: true,
           remote_install_ready: false,
+          signature_verification_plan_ready: true,
+          signature_verify_ready: false,
           approval_gate_plan_ready: true,
           approval_gate_ready: false,
           plugin_count: 1,
@@ -198,6 +230,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
             "wasm.host_abi.execution_gate",
             "wasm.module.integrity_gate",
             "wasm.remote_install.plan",
+            "wasm.remote_install.signature_verification_plan",
             "wasm.remote_install.approval_plan",
           ],
         });
@@ -237,12 +270,19 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.module_integrity_gate_ready, true);
   assertEqual(status.remote_install_plan_ready, true);
   assertEqual(status.remote_install_ready, false);
+  assertEqual(status.signature_verification_plan_ready, true);
+  assertEqual(status.signature_verify_ready, false);
   assertEqual(status.approval_gate_plan_ready, true);
   assertEqual(status.approval_gate_ready, false);
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
   assert(status.capabilities.includes("wasm.module.integrity_gate"));
   assert(status.capabilities.includes("wasm.remote_install.plan"));
+  assert(
+    status.capabilities.includes(
+      "wasm.remote_install.signature_verification_plan",
+    ),
+  );
   assert(status.capabilities.includes("wasm.remote_install.approval_plan"));
   assertEqual(plugins.count, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/wasm-plugin/status");
@@ -357,10 +397,23 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   assertEqual(remotePlanned.plan.remote_install_plan_ready, true);
   assertEqual(remotePlanned.plan.remote_install_ready, false);
   assertEqual(remotePlanned.plan.writes_files, false);
+  assertEqual(
+    remotePlanned.plan.signature_verification.signature_verification_plan_ready,
+    true,
+  );
+  assertEqual(
+    remotePlanned.plan.signature_verification.signature_verify_ready,
+    false,
+  );
+  assertEqual(remotePlanned.plan.signature_verification.allows_install, false);
   assertEqual(gatePlanned.plan.approval_gate_plan_ready, true);
   assertEqual(gatePlanned.plan.approval_gate_ready, false);
   assertEqual(gatePlanned.plan.requires_approval, true);
   assertEqual(gatePlanned.plan.writes_approval_queue, false);
+  assertEqual(
+    gatePlanned.plan.signature_verification.signature_verification_plan_ready,
+    true,
+  );
   assertEqual(detail.plugin.slug, "calculator");
   assertEqual(unloaded.status, "unloaded");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/wasm-plugin/plugins");
@@ -446,6 +499,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
           "host-abi-plan.json",
           "module-integrity-gate.json",
           "remote-install-plan.json",
+          "signature-verification.json",
           "approval-gate-plan.json",
         ],
         plugin: { slug: "calculator" },
@@ -454,6 +508,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         host_abi_gate: hostABIGate,
         module_integrity_gate: moduleIntegrityGate,
         remote_install_plan: remoteInstallPlan,
+        signature_verification: remoteInstallPlan.signature_verification,
         approval_gate_plan: approvalPlan,
       });
     },
@@ -467,6 +522,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     "host-abi-plan.json",
     "module-integrity-gate.json",
     "remote-install-plan.json",
+    "signature-verification.json",
     "approval-gate-plan.json",
   ]);
   assertEqual(evidence.host_abi_plan.status, "plan_only");
@@ -474,6 +530,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
   assertEqual(evidence.host_abi_gate.blocked, true);
   assertEqual(evidence.module_integrity_gate.status, "verified");
   assertEqual(evidence.remote_install_plan.downloads, false);
+  assertEqual(evidence.signature_verification.signature_verify_ready, false);
+  assertEqual(evidence.signature_verification.allows_install, false);
   assertEqual(evidence.approval_gate_plan.requires_approval, true);
   assertEqual(
     calls[0]?.url,

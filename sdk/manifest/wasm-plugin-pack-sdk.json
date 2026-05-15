@@ -1,12 +1,13 @@
 {
   "version": 1,
   "domain": "wasm-plugin-pack",
-  "description": "WASM Plugin capability pack manifest binding for Pack Runtime route gates, frontend sync, sandbox lifecycle, Host ABI execution gate, module integrity gate, permission plans, evidence export, and lightweight SDK import discovery.",
+  "description": "WASM Plugin capability pack manifest binding for Pack Runtime route gates, frontend sync, sandbox lifecycle, Host ABI execution gate, module integrity gate, remote signature verification gate preview, permission plans, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose WASM plugin registry, load/unload lifecycle, dry-run sandbox execution, Host ABI plan/execution-gate previews, and JSON evidence export as a high-risk optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Expose WASM plugin registry, load/unload lifecycle, dry-run sandbox execution, Host ABI plan/execution-gate previews, remote signature verification gate previews, and JSON evidence export as a high-risk optional Pack Runtime capability instead of a hard-coded main-shell feature.",
     "Keep WASM method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Keep privileged Host ABI requests blocked during real execution until host_abi_enforcement_ready becomes true.",
     "Keep local WASM module bytes matched to registered SHA-256 metadata before sandbox execution.",
+    "Keep remote signed package installs blocked behind a deterministic signature_verification gate preview until signature_verify_ready becomes true.",
     "Let external projects import yunque-client/wasm-plugin only when the WASM Plugin pack is installed and enabled."
   ],
   "packManifest": "packs/examples/wasm-plugin-pack/pack.json",

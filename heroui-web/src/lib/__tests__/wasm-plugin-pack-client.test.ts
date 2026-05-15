@@ -86,9 +86,41 @@ describe("wasm-plugin-pack-client", () => {
     package: {
       manifest_url: "https://packs.yunque.local/wasm/calculator-remote.json",
       package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
+      expected_sha256:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      signature: "sig",
+      signature_algorithm: "ed25519",
+      public_key_id: "root",
+      trust_root: "yunque-pack-root",
       manifest_artifact: "calculator-remote-remote-manifest.json",
       package_artifact: "calculator-remote.tgz",
       cache_key: "cache-key",
+    },
+    signature_verification: {
+      pack_id: "yunque.pack.wasm-plugin",
+      generated_at: "now",
+      signature_verification_plan_ready: true,
+      verification_gate_ready: false,
+      signature_verify_ready: false,
+      required: true,
+      allows_install: false,
+      blocked: true,
+      status: "blocked_until_signature_verifier",
+      algorithm: "ed25519",
+      signature_provided: true,
+      public_key_id_present: true,
+      public_key_id: "root",
+      trust_root: "yunque-pack-root",
+      expected_sha256:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      expected_sha256_format_valid: true,
+      canonical_payload_sha256: "payload-digest",
+      artifact: "signature-verification.json",
+      downloads: false,
+      writes_files: false,
+      network_access: false,
+      checks: [],
+      labels: ["signature-verification", "plan-only", "blocked"],
     },
     checks: [],
     artifacts: ["remote-install-plan.json", "signature-verification.json"],
@@ -114,6 +146,7 @@ describe("wasm-plugin-pack-client", () => {
     reason: "preview approval gate",
     plugin: remoteInstallPlan.plugin,
     package: remoteInstallPlan.package,
+    signature_verification: remoteInstallPlan.signature_verification,
     checks: [],
     approvers: ["security"],
     artifacts: [
@@ -142,6 +175,8 @@ describe("wasm-plugin-pack-client", () => {
             module_integrity_gate_ready: true,
             remote_install_plan_ready: true,
             remote_install_ready: false,
+            signature_verification_plan_ready: true,
+            signature_verify_ready: false,
             approval_gate_plan_ready: true,
             approval_gate_ready: false,
             plugin_count: 1,
@@ -151,6 +186,7 @@ describe("wasm-plugin-pack-client", () => {
               "wasm.host_abi.execution_gate",
               "wasm.module.integrity_gate",
               "wasm.remote_install.plan",
+              "wasm.remote_install.signature_verification_plan",
               "wasm.remote_install.approval_plan",
             ],
           }),
@@ -221,12 +257,17 @@ describe("wasm-plugin-pack-client", () => {
     expect(status.module_integrity_gate_ready).toBe(true);
     expect(status.remote_install_plan_ready).toBe(true);
     expect(status.remote_install_ready).toBe(false);
+    expect(status.signature_verification_plan_ready).toBe(true);
+    expect(status.signature_verify_ready).toBe(false);
     expect(status.approval_gate_plan_ready).toBe(true);
     expect(status.approval_gate_ready).toBe(false);
     expect(status.capabilities).toContain("wasm.host_abi.plan");
     expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
     expect(status.capabilities).toContain("wasm.module.integrity_gate");
     expect(status.capabilities).toContain("wasm.remote_install.plan");
+    expect(status.capabilities).toContain(
+      "wasm.remote_install.signature_verification_plan",
+    );
     expect(status.capabilities).toContain("wasm.remote_install.approval_plan");
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/wasm-plugin/status",
@@ -342,10 +383,20 @@ describe("wasm-plugin-pack-client", () => {
     expect(remotePlan.plan.remote_install_plan_ready).toBe(true);
     expect(remotePlan.plan.remote_install_ready).toBe(false);
     expect(remotePlan.plan.writes_files).toBe(false);
+    expect(
+      remotePlan.plan.signature_verification.signature_verification_plan_ready,
+    ).toBe(true);
+    expect(remotePlan.plan.signature_verification.signature_verify_ready).toBe(
+      false,
+    );
+    expect(remotePlan.plan.signature_verification.allows_install).toBe(false);
     expect(gatePlan.plan.approval_gate_plan_ready).toBe(true);
     expect(gatePlan.plan.approval_gate_ready).toBe(false);
     expect(gatePlan.plan.requires_approval).toBe(true);
     expect(gatePlan.plan.writes_approval_queue).toBe(false);
+    expect(
+      gatePlan.plan.signature_verification.signature_verification_plan_ready,
+    ).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/plugins");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(
@@ -411,6 +462,7 @@ describe("wasm-plugin-pack-client", () => {
               "host-abi-plan.json",
               "module-integrity-gate.json",
               "remote-install-plan.json",
+              "signature-verification.json",
               "approval-gate-plan.json",
             ],
             plugin: { slug: "calculator" },
@@ -419,6 +471,7 @@ describe("wasm-plugin-pack-client", () => {
             host_abi_gate: hostABIGate,
             module_integrity_gate: moduleIntegrityGate,
             remote_install_plan: remoteInstallPlan,
+            signature_verification: remoteInstallPlan.signature_verification,
             approval_gate_plan: approvalPlan,
           }),
           { status: 200 },
@@ -431,12 +484,15 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.files).toContain("host-abi-plan.json");
     expect(evidence.files).toContain("module-integrity-gate.json");
     expect(evidence.files).toContain("remote-install-plan.json");
+    expect(evidence.files).toContain("signature-verification.json");
     expect(evidence.files).toContain("approval-gate-plan.json");
     expect(evidence.host_abi_plan.status).toBe("plan_only");
     expect(evidence.host_abi_gate.enforcement_ready).toBe(false);
     expect(evidence.host_abi_gate.blocked).toBe(true);
     expect(evidence.module_integrity_gate.status).toBe("verified");
     expect(evidence.remote_install_plan.downloads).toBe(false);
+    expect(evidence.signature_verification.signature_verify_ready).toBe(false);
+    expect(evidence.signature_verification.allows_install).toBe(false);
     expect(evidence.approval_gate_plan.requires_approval).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");
   });

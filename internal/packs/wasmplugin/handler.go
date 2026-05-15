@@ -117,7 +117,9 @@ type RemoteInstallPlanRequest struct {
 	ModulePath   string            `json:"module_path,omitempty"`
 	SHA256       string            `json:"sha256,omitempty"`
 	Signature    string            `json:"signature,omitempty"`
+	SignatureAlg string            `json:"signature_algorithm,omitempty"`
 	PublicKeyID  string            `json:"public_key_id,omitempty"`
+	TrustRoot    string            `json:"trust_root,omitempty"`
 	Entrypoint   string            `json:"entrypoint,omitempty"`
 	RequestedBy  string            `json:"requested_by,omitempty"`
 	Reason       string            `json:"reason,omitempty"`
@@ -127,74 +129,78 @@ type RemoteInstallPlanRequest struct {
 }
 
 type RemoteInstallApprovalPlanRequest struct {
-	Slug        string            `json:"slug,omitempty"`
-	Name        string            `json:"name,omitempty"`
-	Version     string            `json:"version,omitempty"`
-	PackageURL  string            `json:"package_url"`
-	ManifestURL string            `json:"manifest_url,omitempty"`
-	ModulePath  string            `json:"module_path,omitempty"`
-	SHA256      string            `json:"sha256,omitempty"`
-	Signature   string            `json:"signature,omitempty"`
-	PublicKeyID string            `json:"public_key_id,omitempty"`
-	Entrypoint  string            `json:"entrypoint,omitempty"`
-	RequestedBy string            `json:"requested_by,omitempty"`
-	Reason      string            `json:"reason,omitempty"`
-	RiskTier    string            `json:"risk_tier,omitempty"`
-	Approvers   []string          `json:"approvers,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	Slug         string            `json:"slug,omitempty"`
+	Name         string            `json:"name,omitempty"`
+	Version      string            `json:"version,omitempty"`
+	PackageURL   string            `json:"package_url"`
+	ManifestURL  string            `json:"manifest_url,omitempty"`
+	ModulePath   string            `json:"module_path,omitempty"`
+	SHA256       string            `json:"sha256,omitempty"`
+	Signature    string            `json:"signature,omitempty"`
+	SignatureAlg string            `json:"signature_algorithm,omitempty"`
+	PublicKeyID  string            `json:"public_key_id,omitempty"`
+	TrustRoot    string            `json:"trust_root,omitempty"`
+	Entrypoint   string            `json:"entrypoint,omitempty"`
+	RequestedBy  string            `json:"requested_by,omitempty"`
+	Reason       string            `json:"reason,omitempty"`
+	RiskTier     string            `json:"risk_tier,omitempty"`
+	Approvers    []string          `json:"approvers,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
 type RemoteInstallPlanReport struct {
-	PackID                 string                   `json:"pack_id"`
-	GeneratedAt            time.Time                `json:"generated_at"`
-	Status                 string                   `json:"status"`
-	RemoteInstallPlanReady bool                     `json:"remote_install_plan_ready"`
-	RemoteInstallReady     bool                     `json:"remote_install_ready"`
-	DownloadReady          bool                     `json:"download_ready"`
-	SignatureVerifyReady   bool                     `json:"signature_verify_ready"`
-	Downloads              bool                     `json:"downloads"`
-	InstallsPlugin         bool                     `json:"installs_plugin"`
-	WritesFiles            bool                     `json:"writes_files"`
-	NetworkAccess          bool                     `json:"network_access"`
-	Plugin                 RemoteInstallPluginPlan  `json:"plugin"`
-	Package                RemoteInstallPackagePlan `json:"package"`
-	Checks                 []RemoteInstallCheck     `json:"checks"`
-	Artifacts              []string                 `json:"artifacts"`
-	Actions                []string                 `json:"actions"`
-	Labels                 []string                 `json:"labels"`
-	RequestedBy            string                   `json:"requested_by,omitempty"`
-	Reason                 string                   `json:"reason,omitempty"`
-	Metadata               map[string]string        `json:"metadata,omitempty"`
-	Notes                  []string                 `json:"notes,omitempty"`
+	PackID                 string                    `json:"pack_id"`
+	GeneratedAt            time.Time                 `json:"generated_at"`
+	Status                 string                    `json:"status"`
+	RemoteInstallPlanReady bool                      `json:"remote_install_plan_ready"`
+	RemoteInstallReady     bool                      `json:"remote_install_ready"`
+	DownloadReady          bool                      `json:"download_ready"`
+	SignatureVerifyReady   bool                      `json:"signature_verify_ready"`
+	Downloads              bool                      `json:"downloads"`
+	InstallsPlugin         bool                      `json:"installs_plugin"`
+	WritesFiles            bool                      `json:"writes_files"`
+	NetworkAccess          bool                      `json:"network_access"`
+	Plugin                 RemoteInstallPluginPlan   `json:"plugin"`
+	Package                RemoteInstallPackagePlan  `json:"package"`
+	SignatureVerification  SignatureVerificationPlan `json:"signature_verification"`
+	Checks                 []RemoteInstallCheck      `json:"checks"`
+	Artifacts              []string                  `json:"artifacts"`
+	Actions                []string                  `json:"actions"`
+	Labels                 []string                  `json:"labels"`
+	RequestedBy            string                    `json:"requested_by,omitempty"`
+	Reason                 string                    `json:"reason,omitempty"`
+	Metadata               map[string]string         `json:"metadata,omitempty"`
+	Notes                  []string                  `json:"notes,omitempty"`
 }
 
 type RemoteInstallApprovalPlanReport struct {
-	PackID                   string                   `json:"pack_id"`
-	GeneratedAt              time.Time                `json:"generated_at"`
-	Status                   string                   `json:"status"`
-	ApprovalGatePlanReady    bool                     `json:"approval_gate_plan_ready"`
-	ApprovalGateReady        bool                     `json:"approval_gate_ready"`
-	RequiresApproval         bool                     `json:"requires_approval"`
-	ApprovalQueueReady       bool                     `json:"approval_queue_ready"`
-	WritesApprovalQueue      bool                     `json:"writes_approval_queue"`
-	WritesFiles              bool                     `json:"writes_files"`
-	Downloads                bool                     `json:"downloads"`
-	NetworkAccess            bool                     `json:"network_access"`
-	InstallsPlugin           bool                     `json:"installs_plugin"`
-	Decision                 string                   `json:"decision"`
-	RiskTier                 string                   `json:"risk_tier"`
-	RequestedBy              string                   `json:"requested_by,omitempty"`
-	Reason                   string                   `json:"reason,omitempty"`
-	Plugin                   RemoteInstallPluginPlan  `json:"plugin"`
-	Package                  RemoteInstallPackagePlan `json:"package"`
-	Checks                   []RemoteInstallCheck     `json:"checks"`
-	Approvers                []string                 `json:"approvers,omitempty"`
-	Artifacts                []string                 `json:"artifacts"`
-	Actions                  []string                 `json:"actions"`
-	Labels                   []string                 `json:"labels"`
-	Metadata                 map[string]string        `json:"metadata,omitempty"`
-	RemoteInstallPlanSummary RemoteInstallPlanReport  `json:"remote_install_plan_summary"`
-	Notes                    []string                 `json:"notes,omitempty"`
+	PackID                   string                    `json:"pack_id"`
+	GeneratedAt              time.Time                 `json:"generated_at"`
+	Status                   string                    `json:"status"`
+	ApprovalGatePlanReady    bool                      `json:"approval_gate_plan_ready"`
+	ApprovalGateReady        bool                      `json:"approval_gate_ready"`
+	RequiresApproval         bool                      `json:"requires_approval"`
+	ApprovalQueueReady       bool                      `json:"approval_queue_ready"`
+	WritesApprovalQueue      bool                      `json:"writes_approval_queue"`
+	WritesFiles              bool                      `json:"writes_files"`
+	Downloads                bool                      `json:"downloads"`
+	NetworkAccess            bool                      `json:"network_access"`
+	InstallsPlugin           bool                      `json:"installs_plugin"`
+	Decision                 string                    `json:"decision"`
+	RiskTier                 string                    `json:"risk_tier"`
+	RequestedBy              string                    `json:"requested_by,omitempty"`
+	Reason                   string                    `json:"reason,omitempty"`
+	Plugin                   RemoteInstallPluginPlan   `json:"plugin"`
+	Package                  RemoteInstallPackagePlan  `json:"package"`
+	SignatureVerification    SignatureVerificationPlan `json:"signature_verification"`
+	Checks                   []RemoteInstallCheck      `json:"checks"`
+	Approvers                []string                  `json:"approvers,omitempty"`
+	Artifacts                []string                  `json:"artifacts"`
+	Actions                  []string                  `json:"actions"`
+	Labels                   []string                  `json:"labels"`
+	Metadata                 map[string]string         `json:"metadata,omitempty"`
+	RemoteInstallPlanSummary RemoteInstallPlanReport   `json:"remote_install_plan_summary"`
+	Notes                    []string                  `json:"notes,omitempty"`
 }
 
 type RemoteInstallPluginPlan struct {
@@ -213,10 +219,39 @@ type RemoteInstallPackagePlan struct {
 	PackageURL       string `json:"package_url"`
 	ExpectedSHA256   string `json:"expected_sha256,omitempty"`
 	Signature        string `json:"signature,omitempty"`
+	SignatureAlg     string `json:"signature_algorithm,omitempty"`
 	PublicKeyID      string `json:"public_key_id,omitempty"`
+	TrustRoot        string `json:"trust_root,omitempty"`
 	ManifestArtifact string `json:"manifest_artifact"`
 	PackageArtifact  string `json:"package_artifact"`
 	CacheKey         string `json:"cache_key"`
+}
+
+type SignatureVerificationPlan struct {
+	PackID                         string               `json:"pack_id"`
+	GeneratedAt                    time.Time            `json:"generated_at"`
+	SignatureVerificationPlanReady bool                 `json:"signature_verification_plan_ready"`
+	VerificationGateReady          bool                 `json:"verification_gate_ready"`
+	SignatureVerifyReady           bool                 `json:"signature_verify_ready"`
+	Required                       bool                 `json:"required"`
+	AllowsInstall                  bool                 `json:"allows_install"`
+	Blocked                        bool                 `json:"blocked"`
+	Status                         string               `json:"status"`
+	Algorithm                      string               `json:"algorithm"`
+	SignatureProvided              bool                 `json:"signature_provided"`
+	PublicKeyIDPresent             bool                 `json:"public_key_id_present"`
+	PublicKeyID                    string               `json:"public_key_id,omitempty"`
+	TrustRoot                      string               `json:"trust_root,omitempty"`
+	ExpectedSHA256                 string               `json:"expected_sha256,omitempty"`
+	ExpectedSHA256FormatValid      bool                 `json:"expected_sha256_format_valid"`
+	CanonicalPayloadSHA256         string               `json:"canonical_payload_sha256"`
+	Artifact                       string               `json:"artifact"`
+	Downloads                      bool                 `json:"downloads"`
+	WritesFiles                    bool                 `json:"writes_files"`
+	NetworkAccess                  bool                 `json:"network_access"`
+	Checks                         []RemoteInstallCheck `json:"checks"`
+	Labels                         []string             `json:"labels"`
+	Notes                          []string             `json:"notes,omitempty"`
 }
 
 type RemoteInstallCheck struct {
@@ -385,23 +420,25 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                       PackID,
-		"stage":                         "pack-shell-before-runtime-hosts",
-		"runtime_ready":                 true,
-		"abi_plan_ready":                true,
-		"abi_ready":                     false,
-		"host_abi_execution_gate_ready": true,
-		"host_abi_enforcement_ready":    false,
-		"module_integrity_gate_ready":   true,
-		"remote_install_plan_ready":     true,
-		"remote_install_ready":          false,
-		"approval_gate_plan_ready":      true,
-		"approval_gate_ready":           false,
-		"plugin_count":                  len(plugins),
-		"loaded_count":                  loaded,
-		"plugin_dir":                    h.pluginDir,
-		"store_dir":                     h.dataDir,
-		"sandbox":                       h.sandbox.Stats(),
+		"pack_id":                           PackID,
+		"stage":                             "pack-shell-before-runtime-hosts",
+		"runtime_ready":                     true,
+		"abi_plan_ready":                    true,
+		"abi_ready":                         false,
+		"host_abi_execution_gate_ready":     true,
+		"host_abi_enforcement_ready":        false,
+		"module_integrity_gate_ready":       true,
+		"remote_install_plan_ready":         true,
+		"remote_install_ready":              false,
+		"signature_verification_plan_ready": true,
+		"signature_verify_ready":            false,
+		"approval_gate_plan_ready":          true,
+		"approval_gate_ready":               false,
+		"plugin_count":                      len(plugins),
+		"loaded_count":                      loaded,
+		"plugin_dir":                        h.pluginDir,
+		"store_dir":                         h.dataDir,
+		"sandbox":                           h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
 			"wasm.plugin.lifecycle",
@@ -411,10 +448,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.host_abi.execution_gate",
 			"wasm.module.integrity_gate",
 			"wasm.remote_install.plan",
+			"wasm.remote_install.signature_verification_plan",
 			"wasm.remote_install.approval_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -633,19 +671,21 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	remotePlan := h.remoteInstallPlanForPlugin(plugin)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":               PackID,
-		"exported_at":           h.now().UTC(),
-		"format":                "json-wasm-plugin-evidence",
-		"files":                 []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "approval-gate-plan.json", "sandbox-stats.json"},
-		"plugin":                plugin,
-		"plan":                  permissionPlan(plugin.Permissions),
-		"host_abi_plan":         hostABIPlan(plugin.Permissions),
-		"host_abi_gate":         hostABIExecutionGate(plugin.Permissions),
-		"module_integrity_gate": moduleIntegrityGate(plugin, h.computeSHA256(plugin.ModulePath)),
-		"remote_install_plan":   h.remoteInstallPlanForPlugin(plugin),
-		"approval_gate_plan":    h.remoteInstallApprovalPlanForPlugin(plugin),
-		"sandbox":               h.sandbox.Stats(),
+		"pack_id":                PackID,
+		"exported_at":            h.now().UTC(),
+		"format":                 "json-wasm-plugin-evidence",
+		"files":                  []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "sandbox-stats.json"},
+		"plugin":                 plugin,
+		"plan":                   permissionPlan(plugin.Permissions),
+		"host_abi_plan":          hostABIPlan(plugin.Permissions),
+		"host_abi_gate":          hostABIExecutionGate(plugin.Permissions),
+		"module_integrity_gate":  moduleIntegrityGate(plugin, h.computeSHA256(plugin.ModulePath)),
+		"remote_install_plan":    remotePlan,
+		"signature_verification": remotePlan.SignatureVerification,
+		"approval_gate_plan":     h.remoteInstallApprovalPlanForPlugin(plugin),
+		"sandbox":                h.sandbox.Stats(),
 	})
 }
 
@@ -1007,15 +1047,46 @@ func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePa
 	}
 	expectedSHA := strings.ToLower(strings.TrimSpace(req.SHA256))
 	signature := strings.TrimSpace(req.Signature)
+	signatureAlg := normalizeSignatureAlgorithm(req.SignatureAlg)
 	publicKeyID := strings.TrimSpace(req.PublicKeyID)
+	trustRoot := strings.TrimSpace(req.TrustRoot)
+	if trustRoot == "" {
+		trustRoot = "yunque-pack-root"
+	}
 	packageArtifact := remotePackageArtifactName(slug, version, normalizedPackageURL)
 	manifestArtifact := slug + "-remote-manifest.json"
+	pluginPlan := RemoteInstallPluginPlan{
+		Slug:         slug,
+		Name:         name,
+		Version:      version,
+		Runtime:      "wazero",
+		Entrypoint:   entrypoint,
+		ModulePath:   modulePath,
+		Capabilities: cleanList(req.Capabilities),
+		Tags:         cleanList(req.Tags),
+	}
+	packagePlan := RemoteInstallPackagePlan{
+		ManifestURL:      normalizedManifestURL,
+		PackageURL:       normalizedPackageURL,
+		ExpectedSHA256:   expectedSHA,
+		Signature:        signature,
+		SignatureAlg:     signatureAlg,
+		PublicKeyID:      publicKeyID,
+		TrustRoot:        trustRoot,
+		ManifestArtifact: manifestArtifact,
+		PackageArtifact:  packageArtifact,
+		CacheKey:         sha256Hex(normalizedManifestURL + "\n" + normalizedPackageURL + "\n" + slug + "\n" + version),
+	}
+	signaturePlan := h.buildSignatureVerificationPlan(pluginPlan, packagePlan)
 	checks := []RemoteInstallCheck{
 		{Name: "package_url_valid", Required: true, Ready: true, Reason: "package_url is a normalized http(s) URL"},
 		{Name: "manifest_url_valid", Required: true, Ready: true, Reason: "manifest_url is a normalized http(s) URL"},
 		{Name: "sha256_present", Required: true, Ready: expectedSHA != "", Reason: boolReason(expectedSHA != "", "expected SHA-256 is provided for later artifact verification", "expected SHA-256 is required before real install")},
 		{Name: "signature_present", Required: true, Ready: signature != "", Reason: boolReason(signature != "", "signature metadata is provided for later verification", "signature is required before real install")},
 		{Name: "public_key_id_present", Required: true, Ready: publicKeyID != "", Reason: boolReason(publicKeyID != "", "public key id is provided for later trust-root lookup", "public key id is required before real install")},
+		{Name: "trust_root_selected", Required: true, Ready: trustRoot != "", Reason: "trust root is selected for later verifier lookup"},
+		{Name: "signature_verification_plan_ready", Required: true, Ready: signaturePlan.SignatureVerificationPlanReady, Reason: "signature-verification.json contract is generated deterministically"},
+		{Name: "signature_verification_gate_ready", Required: true, Ready: signaturePlan.VerificationGateReady, Reason: "real signature verification gate is not wired in this plan-only slice"},
 		{Name: "module_path_relative", Required: true, Ready: true, Reason: "module_path is validated to stay inside plugin_dir"},
 	}
 	return RemoteInstallPlanReport{
@@ -1030,27 +1101,10 @@ func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePa
 		InstallsPlugin:         false,
 		WritesFiles:            false,
 		NetworkAccess:          false,
-		Plugin: RemoteInstallPluginPlan{
-			Slug:         slug,
-			Name:         name,
-			Version:      version,
-			Runtime:      "wazero",
-			Entrypoint:   entrypoint,
-			ModulePath:   modulePath,
-			Capabilities: cleanList(req.Capabilities),
-			Tags:         cleanList(req.Tags),
-		},
-		Package: RemoteInstallPackagePlan{
-			ManifestURL:      normalizedManifestURL,
-			PackageURL:       normalizedPackageURL,
-			ExpectedSHA256:   expectedSHA,
-			Signature:        signature,
-			PublicKeyID:      publicKeyID,
-			ManifestArtifact: manifestArtifact,
-			PackageArtifact:  packageArtifact,
-			CacheKey:         sha256Hex(normalizedManifestURL + "\n" + normalizedPackageURL + "\n" + slug + "\n" + version),
-		},
-		Checks: checks,
+		Plugin:                 pluginPlan,
+		Package:                packagePlan,
+		SignatureVerification:  signaturePlan,
+		Checks:                 checks,
 		Artifacts: []string{
 			"remote-install-plan.json",
 			manifestArtifact,
@@ -1060,15 +1114,16 @@ func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePa
 		Actions: []string{
 			"would fetch the remote plugin manifest after explicit install wiring is enabled",
 			"would download the package into the Pack Runtime artifact cache without touching plugin_dir in plan mode",
-			"would verify SHA-256 and signature before allowing install write-back",
+			"would verify SHA-256 and signature through the signature verification gate before allowing install write-back",
 			"would register plugin metadata only after download and signature verification pass",
 		},
-		Labels:      []string{"remote-install", "signed-package", "plan-only", "no-download", "no-file-write"},
+		Labels:      []string{"remote-install", "signed-package", "signature-verification-gate", "plan-only", "no-download", "no-file-write"},
 		RequestedBy: strings.TrimSpace(req.RequestedBy),
 		Reason:      strings.TrimSpace(req.Reason),
 		Metadata:    cleanStringMap(req.Metadata),
 		Notes: []string{
 			"Preview only: this route does not download packages, fetch manifests, verify signatures, or write plugin metadata.",
+			"signature_verification_plan_ready=true only means the verifier contract is shaped; signature_verify_ready=false until real verifier wiring lands.",
 			"Use this deterministic plan as the contract for the later remote signed package installer slice.",
 		},
 	}, nil
@@ -1076,19 +1131,21 @@ func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePa
 
 func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRequest, requirePackageURL bool) (RemoteInstallApprovalPlanReport, error) {
 	installPlan, err := h.buildRemoteInstallPlan(RemoteInstallPlanRequest{
-		Slug:        req.Slug,
-		Name:        req.Name,
-		Version:     req.Version,
-		PackageURL:  req.PackageURL,
-		ManifestURL: req.ManifestURL,
-		ModulePath:  req.ModulePath,
-		SHA256:      req.SHA256,
-		Signature:   req.Signature,
-		PublicKeyID: req.PublicKeyID,
-		Entrypoint:  req.Entrypoint,
-		RequestedBy: req.RequestedBy,
-		Reason:      req.Reason,
-		Metadata:    req.Metadata,
+		Slug:         req.Slug,
+		Name:         req.Name,
+		Version:      req.Version,
+		PackageURL:   req.PackageURL,
+		ManifestURL:  req.ManifestURL,
+		ModulePath:   req.ModulePath,
+		SHA256:       req.SHA256,
+		Signature:    req.Signature,
+		SignatureAlg: req.SignatureAlg,
+		PublicKeyID:  req.PublicKeyID,
+		TrustRoot:    req.TrustRoot,
+		Entrypoint:   req.Entrypoint,
+		RequestedBy:  req.RequestedBy,
+		Reason:       req.Reason,
+		Metadata:     req.Metadata,
 	}, requirePackageURL)
 	if err != nil {
 		return RemoteInstallApprovalPlanReport{}, err
@@ -1123,15 +1180,73 @@ func (h *Handler) buildRemoteInstallApprovalPlan(req RemoteInstallApprovalPlanRe
 		Reason:                   strings.TrimSpace(req.Reason),
 		Plugin:                   installPlan.Plugin,
 		Package:                  installPlan.Package,
+		SignatureVerification:    installPlan.SignatureVerification,
 		Checks:                   checks,
 		Approvers:                approvers,
 		Artifacts:                []string{"approval-gate-plan.json", "remote-install-plan.json", "signature-verification.json"},
-		Actions:                  []string{"would create an approval request only after approval queue persistence is wired", "would require an explicit approval decision before remote package download starts", "would keep package download, signature verification, install write-back, and plugin registration blocked while approval_gate_ready=false"},
+		Actions:                  []string{"would create an approval request only after approval queue persistence is wired", "would require an explicit approval decision before remote package download starts", "would keep package download, signature verification gate, install write-back, and plugin registration blocked while approval_gate_ready=false"},
 		Labels:                   []string{"remote-install", "approval-gate", "plan-only", "requires-approval", "no-queue-write", "no-download", "no-file-write"},
 		Metadata:                 cleanStringMap(req.Metadata),
 		RemoteInstallPlanSummary: installPlan,
 		Notes:                    []string{"Preview only: this route does not write an approval queue entry, download packages, fetch manifests, verify signatures, or install plugins.", "Use this deterministic approval gate plan as the contract for the later remote installer approval workflow slice."},
 	}, nil
+}
+
+func (h *Handler) buildSignatureVerificationPlan(plugin RemoteInstallPluginPlan, pkg RemoteInstallPackagePlan) SignatureVerificationPlan {
+	expectedSHAValid := isSHA256Hex(pkg.ExpectedSHA256)
+	signatureProvided := strings.TrimSpace(pkg.Signature) != ""
+	publicKeyIDPresent := strings.TrimSpace(pkg.PublicKeyID) != ""
+	trustRoot := strings.TrimSpace(pkg.TrustRoot)
+	if trustRoot == "" {
+		trustRoot = "yunque-pack-root"
+	}
+	status := "blocked_until_signature_verifier"
+	switch {
+	case strings.TrimSpace(pkg.ExpectedSHA256) == "":
+		status = "blocked_missing_sha256"
+	case !expectedSHAValid:
+		status = "blocked_invalid_sha256"
+	case !signatureProvided:
+		status = "blocked_signature_missing"
+	case !publicKeyIDPresent:
+		status = "blocked_public_key_missing"
+	}
+	checks := []RemoteInstallCheck{
+		{Name: "sha256_format_valid", Required: true, Ready: expectedSHAValid, Reason: boolReason(expectedSHAValid, "expected SHA-256 is a 64-character hex digest", "expected SHA-256 must be a 64-character hex digest before real verification")},
+		{Name: "signature_present", Required: true, Ready: signatureProvided, Reason: boolReason(signatureProvided, "signature metadata is present", "signature metadata is required before real verification")},
+		{Name: "public_key_id_present", Required: true, Ready: publicKeyIDPresent, Reason: boolReason(publicKeyIDPresent, "public key id is present for trust-root lookup", "public key id is required before real verification")},
+		{Name: "trust_root_selected", Required: true, Ready: trustRoot != "", Reason: "trust root is selected for later verifier lookup"},
+		{Name: "verifier_wired", Required: true, Ready: false, Reason: "signature verifier implementation is not wired in this plan-only slice"},
+	}
+	return SignatureVerificationPlan{
+		PackID:                         PackID,
+		GeneratedAt:                    h.now().UTC(),
+		SignatureVerificationPlanReady: true,
+		VerificationGateReady:          false,
+		SignatureVerifyReady:           false,
+		Required:                       true,
+		AllowsInstall:                  false,
+		Blocked:                        true,
+		Status:                         status,
+		Algorithm:                      normalizeSignatureAlgorithm(pkg.SignatureAlg),
+		SignatureProvided:              signatureProvided,
+		PublicKeyIDPresent:             publicKeyIDPresent,
+		PublicKeyID:                    strings.TrimSpace(pkg.PublicKeyID),
+		TrustRoot:                      trustRoot,
+		ExpectedSHA256:                 strings.ToLower(strings.TrimSpace(pkg.ExpectedSHA256)),
+		ExpectedSHA256FormatValid:      expectedSHAValid,
+		CanonicalPayloadSHA256:         signaturePayloadDigest(plugin, pkg, trustRoot),
+		Artifact:                       "signature-verification.json",
+		Downloads:                      false,
+		WritesFiles:                    false,
+		NetworkAccess:                  false,
+		Checks:                         checks,
+		Labels:                         []string{"signature-verification", "verification-gate", "plan-only", "blocked", "no-download", "no-file-write"},
+		Notes: []string{
+			"Preview only: this gate does not perform cryptographic verification, key lookup, package download, network access, or file writes.",
+			"signature_verify_ready=false keeps remote install blocked until real verifier wiring lands.",
+		},
+	}
 }
 
 func validateRemotePackageURL(raw string) (string, error) {
@@ -1160,6 +1275,48 @@ func remotePackageArtifactName(slug, version, packageURL string) string {
 		}
 	}
 	return slug + "-" + version + ext
+}
+
+func normalizeSignatureAlgorithm(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
+		return "ed25519"
+	}
+	value = strings.ReplaceAll(value, "_", "-")
+	return value
+}
+
+func isSHA256Hex(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func signaturePayloadDigest(plugin RemoteInstallPluginPlan, pkg RemoteInstallPackagePlan, trustRoot string) string {
+	payload := strings.Join([]string{
+		"pack_id=" + PackID,
+		"slug=" + plugin.Slug,
+		"name=" + plugin.Name,
+		"version=" + plugin.Version,
+		"runtime=" + plugin.Runtime,
+		"entrypoint=" + plugin.Entrypoint,
+		"module_path=" + plugin.ModulePath,
+		"manifest_url=" + pkg.ManifestURL,
+		"package_url=" + pkg.PackageURL,
+		"expected_sha256=" + strings.ToLower(strings.TrimSpace(pkg.ExpectedSHA256)),
+		"signature_algorithm=" + normalizeSignatureAlgorithm(pkg.SignatureAlg),
+		"public_key_id=" + strings.TrimSpace(pkg.PublicKeyID),
+		"trust_root=" + strings.TrimSpace(trustRoot),
+	}, "\n")
+	return sha256Hex(payload)
 }
 
 func boolReason(ok bool, yes string, no string) string {
