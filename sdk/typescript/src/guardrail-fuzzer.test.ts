@@ -62,7 +62,7 @@ test("GuardrailFuzzerClient saves corpus, runs fuzz, plans CI gates and native c
       if (String(url).endsWith("/corpus") && init?.method === "POST") return jsonResponse({ seeds: [], count: 0, status: "saved" }, { status: 201 });
       if (String(url).endsWith("/run")) return jsonResponse({ report: { id: "fuzz-1", pack_id: "yunque.pack.guardrail-fuzzer", created_at: "now", stage: "pack-shell-before-ci-fuzz", seed_count: 1, mutant_count: 4, bypass_count: 1, false_positive_count: 0, blocked_count: 1, pass_count: 3, risk_level: "high", gate_status: "fail", results: [] }, status: "dry_run" });
       if (String(url).endsWith("/ci-gate/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.guardrail-fuzzer", generated_at: "now", status: "rule_writeback_plan", report_id: "fuzz-1", schedule: "on_push+daily", branch: "main", ci_gate_plan_ready: true, ci_gate_ready: false, rule_writeback_plan_ready: true, rule_writeback_ready: false, alert_plan_ready: true, alert_ready: false, risk_level: "high", gate_status: "fail", seed_count: 1, mutant_count: 4, bypass_count: 1, false_positive_count: 0, ci_jobs: [], rule_writebacks: [], alerts: [], actions: [] } });
-      if (String(url).endsWith("/native-corpus/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.guardrail-fuzzer", generated_at: "now", status: "native_corpus_plan", package: "./internal/agentcore/guardrails", fuzz_target: "FuzzSanitizer", corpus_dir: "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer", native_corpus_plan_ready: true, native_corpus_sync_ready: false, go_native_fuzz_plan_ready: true, go_native_fuzz_ready: false, seed_count: 1, attack_seed_count: 1, benign_seed_count: 0, seeds: [], commands: [], actions: [] } });
+      if (String(url).endsWith("/native-corpus/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.guardrail-fuzzer", generated_at: "now", status: "native_corpus_plan", package: "./internal/agentcore/guardrails", fuzz_target: "FuzzSanitizer", corpus_dir: "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer", native_corpus_plan_ready: true, native_corpus_sync_ready: false, go_native_fuzz_plan_ready: true, go_native_fuzz_ready: false, seed_count: 1, attack_seed_count: 1, benign_seed_count: 0, seeds: [], corpus_manifest: [{ seed_id: "prompt-ignore", testdata_file: "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer/prompt-ignore.txt", action: "would_create", content_sha256: "a".repeat(64), content_bytes: 128, source: "user_prompt", category: "prompt_injection", expected_blocked: true }], sync_summary: { manifest_entry_count: 1, would_create: 1, would_update: 0, would_skip: 0, writes_files: false, deterministic: true, hash_algorithm: "sha256" }, commands: [], actions: [] } });
       return jsonResponse({ report: { id: "fuzz-1", results: [] } });
     },
   });
@@ -79,6 +79,9 @@ test("GuardrailFuzzerClient saves corpus, runs fuzz, plans CI gates and native c
   assertEqual(plan.plan.ci_gate_ready, false);
   assertEqual(nativePlan.plan.native_corpus_plan_ready, true);
   assertEqual(nativePlan.plan.go_native_fuzz_ready, false);
+  assertEqual(nativePlan.plan.corpus_manifest[0]?.action, "would_create");
+  assertEqual(nativePlan.plan.sync_summary.writes_files, false);
+  assertEqual(nativePlan.plan.sync_summary.hash_algorithm, "sha256");
   assertEqual(report.report.id, "fuzz-1");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/guardrail-fuzzer/corpus");
   assertEqual(calls[0]?.init?.method, "POST");
@@ -101,7 +104,7 @@ test("GuardrailFuzzerClient lists reports and exports evidence packs", async () 
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
       if (String(url).endsWith("/reports")) return jsonResponse({ reports: [{ id: "fuzz-1", created_at: "now", seed_count: 1, mutant_count: 4, bypass_count: 1, false_positive_count: 0, risk_level: "high", gate_status: "fail" }], count: 1 });
-      return jsonResponse({ pack_id: "yunque.pack.guardrail-fuzzer", exported_at: "now", format: "json-guardrail-fuzzer-evidence", files: ["fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"], report: { id: "fuzz-1", results: [] }, ci_gate_plan: { ci_gate_plan_ready: true, ci_gate_ready: false }, native_corpus_plan: { native_corpus_plan_ready: true, native_corpus_sync_ready: false, go_native_fuzz_ready: false } });
+      return jsonResponse({ pack_id: "yunque.pack.guardrail-fuzzer", exported_at: "now", format: "json-guardrail-fuzzer-evidence", files: ["fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"], report: { id: "fuzz-1", results: [] }, ci_gate_plan: { ci_gate_plan_ready: true, ci_gate_ready: false }, native_corpus_plan: { native_corpus_plan_ready: true, native_corpus_sync_ready: false, go_native_fuzz_ready: false, corpus_manifest: [{ content_sha256: "a".repeat(64), action: "would_create" }], sync_summary: { writes_files: false, hash_algorithm: "sha256" } } });
     },
   });
 
@@ -113,6 +116,7 @@ test("GuardrailFuzzerClient lists reports and exports evidence packs", async () 
   assertDeepEqual(evidence.files, ["fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"]);
   assertEqual(evidence.ci_gate_plan?.ci_gate_ready, false);
   assertEqual(evidence.native_corpus_plan?.go_native_fuzz_ready, false);
+  assertEqual(evidence.native_corpus_plan?.sync_summary.writes_files, false);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/guardrail-fuzzer/reports");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/guardrail-fuzzer/evidence/fuzz-1");
 });

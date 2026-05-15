@@ -223,6 +223,28 @@ export type GuardrailFuzzerNativeCorpusSeedPlan = {
   corpus_entry: string;
 };
 
+export type GuardrailFuzzerNativeCorpusManifestEntry = {
+  seed_id: string;
+  testdata_file: string;
+  action: string;
+  content_sha256: string;
+  content_bytes: number;
+  source: string;
+  category: string;
+  expected_blocked: boolean;
+  tags?: string[];
+};
+
+export type GuardrailFuzzerNativeCorpusSyncSummary = {
+  manifest_entry_count: number;
+  would_create: number;
+  would_update: number;
+  would_skip: number;
+  writes_files: boolean;
+  deterministic: boolean;
+  hash_algorithm: string;
+};
+
 export type GuardrailFuzzerNativeFuzzCommandPlan = {
   name: string;
   command: string;
@@ -246,6 +268,8 @@ export type GuardrailFuzzerNativeCorpusPlan = {
   attack_seed_count: number;
   benign_seed_count: number;
   seeds: GuardrailFuzzerNativeCorpusSeedPlan[];
+  corpus_manifest: GuardrailFuzzerNativeCorpusManifestEntry[];
+  sync_summary: GuardrailFuzzerNativeCorpusSyncSummary;
   commands: GuardrailFuzzerNativeFuzzCommandPlan[];
   requested_by?: string;
   reason?: string;
