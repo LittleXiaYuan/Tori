@@ -59,6 +59,14 @@ func TestGuardrailFuzzerPackRouteSpecsGateByMethod(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET /v1/guardrail-fuzzer/ci-gate/plan should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/guardrail-fuzzer/native-corpus/plan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/guardrail-fuzzer/native-corpus/plan should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
+	}
 }
 
 func TestGuardrailFuzzerPackCanSaveCorpusAndRunFuzzer(t *testing.T) {
@@ -91,6 +99,15 @@ func TestGuardrailFuzzerPackCanSaveCorpusAndRunFuzzer(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rule_writeback_ready":false`) {
 		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	nativePlanBody := `{"categories":["prompt_injection"],"include_benign":false,"max_seeds":2,"requested_by":"unit"}`
+	req = httptest.NewRequest(http.MethodPost, "/v1/guardrail-fuzzer/native-corpus/plan", strings.NewReader(nativePlanBody))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"native_corpus_plan_ready":true`) || !strings.Contains(w.Body.String(), `"go_native_fuzz_ready":false`) {
+		t.Fatalf("native corpus plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -111,6 +128,7 @@ func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.Pack
 				"/v1/guardrail-fuzzer/corpus",
 				"/v1/guardrail-fuzzer/run",
 				"/v1/guardrail-fuzzer/ci-gate/plan",
+				"/v1/guardrail-fuzzer/native-corpus/plan",
 				"/v1/guardrail-fuzzer/reports",
 				"/v1/guardrail-fuzzer/reports/",
 				"/v1/guardrail-fuzzer/evidence/",
@@ -121,6 +139,7 @@ func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.Pack
 				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/corpus"},
 				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/run"},
 				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/ci-gate/plan"},
+				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/native-corpus/plan"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports/"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/evidence/"},

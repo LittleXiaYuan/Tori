@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, CalendarClock, Download, Play, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
+import { AlertTriangle, CalendarClock, Download, FileCode2, Play, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createGuardrailFuzzerPackClient, type GuardrailFuzzerCIGatePlan, type GuardrailFuzzerReport, type GuardrailFuzzerReportSummary, type GuardrailFuzzerStatus } from "@/lib/guardrail-fuzzer-pack-client";
+import { createGuardrailFuzzerPackClient, type GuardrailFuzzerCIGatePlan, type GuardrailFuzzerNativeCorpusPlan, type GuardrailFuzzerReport, type GuardrailFuzzerReportSummary, type GuardrailFuzzerStatus } from "@/lib/guardrail-fuzzer-pack-client";
 
 const guardrailFuzzerPack = createGuardrailFuzzerPackClient();
 
@@ -47,12 +47,13 @@ export default function GuardrailFuzzerPackPage() {
   const [status, setStatus] = useState<GuardrailFuzzerStatus | null>(null);
   const [reports, setReports] = useState<GuardrailFuzzerReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"corpus" | "run" | "ciGate" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"corpus" | "run" | "ciGate" | "nativeCorpus" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [corpusJSON, setCorpusJSON] = useState(sampleCorpus);
   const [mutantsPerSeed, setMutantsPerSeed] = useState("6");
   const [report, setReport] = useState<GuardrailFuzzerReport | null>(null);
   const [ciGatePlan, setCIGatePlan] = useState<GuardrailFuzzerCIGatePlan | null>(null);
+  const [nativeCorpusPlan, setNativeCorpusPlan] = useState<GuardrailFuzzerNativeCorpusPlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
   const tone = riskTone(selectedReport?.risk_level || reports[0]?.risk_level);
@@ -95,6 +96,7 @@ export default function GuardrailFuzzerPackPage() {
       const res = await guardrailFuzzerPack.run({ mutants_per_seed: Number(mutantsPerSeed) || 6, persist: true });
       setReport(res.report);
       setCIGatePlan(null);
+      setNativeCorpusPlan(null);
       showToast(res.report.gate_status === "fail" ? "发现 Guardrail 绕过样本，已生成报告" : "Guardrail fuzz 报告已生成", res.report.gate_status === "fail" ? "warning" : "success");
       await load();
     } catch (e) {
@@ -121,6 +123,30 @@ export default function GuardrailFuzzerPackPage() {
       showToast("CI Gate / 规则写回 / 告警计划已生成（非破坏性）", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成 Guardrail CI Gate 计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planNativeCorpus = async () => {
+    const categories = Array.from(new Set((selectedReport?.results || [])
+      .map((item) => item.category)
+      .filter((category): category is string => Boolean(category))));
+    setBusy("nativeCorpus");
+    setError(null);
+    try {
+      const res = await guardrailFuzzerPack.nativeCorpusPlan({
+        categories: categories.length > 0 ? categories : ["prompt_injection"],
+        include_benign: true,
+        max_seeds: 8,
+        requested_by: "pack-console",
+        reason: "preview non-destructive Go native fuzz corpus sync contract",
+        metadata: { source: "guardrail-fuzzer-pack-page" },
+      });
+      setNativeCorpusPlan(res.plan);
+      showToast("Go native fuzz corpus sync 计划已生成（非破坏性）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 Guardrail Native Corpus 计划失败"));
     } finally {
       setBusy(null);
     }
@@ -168,7 +194,7 @@ export default function GuardrailFuzzerPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.guardrail-fuzzer"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已把 adversarial corpus、确定性 mutation、Sanitizer probe、绕过报告、规则候选、CI Gate / 规则写回 / 告警 plan 和证据包放进可选 Pack。真实 CI 定时 fuzz、规则写回和告警自动化后续接入。
+              当前切片已把 adversarial corpus、确定性 mutation、Sanitizer probe、绕过报告、规则候选、CI Gate / 规则写回 / 告警 plan、Go native fuzz corpus sync plan 和证据包放进可选 Pack。真实 CI 定时 fuzz、规则写回、Go testdata 同步和告警自动化后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -185,7 +211,7 @@ export default function GuardrailFuzzerPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Corpus seeds</div><div className="kpi-value">{status?.seed_count ?? 0}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Reports</div><div className="kpi-value">{status?.report_count ?? reports.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Bypasses</div><div className="kpi-value">{selectedReport?.bypass_count ?? reports[0]?.bypass_count ?? 0}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">CI Gate Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.ci_gate_plan_ready ? "plan" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Native Corpus Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.native_corpus_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
@@ -225,12 +251,13 @@ export default function GuardrailFuzzerPackPage() {
                 <TextField className="w-32" value={mutantsPerSeed} onChange={setMutantsPerSeed}><Input placeholder="mutants" /></TextField>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedReport && reports.length === 0}><Download size={14} />导出证据包</Button>
                 <Button variant="outline" isPending={busy === "ciGate"} onPress={planCIGate}><CalendarClock size={14} />CI Gate 计划</Button>
+                <Button variant="outline" isPending={busy === "nativeCorpus"} onPress={planNativeCorpus}><FileCode2 size={14} />Native Corpus 计划</Button>
                 <Button className="btn-accent" isPending={busy === "run"} onPress={runFuzzer}>运行 Fuzzer</Button>
               </div>
             </div>
 
             <div className="mb-4 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)", background: "rgba(56,189,248,0.06)" }}>
-              CI Gate 计划当前只固定契约：不会创建 CI schedule、不会写 guardrail rules、不会 open issue / send alert，也不会阻断 release。
+              计划类接口当前只固定契约：不会创建 CI schedule、不会写 guardrail rules、不会 open issue / send alert、不会写 Go testdata/fuzz、不会改 fuzz test、不会执行 go test -fuzz，也不会上传 artifacts 或阻断 release。
             </div>
 
             {selectedReport ? (
@@ -256,6 +283,25 @@ export default function GuardrailFuzzerPackPage() {
                 </div>
                 <TextField value={JSON.stringify(ciGatePlan, null, 2)} onChange={() => undefined}>
                   <TextArea rows={14} aria-label="Guardrail fuzzer CI gate plan JSON" className="font-mono text-xs" readOnly />
+                </TextField>
+              </Card>
+            )}
+
+            {nativeCorpusPlan && (
+              <Card className="mt-4 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <FileCode2 size={16} />
+                  <span>Go Native Fuzz Corpus Sync Plan</span>
+                  <Chip size="sm">{nativeCorpusPlan.status}</Chip>
+                  <Chip size="sm">seeds: {nativeCorpusPlan.seed_count}</Chip>
+                  <Chip size="sm">sync_ready: {String(nativeCorpusPlan.native_corpus_sync_ready)}</Chip>
+                  <Chip size="sm">go_fuzz_ready: {String(nativeCorpusPlan.go_native_fuzz_ready)}</Chip>
+                </div>
+                <div className="mb-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)", background: "rgba(250,204,21,0.08)" }}>
+                  非破坏性边界：只预览 corpus 文件映射和未来 go fuzz 命令；不写 testdata/fuzz、不修改 FuzzSanitizer、不执行 go test -fuzz、不上传 artifacts。
+                </div>
+                <TextField value={JSON.stringify(nativeCorpusPlan, null, 2)} onChange={() => undefined}>
+                  <TextArea rows={14} aria-label="Guardrail fuzzer native corpus plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
             )}

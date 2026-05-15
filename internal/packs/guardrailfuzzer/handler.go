@@ -2,9 +2,9 @@
 // adversarial guardrail fuzzer capability pack. This first delivery is a pack
 // shell: it owns manifest-gated HTTP routes, local corpus storage, deterministic
 // mutation strategies, sanitizer probe execution, bypass/false-positive reports,
-// rule-candidate hints, non-destructive CI/rule write-back planning, and
-// evidence export while CI scheduling and automatic rule proposal write-back are
-// wired later.
+// rule-candidate hints, non-destructive CI/rule write-back planning, Go native
+// fuzz corpus sync planning, and evidence export while CI scheduling and
+// automatic rule proposal write-back are wired later.
 package guardrailfuzzer
 
 import (
@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,6 +84,60 @@ type CIGatePlanRequest struct {
 	RequestedBy string            `json:"requested_by,omitempty"`
 	Reason      string            `json:"reason,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type NativeCorpusPlanRequest struct {
+	Categories    []string          `json:"categories,omitempty"`
+	IncludeBenign *bool             `json:"include_benign,omitempty"`
+	MaxSeeds      int               `json:"max_seeds,omitempty"`
+	Package       string            `json:"package,omitempty"`
+	FuzzTarget    string            `json:"fuzz_target,omitempty"`
+	CorpusDir     string            `json:"corpus_dir,omitempty"`
+	RequestedBy   string            `json:"requested_by,omitempty"`
+	Reason        string            `json:"reason,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+}
+
+type NativeCorpusPlanReport struct {
+	PackID                string                  `json:"pack_id"`
+	GeneratedAt           time.Time               `json:"generated_at"`
+	Status                string                  `json:"status"`
+	Package               string                  `json:"package"`
+	FuzzTarget            string                  `json:"fuzz_target"`
+	CorpusDir             string                  `json:"corpus_dir"`
+	NativeCorpusPlanReady bool                    `json:"native_corpus_plan_ready"`
+	NativeCorpusSyncReady bool                    `json:"native_corpus_sync_ready"`
+	GoNativeFuzzPlanReady bool                    `json:"go_native_fuzz_plan_ready"`
+	GoNativeFuzzReady     bool                    `json:"go_native_fuzz_ready"`
+	SeedCount             int                     `json:"seed_count"`
+	AttackSeedCount       int                     `json:"attack_seed_count"`
+	BenignSeedCount       int                     `json:"benign_seed_count"`
+	Seeds                 []NativeCorpusSeedPlan  `json:"seeds"`
+	Commands              []NativeFuzzCommandPlan `json:"commands"`
+	RequestedBy           string                  `json:"requested_by,omitempty"`
+	Reason                string                  `json:"reason,omitempty"`
+	Actions               []string                `json:"actions"`
+	Metadata              map[string]string       `json:"metadata,omitempty"`
+	Notes                 []string                `json:"notes,omitempty"`
+}
+
+type NativeCorpusSeedPlan struct {
+	SeedID          string   `json:"seed_id"`
+	Category        string   `json:"category"`
+	Source          string   `json:"source"`
+	ExpectedBlocked bool     `json:"expected_blocked"`
+	Tags            []string `json:"tags,omitempty"`
+	TestdataFile    string   `json:"testdata_file"`
+	AddCall         string   `json:"add_call"`
+	CorpusEntry     string   `json:"corpus_entry"`
+}
+
+type NativeFuzzCommandPlan struct {
+	Name        string   `json:"name"`
+	Command     string   `json:"command"`
+	Artifacts   []string `json:"artifacts"`
+	WritesFiles bool     `json:"writes_files"`
+	Ready       bool     `json:"ready"`
 }
 
 type CIGatePlanReport struct {
@@ -222,6 +277,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/guardrail-fuzzer/corpus", Handler: h.Corpus},
 		{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/run", Handler: h.Run},
 		{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/ci-gate/plan", Handler: h.CIGatePlan},
+		{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/native-corpus/plan", Handler: h.NativeCorpusPlan},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/evidence/", Handler: h.Evidence},
@@ -253,6 +309,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"rule_writeback_ready":      false,
 		"alert_plan_ready":          true,
 		"alert_ready":               false,
+		"native_corpus_plan_ready":  true,
+		"native_corpus_sync_ready":  false,
+		"go_native_fuzz_plan_ready": true,
+		"go_native_fuzz_ready":      false,
 		"seed_count":                len(seeds),
 		"report_count":              len(reports),
 		"store_dir":                 h.dataDir,
@@ -267,9 +327,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"guardrail.ci_gate.plan",
 			"guardrail.rule_writeback.plan",
 			"guardrail.alert.plan",
+			"guardrail.native_corpus.plan",
+			"guardrail.go_native_fuzz.plan",
 			"guardrail.evidence.export",
 		},
-		"notes": []string{"CI gate, rule write-back, and alert plans are available as non-destructive contracts; real CI scheduling, automatic guardrail rule proposal write-back, and alert routing remain follow-up wiring."},
+		"notes": []string{"CI gate, rule write-back, alert, and Go native fuzz corpus plans are available as non-destructive contracts; real CI scheduling, automatic guardrail rule proposal write-back, corpus file sync, and alert routing remain follow-up wiring."},
 	})
 }
 
@@ -360,6 +422,24 @@ func (h *Handler) CIGatePlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildCIGatePlan(report, req)})
 }
 
+func (h *Handler) NativeCorpusPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req NativeCorpusPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid guardrail fuzzer native corpus plan payload")
+		return
+	}
+	seeds, err := h.seedsForNativeCorpusPlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildNativeCorpusPlan(seeds, req)})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -399,13 +479,19 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan := h.buildCIGatePlan(report, CIGatePlanRequest{ReportID: report.ID, RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
+	nativePlan, err := h.nativeCorpusPlanForEvidence(report)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":      PackID,
-		"exported_at":  h.now().UTC(),
-		"format":       "json-guardrail-fuzzer-evidence",
-		"files":        []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json"},
-		"report":       report,
-		"ci_gate_plan": plan,
+		"pack_id":            PackID,
+		"exported_at":        h.now().UTC(),
+		"format":             "json-guardrail-fuzzer-evidence",
+		"files":              []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"},
+		"report":             report,
+		"ci_gate_plan":       plan,
+		"native_corpus_plan": nativePlan,
 	})
 }
 
@@ -573,6 +659,181 @@ func (h *Handler) buildCIGatePlan(report FuzzReport, req CIGatePlanRequest) CIGa
 			"Use the plan shape as the contract for the later CI scheduled fuzz / rule write-back / alert automation slice.",
 		},
 	}
+}
+
+func (h *Handler) seedsForNativeCorpusPlan(req NativeCorpusPlanRequest) ([]Seed, error) {
+	seeds, err := h.loadCorpus()
+	if err != nil {
+		return nil, err
+	}
+	includeBenign := true
+	if req.IncludeBenign != nil {
+		includeBenign = *req.IncludeBenign
+	}
+	allowedCategories := map[string]bool{}
+	for _, category := range req.Categories {
+		category = strings.TrimSpace(category)
+		if category != "" {
+			allowedCategories[category] = true
+		}
+	}
+	var out []Seed
+	for _, seed := range seeds {
+		if !includeBenign && !seed.ExpectedBlocked {
+			continue
+		}
+		if len(allowedCategories) > 0 && !allowedCategories[seed.Category] {
+			continue
+		}
+		out = append(out, seed)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	if req.MaxSeeds > 0 && len(out) > req.MaxSeeds {
+		out = out[:req.MaxSeeds]
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("native corpus plan requires at least one matching seed")
+	}
+	return out, nil
+}
+
+func (h *Handler) nativeCorpusPlanForEvidence(report FuzzReport) (NativeCorpusPlanReport, error) {
+	categorySeen := map[string]bool{}
+	var categories []string
+	for _, result := range report.Results {
+		if result.Category == "" || categorySeen[result.Category] {
+			continue
+		}
+		categorySeen[result.Category] = true
+		categories = append(categories, result.Category)
+	}
+	sort.Strings(categories)
+	seeds, err := h.seedsForNativeCorpusPlan(NativeCorpusPlanRequest{Categories: categories, MaxSeeds: report.SeedCount})
+	if err != nil {
+		seeds, err = h.seedsForNativeCorpusPlan(NativeCorpusPlanRequest{MaxSeeds: report.SeedCount})
+	}
+	if err != nil {
+		return NativeCorpusPlanReport{}, err
+	}
+	return h.buildNativeCorpusPlan(seeds, NativeCorpusPlanRequest{
+		Categories:  categories,
+		MaxSeeds:    report.SeedCount,
+		RequestedBy: "evidence-export",
+		Reason:      "report evidence schema snapshot",
+	}), nil
+}
+
+func (h *Handler) buildNativeCorpusPlan(seeds []Seed, req NativeCorpusPlanRequest) NativeCorpusPlanReport {
+	pkg := strings.TrimSpace(req.Package)
+	if pkg == "" {
+		pkg = "./internal/agentcore/guardrails"
+	}
+	target := strings.TrimSpace(req.FuzzTarget)
+	if target == "" {
+		target = "FuzzSanitizer"
+	}
+	corpusDir := strings.Trim(strings.TrimSpace(req.CorpusDir), "/")
+	if corpusDir == "" {
+		corpusDir = "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer"
+	}
+	plannedSeeds := buildNativeCorpusSeedPlans(seeds, corpusDir)
+	attackCount := 0
+	benignCount := 0
+	for _, seed := range seeds {
+		if seed.ExpectedBlocked {
+			attackCount++
+		} else {
+			benignCount++
+		}
+	}
+	return NativeCorpusPlanReport{
+		PackID:                PackID,
+		GeneratedAt:           h.now().UTC(),
+		Status:                "native_corpus_plan",
+		Package:               pkg,
+		FuzzTarget:            target,
+		CorpusDir:             corpusDir,
+		NativeCorpusPlanReady: true,
+		NativeCorpusSyncReady: false,
+		GoNativeFuzzPlanReady: true,
+		GoNativeFuzzReady:     false,
+		SeedCount:             len(plannedSeeds),
+		AttackSeedCount:       attackCount,
+		BenignSeedCount:       benignCount,
+		Seeds:                 plannedSeeds,
+		Commands:              buildNativeFuzzCommandPlans(pkg, target, corpusDir),
+		RequestedBy:           strings.TrimSpace(req.RequestedBy),
+		Reason:                strings.TrimSpace(req.Reason),
+		Actions:               buildNativeCorpusActions(corpusDir, target),
+		Metadata:              req.Metadata,
+		Notes: []string{
+			"This route is non-destructive: it does not write Go testdata corpus files, modify fuzz tests, run go test -fuzz, or upload artifacts.",
+			"Use the plan shape as the contract for the later Go native fuzz corpus sync and CI fuzz execution slice.",
+		},
+	}
+}
+
+func buildNativeCorpusSeedPlans(seeds []Seed, corpusDir string) []NativeCorpusSeedPlan {
+	out := make([]NativeCorpusSeedPlan, 0, len(seeds))
+	for _, seed := range seeds {
+		file := strings.Trim(corpusDir, "/") + "/" + safeCorpusFileName(seed.ID) + ".txt"
+		out = append(out, NativeCorpusSeedPlan{
+			SeedID:          seed.ID,
+			Category:        seed.Category,
+			Source:          string(parseSource(seed.Source)),
+			ExpectedBlocked: seed.ExpectedBlocked,
+			Tags:            seed.Tags,
+			TestdataFile:    file,
+			AddCall:         fmt.Sprintf("f.Add(%s, %s)", strconv.Quote(seed.Input), strconv.Quote(string(parseSource(seed.Source)))),
+			CorpusEntry:     seed.Input,
+		})
+	}
+	return out
+}
+
+func buildNativeFuzzCommandPlans(pkg, target, corpusDir string) []NativeFuzzCommandPlan {
+	return []NativeFuzzCommandPlan{
+		{
+			Name:        "preview-go-native-fuzz-corpus",
+			Command:     fmt.Sprintf("go test %s -run %s -count=1", pkg, target),
+			Artifacts:   []string{"native-corpus-plan.json", corpusDir},
+			WritesFiles: false,
+			Ready:       false,
+		},
+		{
+			Name:        "future-go-native-fuzz",
+			Command:     fmt.Sprintf("go test %s -run '^$' -fuzz %s -fuzztime=5m", pkg, target),
+			Artifacts:   []string{"go-native-fuzz-plan.json", "testdata/fuzz/"},
+			WritesFiles: false,
+			Ready:       false,
+		},
+	}
+}
+
+func buildNativeCorpusActions(corpusDir, target string) []string {
+	return []string{
+		fmt.Sprintf("would map pack corpus seeds into %s", corpusDir),
+		fmt.Sprintf("would add or refresh f.Add(...) seeds for %s", target),
+		"would preserve expected_blocked metadata for later bypass assertions",
+		"would keep Go native fuzz execution disabled until an explicit CI/runtime slice wires it",
+	}
+}
+
+func safeCorpusFileName(id string) string {
+	id = strings.TrimSpace(strings.ToLower(id))
+	var b strings.Builder
+	for _, r := range id {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-_")
+	if out == "" {
+		return "seed"
+	}
+	return out
 }
 
 type variant struct {

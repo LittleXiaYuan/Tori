@@ -2,7 +2,7 @@
   "id": "yunque.pack.guardrail-fuzzer",
   "name": "Guardrail Fuzzer Pack",
   "version": "0.1.0",
-  "description": "将对抗性 Guardrail fuzz、绕过收集、规则候选、CI gate / rule write-back / alert plan 和证据包导出作为可选安全治理能力包暴露。",
+  "description": "将对抗性 Guardrail fuzz、绕过收集、规则候选、CI gate / rule write-back / alert plan、Go native fuzz corpus sync plan 和证据包导出作为可选安全治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -15,6 +15,8 @@
       "guardrail_fuzzer.ci_gate.plan",
       "guardrail_fuzzer.rule_writeback.plan",
       "guardrail_fuzzer.alert.plan",
+      "guardrail_fuzzer.native_corpus.plan",
+      "guardrail_fuzzer.go_native_fuzz.plan",
       "guardrail_fuzzer.report.list",
       "guardrail_fuzzer.report.detail",
       "guardrail_fuzzer.evidence.export"
@@ -24,6 +26,7 @@
       "/v1/guardrail-fuzzer/corpus",
       "/v1/guardrail-fuzzer/run",
       "/v1/guardrail-fuzzer/ci-gate/plan",
+      "/v1/guardrail-fuzzer/native-corpus/plan",
       "/v1/guardrail-fuzzer/reports",
       "/v1/guardrail-fuzzer/reports/",
       "/v1/guardrail-fuzzer/evidence/"
@@ -58,6 +61,11 @@
         "method": "POST",
         "path": "/v1/guardrail-fuzzer/ci-gate/plan",
         "description": "Generate a non-destructive CI scheduled fuzz, rule write-back, and alert plan for a guardrail fuzz report."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/guardrail-fuzzer/native-corpus/plan",
+        "description": "Generate a non-destructive Go native fuzz corpus sync plan without writing testdata, modifying fuzz tests, running go test -fuzz, or uploading artifacts."
       },
       {
         "method": "GET",

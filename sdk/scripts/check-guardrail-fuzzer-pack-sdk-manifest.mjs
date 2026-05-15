@@ -40,11 +40,17 @@ for (const token of [
   "/v1/guardrail-fuzzer/corpus",
   "/v1/guardrail-fuzzer/run",
   "/v1/guardrail-fuzzer/ci-gate/plan",
+  "/v1/guardrail-fuzzer/native-corpus/plan",
   "ciGatePlan",
+  "nativeCorpusPlan",
   "ci_gate_plan_ready",
   "rule_writeback_plan_ready",
   "alert_plan_ready",
   "alert_ready",
+  "native_corpus_plan_ready",
+  "native_corpus_sync_ready",
+  "go_native_fuzz_plan_ready",
+  "go_native_fuzz_ready",
   "/v1/guardrail-fuzzer/reports",
   "/v1/guardrail-fuzzer/evidence/",
   "method: \"POST\"",
@@ -56,12 +62,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createGuardrailFuzzerPackClient") || page.includes('from "@/lib/api"') || page.includes("api.guardrailFuzzer")) {
   fail("Guardrail Fuzzer pack page must use guardrail-fuzzer-pack-client instead of monolithic api.ts");
 }
-for (const token of ["Guardrail Fuzzer", "保存 Corpus", "运行 Fuzzer", "导出证据包", "CI Gate 计划", "Pack shell"]) {
+for (const token of ["Guardrail Fuzzer", "保存 Corpus", "运行 Fuzzer", "导出证据包", "CI Gate 计划", "Native Corpus 计划", "Pack shell"]) {
   if (!page.includes(token)) fail(`Guardrail Fuzzer pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts");
-for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
+for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
   if (!frontendTest.includes(token)) fail(`Guardrail Fuzzer frontend client test missing token: ${token}`);
 }
 
@@ -78,12 +84,20 @@ for (const token of [
   "rule_writeback_ready",
   "alert_plan_ready",
   "alert_ready",
+  "native_corpus_plan_ready",
+  "native_corpus_sync_ready",
+  "go_native_fuzz_plan_ready",
+  "go_native_fuzz_ready",
   "guardrail.ci_gate.plan",
   "guardrail.rule_writeback.plan",
   "guardrail.alert.plan",
+  "guardrail.native_corpus.plan",
+  "guardrail.go_native_fuzz.plan",
   "ci-gate-plan.json",
   "rule-writeback-plan.json",
   "alert-plan.json",
+  "native-corpus-plan.json",
+  "go-native-fuzz-plan.json",
   "json-guardrail-fuzzer-evidence",
   "cfg.DataPath(\"guardrail-fuzzer\")",
   "guardrailfuzzerpack.New",
@@ -102,12 +116,18 @@ for (const token of [
   "/v1/guardrail-fuzzer/status",
   "/v1/guardrail-fuzzer/run",
   "/v1/guardrail-fuzzer/ci-gate/plan",
+  "/v1/guardrail-fuzzer/native-corpus/plan",
   "/v1/guardrail-fuzzer/evidence/",
   "ciGatePlan",
+  "nativeCorpusPlan",
   "ci_gate_plan_ready",
   "rule_writeback_plan_ready",
   "alert_plan_ready",
   "alert_ready",
+  "native_corpus_plan_ready",
+  "native_corpus_sync_ready",
+  "go_native_fuzz_plan_ready",
+  "go_native_fuzz_ready",
   "Guardrail Fuzzer request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Guardrail Fuzzer SDK slice missing token: ${token}`);
