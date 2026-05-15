@@ -71,6 +71,8 @@ for (const token of [
   "temporal_query_ready",
   "ledger_history_ready",
   "merkle_verification_ready",
+  "audit-verification.json",
+  "audit_verification",
   "memory.audit.verify",
   "MerkleVerifier",
   "VerifyMerkleAuditChain",

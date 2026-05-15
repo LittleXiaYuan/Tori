@@ -682,7 +682,7 @@ for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientErro
 for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!memoryTimeTravelClientTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
-for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "memory.audit.verify", "MerkleVerifier", "VerifyMerkleAuditChain", "rollback_writeback_ready"]) {
+for (const token of ["json-memory-time-travel-evidence", "audit-verification.json", "audit_verification", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "memory.audit.verify", "MerkleVerifier", "VerifyMerkleAuditChain", "rollback_writeback_ready"]) {
   if (!memoryTimeTravelSource.includes(token)) fail(`Memory Time Travel handler missing memory governance shell token: ${token}`);
 }
 for (const token of ["NewTemporalKVStore", "PutRawVersionedAt", "GetRawAt", "ListVersions", "SnapshotRawAt", "__kv_history__", "TestTemporalKVStorePutVersionedAndGetRawAt", "TestTemporalKVStoreListVersionsAndSnapshotRawAt"]) {

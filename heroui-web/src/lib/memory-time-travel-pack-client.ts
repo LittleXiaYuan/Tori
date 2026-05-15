@@ -158,7 +158,7 @@ export interface MemoryTimeTravelPackClient {
   diff(input: MemoryTimeTravelDiffInput): Promise<{ diff: MemoryTimeTravelDiffReport }>;
   rollbackPlan(input: MemoryTimeTravelRollbackPlanInput): Promise<{ plan: MemoryTimeTravelRollbackPlan }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[] }>;
+  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
 }
 
 function enc(value: string): string {
@@ -201,7 +201,7 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
     auditVerify: (limit) =>
       fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[] }>(
+      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
         `/v1/memory-time-travel/evidence/${enc(id)}`,
       ),
   };

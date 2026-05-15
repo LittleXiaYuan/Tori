@@ -186,6 +186,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   files: string[];
   snapshot: MemoryTimeTravelSnapshot;
   history: MemoryTimeTravelSnapshotSummary[];
+  audit_verification?: MemoryTimeTravelAuditVerificationResponse;
+  audit_verification_error?: string;
 };
 
 export type MemoryTimeTravelClientOptions = {
