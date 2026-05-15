@@ -93,6 +93,18 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Guardrail Fuzzer token: ${token}`);
 }
 for (const token of [
+  "packs/examples/memory-time-travel-pack",
+  "yunque.pack.memory-time-travel",
+  "pack-shell-before-ledger-kv-history",
+  "yunque-client/memory-time-travel",
+  "Memory Time Travel Pack shell 闭环",
+  "Ledger KV kv_history",
+  "Merkle audit-chain",
+  "Memory Persister write-back",
+]) {
+  if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Memory Time Travel token: ${token}`);
+}
+for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
   "GatewayConfig.BackendPacks",
@@ -178,6 +190,10 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go")
   + "\n"
+  + readText("internal/packs/memorytimetravel/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_memory_time_travel_pack_test.go")
+  + "\n"
   + readText("internal/packs/skillanomaly/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go")
@@ -185,7 +201,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/cognitive-canary-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "cognitivecanarypack.New", "cfg.DataPath(\"cognitive-canary\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/cognitive-canary-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/memory-time-travel-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "cognitivecanarypack.New", "cfg.DataPath(\"cognitive-canary\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "memorytimetravelpack.New", "cfg.DataPath(\"memory-time-travel\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -619,6 +635,56 @@ for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "b
 }
 for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrailFuzzerEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Guardrail Fuzzer method: ${token}`);
+}
+
+
+const memoryTimeTravelManifest = readJSON("packs/examples/memory-time-travel-pack/pack.json");
+const memoryTimeTravelSource = readText("internal/packs/memorytimetravel/handler.go");
+const memoryTimeTravelGateTest = readText("internal/controlplane/gateway/handlers_memory_time_travel_pack_test.go");
+const memoryTimeTravelPage = readText("heroui-web/src/app/packs/memory-time-travel/page.tsx");
+const memoryTimeTravelClient = readText("heroui-web/src/lib/memory-time-travel-pack-client.ts");
+const memoryTimeTravelClientTest = readText("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
+const memoryTimeTravelSdk = readText("sdk/typescript/src/memory-time-travel.ts") + "\n" + readText("sdk/typescript/src/memory-time-travel.test.ts");
+if (memoryTimeTravelManifest) {
+  if (!memoryTimeTravelSource.includes(`const PackID = "${memoryTimeTravelManifest.id}"`)) {
+    fail("Memory Time Travel pack handler PackID must match packs/examples/memory-time-travel-pack/pack.json");
+  }
+  for (const route of memoryTimeTravelManifest.backend?.routes ?? []) {
+    if (!memoryTimeTravelSource.includes(route)) fail(`Memory Time Travel handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!memoryTimeTravelSource.includes(method)) fail(`Memory Time Travel handler missing method gate declaration: ${method}`);
+  }
+  if (memoryTimeTravelManifest.frontend?.menus?.[0]?.path !== "/packs/memory-time-travel") fail("Memory Time Travel menu path must stay under /packs/memory-time-travel");
+  if (memoryTimeTravelManifest.frontend?.routes?.[0]?.component !== "memory/MemoryTimeTravelPackPage") fail("Memory Time Travel frontend route component drifted");
+  if (memoryTimeTravelManifest.sdk?.typescript !== "yunque-client/memory-time-travel") fail("Memory Time Travel SDK import must stay yunque-client/memory-time-travel");
+  if (memoryTimeTravelManifest.defaultState !== "disabled") fail("Memory Time Travel pack must remain default disabled before Ledger KV history and Memory Persister write-back readiness");
+  if (memoryTimeTravelManifest.metadata?.stage !== "pack-shell-before-ledger-kv-history") fail("Memory Time Travel pack stage must remain pack-shell-before-ledger-kv-history");
+  if (memoryTimeTravelManifest.metadata?.blueprint !== "doc/MEMORY-TIME-TRAVEL.md") fail("Memory Time Travel pack blueprint pointer drifted");
+}
+if (memoryTimeTravelPage.includes('from "@/lib/api"') || memoryTimeTravelPage.includes("api.memoryTimeTravel") || !memoryTimeTravelPage.includes("createMemoryTimeTravelPackClient")) {
+  fail("Memory Time Travel pack page must use memory-time-travel-pack-client instead of monolithic api object");
+}
+for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/evidence/", 'method: "POST"']) {
+  if (!memoryTimeTravelClient.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
+  fail("Memory Time Travel runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestMemoryTimeTravel", "StatusMethodNotAllowed", "/v1/memory-time-travel/diff"]) {
+  if (!memoryTimeTravelGateTest.includes(token)) fail(`Memory Time Travel gateway gate test missing token: ${token}`);
+}
+for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientError", "/v1/memory-time-travel/status", "/v1/memory-time-travel/evidence/"]) {
+  if (!memoryTimeTravelSdk.includes(token)) fail(`Memory Time Travel TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/evidence/baseline"]) {
+  if (!memoryTimeTravelClientTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
+}
+for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "merkle_verification_ready", "rollback_writeback_ready"]) {
+  if (!memoryTimeTravelSource.includes(token)) fail(`Memory Time Travel handler missing memory governance shell token: ${token}`);
+}
+for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memoryTimeTravelEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Memory Time Travel method: ${token}`);
 }
 
 

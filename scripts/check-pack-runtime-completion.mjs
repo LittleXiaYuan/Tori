@@ -53,6 +53,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_chaos_probe_pack_test.go",
   "internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go",
   "internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go",
+  "internal/controlplane/gateway/handlers_memory_time_travel_pack_test.go",
   "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_sbom_drift_pack_test.go",
   "internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go",
@@ -74,6 +75,8 @@ const cognitiveCanaryPack = read("internal/packs/cognitivecanary/handler.go");
 const cognitiveCanaryManifest = read("packs/examples/cognitive-canary-pack/pack.json");
 const guardrailFuzzerPack = read("internal/packs/guardrailfuzzer/handler.go");
 const guardrailFuzzerManifest = read("packs/examples/guardrail-fuzzer-pack/pack.json");
+const memoryTimeTravelPack = read("internal/packs/memorytimetravel/handler.go");
+const memoryTimeTravelManifest = read("packs/examples/memory-time-travel-pack/pack.json");
 const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
 const rpaReplayManifest = read("packs/examples/rpa-replay-pack/pack.json");
 const sbomDriftPack = read("internal/packs/sbomdrift/handler.go");
@@ -113,6 +116,9 @@ const frontend = [
   "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx",
   "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
   "heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts",
+  "heroui-web/src/app/packs/memory-time-travel/page.tsx",
+  "heroui-web/src/lib/memory-time-travel-pack-client.ts",
+  "heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts",
   "heroui-web/src/app/packs/rpa-replay/page.tsx",
   "heroui-web/src/lib/rpa-replay-pack-client.ts",
   "heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts",
@@ -140,6 +146,7 @@ const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
 const chaosProbePackPage = read("heroui-web/src/app/packs/chaos-probe/page.tsx");
 const cognitiveCanaryPackPage = read("heroui-web/src/app/packs/cognitive-canary/page.tsx");
 const guardrailFuzzerPackPage = read("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
+const memoryTimeTravelPackPage = read("heroui-web/src/app/packs/memory-time-travel/page.tsx");
 const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
 const skillAnomalyPackPage = read("heroui-web/src/app/packs/skill-anomaly/page.tsx");
@@ -159,6 +166,7 @@ const sdk = [
   "sdk/manifest/chaos-probe-pack-sdk.json",
   "sdk/manifest/cognitive-canary-pack-sdk.json",
   "sdk/manifest/guardrail-fuzzer-pack-sdk.json",
+  "sdk/manifest/memory-time-travel-pack-sdk.json",
   "sdk/manifest/rpa-replay-pack-sdk.json",
   "sdk/manifest/sbom-drift-pack-sdk.json",
   "sdk/manifest/skill-anomaly-pack-sdk.json",
@@ -167,6 +175,8 @@ const sdk = [
   "sdk/typescript/src/cognitive-canary.test.ts",
   "sdk/typescript/src/guardrail-fuzzer.ts",
   "sdk/typescript/src/guardrail-fuzzer.test.ts",
+  "sdk/typescript/src/memory-time-travel.ts",
+  "sdk/typescript/src/memory-time-travel.test.ts",
   "sdk/typescript/src/rpa-replay.ts",
   "sdk/typescript/src/rpa-replay.test.ts",
   "sdk/typescript/src/sbom-drift.ts",
@@ -184,6 +194,7 @@ const sdk = [
   "sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs",
   "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-memory-time-travel-pack-sdk-manifest.mjs",
   "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
   "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs",
   "sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs",
@@ -237,6 +248,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/chaos-probe-pack/pack.json",
   "packs/examples/cognitive-canary-pack/pack.json",
   "packs/examples/guardrail-fuzzer-pack/pack.json",
+  "packs/examples/memory-time-travel-pack/pack.json",
   "packs/examples/rpa-replay-pack/pack.json",
   "packs/examples/sbom-drift-pack/pack.json",
   "packs/examples/skill-anomaly-pack/pack.json",
@@ -405,6 +417,36 @@ requireTokens("guardrail-fuzzer 蓝图能力包", guardrailFuzzerPack + guardrai
   "TestGuardrailFuzzerPackGateReturnsNotFoundWhenDisabled",
   "/packs/guardrail-fuzzer",
   "pack-shell-before-ci-fuzz",
+  "distribution",
+  "rollback",
+]);
+
+
+requireTokens("memory-time-travel 蓝图能力包", memoryTimeTravelPack + memoryTimeTravelManifest + frontend + gateway + sdk + docs, [
+  'const PackID = "yunque.pack.memory-time-travel"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/memory-time-travel/status",
+  "/v1/memory-time-travel/snapshots",
+  "/v1/memory-time-travel/snapshot-at",
+  "/v1/memory-time-travel/diff",
+  "/v1/memory-time-travel/rollback-plan",
+  "/v1/memory-time-travel/evidence/",
+  "snapshot_store_ready",
+  "temporal_query_ready",
+  "ledger_history_ready",
+  "merkle_verification_ready",
+  "rollback_writeback_ready",
+  "cfg.DataPath(\"memory-time-travel\")",
+  "json-memory-time-travel-evidence",
+  "http.MethodPost",
+  "yunque-client/memory-time-travel",
+  "Memory Time Travel Pack",
+  "createMemoryTimeTravelPackClient",
+  "createMemoryTimeTravelClient",
+  "memory-time-travel-pack-client",
+  "TestMemoryTimeTravelPackGateReturnsNotFoundWhenDisabled",
+  "/packs/memory-time-travel",
+  "pack-shell-before-ledger-kv-history",
   "distribution",
   "rollback",
 ]);
@@ -637,6 +679,12 @@ if (guardrailFuzzerPackPage.includes("api.guardrailFuzzer") || guardrailFuzzerPa
   ok("前端 Guardrail Fuzzer pack 客户端拆分", "Guardrail Fuzzer page uses guardrail-fuzzer-pack-client instead of monolithic api guardrail fuzzer methods");
 }
 
+if (memoryTimeTravelPackPage.includes("api.memoryTimeTravel") || memoryTimeTravelPackPage.includes('from "@/lib/api"') || !memoryTimeTravelPackPage.includes("createMemoryTimeTravelPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "Memory Time Travel pack page must use memory-time-travel-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Memory Time Travel pack 客户端拆分", "Memory Time Travel page uses memory-time-travel-pack-client instead of monolithic api memory time travel methods");
+}
+
 if (rpaReplayPackPage.includes("api.rpa") || rpaReplayPackPage.includes('from "@/lib/api"') || !rpaReplayPackPage.includes("createRPAReplayPackClient")) {
   fail("前端同步菜单/路由/资源/控制台", "RPA Replay pack page must use rpa-replay-pack-client instead of the monolithic api object");
 } else {
@@ -734,6 +782,9 @@ const forbiddenMonolithicPackMethods = [
   "guardrailFuzzerStatus:",
   "guardrailFuzzerRun:",
   "guardrailFuzzerEvidence:",
+  "memoryTimeTravelStatus:",
+  "memoryTimeTravelDiff:",
+  "memoryTimeTravelEvidence:",
   "rpaReplayStatus:",
   "createRPAReplayTrace:",
   "rpaReplay:",
@@ -755,7 +806,7 @@ const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) =>
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser/chaos-probe/cognitive-canary/guardrail-fuzzer/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/chaos-probe/cognitive-canary/guardrail-fuzzer/memory-time-travel/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -788,6 +839,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "CognitiveCanaryClientError",
   "createGuardrailFuzzerClient",
   "GuardrailFuzzerClientError",
+  "createMemoryTimeTravelClient",
+  "MemoryTimeTravelClientError",
   "createRPAReplayClient",
   "RPAReplayClientError",
   "createSBOMDriftClient",
@@ -827,6 +880,7 @@ runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/chec
 runCheck("chaos probe pack sdk checker", process.execPath, ["sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs"]);
 runCheck("cognitive canary pack sdk checker", process.execPath, ["sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs"]);
 runCheck("guardrail fuzzer pack sdk checker", process.execPath, ["sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"]);
+runCheck("memory time travel pack sdk checker", process.execPath, ["sdk/scripts/check-memory-time-travel-pack-sdk-manifest.mjs"]);
 runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 runCheck("sbom drift pack sdk checker", process.execPath, ["sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"]);
 runCheck("skill anomaly pack sdk checker", process.execPath, ["sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs"]);

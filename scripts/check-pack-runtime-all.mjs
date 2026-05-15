@@ -48,6 +48,7 @@ const checks = [
       "./internal/packs/chaosprobe",
       "./internal/packs/cognitivecanary",
       "./internal/packs/guardrailfuzzer",
+      "./internal/packs/memorytimetravel",
       "./internal/packs/rpareplay",
       "./internal/packs/sbomdrift",
       "./internal/packs/skillanomaly",
@@ -55,7 +56,7 @@ const checks = [
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|CognitiveCanary|GuardrailFuzzer|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|CognitiveCanary|GuardrailFuzzer|MemoryTimeTravel|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },
@@ -119,6 +120,12 @@ const checks = [
     cwd: "heroui-web",
   },
   {
+    name: "Frontend Memory Time Travel pack client tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/memory-time-travel-pack-client.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
     name: "Frontend RPA Replay pack client tests",
     command: process.execPath,
     args: [npmCli, "run", "test", "--", "src/lib/__tests__/rpa-replay-pack-client.test.ts"],
@@ -169,7 +176,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "cognitive-canary", "guardrail-fuzzer", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "cognitive-canary", "guardrail-fuzzer", "memory-time-travel", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
     cwd: "sdk/typescript",
   },
   {

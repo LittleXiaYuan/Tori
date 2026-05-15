@@ -1426,6 +1426,10 @@
     "./guardrail-fuzzer": {
       "types": "./src/guardrail-fuzzer.ts",
       "import": "./src/guardrail-fuzzer.ts"
+    },
+    "./memory-time-travel": {
+      "types": "./src/memory-time-travel.ts",
+      "import": "./src/memory-time-travel.ts"
     }
   },
   "files": [
