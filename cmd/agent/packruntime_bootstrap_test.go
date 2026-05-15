@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -50,6 +50,17 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentGuardrailFu
 	}
 	if browserIntent.Manifest.SDK.TypeScript != "yunque-client/browser" {
 		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
+	}
+
+	chaosProbe, ok := registry.Get("yunque.pack.chaos-probe")
+	if !ok {
+		t.Fatal("expected Chaos Probe builtin pack to be installed")
+	}
+	if chaosProbe.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Chaos Probe default disabled, got %s", chaosProbe.Status)
+	}
+	if chaosProbe.Manifest.SDK.TypeScript != "yunque-client/chaos-probe" {
+		t.Fatalf("unexpected Chaos Probe SDK import: %s", chaosProbe.Manifest.SDK.TypeScript)
 	}
 
 	guardrailFuzzer, ok := registry.Get("yunque.pack.guardrail-fuzzer")
@@ -108,7 +119,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentGuardrailFu
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 9 {
+	if got := len(registry.List()); got != 10 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
