@@ -74,6 +74,35 @@ func TestSBOMDriftPackCanCreateSnapshotAndDiff(t *testing.T) {
 	}
 }
 
+func TestSBOMDriftPackCanExportCycloneDXAndPlanCIGate(t *testing.T) {
+	gw, tm := newTestGatewayWithSBOMDriftPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("sbom-drift-ci-gate")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/snapshots", strings.NewReader(`{"id":"baseline","source":"gateway-test"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create snapshot status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/sbom-drift/cyclonedx/baseline", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"bomFormat":"CycloneDX"`) {
+		t.Fatalf("cyclonedx status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/plan", strings.NewReader(`{"base_id":"baseline","target_current":true,"fail_on_risk":"high"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"ci_gate_ready":false`) {
+		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
 	t.Helper()
 	registry, err := packruntime.NewRegistry(t.TempDir())
@@ -92,6 +121,8 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				"/v1/sbom-drift/snapshots",
 				"/v1/sbom-drift/snapshots/",
 				"/v1/sbom-drift/diff",
+				"/v1/sbom-drift/cyclonedx/",
+				"/v1/sbom-drift/ci-gate/plan",
 				"/v1/sbom-drift/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -100,6 +131,8 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/snapshots"},
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/snapshots/"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/diff"},
+				{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/"},
+				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan"},
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/"},
 			},
 		},

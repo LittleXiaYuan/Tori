@@ -81,6 +81,75 @@ type DiffResult struct {
 	Notes     []string          `json:"notes,omitempty"`
 }
 
+type CycloneDXDocument struct {
+	BOMFormat    string                `json:"bomFormat"`
+	SpecVersion  string                `json:"specVersion"`
+	Version      int                   `json:"version"`
+	Metadata     CycloneDXMetadata     `json:"metadata"`
+	Components   []CycloneDXComponent  `json:"components"`
+	Dependencies []CycloneDXDependency `json:"dependencies,omitempty"`
+}
+
+type CycloneDXMetadata struct {
+	Timestamp time.Time          `json:"timestamp"`
+	Component CycloneDXComponent `json:"component"`
+	Tools     []CycloneDXTool    `json:"tools,omitempty"`
+}
+
+type CycloneDXTool struct {
+	Vendor  string `json:"vendor,omitempty"`
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+}
+
+type CycloneDXComponent struct {
+	Type       string              `json:"type"`
+	BOMRef     string              `json:"bom-ref,omitempty"`
+	Name       string              `json:"name"`
+	Version    string              `json:"version,omitempty"`
+	Scope      string              `json:"scope,omitempty"`
+	PURL       string              `json:"purl,omitempty"`
+	Properties []CycloneDXProperty `json:"properties,omitempty"`
+}
+
+type CycloneDXProperty struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type CycloneDXDependency struct {
+	Ref       string   `json:"ref"`
+	DependsOn []string `json:"dependsOn,omitempty"`
+}
+
+type CIGatePlanRequest struct {
+	BaseID        string `json:"base_id"`
+	TargetID      string `json:"target_id,omitempty"`
+	TargetCurrent bool   `json:"target_current,omitempty"`
+	FailOnRisk    string `json:"fail_on_risk,omitempty"`
+	RequestedBy   string `json:"requested_by,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+type CIGatePlanReport struct {
+	PackID           string     `json:"pack_id"`
+	GeneratedAt      time.Time  `json:"generated_at"`
+	Status           string     `json:"status"`
+	Blocked          bool       `json:"blocked"`
+	FailOnRisk       string     `json:"fail_on_risk"`
+	CycloneDXReady   bool       `json:"cyclonedx_ready"`
+	CIGatePlanReady  bool       `json:"ci_gate_plan_ready"`
+	CIGateReady      bool       `json:"ci_gate_ready"`
+	GovulncheckReady bool       `json:"govulncheck_ready"`
+	RequestedBy      string     `json:"requested_by,omitempty"`
+	Reason           string     `json:"reason,omitempty"`
+	Diff             DiffResult `json:"diff"`
+	Artifacts        []string   `json:"artifacts"`
+	Commands         []string   `json:"commands"`
+	Actions          []string   `json:"actions"`
+	Notes            []string   `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
 
 func New(cfg Config) *Handler {
@@ -109,6 +178,8 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/sbom-drift/snapshots", Handler: h.Snapshots},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/snapshots/", Handler: h.SnapshotDetail},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/diff", Handler: h.Diff},
+		{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/", Handler: h.CycloneDX},
+		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan", Handler: h.CIGatePlan},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/", Handler: h.Evidence},
 	}
 }
@@ -127,7 +198,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"pack_id":             PackID,
 		"stage":               "pack-shell-before-ci",
 		"scanner_ready":       true,
+		"cyclonedx_ready":     true,
+		"ci_gate_plan_ready":  true,
+		"ci_gate_ready":       false,
 		"vulnerability_ready": false,
+		"govulncheck_ready":   false,
 		"snapshot_count":      len(snapshots),
 		"repo_root":           h.repoRoot,
 		"store_dir":           h.dataDir,
@@ -135,9 +210,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"sbom.snapshot.go_mod",
 			"sbom.snapshot.npm_package_json",
 			"sbom.drift.diff",
+			"sbom.cyclonedx.export",
+			"sbom.ci_gate.plan",
 			"sbom.evidence.export",
 		},
-		"notes": []string{"CycloneDX generation and govulncheck CI gates are planned follow-up wiring."},
+		"notes": []string{"CycloneDX JSON export and CI gate plan are available as non-destructive pack contracts; govulncheck execution and CI write-back remain follow-up wiring."},
 	})
 }
 
@@ -217,6 +294,44 @@ func (h *Handler) Diff(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"diff": diffSnapshots(base, target)})
 }
 
+func (h *Handler) CycloneDX(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/v1/sbom-drift/cyclonedx/")
+	snapshot, err := h.loadSnapshotOrCurrent(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"bom": h.buildCycloneDX(snapshot), "snapshot": toSummary(snapshot)})
+}
+
+func (h *Handler) CIGatePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req CIGatePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.BaseID) == "" {
+		writeError(w, http.StatusBadRequest, "base_id is required")
+		return
+	}
+	base, err := h.loadSnapshot(req.BaseID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("base snapshot not found: %s", req.BaseID))
+		return
+	}
+	target, err := h.resolveTargetSnapshot(req.TargetID, req.TargetCurrent)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	plan := h.buildCIGatePlan(diffSnapshots(base, target), req.FailOnRisk, req.RequestedBy, req.Reason)
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -228,12 +343,15 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	ciGatePlan := h.buildCIGatePlan(diffSnapshots(snapshot, snapshot), "high", "evidence-export", "snapshot evidence schema snapshot")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-sbom-drift-evidence",
-		"files":       []string{"snapshot.json", "meta.json"},
-		"snapshot":    snapshot,
+		"pack_id":      PackID,
+		"exported_at":  h.now().UTC(),
+		"format":       "json-sbom-drift-evidence",
+		"files":        []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json"},
+		"snapshot":     snapshot,
+		"cyclonedx":    h.buildCycloneDX(snapshot),
+		"ci_gate_plan": ciGatePlan,
 	})
 }
 
@@ -258,6 +376,112 @@ func (h *Handler) createSnapshot(id string, source string) (Snapshot, error) {
 		ecosystems[component.Ecosystem]++
 	}
 	return Snapshot{ID: id, Source: source, CreatedAt: h.now().UTC(), ComponentCount: len(components), Ecosystems: ecosystems, Components: components}, nil
+}
+
+func (h *Handler) loadSnapshotOrCurrent(id string) (Snapshot, error) {
+	id = strings.Trim(strings.TrimSpace(id), "/")
+	if id == "" || id == "current" {
+		return h.createSnapshot("current", "working-tree")
+	}
+	return h.loadSnapshot(id)
+}
+
+func (h *Handler) resolveTargetSnapshot(targetID string, targetCurrent bool) (Snapshot, error) {
+	if strings.TrimSpace(targetID) != "" {
+		target, err := h.loadSnapshot(targetID)
+		if err != nil {
+			return Snapshot{}, fmt.Errorf("target snapshot not found: %s", targetID)
+		}
+		return target, nil
+	}
+	if targetCurrent || strings.TrimSpace(targetID) == "" {
+		return h.createSnapshot("current", "working-tree")
+	}
+	return Snapshot{}, fmt.Errorf("target snapshot not found")
+}
+
+func (h *Handler) buildCycloneDX(snapshot Snapshot) CycloneDXDocument {
+	components := make([]CycloneDXComponent, 0, len(snapshot.Components))
+	dependsOn := make([]string, 0, len(snapshot.Components))
+	for _, component := range snapshot.Components {
+		ref := cyclonedxRef(component)
+		dependsOn = append(dependsOn, ref)
+		properties := []CycloneDXProperty{
+			{Name: "yunque:ecosystem", Value: component.Ecosystem},
+			{Name: "yunque:direct", Value: fmt.Sprintf("%t", component.Direct)},
+		}
+		if component.Path != "" {
+			properties = append(properties, CycloneDXProperty{Name: "yunque:path", Value: component.Path})
+		}
+		components = append(components, CycloneDXComponent{
+			Type:       "library",
+			BOMRef:     ref,
+			Name:       component.Name,
+			Version:    component.Version,
+			Scope:      cyclonedxScope(component.Scope),
+			PURL:       packageURL(component),
+			Properties: properties,
+		})
+	}
+	return CycloneDXDocument{
+		BOMFormat:   "CycloneDX",
+		SpecVersion: "1.5",
+		Version:     1,
+		Metadata: CycloneDXMetadata{
+			Timestamp: snapshot.CreatedAt.UTC(),
+			Component: CycloneDXComponent{
+				Type:    "application",
+				BOMRef:  "pkg:generic/yunque-agent@" + snapshot.ID,
+				Name:    "yunque-agent",
+				Version: snapshot.ID,
+			},
+			Tools: []CycloneDXTool{{Vendor: "Yunque", Name: "sbom-drift-pack", Version: "0.1.0"}},
+		},
+		Components:   components,
+		Dependencies: []CycloneDXDependency{{Ref: "pkg:generic/yunque-agent@" + snapshot.ID, DependsOn: dependsOn}},
+	}
+}
+
+func (h *Handler) buildCIGatePlan(diff DiffResult, failOnRisk, requestedBy, reason string) CIGatePlanReport {
+	threshold := normalizeRisk(failOnRisk)
+	if threshold == "" {
+		threshold = "high"
+	}
+	blocked := riskRank(diff.RiskLevel) >= riskRank(threshold) && diff.RiskLevel != "none"
+	status := "ci_gate_pass_plan"
+	if blocked {
+		status = "ci_gate_block_plan"
+	}
+	actions := []string{
+		"would export CycloneDX JSON as dist/sbom.cdx.json during release packaging",
+		"would compare the generated SBOM against the selected baseline before release",
+	}
+	if blocked {
+		actions = append(actions, fmt.Sprintf("would block release because risk %s reaches threshold %s", diff.RiskLevel, threshold))
+	} else {
+		actions = append(actions, fmt.Sprintf("would allow release because risk %s is below threshold %s", diff.RiskLevel, threshold))
+	}
+	return CIGatePlanReport{
+		PackID:           PackID,
+		GeneratedAt:      h.now().UTC(),
+		Status:           status,
+		Blocked:          blocked,
+		FailOnRisk:       threshold,
+		CycloneDXReady:   true,
+		CIGatePlanReady:  true,
+		CIGateReady:      false,
+		GovulncheckReady: false,
+		RequestedBy:      strings.TrimSpace(requestedBy),
+		Reason:           strings.TrimSpace(reason),
+		Diff:             diff,
+		Artifacts:        []string{"dist/sbom.cdx.json", "sbom-drift-report.json", "ci-gate-plan.json"},
+		Commands:         []string{"make sbom", "make vulncheck", "node scripts/check-pack-runtime-all.mjs"},
+		Actions:          actions,
+		Notes: []string{
+			"This route is non-destructive: it does not write CI workflow files, invoke govulncheck, or block a release by itself.",
+			"Use the plan shape as the contract for the later CI baseline gate and govulncheck write-back slice.",
+		},
+	}
 }
 
 func (h *Handler) collectComponents() ([]Component, error) {
@@ -516,6 +740,44 @@ func sortChanges(changes []ComponentChange) {
 	})
 }
 
+func cyclonedxRef(component Component) string {
+	version := component.Version
+	if version == "" {
+		version = "unknown"
+	}
+	return fmt.Sprintf("pkg:%s/%s@%s", cyclonedxType(component.Ecosystem), component.Name, version)
+}
+
+func cyclonedxType(ecosystem string) string {
+	switch ecosystem {
+	case "gomod":
+		return "golang"
+	case "npm":
+		return "npm"
+	default:
+		return "generic"
+	}
+}
+
+func packageURL(component Component) string {
+	version := component.Version
+	if version == "" {
+		return fmt.Sprintf("pkg:%s/%s", cyclonedxType(component.Ecosystem), component.Name)
+	}
+	return fmt.Sprintf("pkg:%s/%s@%s", cyclonedxType(component.Ecosystem), component.Name, version)
+}
+
+func cyclonedxScope(scope string) string {
+	switch scope {
+	case "devDependencies":
+		return "optional"
+	case "peer":
+		return "optional"
+	default:
+		return "required"
+	}
+}
+
 func addedRisk(component Component) string {
 	if component.Direct {
 		return "high"
@@ -545,11 +807,23 @@ func semverMajor(version string) string {
 }
 
 func maxRisk(a string, b string) string {
-	order := map[string]int{"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
-	if order[b] > order[a] {
+	if riskRank(b) > riskRank(a) {
 		return b
 	}
 	return a
+}
+
+func normalizeRisk(risk string) string {
+	risk = strings.ToLower(strings.TrimSpace(risk))
+	if _, ok := map[string]bool{"low": true, "medium": true, "high": true, "critical": true}[risk]; ok {
+		return risk
+	}
+	return ""
+}
+
+func riskRank(risk string) int {
+	order := map[string]int{"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+	return order[strings.ToLower(strings.TrimSpace(risk))]
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

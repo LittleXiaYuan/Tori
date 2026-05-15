@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "sbom-drift-pack",
-  "description": "SBOM Drift capability pack manifest binding for Pack Runtime route gates, frontend sync, dependency snapshot drift reports, evidence export, and lightweight SDK import discovery.",
+  "description": "SBOM Drift capability pack manifest binding for Pack Runtime route gates, frontend sync, dependency snapshot drift reports, CycloneDX export, CI gate planning, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose dependency snapshot collection, drift diffing, risk summaries, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Expose dependency snapshot collection, drift diffing, CycloneDX JSON export, CI gate planning, risk summaries, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
     "Keep SBOM Drift method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/sbom-drift only when the SBOM Drift pack is installed and enabled."
   ],
@@ -15,6 +15,8 @@
     "POST /v1/sbom-drift/snapshots",
     "GET /v1/sbom-drift/snapshots/",
     "POST /v1/sbom-drift/diff",
+    "GET /v1/sbom-drift/cyclonedx/",
+    "POST /v1/sbom-drift/ci-gate/plan",
     "GET /v1/sbom-drift/evidence/"
   ],
   "frontend": {

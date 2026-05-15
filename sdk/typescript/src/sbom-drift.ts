@@ -1,8 +1,9 @@
 /**
  * Lightweight SBOM Drift Pack SDK slice.
  *
- * This keeps dependency snapshots, drift diffing, and evidence export usable
- * without importing the full generated OpenAPI SDK:
+ * This keeps dependency snapshots, drift diffing, CycloneDX export, CI gate
+ * planning, and evidence export usable without importing the full generated
+ * OpenAPI SDK:
  *
  *   import { createSBOMDriftClient } from "yunque-client/sbom-drift";
  */
@@ -32,7 +33,11 @@ export type SBOMDriftStatusResponse = {
   pack_id: string;
   stage: string;
   scanner_ready: boolean;
+  cyclonedx_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
   vulnerability_ready: boolean;
+  govulncheck_ready: boolean;
   snapshot_count: number;
   repo_root?: string;
   store_dir?: string;
@@ -87,12 +92,60 @@ export type SBOMDriftDiffResponse = {
   diff: SBOMDriftDiff;
 };
 
+export type SBOMDriftCycloneDXDocument = {
+  bomFormat: string;
+  specVersion: string;
+  version: number;
+  metadata: Record<string, unknown>;
+  components: Array<Record<string, unknown>>;
+  dependencies?: Array<Record<string, unknown>>;
+};
+
+export type SBOMDriftCycloneDXResponse = {
+  bom: SBOMDriftCycloneDXDocument;
+  snapshot: SBOMDriftSnapshotSummary;
+};
+
+export type SBOMDriftCIGatePlanRequest = {
+  base_id: string;
+  target_id?: string;
+  target_current?: boolean;
+  fail_on_risk?: string;
+  requested_by?: string;
+  reason?: string;
+};
+
+export type SBOMDriftCIGatePlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  blocked: boolean;
+  fail_on_risk: string;
+  cyclonedx_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  diff: SBOMDriftDiff;
+  artifacts: string[];
+  commands: string[];
+  actions: string[];
+  notes?: string[];
+};
+
+export type SBOMDriftCIGatePlanResponse = {
+  plan: SBOMDriftCIGatePlan;
+};
+
 export type SBOMDriftEvidenceResponse = {
   pack_id: string;
   exported_at: string;
   format: string;
   files: string[];
   snapshot: SBOMDriftSnapshot;
+  cyclonedx?: SBOMDriftCycloneDXDocument;
+  ci_gate_plan?: SBOMDriftCIGatePlan;
 };
 
 export type SBOMDriftClientOptions = {
@@ -194,6 +247,14 @@ export class SBOMDriftClient {
 
   diff(input: SBOMDriftDiffRequest): Promise<SBOMDriftDiffResponse> {
     return this.request<SBOMDriftDiffResponse>("POST", "/v1/sbom-drift/diff", input);
+  }
+
+  cycloneDX(id = "current"): Promise<SBOMDriftCycloneDXResponse> {
+    return this.request<SBOMDriftCycloneDXResponse>("GET", `/v1/sbom-drift/cyclonedx/${enc(id)}`);
+  }
+
+  ciGatePlan(input: SBOMDriftCIGatePlanRequest): Promise<SBOMDriftCIGatePlanResponse> {
+    return this.request<SBOMDriftCIGatePlanResponse>("POST", "/v1/sbom-drift/ci-gate/plan", input);
   }
 
   evidence(id: string): Promise<SBOMDriftEvidenceResponse> {

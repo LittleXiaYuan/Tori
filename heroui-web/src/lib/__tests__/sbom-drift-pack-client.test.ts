@@ -9,7 +9,7 @@ describe("sbom-drift-pack-client", () => {
   it("reads SBOM Drift pack status and snapshots through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, vulnerability_ready: false, snapshot_count: 1, capabilities: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, vulnerability_ready: false, govulncheck_ready: false, snapshot_count: 1, capabilities: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshots: [{ id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 } }], count: 1 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshot: { id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 }, components: [] } }), { status: 200 }));
 
@@ -45,11 +45,20 @@ describe("sbom-drift-pack-client", () => {
   it("exports JSON evidence packs by snapshot id", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", exported_at: "now", format: "json-sbom-drift-evidence", files: ["snapshot.json"], snapshot: { id: "baseline" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ bom: { bomFormat: "CycloneDX", specVersion: "1.5", version: 1, metadata: {}, components: [] }, snapshot: { id: "baseline" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ plan: { pack_id: "yunque.pack.sbom-drift", blocked: false, ci_gate_plan_ready: true, ci_gate_ready: false, artifacts: ["dist/sbom.cdx.json"], commands: [], actions: [], diff: { risk_level: "none" } } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", exported_at: "now", format: "json-sbom-drift-evidence", files: ["snapshot.json", "sbom.cdx.json", "ci-gate-plan.json"], snapshot: { id: "baseline" } }), { status: 200 }));
 
     const client = createSBOMDriftPackClient();
+    await client.cycloneDX("baseline");
+    await client.ciGatePlan({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
     await client.evidence("baseline");
 
-    expect(spy.mock.calls[0]?.[0]).toBe("/v1/sbom-drift/evidence/baseline");
+    expect(spy.mock.calls.map((call) => call[0])).toEqual([
+      "/v1/sbom-drift/cyclonedx/baseline",
+      "/v1/sbom-drift/ci-gate/plan",
+      "/v1/sbom-drift/evidence/baseline",
+    ]);
+    expect(JSON.parse(String((spy.mock.calls[1]?.[1] as RequestInit).body))).toEqual({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
   });
 });
