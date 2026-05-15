@@ -79,7 +79,6 @@ type Sentinel struct {
 
 	stopCh chan struct{}
 	doneCh chan struct{}
-	once   sync.Once
 }
 
 // NewSentinel wires a Sentinel around the given store and registry.
@@ -106,25 +105,53 @@ func (s *Sentinel) Start(ctx context.Context) {
 	if s.policy.Interval <= 0 {
 		return
 	}
-	s.once.Do(func() {
-		s.stopCh = make(chan struct{})
-		s.doneCh = make(chan struct{})
-		go s.loop(ctx)
-	})
+	s.mu.Lock()
+	if s.stopCh != nil {
+		select {
+		case <-s.stopCh:
+		default:
+			s.mu.Unlock()
+			return
+		}
+	}
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	s.stopCh = stopCh
+	s.doneCh = doneCh
+	s.mu.Unlock()
+
+	go s.loop(ctx, stopCh, doneCh)
 }
 
 // Stop halts the background loop if running.  Safe to call without Start.
 func (s *Sentinel) Stop() {
-	if s == nil || s.stopCh == nil {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	stopCh := s.stopCh
+	doneCh := s.doneCh
+	if stopCh == nil {
+		s.mu.Unlock()
 		return
 	}
 	select {
-	case <-s.stopCh:
-		return // already stopped
+	case <-stopCh:
+		s.mu.Unlock()
+		return
 	default:
+		close(stopCh)
 	}
-	close(s.stopCh)
-	<-s.doneCh
+	s.mu.Unlock()
+
+	<-doneCh
+
+	s.mu.Lock()
+	if s.stopCh == stopCh {
+		s.stopCh = nil
+		s.doneCh = nil
+	}
+	s.mu.Unlock()
 }
 
 // Scan runs one evaluation pass over the recent trace window, updates the
@@ -133,12 +160,12 @@ func (s *Sentinel) Stop() {
 // set after the scan, sorted by (severity desc, id asc).
 //
 // Three rule families run per scan:
-//   1. Runtime SLO rules fed by the TraceStore (unhealthy score, chronic
-//      suppression, persistent template errors).
-//   2. Declarative Check failures drawn from Registry.VerifyAll — treats a
-//      broken assertion as a config-level regression.
-//   3. Recovery: any alert key no longer matched is evicted so stale
-//      conditions don't haunt the UI.
+//  1. Runtime SLO rules fed by the TraceStore (unhealthy score, chronic
+//     suppression, persistent template errors).
+//  2. Declarative Check failures drawn from Registry.VerifyAll — treats a
+//     broken assertion as a config-level regression.
+//  3. Recovery: any alert key no longer matched is evicted so stale
+//     conditions don't haunt the UI.
 func (s *Sentinel) Scan() []Alert {
 	if s == nil || s.store == nil {
 		return nil
@@ -322,15 +349,15 @@ func (s *Sentinel) evaluate(m HealthMetrics) []Alert {
 	return out
 }
 
-func (s *Sentinel) loop(ctx context.Context) {
-	defer close(s.doneCh)
+func (s *Sentinel) loop(ctx context.Context, stopCh <-chan struct{}, doneCh chan<- struct{}) {
+	defer close(doneCh)
 	t := time.NewTicker(s.policy.Interval)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-s.stopCh:
+		case <-stopCh:
 			return
 		case <-t.C:
 			s.Scan()

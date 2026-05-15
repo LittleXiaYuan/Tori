@@ -43,11 +43,11 @@ func TestCogniBus_Route_MultipleWinners(t *testing.T) {
 	bus := NewCogniBus(eval, cfg)
 
 	bus.Register(&Declaration{
-		ID:       "a",
+		ID:         "a",
 		Activation: ActivationRules{Keywords: []string{"test"}, MinScore: 0.1},
 	})
 	bus.Register(&Declaration{
-		ID:       "b",
+		ID:         "b",
 		Activation: ActivationRules{Keywords: []string{"test"}, MinScore: 0.1},
 	})
 
@@ -62,7 +62,7 @@ func TestCogniBus_Route_NoMatch(t *testing.T) {
 	bus := NewCogniBus(eval, DefaultBusConfig())
 
 	bus.Register(&Declaration{
-		ID:       "specific",
+		ID:         "specific",
 		Activation: ActivationRules{Keywords: []string{"special"}, MinScore: 0.5},
 	})
 
@@ -87,7 +87,7 @@ func TestCogniBus_CustomBidder(t *testing.T) {
 	bus := NewCogniBus(eval, cfg)
 
 	bus.Register(&Declaration{
-		ID:       "smart",
+		ID:         "smart",
 		Activation: ActivationRules{Keywords: []string{"code"}, MinScore: 0.1},
 	})
 	bus.RegisterBidder("smart", &mockBidder{
@@ -115,6 +115,32 @@ func TestCogniBus_RegisterUnregister(t *testing.T) {
 	bus.Unregister("a")
 	if bus.ActiveCognis() != 0 {
 		t.Errorf("active = %d, want 0", bus.ActiveCognis())
+	}
+}
+
+func TestCogniBus_ClearRemovesCognisAndBidders(t *testing.T) {
+	eval := NewEvaluator()
+	cfg := DefaultBusConfig()
+	cfg.MinConfidence = 0.1
+	bus := NewCogniBus(eval, cfg)
+
+	bus.Register(&Declaration{ID: "a", Activation: ActivationRules{AlwaysOn: true}})
+	bus.RegisterBidder("a", &mockBidder{
+		bid: &Bid{Confidence: 0.95, Cost: 0.01, ETA: time.Millisecond, Reason: "custom"},
+	})
+	if bus.ActiveCognis() != 1 {
+		t.Fatalf("active = %d, want 1", bus.ActiveCognis())
+	}
+	if got := bus.Route(context.Background(), Session{Message: "anything"}); len(got.Winners) != 1 {
+		t.Fatalf("expected winner before clear, got %#v", got)
+	}
+
+	bus.Clear()
+	if bus.ActiveCognis() != 0 {
+		t.Fatalf("active after clear = %d, want 0", bus.ActiveCognis())
+	}
+	if got := bus.Route(context.Background(), Session{Message: "anything"}); len(got.Winners) != 0 || len(got.AllBids) != 0 {
+		t.Fatalf("expected no routing after clear, got %#v", got)
 	}
 }
 

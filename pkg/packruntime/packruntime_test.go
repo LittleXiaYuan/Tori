@@ -262,3 +262,68 @@ func TestRegistryInstallEnableDisableAndRollback(t *testing.T) {
 		t.Fatalf("expected rollback to swap artifacts: %#v", rolledBack)
 	}
 }
+
+func TestRegistryOnChangeEmitsMutationEvents(t *testing.T) {
+	registry, err := NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+
+	var events []ChangeEvent
+	registry.OnChange(func(event ChangeEvent) {
+		events = append(events, event)
+	})
+
+	if _, err := registry.Install(backupManifest("0.1.0"), "packs/examples/backup-pack"); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if _, err := registry.Disable("yunque.pack.backup"); err != nil {
+		t.Fatalf("Disable: %v", err)
+	}
+	if _, err := registry.Enable("yunque.pack.backup"); err != nil {
+		t.Fatalf("Enable: %v", err)
+	}
+	if _, err := registry.Install(backupManifest("0.1.1"), "packs/examples/backup-pack"); err != nil {
+		t.Fatalf("Install update: %v", err)
+	}
+	if _, err := registry.Rollback("yunque.pack.backup"); err != nil {
+		t.Fatalf("Rollback: %v", err)
+	}
+
+	if len(events) != 5 {
+		t.Fatalf("expected 5 change events, got %#v", events)
+	}
+	want := []struct {
+		reason ChangeReason
+		prev   PackStatus
+		status PackStatus
+	}{
+		{ChangeReasonInstall, "", PackStatusEnabled},
+		{ChangeReasonDisable, PackStatusEnabled, PackStatusDisabled},
+		{ChangeReasonEnable, PackStatusDisabled, PackStatusEnabled},
+		{ChangeReasonUpdate, PackStatusEnabled, PackStatusEnabled},
+		{ChangeReasonRollback, PackStatusEnabled, PackStatusEnabled},
+	}
+	for i, item := range want {
+		if events[i].Reason != item.reason || events[i].PreviousStatus != item.prev || events[i].Status != item.status {
+			t.Fatalf("event %d mismatch: got %#v want reason=%s prev=%s status=%s", i, events[i], item.reason, item.prev, item.status)
+		}
+		if events[i].Pack.Manifest.ID != "yunque.pack.backup" {
+			t.Fatalf("event %d pack ID mismatch: %#v", i, events[i])
+		}
+	}
+
+	// Hook payloads are snapshots, not aliases into the registry's mutable
+	// artifact pointers. Runtime modules can safely inspect them after the
+	// mutation has completed.
+	withArtifacts := backupManifest("0.2.0")
+	artifact := &PackArtifacts{SHA256: "snapshot-sha", PackagePath: filepath.Join(t.TempDir(), "pack.tgz")}
+	if _, err := registry.InstallWithArtifacts(withArtifacts, "downloaded://backup-0.2.0", artifact); err != nil {
+		t.Fatalf("InstallWithArtifacts: %v", err)
+	}
+	artifact.SHA256 = "mutated-after-install"
+	last := events[len(events)-1]
+	if last.Pack.Artifacts == nil || last.Pack.Artifacts.SHA256 != "snapshot-sha" {
+		t.Fatalf("expected event artifacts to be cloned, got %#v", last.Pack.Artifacts)
+	}
+}

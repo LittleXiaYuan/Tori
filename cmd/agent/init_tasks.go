@@ -88,7 +88,7 @@ func initTasks(app *agentrt.App) error {
 	} else {
 		ensureBuiltinPacks(packRegistry)
 		gw.SetPackRegistry(packRegistry)
-		app.Set("pack_runtime_registry", packRegistry)
+		app.Set(agentrt.CompPackRuntimeRegistry, packRegistry)
 		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()))
 	}
 	if sa.hbService != nil {

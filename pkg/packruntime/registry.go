@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -55,11 +56,35 @@ type RegistrySnapshot struct {
 	Packs   []InstalledPack `json:"packs"`
 }
 
+type ChangeReason string
+
+const (
+	ChangeReasonInstall  ChangeReason = "install"
+	ChangeReasonUpdate   ChangeReason = "update"
+	ChangeReasonEnable   ChangeReason = "enable"
+	ChangeReasonDisable  ChangeReason = "disable"
+	ChangeReasonRollback ChangeReason = "rollback"
+)
+
+// ChangeEvent is emitted after a registry mutation has been persisted. Runtime
+// modules use it to bind pack enabled/disabled state to background workloads
+// without polling installed.json.
+type ChangeEvent struct {
+	Pack           InstalledPack `json:"pack"`
+	PreviousStatus PackStatus    `json:"previousStatus,omitempty"`
+	Status         PackStatus    `json:"status"`
+	Reason         ChangeReason  `json:"reason"`
+}
+
+type ChangeHook func(ChangeEvent)
+
 type Registry struct {
 	root     string
 	path     string
 	snapshot RegistrySnapshot
 	now      func() time.Time
+	hooksMu  sync.RWMutex
+	hooks    []ChangeHook
 }
 
 func NewRegistry(root string) (*Registry, error) {
@@ -113,6 +138,7 @@ func (r *Registry) InstallWithArtifacts(manifest Manifest, source string, artifa
 	}
 	for i, pack := range r.snapshot.Packs {
 		if pack.Manifest.ID == manifest.ID {
+			previousStatus := pack.Status
 			pack.PreviousVersion = pack.Manifest.Version
 			pack.PreviousArtifacts = clonePackArtifacts(pack.Artifacts)
 			pack.Manifest = manifest
@@ -124,13 +150,21 @@ func (r *Registry) InstallWithArtifacts(manifest Manifest, source string, artifa
 			}
 			r.snapshot.Packs[i] = pack
 			r.snapshot.Version++
-			return pack, r.save()
+			if err := r.save(); err != nil {
+				return pack, err
+			}
+			r.notify(ChangeEvent{Pack: cloneInstalledPack(pack), PreviousStatus: previousStatus, Status: pack.Status, Reason: ChangeReasonUpdate})
+			return pack, nil
 		}
 	}
 	pack := InstalledPack{Manifest: manifest, Status: status, Source: source, Artifacts: clonePackArtifacts(artifacts), InstalledAt: now, UpdatedAt: now}
 	r.snapshot.Packs = append(r.snapshot.Packs, pack)
 	r.snapshot.Version++
-	return pack, r.save()
+	if err := r.save(); err != nil {
+		return pack, err
+	}
+	r.notify(ChangeEvent{Pack: cloneInstalledPack(pack), Status: pack.Status, Reason: ChangeReasonInstall})
+	return pack, nil
 }
 
 func (r *Registry) CacheDistribution(ctx context.Context, manifest Manifest) (*PackArtifacts, error) {
@@ -284,11 +318,41 @@ func clonePackArtifacts(artifacts *PackArtifacts) *PackArtifacts {
 	return &clone
 }
 
+func cloneInstalledPack(pack InstalledPack) InstalledPack {
+	pack.Artifacts = clonePackArtifacts(pack.Artifacts)
+	pack.PreviousArtifacts = clonePackArtifacts(pack.PreviousArtifacts)
+	return pack
+}
+
+// OnChange registers a synchronous hook that runs after successful registry
+// mutations. Hooks are intentionally process-local and are not serialized into
+// installed.json.
+func (r *Registry) OnChange(fn ChangeHook) {
+	if r == nil || fn == nil {
+		return
+	}
+	r.hooksMu.Lock()
+	defer r.hooksMu.Unlock()
+	r.hooks = append(r.hooks, fn)
+}
+
+func (r *Registry) notify(event ChangeEvent) {
+	if r == nil {
+		return
+	}
+	r.hooksMu.RLock()
+	hooks := append([]ChangeHook(nil), r.hooks...)
+	r.hooksMu.RUnlock()
+	for _, hook := range hooks {
+		hook(event)
+	}
+}
+
 func (r *Registry) Enable(id string) (InstalledPack, error) {
-	return r.setStatus(id, PackStatusEnabled)
+	return r.setStatus(id, PackStatusEnabled, ChangeReasonEnable)
 }
 func (r *Registry) Disable(id string) (InstalledPack, error) {
-	return r.setStatus(id, PackStatusDisabled)
+	return r.setStatus(id, PackStatusDisabled, ChangeReasonDisable)
 }
 
 func (r *Registry) Rollback(id string) (InstalledPack, error) {
@@ -307,21 +371,30 @@ func (r *Registry) Rollback(id string) (InstalledPack, error) {
 		pack.UpdatedAt = r.now().UTC()
 		r.snapshot.Packs[i] = pack
 		r.snapshot.Version++
-		return pack, r.save()
+		if err := r.save(); err != nil {
+			return pack, err
+		}
+		r.notify(ChangeEvent{Pack: cloneInstalledPack(pack), PreviousStatus: pack.Status, Status: pack.Status, Reason: ChangeReasonRollback})
+		return pack, nil
 	}
 	return InstalledPack{}, fmt.Errorf("pack %q is not installed", id)
 }
 
-func (r *Registry) setStatus(id string, status PackStatus) (InstalledPack, error) {
+func (r *Registry) setStatus(id string, status PackStatus, reason ChangeReason) (InstalledPack, error) {
 	for i, pack := range r.snapshot.Packs {
 		if pack.Manifest.ID != id {
 			continue
 		}
+		previousStatus := pack.Status
 		pack.Status = status
 		pack.UpdatedAt = r.now().UTC()
 		r.snapshot.Packs[i] = pack
 		r.snapshot.Version++
-		return pack, r.save()
+		if err := r.save(); err != nil {
+			return pack, err
+		}
+		r.notify(ChangeEvent{Pack: cloneInstalledPack(pack), PreviousStatus: previousStatus, Status: pack.Status, Reason: reason})
+		return pack, nil
 	}
 	return InstalledPack{}, fmt.Errorf("pack %q is not installed", id)
 }
