@@ -99,6 +99,8 @@ for (const token of [
   "approval-queue-entry.json",
   "approval-decision-plan.json",
   "approval-writeback-plan.json",
+  "approval-queue-store.json",
+  "approval-queue-record.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",
@@ -124,7 +126,7 @@ for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "�
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json"]) {
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json"]) {
   if (!frontendTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
 
@@ -192,6 +194,8 @@ for (const token of [
   "approval-gate-plan.json",
   "approval-decision-plan.json",
   "approval-writeback-plan.json",
+  "approval-queue-store.json",
+  "approval-queue-record.json",
   "signature-verification.json",
   "downloads",
   "json-wasm-plugin-evidence",
@@ -269,6 +273,8 @@ for (const token of [
   "approval-queue-entry.json",
   "approval-decision-plan.json",
   "approval-writeback-plan.json",
+  "approval-queue-store.json",
+  "approval-queue-record.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",

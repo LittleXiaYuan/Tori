@@ -175,6 +175,8 @@ type RemoteInstallApprovalDecisionPlanRequest struct {
 
 type RemoteInstallApprovalWritebackPlanRequest = RemoteInstallApprovalDecisionPlanRequest
 
+type RemoteInstallApprovalQueueWritebackRequest = RemoteInstallApprovalWritebackPlanRequest
+
 type RemoteInstallPlanReport struct {
 	PackID                 string                    `json:"pack_id"`
 	GeneratedAt            time.Time                 `json:"generated_at"`
@@ -306,6 +308,97 @@ type RemoteInstallApprovalWritebackPlanReport struct {
 	RemoteInstallPlanSummary       RemoteInstallPlanReport         `json:"remote_install_plan_summary"`
 	ApprovalGatePlanSummary        RemoteInstallApprovalPlanReport `json:"approval_gate_plan_summary"`
 	Notes                          []string                        `json:"notes,omitempty"`
+}
+
+type RemoteInstallApprovalQueueWritebackReport struct {
+	PackID                               string                                   `json:"pack_id"`
+	GeneratedAt                          time.Time                                `json:"generated_at"`
+	Status                               string                                   `json:"status"`
+	ApprovalQueueStoreReady              bool                                     `json:"approval_queue_store_ready"`
+	ApprovalWritebackPlanReady           bool                                     `json:"approval_writeback_plan_ready"`
+	ApprovalWritebackReady               bool                                     `json:"approval_writeback_ready"`
+	ApprovalQueueReady                   bool                                     `json:"approval_queue_ready"`
+	WritesApprovalQueue                  bool                                     `json:"writes_approval_queue"`
+	WritesApprovalQueueStore             bool                                     `json:"writes_approval_queue_store"`
+	ApprovalDecisionReady                bool                                     `json:"approval_decision_ready"`
+	AppliesApprovalDecision              bool                                     `json:"applies_approval_decision"`
+	WritesFiles                          bool                                     `json:"writes_files"`
+	Downloads                            bool                                     `json:"downloads"`
+	NetworkAccess                        bool                                     `json:"network_access"`
+	InstallsPlugin                       bool                                     `json:"installs_plugin"`
+	Decision                             string                                   `json:"decision"`
+	DecisionBy                           string                                   `json:"decision_by"`
+	DecisionReason                       string                                   `json:"decision_reason,omitempty"`
+	RequestID                            string                                   `json:"request_id"`
+	RequestKey                           string                                   `json:"request_key"`
+	DecisionKey                          string                                   `json:"decision_key"`
+	InstallerBlockedUntilWriteback       bool                                     `json:"installer_blocked_until_writeback"`
+	InstallerBlockedUntilInstallerWiring bool                                     `json:"installer_blocked_until_installer_wiring"`
+	ApprovalQueueRecord                  ApprovalQueueRecord                      `json:"approval_queue_record"`
+	ApprovalQueueStore                   ApprovalQueueStoreSummary                `json:"approval_queue_store"`
+	PlanSummary                          RemoteInstallApprovalWritebackPlanReport `json:"plan_summary"`
+	Checks                               []RemoteInstallCheck                     `json:"checks"`
+	Artifacts                            []string                                 `json:"artifacts"`
+	Actions                              []string                                 `json:"actions"`
+	Labels                               []string                                 `json:"labels"`
+	Metadata                             map[string]string                        `json:"metadata,omitempty"`
+	Notes                                []string                                 `json:"notes,omitempty"`
+}
+
+type ApprovalQueueStoreSummary struct {
+	PackID                   string   `json:"pack_id"`
+	QueueName                string   `json:"queue_name"`
+	Store                    string   `json:"store"`
+	StoreReady               bool     `json:"store_ready"`
+	RecordCount              int      `json:"record_count"`
+	Artifact                 string   `json:"artifact"`
+	WritesFiles              bool     `json:"writes_files"`
+	WritesApprovalQueue      bool     `json:"writes_approval_queue"`
+	WritesApprovalQueueStore bool     `json:"writes_approval_queue_store"`
+	InstallerWritebackReady  bool     `json:"installer_writeback_ready"`
+	Notes                    []string `json:"notes,omitempty"`
+}
+
+type ApprovalQueueRecord struct {
+	PackID                               string                   `json:"pack_id"`
+	QueueName                            string                   `json:"queue_name"`
+	RequestID                            string                   `json:"request_id"`
+	RequestKey                           string                   `json:"request_key"`
+	DecisionKey                          string                   `json:"decision_key"`
+	Decision                             string                   `json:"decision"`
+	DecisionBy                           string                   `json:"decision_by"`
+	DecisionReason                       string                   `json:"decision_reason,omitempty"`
+	RiskTier                             string                   `json:"risk_tier"`
+	RequestedBy                          string                   `json:"requested_by,omitempty"`
+	Reason                               string                   `json:"reason,omitempty"`
+	Status                               string                   `json:"status"`
+	CreatedAt                            time.Time                `json:"created_at"`
+	UpdatedAt                            time.Time                `json:"updated_at"`
+	ApprovalQueueStoreReady              bool                     `json:"approval_queue_store_ready"`
+	WritesApprovalQueue                  bool                     `json:"writes_approval_queue"`
+	WritesApprovalQueueStore             bool                     `json:"writes_approval_queue_store"`
+	ApprovalWritebackReady               bool                     `json:"approval_writeback_ready"`
+	ApprovalQueueReady                   bool                     `json:"approval_queue_ready"`
+	ApprovalDecisionReady                bool                     `json:"approval_decision_ready"`
+	AppliesApprovalDecision              bool                     `json:"applies_approval_decision"`
+	InstallerBlockedUntilWriteback       bool                     `json:"installer_blocked_until_writeback"`
+	InstallerBlockedUntilInstallerWiring bool                     `json:"installer_blocked_until_installer_wiring"`
+	Plugin                               RemoteInstallPluginPlan  `json:"plugin"`
+	Package                              RemoteInstallPackagePlan `json:"package"`
+	SignatureGateStatus                  string                   `json:"signature_gate_status"`
+	CanonicalPayloadSHA256               string                   `json:"canonical_payload_sha256"`
+	ApprovalQueueEntry                   ApprovalQueueEntryPlan   `json:"approval_queue_entry"`
+	DecisionPlan                         ApprovalDecisionPlan     `json:"decision_plan"`
+	WritebackPlan                        ApprovalWritebackPlan    `json:"writeback_plan"`
+	StoreArtifact                        string                   `json:"store_artifact"`
+	Downloads                            bool                     `json:"downloads"`
+	WritesFiles                          bool                     `json:"writes_files"`
+	NetworkAccess                        bool                     `json:"network_access"`
+	InstallsPlugin                       bool                     `json:"installs_plugin"`
+	Artifacts                            []string                 `json:"artifacts"`
+	Labels                               []string                 `json:"labels"`
+	Metadata                             map[string]string        `json:"metadata,omitempty"`
+	Notes                                []string                 `json:"notes,omitempty"`
 }
 
 type ApprovalQueueEntryPlan struct {
@@ -621,6 +714,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/plan", Handler: h.RemoteInstallApprovalPlan},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/decision/plan", Handler: h.RemoteInstallApprovalDecisionPlan},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/writeback/plan", Handler: h.RemoteInstallApprovalWritebackPlan},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/queue/writeback", Handler: h.RemoteInstallApprovalQueueWriteback},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -641,6 +735,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			loaded++
 		}
 	}
+	approvalQueueSummary := h.approvalQueueStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                           PackID,
 		"stage":                             "pack-shell-before-runtime-hosts",
@@ -657,15 +752,17 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"approval_gate_plan_ready":          true,
 		"approval_gate_ready":               false,
 		"approval_queue_plan_ready":         true,
-		"approval_queue_ready":              false,
+		"approval_queue_ready":              true,
+		"approval_queue_store_ready":        true,
 		"approval_decision_plan_ready":      true,
-		"approval_decision_ready":           false,
+		"approval_decision_ready":           true,
 		"approval_writeback_plan_ready":     true,
-		"approval_writeback_ready":          false,
+		"approval_writeback_ready":          true,
 		"plugin_count":                      len(plugins),
 		"loaded_count":                      loaded,
 		"plugin_dir":                        h.pluginDir,
 		"store_dir":                         h.dataDir,
+		"approval_queue_store":              approvalQueueSummary,
 		"sandbox":                           h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
@@ -681,9 +778,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.remote_install.approval_plan",
 			"wasm.remote_install.approval_decision_plan",
 			"wasm.remote_install.approval_writeback_plan",
+			"wasm.remote_install.approval_queue_writeback",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, and approval queue write-back bridge plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, decision application, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, and pack-local approval queue write-back persistence are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, installer continuation, and plugin registration remain follow-up wiring."},
 	})
 }
 
@@ -927,6 +1025,24 @@ func (h *Handler) RemoteInstallApprovalWritebackPlan(w http.ResponseWriter, r *h
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) RemoteInstallApprovalQueueWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallApprovalQueueWritebackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install approval queue writeback payload")
+		return
+	}
+	report, err := h.writeRemoteInstallApprovalQueue(req, true)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -939,11 +1055,13 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	remotePlan := h.remoteInstallPlanForPlugin(plugin)
+	writebackPlan := h.remoteInstallApprovalWritebackPlanForPlugin(plugin)
+	queueRecord := h.approvalQueueRecordPreview(writebackPlan)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                 PackID,
 		"exported_at":             h.now().UTC(),
 		"format":                  "json-wasm-plugin-evidence",
-		"files":                   []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "sandbox-stats.json"},
+		"files":                   []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "sandbox-stats.json"},
 		"plugin":                  plugin,
 		"plan":                    permissionPlan(plugin.Permissions),
 		"host_abi_plan":           hostABIPlan(plugin.Permissions),
@@ -953,7 +1071,9 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"signature_verification":  remotePlan.SignatureVerification,
 		"approval_gate_plan":      h.remoteInstallApprovalPlanForPlugin(plugin),
 		"approval_decision_plan":  h.remoteInstallApprovalDecisionPlanForPlugin(plugin),
-		"approval_writeback_plan": h.remoteInstallApprovalWritebackPlanForPlugin(plugin),
+		"approval_writeback_plan": writebackPlan,
+		"approval_queue_store":    h.approvalQueueStoreSummary(),
+		"approval_queue_record":   queueRecord,
 		"sandbox":                 h.sandbox.Stats(),
 	})
 }
@@ -1711,6 +1831,141 @@ func (h *Handler) buildRemoteInstallApprovalWritebackPlan(req RemoteInstallAppro
 	}, nil
 }
 
+func (h *Handler) writeRemoteInstallApprovalQueue(req RemoteInstallApprovalQueueWritebackRequest, requirePackageURL bool) (RemoteInstallApprovalQueueWritebackReport, error) {
+	plan, err := h.buildRemoteInstallApprovalWritebackPlan(RemoteInstallApprovalWritebackPlanRequest(req), requirePackageURL)
+	if err != nil {
+		return RemoteInstallApprovalQueueWritebackReport{}, err
+	}
+	record := h.approvalQueueRecordFromPlan(plan, true)
+	if err := h.saveApprovalQueueRecord(record); err != nil {
+		return RemoteInstallApprovalQueueWritebackReport{}, err
+	}
+	store := h.approvalQueueStoreSummary()
+	checks := append([]RemoteInstallCheck{}, plan.Checks...)
+	checks = append(checks,
+		RemoteInstallCheck{Name: "approval_queue_store_ready", Required: true, Ready: true, Reason: "pack-local approval queue store is writable"},
+		RemoteInstallCheck{Name: "approval_queue_record_persisted", Required: true, Ready: true, Reason: "approval queue entry and decision were persisted into approval-queue-store.json"},
+		RemoteInstallCheck{Name: "installer_continuation_wired", Required: true, Ready: false, Reason: "installer continuation still requires explicit installer routing and package verifier/download wiring"},
+	)
+	return RemoteInstallApprovalQueueWritebackReport{
+		PackID:                               PackID,
+		GeneratedAt:                          h.now().UTC(),
+		Status:                               "approval_queue_written_pending_installer_wiring",
+		ApprovalQueueStoreReady:              true,
+		ApprovalWritebackPlanReady:           plan.ApprovalWritebackPlanReady,
+		ApprovalWritebackReady:               true,
+		ApprovalQueueReady:                   true,
+		WritesApprovalQueue:                  true,
+		WritesApprovalQueueStore:             true,
+		ApprovalDecisionReady:                true,
+		AppliesApprovalDecision:              true,
+		WritesFiles:                          false,
+		Downloads:                            false,
+		NetworkAccess:                        false,
+		InstallsPlugin:                       false,
+		Decision:                             plan.Decision,
+		DecisionBy:                           plan.DecisionBy,
+		DecisionReason:                       plan.DecisionReason,
+		RequestID:                            plan.RequestID,
+		RequestKey:                           plan.RequestKey,
+		DecisionKey:                          plan.DecisionKey,
+		InstallerBlockedUntilWriteback:       false,
+		InstallerBlockedUntilInstallerWiring: true,
+		ApprovalQueueRecord:                  record,
+		ApprovalQueueStore:                   store,
+		PlanSummary:                          plan,
+		Checks:                               checks,
+		Artifacts:                            []string{"approval-queue-store.json", "approval-queue-record.json", "approval-writeback-plan.json", "approval-decision-plan.json", "approval-queue-entry.json", "approval-gate-plan.json", "remote-install-plan.json", "signature-verification.json"},
+		Actions: []string{
+			"persisted approval queue entry and decision into the pack-local approval queue store",
+			"kept package download, signature verification, install write-back, and plugin registration blocked until installer wiring is explicit",
+		},
+		Labels:   []string{"remote-install", "approval-queue-writeback", "pack-local-store", "no-download", "no-file-write", "decision-" + plan.Decision},
+		Metadata: cleanStringMap(req.Metadata),
+		Notes: []string{
+			"This route writes only the pack-local approval queue store; it does not download packages, verify signatures, install plugins, or write plugin files.",
+			"approval_writeback_ready=true means queue persistence is available, not that installer continuation has been wired.",
+			"installer_blocked_until_writeback=false after this queue write, but installer_blocked_until_installer_wiring=true remains until verifier/download/install routing lands.",
+		},
+	}, nil
+}
+
+func (h *Handler) approvalQueueRecordPreview(plan RemoteInstallApprovalWritebackPlanReport) ApprovalQueueRecord {
+	return h.approvalQueueRecordFromPlan(plan, false)
+}
+
+func (h *Handler) approvalQueueRecordFromPlan(plan RemoteInstallApprovalWritebackPlanReport, persisted bool) ApprovalQueueRecord {
+	now := h.now().UTC()
+	status := "preview_not_persisted"
+	if persisted {
+		status = "written_pending_installer_wiring"
+	}
+	return ApprovalQueueRecord{
+		PackID:                               PackID,
+		QueueName:                            plan.ApprovalQueueEntry.QueueName,
+		RequestID:                            plan.RequestID,
+		RequestKey:                           plan.RequestKey,
+		DecisionKey:                          plan.DecisionKey,
+		Decision:                             plan.Decision,
+		DecisionBy:                           plan.DecisionBy,
+		DecisionReason:                       plan.DecisionReason,
+		RiskTier:                             plan.ApprovalQueueEntry.RiskTier,
+		RequestedBy:                          plan.ApprovalQueueEntry.RequestedBy,
+		Reason:                               plan.ApprovalQueueEntry.Reason,
+		Status:                               status,
+		CreatedAt:                            now,
+		UpdatedAt:                            now,
+		ApprovalQueueStoreReady:              true,
+		WritesApprovalQueue:                  persisted,
+		WritesApprovalQueueStore:             persisted,
+		ApprovalWritebackReady:               persisted,
+		ApprovalQueueReady:                   persisted,
+		ApprovalDecisionReady:                persisted,
+		AppliesApprovalDecision:              persisted,
+		InstallerBlockedUntilWriteback:       !persisted,
+		InstallerBlockedUntilInstallerWiring: true,
+		Plugin:                               plan.Plugin,
+		Package:                              plan.Package,
+		SignatureGateStatus:                  plan.SignatureVerification.Status,
+		CanonicalPayloadSHA256:               plan.SignatureVerification.CanonicalPayloadSHA256,
+		ApprovalQueueEntry:                   plan.ApprovalQueueEntry,
+		DecisionPlan:                         plan.DecisionPlan,
+		WritebackPlan:                        plan.WritebackPlan,
+		StoreArtifact:                        "approval-queue-store.json",
+		Downloads:                            false,
+		WritesFiles:                          false,
+		NetworkAccess:                        false,
+		InstallsPlugin:                       false,
+		Artifacts:                            []string{"approval-queue-store.json", "approval-queue-record.json", "approval-writeback-plan.json", "approval-decision-plan.json", "approval-queue-entry.json"},
+		Labels:                               []string{"remote-install", "approval-queue-record", "pack-local-store", "installer-blocked", "decision-" + plan.Decision},
+		Metadata:                             cleanStringMap(plan.WritebackPlan.Metadata),
+		Notes: []string{
+			"Pack-local approval queue record; not a package download, signature verification, installer write-back, or plugin registration.",
+			"Installer remains blocked until a later explicit installer route consumes the persisted approval decision.",
+		},
+	}
+}
+
+func (h *Handler) approvalQueueStoreSummary() ApprovalQueueStoreSummary {
+	records, _ := h.loadApprovalQueueRecords()
+	return ApprovalQueueStoreSummary{
+		PackID:                   PackID,
+		QueueName:                "wasm_remote_install",
+		Store:                    "pack-local-json",
+		StoreReady:               true,
+		RecordCount:              len(records),
+		Artifact:                 "approval-queue-store.json",
+		WritesFiles:              false,
+		WritesApprovalQueue:      false,
+		WritesApprovalQueueStore: false,
+		InstallerWritebackReady:  false,
+		Notes: []string{
+			"Store readiness only covers the pack-local approval queue JSON bridge.",
+			"Installer write-back and package installation remain disabled until a later explicit route consumes approved records.",
+		},
+	}
+}
+
 func (h *Handler) buildApprovalDecisionPlan(approvalPlan RemoteInstallApprovalPlanReport, queueEntry ApprovalQueueEntryPlan, decision string, decisionBy string, decisionReason string, metadata map[string]string) ApprovalDecisionPlan {
 	wouldAllowInstallerContinue := decision == "approved"
 	status := "decision_preview_" + decision
@@ -2064,6 +2319,74 @@ func (h *Handler) savePlugin(plugin Plugin) error {
 
 func (h *Handler) pluginMetaPath(slug string) string {
 	return filepath.Join(h.dataDir, "plugins", slug+".json")
+}
+
+func (h *Handler) approvalQueueStorePath() string {
+	return filepath.Join(h.dataDir, "approval-queue-store.json")
+}
+
+func (h *Handler) saveApprovalQueueRecord(record ApprovalQueueRecord) error {
+	if strings.TrimSpace(record.RequestID) == "" || strings.TrimSpace(record.RequestKey) == "" {
+		return fmt.Errorf("approval queue record requires request_id and request_key")
+	}
+	if strings.TrimSpace(record.DecisionKey) == "" {
+		return fmt.Errorf("approval queue record requires decision_key")
+	}
+	records, err := h.loadApprovalQueueRecords()
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i := range records {
+		if records[i].RequestKey == record.RequestKey || records[i].RequestID == record.RequestID {
+			if records[i].CreatedAt.IsZero() {
+				records[i].CreatedAt = record.CreatedAt
+			}
+			record.CreatedAt = records[i].CreatedAt
+			records[i] = record
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].RequestKey < records[j].RequestKey })
+	if err := os.MkdirAll(filepath.Dir(h.approvalQueueStorePath()), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(map[string]any{
+		"pack_id":      PackID,
+		"queue_name":   "wasm_remote_install",
+		"format":       "json-wasm-plugin-approval-queue-store",
+		"record_count": len(records),
+		"updated_at":   h.now().UTC(),
+		"records":      records,
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.approvalQueueStorePath(), data, 0o644)
+}
+
+func (h *Handler) loadApprovalQueueRecords() ([]ApprovalQueueRecord, error) {
+	data, err := os.ReadFile(h.approvalQueueStorePath())
+	if os.IsNotExist(err) {
+		return []ApprovalQueueRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Records []ApprovalQueueRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	if payload.Records == nil {
+		payload.Records = []ApprovalQueueRecord{}
+	}
+	return payload.Records, nil
 }
 
 func normalizeModulePath(raw string, slug string) (string, error) {

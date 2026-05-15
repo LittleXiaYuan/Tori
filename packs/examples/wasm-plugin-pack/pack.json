@@ -24,6 +24,7 @@
       "wasm.remote_install.approval_plan",
       "wasm.remote_install.approval_decision_plan",
       "wasm.remote_install.approval_writeback_plan",
+      "wasm.remote_install.approval_queue_writeback",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -37,6 +38,7 @@
       "/v1/wasm-plugin/remote-install/approval/plan",
       "/v1/wasm-plugin/remote-install/approval/decision/plan",
       "/v1/wasm-plugin/remote-install/approval/writeback/plan",
+      "/v1/wasm-plugin/remote-install/approval/queue/writeback",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -100,6 +102,11 @@
         "method": "POST",
         "path": "/v1/wasm-plugin/remote-install/approval/writeback/plan",
         "description": "Preview a non-destructive approval queue write-back bridge plan without persisting decisions or allowing installer continuation."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/approval/queue/writeback",
+        "description": "Persist only a pack-local approval queue store record for a remote install decision; no package download, signature verification, plugin file write, or installer continuation is performed."
       },
       {
         "method": "GET",

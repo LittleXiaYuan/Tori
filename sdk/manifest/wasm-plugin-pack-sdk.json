@@ -1,13 +1,13 @@
 {
   "version": 1,
   "domain": "wasm-plugin-pack",
-  "description": "WASM Plugin capability pack manifest binding for Pack Runtime route gates, frontend sync, sandbox lifecycle, Host ABI execution gate, module integrity gate, remote signature verification gate preview, approval decision/writeback plan previews, permission plans, evidence export, and lightweight SDK import discovery.",
+  "description": "WASM Plugin capability pack manifest binding for Pack Runtime route gates, frontend sync, sandbox lifecycle, Host ABI execution gate, module integrity gate, remote signature verification gate preview, approval decision/writeback plan previews, pack-local approval queue writeback persistence, permission plans, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose WASM plugin registry, load/unload lifecycle, dry-run sandbox execution, Host ABI plan/execution-gate previews, remote signature verification gate previews, approval gate/decision/writeback plan previews, and JSON evidence export as a high-risk optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Expose WASM plugin registry, load/unload lifecycle, dry-run sandbox execution, Host ABI plan/execution-gate previews, remote signature verification gate previews, approval gate/decision/writeback plan previews, pack-local approval queue writeback persistence, and JSON evidence export as a high-risk optional Pack Runtime capability instead of a hard-coded main-shell feature.",
     "Keep WASM method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Keep privileged Host ABI requests blocked during real execution until host_abi_enforcement_ready becomes true.",
     "Keep local WASM module bytes matched to registered SHA-256 metadata before sandbox execution.",
-    "Keep remote signed package installs blocked behind deterministic signature_verification, approval decision, and approval writeback plan previews until signature_verify_ready, approval_decision_ready, approval_writeback_ready, and explicit installer write-back become true.",
+    "Keep remote signed package installs blocked behind deterministic signature_verification, approval decision, and pack-local approval queue writeback persistence until signature_verify_ready and explicit installer wiring become true.",
     "Let external projects import yunque-client/wasm-plugin only when the WASM Plugin pack is installed and enabled."
   ],
   "packManifest": "packs/examples/wasm-plugin-pack/pack.json",
@@ -24,6 +24,7 @@
     "POST /v1/wasm-plugin/remote-install/approval/plan",
     "POST /v1/wasm-plugin/remote-install/approval/decision/plan",
     "POST /v1/wasm-plugin/remote-install/approval/writeback/plan",
+    "POST /v1/wasm-plugin/remote-install/approval/queue/writeback",
     "GET /v1/wasm-plugin/evidence/"
   ],
   "frontend": {

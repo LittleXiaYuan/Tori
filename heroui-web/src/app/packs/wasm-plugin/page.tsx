@@ -29,6 +29,7 @@ import {
   type WASMPluginExecuteResult,
   type WASMPluginRemoteInstallApprovalDecisionPlan,
   type WASMPluginRemoteInstallApprovalPlan,
+  type WASMPluginRemoteInstallApprovalQueueWriteback,
   type WASMPluginRemoteInstallApprovalWritebackPlan,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginStatus,
@@ -192,6 +193,38 @@ function sampleRemoteApprovalWritebackPlan(slug: string) {
   );
 }
 
+function sampleRemoteApprovalQueueWriteback(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      name: "Calculator Remote WASM",
+      version: "0.2.0",
+      package_url: `https://packs.yunque.local/wasm/${slug}-0.2.0.tgz`,
+      manifest_url: `https://packs.yunque.local/wasm/${slug}.json`,
+      module_path: `${slug}.wasm`,
+      sha256:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      signature: "sig-ed25519-preview",
+      signature_algorithm: "ed25519",
+      public_key_id: "yunque-root-2026",
+      trust_root: "yunque-root-bundle-2026",
+      requested_by: "operator",
+      reason: "persist remote WASM approval decision into pack-local queue",
+      risk_tier: "high",
+      approvers: ["security", "platform"],
+      request_id: "wasm-remote-install-preview",
+      request_key: "preview-request-key",
+      decision: "approved",
+      decision_by: "security",
+      decision_reason:
+        "write only the pack-local approval queue; installer remains blocked",
+      metadata: { ticket: "WASM-REMOTE-QUEUE-WRITEBACK-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -206,6 +239,7 @@ export default function WASMPluginPackPage() {
     | "remote-approval"
     | "remote-approval-decision"
     | "remote-approval-writeback"
+    | "remote-approval-queue-writeback"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +267,11 @@ export default function WASMPluginPackPage() {
   );
   const [remoteWritebackPlan, setRemoteWritebackPlan] =
     useState<WASMPluginRemoteInstallApprovalWritebackPlan | null>(null);
+  const [remoteQueueWritebackJSON, setRemoteQueueWritebackJSON] = useState(() =>
+    sampleRemoteApprovalQueueWriteback("calculator-remote"),
+  );
+  const [remoteQueueWriteback, setRemoteQueueWriteback] =
+    useState<WASMPluginRemoteInstallApprovalQueueWriteback | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -348,6 +387,23 @@ export default function WASMPluginPackPage() {
       showToast("已生成远程安装审批写回桥接计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成远程安装审批写回桥接计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeRemoteApprovalQueue = async () => {
+    setBusy("remote-approval-queue-writeback");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteQueueWritebackJSON);
+      const res =
+        await wasmPluginPack.remoteInstallApprovalQueueWriteback(payload);
+      setRemoteQueueWriteback(res.writeback);
+      showToast("已写入 pack-local 远程安装审批队列", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入远程安装审批队列失败"));
     } finally {
       setBusy(null);
     }
@@ -526,12 +582,14 @@ export default function WASMPluginPackPage() {
               dry-run、权限计划、Host ABI plan preview、真实执行前 Host ABI
               execution gate、远程签名包安装计划、远程安装审批 gate
               计划、审批决策 plan-only
-              预览、审批队列写回桥接计划和证据包放进可选 Pack。请求 ledger_kv /
+              预览、审批队列写回桥接计划、pack-local 审批队列 JSON
+              持久化和证据包放进可选 Pack。请求 ledger_kv /
               memory_search / http_fetch / env_get 的插件在
               host_abi_enforcement_ready=false 时会被真实执行前阻断；本地 WASM
               模块 SHA-256 与注册元数据不一致时也会被 module integrity gate
-              阻断，不进入 sandbox；真实下载、签名验证、审批队列写回、
-              审批决策应用、install 写回、Host ABI 权限强执行和 TinyGo
+              阻断，不进入 sandbox；当前审批写回只落 pack-local queue store，
+              不继续 installer；真实下载、签名验证、install 写回、插件注册、
+              Host ABI 权限强执行和 TinyGo
               示例会在后续切片继续接入。
             </div>
           </div>
@@ -625,7 +683,11 @@ export default function WASMPluginPackPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">审批写回</div>
           <div className="kpi-value text-lg">
-            {status?.approval_writeback_plan_ready ? "plan" : "pending"}
+            {status?.approval_queue_store_ready
+              ? "queue"
+              : status?.approval_writeback_plan_ready
+                ? "plan"
+                : "pending"}
           </div>
           <div className="kpi-label mt-1">
             ready: {String(status?.approval_writeback_ready ?? false)}
@@ -709,6 +771,149 @@ export default function WASMPluginPackPage() {
                 校验 / 注册插件
               </Button>
             </div>
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  远程安装审批队列写回
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  真实写入边界：只把审批 entry / decision 写入 pack-local
+                  approval-queue-store.json，生成 approval-queue-record.json
+                  语义证据；不下载包、不联网、不验签、不写插件文件、不注册插件，installer
+                  仍保持 blocked_until_installer_wiring。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-approval-queue-writeback"}
+                onPress={writeRemoteApprovalQueue}
+              >
+                写入队列
+              </Button>
+            </div>
+            <TextField
+              value={remoteQueueWritebackJSON}
+              onChange={setRemoteQueueWritebackJSON}
+            >
+              <TextArea
+                rows={8}
+                aria-label="WASM remote install approval queue writeback JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                approval_queue_store_ready:{" "}
+                {String(
+                  remoteQueueWriteback?.approval_queue_store_ready ??
+                    status?.approval_queue_store_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_writeback_ready:{" "}
+                {String(
+                  remoteQueueWriteback?.approval_writeback_ready ??
+                    status?.approval_writeback_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_approval_queue:{" "}
+                {String(remoteQueueWriteback?.writes_approval_queue ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_approval_queue_store:{" "}
+                {String(
+                  remoteQueueWriteback?.writes_approval_queue_store ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_queue_ready:{" "}
+                {String(
+                  remoteQueueWriteback?.approval_queue_ready ??
+                    status?.approval_queue_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_decision_ready:{" "}
+                {String(
+                  remoteQueueWriteback?.approval_decision_ready ??
+                    status?.approval_decision_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                applies_approval_decision:{" "}
+                {String(
+                  remoteQueueWriteback?.applies_approval_decision ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_writeback:{" "}
+                {String(
+                  remoteQueueWriteback?.installer_blocked_until_writeback ??
+                    true,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_installer_wiring:{" "}
+                {String(
+                  remoteQueueWriteback
+                    ?.installer_blocked_until_installer_wiring ?? true,
+                )}
+              </Chip>
+              <Chip size="sm">
+                downloads: {String(remoteQueueWriteback?.downloads ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteQueueWriteback?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                network_access:{" "}
+                {String(remoteQueueWriteback?.network_access ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteQueueWriteback?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">
+                store_records:{" "}
+                {remoteQueueWriteback?.approval_queue_store?.record_count ??
+                  status?.approval_queue_store?.record_count ??
+                  0}
+              </Chip>
+              <Chip size="sm">
+                approval_queue_record:{" "}
+                {remoteQueueWriteback?.approval_queue_record?.status ||
+                  "pending"}
+              </Chip>
+              <Chip size="sm">artifact: approval-queue-store.json</Chip>
+              <Chip size="sm">artifact: approval-queue-record.json</Chip>
+            </div>
+            {remoteQueueWriteback && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteQueueWriteback, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM remote install approval queue writeback result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
           </Card>
 
           <Card className="section-card p-4">
@@ -833,10 +1038,10 @@ export default function WASMPluginPackPage() {
                   className="mt-1 text-xs"
                   style={{ color: "var(--yunque-text-muted)" }}
                 >
-                  plan-only 契约：把 approval-queue-entry.json 与
+                  plan-only 契约：只把 approval-queue-entry.json 与
                   approval-decision-plan.json 串成 approval-writeback-plan.json
-                  预览；approval_writeback_ready=false、writes_approval_queue=false，
-                  即使 approved 也保持 installer_blocked_until_writeback=true。
+                  预览；该计划本身不写队列、不应用决策。真实队列写回请使用上方
+                  pack-local queue store 路由，installer continuation 仍需后续显式接线。
                 </div>
               </div>
               <Button
@@ -868,11 +1073,7 @@ export default function WASMPluginPackPage() {
               </Chip>
               <Chip size="sm">
                 approval_writeback_ready:{" "}
-                {String(
-                  remoteWritebackPlan?.approval_writeback_ready ??
-                    status?.approval_writeback_ready ??
-                    false,
-                )}
+                {String(remoteWritebackPlan?.approval_writeback_ready ?? false)}
               </Chip>
               <Chip size="sm">
                 writes_approval_queue:{" "}

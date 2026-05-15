@@ -6,6 +6,8 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "approval-queue-entry.json",
   "approval-decision-plan.json",
   "approval-writeback-plan.json",
+  "approval-queue-store.json",
+  "approval-queue-record.json",
   "signature-verification.json",
 ] as const;
 
@@ -38,6 +40,12 @@ export const WASM_PLUGIN_APPROVAL_DECISION_PLAN_ARTIFACT =
 
 export const WASM_PLUGIN_APPROVAL_WRITEBACK_PLAN_ARTIFACT =
   "approval-writeback-plan.json";
+
+export const WASM_PLUGIN_APPROVAL_QUEUE_STORE_ARTIFACT =
+  "approval-queue-store.json";
+
+export const WASM_PLUGIN_APPROVAL_QUEUE_WRITEBACK_CAPABILITY =
+  "wasm.remote_install.approval_queue_writeback";
 
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
@@ -91,6 +99,8 @@ export interface WASMPluginStatus {
   approval_decision_ready: boolean;
   approval_writeback_plan_ready: boolean;
   approval_writeback_ready: boolean;
+  approval_queue_store_ready: boolean;
+  approval_queue_store?: WASMPluginApprovalQueueStoreSummary;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -231,6 +241,9 @@ export interface WASMPluginRemoteInstallApprovalDecisionPlanInput extends WASMPl
 
 export type WASMPluginRemoteInstallApprovalWritebackPlanInput =
   WASMPluginRemoteInstallApprovalDecisionPlanInput;
+
+export type WASMPluginRemoteInstallApprovalQueueWritebackInput =
+  WASMPluginRemoteInstallApprovalWritebackPlanInput;
 
 export interface WASMPluginRemoteInstallPluginPlan {
   slug: string;
@@ -538,6 +551,97 @@ export interface WASMPluginRemoteInstallApprovalWritebackPlan {
   notes?: string[];
 }
 
+export interface WASMPluginApprovalQueueStoreSummary {
+  pack_id: string;
+  queue_name: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  writes_files: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_store: boolean;
+  installer_writeback_ready: boolean;
+  notes?: string[];
+}
+
+export interface WASMPluginApprovalQueueRecord {
+  pack_id: string;
+  queue_name: string;
+  request_id: string;
+  request_key: string;
+  decision_key: string;
+  decision: "approved" | "denied" | "expired";
+  decision_by: string;
+  decision_reason?: string;
+  risk_tier: string;
+  requested_by?: string;
+  reason?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  approval_queue_store_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_store: boolean;
+  approval_writeback_ready: boolean;
+  approval_queue_ready: boolean;
+  approval_decision_ready: boolean;
+  applies_approval_decision: boolean;
+  installer_blocked_until_writeback: boolean;
+  installer_blocked_until_installer_wiring: boolean;
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  signature_gate_status: string;
+  canonical_payload_sha256: string;
+  approval_queue_entry: WASMPluginApprovalQueueEntryPlan;
+  decision_plan: WASMPluginApprovalDecisionPlan;
+  writeback_plan: WASMPluginApprovalWritebackPlan;
+  store_artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  artifacts: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
+export interface WASMPluginRemoteInstallApprovalQueueWriteback {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_queue_store_ready: boolean;
+  approval_writeback_plan_ready: boolean;
+  approval_writeback_ready: boolean;
+  approval_queue_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_store: boolean;
+  approval_decision_ready: boolean;
+  applies_approval_decision: boolean;
+  writes_files: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  decision: "approved" | "denied" | "expired";
+  decision_by: string;
+  decision_reason?: string;
+  request_id: string;
+  request_key: string;
+  decision_key: string;
+  installer_blocked_until_writeback: boolean;
+  installer_blocked_until_installer_wiring: boolean;
+  approval_queue_record: WASMPluginApprovalQueueRecord;
+  approval_queue_store: WASMPluginApprovalQueueStoreSummary;
+  plan_summary: WASMPluginRemoteInstallApprovalWritebackPlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface WASMPluginExecuteResult {
   slug: string;
   dry_run: boolean;
@@ -600,6 +704,9 @@ export interface WASMPluginPackClient {
   remoteInstallApprovalWritebackPlan(
     input: WASMPluginRemoteInstallApprovalWritebackPlanInput,
   ): Promise<{ plan: WASMPluginRemoteInstallApprovalWritebackPlan }>;
+  remoteInstallApprovalQueueWriteback(
+    input: WASMPluginRemoteInstallApprovalQueueWritebackInput,
+  ): Promise<{ writeback: WASMPluginRemoteInstallApprovalQueueWriteback }>;
   evidence(slug: string): Promise<{
     pack_id: string;
     exported_at: string;
@@ -615,6 +722,8 @@ export interface WASMPluginPackClient {
     approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
     approval_decision_plan: WASMPluginRemoteInstallApprovalDecisionPlan;
     approval_writeback_plan: WASMPluginRemoteInstallApprovalWritebackPlan;
+    approval_queue_store: WASMPluginApprovalQueueStoreSummary;
+    approval_queue_record: WASMPluginApprovalQueueRecord;
     sandbox?: Record<string, unknown>;
   }>;
 }
@@ -695,6 +804,14 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
           body: JSON.stringify(input),
         },
       ),
+    remoteInstallApprovalQueueWriteback: (input) =>
+      fetcher<{ writeback: WASMPluginRemoteInstallApprovalQueueWriteback }>(
+        "/v1/wasm-plugin/remote-install/approval/queue/writeback",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
     evidence: (slug) =>
       fetcher<{
         pack_id: string;
@@ -711,6 +828,8 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
         approval_decision_plan: WASMPluginRemoteInstallApprovalDecisionPlan;
         approval_writeback_plan: WASMPluginRemoteInstallApprovalWritebackPlan;
+        approval_queue_store: WASMPluginApprovalQueueStoreSummary;
+        approval_queue_record: WASMPluginApprovalQueueRecord;
         sandbox?: Record<string, unknown>;
       }>(`/v1/wasm-plugin/evidence/${enc(slug)}`),
   };

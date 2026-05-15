@@ -392,6 +392,102 @@ const approvalWritebackPlan = {
   approval_gate_plan_summary: approvalPlan,
 };
 
+const approvalQueueStore = {
+  pack_id: "yunque.pack.wasm-plugin",
+  queue_name: "wasm_remote_install",
+  store: "pack-local-json",
+  store_ready: true,
+  record_count: 1,
+  artifact: "approval-queue-store.json",
+  writes_files: false,
+  writes_approval_queue: false,
+  writes_approval_queue_store: false,
+  installer_writeback_ready: false,
+  notes: ["pack-local queue store only"],
+};
+
+const approvalQueueRecord = {
+  pack_id: "yunque.pack.wasm-plugin",
+  queue_name: "wasm_remote_install",
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  decision: "approved",
+  decision_by: "security",
+  decision_reason: "preview decision",
+  risk_tier: "high",
+  requested_by: "operator",
+  reason: "preview approval gate",
+  status: "written_pending_installer_wiring",
+  created_at: "now",
+  updated_at: "now",
+  approval_queue_store_ready: true,
+  writes_approval_queue: true,
+  writes_approval_queue_store: true,
+  approval_writeback_ready: true,
+  approval_queue_ready: true,
+  approval_decision_ready: true,
+  applies_approval_decision: true,
+  installer_blocked_until_writeback: false,
+  installer_blocked_until_installer_wiring: true,
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  signature_gate_status: "blocked_until_signature_verifier",
+  canonical_payload_sha256: "payload-digest",
+  approval_queue_entry: approvalPlan.approval_queue_entry,
+  decision_plan: approvalDecisionPlan.decision_plan,
+  writeback_plan: approvalWritebackPlan.writeback_plan,
+  store_artifact: "approval-queue-store.json",
+  downloads: false,
+  writes_files: false,
+  network_access: false,
+  installs_plugin: false,
+  artifacts: [
+    "approval-queue-store.json",
+    "approval-queue-record.json",
+    "approval-writeback-plan.json",
+  ],
+  labels: ["remote-install", "approval-queue-record", "pack-local-store"],
+};
+
+const approvalQueueWriteback = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "approval_queue_written_pending_installer_wiring",
+  approval_queue_store_ready: true,
+  approval_writeback_plan_ready: true,
+  approval_writeback_ready: true,
+  approval_queue_ready: true,
+  writes_approval_queue: true,
+  writes_approval_queue_store: true,
+  approval_decision_ready: true,
+  applies_approval_decision: true,
+  writes_files: false,
+  downloads: false,
+  network_access: false,
+  installs_plugin: false,
+  decision: "approved",
+  decision_by: "security",
+  decision_reason: "preview decision",
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  installer_blocked_until_writeback: false,
+  installer_blocked_until_installer_wiring: true,
+  approval_queue_record: approvalQueueRecord,
+  approval_queue_store: approvalQueueStore,
+  plan_summary: approvalWritebackPlan,
+  checks: [],
+  artifacts: [
+    "approval-queue-store.json",
+    "approval-queue-record.json",
+    "approval-writeback-plan.json",
+    "approval-decision-plan.json",
+  ],
+  actions: [],
+  labels: ["remote-install", "approval-queue-writeback", "pack-local-store"],
+};
+
 test("WASMPluginClient reads status and plugin list with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createWASMPluginClient({
@@ -416,11 +512,13 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           approval_gate_plan_ready: true,
           approval_gate_ready: false,
           approval_queue_plan_ready: true,
-          approval_queue_ready: false,
+          approval_queue_ready: true,
+          approval_queue_store_ready: true,
+          approval_queue_store: approvalQueueStore,
           approval_decision_plan_ready: true,
-          approval_decision_ready: false,
+          approval_decision_ready: true,
           approval_writeback_plan_ready: true,
-          approval_writeback_ready: false,
+          approval_writeback_ready: true,
           plugin_count: 1,
           loaded_count: 0,
           capabilities: [
@@ -433,6 +531,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
             "wasm.remote_install.approval_plan",
             "wasm.remote_install.approval_decision_plan",
             "wasm.remote_install.approval_writeback_plan",
+            "wasm.remote_install.approval_queue_writeback",
           ],
         });
       return jsonResponse({
@@ -476,11 +575,13 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.approval_gate_plan_ready, true);
   assertEqual(status.approval_gate_ready, false);
   assertEqual(status.approval_queue_plan_ready, true);
-  assertEqual(status.approval_queue_ready, false);
+  assertEqual(status.approval_queue_ready, true);
+  assertEqual(status.approval_queue_store_ready, true);
+  assertEqual(status.approval_queue_store?.artifact, "approval-queue-store.json");
   assertEqual(status.approval_decision_plan_ready, true);
-  assertEqual(status.approval_decision_ready, false);
+  assertEqual(status.approval_decision_ready, true);
   assertEqual(status.approval_writeback_plan_ready, true);
-  assertEqual(status.approval_writeback_ready, false);
+  assertEqual(status.approval_writeback_ready, true);
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
   assert(status.capabilities.includes("wasm.module.integrity_gate"));
@@ -499,6 +600,11 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   );
   assert(
     status.capabilities.includes("wasm.remote_install.approval_writeback_plan"),
+  );
+  assert(
+    status.capabilities.includes(
+      "wasm.remote_install.approval_queue_writeback",
+    ),
   );
   assertEqual(plugins.count, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/wasm-plugin/status");
@@ -552,6 +658,8 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
         return jsonResponse({ plan: approvalDecisionPlan });
       if (String(url).endsWith("/remote-install/approval/writeback/plan"))
         return jsonResponse({ plan: approvalWritebackPlan });
+      if (String(url).endsWith("/remote-install/approval/queue/writeback"))
+        return jsonResponse({ writeback: approvalQueueWriteback }, { status: 202 });
       if (String(url).endsWith("/remote-install/plan"))
         return jsonResponse({ plan: remoteInstallPlan });
       if (String(url).includes("/plugins/calculator"))
@@ -634,6 +742,23 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
     decision_by: "security",
     decision_reason: "preview decision",
   });
+  const queueWriteback = await client.remoteInstallApprovalQueueWriteback({
+    slug: "calculator-remote",
+    name: "Calculator Remote",
+    package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
+    sha256: "0123456789abcdef",
+    signature: "sig",
+    public_key_id: "root",
+    requested_by: "operator",
+    reason: "preview approval gate",
+    risk_tier: "high",
+    approvers: ["security"],
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision: "approved",
+    decision_by: "security",
+    decision_reason: "preview decision",
+  });
   const detail = await client.plugin("calculator");
   const unloaded = await client.unload("calculator");
 
@@ -694,6 +819,24 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   assertEqual(
     writebackPlanned.plan.writeback_plan.artifact,
     "approval-writeback-plan.json",
+  );
+  assertEqual(queueWriteback.writeback.approval_queue_store_ready, true);
+  assertEqual(queueWriteback.writeback.writes_approval_queue, true);
+  assertEqual(queueWriteback.writeback.writes_approval_queue_store, true);
+  assertEqual(queueWriteback.writeback.approval_writeback_ready, true);
+  assertEqual(queueWriteback.writeback.downloads, false);
+  assertEqual(queueWriteback.writeback.writes_files, false);
+  assertEqual(
+    queueWriteback.writeback.installer_blocked_until_writeback,
+    false,
+  );
+  assertEqual(
+    queueWriteback.writeback.installer_blocked_until_installer_wiring,
+    true,
+  );
+  assertEqual(
+    queueWriteback.writeback.approval_queue_store.artifact,
+    "approval-queue-store.json",
   );
   assertEqual(detail.plugin.slug, "calculator");
   assertEqual(unloaded.status, "unloaded");
@@ -806,10 +949,35 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   );
   assertEqual(
     calls[7]?.url,
-    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+    "http://localhost:9090/v1/wasm-plugin/remote-install/approval/queue/writeback",
+  );
+  assertEqual(calls[7]?.init?.method, "POST");
+  assertEqual(
+    calls[7]?.init?.body,
+    JSON.stringify({
+      slug: "calculator-remote",
+      name: "Calculator Remote",
+      package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
+      sha256: "0123456789abcdef",
+      signature: "sig",
+      public_key_id: "root",
+      requested_by: "operator",
+      reason: "preview approval gate",
+      risk_tier: "high",
+      approvers: ["security"],
+      request_id: "wasm-remote-install-preview",
+      request_key: "request-key",
+      decision: "approved",
+      decision_by: "security",
+      decision_reason: "preview decision",
+    }),
   );
   assertEqual(
     calls[8]?.url,
+    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+  );
+  assertEqual(
+    calls[9]?.url,
     "http://localhost:9090/v1/wasm-plugin/plugins/unload",
   );
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
@@ -835,6 +1003,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
           "approval-gate-plan.json",
           "approval-decision-plan.json",
           "approval-writeback-plan.json",
+          "approval-queue-store.json",
+          "approval-queue-record.json",
         ],
         plugin: { slug: "calculator" },
         plan: [],
@@ -846,6 +1016,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         approval_gate_plan: approvalPlan,
         approval_decision_plan: approvalDecisionPlan,
         approval_writeback_plan: approvalWritebackPlan,
+        approval_queue_store: approvalQueueStore,
+        approval_queue_record: approvalQueueRecord,
       });
     },
   });
@@ -863,6 +1035,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     "approval-gate-plan.json",
     "approval-decision-plan.json",
     "approval-writeback-plan.json",
+    "approval-queue-store.json",
+    "approval-queue-record.json",
   ]);
   assertEqual(evidence.host_abi_plan.status, "plan_only");
   assertEqual(evidence.host_abi_gate.enforcement_ready, false);
@@ -886,6 +1060,11 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
   assertEqual(
     evidence.approval_writeback_plan.writeback_plan.artifact,
     "approval-writeback-plan.json",
+  );
+  assertEqual(evidence.approval_queue_store.artifact, "approval-queue-store.json");
+  assertEqual(
+    evidence.approval_queue_record.store_artifact,
+    "approval-queue-store.json",
   );
   assertEqual(
     calls[0]?.url,
