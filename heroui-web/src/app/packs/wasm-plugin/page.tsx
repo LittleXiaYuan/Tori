@@ -382,6 +382,10 @@ export default function WASMPluginPackPage() {
                 {String(status?.remote_install_ready ?? false)}
               </Chip>
               <Chip size="sm">
+                module_integrity_gate_ready:{" "}
+                {String(status?.module_integrity_gate_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
                 approval_gate_ready:{" "}
                 {String(status?.approval_gate_ready ?? false)}
               </Chip>
@@ -401,8 +405,9 @@ export default function WASMPluginPackPage() {
               execution gate、远程签名包安装计划、远程安装审批 gate
               计划和证据包放进可选 Pack。请求 ledger_kv / memory_search /
               http_fetch / env_get 的插件在 host_abi_enforcement_ready=false
-              时会被真实执行前阻断；真实下载、签名验证、审批队列写回、install
-              写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
+              时会被真实执行前阻断；本地 WASM 模块 SHA-256 与注册元数据不一致时也会被
+              module integrity gate 阻断，不进入 sandbox；真实下载、签名验证、审批队列写回、
+              install 写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
@@ -457,6 +462,12 @@ export default function WASMPluginPackPage() {
           </div>
           <div className="kpi-label mt-1">
             enforcement: {String(status?.host_abi_enforcement_ready ?? false)}
+          </div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">模块完整性</div>
+          <div className="kpi-value text-lg">
+            {status?.module_integrity_gate_ready ? "sha256" : "pending"}
           </div>
         </Card>
         <Card className="section-card p-4">
@@ -837,6 +848,18 @@ export default function WASMPluginPackPage() {
                   <Chip size="sm">
                     gate: {result.host_abi_gate?.status || "unknown"}
                   </Chip>
+                  <Chip size="sm">
+                    integrity_gate_ready:{" "}
+                    {String(result.module_integrity_gate?.integrity_gate_ready)}
+                  </Chip>
+                  <Chip size="sm">
+                    integrity:{" "}
+                    {result.module_integrity_gate?.status || "unknown"}
+                  </Chip>
+                  <Chip size="sm">
+                    sha256_blocked:{" "}
+                    {String(result.module_integrity_gate?.blocked)}
+                  </Chip>
                 </div>
                 <TextField
                   value={JSON.stringify(result, null, 2)}
@@ -855,8 +878,9 @@ export default function WASMPluginPackPage() {
                 >
                   Host ABI plan preview 仅固定后续 host function
                   权限强执行契约；Host ABI execution gate 会在真实执行前阻断已请求特权
-                  Host ABI 的插件，直到 enforcement_ready=true。当前不会绑定 wazero
-                  host functions、不会写文件，也不会绕过 Pack Runtime gate。
+                  Host ABI 的插件，直到 enforcement_ready=true。module integrity gate
+                  会在 sandbox 执行前比对本地 WASM SHA-256 与注册元数据，防止模块漂移。
+                  当前不会绑定 wazero host functions、不会写文件，也不会绕过 Pack Runtime gate。
                 </div>
               </Card>
             ) : (

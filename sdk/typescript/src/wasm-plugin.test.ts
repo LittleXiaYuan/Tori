@@ -87,6 +87,22 @@ const hostABIGate = {
   labels: ["host-abi", "execution-gate", "blocked", "needs-enforcement"],
 };
 
+const moduleIntegrityGate = {
+  integrity_gate_ready: true,
+  allows_execution: true,
+  blocked: false,
+  status: "verified",
+  expected_sha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  actual_sha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  module_path: "calculator.wasm",
+  writes_files: false,
+  network_access: false,
+  reason: "registered SHA-256 matches local module bytes",
+  labels: ["module-integrity", "execution-gate", "verified"],
+};
+
 const remoteInstallPlan = {
   pack_id: "yunque.pack.wasm-plugin",
   generated_at: "now",
@@ -170,6 +186,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           abi_ready: false,
           host_abi_execution_gate_ready: true,
           host_abi_enforcement_ready: false,
+          module_integrity_gate_ready: true,
           remote_install_plan_ready: true,
           remote_install_ready: false,
           approval_gate_plan_ready: true,
@@ -179,6 +196,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           capabilities: [
             "wasm.host_abi.plan",
             "wasm.host_abi.execution_gate",
+            "wasm.module.integrity_gate",
             "wasm.remote_install.plan",
             "wasm.remote_install.approval_plan",
           ],
@@ -216,12 +234,14 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.abi_ready, false);
   assertEqual(status.host_abi_execution_gate_ready, true);
   assertEqual(status.host_abi_enforcement_ready, false);
+  assertEqual(status.module_integrity_gate_ready, true);
   assertEqual(status.remote_install_plan_ready, true);
   assertEqual(status.remote_install_ready, false);
   assertEqual(status.approval_gate_plan_ready, true);
   assertEqual(status.approval_gate_ready, false);
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
+  assert(status.capabilities.includes("wasm.module.integrity_gate"));
   assert(status.capabilities.includes("wasm.remote_install.plan"));
   assert(status.capabilities.includes("wasm.remote_install.approval_plan"));
   assertEqual(plugins.count, 1);
@@ -267,6 +287,7 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
             plan: [],
             host_abi_plan: hostABIPlan,
             host_abi_gate: hostABIGate,
+            module_integrity_gate: moduleIntegrityGate,
           },
         });
       if (String(url).endsWith("/remote-install/approval/plan"))
@@ -331,6 +352,8 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   assertEqual(executed.result.host_abi_gate.execution_gate_ready, true);
   assertEqual(executed.result.host_abi_gate.allows_execution, false);
   assertEqual(executed.result.host_abi_gate.enforcement_ready, false);
+  assertEqual(executed.result.module_integrity_gate.integrity_gate_ready, true);
+  assertEqual(executed.result.module_integrity_gate.status, "verified");
   assertEqual(remotePlanned.plan.remote_install_plan_ready, true);
   assertEqual(remotePlanned.plan.remote_install_ready, false);
   assertEqual(remotePlanned.plan.writes_files, false);
@@ -421,6 +444,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         files: [
           "plugin.json",
           "host-abi-plan.json",
+          "module-integrity-gate.json",
           "remote-install-plan.json",
           "approval-gate-plan.json",
         ],
@@ -428,6 +452,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         plan: [],
         host_abi_plan: hostABIPlan,
         host_abi_gate: hostABIGate,
+        module_integrity_gate: moduleIntegrityGate,
         remote_install_plan: remoteInstallPlan,
         approval_gate_plan: approvalPlan,
       });
@@ -440,12 +465,14 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
   assertDeepEqual(evidence.files, [
     "plugin.json",
     "host-abi-plan.json",
+    "module-integrity-gate.json",
     "remote-install-plan.json",
     "approval-gate-plan.json",
   ]);
   assertEqual(evidence.host_abi_plan.status, "plan_only");
   assertEqual(evidence.host_abi_gate.enforcement_ready, false);
   assertEqual(evidence.host_abi_gate.blocked, true);
+  assertEqual(evidence.module_integrity_gate.status, "verified");
   assertEqual(evidence.remote_install_plan.downloads, false);
   assertEqual(evidence.approval_gate_plan.requires_approval, true);
   assertEqual(
