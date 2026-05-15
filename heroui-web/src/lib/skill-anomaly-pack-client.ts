@@ -1,0 +1,130 @@
+import { fetcher } from "./api-core";
+
+export interface SkillAnomalyPolicy {
+  window_size: number;
+  min_observations: number;
+  new_action_score: number;
+  new_param_score: number;
+  failure_burst_score: number;
+  duration_spike_score: number;
+  needs_approval_score: number;
+  block_score: number;
+  duration_spike_factor: number;
+}
+
+export interface SkillAnomalyEvent {
+  id: string;
+  skill_slug: string;
+  actor?: string;
+  action: string;
+  param_keys?: string[];
+  success: boolean;
+  duration_ms?: number;
+  timestamp: string;
+}
+
+export interface SkillAnomalyProfileSummary {
+  skill_slug: string;
+  observed: number;
+  calls_per_minute: number;
+  action_distrib: Record<string, number>;
+  param_key_set: Record<string, number>;
+  success_rate: number;
+  avg_duration_ms: number;
+  last_anomaly_at?: string;
+  anomaly_count: number;
+  updated_at: string;
+}
+
+export interface SkillAnomalyProfile extends SkillAnomalyProfileSummary {
+  window_size: number;
+  recent: SkillAnomalyEvent[];
+}
+
+export interface SkillAnomalyStatus {
+  pack_id: string;
+  stage: string;
+  detector_ready: boolean;
+  audit_hook_ready: boolean;
+  profile_count: number;
+  active_profiles: number;
+  anomaly_count: number;
+  store_dir?: string;
+  policy: SkillAnomalyPolicy;
+  capabilities: string[];
+  notes?: string[];
+}
+
+export interface SkillAnomalyReason {
+  name: string;
+  score: number;
+  severity: string;
+  detail?: string;
+}
+
+export interface SkillAnomalyResult {
+  skill_slug: string;
+  score: number;
+  severity: string;
+  needs_approval: boolean;
+  block: boolean;
+  reasons?: SkillAnomalyReason[];
+  profile: SkillAnomalyProfileSummary;
+  event: SkillAnomalyEvent;
+  notes?: string[];
+}
+
+export interface SkillAnomalyObservationInput {
+  skill_slug: string;
+  actor?: string;
+  action: string;
+  params?: Record<string, unknown>;
+  param_keys?: string[];
+  success?: boolean;
+  duration_ms?: number;
+  timestamp?: string;
+  dry_run?: boolean;
+}
+
+export interface SkillAnomalyPackClient {
+  status(): Promise<SkillAnomalyStatus>;
+  events(input?: { skill_slug?: string; limit?: number }): Promise<{ events: SkillAnomalyEvent[]; count: number }>;
+  observe(input: SkillAnomalyObservationInput): Promise<{ event: SkillAnomalyEvent; result: SkillAnomalyResult; status: string }>;
+  profiles(): Promise<{ profiles: SkillAnomalyProfileSummary[]; count: number }>;
+  profile(skillSlug: string): Promise<{ profile: SkillAnomalyProfile }>;
+  detect(input: SkillAnomalyObservationInput): Promise<{ result: SkillAnomalyResult }>;
+  evidence(skillSlug: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; profile: SkillAnomalyProfile; events: SkillAnomalyEvent[]; policy: SkillAnomalyPolicy }>;
+}
+
+function enc(value: string): string {
+  return encodeURIComponent(value);
+}
+
+function query(input?: { skill_slug?: string; limit?: number }): string {
+  const params = new URLSearchParams();
+  if (input?.skill_slug) params.set("skill_slug", input.skill_slug);
+  if (input?.limit) params.set("limit", String(input.limit));
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+export function createSkillAnomalyPackClient(): SkillAnomalyPackClient {
+  return {
+    status: () => fetcher<SkillAnomalyStatus>("/v1/skill-anomaly/status"),
+    events: (input) => fetcher<{ events: SkillAnomalyEvent[]; count: number }>(`/v1/skill-anomaly/events${query(input)}`),
+    observe: (input) =>
+      fetcher<{ event: SkillAnomalyEvent; result: SkillAnomalyResult; status: string }>("/v1/skill-anomaly/events", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    profiles: () => fetcher<{ profiles: SkillAnomalyProfileSummary[]; count: number }>("/v1/skill-anomaly/profiles"),
+    profile: (skillSlug) => fetcher<{ profile: SkillAnomalyProfile }>(`/v1/skill-anomaly/profiles/${enc(skillSlug)}`),
+    detect: (input) =>
+      fetcher<{ result: SkillAnomalyResult }>("/v1/skill-anomaly/detect", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    evidence: (skillSlug) =>
+      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; profile: SkillAnomalyProfile; events: SkillAnomalyEvent[]; policy: SkillAnomalyPolicy }>(`/v1/skill-anomaly/evidence/${enc(skillSlug)}`),
+  };
+}

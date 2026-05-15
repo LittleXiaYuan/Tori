@@ -52,6 +52,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_browser_pack_test.go",
   "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_sbom_drift_pack_test.go",
+  "internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go",
   "internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go",
   "internal/controlplane/gateway/handlers_cogni_experience_test.go",
   "cmd/agent/init_tasks.go",
@@ -68,6 +69,8 @@ const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
 const rpaReplayManifest = read("packs/examples/rpa-replay-pack/pack.json");
 const sbomDriftPack = read("internal/packs/sbomdrift/handler.go");
 const sbomDriftManifest = read("packs/examples/sbom-drift-pack/pack.json");
+const skillAnomalyPack = read("internal/packs/skillanomaly/handler.go");
+const skillAnomalyManifest = read("packs/examples/skill-anomaly-pack/pack.json");
 const wasmPluginPack = read("internal/packs/wasmplugin/handler.go");
 const wasmPluginManifest = read("packs/examples/wasm-plugin-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
@@ -98,6 +101,9 @@ const frontend = [
   "heroui-web/src/app/packs/sbom-drift/page.tsx",
   "heroui-web/src/lib/sbom-drift-pack-client.ts",
   "heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts",
+  "heroui-web/src/app/packs/skill-anomaly/page.tsx",
+  "heroui-web/src/lib/skill-anomaly-pack-client.ts",
+  "heroui-web/src/lib/__tests__/skill-anomaly-pack-client.test.ts",
   "heroui-web/src/app/packs/wasm-plugin/page.tsx",
   "heroui-web/src/lib/wasm-plugin-pack-client.ts",
   "heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts",
@@ -115,6 +121,7 @@ const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
 const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
 const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
+const skillAnomalyPackPage = read("heroui-web/src/app/packs/skill-anomaly/page.tsx");
 const wasmPluginPackPage = read("heroui-web/src/app/packs/wasm-plugin/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
@@ -130,11 +137,14 @@ const sdk = [
   "sdk/manifest/browser-intent-pack-sdk.json",
   "sdk/manifest/rpa-replay-pack-sdk.json",
   "sdk/manifest/sbom-drift-pack-sdk.json",
+  "sdk/manifest/skill-anomaly-pack-sdk.json",
   "sdk/manifest/wasm-plugin-pack-sdk.json",
   "sdk/typescript/src/rpa-replay.ts",
   "sdk/typescript/src/rpa-replay.test.ts",
   "sdk/typescript/src/sbom-drift.ts",
   "sdk/typescript/src/sbom-drift.test.ts",
+  "sdk/typescript/src/skill-anomaly.ts",
+  "sdk/typescript/src/skill-anomaly.test.ts",
   "sdk/typescript/src/wasm-plugin.ts",
   "sdk/typescript/src/wasm-plugin.test.ts",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
@@ -143,6 +153,7 @@ const sdk = [
   "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
   "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
   "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs",
   "sdk/scripts/check-wasm-plugin-pack-sdk-manifest.mjs",
 ].map(read).join("\n");
 const docs = [
@@ -192,6 +203,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/browser-intent-pack/pack.json",
   "packs/examples/rpa-replay-pack/pack.json",
   "packs/examples/sbom-drift-pack/pack.json",
+  "packs/examples/skill-anomaly-pack/pack.json",
   "packs/examples/wasm-plugin-pack/pack.json",
 ]);
 
@@ -330,6 +342,31 @@ requireTokens("sbom-drift 蓝图能力包", sbomDriftPack + sbomDriftManifest + 
   "rollback",
 ]);
 
+requireTokens("skill-anomaly 蓝图能力包", skillAnomalyPack + skillAnomalyManifest + frontend + gateway + sdk + docs, [
+  'const PackID = "yunque.pack.skill-anomaly"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/skill-anomaly/status",
+  "/v1/skill-anomaly/events",
+  "/v1/skill-anomaly/profiles",
+  "/v1/skill-anomaly/detect",
+  "/v1/skill-anomaly/evidence/",
+  "detector_ready",
+  "audit_hook_ready",
+  "cfg.DataPath(\"skill-anomaly\")",
+  "json-skill-anomaly-evidence",
+  "http.MethodPost",
+  "yunque-client/skill-anomaly",
+  "Skill Anomaly Pack",
+  "createSkillAnomalyPackClient",
+  "createSkillAnomalyClient",
+  "skill-anomaly-pack-client",
+  "TestSkillAnomalyPackGateReturnsNotFoundWhenDisabled",
+  "/packs/skill-anomaly",
+  "pack-shell-before-audit-hook",
+  "distribution",
+  "rollback",
+]);
+
 requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest + frontend + gateway + sdk + docs, [
   'const PackID = "yunque.pack.wasm-plugin"',
   "func (h *Handler) Routes() []packruntime.BackendRoute",
@@ -377,6 +414,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend Browser Intent pack client tests",
   "Frontend RPA Replay pack client tests",
   "Frontend SBOM Drift pack client tests",
+  "Frontend Skill Anomaly pack client tests",
   "Frontend WASM Plugin pack client tests",
   "Frontend shell pack entry tests",
   "PackRuntimeRoutePage",
@@ -474,6 +512,12 @@ if (sbomDriftPackPage.includes("api.sbom") || sbomDriftPackPage.includes('from "
   ok("前端 SBOM Drift pack 客户端拆分", "SBOM Drift page uses sbom-drift-pack-client instead of monolithic api SBOM methods");
 }
 
+if (skillAnomalyPackPage.includes("api.skillAnomaly") || skillAnomalyPackPage.includes('from "@/lib/api"') || !skillAnomalyPackPage.includes("createSkillAnomalyPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "Skill Anomaly pack page must use skill-anomaly-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Skill Anomaly pack 客户端拆分", "Skill Anomaly page uses skill-anomaly-pack-client instead of monolithic api skill anomaly methods");
+}
+
 if (wasmPluginPackPage.includes("api.wasm") || wasmPluginPackPage.includes('from "@/lib/api"') || !wasmPluginPackPage.includes("createWASMPluginPackClient")) {
   fail("前端同步菜单/路由/资源/控制台", "WASM Plugin pack page must use wasm-plugin-pack-client instead of the monolithic api object");
 } else {
@@ -552,6 +596,10 @@ const forbiddenMonolithicPackMethods = [
   "createSBOMDriftSnapshot:",
   "sbomDriftDiff:",
   "sbomDriftEvidence:",
+  "skillAnomalyStatus:",
+  "createSkillAnomalyEvent:",
+  "skillAnomalyDetect:",
+  "skillAnomalyEvidence:",
   "wasmPluginStatus:",
   "createWASMPlugin:",
   "wasmPluginExecute:",
@@ -561,7 +609,7 @@ const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) =>
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser/rpa/sbom/wasm methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -592,6 +640,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "RPAReplayClientError",
   "createSBOMDriftClient",
   "SBOMDriftClientError",
+  "createSkillAnomalyClient",
+  "SkillAnomalyClientError",
   "createWASMPluginClient",
   "WASMPluginClientError",
   "download?: boolean",
@@ -624,6 +674,7 @@ runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-
 runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
 runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 runCheck("sbom drift pack sdk checker", process.execPath, ["sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"]);
+runCheck("skill anomaly pack sdk checker", process.execPath, ["sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs"]);
 runCheck("wasm plugin pack sdk checker", process.execPath, ["sdk/scripts/check-wasm-plugin-pack-sdk-manifest.mjs"]);
 
 if (failures.length > 0) {

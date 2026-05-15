@@ -50,6 +50,7 @@ const checks = [
   ["Browser Intent Pack SDK manifest", "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"],
   ["RPA Replay Pack SDK manifest", "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"],
   ["SBOM Drift Pack SDK manifest", "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"],
+  ["Skill Anomaly Pack SDK manifest", "sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs"],
   ["WASM Plugin Pack SDK manifest", "sdk/scripts/check-wasm-plugin-pack-sdk-manifest.mjs"],
   ["Workflow SDK manifest", "sdk/scripts/check-workflow-sdk-manifest.mjs"],
   ["Connectors SDK manifest", "sdk/scripts/check-connectors-sdk-manifest.mjs"],

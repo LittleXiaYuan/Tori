@@ -61,6 +61,16 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing WASM Plugin token: ${token}`);
 }
 for (const token of [
+  "packs/examples/skill-anomaly-pack",
+  "yunque.pack.skill-anomaly",
+  "pack-shell-before-audit-hook",
+  "yunque-client/skill-anomaly",
+  "Skill Anomaly Pack shell 闭环",
+  "Trust Score 惩罚",
+]) {
+  if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Skill Anomaly token: ${token}`);
+}
+for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
   "GatewayConfig.BackendPacks",
@@ -134,10 +144,14 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go")
   + "\n"
+  + readText("internal/packs/skillanomaly/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go")
+  + "\n"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -420,6 +434,52 @@ for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-d
 }
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes SBOM Drift method: ${token}`);
+}
+
+
+const skillAnomalyManifest = readJSON("packs/examples/skill-anomaly-pack/pack.json");
+const skillAnomalySource = readText("internal/packs/skillanomaly/handler.go");
+const skillAnomalyGateTest = readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go");
+const skillAnomalyPage = readText("heroui-web/src/app/packs/skill-anomaly/page.tsx");
+const skillAnomalyClient = readText("heroui-web/src/lib/skill-anomaly-pack-client.ts");
+const skillAnomalyClientTest = readText("heroui-web/src/lib/__tests__/skill-anomaly-pack-client.test.ts");
+const skillAnomalySdk = readText("sdk/typescript/src/skill-anomaly.ts") + "\n" + readText("sdk/typescript/src/skill-anomaly.test.ts");
+if (skillAnomalyManifest) {
+  if (!skillAnomalySource.includes(`const PackID = "${skillAnomalyManifest.id}"`)) {
+    fail("Skill Anomaly pack handler PackID must match packs/examples/skill-anomaly-pack/pack.json");
+  }
+  for (const route of skillAnomalyManifest.backend?.routes ?? []) {
+    if (!skillAnomalySource.includes(route)) fail(`Skill Anomaly handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!skillAnomalySource.includes(method)) fail(`Skill Anomaly handler missing method gate declaration: ${method}`);
+  }
+  if (skillAnomalyManifest.frontend?.menus?.[0]?.path !== "/packs/skill-anomaly") fail("Skill Anomaly menu path must stay under /packs/skill-anomaly");
+  if (skillAnomalyManifest.frontend?.routes?.[0]?.component !== "security/SkillAnomalyPackPage") fail("Skill Anomaly frontend route component drifted");
+  if (skillAnomalyManifest.sdk?.typescript !== "yunque-client/skill-anomaly") fail("Skill Anomaly SDK import must stay yunque-client/skill-anomaly");
+  if (skillAnomalyManifest.defaultState !== "disabled") fail("Skill Anomaly pack must remain default disabled before audit hook readiness");
+  if (skillAnomalyManifest.metadata?.stage !== "pack-shell-before-audit-hook") fail("Skill Anomaly pack stage must remain pack-shell-before-audit-hook");
+}
+if (skillAnomalyPage.includes('from "@/lib/api"') || skillAnomalyPage.includes("api.skillAnomaly") || !skillAnomalyPage.includes("createSkillAnomalyPackClient")) {
+  fail("Skill Anomaly pack page must use skill-anomaly-pack-client instead of monolithic api object");
+}
+for (const token of ["createSkillAnomalyPackClient", "/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/evidence/", 'method: "POST"']) {
+  if (!skillAnomalyClient.includes(token)) fail(`skill-anomaly-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("skill-anomaly")')) {
+  fail("Skill Anomaly runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestSkillAnomaly", "StatusNotFound", "StatusMethodNotAllowed", "/v1/skill-anomaly/detect"]) {
+  if (!skillAnomalyGateTest.includes(token)) fail(`Skill Anomaly gateway gate test missing token: ${token}`);
+}
+for (const token of ["createSkillAnomalyClient", "SkillAnomalyClientError", "/v1/skill-anomaly/status", "/v1/skill-anomaly/evidence/"]) {
+  if (!skillAnomalySdk.includes(token)) fail(`Skill Anomaly TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/evidence/text_processing"]) {
+  if (!skillAnomalyClientTest.includes(token)) fail(`Skill Anomaly frontend client test missing token: ${token}`);
+}
+for (const token of ["skillAnomalyStatus:", "createSkillAnomalyEvent:", "skillAnomalyDetect:", "skillAnomalyEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Skill Anomaly method: ${token}`);
 }
 
 

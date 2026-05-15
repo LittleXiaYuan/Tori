@@ -551,6 +551,10 @@
       "types": "./src/sbom-drift.ts",
       "import": "./src/sbom-drift.ts"
     },
+    "./skill-anomaly": {
+      "types": "./src/skill-anomaly.ts",
+      "import": "./src/skill-anomaly.ts"
+    },
     "./wasm-plugin": {
       "types": "./src/wasm-plugin.ts",
       "import": "./src/wasm-plugin.ts"
