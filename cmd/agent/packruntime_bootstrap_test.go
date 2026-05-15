@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplayAndSBOMDrift(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySBOMDriftAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -74,8 +74,19 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplayAn
 		t.Fatalf("unexpected SBOM Drift SDK import: %s", sbomDrift.Manifest.SDK.TypeScript)
 	}
 
+	wasmPlugin, ok := registry.Get("yunque.pack.wasm-plugin")
+	if !ok {
+		t.Fatal("expected WASM Plugin builtin pack to be installed")
+	}
+	if wasmPlugin.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected WASM Plugin default disabled, got %s", wasmPlugin.Status)
+	}
+	if wasmPlugin.Manifest.SDK.TypeScript != "yunque-client/wasm-plugin" {
+		t.Fatalf("unexpected WASM Plugin SDK import: %s", wasmPlugin.Manifest.SDK.TypeScript)
+	}
+
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 6 {
+	if got := len(registry.List()); got != 7 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

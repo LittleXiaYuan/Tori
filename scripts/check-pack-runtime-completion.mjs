@@ -52,6 +52,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_browser_pack_test.go",
   "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_sbom_drift_pack_test.go",
+  "internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go",
   "internal/controlplane/gateway/handlers_cogni_experience_test.go",
   "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
@@ -67,6 +68,8 @@ const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
 const rpaReplayManifest = read("packs/examples/rpa-replay-pack/pack.json");
 const sbomDriftPack = read("internal/packs/sbomdrift/handler.go");
 const sbomDriftManifest = read("packs/examples/sbom-drift-pack/pack.json");
+const wasmPluginPack = read("internal/packs/wasmplugin/handler.go");
+const wasmPluginManifest = read("packs/examples/wasm-plugin-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
@@ -95,6 +98,9 @@ const frontend = [
   "heroui-web/src/app/packs/sbom-drift/page.tsx",
   "heroui-web/src/lib/sbom-drift-pack-client.ts",
   "heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts",
+  "heroui-web/src/app/packs/wasm-plugin/page.tsx",
+  "heroui-web/src/lib/wasm-plugin-pack-client.ts",
+  "heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts",
   "heroui-web/src/lib/pack-types.ts",
   "heroui-web/src/lib/api.ts",
   "heroui-web/src/lib/api-types/skills.ts",
@@ -109,6 +115,7 @@ const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
 const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
 const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
+const wasmPluginPackPage = read("heroui-web/src/app/packs/wasm-plugin/page.tsx");
 const frontendShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",
@@ -123,19 +130,24 @@ const sdk = [
   "sdk/manifest/browser-intent-pack-sdk.json",
   "sdk/manifest/rpa-replay-pack-sdk.json",
   "sdk/manifest/sbom-drift-pack-sdk.json",
+  "sdk/manifest/wasm-plugin-pack-sdk.json",
   "sdk/typescript/src/rpa-replay.ts",
   "sdk/typescript/src/rpa-replay.test.ts",
   "sdk/typescript/src/sbom-drift.ts",
   "sdk/typescript/src/sbom-drift.test.ts",
+  "sdk/typescript/src/wasm-plugin.ts",
+  "sdk/typescript/src/wasm-plugin.test.ts",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
   "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
   "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
   "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-wasm-plugin-pack-sdk-manifest.mjs",
 ].map(read).join("\n");
 const docs = [
   "packs/AUTHORING.md",
+  "doc/PACK-RUNTIME-BLUEPRINT.md",
   "docs/guide/pack-runtime.md",
   "docs/zh/guide/pack-runtime.md",
   "docs/guide/pack-runtime-state.md",
@@ -180,6 +192,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/browser-intent-pack/pack.json",
   "packs/examples/rpa-replay-pack/pack.json",
   "packs/examples/sbom-drift-pack/pack.json",
+  "packs/examples/wasm-plugin-pack/pack.json",
 ]);
 
 requireTokens("后端 backend pack module registry / route gates", backend + gateway, [
@@ -317,6 +330,34 @@ requireTokens("sbom-drift 蓝图能力包", sbomDriftPack + sbomDriftManifest + 
   "rollback",
 ]);
 
+requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest + frontend + gateway + sdk + docs, [
+  'const PackID = "yunque.pack.wasm-plugin"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/wasm-plugin/status",
+  "/v1/wasm-plugin/plugins",
+  "/v1/wasm-plugin/plugins/load",
+  "/v1/wasm-plugin/plugins/unload",
+  "/v1/wasm-plugin/execute",
+  "/v1/wasm-plugin/evidence/",
+  "runtime_ready",
+  "abi_ready",
+  "cfg.DataPath(\"wasm-plugin\")",
+  "json-wasm-plugin-evidence",
+  "http.MethodPost",
+  "yunque-client/wasm-plugin",
+  "WASM Plugin Pack",
+  "createWASMPluginPackClient",
+  "createWASMPluginClient",
+  "wasm-plugin-pack-client",
+  "TestWASMPluginPackGateReturnsNotFoundWhenDisabled",
+  "/packs/wasm-plugin",
+  "pack-shell-before-runtime-hosts",
+  "normalizeModulePath",
+  "validateModulePath",
+  "distribution",
+  "rollback",
+]);
+
 requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerification, [
   "fetchEnabledPacks",
   "buildPackNavItems",
@@ -336,6 +377,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend Browser Intent pack client tests",
   "Frontend RPA Replay pack client tests",
   "Frontend SBOM Drift pack client tests",
+  "Frontend WASM Plugin pack client tests",
   "Frontend shell pack entry tests",
   "PackRuntimeRoutePage",
   "enabled()",
@@ -432,6 +474,12 @@ if (sbomDriftPackPage.includes("api.sbom") || sbomDriftPackPage.includes('from "
   ok("前端 SBOM Drift pack 客户端拆分", "SBOM Drift page uses sbom-drift-pack-client instead of monolithic api SBOM methods");
 }
 
+if (wasmPluginPackPage.includes("api.wasm") || wasmPluginPackPage.includes('from "@/lib/api"') || !wasmPluginPackPage.includes("createWASMPluginPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "WASM Plugin pack page must use wasm-plugin-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 WASM Plugin pack 客户端拆分", "WASM Plugin page uses wasm-plugin-pack-client instead of monolithic api WASM methods");
+}
+
 const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
 if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
@@ -504,12 +552,16 @@ const forbiddenMonolithicPackMethods = [
   "createSBOMDriftSnapshot:",
   "sbomDriftDiff:",
   "sbomDriftEvidence:",
+  "wasmPluginStatus:",
+  "createWASMPlugin:",
+  "wasmPluginExecute:",
+  "wasmPluginEvidence:",
 ];
 const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) => monolithicApi.includes(token));
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser/rpa/sbom methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/rpa/sbom/wasm methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -540,6 +592,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "RPAReplayClientError",
   "createSBOMDriftClient",
   "SBOMDriftClientError",
+  "createWASMPluginClient",
+  "WASMPluginClientError",
   "download?: boolean",
   "distributions:",
   "routeBindings:",
@@ -570,6 +624,7 @@ runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-
 runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
 runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 runCheck("sbom drift pack sdk checker", process.execPath, ["sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"]);
+runCheck("wasm plugin pack sdk checker", process.execPath, ["sdk/scripts/check-wasm-plugin-pack-sdk-manifest.mjs"]);
 
 if (failures.length > 0) {
   console.error("Pack Runtime completion audit failed:");

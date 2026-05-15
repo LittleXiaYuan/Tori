@@ -43,12 +43,23 @@ function walk(dir) {
 }
 
 const authoring = readText("packs/AUTHORING.md");
+const packRuntimeBlueprint = readText("doc/PACK-RUNTIME-BLUEPRINT.md");
 const englishGuide = readText("docs/guide/pack-runtime.md") + "\n" + readText("docs/guide/pack-runtime-state.md");
 const chineseGuide = readText("docs/zh/guide/pack-runtime.md") + "\n" + readText("docs/zh/guide/pack-runtime-state.md");
 const docsConfig = readText("docs/.vitepress/config.ts");
 const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
 const completionCheck = readText("scripts/check-pack-runtime-completion.mjs");
+for (const token of [
+  "packs/examples/wasm-plugin-pack",
+  "yunque.pack.wasm-plugin",
+  "pack-shell-before-runtime-hosts",
+  "yunque-client/wasm-plugin",
+  "WASM Plugin Pack shell 闭环",
+  "Host ABI 权限强执行",
+]) {
+  if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing WASM Plugin token: ${token}`);
+}
 for (const token of [
   "Pack Authoring Contract",
   "packruntime.BackendModule",
@@ -121,8 +132,12 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/packs/sbomdrift/handler.go")
   + "\n"
-  + readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go")
+  + "\n"
+  + readText("internal/packs/wasmplugin/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -405,6 +420,55 @@ for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-d
 }
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes SBOM Drift method: ${token}`);
+}
+
+
+const wasmPluginManifest = readJSON("packs/examples/wasm-plugin-pack/pack.json");
+const wasmPluginSource = readText("internal/packs/wasmplugin/handler.go");
+const wasmPluginGateTest = readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
+const wasmPluginPage = readText("heroui-web/src/app/packs/wasm-plugin/page.tsx");
+const wasmPluginClient = readText("heroui-web/src/lib/wasm-plugin-pack-client.ts");
+const wasmPluginClientTest = readText("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
+const wasmPluginSdk = readText("sdk/typescript/src/wasm-plugin.ts") + "\n" + readText("sdk/typescript/src/wasm-plugin.test.ts");
+if (wasmPluginManifest) {
+  if (!wasmPluginSource.includes(`const PackID = "${wasmPluginManifest.id}"`)) {
+    fail("WASM Plugin pack handler PackID must match packs/examples/wasm-plugin-pack/pack.json");
+  }
+  for (const route of wasmPluginManifest.backend?.routes ?? []) {
+    if (!wasmPluginSource.includes(route)) fail(`WASM Plugin handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!wasmPluginSource.includes(method)) fail(`WASM Plugin handler missing method gate declaration: ${method}`);
+  }
+  if (wasmPluginManifest.frontend?.menus?.[0]?.path !== "/packs/wasm-plugin") fail("WASM Plugin menu path must stay under /packs/wasm-plugin");
+  if (wasmPluginManifest.frontend?.routes?.[0]?.component !== "wasm/WASMPluginPackPage") fail("WASM Plugin frontend route component drifted");
+  if (wasmPluginManifest.sdk?.typescript !== "yunque-client/wasm-plugin") fail("WASM Plugin SDK import must stay yunque-client/wasm-plugin");
+  if (wasmPluginManifest.defaultState !== "disabled") fail("WASM Plugin pack must remain default disabled because it is a high-risk execution surface");
+  if (wasmPluginManifest.metadata?.stage !== "pack-shell-before-runtime-hosts") fail("WASM Plugin pack stage must remain pack-shell-before-runtime-hosts");
+}
+if (wasmPluginPage.includes('from "@/lib/api"') || wasmPluginPage.includes("api.wasm") || !wasmPluginPage.includes("createWASMPluginPackClient")) {
+  fail("WASM Plugin pack page must use wasm-plugin-pack-client instead of monolithic api object");
+}
+for (const token of ["createWASMPluginPackClient", "/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/", 'method: "POST"']) {
+  if (!wasmPluginClient.includes(token)) fail(`wasm-plugin-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("wasm-plugin")')) {
+  fail("WASM Plugin runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestWASMPlugin", "StatusNotFound", "StatusMethodNotAllowed", "/v1/wasm-plugin/execute"]) {
+  if (!wasmPluginGateTest.includes(token)) fail(`WASM Plugin gateway gate test missing token: ${token}`);
+}
+for (const token of ["createWASMPluginClient", "WASMPluginClientError", "/v1/wasm-plugin/status", "/v1/wasm-plugin/evidence/"]) {
+  if (!wasmPluginSdk.includes(token)) fail(`WASM Plugin TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/calculator"]) {
+  if (!wasmPluginClientTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
+}
+for (const token of ["normalizeModulePath", "validateModulePath", "module_path must not contain traversal segments"]) {
+  if (!wasmPluginSource.includes(token)) fail(`WASM Plugin handler missing module path safety token: ${token}`);
+}
+for (const token of ["wasmPluginStatus:", "createWASMPlugin:", "wasmPluginExecute:", "wasmPluginEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes WASM Plugin method: ${token}`);
 }
 
 if (failures.length > 0) {
