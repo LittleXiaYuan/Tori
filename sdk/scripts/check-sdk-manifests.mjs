@@ -48,6 +48,7 @@ const checks = [
   ["LoRA Pack SDK manifest", "sdk/scripts/check-lora-pack-sdk-manifest.mjs"],
   ["Cogni Kernel Pack SDK manifest", "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"],
   ["Browser Intent Pack SDK manifest", "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"],
+  ["Guardrail Fuzzer Pack SDK manifest", "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"],
   ["RPA Replay Pack SDK manifest", "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"],
   ["SBOM Drift Pack SDK manifest", "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"],
   ["Skill Anomaly Pack SDK manifest", "sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs"],

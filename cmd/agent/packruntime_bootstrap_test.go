@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -50,6 +50,17 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySB
 	}
 	if browserIntent.Manifest.SDK.TypeScript != "yunque-client/browser" {
 		t.Fatalf("unexpected Browser Intent SDK import: %s", browserIntent.Manifest.SDK.TypeScript)
+	}
+
+	guardrailFuzzer, ok := registry.Get("yunque.pack.guardrail-fuzzer")
+	if !ok {
+		t.Fatal("expected Guardrail Fuzzer builtin pack to be installed")
+	}
+	if guardrailFuzzer.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Guardrail Fuzzer default disabled, got %s", guardrailFuzzer.Status)
+	}
+	if guardrailFuzzer.Manifest.SDK.TypeScript != "yunque-client/guardrail-fuzzer" {
+		t.Fatalf("unexpected Guardrail Fuzzer SDK import: %s", guardrailFuzzer.Manifest.SDK.TypeScript)
 	}
 
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
@@ -97,7 +108,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySB
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 8 {
+	if got := len(registry.List()); got != 9 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

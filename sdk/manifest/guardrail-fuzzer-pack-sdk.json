@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "domain": "guardrail-fuzzer-pack",
+  "description": "Guardrail Fuzzer capability pack manifest binding for Pack Runtime route gates, frontend sync, adversarial corpus management, sanitizer probes, bypass reports, rule candidates, evidence export, and lightweight SDK import discovery.",
+  "principles": [
+    "Expose adversarial guardrail fuzzing, bypass collection, rule-candidate planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded security console feature.",
+    "Keep guardrail fuzzer method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import yunque-client/guardrail-fuzzer only when the Guardrail Fuzzer pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/guardrail-fuzzer-pack/pack.json",
+  "sdkImport": "yunque-client/guardrail-fuzzer",
+  "routes": [
+    "GET /v1/guardrail-fuzzer/status",
+    "GET /v1/guardrail-fuzzer/corpus",
+    "POST /v1/guardrail-fuzzer/corpus",
+    "POST /v1/guardrail-fuzzer/run",
+    "GET /v1/guardrail-fuzzer/reports",
+    "GET /v1/guardrail-fuzzer/reports/",
+    "GET /v1/guardrail-fuzzer/evidence/"
+  ],
+  "frontend": {
+    "menuPath": "/packs/guardrail-fuzzer",
+    "component": "security/GuardrailFuzzerPackPage",
+    "client": "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
+    "page": "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx"
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "id": "yunque.pack.guardrail-fuzzer",
+  "name": "Guardrail Fuzzer Pack",
+  "version": "0.1.0",
+  "description": "将对抗性 Guardrail fuzz、绕过收集、规则候选和证据包导出作为可选安全治理能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "guardrail_fuzzer.status",
+      "guardrail_fuzzer.corpus.list",
+      "guardrail_fuzzer.corpus.save",
+      "guardrail_fuzzer.run",
+      "guardrail_fuzzer.report.list",
+      "guardrail_fuzzer.report.detail",
+      "guardrail_fuzzer.evidence.export"
+    ],
+    "routes": [
+      "/v1/guardrail-fuzzer/status",
+      "/v1/guardrail-fuzzer/corpus",
+      "/v1/guardrail-fuzzer/run",
+      "/v1/guardrail-fuzzer/reports",
+      "/v1/guardrail-fuzzer/reports/",
+      "/v1/guardrail-fuzzer/evidence/"
+    ],
+    "permissions": [
+      "guardrail_fuzzer:read",
+      "guardrail_fuzzer:write",
+      "guardrail_fuzzer:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/guardrail-fuzzer/status",
+        "description": "Read guardrail fuzzer pack shell status and mutation readiness."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/guardrail-fuzzer/corpus",
+        "description": "List adversarial fuzz seeds used by the local sanitizer probe."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/guardrail-fuzzer/corpus",
+        "description": "Save or merge adversarial fuzz corpus seeds."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/guardrail-fuzzer/run",
+        "description": "Run deterministic mutation probes and generate a bypass report."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/guardrail-fuzzer/reports",
+        "description": "List saved guardrail fuzz reports."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/guardrail-fuzzer/reports/",
+        "description": "Read one saved guardrail fuzz report by id."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/guardrail-fuzzer/evidence/",
+        "description": "Export a JSON evidence pack for one guardrail fuzz report."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "guardrail-fuzzer",
+        "label": "Guardrail Fuzzer",
+        "path": "/packs/guardrail-fuzzer",
+        "icon": "shield-alert",
+        "order": 99
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/guardrail-fuzzer",
+        "component": "security/GuardrailFuzzerPackPage",
+        "title": "Guardrail Fuzzer"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "security/GuardrailFuzzerPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/guardrail-fuzzer"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/GUARDRAIL-FUZZER.md",
+    "stage": "pack-shell-before-ci-fuzz",
+    "risk": "security-governance",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/guardrail-fuzzer-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/guardrail-fuzzer-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

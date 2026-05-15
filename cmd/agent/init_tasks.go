@@ -42,6 +42,7 @@ import (
 	iledger "yunque-agent/internal/ledger"
 	backuppack "yunque-agent/internal/packs/backup"
 	browserintentpack "yunque-agent/internal/packs/browserintent"
+	guardrailfuzzerpack "yunque-agent/internal/packs/guardrailfuzzer"
 	lorapack "yunque-agent/internal/packs/lora"
 	rpareplaypack "yunque-agent/internal/packs/rpareplay"
 	sbomdriftpack "yunque-agent/internal/packs/sbomdrift"
@@ -86,6 +87,7 @@ func initTasks(app *agentrt.App) error {
 		Persona:   botPersona,
 		BackendPacks: []packruntime.BackendModule{
 			backuppack.DefaultHandler(),
+			guardrailfuzzerpack.New(guardrailfuzzerpack.Config{DataDir: cfg.DataPath("guardrail-fuzzer")}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
 			skillanomalypack.New(skillanomalypack.Config{DataDir: cfg.DataPath("skill-anomaly")}),
@@ -384,6 +386,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/cogni-kernel-pack/pack.json",
 		"packs/examples/lora-pack/pack.json",
 		"packs/examples/browser-intent-pack/pack.json",
+		"packs/examples/guardrail-fuzzer-pack/pack.json",
 		"packs/examples/rpa-replay-pack/pack.json",
 		"packs/examples/sbom-drift-pack/pack.json",
 		"packs/examples/skill-anomaly-pack/pack.json",
