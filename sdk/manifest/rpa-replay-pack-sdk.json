@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "domain": "rpa-replay-pack",
+  "description": "RPA Replay capability pack manifest binding for Pack Runtime route gates, frontend sync, dry-run replay planning, evidence export, and lightweight SDK import discovery.",
+  "principles": [
+    "Expose RPA trace storage, recording sessions, dry-run replay plans, and evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Keep RPA method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import yunque-client/rpa-replay only when the RPA Replay pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/rpa-replay-pack/pack.json",
+  "sdkImport": "yunque-client/rpa-replay",
+  "routes": [
+    "GET /v1/rpa-replay/status",
+    "GET /v1/rpa-replay/traces",
+    "POST /v1/rpa-replay/traces",
+    "GET /v1/rpa-replay/traces/",
+    "POST /v1/rpa-replay/recordings/start",
+    "POST /v1/rpa-replay/recordings/stop",
+    "POST /v1/rpa-replay/replay",
+    "GET /v1/rpa-replay/evidence/"
+  ],
+  "frontend": {
+    "menuPath": "/packs/rpa-replay",
+    "component": "rpa/RPAReplayPackPage",
+    "client": "heroui-web/src/lib/rpa-replay-pack-client.ts",
+    "page": "heroui-web/src/app/packs/rpa-replay/page.tsx"
+  }
+}

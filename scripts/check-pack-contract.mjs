@@ -107,14 +107,18 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_browser_pack.go")
   + "\n"
+  + readText("internal/controlplane/gateway/handlers_rpa_replay_pack_test.go")
+  + "\n"
   + readText("internal/controlplane/gateway/handlers_cogni_experience_test.go")
   + "\n"
   + readText("internal/packs/lora/handler.go")
   + "\n"
   + readText("internal/packs/cognikernel/handler.go")
   + "\n"
-  + readText("internal/packs/browserintent/handler.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/packs/browserintent/handler.go")
+  + "\n"
+  + readText("internal/packs/rpareplay/handler.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -307,6 +311,50 @@ const hardcodedBrowserShell = [
 ].map(readText).join("\n");
 if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) {
   fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
+}
+
+
+const rpaReplayManifest = readJSON("packs/examples/rpa-replay-pack/pack.json");
+const rpaReplaySource = readText("internal/packs/rpareplay/handler.go");
+const rpaReplayGateTest = readText("internal/controlplane/gateway/handlers_rpa_replay_pack_test.go");
+const rpaReplayPage = readText("heroui-web/src/app/packs/rpa-replay/page.tsx");
+const rpaReplayClient = readText("heroui-web/src/lib/rpa-replay-pack-client.ts");
+const rpaReplayClientTest = readText("heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
+const rpaReplaySdk = readText("sdk/typescript/src/rpa-replay.ts") + "\n" + readText("sdk/typescript/src/rpa-replay.test.ts");
+if (rpaReplayManifest) {
+  if (!rpaReplaySource.includes(`const PackID = "${rpaReplayManifest.id}"`)) {
+    fail("RPA Replay pack handler PackID must match packs/examples/rpa-replay-pack/pack.json");
+  }
+  for (const route of rpaReplayManifest.backend?.routes ?? []) {
+    if (!rpaReplaySource.includes(route)) fail(`RPA Replay handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!rpaReplaySource.includes(method)) fail(`RPA Replay handler missing method gate declaration: ${method}`);
+  }
+  if (rpaReplayManifest.frontend?.menus?.[0]?.path !== "/packs/rpa-replay") fail("RPA Replay menu path must stay under /packs/rpa-replay");
+  if (rpaReplayManifest.sdk?.typescript !== "yunque-client/rpa-replay") fail("RPA Replay SDK import must stay yunque-client/rpa-replay");
+  if (rpaReplayManifest.defaultState !== "disabled") fail("RPA Replay pack must remain default disabled before executor readiness");
+}
+if (rpaReplayPage.includes('from "@/lib/api"') || rpaReplayPage.includes("api.rpa") || !rpaReplayPage.includes("createRPAReplayPackClient")) {
+  fail("RPA Replay pack page must use rpa-replay-pack-client instead of monolithic api object");
+}
+for (const token of ["createRPAReplayPackClient", "/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/evidence/", 'method: "POST"']) {
+  if (!rpaReplayClient.includes(token)) fail(`rpa-replay-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("rpa-replay")')) {
+  fail("RPA Replay runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestRPAReplay", "StatusNotFound", "StatusMethodNotAllowed", "/v1/rpa-replay/replay"]) {
+  if (!rpaReplayGateTest.includes(token)) fail(`RPA Replay gateway gate test missing token: ${token}`);
+}
+for (const token of ["createRPAReplayClient", "RPAReplayClientError", "/v1/rpa-replay/status", "/v1/rpa-replay/evidence/"]) {
+  if (!rpaReplaySdk.includes(token)) fail(`RPA Replay TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/evidence/export-report"]) {
+  if (!rpaReplayClientTest.includes(token)) fail(`RPA Replay frontend client test missing token: ${token}`);
+}
+for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", "rpaReplayEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes RPA Replay method: ${token}`);
 }
 
 if (failures.length > 0) {
