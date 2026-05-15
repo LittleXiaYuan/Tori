@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "domain": "skill-anomaly-pack",
+  "description": "Skill Anomaly capability pack manifest binding for Pack Runtime route gates, frontend sync, behavior profiles, anomaly detection dry-runs, NeedsApproval plans, evidence export, and lightweight SDK import discovery.",
+  "principles": [
+    "Expose skill behavior profiles, anomaly scoring, NeedsApproval planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Keep skill anomaly method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
+    "Let external projects import yunque-client/skill-anomaly only when the Skill Anomaly pack is installed and enabled."
+  ],
+  "packManifest": "packs/examples/skill-anomaly-pack/pack.json",
+  "sdkImport": "yunque-client/skill-anomaly",
+  "routes": [
+    "GET /v1/skill-anomaly/status",
+    "GET /v1/skill-anomaly/events",
+    "POST /v1/skill-anomaly/events",
+    "GET /v1/skill-anomaly/profiles",
+    "GET /v1/skill-anomaly/profiles/",
+    "POST /v1/skill-anomaly/detect",
+    "GET /v1/skill-anomaly/evidence/"
+  ],
+  "frontend": {
+    "menuPath": "/packs/skill-anomaly",
+    "component": "security/SkillAnomalyPackPage",
+    "client": "heroui-web/src/lib/skill-anomaly-pack-client.ts",
+    "page": "heroui-web/src/app/packs/skill-anomaly/page.tsx"
+  }
+}

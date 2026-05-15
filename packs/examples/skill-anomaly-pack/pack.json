@@ -1,0 +1,111 @@
+{
+  "id": "yunque.pack.skill-anomaly",
+  "name": "Skill Anomaly Pack",
+  "version": "0.1.0",
+  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划和证据包导出作为可选治理能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "skill_anomaly.status",
+      "skill_anomaly.event.observe",
+      "skill_anomaly.event.list",
+      "skill_anomaly.profile.list",
+      "skill_anomaly.profile.detail",
+      "skill_anomaly.detect",
+      "skill_anomaly.evidence.export"
+    ],
+    "routes": [
+      "/v1/skill-anomaly/status",
+      "/v1/skill-anomaly/events",
+      "/v1/skill-anomaly/profiles",
+      "/v1/skill-anomaly/profiles/",
+      "/v1/skill-anomaly/detect",
+      "/v1/skill-anomaly/evidence/"
+    ],
+    "permissions": [
+      "skill_anomaly:read",
+      "skill_anomaly:write",
+      "skill_anomaly:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/skill-anomaly/status",
+        "description": "Read skill anomaly pack shell status and detector readiness."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/skill-anomaly/events",
+        "description": "List recent normalized skill behavior observations."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/skill-anomaly/events",
+        "description": "Observe or dry-run validate one skill behavior event and update its baseline."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/skill-anomaly/profiles",
+        "description": "List skill behavior profile summaries."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/skill-anomaly/profiles/",
+        "description": "Read one skill behavior profile by skill slug."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/skill-anomaly/detect",
+        "description": "Score one candidate skill behavior event without requiring a direct audit hook."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/skill-anomaly/evidence/",
+        "description": "Export a JSON evidence pack for one skill behavior profile."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "skill-anomaly",
+        "label": "Skill 异常",
+        "path": "/packs/skill-anomaly",
+        "icon": "activity",
+        "order": 98
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/skill-anomaly",
+        "component": "security/SkillAnomalyPackPage",
+        "title": "Skill 异常"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "security/SkillAnomalyPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/skill-anomaly"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/SKILL-ANOMALY-DETECTION.md",
+    "stage": "pack-shell-before-audit-hook",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/skill-anomaly-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/skill-anomaly-pack/skill-anomaly-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/skill-anomaly-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

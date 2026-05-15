@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySBOMDriftAndWASMPlugin(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -74,6 +74,17 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySB
 		t.Fatalf("unexpected SBOM Drift SDK import: %s", sbomDrift.Manifest.SDK.TypeScript)
 	}
 
+	skillAnomaly, ok := registry.Get("yunque.pack.skill-anomaly")
+	if !ok {
+		t.Fatal("expected Skill Anomaly builtin pack to be installed")
+	}
+	if skillAnomaly.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Skill Anomaly default disabled, got %s", skillAnomaly.Status)
+	}
+	if skillAnomaly.Manifest.SDK.TypeScript != "yunque-client/skill-anomaly" {
+		t.Fatalf("unexpected Skill Anomaly SDK import: %s", skillAnomaly.Manifest.SDK.TypeScript)
+	}
+
 	wasmPlugin, ok := registry.Get("yunque.pack.wasm-plugin")
 	if !ok {
 		t.Fatal("expected WASM Plugin builtin pack to be installed")
@@ -86,7 +97,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplaySB
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 7 {
+	if got := len(registry.List()); got != 8 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }
