@@ -39,8 +39,15 @@ for (const token of [
   "/v1/cognitive-canary/status",
   "/v1/cognitive-canary/scenarios",
   "/v1/cognitive-canary/evaluate",
+  "/v1/cognitive-canary/shadow/plan",
   "/v1/cognitive-canary/reports",
   "/v1/cognitive-canary/evidence/",
+  "shadowPlan",
+  "shadow_plan_ready",
+  "judge_plan_ready",
+  "metrics_plan_ready",
+  "prometheus_ready",
+  "auto_rollback_plan_ready",
   "method: \"POST\"",
 ]) {
   if (!client.includes(token)) fail(`cognitive-canary-pack-client missing token: ${token}`);
@@ -50,12 +57,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createCognitiveCanaryPackClient") || page.includes('from "@/lib/api"') || page.includes("api.cognitiveCanary")) {
   fail("Cognitive Canary pack page must use cognitive-canary-pack-client instead of monolithic api.ts");
 }
-for (const token of ["Cognitive Canary", "保存 Scenarios", "运行评估", "导出证据包", "Pack shell"]) {
+for (const token of ["Cognitive Canary", "保存 Scenarios", "运行评估", "导出证据包", "Plan shell", "Shadow 计划"]) {
   if (!page.includes(token)) fail(`Cognitive Canary pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
-for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/evidence/canary-1"]) {
+for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/canary-1"]) {
   if (!frontendTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
 }
 
@@ -65,11 +72,25 @@ const backend = readRepoFile("internal/packs/cognitivecanary/handler.go")
   + "\n" + readRepoFile("cmd/agent/packruntime_bootstrap_test.go");
 for (const token of [
   "const PackID = \"yunque.pack.cognitive-canary\"",
+  "/v1/cognitive-canary/shadow/plan",
+  "shadow_plan_ready",
   "shadow_traffic_ready",
+  "judge_plan_ready",
   "judge_pipeline_ready",
+  "metrics_plan_ready",
+  "prometheus_ready",
   "quality_sli_ready",
+  "auto_rollback_plan_ready",
   "auto_rollback_ready",
+  "canary.shadow.plan",
+  "canary.judge.plan",
+  "canary.metrics.plan",
+  "canary.rollback.plan",
   "json-cognitive-canary-evidence",
+  "shadow-plan.json",
+  "judge-plan.json",
+  "metrics-plan.json",
+  "rollback-plan.json",
   "cfg.DataPath(\"cognitive-canary\")",
   "cognitivecanarypack.New",
   "packs/examples/cognitive-canary-pack/pack.json",
@@ -86,7 +107,10 @@ for (const token of [
   "CognitiveCanaryClientError",
   "/v1/cognitive-canary/status",
   "/v1/cognitive-canary/evaluate",
+  "/v1/cognitive-canary/shadow/plan",
   "/v1/cognitive-canary/evidence/",
+  "shadowPlan",
+  "CognitiveCanaryShadowPlan",
   "Cognitive Canary request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Cognitive Canary SDK slice missing token: ${token}`);

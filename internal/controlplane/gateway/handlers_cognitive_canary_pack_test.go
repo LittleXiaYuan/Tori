@@ -51,6 +51,15 @@ func TestCognitiveCanaryPackRouteSpecsGateByMethod(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET /v1/cognitive-canary/evaluate should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognitive-canary/shadow/plan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/cognitive-canary/shadow/plan should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
+	}
 }
 
 func TestCognitiveCanaryPackCanSaveScenariosAndEvaluate(t *testing.T) {
@@ -74,6 +83,15 @@ func TestCognitiveCanaryPackCanSaveScenariosAndEvaluate(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "quality_score") || !strings.Contains(w.Body.String(), "promotion_decision") {
 		t.Fatalf("evaluate cognitive canary status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	planBody := `{"candidate_version":"1.1.0-rc1","stable_version":"1.0.0","traffic_percent":5,"requested_by":"unit"}`
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/shadow/plan", strings.NewReader(planBody))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"auto_rollback_ready":false`) {
+		t.Fatalf("shadow plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -93,6 +111,7 @@ func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.Pack
 				"/v1/cognitive-canary/status",
 				"/v1/cognitive-canary/scenarios",
 				"/v1/cognitive-canary/evaluate",
+				"/v1/cognitive-canary/shadow/plan",
 				"/v1/cognitive-canary/reports",
 				"/v1/cognitive-canary/reports/",
 				"/v1/cognitive-canary/evidence/",
@@ -102,6 +121,7 @@ func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.Pack
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/scenarios"},
 				{Method: http.MethodPost, Path: "/v1/cognitive-canary/scenarios"},
 				{Method: http.MethodPost, Path: "/v1/cognitive-canary/evaluate"},
+				{Method: http.MethodPost, Path: "/v1/cognitive-canary/shadow/plan"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports/"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/evidence/"},

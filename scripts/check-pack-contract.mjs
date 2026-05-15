@@ -497,22 +497,22 @@ if (cognitiveCanaryManifest) {
 if (cognitiveCanaryPage.includes('from "@/lib/api"') || cognitiveCanaryPage.includes("api.cognitiveCanary") || !cognitiveCanaryPage.includes("createCognitiveCanaryPackClient")) {
   fail("Cognitive Canary pack page must use cognitive-canary-pack-client instead of monolithic api object");
 }
-for (const token of ["createCognitiveCanaryPackClient", "/v1/cognitive-canary/status", "/v1/cognitive-canary/scenarios", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/reports", "/v1/cognitive-canary/evidence/", 'method: "POST"']) {
+for (const token of ["createCognitiveCanaryPackClient", "/v1/cognitive-canary/status", "/v1/cognitive-canary/scenarios", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/reports", "/v1/cognitive-canary/evidence/", "shadowPlan", "shadow_plan_ready", "judge_plan_ready", "metrics_plan_ready", "prometheus_ready", "auto_rollback_plan_ready", 'method: "POST"']) {
   if (!cognitiveCanaryClient.includes(token)) fail(`cognitive-canary-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("cognitive-canary")')) {
   fail("Cognitive Canary runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestCognitiveCanary", "StatusMethodNotAllowed", "/v1/cognitive-canary/evaluate"]) {
+for (const token of ["TestCognitiveCanary", "StatusMethodNotAllowed", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan"]) {
   if (!cognitiveCanaryGateTest.includes(token)) fail(`Cognitive Canary gateway gate test missing token: ${token}`);
 }
-for (const token of ["createCognitiveCanaryClient", "CognitiveCanaryClientError", "/v1/cognitive-canary/status", "/v1/cognitive-canary/evidence/"]) {
+for (const token of ["createCognitiveCanaryClient", "CognitiveCanaryClientError", "/v1/cognitive-canary/status", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/", "shadowPlan"]) {
   if (!cognitiveCanarySdk.includes(token)) fail(`Cognitive Canary TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/evidence/canary-1"]) {
+for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/canary-1"]) {
   if (!cognitiveCanaryClientTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
 }
-for (const token of ["json-cognitive-canary-evidence", "shadow_traffic_ready", "judge_pipeline_ready", "quality_sli_ready", "auto_rollback_ready"]) {
+for (const token of ["json-cognitive-canary-evidence", "shadow_plan_ready", "shadow_traffic_ready", "judge_plan_ready", "judge_pipeline_ready", "metrics_plan_ready", "prometheus_ready", "quality_sli_ready", "auto_rollback_plan_ready", "auto_rollback_ready", "canary.shadow.plan", "canary.judge.plan", "canary.metrics.plan", "canary.rollback.plan", "shadow-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"]) {
   if (!cognitiveCanarySource.includes(token)) fail(`Cognitive Canary handler missing cognitive quality shell token: ${token}`);
 }
 for (const token of ["cognitiveCanaryStatus:", "cognitiveCanaryEvaluate:", "cognitiveCanaryEvidence:"]) {

@@ -2,8 +2,9 @@
  * Lightweight Cognitive Canary Pack SDK slice.
  *
  * This keeps canary scenario sets, deterministic local judge evaluation,
- * cognitive SLI summaries, promotion/block decisions, and evidence export
- * usable without importing the full generated OpenAPI SDK:
+ * cognitive SLI summaries, promotion/block decisions, shadow/judge/metrics/
+ * rollback plans, and evidence export usable without importing the full
+ * generated OpenAPI SDK:
  *
  *   import { createCognitiveCanaryClient } from "yunque-client/cognitive-canary";
  */
@@ -103,9 +104,14 @@ export type CognitiveCanaryReportSummary = {
 export type CognitiveCanaryStatusResponse = {
   pack_id: string;
   stage: string;
+  shadow_plan_ready: boolean;
   shadow_traffic_ready: boolean;
+  judge_plan_ready: boolean;
   judge_pipeline_ready: boolean;
+  metrics_plan_ready: boolean;
+  prometheus_ready: boolean;
   quality_sli_ready: boolean;
+  auto_rollback_plan_ready: boolean;
   auto_rollback_ready: boolean;
   scenario_count: number;
   report_count: number;
@@ -141,6 +147,91 @@ export type CognitiveCanaryEvaluateResponse = {
   status: string;
 };
 
+export type CognitiveCanaryShadowPlanRequest = {
+  report_id?: string;
+  candidate_version?: string;
+  stable_version?: string;
+  traffic_percent?: number;
+  sample_percent?: number;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
+export type CognitiveCanaryShadowPairPlan = {
+  scenario_id: string;
+  category: string;
+  stable_version: string;
+  candidate_version: string;
+  sample_percent: number;
+  shadow_traffic_ready: boolean;
+  response_collector_ready: boolean;
+};
+
+export type CognitiveCanaryJudgeBatchPlan = {
+  name: string;
+  source: string;
+  scenario_count: number;
+  judge_type: string;
+  dimensions: string[];
+  judge_pipeline_ready: boolean;
+};
+
+export type CognitiveCanaryMetricPlan = {
+  name: string;
+  type: string;
+  value: number;
+  threshold?: number;
+  labels?: Record<string, string>;
+};
+
+export type CognitiveCanaryRollbackActionPlan = {
+  target: string;
+  trigger: string;
+  decision: string;
+  reason: string;
+  auto_rollback_ready: boolean;
+};
+
+export type CognitiveCanaryShadowPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id?: string;
+  candidate_version?: string;
+  stable_version?: string;
+  traffic_percent: number;
+  sample_percent: number;
+  shadow_plan_ready: boolean;
+  shadow_traffic_ready: boolean;
+  judge_plan_ready: boolean;
+  judge_pipeline_ready: boolean;
+  metrics_plan_ready: boolean;
+  prometheus_ready: boolean;
+  auto_rollback_plan_ready: boolean;
+  auto_rollback_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  quality_score: number;
+  safety_pass_rate: number;
+  delta_score: number;
+  latency_p99_ratio: number;
+  canary_error_rate: number;
+  gate_status: string;
+  promotion_decision: string;
+  shadow_pairs: CognitiveCanaryShadowPairPlan[];
+  judge_batches: CognitiveCanaryJudgeBatchPlan[];
+  metrics: CognitiveCanaryMetricPlan[];
+  rollback_actions: CognitiveCanaryRollbackActionPlan[];
+  actions: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type CognitiveCanaryShadowPlanResponse = {
+  plan: CognitiveCanaryShadowPlan;
+};
+
 export type CognitiveCanaryReportsResponse = {
   reports: CognitiveCanaryReportSummary[];
   count: number;
@@ -156,6 +247,7 @@ export type CognitiveCanaryEvidenceResponse = {
   format: string;
   files: string[];
   report: CognitiveCanaryReport;
+  shadow_plan?: CognitiveCanaryShadowPlan;
 };
 
 export type CognitiveCanaryClientOptions = {
@@ -253,6 +345,10 @@ export class CognitiveCanaryClient {
 
   evaluate(input: CognitiveCanaryEvaluateRequest = {}): Promise<CognitiveCanaryEvaluateResponse> {
     return this.request<CognitiveCanaryEvaluateResponse>("POST", "/v1/cognitive-canary/evaluate", input);
+  }
+
+  shadowPlan(input: CognitiveCanaryShadowPlanRequest = {}): Promise<CognitiveCanaryShadowPlanResponse> {
+    return this.request<CognitiveCanaryShadowPlanResponse>("POST", "/v1/cognitive-canary/shadow/plan", input);
   }
 
   reports(): Promise<CognitiveCanaryReportsResponse> {

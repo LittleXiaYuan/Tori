@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "cognitive-canary-pack",
-  "description": "Cognitive Canary capability pack manifest binding for Pack Runtime route gates, frontend sync, canary scenario sets, deterministic local judge evaluation, cognitive SLI summaries, promotion/block decisions, evidence export, and lightweight SDK import discovery.",
+  "description": "Cognitive Canary capability pack manifest binding for Pack Runtime route gates, frontend sync, canary scenario sets, deterministic local judge evaluation, cognitive SLI summaries, promotion/block decisions, non-destructive shadow/judge/metrics/rollback plans, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose cognitive quality canary evaluation, promotion gates, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded release console feature.",
+    "Expose cognitive quality canary evaluation, promotion gates, non-destructive shadow/judge/metrics/rollback planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded release console feature.",
     "Keep Cognitive Canary method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/cognitive-canary only when the Cognitive Canary pack is installed and enabled."
   ],
@@ -14,6 +14,7 @@
     "GET /v1/cognitive-canary/scenarios",
     "POST /v1/cognitive-canary/scenarios",
     "POST /v1/cognitive-canary/evaluate",
+    "POST /v1/cognitive-canary/shadow/plan",
     "GET /v1/cognitive-canary/reports",
     "GET /v1/cognitive-canary/reports/",
     "GET /v1/cognitive-canary/evidence/"

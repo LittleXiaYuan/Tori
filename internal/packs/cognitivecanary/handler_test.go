@@ -15,8 +15,8 @@ func TestCognitiveCanaryHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 6 {
-		t.Fatalf("expected 6 Cognitive Canary routes, got %d", len(routes))
+	if len(routes) != 7 {
+		t.Fatalf("expected 7 Cognitive Canary routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -30,12 +30,13 @@ func TestCognitiveCanaryHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/cognitive-canary/status":    {http.MethodGet},
-		"/v1/cognitive-canary/scenarios": {http.MethodGet, http.MethodPost},
-		"/v1/cognitive-canary/evaluate":  {http.MethodPost},
-		"/v1/cognitive-canary/reports":   {http.MethodGet},
-		"/v1/cognitive-canary/reports/":  {http.MethodGet},
-		"/v1/cognitive-canary/evidence/": {http.MethodGet},
+		"/v1/cognitive-canary/status":      {http.MethodGet},
+		"/v1/cognitive-canary/scenarios":   {http.MethodGet, http.MethodPost},
+		"/v1/cognitive-canary/evaluate":    {http.MethodPost},
+		"/v1/cognitive-canary/shadow/plan": {http.MethodPost},
+		"/v1/cognitive-canary/reports":     {http.MethodGet},
+		"/v1/cognitive-canary/reports/":    {http.MethodGet},
+		"/v1/cognitive-canary/evidence/":   {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -78,6 +79,40 @@ func TestCognitiveCanaryEvaluatePersistsReportAndExportsEvidence(t *testing.T) {
 	h.Evidence(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-cognitive-canary-evidence") || !strings.Contains(w.Body.String(), "canary-report.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "shadow-plan.json") || !strings.Contains(w.Body.String(), "shadow_plan") {
+		t.Fatalf("evidence should include plan-only shadow evidence, body=%s", w.Body.String())
+	}
+}
+
+func TestCognitiveCanaryShadowPlanIsNonDestructiveContract(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 45, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, Policy: CanaryPolicy{MinSamplesForPromotion: 1}})
+
+	body := `{"candidate_version":"1.1.0-rc1","stable_version":"1.0.0","traffic_percent":7.5,"sample_percent":3,"requested_by":"unit","reason":"shape contract","metadata":{"source":"unit"}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/shadow/plan", strings.NewReader(body))
+	h.ShadowPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"shadow_traffic_ready":false`) {
+		t.Fatalf("shadow plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var res struct {
+		Plan ShadowPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode shadow plan: %v", err)
+	}
+	if res.Plan.PackID != PackID || res.Plan.CandidateVersion != "1.1.0-rc1" || res.Plan.StableVersion != "1.0.0" {
+		t.Fatalf("unexpected shadow plan identity: %#v", res.Plan)
+	}
+	if !res.Plan.ShadowPlanReady || res.Plan.ShadowTrafficReady || !res.Plan.JudgePlanReady || res.Plan.JudgePipelineReady || !res.Plan.MetricsPlanReady || res.Plan.PrometheusReady || !res.Plan.AutoRollbackPlanReady || res.Plan.AutoRollbackReady {
+		t.Fatalf("unexpected plan readiness flags: %#v", res.Plan)
+	}
+	if res.Plan.TrafficPercent != 7.5 || res.Plan.SamplePercent != 3 || len(res.Plan.ShadowPairs) == 0 || len(res.Plan.JudgeBatches) == 0 || len(res.Plan.Metrics) == 0 || len(res.Plan.RollbackActions) == 0 {
+		t.Fatalf("expected concrete plan contract, got %#v", res.Plan)
+	}
+	if got := strings.Join(res.Plan.Notes, "\n"); !strings.Contains(got, "does not mirror live traffic") || !strings.Contains(got, "does not mirror live traffic, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state") {
+		t.Fatalf("plan should explicitly stay non-destructive, notes=%q", got)
 	}
 }
 
