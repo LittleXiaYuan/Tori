@@ -41,11 +41,19 @@ for (const token of [
   "/v1/wasm-plugin/plugins/load",
   "/v1/wasm-plugin/plugins/unload",
   "/v1/wasm-plugin/execute",
+  "/v1/wasm-plugin/remote-install/plan",
   "/v1/wasm-plugin/evidence/",
   "WASMPluginHostABIPlan",
+  "WASMPluginRemoteInstallPlan",
   "host_abi_plan",
+  "remote_install_plan",
+  "remote_install_plan_ready",
+  "remote-install-plan.json",
+  "signature-verification.json",
+  "downloads",
   "enforcement_ready",
   "writes_files",
+  "remoteInstallPlan",
   "method: \"POST\"",
 ]) {
   if (!client.includes(token)) fail(`wasm-plugin-pack-client missing token: ${token}`);
@@ -55,12 +63,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createWASMPluginPackClient") || page.includes('from "@/lib/api"') || page.includes("api.wasm")) {
   fail("WASM Plugin pack page must use wasm-plugin-pack-client instead of monolithic api.ts");
 }
-for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "enforcement_ready", "writes_files", "pack-shell"]) {
+for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "远程签名包安装计划", "remote_install_plan_ready", "remote_install_ready", "download_ready", "signature_verify_ready", "remote-install-plan.json", "signature-verification.json", "enforcement_ready", "writes_files", "pack-shell"]) {
   if (!page.includes(token)) fail(`WASM Plugin pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "host-abi-plan.json"]) {
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "remote_install_plan", "host-abi-plan.json", "remote-install-plan.json"]) {
   if (!frontendTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
 
@@ -73,9 +81,15 @@ for (const token of [
   "runtime_ready",
   "abi_plan_ready",
   "abi_ready",
+  "remote_install_plan_ready",
+  "wasm.remote_install.plan",
   "host_abi_plan",
+  "remote_install_plan",
   "wasm.host_abi.plan",
   "host-abi-plan.json",
+  "remote-install-plan.json",
+  "signature-verification.json",
+  "downloads",
   "json-wasm-plugin-evidence",
   "cfg.DataPath(\"wasm-plugin\")",
   "wasmpluginpack.New",
@@ -93,11 +107,19 @@ for (const token of [
   "WASMPluginClientError",
   "/v1/wasm-plugin/status",
   "/v1/wasm-plugin/execute",
+  "/v1/wasm-plugin/remote-install/plan",
   "/v1/wasm-plugin/evidence/",
   "WASMPluginHostABIPlan",
+  "WASMPluginRemoteInstallPlan",
   "host_abi_plan",
+  "remote_install_plan",
+  "remote_install_plan_ready",
+  "remote-install-plan.json",
+  "signature-verification.json",
+  "downloads",
   "enforcement_ready",
   "writes_files",
+  "remoteInstallPlan",
   "WASM Plugin request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript WASM Plugin SDK slice missing token: ${token}`);

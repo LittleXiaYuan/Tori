@@ -38,8 +38,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 7 {
-		t.Fatalf("expected 7 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 8 {
+		t.Fatalf("expected 8 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,13 +53,14 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":         {http.MethodGet},
-		"/v1/wasm-plugin/plugins":        {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":       {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":   {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload": {http.MethodPost},
-		"/v1/wasm-plugin/execute":        {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":      {http.MethodGet},
+		"/v1/wasm-plugin/status":              {http.MethodGet},
+		"/v1/wasm-plugin/plugins":             {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":            {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":        {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":      {http.MethodPost},
+		"/v1/wasm-plugin/execute":             {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":           {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -113,6 +114,25 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","capabilities":["math.add"],"tags":["remote"]}`))
+	h.RemoteInstallPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature-verification.json") {
+		t.Fatalf("remote install plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var remotePlanResp struct {
+		Plan RemoteInstallPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&remotePlanResp); err != nil {
+		t.Fatalf("decode remote install plan: %v", err)
+	}
+	if !remotePlanResp.Plan.RemoteInstallPlanReady || remotePlanResp.Plan.RemoteInstallReady || remotePlanResp.Plan.Downloads || remotePlanResp.Plan.WritesFiles || remotePlanResp.Plan.NetworkAccess {
+		t.Fatalf("remote install plan should be plan-only and non-destructive: %#v", remotePlanResp.Plan)
+	}
+	if remotePlanResp.Plan.SignatureVerifyReady || remotePlanResp.Plan.Package.Signature != "sig-ed25519" || remotePlanResp.Plan.Package.PublicKeyID != "yunque-root-2026" || remotePlanResp.Plan.Plugin.Slug != "calculator-remote" {
+		t.Fatalf("remote install plan should capture signature metadata and plugin slug: %#v", remotePlanResp.Plan)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"hello"}`))
 	h.Execute(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "last_input") || fake.calls != 1 {
@@ -131,17 +151,21 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		HostABIPlan HostABIPlan `json:"host_abi_plan"`
+		HostABIPlan       HostABIPlan             `json:"host_abi_plan"`
+		RemoteInstallPlan RemoteInstallPlanReport `json:"remote_install_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
 	}
 	if !evidenceResp.HostABIPlan.PlanReady || evidenceResp.HostABIPlan.Status != "plan_only" {
 		t.Fatalf("evidence should include host ABI plan preview: %#v", evidenceResp.HostABIPlan)
+	}
+	if !evidenceResp.RemoteInstallPlan.RemoteInstallPlanReady || evidenceResp.RemoteInstallPlan.RemoteInstallReady {
+		t.Fatalf("evidence should include remote install plan preview: %#v", evidenceResp.RemoteInstallPlan)
 	}
 }
 
