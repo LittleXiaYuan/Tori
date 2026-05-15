@@ -83,6 +83,9 @@ func TestCognitiveCanaryEvaluatePersistsReportAndExportsEvidence(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "shadow-plan.json") || !strings.Contains(w.Body.String(), "shadow_plan") {
 		t.Fatalf("evidence should include plan-only shadow evidence, body=%s", w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), "response-collector-plan.json") || !strings.Contains(w.Body.String(), "response_collectors") {
+		t.Fatalf("evidence should include response collector plan preview evidence, body=%s", w.Body.String())
+	}
 }
 
 func TestCognitiveCanaryShadowPlanIsNonDestructiveContract(t *testing.T) {
@@ -93,7 +96,7 @@ func TestCognitiveCanaryShadowPlanIsNonDestructiveContract(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/shadow/plan", strings.NewReader(body))
 	h.ShadowPlan(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"shadow_traffic_ready":false`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"shadow_traffic_ready":false`) || !strings.Contains(w.Body.String(), `"response_collector_plan_ready":true`) || !strings.Contains(w.Body.String(), `"response_collector_ready":false`) {
 		t.Fatalf("shadow plan status=%d body=%s", w.Code, w.Body.String())
 	}
 	var res struct {
@@ -105,13 +108,26 @@ func TestCognitiveCanaryShadowPlanIsNonDestructiveContract(t *testing.T) {
 	if res.Plan.PackID != PackID || res.Plan.CandidateVersion != "1.1.0-rc1" || res.Plan.StableVersion != "1.0.0" {
 		t.Fatalf("unexpected shadow plan identity: %#v", res.Plan)
 	}
-	if !res.Plan.ShadowPlanReady || res.Plan.ShadowTrafficReady || !res.Plan.JudgePlanReady || res.Plan.JudgePipelineReady || !res.Plan.MetricsPlanReady || res.Plan.PrometheusReady || !res.Plan.AutoRollbackPlanReady || res.Plan.AutoRollbackReady {
+	if !res.Plan.ShadowPlanReady || res.Plan.ShadowTrafficReady || !res.Plan.JudgePlanReady || res.Plan.JudgePipelineReady || !res.Plan.ResponseCollectorPlanReady || res.Plan.ResponseCollectorReady || !res.Plan.MetricsPlanReady || res.Plan.PrometheusReady || !res.Plan.AutoRollbackPlanReady || res.Plan.AutoRollbackReady {
 		t.Fatalf("unexpected plan readiness flags: %#v", res.Plan)
 	}
-	if res.Plan.TrafficPercent != 7.5 || res.Plan.SamplePercent != 3 || len(res.Plan.ShadowPairs) == 0 || len(res.Plan.JudgeBatches) == 0 || len(res.Plan.Metrics) == 0 || len(res.Plan.RollbackActions) == 0 {
+	if res.Plan.TrafficPercent != 7.5 || res.Plan.SamplePercent != 3 || len(res.Plan.ShadowPairs) == 0 || len(res.Plan.ResponseCollectors) == 0 || len(res.Plan.JudgeBatches) == 0 || len(res.Plan.Metrics) == 0 || len(res.Plan.RollbackActions) == 0 {
 		t.Fatalf("expected concrete plan contract, got %#v", res.Plan)
 	}
-	if got := strings.Join(res.Plan.Notes, "\n"); !strings.Contains(got, "does not mirror live traffic") || !strings.Contains(got, "does not mirror live traffic, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state") {
+	collector := res.Plan.ResponseCollectors[0]
+	if collector.PairID == "" || collector.ScenarioID == "" || collector.CollectorRoute != "/v1/cognitive-canary/shadow/collect" || collector.WritesFiles || collector.Ready {
+		t.Fatalf("response collector plan should preview a non-destructive collector artifact: %#v", collector)
+	}
+	if !strings.HasPrefix(collector.Artifact, "response-collector/") || len(collector.ArtifactSHA256) != 64 || collector.ArtifactBytes == 0 || collector.Labels["pack_id"] != PackID {
+		t.Fatalf("response collector artifact preview should include stable artifact metadata: %#v", collector)
+	}
+	if !strings.Contains(strings.Join(res.Plan.Actions, "\n"), "would preview response collector artifacts") {
+		t.Fatalf("actions should explain response collector preview boundary: %#v", res.Plan.Actions)
+	}
+	if res.Plan.ResponseCollectorSummary.CollectorCount != len(res.Plan.ResponseCollectors) || res.Plan.ResponseCollectorSummary.WritesFiles || res.Plan.ResponseCollectorSummary.HashAlgorithm != "sha256" || res.Plan.ResponseCollectorSummary.Ready {
+		t.Fatalf("response collector summary should stay deterministic and non-destructive: %#v", res.Plan.ResponseCollectorSummary)
+	}
+	if got := strings.Join(res.Plan.Notes, "\n"); !strings.Contains(got, "does not mirror live traffic") || !strings.Contains(got, "does not mirror live traffic, persist response collector artifacts, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state") || !strings.Contains(got, "response_collectors is a deterministic preview") {
 		t.Fatalf("plan should explicitly stay non-destructive, notes=%q", got)
 	}
 }

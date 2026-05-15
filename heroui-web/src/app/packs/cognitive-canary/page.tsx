@@ -160,11 +160,11 @@ export default function CognitiveCanaryPackPage() {
         stable_version: stableVersion,
         traffic_percent: 5,
         requested_by: "pack-console",
-        reason: "operator requested shadow/judge/metrics/rollback plan",
+        reason: "operator requested shadow/response-collector/judge/metrics/rollback plan",
         metadata: { source: "web-pack" },
       });
       setShadowPlan(res.plan);
-      showToast("已生成 shadow / judge / metrics / rollback 非破坏性计划", "success");
+      showToast("已生成 shadow / collector / judge / metrics / rollback 非破坏性计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成 Cognitive Canary shadow 计划失败"));
     } finally {
@@ -190,7 +190,7 @@ export default function CognitiveCanaryPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.cognitive-canary"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow/judge/metrics/rollback 计划和证据包放进可选 Pack。真实 shadow traffic、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
+              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow response collector / judge / metrics / rollback 计划和证据包放进可选 Pack。真实 shadow traffic、response collector 持久化、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -276,6 +276,8 @@ export default function CognitiveCanaryPackPage() {
                 <Chip size="sm">{shadowPlan.status}</Chip>
                 <Chip size="sm">traffic: {shadowPlan.traffic_percent}%</Chip>
                 <Chip size="sm">shadow_ready: {String(shadowPlan.shadow_traffic_ready)}</Chip>
+                <Chip size="sm">collector: {shadowPlan.response_collector_summary?.collector_count ?? shadowPlan.response_collectors?.length ?? 0}</Chip>
+                <Chip size="sm">writes_files: {String(shadowPlan.response_collector_summary?.writes_files ?? false)}</Chip>
                 <Chip size="sm">judge_ready: {String(shadowPlan.judge_pipeline_ready)}</Chip>
                 <Chip size="sm">auto_rollback_ready: {String(shadowPlan.auto_rollback_ready)}</Chip>
               </div>
@@ -283,7 +285,7 @@ export default function CognitiveCanaryPackPage() {
                 <TextArea rows={12} aria-label="Cognitive Canary Shadow Plan JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                非破坏性计划：不会 mirror live traffic、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
+                非破坏性计划：只预览 response collector artifact 名称、SHA-256 内容哈希、labels 和 writes_files=false；不会 mirror live traffic、不会持久化 collector artifacts、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
               </div>
             </Card>
           )}

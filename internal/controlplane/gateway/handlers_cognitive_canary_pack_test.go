@@ -89,7 +89,7 @@ func TestCognitiveCanaryPackCanSaveScenariosAndEvaluate(t *testing.T) {
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"auto_rollback_ready":false`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"shadow_plan_ready":true`) || !strings.Contains(w.Body.String(), `"response_collector_plan_ready":true`) || !strings.Contains(w.Body.String(), `"response_collector_ready":false`) || !strings.Contains(w.Body.String(), `"auto_rollback_ready":false`) {
 		t.Fatalf("shadow plan status=%d body=%s", w.Code, w.Body.String())
 	}
 }

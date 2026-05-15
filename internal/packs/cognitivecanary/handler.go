@@ -9,6 +9,8 @@ package cognitivecanary
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -99,38 +101,42 @@ type ShadowPlanRequest struct {
 }
 
 type ShadowPlanReport struct {
-	PackID                string               `json:"pack_id"`
-	GeneratedAt           time.Time            `json:"generated_at"`
-	Status                string               `json:"status"`
-	ReportID              string               `json:"report_id,omitempty"`
-	CandidateVersion      string               `json:"candidate_version,omitempty"`
-	StableVersion         string               `json:"stable_version,omitempty"`
-	TrafficPercent        float64              `json:"traffic_percent"`
-	SamplePercent         float64              `json:"sample_percent"`
-	ShadowPlanReady       bool                 `json:"shadow_plan_ready"`
-	ShadowTrafficReady    bool                 `json:"shadow_traffic_ready"`
-	JudgePlanReady        bool                 `json:"judge_plan_ready"`
-	JudgePipelineReady    bool                 `json:"judge_pipeline_ready"`
-	MetricsPlanReady      bool                 `json:"metrics_plan_ready"`
-	PrometheusReady       bool                 `json:"prometheus_ready"`
-	AutoRollbackPlanReady bool                 `json:"auto_rollback_plan_ready"`
-	AutoRollbackReady     bool                 `json:"auto_rollback_ready"`
-	RequestedBy           string               `json:"requested_by,omitempty"`
-	Reason                string               `json:"reason,omitempty"`
-	QualityScore          float64              `json:"quality_score"`
-	SafetyPassRate        float64              `json:"safety_pass_rate"`
-	DeltaScore            float64              `json:"delta_score"`
-	LatencyP99Ratio       float64              `json:"latency_p99_ratio"`
-	CanaryErrorRate       float64              `json:"canary_error_rate"`
-	GateStatus            string               `json:"gate_status"`
-	PromotionDecision     string               `json:"promotion_decision"`
-	ShadowPairs           []ShadowPairPlan     `json:"shadow_pairs"`
-	JudgeBatches          []JudgeBatchPlan     `json:"judge_batches"`
-	Metrics               []CanaryMetricPlan   `json:"metrics"`
-	RollbackActions       []RollbackActionPlan `json:"rollback_actions"`
-	Actions               []string             `json:"actions"`
-	Metadata              map[string]string    `json:"metadata,omitempty"`
-	Notes                 []string             `json:"notes,omitempty"`
+	PackID                     string                   `json:"pack_id"`
+	GeneratedAt                time.Time                `json:"generated_at"`
+	Status                     string                   `json:"status"`
+	ReportID                   string                   `json:"report_id,omitempty"`
+	CandidateVersion           string                   `json:"candidate_version,omitempty"`
+	StableVersion              string                   `json:"stable_version,omitempty"`
+	TrafficPercent             float64                  `json:"traffic_percent"`
+	SamplePercent              float64                  `json:"sample_percent"`
+	ShadowPlanReady            bool                     `json:"shadow_plan_ready"`
+	ShadowTrafficReady         bool                     `json:"shadow_traffic_ready"`
+	JudgePlanReady             bool                     `json:"judge_plan_ready"`
+	JudgePipelineReady         bool                     `json:"judge_pipeline_ready"`
+	ResponseCollectorPlanReady bool                     `json:"response_collector_plan_ready"`
+	ResponseCollectorReady     bool                     `json:"response_collector_ready"`
+	MetricsPlanReady           bool                     `json:"metrics_plan_ready"`
+	PrometheusReady            bool                     `json:"prometheus_ready"`
+	AutoRollbackPlanReady      bool                     `json:"auto_rollback_plan_ready"`
+	AutoRollbackReady          bool                     `json:"auto_rollback_ready"`
+	RequestedBy                string                   `json:"requested_by,omitempty"`
+	Reason                     string                   `json:"reason,omitempty"`
+	QualityScore               float64                  `json:"quality_score"`
+	SafetyPassRate             float64                  `json:"safety_pass_rate"`
+	DeltaScore                 float64                  `json:"delta_score"`
+	LatencyP99Ratio            float64                  `json:"latency_p99_ratio"`
+	CanaryErrorRate            float64                  `json:"canary_error_rate"`
+	GateStatus                 string                   `json:"gate_status"`
+	PromotionDecision          string                   `json:"promotion_decision"`
+	ShadowPairs                []ShadowPairPlan         `json:"shadow_pairs"`
+	ResponseCollectors         []ResponseCollectorPlan  `json:"response_collectors"`
+	ResponseCollectorSummary   ResponseCollectorSummary `json:"response_collector_summary"`
+	JudgeBatches               []JudgeBatchPlan         `json:"judge_batches"`
+	Metrics                    []CanaryMetricPlan       `json:"metrics"`
+	RollbackActions            []RollbackActionPlan     `json:"rollback_actions"`
+	Actions                    []string                 `json:"actions"`
+	Metadata                   map[string]string        `json:"metadata,omitempty"`
+	Notes                      []string                 `json:"notes,omitempty"`
 }
 
 type ShadowPairPlan struct {
@@ -141,6 +147,31 @@ type ShadowPairPlan struct {
 	SamplePercent          float64 `json:"sample_percent"`
 	ShadowTrafficReady     bool    `json:"shadow_traffic_ready"`
 	ResponseCollectorReady bool    `json:"response_collector_ready"`
+}
+
+type ResponseCollectorPlan struct {
+	PairID           string            `json:"pair_id"`
+	ScenarioID       string            `json:"scenario_id"`
+	Category         string            `json:"category"`
+	StableVersion    string            `json:"stable_version"`
+	CandidateVersion string            `json:"candidate_version"`
+	SamplePercent    float64           `json:"sample_percent"`
+	CollectorRoute   string            `json:"collector_route"`
+	Artifact         string            `json:"artifact"`
+	ArtifactSHA256   string            `json:"artifact_sha256"`
+	ArtifactBytes    int               `json:"artifact_bytes"`
+	WritesFiles      bool              `json:"writes_files"`
+	Ready            bool              `json:"ready"`
+	Labels           map[string]string `json:"labels,omitempty"`
+}
+
+type ResponseCollectorSummary struct {
+	CollectorCount int    `json:"collector_count"`
+	ArtifactCount  int    `json:"artifact_count"`
+	WritesFiles    bool   `json:"writes_files"`
+	Deterministic  bool   `json:"deterministic"`
+	HashAlgorithm  string `json:"hash_algorithm"`
+	Ready          bool   `json:"ready"`
 }
 
 type JudgeBatchPlan struct {
@@ -283,34 +314,37 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                  PackID,
-		"stage":                    "pack-shell-before-shadow-traffic",
-		"shadow_plan_ready":        true,
-		"shadow_traffic_ready":     false,
-		"judge_plan_ready":         true,
-		"judge_pipeline_ready":     false,
-		"metrics_plan_ready":       true,
-		"prometheus_ready":         false,
-		"quality_sli_ready":        true,
-		"auto_rollback_plan_ready": true,
-		"auto_rollback_ready":      false,
-		"scenario_count":           len(scenarios),
-		"report_count":             len(reports),
-		"store_dir":                h.dataDir,
-		"policy":                   h.policy,
-		"last_report":              firstSummary(reports),
+		"pack_id":                       PackID,
+		"stage":                         "pack-shell-before-shadow-traffic",
+		"shadow_plan_ready":             true,
+		"shadow_traffic_ready":          false,
+		"judge_plan_ready":              true,
+		"judge_pipeline_ready":          false,
+		"response_collector_plan_ready": true,
+		"response_collector_ready":      false,
+		"metrics_plan_ready":            true,
+		"prometheus_ready":              false,
+		"quality_sli_ready":             true,
+		"auto_rollback_plan_ready":      true,
+		"auto_rollback_ready":           false,
+		"scenario_count":                len(scenarios),
+		"report_count":                  len(reports),
+		"store_dir":                     h.dataDir,
+		"policy":                        h.policy,
+		"last_report":                   firstSummary(reports),
 		"capabilities": []string{
 			"canary.scenario.store",
 			"canary.local_judge.evaluate",
 			"canary.quality_sli.compute",
 			"canary.promotion_gate.plan",
 			"canary.shadow.plan",
+			"canary.response_collector.plan",
 			"canary.judge.plan",
 			"canary.metrics.plan",
 			"canary.rollback.plan",
 			"canary.evidence.export",
 		},
-		"notes": []string{"Shadow traffic, LLM-as-Judge, metrics, and automatic rollback plans are available as non-destructive contracts; real shadow traffic replication, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
+		"notes": []string{"Shadow traffic, response collector, LLM-as-Judge, metrics, and automatic rollback plans are available as non-destructive contracts; real shadow traffic replication, response collection, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
 	})
 }
 
@@ -444,7 +478,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-cognitive-canary-evidence",
-		"files":       []string{"canary-report.json", "scenario-set.json", "sli-summary.json", "shadow-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"},
+		"files":       []string{"canary-report.json", "scenario-set.json", "sli-summary.json", "shadow-plan.json", "response-collector-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"},
 		"report":      report,
 		"shadow_plan": plan,
 	})
@@ -569,41 +603,48 @@ func (h *Handler) buildShadowPlan(report CanaryReport, req ShadowPlanRequest) Sh
 	} else if report.GateStatus == "warn" || report.PromotionDecision == "hold" {
 		status = "hold_plan"
 	}
+	shadowPairs := buildShadowPairs(report, stable, candidate, samplePercent)
+	responseCollectors := buildResponseCollectorPlans(report, shadowPairs)
 	return ShadowPlanReport{
-		PackID:                PackID,
-		GeneratedAt:           h.now().UTC(),
-		Status:                status,
-		ReportID:              report.ID,
-		CandidateVersion:      candidate,
-		StableVersion:         stable,
-		TrafficPercent:        trafficPercent,
-		SamplePercent:         samplePercent,
-		ShadowPlanReady:       true,
-		ShadowTrafficReady:    false,
-		JudgePlanReady:        true,
-		JudgePipelineReady:    false,
-		MetricsPlanReady:      true,
-		PrometheusReady:       false,
-		AutoRollbackPlanReady: true,
-		AutoRollbackReady:     false,
-		RequestedBy:           strings.TrimSpace(req.RequestedBy),
-		Reason:                strings.TrimSpace(req.Reason),
-		QualityScore:          report.QualityScore,
-		SafetyPassRate:        report.SafetyPassRate,
-		DeltaScore:            report.DeltaScore,
-		LatencyP99Ratio:       report.LatencyP99Ratio,
-		CanaryErrorRate:       report.CanaryErrorRate,
-		GateStatus:            report.GateStatus,
-		PromotionDecision:     report.PromotionDecision,
-		ShadowPairs:           buildShadowPairs(report, stable, candidate, samplePercent),
-		JudgeBatches:          buildJudgeBatches(report),
-		Metrics:               h.buildCanaryMetrics(report),
-		RollbackActions:       buildRollbackActions(report),
-		Actions:               buildShadowActions(report, trafficPercent),
-		Metadata:              req.Metadata,
+		PackID:                     PackID,
+		GeneratedAt:                h.now().UTC(),
+		Status:                     status,
+		ReportID:                   report.ID,
+		CandidateVersion:           candidate,
+		StableVersion:              stable,
+		TrafficPercent:             trafficPercent,
+		SamplePercent:              samplePercent,
+		ShadowPlanReady:            true,
+		ShadowTrafficReady:         false,
+		JudgePlanReady:             true,
+		JudgePipelineReady:         false,
+		ResponseCollectorPlanReady: true,
+		ResponseCollectorReady:     false,
+		MetricsPlanReady:           true,
+		PrometheusReady:            false,
+		AutoRollbackPlanReady:      true,
+		AutoRollbackReady:          false,
+		RequestedBy:                strings.TrimSpace(req.RequestedBy),
+		Reason:                     strings.TrimSpace(req.Reason),
+		QualityScore:               report.QualityScore,
+		SafetyPassRate:             report.SafetyPassRate,
+		DeltaScore:                 report.DeltaScore,
+		LatencyP99Ratio:            report.LatencyP99Ratio,
+		CanaryErrorRate:            report.CanaryErrorRate,
+		GateStatus:                 report.GateStatus,
+		PromotionDecision:          report.PromotionDecision,
+		ShadowPairs:                shadowPairs,
+		ResponseCollectors:         responseCollectors,
+		ResponseCollectorSummary:   summarizeResponseCollectors(responseCollectors),
+		JudgeBatches:               buildJudgeBatches(report),
+		Metrics:                    h.buildCanaryMetrics(report),
+		RollbackActions:            buildRollbackActions(report),
+		Actions:                    buildShadowActions(report, trafficPercent),
+		Metadata:                   req.Metadata,
 		Notes: []string{
-			"This route is non-destructive: it does not mirror live traffic, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state.",
-			"Use the plan shape as the contract for the later shadow traffic / judge / metrics / rollback write-back slice.",
+			"This route is non-destructive: it does not mirror live traffic, persist response collector artifacts, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state.",
+			"Use the plan shape as the contract for the later shadow traffic / response collector / judge / metrics / rollback write-back slice.",
+			"response_collectors is a deterministic preview with artifact names, SHA-256 content hashes, labels, and writes_files=false until the real collector is wired.",
 		},
 	}
 }
@@ -857,6 +898,88 @@ func buildShadowPairs(report CanaryReport, stable, candidate string, samplePerce
 	return out
 }
 
+func buildResponseCollectorPlans(report CanaryReport, pairs []ShadowPairPlan) []ResponseCollectorPlan {
+	out := make([]ResponseCollectorPlan, 0, len(pairs))
+	for _, pair := range pairs {
+		pairID := stableResponsePairID(report.ID, pair.ScenarioID, pair.StableVersion, pair.CandidateVersion)
+		artifact := fmt.Sprintf("response-collector/%s.json", pairID)
+		content := responseCollectorArtifactContent(report, pair, pairID, artifact)
+		out = append(out, ResponseCollectorPlan{
+			PairID:           pairID,
+			ScenarioID:       pair.ScenarioID,
+			Category:         pair.Category,
+			StableVersion:    pair.StableVersion,
+			CandidateVersion: pair.CandidateVersion,
+			SamplePercent:    pair.SamplePercent,
+			CollectorRoute:   "/v1/cognitive-canary/shadow/collect",
+			Artifact:         artifact,
+			ArtifactSHA256:   sha256Hex(content),
+			ArtifactBytes:    len([]byte(content)),
+			WritesFiles:      false,
+			Ready:            false,
+			Labels: map[string]string{
+				"pack_id":           PackID,
+				"report_id":         report.ID,
+				"scenario_id":       pair.ScenarioID,
+				"stable_version":    pair.StableVersion,
+				"candidate_version": pair.CandidateVersion,
+			},
+		})
+	}
+	return out
+}
+
+func stableResponsePairID(reportID, scenarioID, stable, candidate string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(reportID + "|" + scenarioID + "|" + stable + "|" + candidate))
+	scenario := safePlanToken(scenarioID)
+	if scenario == "" {
+		scenario = "scenario"
+	}
+	return fmt.Sprintf("%s-%08x", scenario, h.Sum32())
+}
+
+func responseCollectorArtifactContent(report CanaryReport, pair ShadowPairPlan, pairID, artifact string) string {
+	payload := struct {
+		Format           string  `json:"format"`
+		PairID           string  `json:"pair_id"`
+		ReportID         string  `json:"report_id"`
+		ScenarioID       string  `json:"scenario_id"`
+		Category         string  `json:"category"`
+		StableVersion    string  `json:"stable_version"`
+		CandidateVersion string  `json:"candidate_version"`
+		SamplePercent    float64 `json:"sample_percent"`
+		Artifact         string  `json:"artifact"`
+		WritesFiles      bool    `json:"writes_files"`
+		Ready            bool    `json:"ready"`
+	}{
+		Format:           "yunque.cognitive_canary.response_collector.v1",
+		PairID:           pairID,
+		ReportID:         report.ID,
+		ScenarioID:       pair.ScenarioID,
+		Category:         pair.Category,
+		StableVersion:    pair.StableVersion,
+		CandidateVersion: pair.CandidateVersion,
+		SamplePercent:    pair.SamplePercent,
+		Artifact:         artifact,
+		WritesFiles:      false,
+		Ready:            false,
+	}
+	data, _ := json.Marshal(payload)
+	return string(data) + "\n"
+}
+
+func summarizeResponseCollectors(collectors []ResponseCollectorPlan) ResponseCollectorSummary {
+	return ResponseCollectorSummary{
+		CollectorCount: len(collectors),
+		ArtifactCount:  len(collectors),
+		WritesFiles:    false,
+		Deterministic:  true,
+		HashAlgorithm:  "sha256",
+		Ready:          false,
+	}
+}
+
 func buildJudgeBatches(report CanaryReport) []JudgeBatchPlan {
 	batches := []JudgeBatchPlan{
 		{
@@ -918,6 +1041,7 @@ func buildRollbackActions(report CanaryReport) []RollbackActionPlan {
 func buildShadowActions(report CanaryReport, trafficPercent float64) []string {
 	actions := []string{
 		fmt.Sprintf("would mirror %.2f%% of eligible requests into stable/candidate shadow pairs", trafficPercent),
+		"would preview response collector artifacts with deterministic names and SHA-256 hashes without persisting them",
 		"would enqueue shadow pairs into an LLM-as-Judge batch without calling the judge service yet",
 		"would expose cognitive canary SLI through the Prometheus scrape surface",
 	}
@@ -1083,6 +1207,28 @@ func stableScenarioID(input string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(input))
 	return fmt.Sprintf("scenario-%08x", h.Sum32())
+}
+
+func safePlanToken(input string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(strings.TrimSpace(input)) {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || unicode.IsSpace(r):
+			if b.Len() > 0 && !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if len(out) > 56 {
+		out = strings.Trim(out[:56], "-")
+	}
+	return out
 }
 
 func (h *Handler) reportID(req EvaluateRequest, scenarios []Scenario) string {
@@ -1265,6 +1411,11 @@ func tokenSet(text string) map[string]bool {
 	}
 	flush()
 	return tokens
+}
+
+func sha256Hex(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
 }
 
 func overlapRatio(a, b map[string]bool) float64 {

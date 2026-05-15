@@ -108,6 +108,8 @@ export type CognitiveCanaryStatusResponse = {
   shadow_traffic_ready: boolean;
   judge_plan_ready: boolean;
   judge_pipeline_ready: boolean;
+  response_collector_plan_ready: boolean;
+  response_collector_ready: boolean;
   metrics_plan_ready: boolean;
   prometheus_ready: boolean;
   quality_sli_ready: boolean;
@@ -168,6 +170,31 @@ export type CognitiveCanaryShadowPairPlan = {
   response_collector_ready: boolean;
 };
 
+export type CognitiveCanaryResponseCollectorPlan = {
+  pair_id: string;
+  scenario_id: string;
+  category: string;
+  stable_version: string;
+  candidate_version: string;
+  sample_percent: number;
+  collector_route: string;
+  artifact: string;
+  artifact_sha256: string;
+  artifact_bytes: number;
+  writes_files: boolean;
+  ready: boolean;
+  labels?: Record<string, string>;
+};
+
+export type CognitiveCanaryResponseCollectorSummary = {
+  collector_count: number;
+  artifact_count: number;
+  writes_files: boolean;
+  deterministic: boolean;
+  hash_algorithm: string;
+  ready: boolean;
+};
+
 export type CognitiveCanaryJudgeBatchPlan = {
   name: string;
   source: string;
@@ -206,6 +233,8 @@ export type CognitiveCanaryShadowPlan = {
   shadow_traffic_ready: boolean;
   judge_plan_ready: boolean;
   judge_pipeline_ready: boolean;
+  response_collector_plan_ready: boolean;
+  response_collector_ready: boolean;
   metrics_plan_ready: boolean;
   prometheus_ready: boolean;
   auto_rollback_plan_ready: boolean;
@@ -220,6 +249,8 @@ export type CognitiveCanaryShadowPlan = {
   gate_status: string;
   promotion_decision: string;
   shadow_pairs: CognitiveCanaryShadowPairPlan[];
+  response_collectors: CognitiveCanaryResponseCollectorPlan[];
+  response_collector_summary: CognitiveCanaryResponseCollectorSummary;
   judge_batches: CognitiveCanaryJudgeBatchPlan[];
   metrics: CognitiveCanaryMetricPlan[];
   rollback_actions: CognitiveCanaryRollbackActionPlan[];
