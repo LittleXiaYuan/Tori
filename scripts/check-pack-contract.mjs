@@ -90,6 +90,8 @@ for (const token of [
   "yunque-client/guardrail-fuzzer",
   "Guardrail Fuzzer Pack shell 闭环",
   "CI 定时 fuzz",
+  "/v1/guardrail-fuzzer/ci-gate/plan",
+  "ci-gate-plan.json",
   "规则写回",
 ]) {
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Guardrail Fuzzer token: ${token}`);
@@ -640,22 +642,22 @@ if (guardrailFuzzerManifest) {
 if (guardrailFuzzerPage.includes('from "@/lib/api"') || guardrailFuzzerPage.includes("api.guardrailFuzzer") || !guardrailFuzzerPage.includes("createGuardrailFuzzerPackClient")) {
   fail("Guardrail Fuzzer pack page must use guardrail-fuzzer-pack-client instead of monolithic api object");
 }
-for (const token of ["createGuardrailFuzzerPackClient", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/evidence/", 'method: "POST"']) {
+for (const token of ["createGuardrailFuzzerPackClient", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan", "ci_gate_plan_ready", "rule_writeback_plan_ready", "alert_plan_ready", "alert_ready", 'method: "POST"']) {
   if (!guardrailFuzzerClient.includes(token)) fail(`guardrail-fuzzer-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("guardrail-fuzzer")')) {
   fail("Guardrail Fuzzer runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestGuardrailFuzzer", "StatusMethodNotAllowed", "/v1/guardrail-fuzzer/run"]) {
+for (const token of ["TestGuardrailFuzzer", "StatusMethodNotAllowed", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan"]) {
   if (!guardrailFuzzerGateTest.includes(token)) fail(`Guardrail Fuzzer gateway gate test missing token: ${token}`);
 }
-for (const token of ["createGuardrailFuzzerClient", "GuardrailFuzzerClientError", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/evidence/"]) {
+for (const token of ["createGuardrailFuzzerClient", "GuardrailFuzzerClientError", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan"]) {
   if (!guardrailFuzzerSdk.includes(token)) fail(`Guardrail Fuzzer TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
+for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
   if (!guardrailFuzzerClientTest.includes(token)) fail(`Guardrail Fuzzer frontend client test missing token: ${token}`);
 }
-for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "base64_wrap", "double_url_encode", "ci_gate_ready", "rule_writeback_ready"]) {
+for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "base64_wrap", "double_url_encode", "ci_gate_plan_ready", "ci_gate_ready", "rule_writeback_plan_ready", "rule_writeback_ready", "alert_plan_ready", "alert_ready", "guardrail.ci_gate.plan", "guardrail.rule_writeback.plan", "guardrail.alert.plan", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json"]) {
   if (!guardrailFuzzerSource.includes(token)) fail(`Guardrail Fuzzer handler missing fuzzer shell token: ${token}`);
 }
 for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrailFuzzerEvidence:"]) {

@@ -2,8 +2,8 @@
  * Lightweight Guardrail Fuzzer Pack SDK slice.
  *
  * This keeps adversarial guardrail corpus management, deterministic fuzz runs,
- * bypass reports, rule-candidate hints, and evidence export usable without
- * importing the full generated OpenAPI SDK:
+ * bypass reports, rule-candidate hints, non-destructive CI/rule/alert plans,
+ * and evidence export usable without importing the full generated OpenAPI SDK:
  *
  *   import { createGuardrailFuzzerClient } from "yunque-client/guardrail-fuzzer";
  */
@@ -35,8 +35,12 @@ export type GuardrailFuzzerStatusResponse = {
   pack_id: string;
   stage: string;
   fuzzer_ready: boolean;
+  ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
+  rule_writeback_plan_ready: boolean;
   rule_writeback_ready: boolean;
+  alert_plan_ready: boolean;
+  alert_ready: boolean;
   seed_count: number;
   report_count: number;
   store_dir?: string;
@@ -123,6 +127,74 @@ export type GuardrailFuzzerRunResponse = {
   status: string;
 };
 
+export type GuardrailFuzzerCIGatePlanRequest = {
+  report_id?: string;
+  schedule?: string;
+  branch?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
+export type GuardrailFuzzerCIGateJobPlan = {
+  name: string;
+  trigger: string;
+  branch: string;
+  command: string;
+  artifacts: string[];
+  gate_on_bypass: boolean;
+  ci_gate_ready: boolean;
+};
+
+export type GuardrailFuzzerRuleWritebackPlan = {
+  category: string;
+  strategy: string;
+  confidence: number;
+  mutations?: string[];
+  writeback_ready: boolean;
+};
+
+export type GuardrailFuzzerAlertPlan = {
+  severity: string;
+  route: string;
+  message: string;
+  alert_ready: boolean;
+};
+
+export type GuardrailFuzzerCIGatePlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id?: string;
+  schedule: string;
+  branch: string;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  rule_writeback_plan_ready: boolean;
+  rule_writeback_ready: boolean;
+  alert_plan_ready: boolean;
+  alert_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  risk_level: string;
+  gate_status: string;
+  seed_count: number;
+  mutant_count: number;
+  bypass_count: number;
+  false_positive_count: number;
+  ci_jobs: GuardrailFuzzerCIGateJobPlan[];
+  rule_writebacks?: GuardrailFuzzerRuleWritebackPlan[];
+  alerts?: GuardrailFuzzerAlertPlan[];
+  rule_candidates?: GuardrailFuzzerRuleCandidate[];
+  actions: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type GuardrailFuzzerCIGatePlanResponse = {
+  plan: GuardrailFuzzerCIGatePlan;
+};
+
 export type GuardrailFuzzerReportsResponse = {
   reports: GuardrailFuzzerReportSummary[];
   count: number;
@@ -138,6 +210,7 @@ export type GuardrailFuzzerEvidenceResponse = {
   format: string;
   files: string[];
   report: GuardrailFuzzerReport;
+  ci_gate_plan?: GuardrailFuzzerCIGatePlan;
 };
 
 export type GuardrailFuzzerClientOptions = {
@@ -235,6 +308,10 @@ export class GuardrailFuzzerClient {
 
   run(input: GuardrailFuzzerFuzzRequest = {}): Promise<GuardrailFuzzerRunResponse> {
     return this.request<GuardrailFuzzerRunResponse>("POST", "/v1/guardrail-fuzzer/run", input);
+  }
+
+  ciGatePlan(input: GuardrailFuzzerCIGatePlanRequest = {}): Promise<GuardrailFuzzerCIGatePlanResponse> {
+    return this.request<GuardrailFuzzerCIGatePlanResponse>("POST", "/v1/guardrail-fuzzer/ci-gate/plan", input);
   }
 
   reports(): Promise<GuardrailFuzzerReportsResponse> {

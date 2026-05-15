@@ -27,8 +27,12 @@ export interface GuardrailFuzzerStatus {
   pack_id: string;
   stage: string;
   fuzzer_ready: boolean;
+  ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
+  rule_writeback_plan_ready: boolean;
   rule_writeback_ready: boolean;
+  alert_plan_ready: boolean;
+  alert_ready: boolean;
   seed_count: number;
   report_count: number;
   store_dir?: string;
@@ -100,14 +104,88 @@ export interface GuardrailFuzzerRunInput {
   dry_run?: boolean;
 }
 
+export interface GuardrailFuzzerCIGatePlanInput {
+  report_id?: string;
+  schedule?: string;
+  branch?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface GuardrailFuzzerCIGateJobPlan {
+  name: string;
+  trigger: string;
+  branch: string;
+  command: string;
+  artifacts: string[];
+  gate_on_bypass: boolean;
+  ci_gate_ready: boolean;
+}
+
+export interface GuardrailFuzzerRuleWritebackPlan {
+  category: string;
+  strategy: string;
+  confidence: number;
+  mutations?: string[];
+  writeback_ready: boolean;
+}
+
+export interface GuardrailFuzzerAlertPlan {
+  severity: string;
+  route: string;
+  message: string;
+  alert_ready: boolean;
+}
+
+export interface GuardrailFuzzerCIGatePlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id?: string;
+  schedule: string;
+  branch: string;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  rule_writeback_plan_ready: boolean;
+  rule_writeback_ready: boolean;
+  alert_plan_ready: boolean;
+  alert_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  risk_level: string;
+  gate_status: string;
+  seed_count: number;
+  mutant_count: number;
+  bypass_count: number;
+  false_positive_count: number;
+  ci_jobs: GuardrailFuzzerCIGateJobPlan[];
+  rule_writebacks?: GuardrailFuzzerRuleWritebackPlan[];
+  alerts?: GuardrailFuzzerAlertPlan[];
+  rule_candidates?: GuardrailFuzzerRuleCandidate[];
+  actions: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
+export interface GuardrailFuzzerEvidence {
+  pack_id: string;
+  exported_at: string;
+  format: string;
+  files: string[];
+  report: GuardrailFuzzerReport;
+  ci_gate_plan?: GuardrailFuzzerCIGatePlan;
+}
+
 export interface GuardrailFuzzerPackClient {
   status(): Promise<GuardrailFuzzerStatus>;
   corpus(): Promise<{ seeds: GuardrailFuzzerSeed[]; count: number }>;
   saveCorpus(input: { seeds: GuardrailFuzzerSeed[]; replace?: boolean }): Promise<{ seeds: GuardrailFuzzerSeed[]; count: number; status: string }>;
   run(input?: GuardrailFuzzerRunInput): Promise<{ report: GuardrailFuzzerReport; status: string }>;
+  ciGatePlan(input?: GuardrailFuzzerCIGatePlanInput): Promise<{ plan: GuardrailFuzzerCIGatePlan }>;
   reports(): Promise<{ reports: GuardrailFuzzerReportSummary[]; count: number }>;
   report(id: string): Promise<{ report: GuardrailFuzzerReport }>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; report: GuardrailFuzzerReport }>;
+  evidence(id: string): Promise<GuardrailFuzzerEvidence>;
 }
 
 function enc(value: string): string {
@@ -128,8 +206,13 @@ export function createGuardrailFuzzerPackClient(): GuardrailFuzzerPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    ciGatePlan: (input = {}) =>
+      fetcher<{ plan: GuardrailFuzzerCIGatePlan }>("/v1/guardrail-fuzzer/ci-gate/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     reports: () => fetcher<{ reports: GuardrailFuzzerReportSummary[]; count: number }>("/v1/guardrail-fuzzer/reports"),
     report: (id) => fetcher<{ report: GuardrailFuzzerReport }>(`/v1/guardrail-fuzzer/reports/${enc(id)}`),
-    evidence: (id) => fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; report: GuardrailFuzzerReport }>(`/v1/guardrail-fuzzer/evidence/${enc(id)}`),
+    evidence: (id) => fetcher<GuardrailFuzzerEvidence>(`/v1/guardrail-fuzzer/evidence/${enc(id)}`),
   };
 }
