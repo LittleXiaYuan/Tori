@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { Activity, AlertTriangle, Download, GitCompareArrows, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Download, GitCompareArrows, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryScenario, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
+import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryScenario, type CognitiveCanaryShadowPlan, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
 
 const cognitiveCanaryPack = createCognitiveCanaryPackClient();
 
@@ -60,13 +60,14 @@ export default function CognitiveCanaryPackPage() {
   const [reports, setReports] = useState<CognitiveCanaryReportSummary[]>([]);
   const [scenarios, setScenarios] = useState<CognitiveCanaryScenario[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"scenarios" | "evaluate" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"scenarios" | "evaluate" | "shadow" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scenarioJSON, setScenarioJSON] = useState(sampleScenarios);
   const [scenarioIDs, setScenarioIDs] = useState("troubleshooting-summary,tool-safety-decision");
   const [candidateVersion, setCandidateVersion] = useState("1.1.0-rc1");
   const [stableVersion, setStableVersion] = useState("1.0.0");
   const [report, setReport] = useState<CognitiveCanaryReport | null>(null);
+  const [shadowPlan, setShadowPlan] = useState<CognitiveCanaryShadowPlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
   const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
@@ -149,6 +150,28 @@ export default function CognitiveCanaryPackPage() {
     }
   };
 
+  const planShadow = async () => {
+    setBusy("shadow");
+    setError(null);
+    try {
+      const res = await cognitiveCanaryPack.shadowPlan({
+        report_id: selectedReport?.id || reports[0]?.id,
+        candidate_version: candidateVersion,
+        stable_version: stableVersion,
+        traffic_percent: 5,
+        requested_by: "pack-console",
+        reason: "operator requested shadow/judge/metrics/rollback plan",
+        metadata: { source: "web-pack" },
+      });
+      setShadowPlan(res.plan);
+      showToast("已生成 shadow / judge / metrics / rollback 非破坏性计划", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 Cognitive Canary shadow 计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -162,12 +185,12 @@ export default function CognitiveCanaryPackPage() {
           <div>
             <div className="mb-1 flex items-center gap-2">
               <Chip size="sm" style={{ background: status?.shadow_traffic_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.shadow_traffic_ready ? "#22c55e" : "#facc15" }}>
-                {status?.shadow_traffic_ready ? "Shadow traffic ready" : "Pack shell"}
+                {status?.shadow_traffic_ready ? "Shadow traffic ready" : status?.shadow_plan_ready ? "Plan shell" : "Pack shell"}
               </Chip>
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.cognitive-canary"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策和证据包放进可选 Pack。Shadow traffic、LLM-as-Judge batch、自动回滚和指标写回后续接入。
+              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow/judge/metrics/rollback 计划和证据包放进可选 Pack。真实 shadow traffic、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -184,7 +207,7 @@ export default function CognitiveCanaryPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Scenarios</div><div className="kpi-value">{status?.scenario_count ?? scenarios.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Reports</div><div className="kpi-value">{status?.report_count ?? reports.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Quality</div><div className="kpi-value">{(selectedReport?.quality_score ?? reports[0]?.quality_score ?? status?.last_report?.quality_score ?? 0).toFixed(2)}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Gate</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{selectedReport?.gate_status || reports[0]?.gate_status || "ready"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Shadow Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.shadow_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
@@ -218,12 +241,13 @@ export default function CognitiveCanaryPackPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold"><Activity size={16} />Deterministic local judge</div>
-                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell：用本地确定性规则计算 cognitive_quality_score / delta / safety / latency gate；LLM-as-Judge 和 shadow traffic 后续接。</div>
+                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>本阶段为 pack-shell：用本地确定性规则计算 cognitive_quality_score / delta / safety / latency gate，并生成 shadow traffic / LLM-as-Judge / metrics / rollback plan；真实执行后续接。</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <TextField className="min-w-40" value={stableVersion} onChange={setStableVersion}><Input placeholder="stable version" /></TextField>
                 <TextField className="min-w-40" value={candidateVersion} onChange={setCandidateVersion}><Input placeholder="candidate version" /></TextField>
                 <TextField className="min-w-64" value={scenarioIDs} onChange={setScenarioIDs}><Input placeholder="scenario ids" /></TextField>
+                <Button variant="outline" isPending={busy === "shadow"} onPress={planShadow}><CalendarClock size={14} />Shadow 计划</Button>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedReport && reports.length === 0}><Download size={14} />导出证据包</Button>
                 <Button className="btn-accent" isPending={busy === "evaluate"} onPress={evaluate}>运行评估</Button>
               </div>
@@ -244,6 +268,25 @@ export default function CognitiveCanaryPackPage() {
               <div className="rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>运行后会展示 cognitive_quality_score / delta / safety_pass_rate / promotion_decision。</div>
             )}
           </Card>
+
+          {shadowPlan && (
+            <Card className="section-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><CalendarClock size={16} />Shadow / Judge / Metrics / Rollback 计划</div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Chip size="sm">{shadowPlan.status}</Chip>
+                <Chip size="sm">traffic: {shadowPlan.traffic_percent}%</Chip>
+                <Chip size="sm">shadow_ready: {String(shadowPlan.shadow_traffic_ready)}</Chip>
+                <Chip size="sm">judge_ready: {String(shadowPlan.judge_pipeline_ready)}</Chip>
+                <Chip size="sm">auto_rollback_ready: {String(shadowPlan.auto_rollback_ready)}</Chip>
+              </div>
+              <TextField value={JSON.stringify(shadowPlan, null, 2)} onChange={() => undefined}>
+                <TextArea rows={12} aria-label="Cognitive Canary Shadow Plan JSON" className="font-mono text-xs" readOnly />
+              </TextField>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                非破坏性计划：不会 mirror live traffic、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

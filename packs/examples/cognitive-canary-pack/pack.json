@@ -2,7 +2,7 @@
   "id": "yunque.pack.cognitive-canary",
   "name": "Cognitive Canary Pack",
   "version": "0.1.0",
-  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策和证据包导出作为可选能力包暴露。",
+  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策、shadow/judge/metrics/rollback plan 和证据包导出作为可选能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -12,6 +12,10 @@
       "cognitive_canary.scenarios.list",
       "cognitive_canary.scenarios.save",
       "cognitive_canary.evaluate",
+      "cognitive_canary.shadow.plan",
+      "cognitive_canary.judge.plan",
+      "cognitive_canary.metrics.plan",
+      "cognitive_canary.rollback.plan",
       "cognitive_canary.report.list",
       "cognitive_canary.report.detail",
       "cognitive_canary.evidence.export"
@@ -20,6 +24,7 @@
       "/v1/cognitive-canary/status",
       "/v1/cognitive-canary/scenarios",
       "/v1/cognitive-canary/evaluate",
+      "/v1/cognitive-canary/shadow/plan",
       "/v1/cognitive-canary/reports",
       "/v1/cognitive-canary/reports/",
       "/v1/cognitive-canary/evidence/"
@@ -49,6 +54,11 @@
         "method": "POST",
         "path": "/v1/cognitive-canary/evaluate",
         "description": "Evaluate selected stable/canary shadow pairs and generate a cognitive quality report."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognitive-canary/shadow/plan",
+        "description": "Generate a non-destructive shadow traffic, LLM-as-Judge, metrics and rollback write-back plan for a Cognitive Canary report."
       },
       {
         "method": "GET",

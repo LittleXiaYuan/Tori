@@ -2,8 +2,9 @@
 // Cognitive Canary capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, canary scenario storage,
 // deterministic local judge scoring, cognitive SLI summaries, promotion/block
-// recommendations, and JSON evidence export while shadow traffic, LLM-as-Judge,
-// and automatic rollback/write-back are wired later.
+// recommendations, non-destructive shadow/judge/metrics/rollback planning, and
+// JSON evidence export while real shadow traffic, LLM-as-Judge, Prometheus
+// metrics, and automatic rollback/write-back are wired later.
 package cognitivecanary
 
 import (
@@ -82,6 +83,89 @@ type EvaluateRequest struct {
 	CandidateVersion string            `json:"candidate_version,omitempty"`
 	StableVersion    string            `json:"stable_version,omitempty"`
 	Metadata         map[string]string `json:"metadata,omitempty"`
+}
+
+// ShadowPlanRequest asks the shell to shape the future shadow-traffic /
+// LLM-as-Judge / metrics / rollback contract without executing any of it.
+type ShadowPlanRequest struct {
+	ReportID         string            `json:"report_id,omitempty"`
+	CandidateVersion string            `json:"candidate_version,omitempty"`
+	StableVersion    string            `json:"stable_version,omitempty"`
+	TrafficPercent   float64           `json:"traffic_percent,omitempty"`
+	SamplePercent    float64           `json:"sample_percent,omitempty"`
+	RequestedBy      string            `json:"requested_by,omitempty"`
+	Reason           string            `json:"reason,omitempty"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
+}
+
+type ShadowPlanReport struct {
+	PackID                string               `json:"pack_id"`
+	GeneratedAt           time.Time            `json:"generated_at"`
+	Status                string               `json:"status"`
+	ReportID              string               `json:"report_id,omitempty"`
+	CandidateVersion      string               `json:"candidate_version,omitempty"`
+	StableVersion         string               `json:"stable_version,omitempty"`
+	TrafficPercent        float64              `json:"traffic_percent"`
+	SamplePercent         float64              `json:"sample_percent"`
+	ShadowPlanReady       bool                 `json:"shadow_plan_ready"`
+	ShadowTrafficReady    bool                 `json:"shadow_traffic_ready"`
+	JudgePlanReady        bool                 `json:"judge_plan_ready"`
+	JudgePipelineReady    bool                 `json:"judge_pipeline_ready"`
+	MetricsPlanReady      bool                 `json:"metrics_plan_ready"`
+	PrometheusReady       bool                 `json:"prometheus_ready"`
+	AutoRollbackPlanReady bool                 `json:"auto_rollback_plan_ready"`
+	AutoRollbackReady     bool                 `json:"auto_rollback_ready"`
+	RequestedBy           string               `json:"requested_by,omitempty"`
+	Reason                string               `json:"reason,omitempty"`
+	QualityScore          float64              `json:"quality_score"`
+	SafetyPassRate        float64              `json:"safety_pass_rate"`
+	DeltaScore            float64              `json:"delta_score"`
+	LatencyP99Ratio       float64              `json:"latency_p99_ratio"`
+	CanaryErrorRate       float64              `json:"canary_error_rate"`
+	GateStatus            string               `json:"gate_status"`
+	PromotionDecision     string               `json:"promotion_decision"`
+	ShadowPairs           []ShadowPairPlan     `json:"shadow_pairs"`
+	JudgeBatches          []JudgeBatchPlan     `json:"judge_batches"`
+	Metrics               []CanaryMetricPlan   `json:"metrics"`
+	RollbackActions       []RollbackActionPlan `json:"rollback_actions"`
+	Actions               []string             `json:"actions"`
+	Metadata              map[string]string    `json:"metadata,omitempty"`
+	Notes                 []string             `json:"notes,omitempty"`
+}
+
+type ShadowPairPlan struct {
+	ScenarioID             string  `json:"scenario_id"`
+	Category               string  `json:"category"`
+	StableVersion          string  `json:"stable_version"`
+	CandidateVersion       string  `json:"candidate_version"`
+	SamplePercent          float64 `json:"sample_percent"`
+	ShadowTrafficReady     bool    `json:"shadow_traffic_ready"`
+	ResponseCollectorReady bool    `json:"response_collector_ready"`
+}
+
+type JudgeBatchPlan struct {
+	Name               string   `json:"name"`
+	Source             string   `json:"source"`
+	ScenarioCount      int      `json:"scenario_count"`
+	JudgeType          string   `json:"judge_type"`
+	Dimensions         []string `json:"dimensions"`
+	JudgePipelineReady bool     `json:"judge_pipeline_ready"`
+}
+
+type CanaryMetricPlan struct {
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Value     float64           `json:"value"`
+	Threshold float64           `json:"threshold,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
+}
+
+type RollbackActionPlan struct {
+	Target            string `json:"target"`
+	Trigger           string `json:"trigger"`
+	Decision          string `json:"decision"`
+	Reason            string `json:"reason"`
+	AutoRollbackReady bool   `json:"auto_rollback_ready"`
 }
 
 // JudgeScore is the deterministic local judge output. It mirrors the planned
@@ -176,6 +260,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/status", Handler: h.Status},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognitive-canary/scenarios", Handler: h.Scenarios},
 		{Method: http.MethodPost, Path: "/v1/cognitive-canary/evaluate", Handler: h.Evaluate},
+		{Method: http.MethodPost, Path: "/v1/cognitive-canary/shadow/plan", Handler: h.ShadowPlan},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/evidence/", Handler: h.Evidence},
@@ -198,25 +283,34 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":              PackID,
-		"stage":                "pack-shell-before-shadow-traffic",
-		"shadow_traffic_ready": false,
-		"judge_pipeline_ready": false,
-		"quality_sli_ready":    true,
-		"auto_rollback_ready":  false,
-		"scenario_count":       len(scenarios),
-		"report_count":         len(reports),
-		"store_dir":            h.dataDir,
-		"policy":               h.policy,
-		"last_report":          firstSummary(reports),
+		"pack_id":                  PackID,
+		"stage":                    "pack-shell-before-shadow-traffic",
+		"shadow_plan_ready":        true,
+		"shadow_traffic_ready":     false,
+		"judge_plan_ready":         true,
+		"judge_pipeline_ready":     false,
+		"metrics_plan_ready":       true,
+		"prometheus_ready":         false,
+		"quality_sli_ready":        true,
+		"auto_rollback_plan_ready": true,
+		"auto_rollback_ready":      false,
+		"scenario_count":           len(scenarios),
+		"report_count":             len(reports),
+		"store_dir":                h.dataDir,
+		"policy":                   h.policy,
+		"last_report":              firstSummary(reports),
 		"capabilities": []string{
 			"canary.scenario.store",
 			"canary.local_judge.evaluate",
 			"canary.quality_sli.compute",
 			"canary.promotion_gate.plan",
+			"canary.shadow.plan",
+			"canary.judge.plan",
+			"canary.metrics.plan",
+			"canary.rollback.plan",
 			"canary.evidence.export",
 		},
-		"notes": []string{"Shadow traffic replication, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
+		"notes": []string{"Shadow traffic, LLM-as-Judge, metrics, and automatic rollback plans are available as non-destructive contracts; real shadow traffic replication, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
 	})
 }
 
@@ -289,6 +383,24 @@ func (h *Handler) Evaluate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"report": report, "status": status})
 }
 
+func (h *Handler) ShadowPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ShadowPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid cognitive canary shadow plan payload")
+		return
+	}
+	report, err := h.reportForShadowPlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildShadowPlan(report, req)})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -327,12 +439,14 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	plan := h.buildShadowPlan(report, ShadowPlanRequest{ReportID: report.ID, RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-cognitive-canary-evidence",
-		"files":       []string{"canary-report.json", "scenario-set.json", "sli-summary.json"},
+		"files":       []string{"canary-report.json", "scenario-set.json", "sli-summary.json", "shadow-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"},
 		"report":      report,
+		"shadow_plan": plan,
 	})
 }
 
@@ -402,6 +516,96 @@ func (h *Handler) buildReport(ctx context.Context, req EvaluateRequest) (CanaryR
 		Metadata:           req.Metadata,
 		Notes:              []string{"Deterministic local judge shell; replace with shadow traffic collector and LLM-as-Judge batch pipeline in the next stage."},
 	}, nil
+}
+
+func (h *Handler) reportForShadowPlan(ctx context.Context, req ShadowPlanRequest) (CanaryReport, error) {
+	if strings.TrimSpace(req.ReportID) != "" {
+		return h.loadReport(req.ReportID)
+	}
+	reports, err := h.listReports()
+	if err == nil && len(reports) > 0 {
+		if report, loadErr := h.loadReport(reports[0].ID); loadErr == nil {
+			return report, nil
+		}
+	}
+	report, err := h.buildReport(ctx, EvaluateRequest{
+		DryRun:           true,
+		CandidateVersion: req.CandidateVersion,
+		StableVersion:    req.StableVersion,
+		Metadata:         map[string]string{"source": "shadow-plan"},
+	})
+	if err != nil {
+		return CanaryReport{}, err
+	}
+	return report, nil
+}
+
+func (h *Handler) buildShadowPlan(report CanaryReport, req ShadowPlanRequest) ShadowPlanReport {
+	candidate := strings.TrimSpace(req.CandidateVersion)
+	if candidate == "" {
+		candidate = strings.TrimSpace(report.CandidateVersion)
+	}
+	if candidate == "" {
+		candidate = "candidate"
+	}
+	stable := strings.TrimSpace(req.StableVersion)
+	if stable == "" {
+		stable = strings.TrimSpace(report.StableVersion)
+	}
+	if stable == "" {
+		stable = "stable"
+	}
+	trafficPercent := clampPercent(req.TrafficPercent)
+	if trafficPercent == 0 {
+		trafficPercent = recommendedShadowTrafficPercent(report)
+	}
+	samplePercent := clampPercent(req.SamplePercent)
+	if samplePercent == 0 {
+		samplePercent = trafficPercent
+	}
+	status := "shadow_plan"
+	if report.GateStatus == "block" || report.PromotionDecision == "block" {
+		status = "rollback_plan"
+	} else if report.GateStatus == "warn" || report.PromotionDecision == "hold" {
+		status = "hold_plan"
+	}
+	return ShadowPlanReport{
+		PackID:                PackID,
+		GeneratedAt:           h.now().UTC(),
+		Status:                status,
+		ReportID:              report.ID,
+		CandidateVersion:      candidate,
+		StableVersion:         stable,
+		TrafficPercent:        trafficPercent,
+		SamplePercent:         samplePercent,
+		ShadowPlanReady:       true,
+		ShadowTrafficReady:    false,
+		JudgePlanReady:        true,
+		JudgePipelineReady:    false,
+		MetricsPlanReady:      true,
+		PrometheusReady:       false,
+		AutoRollbackPlanReady: true,
+		AutoRollbackReady:     false,
+		RequestedBy:           strings.TrimSpace(req.RequestedBy),
+		Reason:                strings.TrimSpace(req.Reason),
+		QualityScore:          report.QualityScore,
+		SafetyPassRate:        report.SafetyPassRate,
+		DeltaScore:            report.DeltaScore,
+		LatencyP99Ratio:       report.LatencyP99Ratio,
+		CanaryErrorRate:       report.CanaryErrorRate,
+		GateStatus:            report.GateStatus,
+		PromotionDecision:     report.PromotionDecision,
+		ShadowPairs:           buildShadowPairs(report, stable, candidate, samplePercent),
+		JudgeBatches:          buildJudgeBatches(report),
+		Metrics:               h.buildCanaryMetrics(report),
+		RollbackActions:       buildRollbackActions(report),
+		Actions:               buildShadowActions(report, trafficPercent),
+		Metadata:              req.Metadata,
+		Notes: []string{
+			"This route is non-destructive: it does not mirror live traffic, call LLM-as-Judge batches, publish Prometheus metrics, execute rollbacks, or write release state.",
+			"Use the plan shape as the contract for the later shadow traffic / judge / metrics / rollback write-back slice.",
+		},
+	}
 }
 
 func (h *Handler) selectScenarios(req EvaluateRequest) ([]Scenario, error) {
@@ -624,6 +828,105 @@ func (h *Handler) decide(quality float64, safetyFailures int, delta float64, lat
 		recs = append(recs, "Promotion gates passed for the current deterministic scenario set; keep shadow evaluation running before stable rollout.")
 	}
 	return status, decision, recs
+}
+
+func recommendedShadowTrafficPercent(report CanaryReport) float64 {
+	switch {
+	case report.GateStatus == "block" || report.PromotionDecision == "block":
+		return 0.5
+	case report.GateStatus == "warn" || report.PromotionDecision == "hold":
+		return 1
+	default:
+		return 5
+	}
+}
+
+func buildShadowPairs(report CanaryReport, stable, candidate string, samplePercent float64) []ShadowPairPlan {
+	out := make([]ShadowPairPlan, 0, len(report.Results))
+	for _, result := range report.Results {
+		out = append(out, ShadowPairPlan{
+			ScenarioID:             result.ScenarioID,
+			Category:               result.Category,
+			StableVersion:          stable,
+			CandidateVersion:       candidate,
+			SamplePercent:          samplePercent,
+			ShadowTrafficReady:     false,
+			ResponseCollectorReady: false,
+		})
+	}
+	return out
+}
+
+func buildJudgeBatches(report CanaryReport) []JudgeBatchPlan {
+	batches := []JudgeBatchPlan{
+		{
+			Name:               "primary-llm-judge-batch",
+			Source:             "shadow_pairs",
+			ScenarioCount:      report.ScenarioCount,
+			JudgeType:          "llm_as_judge",
+			Dimensions:         []string{"coherence", "relevance", "helpfulness", "consistency", "safety"},
+			JudgePipelineReady: false,
+		},
+	}
+	if report.SafetyFailureCount > 0 {
+		batches = append(batches, JudgeBatchPlan{
+			Name:               "safety-escalation-batch",
+			Source:             "failed_safety_results",
+			ScenarioCount:      report.SafetyFailureCount,
+			JudgeType:          "safety_review",
+			Dimensions:         []string{"policy_violation", "secret_leakage", "unsafe_instruction"},
+			JudgePipelineReady: false,
+		})
+	}
+	return batches
+}
+
+func (h *Handler) buildCanaryMetrics(report CanaryReport) []CanaryMetricPlan {
+	labels := map[string]string{"pack_id": PackID, "report_id": report.ID}
+	return []CanaryMetricPlan{
+		{Name: "yunque_cognitive_canary_quality_score", Type: "gauge", Value: report.QualityScore, Threshold: h.policy.QualityScoreSLO, Labels: labels},
+		{Name: "yunque_cognitive_canary_delta_score", Type: "gauge", Value: report.DeltaScore, Threshold: h.policy.MinDeltaScore, Labels: labels},
+		{Name: "yunque_cognitive_canary_safety_pass_rate", Type: "gauge", Value: report.SafetyPassRate, Threshold: 100, Labels: labels},
+		{Name: "yunque_cognitive_canary_latency_p99_ratio", Type: "gauge", Value: report.LatencyP99Ratio, Threshold: h.policy.MaxLatencyRatio, Labels: labels},
+		{Name: "yunque_cognitive_canary_error_rate", Type: "gauge", Value: report.CanaryErrorRate, Threshold: h.policy.MaxErrorRate, Labels: labels},
+	}
+}
+
+func buildRollbackActions(report CanaryReport) []RollbackActionPlan {
+	decision := "observe_only"
+	trigger := "gate_status=pass"
+	if report.GateStatus == "block" || report.PromotionDecision == "block" {
+		decision = "rollback_candidate"
+		trigger = "gate_status=block"
+	} else if report.GateStatus == "warn" || report.PromotionDecision == "hold" || report.PromotionDecision == "observe" {
+		decision = "hold_candidate"
+		trigger = "gate_status=warn"
+	}
+	reason := "canary report gate passed; keep observing shadow SLI before promotion"
+	if len(report.Recommendations) > 0 {
+		reason = report.Recommendations[0]
+	}
+	return []RollbackActionPlan{{
+		Target:            "release.cognitive_canary",
+		Trigger:           trigger,
+		Decision:          decision,
+		Reason:            reason,
+		AutoRollbackReady: false,
+	}}
+}
+
+func buildShadowActions(report CanaryReport, trafficPercent float64) []string {
+	actions := []string{
+		fmt.Sprintf("would mirror %.2f%% of eligible requests into stable/candidate shadow pairs", trafficPercent),
+		"would enqueue shadow pairs into an LLM-as-Judge batch without calling the judge service yet",
+		"would expose cognitive canary SLI through the Prometheus scrape surface",
+	}
+	if report.GateStatus == "block" || report.PromotionDecision == "block" {
+		actions = append(actions, "would prepare automatic rollback write-back after explicit approval")
+	} else {
+		actions = append(actions, "would keep rollback write-back disabled until SLI gates fail")
+	}
+	return actions
 }
 
 func defaultScenarios() []Scenario {
@@ -1048,6 +1351,10 @@ func clamp(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+func clampPercent(value float64) float64 {
+	return round2(clamp(value, 0, 100))
 }
 
 func round2(value float64) float64 {
