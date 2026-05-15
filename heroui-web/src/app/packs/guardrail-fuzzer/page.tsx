@@ -194,7 +194,7 @@ export default function GuardrailFuzzerPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.guardrail-fuzzer"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已把 adversarial corpus、确定性 mutation、Sanitizer probe、绕过报告、规则候选、CI Gate / 规则写回 / 告警 plan、Go native fuzz corpus sync plan 和证据包放进可选 Pack。真实 CI 定时 fuzz、规则写回、Go testdata 同步和告警自动化后续接入。
+              当前切片已把 adversarial corpus、确定性 mutation、Sanitizer probe、绕过报告、规则候选、CI Gate / 规则写回 / 告警 plan、Go native fuzz corpus sync plan、deterministic corpus manifest preview 和证据包放进可选 Pack。真实 CI 定时 fuzz、规则写回、Go testdata 同步和告警自动化后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -296,9 +296,11 @@ export default function GuardrailFuzzerPackPage() {
                   <Chip size="sm">seeds: {nativeCorpusPlan.seed_count}</Chip>
                   <Chip size="sm">sync_ready: {String(nativeCorpusPlan.native_corpus_sync_ready)}</Chip>
                   <Chip size="sm">go_fuzz_ready: {String(nativeCorpusPlan.go_native_fuzz_ready)}</Chip>
+                  <Chip size="sm">manifest: {nativeCorpusPlan.sync_summary?.manifest_entry_count ?? nativeCorpusPlan.corpus_manifest?.length ?? 0}</Chip>
+                  <Chip size="sm">writes_files: {String(nativeCorpusPlan.sync_summary?.writes_files ?? false)}</Chip>
                 </div>
                 <div className="mb-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)", background: "rgba(250,204,21,0.08)" }}>
-                  非破坏性边界：只预览 corpus 文件映射和未来 go fuzz 命令；不写 testdata/fuzz、不修改 FuzzSanitizer、不执行 go test -fuzz、不上传 artifacts。
+                  非破坏性边界：只预览 corpus 文件映射、SHA-256 内容哈希、would_create / would_update / would_skip 动作和未来 go fuzz 命令；不写 testdata/fuzz、不修改 FuzzSanitizer、不执行 go test -fuzz、不上传 artifacts。
                 </div>
                 <TextField value={JSON.stringify(nativeCorpusPlan, null, 2)} onChange={() => undefined}>
                   <TextArea rows={14} aria-label="Guardrail fuzzer native corpus plan JSON" className="font-mono text-xs" readOnly />

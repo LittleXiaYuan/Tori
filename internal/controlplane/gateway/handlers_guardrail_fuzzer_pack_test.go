@@ -108,6 +108,9 @@ func TestGuardrailFuzzerPackCanSaveCorpusAndRunFuzzer(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"native_corpus_plan_ready":true`) || !strings.Contains(w.Body.String(), `"go_native_fuzz_ready":false`) {
 		t.Fatalf("native corpus plan status=%d body=%s", w.Code, w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), `"corpus_manifest"`) || !strings.Contains(w.Body.String(), `"content_sha256"`) || !strings.Contains(w.Body.String(), `"sync_summary"`) || !strings.Contains(w.Body.String(), `"writes_files":false`) {
+		t.Fatalf("native corpus plan should expose deterministic non-writing manifest preview, body=%s", w.Body.String())
+	}
 }
 
 func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {

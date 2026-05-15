@@ -27,6 +27,7 @@ if (pack.update?.rollback !== true) fail("Guardrail Fuzzer pack must be rollback
 if (pack.defaultState !== "disabled") fail("Guardrail Fuzzer pack should stay default disabled until CI fuzz gates are wired");
 if (pack.metadata?.stage !== "pack-shell-before-ci-fuzz") fail("Guardrail Fuzzer pack should declare pack-shell-before-ci-fuzz stage");
 if (pack.metadata?.blueprint !== "doc/GUARDRAIL-FUZZER.md") fail("Guardrail Fuzzer pack should point to doc/GUARDRAIL-FUZZER.md");
+if (!(pack.backend?.capabilities ?? []).includes("guardrail_fuzzer.native_corpus.manifest_preview")) fail("Guardrail Fuzzer pack should expose deterministic native corpus manifest preview capability");
 
 const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
 for (const route of manifest.routes ?? []) {
@@ -51,6 +52,10 @@ for (const token of [
   "native_corpus_sync_ready",
   "go_native_fuzz_plan_ready",
   "go_native_fuzz_ready",
+  "corpus_manifest",
+  "sync_summary",
+  "content_sha256",
+  "writes_files",
   "/v1/guardrail-fuzzer/reports",
   "/v1/guardrail-fuzzer/evidence/",
   "method: \"POST\"",
@@ -88,16 +93,23 @@ for (const token of [
   "native_corpus_sync_ready",
   "go_native_fuzz_plan_ready",
   "go_native_fuzz_ready",
+  "corpus_manifest",
+  "sync_summary",
+  "content_sha256",
+  "writes_files",
   "guardrail.ci_gate.plan",
   "guardrail.rule_writeback.plan",
   "guardrail.alert.plan",
   "guardrail.native_corpus.plan",
   "guardrail.go_native_fuzz.plan",
+  "guardrail.native_corpus.manifest_preview",
   "ci-gate-plan.json",
   "rule-writeback-plan.json",
   "alert-plan.json",
   "native-corpus-plan.json",
   "go-native-fuzz-plan.json",
+  "native-corpus-manifest.json",
+  "native-corpus-sync-preview.json",
   "json-guardrail-fuzzer-evidence",
   "cfg.DataPath(\"guardrail-fuzzer\")",
   "guardrailfuzzerpack.New",
@@ -128,6 +140,10 @@ for (const token of [
   "native_corpus_sync_ready",
   "go_native_fuzz_plan_ready",
   "go_native_fuzz_ready",
+  "corpus_manifest",
+  "sync_summary",
+  "content_sha256",
+  "writes_files",
   "Guardrail Fuzzer request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Guardrail Fuzzer SDK slice missing token: ${token}`);

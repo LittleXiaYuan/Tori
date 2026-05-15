@@ -3,14 +3,17 @@
 // shell: it owns manifest-gated HTTP routes, local corpus storage, deterministic
 // mutation strategies, sanitizer probe execution, bypass/false-positive reports,
 // rule-candidate hints, non-destructive CI/rule write-back planning, Go native
-// fuzz corpus sync planning, and evidence export while CI scheduling and
-// automatic rule proposal write-back are wired later.
+// fuzz corpus sync planning with deterministic manifest previews, and
+// evidence export while CI scheduling and automatic rule proposal write-back are
+// wired later.
 package guardrailfuzzer
 
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -99,26 +102,28 @@ type NativeCorpusPlanRequest struct {
 }
 
 type NativeCorpusPlanReport struct {
-	PackID                string                  `json:"pack_id"`
-	GeneratedAt           time.Time               `json:"generated_at"`
-	Status                string                  `json:"status"`
-	Package               string                  `json:"package"`
-	FuzzTarget            string                  `json:"fuzz_target"`
-	CorpusDir             string                  `json:"corpus_dir"`
-	NativeCorpusPlanReady bool                    `json:"native_corpus_plan_ready"`
-	NativeCorpusSyncReady bool                    `json:"native_corpus_sync_ready"`
-	GoNativeFuzzPlanReady bool                    `json:"go_native_fuzz_plan_ready"`
-	GoNativeFuzzReady     bool                    `json:"go_native_fuzz_ready"`
-	SeedCount             int                     `json:"seed_count"`
-	AttackSeedCount       int                     `json:"attack_seed_count"`
-	BenignSeedCount       int                     `json:"benign_seed_count"`
-	Seeds                 []NativeCorpusSeedPlan  `json:"seeds"`
-	Commands              []NativeFuzzCommandPlan `json:"commands"`
-	RequestedBy           string                  `json:"requested_by,omitempty"`
-	Reason                string                  `json:"reason,omitempty"`
-	Actions               []string                `json:"actions"`
-	Metadata              map[string]string       `json:"metadata,omitempty"`
-	Notes                 []string                `json:"notes,omitempty"`
+	PackID                string                      `json:"pack_id"`
+	GeneratedAt           time.Time                   `json:"generated_at"`
+	Status                string                      `json:"status"`
+	Package               string                      `json:"package"`
+	FuzzTarget            string                      `json:"fuzz_target"`
+	CorpusDir             string                      `json:"corpus_dir"`
+	NativeCorpusPlanReady bool                        `json:"native_corpus_plan_ready"`
+	NativeCorpusSyncReady bool                        `json:"native_corpus_sync_ready"`
+	GoNativeFuzzPlanReady bool                        `json:"go_native_fuzz_plan_ready"`
+	GoNativeFuzzReady     bool                        `json:"go_native_fuzz_ready"`
+	SeedCount             int                         `json:"seed_count"`
+	AttackSeedCount       int                         `json:"attack_seed_count"`
+	BenignSeedCount       int                         `json:"benign_seed_count"`
+	Seeds                 []NativeCorpusSeedPlan      `json:"seeds"`
+	CorpusManifest        []NativeCorpusManifestEntry `json:"corpus_manifest"`
+	SyncSummary           NativeCorpusSyncSummary     `json:"sync_summary"`
+	Commands              []NativeFuzzCommandPlan     `json:"commands"`
+	RequestedBy           string                      `json:"requested_by,omitempty"`
+	Reason                string                      `json:"reason,omitempty"`
+	Actions               []string                    `json:"actions"`
+	Metadata              map[string]string           `json:"metadata,omitempty"`
+	Notes                 []string                    `json:"notes,omitempty"`
 }
 
 type NativeCorpusSeedPlan struct {
@@ -130,6 +135,28 @@ type NativeCorpusSeedPlan struct {
 	TestdataFile    string   `json:"testdata_file"`
 	AddCall         string   `json:"add_call"`
 	CorpusEntry     string   `json:"corpus_entry"`
+}
+
+type NativeCorpusManifestEntry struct {
+	SeedID          string   `json:"seed_id"`
+	TestdataFile    string   `json:"testdata_file"`
+	Action          string   `json:"action"`
+	ContentSHA256   string   `json:"content_sha256"`
+	ContentBytes    int      `json:"content_bytes"`
+	Source          string   `json:"source"`
+	Category        string   `json:"category"`
+	ExpectedBlocked bool     `json:"expected_blocked"`
+	Tags            []string `json:"tags,omitempty"`
+}
+
+type NativeCorpusSyncSummary struct {
+	ManifestEntryCount int    `json:"manifest_entry_count"`
+	WouldCreate        int    `json:"would_create"`
+	WouldUpdate        int    `json:"would_update"`
+	WouldSkip          int    `json:"would_skip"`
+	WritesFiles        bool   `json:"writes_files"`
+	Deterministic      bool   `json:"deterministic"`
+	HashAlgorithm      string `json:"hash_algorithm"`
 }
 
 type NativeFuzzCommandPlan struct {
@@ -329,6 +356,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"guardrail.alert.plan",
 			"guardrail.native_corpus.plan",
 			"guardrail.go_native_fuzz.plan",
+			"guardrail.native_corpus.manifest_preview",
 			"guardrail.evidence.export",
 		},
 		"notes": []string{"CI gate, rule write-back, alert, and Go native fuzz corpus plans are available as non-destructive contracts; real CI scheduling, automatic guardrail rule proposal write-back, corpus file sync, and alert routing remain follow-up wiring."},
@@ -488,7 +516,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":            PackID,
 		"exported_at":        h.now().UTC(),
 		"format":             "json-guardrail-fuzzer-evidence",
-		"files":              []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"},
+		"files":              []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json", "native-corpus-manifest.json", "native-corpus-sync-preview.json"},
 		"report":             report,
 		"ci_gate_plan":       plan,
 		"native_corpus_plan": nativePlan,
@@ -737,6 +765,7 @@ func (h *Handler) buildNativeCorpusPlan(seeds []Seed, req NativeCorpusPlanReques
 		corpusDir = "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer"
 	}
 	plannedSeeds := buildNativeCorpusSeedPlans(seeds, corpusDir)
+	corpusManifest := buildNativeCorpusManifest(plannedSeeds)
 	attackCount := 0
 	benignCount := 0
 	for _, seed := range seeds {
@@ -761,6 +790,8 @@ func (h *Handler) buildNativeCorpusPlan(seeds []Seed, req NativeCorpusPlanReques
 		AttackSeedCount:       attackCount,
 		BenignSeedCount:       benignCount,
 		Seeds:                 plannedSeeds,
+		CorpusManifest:        corpusManifest,
+		SyncSummary:           summarizeNativeCorpusSync(corpusManifest),
 		Commands:              buildNativeFuzzCommandPlans(pkg, target, corpusDir),
 		RequestedBy:           strings.TrimSpace(req.RequestedBy),
 		Reason:                strings.TrimSpace(req.Reason),
@@ -769,6 +800,7 @@ func (h *Handler) buildNativeCorpusPlan(seeds []Seed, req NativeCorpusPlanReques
 		Notes: []string{
 			"This route is non-destructive: it does not write Go testdata corpus files, modify fuzz tests, run go test -fuzz, or upload artifacts.",
 			"Use the plan shape as the contract for the later Go native fuzz corpus sync and CI fuzz execution slice.",
+			"corpus_manifest is a deterministic preview with SHA-256 content hashes and would_* actions only; sync_summary.writes_files stays false in this slice.",
 		},
 	}
 }
@@ -791,19 +823,85 @@ func buildNativeCorpusSeedPlans(seeds []Seed, corpusDir string) []NativeCorpusSe
 	return out
 }
 
+func buildNativeCorpusManifest(seeds []NativeCorpusSeedPlan) []NativeCorpusManifestEntry {
+	out := make([]NativeCorpusManifestEntry, 0, len(seeds))
+	for _, seed := range seeds {
+		content := nativeCorpusManifestContent(seed)
+		out = append(out, NativeCorpusManifestEntry{
+			SeedID:          seed.SeedID,
+			TestdataFile:    seed.TestdataFile,
+			Action:          "would_create",
+			ContentSHA256:   sha256Hex(content),
+			ContentBytes:    len([]byte(content)),
+			Source:          seed.Source,
+			Category:        seed.Category,
+			ExpectedBlocked: seed.ExpectedBlocked,
+			Tags:            seed.Tags,
+		})
+	}
+	return out
+}
+
+func summarizeNativeCorpusSync(manifest []NativeCorpusManifestEntry) NativeCorpusSyncSummary {
+	summary := NativeCorpusSyncSummary{
+		ManifestEntryCount: len(manifest),
+		WritesFiles:        false,
+		Deterministic:      true,
+		HashAlgorithm:      "sha256",
+	}
+	for _, entry := range manifest {
+		switch entry.Action {
+		case "would_update":
+			summary.WouldUpdate++
+		case "would_skip":
+			summary.WouldSkip++
+		default:
+			summary.WouldCreate++
+		}
+	}
+	return summary
+}
+
+func nativeCorpusManifestContent(seed NativeCorpusSeedPlan) string {
+	payload := struct {
+		Format          string   `json:"format"`
+		SeedID          string   `json:"seed_id"`
+		Input           string   `json:"input"`
+		Source          string   `json:"source"`
+		Category        string   `json:"category"`
+		ExpectedBlocked bool     `json:"expected_blocked"`
+		Tags            []string `json:"tags,omitempty"`
+	}{
+		Format:          "yunque.guardrail_fuzzer.native_corpus.v1",
+		SeedID:          seed.SeedID,
+		Input:           seed.CorpusEntry,
+		Source:          seed.Source,
+		Category:        seed.Category,
+		ExpectedBlocked: seed.ExpectedBlocked,
+		Tags:            seed.Tags,
+	}
+	data, _ := json.Marshal(payload)
+	return string(data) + "\n"
+}
+
+func sha256Hex(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
 func buildNativeFuzzCommandPlans(pkg, target, corpusDir string) []NativeFuzzCommandPlan {
 	return []NativeFuzzCommandPlan{
 		{
 			Name:        "preview-go-native-fuzz-corpus",
 			Command:     fmt.Sprintf("go test %s -run %s -count=1", pkg, target),
-			Artifacts:   []string{"native-corpus-plan.json", corpusDir},
+			Artifacts:   []string{"native-corpus-plan.json", "native-corpus-manifest.json", "native-corpus-sync-preview.json", corpusDir},
 			WritesFiles: false,
 			Ready:       false,
 		},
 		{
 			Name:        "future-go-native-fuzz",
 			Command:     fmt.Sprintf("go test %s -run '^$' -fuzz %s -fuzztime=5m", pkg, target),
-			Artifacts:   []string{"go-native-fuzz-plan.json", "testdata/fuzz/"},
+			Artifacts:   []string{"go-native-fuzz-plan.json", "native-corpus-manifest.json", "native-corpus-sync-preview.json", "testdata/fuzz/"},
 			WritesFiles: false,
 			Ready:       false,
 		},
@@ -813,6 +911,8 @@ func buildNativeFuzzCommandPlans(pkg, target, corpusDir string) []NativeFuzzComm
 func buildNativeCorpusActions(corpusDir, target string) []string {
 	return []string{
 		fmt.Sprintf("would map pack corpus seeds into %s", corpusDir),
+		"would emit native-corpus-manifest.json with stable file names and SHA-256 content hashes",
+		"would preview would_create/would_update/would_skip actions without touching files",
 		fmt.Sprintf("would add or refresh f.Add(...) seeds for %s", target),
 		"would preserve expected_blocked metadata for later bypass assertions",
 		"would keep Go native fuzz execution disabled until an explicit CI/runtime slice wires it",

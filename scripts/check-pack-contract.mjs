@@ -641,11 +641,12 @@ if (guardrailFuzzerManifest) {
   if (guardrailFuzzerManifest.defaultState !== "disabled") fail("Guardrail Fuzzer pack must remain default disabled before CI fuzz gates are wired");
   if (guardrailFuzzerManifest.metadata?.stage !== "pack-shell-before-ci-fuzz") fail("Guardrail Fuzzer pack stage must remain pack-shell-before-ci-fuzz");
   if (guardrailFuzzerManifest.metadata?.blueprint !== "doc/GUARDRAIL-FUZZER.md") fail("Guardrail Fuzzer pack blueprint pointer drifted");
+  if (!(guardrailFuzzerManifest.backend?.capabilities ?? []).includes("guardrail_fuzzer.native_corpus.manifest_preview")) fail("Guardrail Fuzzer manifest missing native corpus manifest preview capability");
 }
 if (guardrailFuzzerPage.includes('from "@/lib/api"') || guardrailFuzzerPage.includes("api.guardrailFuzzer") || !guardrailFuzzerPage.includes("createGuardrailFuzzerPackClient")) {
   fail("Guardrail Fuzzer pack page must use guardrail-fuzzer-pack-client instead of monolithic api object");
 }
-for (const token of ["createGuardrailFuzzerPackClient", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan", "nativeCorpusPlan", "ci_gate_plan_ready", "rule_writeback_plan_ready", "alert_plan_ready", "alert_ready", "native_corpus_plan_ready", "native_corpus_sync_ready", "go_native_fuzz_plan_ready", "go_native_fuzz_ready", 'method: "POST"']) {
+for (const token of ["createGuardrailFuzzerPackClient", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan", "nativeCorpusPlan", "ci_gate_plan_ready", "rule_writeback_plan_ready", "alert_plan_ready", "alert_ready", "native_corpus_plan_ready", "native_corpus_sync_ready", "go_native_fuzz_plan_ready", "go_native_fuzz_ready", "corpus_manifest", "sync_summary", "content_sha256", "writes_files", 'method: "POST"']) {
   if (!guardrailFuzzerClient.includes(token)) fail(`guardrail-fuzzer-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("guardrail-fuzzer")')) {
@@ -654,13 +655,13 @@ if (!gatewaySource.includes('cfg.DataPath("guardrail-fuzzer")')) {
 for (const token of ["TestGuardrailFuzzer", "StatusMethodNotAllowed", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan"]) {
   if (!guardrailFuzzerGateTest.includes(token)) fail(`Guardrail Fuzzer gateway gate test missing token: ${token}`);
 }
-for (const token of ["createGuardrailFuzzerClient", "GuardrailFuzzerClientError", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan", "nativeCorpusPlan"]) {
+for (const token of ["createGuardrailFuzzerClient", "GuardrailFuzzerClientError", "/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/", "ciGatePlan", "nativeCorpusPlan", "corpus_manifest", "sync_summary", "content_sha256", "writes_files"]) {
   if (!guardrailFuzzerSdk.includes(token)) fail(`Guardrail Fuzzer TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1"]) {
+for (const token of ["/v1/guardrail-fuzzer/status", "/v1/guardrail-fuzzer/run", "/v1/guardrail-fuzzer/ci-gate/plan", "/v1/guardrail-fuzzer/native-corpus/plan", "/v1/guardrail-fuzzer/evidence/fuzz-1", "corpus_manifest", "sync_summary", "content_sha256", "writes_files"]) {
   if (!guardrailFuzzerClientTest.includes(token)) fail(`Guardrail Fuzzer frontend client test missing token: ${token}`);
 }
-for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "base64_wrap", "double_url_encode", "ci_gate_plan_ready", "ci_gate_ready", "rule_writeback_plan_ready", "rule_writeback_ready", "alert_plan_ready", "alert_ready", "native_corpus_plan_ready", "native_corpus_sync_ready", "go_native_fuzz_plan_ready", "go_native_fuzz_ready", "guardrail.ci_gate.plan", "guardrail.rule_writeback.plan", "guardrail.alert.plan", "guardrail.native_corpus.plan", "guardrail.go_native_fuzz.plan", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json"]) {
+for (const token of ["json-guardrail-fuzzer-evidence", "buildRuleCandidates", "base64_wrap", "double_url_encode", "ci_gate_plan_ready", "ci_gate_ready", "rule_writeback_plan_ready", "rule_writeback_ready", "alert_plan_ready", "alert_ready", "native_corpus_plan_ready", "native_corpus_sync_ready", "go_native_fuzz_plan_ready", "go_native_fuzz_ready", "guardrail.ci_gate.plan", "guardrail.rule_writeback.plan", "guardrail.alert.plan", "guardrail.native_corpus.plan", "guardrail.go_native_fuzz.plan", "guardrail.native_corpus.manifest_preview", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json", "native-corpus-plan.json", "go-native-fuzz-plan.json", "native-corpus-manifest.json", "native-corpus-sync-preview.json", "corpus_manifest", "sync_summary", "content_sha256", "writes_files"]) {
   if (!guardrailFuzzerSource.includes(token)) fail(`Guardrail Fuzzer handler missing fuzzer shell token: ${token}`);
 }
 for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrailFuzzerEvidence:"]) {

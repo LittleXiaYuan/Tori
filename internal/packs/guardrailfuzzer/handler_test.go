@@ -84,6 +84,9 @@ func TestGuardrailFuzzerRunDetectsBypassAndExportsEvidence(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "ci-gate-plan.json") || !strings.Contains(w.Body.String(), "rule-writeback-plan.json") || !strings.Contains(w.Body.String(), "native-corpus-plan.json") {
 		t.Fatalf("evidence should include plan-only CI/rule/native corpus evidence, body=%s", w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), "native-corpus-manifest.json") || !strings.Contains(w.Body.String(), "native-corpus-sync-preview.json") {
+		t.Fatalf("evidence should include native corpus manifest preview evidence, body=%s", w.Body.String())
+	}
 }
 
 func TestGuardrailFuzzerCIGatePlanIsNonDestructiveContract(t *testing.T) {
@@ -152,10 +155,23 @@ func TestGuardrailFuzzerNativeCorpusPlanIsNonDestructiveContract(t *testing.T) {
 	if !res.Plan.NativeCorpusPlanReady || res.Plan.NativeCorpusSyncReady || !res.Plan.GoNativeFuzzPlanReady || res.Plan.GoNativeFuzzReady {
 		t.Fatalf("unexpected native corpus readiness flags: %#v", res.Plan)
 	}
-	if res.Plan.SeedCount == 0 || res.Plan.AttackSeedCount == 0 || len(res.Plan.Seeds) == 0 || len(res.Plan.Commands) == 0 || len(res.Plan.Actions) == 0 {
+	if res.Plan.SeedCount == 0 || res.Plan.AttackSeedCount == 0 || len(res.Plan.Seeds) == 0 || len(res.Plan.CorpusManifest) == 0 || len(res.Plan.Commands) == 0 || len(res.Plan.Actions) == 0 {
 		t.Fatalf("expected concrete native corpus plan, got %#v", res.Plan)
 	}
-	if got := strings.Join(res.Plan.Notes, "\n"); !strings.Contains(got, "does not write Go testdata corpus files") || !strings.Contains(got, "does not write Go testdata corpus files, modify fuzz tests, run go test -fuzz, or upload artifacts") {
+	if res.Plan.SyncSummary.ManifestEntryCount != len(res.Plan.CorpusManifest) || res.Plan.SyncSummary.WritesFiles || !res.Plan.SyncSummary.Deterministic || res.Plan.SyncSummary.HashAlgorithm != "sha256" {
+		t.Fatalf("unexpected native corpus sync summary: %#v", res.Plan.SyncSummary)
+	}
+	if res.Plan.SyncSummary.WouldCreate != len(res.Plan.CorpusManifest) || res.Plan.SyncSummary.WouldUpdate != 0 || res.Plan.SyncSummary.WouldSkip != 0 {
+		t.Fatalf("native corpus plan should preview create-only actions in this slice: %#v", res.Plan.SyncSummary)
+	}
+	manifest := res.Plan.CorpusManifest[0]
+	if manifest.SeedID != res.Plan.Seeds[0].SeedID || manifest.TestdataFile != res.Plan.Seeds[0].TestdataFile || manifest.Action != "would_create" {
+		t.Fatalf("manifest entry should mirror seed file mapping with a preview action: seed=%#v manifest=%#v", res.Plan.Seeds[0], manifest)
+	}
+	if len(manifest.ContentSHA256) != 64 || manifest.ContentBytes == 0 {
+		t.Fatalf("manifest entry should carry a SHA-256 content preview: %#v", manifest)
+	}
+	if got := strings.Join(res.Plan.Notes, "\n"); !strings.Contains(got, "does not write Go testdata corpus files") || !strings.Contains(got, "does not write Go testdata corpus files, modify fuzz tests, run go test -fuzz, or upload artifacts") || !strings.Contains(got, "corpus_manifest is a deterministic preview") {
 		t.Fatalf("native corpus plan should explicitly stay non-destructive, notes=%q", got)
 	}
 	if got := res.Plan.Seeds[0].TestdataFile; !strings.Contains(got, "internal/agentcore/guardrails/testdata/fuzz/FuzzSanitizer/") {
