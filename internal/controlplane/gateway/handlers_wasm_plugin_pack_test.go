@@ -34,7 +34,7 @@ func TestWASMPluginPackRoutesStatusWhenEnabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "host_abi_execution_gate_ready") || !strings.Contains(w.Body.String(), "host_abi_enforcement_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.execution_gate") || !strings.Contains(w.Body.String(), "module_integrity_gate_ready") || !strings.Contains(w.Body.String(), "wasm.module.integrity_gate") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.signature_verification_plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "host_abi_execution_gate_ready") || !strings.Contains(w.Body.String(), "host_abi_enforcement_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.execution_gate") || !strings.Contains(w.Body.String(), "module_integrity_gate_ready") || !strings.Contains(w.Body.String(), "wasm.module.integrity_gate") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.signature_verification_plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_writeback") {
 		t.Fatalf("enabled WASM Plugin pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
@@ -113,6 +113,14 @@ func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "installer_blocked_until_writeback") || !strings.Contains(w.Body.String(), "writes_approval_queue") {
 		t.Fatalf("remote install approval writeback plan status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","package_url":"https://packs.yunque.local/wasm/calculator-remote.tgz","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"sig","public_key_id":"root","requested_by":"operator","reason":"test approval","risk_tier":"high","approvers":["security"],"decision":"approved","decision_by":"security","decision_reason":"approved for pack-local queue store"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "writes_approval_queue_store") || !strings.Contains(w.Body.String(), "installer_blocked_until_installer_wiring") {
+		t.Fatalf("remote install approval queue writeback status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithWASMPluginPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -139,6 +147,7 @@ func newTestGatewayWithWASMPluginPack(t *testing.T, status packruntime.PackStatu
 				"/v1/wasm-plugin/remote-install/approval/plan",
 				"/v1/wasm-plugin/remote-install/approval/decision/plan",
 				"/v1/wasm-plugin/remote-install/approval/writeback/plan",
+				"/v1/wasm-plugin/remote-install/approval/queue/writeback",
 				"/v1/wasm-plugin/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -153,6 +162,7 @@ func newTestGatewayWithWASMPluginPack(t *testing.T, status packruntime.PackStatu
 				{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/plan"},
 				{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/decision/plan"},
 				{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/writeback/plan"},
+				{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/queue/writeback"},
 				{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/"},
 			},
 		},

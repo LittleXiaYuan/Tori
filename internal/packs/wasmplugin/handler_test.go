@@ -38,8 +38,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 11 {
-		t.Fatalf("expected 11 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 12 {
+		t.Fatalf("expected 12 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,17 +53,18 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":                                 {http.MethodGet},
-		"/v1/wasm-plugin/plugins":                                {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":                               {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":                           {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload":                         {http.MethodPost},
-		"/v1/wasm-plugin/execute":                                {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/plan":                    {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/plan":           {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/decision/plan":  {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/writeback/plan": {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":                              {http.MethodGet},
+		"/v1/wasm-plugin/status":                                  {http.MethodGet},
+		"/v1/wasm-plugin/plugins":                                 {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":                                {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":                            {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":                          {http.MethodPost},
+		"/v1/wasm-plugin/execute":                                 {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan":                     {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/plan":            {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/decision/plan":   {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/writeback/plan":  {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/queue/writeback": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":                               {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -153,7 +154,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_writeback") {
 		t.Fatalf("status should expose approval queue/decision/writeback plan readiness and capabilities: status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -221,6 +222,35 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if writebackPlanResp.Plan.RequestID != "wasm-remote-install-custom" || writebackPlanResp.Plan.RequestKey != "custom-request-key" || writebackPlanResp.Plan.DecisionKey == "" || !writebackPlanResp.Plan.InstallerBlockedUntilWriteback || writebackPlanResp.Plan.WritebackPlan.Artifact != "approval-writeback-plan.json" {
 		t.Fatalf("writeback plan should preserve queue/decision references and artifact contract: %#v", writebackPlanResp.Plan.WritebackPlan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"persist approval writeback","metadata":{"ticket":"WASM-1"}}`))
+	h.RemoteInstallApprovalQueueWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "approval-queue-store.json") {
+		t.Fatalf("remote install approval queue writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	var queueWritebackResp struct {
+		Writeback RemoteInstallApprovalQueueWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&queueWritebackResp); err != nil {
+		t.Fatalf("decode remote install approval queue writeback: %v", err)
+	}
+	queueWriteback := queueWritebackResp.Writeback
+	if !queueWriteback.ApprovalQueueStoreReady || !queueWriteback.ApprovalWritebackReady || !queueWriteback.ApprovalQueueReady || !queueWriteback.WritesApprovalQueue || !queueWriteback.WritesApprovalQueueStore || !queueWriteback.ApprovalDecisionReady || !queueWriteback.AppliesApprovalDecision {
+		t.Fatalf("approval queue writeback should persist the pack-local approval queue decision: %#v", queueWriteback)
+	}
+	if queueWriteback.Downloads || queueWriteback.WritesFiles || queueWriteback.NetworkAccess || queueWriteback.InstallsPlugin || queueWriteback.InstallerBlockedUntilWriteback || !queueWriteback.InstallerBlockedUntilInstallerWiring {
+		t.Fatalf("approval queue writeback must stay non-installer and blocked until installer wiring: %#v", queueWriteback)
+	}
+	if queueWriteback.ApprovalQueueStore.RecordCount != 1 || queueWriteback.ApprovalQueueRecord.RequestKey != "custom-request-key" || queueWriteback.ApprovalQueueRecord.Status != "written_pending_installer_wiring" {
+		t.Fatalf("approval queue writeback should expose persisted store and record: %#v store=%#v", queueWriteback.ApprovalQueueRecord, queueWriteback.ApprovalQueueStore)
+	}
+	if !containsString(queueWriteback.Artifacts, "approval-queue-store.json") || !containsString(queueWriteback.Artifacts, "approval-queue-record.json") {
+		t.Fatalf("approval queue writeback should declare store/record artifacts: %#v", queueWriteback.Artifacts)
+	}
+	if data, err := os.ReadFile(h.approvalQueueStorePath()); err != nil || !strings.Contains(string(data), "custom-request-key") || !strings.Contains(string(data), "approval-queue-store.json") {
+		t.Fatalf("approval queue store should be written with the request key: err=%v data=%s", err, string(data))
 	}
 
 	w = httptest.NewRecorder()
@@ -293,7 +323,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
@@ -306,6 +336,8 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		ApprovalGatePlan      RemoteInstallApprovalPlanReport          `json:"approval_gate_plan"`
 		ApprovalDecisionPlan  RemoteInstallApprovalDecisionPlanReport  `json:"approval_decision_plan"`
 		ApprovalWritebackPlan RemoteInstallApprovalWritebackPlanReport `json:"approval_writeback_plan"`
+		ApprovalQueueStore    ApprovalQueueStoreSummary                `json:"approval_queue_store"`
+		ApprovalQueueRecord   ApprovalQueueRecord                      `json:"approval_queue_record"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -333,6 +365,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !containsString(evidenceResp.Files, "approval-writeback-plan.json") || !evidenceResp.ApprovalWritebackPlan.ApprovalWritebackPlanReady || evidenceResp.ApprovalWritebackPlan.ApprovalWritebackReady || evidenceResp.ApprovalWritebackPlan.WritesApprovalQueue {
 		t.Fatalf("evidence should include approval writeback bridge plan preview: files=%#v plan=%#v", evidenceResp.Files, evidenceResp.ApprovalWritebackPlan)
+	}
+	if !containsString(evidenceResp.Files, "approval-queue-store.json") || !containsString(evidenceResp.Files, "approval-queue-record.json") || !evidenceResp.ApprovalQueueStore.StoreReady || evidenceResp.ApprovalQueueStore.Artifact != "approval-queue-store.json" || evidenceResp.ApprovalQueueStore.RecordCount != 1 {
+		t.Fatalf("evidence should include approval queue store summary: files=%#v store=%#v", evidenceResp.Files, evidenceResp.ApprovalQueueStore)
+	}
+	if !evidenceResp.ApprovalQueueRecord.ApprovalQueueStoreReady || evidenceResp.ApprovalQueueRecord.StoreArtifact != "approval-queue-store.json" || evidenceResp.ApprovalQueueRecord.WritesApprovalQueue {
+		t.Fatalf("evidence should include a non-persisting approval queue record preview: %#v", evidenceResp.ApprovalQueueRecord)
 	}
 }
 
@@ -460,6 +498,68 @@ func TestWASMPluginRemoteInstallApprovalWritebackPlan(t *testing.T) {
 	h.RemoteInstallApprovalWritebackPlan(w, req)
 	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "decision must be approved, denied, or expired") {
 		t.Fatalf("invalid writeback decision should be rejected, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestWASMPluginRemoteInstallApprovalQueueWritebackPersistsPackLocalStore(t *testing.T) {
+	now := time.Date(2026, 5, 15, 17, 0, 0, 0, time.UTC)
+	h := New(Config{PluginDir: t.TempDir(), DataDir: t.TempDir(), Sandbox: &fakeWasmExecutor{}, Now: func() time.Time { return now }})
+	body := `{"slug":"queue-writeback-calc","name":"Queue Writeback Calculator","version":"1.0.0","package_url":"https://packs.yunque.local/wasm/queue-writeback-calc-1.0.0.tgz","manifest_url":"https://packs.yunque.local/wasm/queue-writeback-calc.json","module_path":"queue-writeback-calc.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"ed25519:preview","signature_algorithm":"ed25519","public_key_id":"yunque-root-2026","trust_root":"yunque-root-bundle-2026","requested_by":"operator","reason":"queue persistence","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-queue-writeback","request_key":"queue-writeback-request-key","decision":"approved","decision_by":"security","decision_reason":"persist queue record only","metadata":{"ticket":"WASM-QW-1"}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(body))
+	h.RemoteInstallApprovalQueueWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "approval-queue-store.json") {
+		t.Fatalf("remote approval queue writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Writeback RemoteInstallApprovalQueueWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode remote approval queue writeback: %v", err)
+	}
+	writeback := resp.Writeback
+	if writeback.Status != "approval_queue_written_pending_installer_wiring" || !writeback.ApprovalQueueStoreReady || !writeback.WritesApprovalQueueStore || writeback.ApprovalQueueStore.RecordCount != 1 {
+		t.Fatalf("writeback should persist one queue record: %#v", writeback)
+	}
+	if writeback.Downloads || writeback.WritesFiles || writeback.NetworkAccess || writeback.InstallsPlugin || !writeback.InstallerBlockedUntilInstallerWiring || writeback.InstallerBlockedUntilWriteback {
+		t.Fatalf("writeback should not download, install, or continue installer routing: %#v", writeback)
+	}
+	if writeback.ApprovalQueueRecord.RequestKey != "queue-writeback-request-key" || writeback.ApprovalQueueRecord.Decision != "approved" || !writeback.ApprovalQueueRecord.WritesApprovalQueueStore {
+		t.Fatalf("writeback should expose the persisted record: %#v", writeback.ApprovalQueueRecord)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(strings.Replace(body, `"decision_reason":"persist queue record only"`, `"decision_reason":"persist queue record idempotently"`, 1)))
+	h.RemoteInstallApprovalQueueWriteback(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("idempotent approval queue writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode idempotent remote approval queue writeback: %v", err)
+	}
+	if resp.Writeback.ApprovalQueueStore.RecordCount != 1 || resp.Writeback.ApprovalQueueRecord.DecisionReason != "persist queue record idempotently" {
+		t.Fatalf("same request key should upsert instead of duplicating: %#v", resp.Writeback)
+	}
+
+	var stored struct {
+		PackID      string                `json:"pack_id"`
+		QueueName   string                `json:"queue_name"`
+		Format      string                `json:"format"`
+		RecordCount int                   `json:"record_count"`
+		Records     []ApprovalQueueRecord `json:"records"`
+	}
+	data, err := os.ReadFile(h.approvalQueueStorePath())
+	if err != nil {
+		t.Fatalf("read approval queue store: %v", err)
+	}
+	if err := json.Unmarshal(data, &stored); err != nil {
+		t.Fatalf("decode approval queue store: %v", err)
+	}
+	if stored.PackID != PackID || stored.QueueName != "wasm_remote_install" || stored.Format != "json-wasm-plugin-approval-queue-store" || stored.RecordCount != 1 || len(stored.Records) != 1 {
+		t.Fatalf("approval queue store format mismatch: %#v", stored)
+	}
+	if stored.Records[0].RequestKey != "queue-writeback-request-key" || stored.Records[0].InstallerBlockedUntilWriteback || !stored.Records[0].InstallerBlockedUntilInstallerWiring {
+		t.Fatalf("stored queue record should preserve conservative installer gates: %#v", stored.Records[0])
 	}
 }
 
