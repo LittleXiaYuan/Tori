@@ -51,6 +51,14 @@ func TestGuardrailFuzzerPackRouteSpecsGateByMethod(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET /v1/guardrail-fuzzer/run should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/guardrail-fuzzer/ci-gate/plan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/guardrail-fuzzer/ci-gate/plan should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
+	}
 }
 
 func TestGuardrailFuzzerPackCanSaveCorpusAndRunFuzzer(t *testing.T) {
@@ -74,6 +82,15 @@ func TestGuardrailFuzzerPackCanSaveCorpusAndRunFuzzer(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "bypass_count") || !strings.Contains(w.Body.String(), "rule_candidates") {
 		t.Fatalf("run fuzzer status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	planBody := `{"schedule":"on_push+daily","branch":"main","requested_by":"unit"}`
+	req = httptest.NewRequest(http.MethodPost, "/v1/guardrail-fuzzer/ci-gate/plan", strings.NewReader(planBody))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rule_writeback_ready":false`) {
+		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -93,6 +110,7 @@ func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.Pack
 				"/v1/guardrail-fuzzer/status",
 				"/v1/guardrail-fuzzer/corpus",
 				"/v1/guardrail-fuzzer/run",
+				"/v1/guardrail-fuzzer/ci-gate/plan",
 				"/v1/guardrail-fuzzer/reports",
 				"/v1/guardrail-fuzzer/reports/",
 				"/v1/guardrail-fuzzer/evidence/",
@@ -102,6 +120,7 @@ func newTestGatewayWithGuardrailFuzzerPack(t *testing.T, status packruntime.Pack
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/corpus"},
 				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/corpus"},
 				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/run"},
+				{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/ci-gate/plan"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports/"},
 				{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/evidence/"},

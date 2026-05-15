@@ -2,8 +2,9 @@
 // adversarial guardrail fuzzer capability pack. This first delivery is a pack
 // shell: it owns manifest-gated HTTP routes, local corpus storage, deterministic
 // mutation strategies, sanitizer probe execution, bypass/false-positive reports,
-// rule-candidate hints, and evidence export while CI scheduling and automatic
-// rule proposal write-back are wired later.
+// rule-candidate hints, non-destructive CI/rule write-back planning, and
+// evidence export while CI scheduling and automatic rule proposal write-back are
+// wired later.
 package guardrailfuzzer
 
 import (
@@ -73,6 +74,70 @@ type FuzzRequest struct {
 	MutantsPerSeed int      `json:"mutants_per_seed,omitempty"`
 	Persist        bool     `json:"persist,omitempty"`
 	DryRun         bool     `json:"dry_run,omitempty"`
+}
+
+type CIGatePlanRequest struct {
+	ReportID    string            `json:"report_id,omitempty"`
+	Schedule    string            `json:"schedule,omitempty"`
+	Branch      string            `json:"branch,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type CIGatePlanReport struct {
+	PackID                 string               `json:"pack_id"`
+	GeneratedAt            time.Time            `json:"generated_at"`
+	Status                 string               `json:"status"`
+	ReportID               string               `json:"report_id,omitempty"`
+	Schedule               string               `json:"schedule"`
+	Branch                 string               `json:"branch"`
+	CIGatePlanReady        bool                 `json:"ci_gate_plan_ready"`
+	CIGateReady            bool                 `json:"ci_gate_ready"`
+	RuleWritebackPlanReady bool                 `json:"rule_writeback_plan_ready"`
+	RuleWritebackReady     bool                 `json:"rule_writeback_ready"`
+	AlertPlanReady         bool                 `json:"alert_plan_ready"`
+	AlertReady             bool                 `json:"alert_ready"`
+	RequestedBy            string               `json:"requested_by,omitempty"`
+	Reason                 string               `json:"reason,omitempty"`
+	RiskLevel              string               `json:"risk_level"`
+	GateStatus             string               `json:"gate_status"`
+	SeedCount              int                  `json:"seed_count"`
+	MutantCount            int                  `json:"mutant_count"`
+	BypassCount            int                  `json:"bypass_count"`
+	FalsePositiveCount     int                  `json:"false_positive_count"`
+	CIJobs                 []CIGateJobPlan      `json:"ci_jobs"`
+	RuleWritebacks         []RuleWritebackPlan  `json:"rule_writebacks,omitempty"`
+	Alerts                 []GuardrailAlertPlan `json:"alerts,omitempty"`
+	RuleCandidates         []RuleCandidate      `json:"rule_candidates,omitempty"`
+	Actions                []string             `json:"actions"`
+	Metadata               map[string]string    `json:"metadata,omitempty"`
+	Notes                  []string             `json:"notes,omitempty"`
+}
+
+type CIGateJobPlan struct {
+	Name         string   `json:"name"`
+	Trigger      string   `json:"trigger"`
+	Branch       string   `json:"branch"`
+	Command      string   `json:"command"`
+	Artifacts    []string `json:"artifacts"`
+	GateOnBypass bool     `json:"gate_on_bypass"`
+	CIGateReady  bool     `json:"ci_gate_ready"`
+}
+
+type RuleWritebackPlan struct {
+	Category       string   `json:"category"`
+	Strategy       string   `json:"strategy"`
+	Confidence     float64  `json:"confidence"`
+	Mutations      []string `json:"mutations,omitempty"`
+	WritebackReady bool     `json:"writeback_ready"`
+}
+
+type GuardrailAlertPlan struct {
+	Severity   string `json:"severity"`
+	Route      string `json:"route"`
+	Message    string `json:"message"`
+	AlertReady bool   `json:"alert_ready"`
 }
 
 type FuzzResult struct {
@@ -156,6 +221,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/status", Handler: h.Status},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/guardrail-fuzzer/corpus", Handler: h.Corpus},
 		{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/run", Handler: h.Run},
+		{Method: http.MethodPost, Path: "/v1/guardrail-fuzzer/ci-gate/plan", Handler: h.CIGatePlan},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/guardrail-fuzzer/evidence/", Handler: h.Evidence},
@@ -178,25 +244,32 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":              PackID,
-		"stage":                "pack-shell-before-ci-fuzz",
-		"fuzzer_ready":         true,
-		"ci_gate_ready":        false,
-		"rule_writeback_ready": false,
-		"seed_count":           len(seeds),
-		"report_count":         len(reports),
-		"store_dir":            h.dataDir,
-		"policy":               h.policy,
-		"mutations":            defaultMutations(),
+		"pack_id":                   PackID,
+		"stage":                     "pack-shell-before-ci-fuzz",
+		"fuzzer_ready":              true,
+		"ci_gate_plan_ready":        true,
+		"ci_gate_ready":             false,
+		"rule_writeback_plan_ready": true,
+		"rule_writeback_ready":      false,
+		"alert_plan_ready":          true,
+		"alert_ready":               false,
+		"seed_count":                len(seeds),
+		"report_count":              len(reports),
+		"store_dir":                 h.dataDir,
+		"policy":                    h.policy,
+		"mutations":                 defaultMutations(),
 		"capabilities": []string{
 			"guardrail.corpus.store",
 			"guardrail.mutation.generate",
 			"guardrail.sanitizer.probe",
 			"guardrail.bypass.report",
 			"guardrail.rule_candidate.plan",
+			"guardrail.ci_gate.plan",
+			"guardrail.rule_writeback.plan",
+			"guardrail.alert.plan",
 			"guardrail.evidence.export",
 		},
-		"notes": []string{"CI scheduled fuzzing and automatic guardrail rule proposal write-back remain follow-up wiring."},
+		"notes": []string{"CI gate, rule write-back, and alert plans are available as non-destructive contracts; real CI scheduling, automatic guardrail rule proposal write-back, and alert routing remain follow-up wiring."},
 	})
 }
 
@@ -269,6 +342,24 @@ func (h *Handler) Run(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"report": report, "status": status})
 }
 
+func (h *Handler) CIGatePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req CIGatePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid guardrail fuzzer ci gate plan payload")
+		return
+	}
+	report, err := h.reportForCIGatePlan(req)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildCIGatePlan(report, req)})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -307,12 +398,14 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	plan := h.buildCIGatePlan(report, CIGatePlanRequest{ReportID: report.ID, RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-guardrail-fuzzer-evidence",
-		"files":       []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl"},
-		"report":      report,
+		"pack_id":      PackID,
+		"exported_at":  h.now().UTC(),
+		"format":       "json-guardrail-fuzzer-evidence",
+		"files":        []string{"fuzz-report.json", "rule-candidates.json", "corpus.jsonl", "ci-gate-plan.json", "rule-writeback-plan.json", "alert-plan.json"},
+		"report":       report,
+		"ci_gate_plan": plan,
 	})
 }
 
@@ -414,6 +507,72 @@ func (h *Handler) buildReport(req FuzzRequest) (FuzzReport, error) {
 	}
 	summarizeReport(&report, h.policy)
 	return report, nil
+}
+
+func (h *Handler) reportForCIGatePlan(req CIGatePlanRequest) (FuzzReport, error) {
+	if strings.TrimSpace(req.ReportID) != "" {
+		return h.loadReport(req.ReportID)
+	}
+	reports, err := h.listReports()
+	if err == nil && len(reports) > 0 {
+		if report, loadErr := h.loadReport(reports[0].ID); loadErr == nil {
+			return report, nil
+		}
+	}
+	report, err := h.buildReport(FuzzRequest{DryRun: true})
+	if err != nil {
+		return FuzzReport{}, err
+	}
+	return report, nil
+}
+
+func (h *Handler) buildCIGatePlan(report FuzzReport, req CIGatePlanRequest) CIGatePlanReport {
+	schedule := strings.TrimSpace(req.Schedule)
+	if schedule == "" {
+		schedule = recommendedSchedule(report)
+	}
+	branch := strings.TrimSpace(req.Branch)
+	if branch == "" {
+		branch = "main"
+	}
+	status := "ci_gate_plan"
+	if report.GateStatus == "fail" {
+		status = "rule_writeback_plan"
+	} else if report.GateStatus == "warn" {
+		status = "alert_plan"
+	}
+	return CIGatePlanReport{
+		PackID:                 PackID,
+		GeneratedAt:            h.now().UTC(),
+		Status:                 status,
+		ReportID:               report.ID,
+		Schedule:               schedule,
+		Branch:                 branch,
+		CIGatePlanReady:        true,
+		CIGateReady:            false,
+		RuleWritebackPlanReady: true,
+		RuleWritebackReady:     false,
+		AlertPlanReady:         true,
+		AlertReady:             false,
+		RequestedBy:            strings.TrimSpace(req.RequestedBy),
+		Reason:                 strings.TrimSpace(req.Reason),
+		RiskLevel:              report.RiskLevel,
+		GateStatus:             report.GateStatus,
+		SeedCount:              report.SeedCount,
+		MutantCount:            report.MutantCount,
+		BypassCount:            report.BypassCount,
+		FalsePositiveCount:     report.FalsePositiveCount,
+		CIJobs:                 buildCIGateJobs(report, schedule, branch),
+		RuleWritebacks:         buildRuleWritebackPlans(report),
+		Alerts:                 buildAlertPlans(report),
+		RuleCandidates:         report.RuleCandidates,
+		Actions:                buildCIGateActions(report, schedule),
+		Metadata:               req.Metadata,
+		Notes: []string{
+			"This route is non-destructive: it does not create CI schedules, write guardrail rules, open issues, send alerts, or block releases.",
+			"Use the plan shape as the contract for the later CI scheduled fuzz / rule write-back / alert automation slice.",
+		},
+	}
 }
 
 type variant struct {
@@ -642,6 +801,76 @@ func buildRuleCandidates(categoryCounts map[string]int, mutationCounts map[strin
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Category < out[j].Category })
 	return out
+}
+
+func recommendedSchedule(report FuzzReport) string {
+	if report.GateStatus == "fail" || report.RiskLevel == "high" {
+		return "on_push+hourly"
+	}
+	if report.GateStatus == "warn" || report.RiskLevel == "medium" {
+		return "on_push+daily"
+	}
+	return "on_push+weekly"
+}
+
+func buildCIGateJobs(report FuzzReport, schedule, branch string) []CIGateJobPlan {
+	return []CIGateJobPlan{
+		{
+			Name:         "guardrail-fuzzer-ci",
+			Trigger:      schedule,
+			Branch:       branch,
+			Command:      "yunque guardrail-fuzzer run --ci --persist=false --json",
+			Artifacts:    []string{"fuzz-report.json", "rule-candidates.json", "ci-gate-plan.json"},
+			GateOnBypass: report.BypassCount > 0,
+			CIGateReady:  false,
+		},
+	}
+}
+
+func buildRuleWritebackPlans(report FuzzReport) []RuleWritebackPlan {
+	if len(report.RuleCandidates) == 0 {
+		return nil
+	}
+	out := make([]RuleWritebackPlan, 0, len(report.RuleCandidates))
+	for _, candidate := range report.RuleCandidates {
+		out = append(out, RuleWritebackPlan{
+			Category:       candidate.Category,
+			Strategy:       candidate.Strategy,
+			Confidence:     candidate.Confidence,
+			Mutations:      candidate.Mutations,
+			WritebackReady: false,
+		})
+	}
+	return out
+}
+
+func buildAlertPlans(report FuzzReport) []GuardrailAlertPlan {
+	if report.GateStatus == "pass" && report.RiskLevel == "pass" {
+		return nil
+	}
+	severity := "warning"
+	if report.GateStatus == "fail" || report.RiskLevel == "high" {
+		severity = "critical"
+	}
+	message := fmt.Sprintf("Guardrail Fuzzer %s: %d bypasses, %d false positives", report.GateStatus, report.BypassCount, report.FalsePositiveCount)
+	return []GuardrailAlertPlan{{Severity: severity, Route: "security.guardrail_fuzzer", Message: message, AlertReady: false}}
+}
+
+func buildCIGateActions(report FuzzReport, schedule string) []string {
+	actions := []string{
+		fmt.Sprintf("would schedule deterministic guardrail fuzzing with trigger %s", schedule),
+		"would archive fuzz-report.json and rule-candidates.json as CI artifacts",
+	}
+	if report.BypassCount > 0 {
+		actions = append(actions, "would fail the CI gate when bypass mutants are observed")
+	}
+	if len(report.RuleCandidates) > 0 {
+		actions = append(actions, "would prepare guardrail rule proposal write-back after explicit approval")
+	}
+	if report.GateStatus != "pass" {
+		actions = append(actions, "would route a security alert for bypass or false-positive regression review")
+	}
+	return actions
 }
 
 func confidence(count int) float64 {
