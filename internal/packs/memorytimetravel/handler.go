@@ -1,9 +1,10 @@
 // Package memorytimetravel contains the backend implementation for the built-in
 // Memory Time Travel capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
-// point-in-time reconstruction, drift diff summaries, rollback plans, JSON
-// evidence export, and read-only Merkle audit-chain verification while native
-// Ledger KV kv_history write-back remains a later slice.
+// point-in-time reconstruction, drift diff summaries, rollback plans, retention
+// dry-run planning, JSON evidence export, and read-only Merkle audit-chain
+// verification while native Ledger KV kv_history write-back remains a later
+// slice.
 package memorytimetravel
 
 import (
@@ -70,11 +71,12 @@ func (fn MerkleVerifierFunc) VerifyMerkleAuditChain(ctx context.Context, limit i
 
 // RetentionPolicy models the future kv_history retention contract at pack level.
 type RetentionPolicy struct {
-	RetentionDays        int `json:"retention_days"`
-	MaxVersionsPerKey    int `json:"max_versions_per_key"`
-	MaxSnapshotBytes     int `json:"max_snapshot_bytes"`
-	MaxKeysPerSnapshot   int `json:"max_keys_per_snapshot"`
-	EvidenceMaxSnapshots int `json:"evidence_max_snapshots"`
+	RetentionDays            int `json:"retention_days"`
+	MaxVersionsPerKey        int `json:"max_versions_per_key"`
+	MaxSnapshotsPerNamespace int `json:"max_snapshots_per_namespace"`
+	MaxSnapshotBytes         int `json:"max_snapshot_bytes"`
+	MaxKeysPerSnapshot       int `json:"max_keys_per_snapshot"`
+	EvidenceMaxSnapshots     int `json:"evidence_max_snapshots"`
 }
 
 // Snapshot contains one exported memory namespace state at a point in time.
@@ -180,6 +182,38 @@ type RollbackPlan struct {
 	Notes         []string          `json:"notes,omitempty"`
 }
 
+type RetentionCandidate struct {
+	ID        string    `json:"id"`
+	Namespace string    `json:"namespace"`
+	CreatedAt time.Time `json:"created_at"`
+	Hash      string    `json:"hash"`
+	SizeBytes int       `json:"size_bytes"`
+	KeyCount  int       `json:"key_count"`
+	Reasons   []string  `json:"reasons"`
+	Action    string    `json:"action"`
+}
+
+type RetentionPlanReport struct {
+	PackID                   string               `json:"pack_id"`
+	Namespace                string               `json:"namespace"`
+	GeneratedAt              time.Time            `json:"generated_at"`
+	DryRun                   bool                 `json:"dry_run"`
+	Status                   string               `json:"status"`
+	Policy                   RetentionPolicy      `json:"policy"`
+	CutoffAt                 time.Time            `json:"cutoff_at"`
+	Scopes                   []string             `json:"scopes"`
+	MaxSnapshotsPerNamespace int                  `json:"max_snapshots_per_namespace"`
+	SnapshotCount            int                  `json:"snapshot_count"`
+	KeepCount                int                  `json:"keep_count"`
+	CandidateCount           int                  `json:"candidate_count"`
+	ReclaimableBytes         int                  `json:"reclaimable_bytes"`
+	TemporalHistoryReady     bool                 `json:"temporal_history_ready"`
+	TemporalPruneReady       bool                 `json:"temporal_prune_ready"`
+	Candidates               []RetentionCandidate `json:"candidates"`
+	Actions                  []string             `json:"actions"`
+	Notes                    []string             `json:"notes,omitempty"`
+}
+
 type MerkleAuditRecord struct {
 	Seq       uint64    `json:"seq"`
 	Timestamp time.Time `json:"timestamp"`
@@ -239,6 +273,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/snapshot-at", Handler: h.SnapshotAt},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff", Handler: h.Diff},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan", Handler: h.RollbackPlan},
+		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
 	}
@@ -263,28 +298,51 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.snapshot_at.reconstruct",
 		"memory.drift.diff",
 		"memory.rollback.plan",
+		"memory.retention.plan",
 		"memory.evidence.export",
 	}
 	if h.merkleVerifier != nil {
 		capabilities = append(capabilities, "memory.audit.verify")
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                          PackID,
-		"stage":                            "pack-shell-before-ledger-kv-history",
-		"snapshot_store_ready":             true,
-		"temporal_query_ready":             true,
-		"ledger_history_ready":             h.temporalKV != nil,
-		"merkle_verification_ready":        h.merkleVerifier != nil,
-		"memory_persister_writeback_ready": h.memoryPersisterWriteback,
-		"rollback_writeback_ready":         false,
-		"snapshot_count":                   len(snapshots),
-		"namespace_count":                  len(namespaces),
-		"store_dir":                        h.dataDir,
-		"policy":                           h.policy,
-		"last_snapshot":                    firstSnapshot(snapshots),
-		"capabilities":                     capabilities,
-		"notes":                            h.statusNotes(),
+	writeJSON(w, http.StatusOK, statusResponse{
+		PackID:                        PackID,
+		Stage:                         "pack-shell-before-ledger-kv-history",
+		SnapshotStoreReady:            true,
+		TemporalQueryReady:            true,
+		LedgerHistoryReady:            h.temporalKV != nil,
+		MerkleVerificationReady:       h.merkleVerifier != nil,
+		MemoryPersisterWritebackReady: h.memoryPersisterWriteback,
+		RollbackWritebackReady:        false,
+		RetentionPlanReady:            true,
+		RetentionPruneReady:           false,
+		SnapshotCount:                 len(snapshots),
+		NamespaceCount:                len(namespaces),
+		StoreDir:                      h.dataDir,
+		Policy:                        h.policy,
+		LastSnapshot:                  firstSnapshot(snapshots),
+		Capabilities:                  capabilities,
+		Notes:                         h.statusNotes(),
 	})
+}
+
+type statusResponse struct {
+	PackID                        string           `json:"pack_id"`
+	Stage                         string           `json:"stage"`
+	SnapshotStoreReady            bool             `json:"snapshot_store_ready"`
+	TemporalQueryReady            bool             `json:"temporal_query_ready"`
+	LedgerHistoryReady            bool             `json:"ledger_history_ready"`
+	MerkleVerificationReady       bool             `json:"merkle_verification_ready"`
+	MemoryPersisterWritebackReady bool             `json:"memory_persister_writeback_ready"`
+	RollbackWritebackReady        bool             `json:"rollback_writeback_ready"`
+	RetentionPlanReady            bool             `json:"retention_plan_ready"`
+	RetentionPruneReady           bool             `json:"retention_prune_ready"`
+	SnapshotCount                 int              `json:"snapshot_count"`
+	NamespaceCount                int              `json:"namespace_count"`
+	StoreDir                      string           `json:"store_dir"`
+	Policy                        RetentionPolicy  `json:"policy"`
+	LastSnapshot                  *SnapshotSummary `json:"last_snapshot"`
+	Capabilities                  []string         `json:"capabilities"`
+	Notes                         []string         `json:"notes"`
 }
 
 func (h *Handler) Snapshots(w http.ResponseWriter, r *http.Request) {
@@ -424,6 +482,19 @@ func (h *Handler) RollbackPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) RetentionPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	plan, err := h.buildRetentionPlan(r.URL.Query().Get("namespace"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) AuditVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -467,9 +538,14 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
+	}
+	if retentionPlan, err := h.buildRetentionPlan(snapshot.Namespace); err != nil {
+		payload["retention_plan_error"] = err.Error()
+	} else {
+		payload["retention_plan"] = retentionPlan
 	}
 	if h.merkleVerifier != nil {
 		auditVerification, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), 10)
@@ -486,16 +562,17 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) statusNotes() []string {
-	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, and evidence export are available."}
+	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, retention dry-run planning, and evidence export are available."}
 	if h.temporalKV != nil {
 		if h.memoryPersisterWriteback {
-			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; native kv_history tables, retention cron, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; native kv_history tables, retention prune execution, cron scheduling, and approved rollback execution remain follow-up wiring.")
 		} else {
-			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, native kv_history tables, retention cron, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, native kv_history tables, retention prune execution, cron scheduling, and approved rollback execution remain follow-up wiring.")
 		}
 	} else {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
 	}
+	notes = append(notes, "Retention planning is dry-run only and currently targets pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
 	} else {
@@ -672,6 +749,84 @@ func (h *Handler) buildRollbackPlan(req RollbackPlanRequest) (RollbackPlan, erro
 		PreviewValues: snapshot.Values,
 		Status:        status,
 		Notes:         []string{"Rollback write-back is intentionally not connected in this pack shell; execute through Ledger KV after approval in a later slice."},
+	}, nil
+}
+
+func (h *Handler) buildRetentionPlan(namespace string) (RetentionPlanReport, error) {
+	normalizedNamespace := ""
+	if strings.TrimSpace(namespace) != "" {
+		normalizedNamespace = normalizeNamespace(namespace)
+	}
+	snapshots, err := h.listSnapshots(normalizedNamespace)
+	if err != nil {
+		return RetentionPlanReport{}, err
+	}
+	generatedAt := h.now().UTC()
+	cutoffAt := generatedAt.AddDate(0, 0, -h.policy.RetentionDays)
+	seenByNamespace := map[string]int{}
+	candidates := make([]RetentionCandidate, 0)
+	reclaimableBytes := 0
+
+	for _, snapshot := range snapshots {
+		seenByNamespace[snapshot.Namespace]++
+		var reasons []string
+		if snapshot.CreatedAt.Before(cutoffAt) {
+			reasons = append(reasons, fmt.Sprintf("older_than_retention_days:%d", h.policy.RetentionDays))
+		}
+		if h.policy.MaxSnapshotsPerNamespace > 0 && seenByNamespace[snapshot.Namespace] > h.policy.MaxSnapshotsPerNamespace {
+			reasons = append(reasons, fmt.Sprintf("exceeds_max_snapshots_per_namespace:%d", h.policy.MaxSnapshotsPerNamespace))
+		}
+		if len(reasons) == 0 {
+			continue
+		}
+		action := fmt.Sprintf("would delete pack-local snapshot %s/%s", snapshot.Namespace, snapshot.ID)
+		candidates = append(candidates, RetentionCandidate{
+			ID:        snapshot.ID,
+			Namespace: snapshot.Namespace,
+			CreatedAt: snapshot.CreatedAt,
+			Hash:      snapshot.Hash,
+			SizeBytes: snapshot.SizeBytes,
+			KeyCount:  snapshot.KeyCount,
+			Reasons:   reasons,
+			Action:    action,
+		})
+		reclaimableBytes += snapshot.SizeBytes
+	}
+
+	actions := make([]string, 0, len(candidates)+1)
+	for _, candidate := range candidates {
+		actions = append(actions, fmt.Sprintf("%s (reclaim %d bytes; %s)", candidate.Action, candidate.SizeBytes, strings.Join(candidate.Reasons, ",")))
+	}
+	if len(actions) == 0 {
+		actions = append(actions, "no pack-local snapshot prune action required under the current policy")
+	}
+
+	namespaceLabel := "all"
+	if normalizedNamespace != "" {
+		namespaceLabel = normalizedNamespace
+	}
+	return RetentionPlanReport{
+		PackID:                   PackID,
+		Namespace:                namespaceLabel,
+		GeneratedAt:              generatedAt,
+		DryRun:                   true,
+		Status:                   "dry_run",
+		Policy:                   h.policy,
+		CutoffAt:                 cutoffAt,
+		Scopes:                   []string{"pack-local-snapshots"},
+		MaxSnapshotsPerNamespace: h.policy.MaxSnapshotsPerNamespace,
+		SnapshotCount:            len(snapshots),
+		KeepCount:                len(snapshots) - len(candidates),
+		CandidateCount:           len(candidates),
+		ReclaimableBytes:         reclaimableBytes,
+		TemporalHistoryReady:     h.temporalKV != nil,
+		TemporalPruneReady:       false,
+		Candidates:               candidates,
+		Actions:                  actions,
+		Notes: []string{
+			"Retention planning is dry-run only; no snapshot files or Ledger KV history entries are deleted by this route.",
+			"Pack-local snapshot retention uses retention_days and max_snapshots_per_namespace; native Ledger kv_history purge and cron scheduling remain follow-up wiring.",
+		},
 	}, nil
 }
 
@@ -981,6 +1136,9 @@ func normalizePolicy(policy RetentionPolicy) RetentionPolicy {
 	}
 	if policy.MaxVersionsPerKey <= 0 {
 		policy.MaxVersionsPerKey = 100
+	}
+	if policy.MaxSnapshotsPerNamespace <= 0 {
+		policy.MaxSnapshotsPerNamespace = 100
 	}
 	if policy.MaxSnapshotBytes <= 0 {
 		policy.MaxSnapshotBytes = 256 * 1024

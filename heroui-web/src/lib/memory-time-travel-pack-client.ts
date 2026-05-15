@@ -3,6 +3,7 @@ import { fetcher } from "./api-core";
 export interface MemoryTimeTravelPolicy {
   retention_days: number;
   max_versions_per_key: number;
+  max_snapshots_per_namespace: number;
   max_snapshot_bytes: number;
   max_keys_per_snapshot: number;
   evidence_max_snapshots: number;
@@ -42,6 +43,8 @@ export interface MemoryTimeTravelStatus {
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
   rollback_writeback_ready: boolean;
+  retention_plan_ready?: boolean;
+  retention_prune_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
   store_dir?: string;
@@ -149,6 +152,37 @@ export interface MemoryTimeTravelRollbackPlan {
   notes?: string[];
 }
 
+export interface MemoryTimeTravelRetentionCandidate {
+  id: string;
+  namespace: string;
+  created_at: string;
+  hash: string;
+  size_bytes: number;
+  key_count: number;
+  reasons: string[];
+  action: string;
+}
+
+export interface MemoryTimeTravelRetentionPlan {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  dry_run: boolean;
+  status: string;
+  policy: MemoryTimeTravelPolicy;
+  cutoff_at: string;
+  scopes: string[];
+  snapshot_count: number;
+  keep_count: number;
+  candidate_count: number;
+  reclaimable_bytes: number;
+  temporal_history_ready: boolean;
+  temporal_prune_ready: boolean;
+  candidates: MemoryTimeTravelRetentionCandidate[];
+  actions: string[];
+  notes?: string[];
+}
+
 export interface MemoryTimeTravelPackClient {
   status(): Promise<MemoryTimeTravelStatus>;
   snapshots(namespace?: string): Promise<{ snapshots: MemoryTimeTravelSnapshotSummary[]; count: number }>;
@@ -157,8 +191,9 @@ export interface MemoryTimeTravelPackClient {
   snapshotAt(input: MemoryTimeTravelSnapshotAtInput): Promise<MemoryTimeTravelSnapshotAtResponse>;
   diff(input: MemoryTimeTravelDiffInput): Promise<{ diff: MemoryTimeTravelDiffReport }>;
   rollbackPlan(input: MemoryTimeTravelRollbackPlanInput): Promise<{ plan: MemoryTimeTravelRollbackPlan }>;
+  retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
+  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
 }
 
 function enc(value: string): string {
@@ -198,10 +233,12 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    retentionPlan: (namespace) =>
+      fetcher<{ plan: MemoryTimeTravelRetentionPlan }>(`/v1/memory-time-travel/retention/plan${query({ namespace })}`),
     auditVerify: (limit) =>
       fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
+      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
         `/v1/memory-time-travel/evidence/${enc(id)}`,
       ),
   };
