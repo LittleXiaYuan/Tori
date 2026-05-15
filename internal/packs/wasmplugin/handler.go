@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -105,6 +106,77 @@ type ExecuteRequest struct {
 	Input      string `json:"input"`
 	Entrypoint string `json:"entrypoint,omitempty"`
 	DryRun     bool   `json:"dry_run"`
+}
+
+type RemoteInstallPlanRequest struct {
+	Slug         string            `json:"slug,omitempty"`
+	Name         string            `json:"name,omitempty"`
+	Version      string            `json:"version,omitempty"`
+	PackageURL   string            `json:"package_url"`
+	ManifestURL  string            `json:"manifest_url,omitempty"`
+	ModulePath   string            `json:"module_path,omitempty"`
+	SHA256       string            `json:"sha256,omitempty"`
+	Signature    string            `json:"signature,omitempty"`
+	PublicKeyID  string            `json:"public_key_id,omitempty"`
+	Entrypoint   string            `json:"entrypoint,omitempty"`
+	RequestedBy  string            `json:"requested_by,omitempty"`
+	Reason       string            `json:"reason,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Capabilities []string          `json:"capabilities,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+}
+
+type RemoteInstallPlanReport struct {
+	PackID                 string                   `json:"pack_id"`
+	GeneratedAt            time.Time                `json:"generated_at"`
+	Status                 string                   `json:"status"`
+	RemoteInstallPlanReady bool                     `json:"remote_install_plan_ready"`
+	RemoteInstallReady     bool                     `json:"remote_install_ready"`
+	DownloadReady          bool                     `json:"download_ready"`
+	SignatureVerifyReady   bool                     `json:"signature_verify_ready"`
+	Downloads              bool                     `json:"downloads"`
+	InstallsPlugin         bool                     `json:"installs_plugin"`
+	WritesFiles            bool                     `json:"writes_files"`
+	NetworkAccess          bool                     `json:"network_access"`
+	Plugin                 RemoteInstallPluginPlan  `json:"plugin"`
+	Package                RemoteInstallPackagePlan `json:"package"`
+	Checks                 []RemoteInstallCheck     `json:"checks"`
+	Artifacts              []string                 `json:"artifacts"`
+	Actions                []string                 `json:"actions"`
+	Labels                 []string                 `json:"labels"`
+	RequestedBy            string                   `json:"requested_by,omitempty"`
+	Reason                 string                   `json:"reason,omitempty"`
+	Metadata               map[string]string        `json:"metadata,omitempty"`
+	Notes                  []string                 `json:"notes,omitempty"`
+}
+
+type RemoteInstallPluginPlan struct {
+	Slug         string   `json:"slug"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Runtime      string   `json:"runtime"`
+	Entrypoint   string   `json:"entrypoint"`
+	ModulePath   string   `json:"module_path"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+}
+
+type RemoteInstallPackagePlan struct {
+	ManifestURL      string `json:"manifest_url"`
+	PackageURL       string `json:"package_url"`
+	ExpectedSHA256   string `json:"expected_sha256,omitempty"`
+	Signature        string `json:"signature,omitempty"`
+	PublicKeyID      string `json:"public_key_id,omitempty"`
+	ManifestArtifact string `json:"manifest_artifact"`
+	PackageArtifact  string `json:"package_artifact"`
+	CacheKey         string `json:"cache_key"`
+}
+
+type RemoteInstallCheck struct {
+	Name     string `json:"name"`
+	Required bool   `json:"required"`
+	Ready    bool   `json:"ready"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 type ExecuteResult struct {
@@ -210,6 +282,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins/load", Handler: h.Load},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/plugins/unload", Handler: h.Unload},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/execute", Handler: h.Execute},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/plan", Handler: h.RemoteInstallPlan},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -231,25 +304,28 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":        PackID,
-		"stage":          "pack-shell-before-runtime-hosts",
-		"runtime_ready":  true,
-		"abi_plan_ready": true,
-		"abi_ready":      false,
-		"plugin_count":   len(plugins),
-		"loaded_count":   loaded,
-		"plugin_dir":     h.pluginDir,
-		"store_dir":      h.dataDir,
-		"sandbox":        h.sandbox.Stats(),
+		"pack_id":                   PackID,
+		"stage":                     "pack-shell-before-runtime-hosts",
+		"runtime_ready":             true,
+		"abi_plan_ready":            true,
+		"abi_ready":                 false,
+		"remote_install_plan_ready": true,
+		"remote_install_ready":      false,
+		"plugin_count":              len(plugins),
+		"loaded_count":              loaded,
+		"plugin_dir":                h.pluginDir,
+		"store_dir":                 h.dataDir,
+		"sandbox":                   h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
 			"wasm.plugin.lifecycle",
 			"wasm.sandbox.execute",
 			"wasm.permission.plan",
 			"wasm.host_abi.plan",
+			"wasm.remote_install.plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview is available as a non-destructive contract; runtime host function binding/enforcement and remote signed package install remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview and remote signed package install plan preview are available as non-destructive contracts; runtime host function binding/enforcement, package download, signature verification, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -403,6 +479,24 @@ func (h *Handler) Execute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
+func (h *Handler) RemoteInstallPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install plan payload")
+		return
+	}
+	plan, err := h.buildRemoteInstallPlan(req, true)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -415,14 +509,15 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":       PackID,
-		"exported_at":   h.now().UTC(),
-		"format":        "json-wasm-plugin-evidence",
-		"files":         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "sandbox-stats.json"},
-		"plugin":        plugin,
-		"plan":          permissionPlan(plugin.Permissions),
-		"host_abi_plan": hostABIPlan(plugin.Permissions),
-		"sandbox":       h.sandbox.Stats(),
+		"pack_id":             PackID,
+		"exported_at":         h.now().UTC(),
+		"format":              "json-wasm-plugin-evidence",
+		"files":               []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "remote-install-plan.json", "sandbox-stats.json"},
+		"plugin":              plugin,
+		"plan":                permissionPlan(plugin.Permissions),
+		"host_abi_plan":       hostABIPlan(plugin.Permissions),
+		"remote_install_plan": h.remoteInstallPlanForPlugin(plugin),
+		"sandbox":             h.sandbox.Stats(),
 	})
 }
 
@@ -610,6 +705,163 @@ func hostABIPlan(policy PluginPermissionPolicy) HostABIPlan {
 	}
 }
 
+func (h *Handler) remoteInstallPlanForPlugin(plugin Plugin) RemoteInstallPlanReport {
+	plan, _ := h.buildRemoteInstallPlan(RemoteInstallPlanRequest{
+		Slug:         plugin.Slug,
+		Name:         plugin.Name,
+		Version:      plugin.Version,
+		PackageURL:   fmt.Sprintf("https://packs.yunque.local/wasm-plugin/%s-%s.tgz", plugin.Slug, plugin.Version),
+		ManifestURL:  fmt.Sprintf("https://packs.yunque.local/wasm-plugin/%s/manifest.json", plugin.Slug),
+		ModulePath:   plugin.ModulePath,
+		SHA256:       plugin.SHA256,
+		Entrypoint:   plugin.Entrypoint,
+		Capabilities: plugin.Capabilities,
+		Tags:         plugin.Tags,
+		Reason:       "evidence export preview for remote signed package install contract",
+	}, false)
+	return plan
+}
+
+func (h *Handler) buildRemoteInstallPlan(req RemoteInstallPlanRequest, requirePackageURL bool) (RemoteInstallPlanReport, error) {
+	packageURL := strings.TrimSpace(req.PackageURL)
+	if packageURL == "" && requirePackageURL {
+		return RemoteInstallPlanReport{}, fmt.Errorf("package_url is required")
+	}
+	if packageURL == "" {
+		packageURL = fmt.Sprintf("https://packs.yunque.local/wasm-plugin/%s.tgz", slugify(req.Name))
+	}
+	normalizedPackageURL, err := validateRemotePackageURL(packageURL)
+	if err != nil {
+		return RemoteInstallPlanReport{}, err
+	}
+	manifestURL := strings.TrimSpace(req.ManifestURL)
+	if manifestURL == "" {
+		manifestURL = normalizedPackageURL + ".manifest.json"
+	}
+	normalizedManifestURL, err := validateRemotePackageURL(manifestURL)
+	if err != nil {
+		return RemoteInstallPlanReport{}, fmt.Errorf("manifest_url: %w", err)
+	}
+	slug := strings.ToLower(strings.TrimSpace(req.Slug))
+	if slug == "" {
+		slug = slugify(req.Name)
+	}
+	if !safeSlugRe.MatchString(slug) {
+		return RemoteInstallPlanReport{}, fmt.Errorf("plugin slug must match ^[a-z0-9][a-z0-9_-]{0,79}$")
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = slug
+	}
+	version := strings.TrimSpace(req.Version)
+	if version == "" {
+		version = "0.1.0"
+	}
+	entrypoint := strings.TrimSpace(req.Entrypoint)
+	if entrypoint == "" {
+		entrypoint = "_start"
+	}
+	modulePath, err := normalizeModulePath(req.ModulePath, slug)
+	if err != nil {
+		return RemoteInstallPlanReport{}, err
+	}
+	expectedSHA := strings.ToLower(strings.TrimSpace(req.SHA256))
+	signature := strings.TrimSpace(req.Signature)
+	publicKeyID := strings.TrimSpace(req.PublicKeyID)
+	packageArtifact := remotePackageArtifactName(slug, version, normalizedPackageURL)
+	manifestArtifact := slug + "-remote-manifest.json"
+	checks := []RemoteInstallCheck{
+		{Name: "package_url_valid", Required: true, Ready: true, Reason: "package_url is a normalized http(s) URL"},
+		{Name: "manifest_url_valid", Required: true, Ready: true, Reason: "manifest_url is a normalized http(s) URL"},
+		{Name: "sha256_present", Required: true, Ready: expectedSHA != "", Reason: boolReason(expectedSHA != "", "expected SHA-256 is provided for later artifact verification", "expected SHA-256 is required before real install")},
+		{Name: "signature_present", Required: true, Ready: signature != "", Reason: boolReason(signature != "", "signature metadata is provided for later verification", "signature is required before real install")},
+		{Name: "public_key_id_present", Required: true, Ready: publicKeyID != "", Reason: boolReason(publicKeyID != "", "public key id is provided for later trust-root lookup", "public key id is required before real install")},
+		{Name: "module_path_relative", Required: true, Ready: true, Reason: "module_path is validated to stay inside plugin_dir"},
+	}
+	return RemoteInstallPlanReport{
+		PackID:                 PackID,
+		GeneratedAt:            h.now().UTC(),
+		Status:                 "plan_only",
+		RemoteInstallPlanReady: true,
+		RemoteInstallReady:     false,
+		DownloadReady:          false,
+		SignatureVerifyReady:   false,
+		Downloads:              false,
+		InstallsPlugin:         false,
+		WritesFiles:            false,
+		NetworkAccess:          false,
+		Plugin: RemoteInstallPluginPlan{
+			Slug:         slug,
+			Name:         name,
+			Version:      version,
+			Runtime:      "wazero",
+			Entrypoint:   entrypoint,
+			ModulePath:   modulePath,
+			Capabilities: cleanList(req.Capabilities),
+			Tags:         cleanList(req.Tags),
+		},
+		Package: RemoteInstallPackagePlan{
+			ManifestURL:      normalizedManifestURL,
+			PackageURL:       normalizedPackageURL,
+			ExpectedSHA256:   expectedSHA,
+			Signature:        signature,
+			PublicKeyID:      publicKeyID,
+			ManifestArtifact: manifestArtifact,
+			PackageArtifact:  packageArtifact,
+			CacheKey:         sha256Hex(normalizedManifestURL + "\n" + normalizedPackageURL + "\n" + slug + "\n" + version),
+		},
+		Checks: checks,
+		Artifacts: []string{
+			"remote-install-plan.json",
+			manifestArtifact,
+			packageArtifact,
+			"signature-verification.json",
+		},
+		Actions: []string{
+			"would fetch the remote plugin manifest after explicit install wiring is enabled",
+			"would download the package into the Pack Runtime artifact cache without touching plugin_dir in plan mode",
+			"would verify SHA-256 and signature before allowing install write-back",
+			"would register plugin metadata only after download and signature verification pass",
+		},
+		Labels:      []string{"remote-install", "signed-package", "plan-only", "no-download", "no-file-write"},
+		RequestedBy: strings.TrimSpace(req.RequestedBy),
+		Reason:      strings.TrimSpace(req.Reason),
+		Metadata:    cleanStringMap(req.Metadata),
+		Notes: []string{
+			"Preview only: this route does not download packages, fetch manifests, verify signatures, or write plugin metadata.",
+			"Use this deterministic plan as the contract for the later remote signed package installer slice.",
+		},
+	}, nil
+}
+
+func validateRemotePackageURL(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("remote package URL is required")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("remote package URL must be absolute")
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return "", fmt.Errorf("remote package URL must use http or https")
+	}
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func remotePackageArtifactName(slug, version, packageURL string) string {
+	parsed, err := url.Parse(packageURL)
+	ext := ".tgz"
+	if err == nil {
+		base := filepath.Base(parsed.Path)
+		if parsedExt := filepath.Ext(base); parsedExt != "" && len(parsedExt) <= 10 {
+			ext = parsedExt
+		}
+	}
+	return slug + "-" + version + ext
+}
+
 func boolReason(ok bool, yes string, no string) string {
 	if ok {
 		return yes
@@ -784,6 +1036,30 @@ func cleanList(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func cleanStringMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for key, value := range values {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

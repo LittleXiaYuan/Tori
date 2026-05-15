@@ -17,6 +17,7 @@
     "POST /v1/wasm-plugin/plugins/load",
     "POST /v1/wasm-plugin/plugins/unload",
     "POST /v1/wasm-plugin/execute",
+    "POST /v1/wasm-plugin/remote-install/plan",
     "GET /v1/wasm-plugin/evidence/"
   ],
   "frontend": {

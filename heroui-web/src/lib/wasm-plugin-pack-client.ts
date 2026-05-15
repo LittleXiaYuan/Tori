@@ -1,5 +1,10 @@
 import { fetcher } from "./api-core";
 
+export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
+  "remote-install-plan.json",
+  "signature-verification.json",
+] as const;
+
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -37,6 +42,8 @@ export interface WASMPluginStatus {
   runtime_ready: boolean;
   abi_plan_ready: boolean;
   abi_ready: boolean;
+  remote_install_plan_ready: boolean;
+  remote_install_ready: boolean;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -96,6 +103,77 @@ export interface WASMPluginHostABIPlan {
   notes?: string[];
 }
 
+export interface WASMPluginRemoteInstallPlanInput {
+  slug?: string;
+  name?: string;
+  version?: string;
+  package_url: string;
+  manifest_url?: string;
+  module_path?: string;
+  sha256?: string;
+  signature?: string;
+  public_key_id?: string;
+  entrypoint?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+  capabilities?: string[];
+  tags?: string[];
+}
+
+export interface WASMPluginRemoteInstallPluginPlan {
+  slug: string;
+  name: string;
+  version: string;
+  runtime: string;
+  entrypoint: string;
+  module_path: string;
+  capabilities?: string[];
+  tags?: string[];
+}
+
+export interface WASMPluginRemoteInstallPackagePlan {
+  manifest_url: string;
+  package_url: string;
+  expected_sha256?: string;
+  signature?: string;
+  public_key_id?: string;
+  manifest_artifact: string;
+  package_artifact: string;
+  cache_key: string;
+}
+
+export interface WASMPluginRemoteInstallCheck {
+  name: string;
+  required: boolean;
+  ready: boolean;
+  reason?: string;
+}
+
+export interface WASMPluginRemoteInstallPlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  remote_install_plan_ready: boolean;
+  remote_install_ready: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  downloads: boolean;
+  installs_plugin: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface WASMPluginExecuteResult {
   slug: string;
   dry_run: boolean;
@@ -129,12 +207,39 @@ export interface WASMPluginInstallInput {
 export interface WASMPluginPackClient {
   status(): Promise<WASMPluginStatus>;
   plugins(): Promise<{ plugins: WASMPluginSummary[]; count: number }>;
-  installPlugin(input: WASMPluginInstallInput): Promise<{ plugin: WASMPlugin; status: string; plan?: WASMPluginPermissionCheck[]; host_abi_plan?: WASMPluginHostABIPlan }>;
+  installPlugin(
+    input: WASMPluginInstallInput,
+  ): Promise<{
+    plugin: WASMPlugin;
+    status: string;
+    plan?: WASMPluginPermissionCheck[];
+    host_abi_plan?: WASMPluginHostABIPlan;
+  }>;
   plugin(slug: string): Promise<{ plugin: WASMPlugin }>;
   load(slug: string): Promise<{ plugin: WASMPlugin; status: string }>;
   unload(slug: string): Promise<{ plugin: WASMPlugin; status: string }>;
-  execute(input: { slug: string; input?: string; entrypoint?: string; dry_run?: boolean }): Promise<{ result: WASMPluginExecuteResult }>;
-  evidence(slug: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; plugin: WASMPlugin; plan: WASMPluginPermissionCheck[]; host_abi_plan: WASMPluginHostABIPlan; sandbox?: Record<string, unknown> }>;
+  execute(input: {
+    slug: string;
+    input?: string;
+    entrypoint?: string;
+    dry_run?: boolean;
+  }): Promise<{ result: WASMPluginExecuteResult }>;
+  remoteInstallPlan(
+    input: WASMPluginRemoteInstallPlanInput,
+  ): Promise<{ plan: WASMPluginRemoteInstallPlan }>;
+  evidence(
+    slug: string,
+  ): Promise<{
+    pack_id: string;
+    exported_at: string;
+    format: string;
+    files: string[];
+    plugin: WASMPlugin;
+    plan: WASMPluginPermissionCheck[];
+    host_abi_plan: WASMPluginHostABIPlan;
+    remote_install_plan: WASMPluginRemoteInstallPlan;
+    sandbox?: Record<string, unknown>;
+  }>;
 }
 
 function enc(value: string): string {
@@ -144,29 +249,62 @@ function enc(value: string): string {
 export function createWASMPluginPackClient(): WASMPluginPackClient {
   return {
     status: () => fetcher<WASMPluginStatus>("/v1/wasm-plugin/status"),
-    plugins: () => fetcher<{ plugins: WASMPluginSummary[]; count: number }>("/v1/wasm-plugin/plugins"),
+    plugins: () =>
+      fetcher<{ plugins: WASMPluginSummary[]; count: number }>(
+        "/v1/wasm-plugin/plugins",
+      ),
     installPlugin: (input) =>
-      fetcher<{ plugin: WASMPlugin; status: string; plan?: WASMPluginPermissionCheck[]; host_abi_plan?: WASMPluginHostABIPlan }>("/v1/wasm-plugin/plugins", {
+      fetcher<{
+        plugin: WASMPlugin;
+        status: string;
+        plan?: WASMPluginPermissionCheck[];
+        host_abi_plan?: WASMPluginHostABIPlan;
+      }>("/v1/wasm-plugin/plugins", {
         method: "POST",
         body: JSON.stringify(input),
       }),
-    plugin: (slug) => fetcher<{ plugin: WASMPlugin }>(`/v1/wasm-plugin/plugins/${enc(slug)}`),
+    plugin: (slug) =>
+      fetcher<{ plugin: WASMPlugin }>(`/v1/wasm-plugin/plugins/${enc(slug)}`),
     load: (slug) =>
-      fetcher<{ plugin: WASMPlugin; status: string }>("/v1/wasm-plugin/plugins/load", {
-        method: "POST",
-        body: JSON.stringify({ slug }),
-      }),
+      fetcher<{ plugin: WASMPlugin; status: string }>(
+        "/v1/wasm-plugin/plugins/load",
+        {
+          method: "POST",
+          body: JSON.stringify({ slug }),
+        },
+      ),
     unload: (slug) =>
-      fetcher<{ plugin: WASMPlugin; status: string }>("/v1/wasm-plugin/plugins/unload", {
-        method: "POST",
-        body: JSON.stringify({ slug }),
-      }),
+      fetcher<{ plugin: WASMPlugin; status: string }>(
+        "/v1/wasm-plugin/plugins/unload",
+        {
+          method: "POST",
+          body: JSON.stringify({ slug }),
+        },
+      ),
     execute: (input) =>
       fetcher<{ result: WASMPluginExecuteResult }>("/v1/wasm-plugin/execute", {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    remoteInstallPlan: (input) =>
+      fetcher<{ plan: WASMPluginRemoteInstallPlan }>(
+        "/v1/wasm-plugin/remote-install/plan",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
     evidence: (slug) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; plugin: WASMPlugin; plan: WASMPluginPermissionCheck[]; host_abi_plan: WASMPluginHostABIPlan; sandbox?: Record<string, unknown> }>(`/v1/wasm-plugin/evidence/${enc(slug)}`),
+      fetcher<{
+        pack_id: string;
+        exported_at: string;
+        format: string;
+        files: string[];
+        plugin: WASMPlugin;
+        plan: WASMPluginPermissionCheck[];
+        host_abi_plan: WASMPluginHostABIPlan;
+        remote_install_plan: WASMPluginRemoteInstallPlan;
+        sandbox?: Record<string, unknown>;
+      }>(`/v1/wasm-plugin/evidence/${enc(slug)}`),
   };
 }

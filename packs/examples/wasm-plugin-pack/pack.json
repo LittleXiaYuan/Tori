@@ -16,6 +16,7 @@
       "wasm.plugin.unload",
       "wasm.plugin.execute",
       "wasm.host_abi.plan",
+      "wasm.remote_install.plan",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -25,6 +26,7 @@
       "/v1/wasm-plugin/plugins/load",
       "/v1/wasm-plugin/plugins/unload",
       "/v1/wasm-plugin/execute",
+      "/v1/wasm-plugin/remote-install/plan",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -68,6 +70,11 @@
         "method": "POST",
         "path": "/v1/wasm-plugin/execute",
         "description": "Execute or dry-run plan a loaded WASM plugin in the sandbox."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/plan",
+        "description": "Preview a non-destructive remote signed WASM package install plan."
       },
       {
         "method": "GET",

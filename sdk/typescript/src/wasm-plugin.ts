@@ -8,6 +8,11 @@
  *   import { createWASMPluginClient } from "yunque-client/wasm-plugin";
  */
 
+export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
+  "remote-install-plan.json",
+  "signature-verification.json",
+] as const;
+
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -45,6 +50,8 @@ export type WASMPluginStatusResponse = {
   runtime_ready: boolean;
   abi_plan_ready: boolean;
   abi_ready: boolean;
+  remote_install_plan_ready: boolean;
+  remote_install_ready: boolean;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -143,6 +150,81 @@ export type WASMPluginHostABIPlan = {
   notes?: string[];
 };
 
+export type WASMPluginRemoteInstallPlanRequest = {
+  slug?: string;
+  name?: string;
+  version?: string;
+  package_url: string;
+  manifest_url?: string;
+  module_path?: string;
+  sha256?: string;
+  signature?: string;
+  public_key_id?: string;
+  entrypoint?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+  capabilities?: string[];
+  tags?: string[];
+};
+
+export type WASMPluginRemoteInstallPluginPlan = {
+  slug: string;
+  name: string;
+  version: string;
+  runtime: string;
+  entrypoint: string;
+  module_path: string;
+  capabilities?: string[];
+  tags?: string[];
+};
+
+export type WASMPluginRemoteInstallPackagePlan = {
+  manifest_url: string;
+  package_url: string;
+  expected_sha256?: string;
+  signature?: string;
+  public_key_id?: string;
+  manifest_artifact: string;
+  package_artifact: string;
+  cache_key: string;
+};
+
+export type WASMPluginRemoteInstallCheck = {
+  name: string;
+  required: boolean;
+  ready: boolean;
+  reason?: string;
+};
+
+export type WASMPluginRemoteInstallPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  remote_install_plan_ready: boolean;
+  remote_install_ready: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  downloads: boolean;
+  installs_plugin: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallPlanResponse = {
+  plan: WASMPluginRemoteInstallPlan;
+};
+
 export type WASMPluginExecuteResult = {
   slug: string;
   dry_run: boolean;
@@ -172,6 +254,7 @@ export type WASMPluginEvidenceResponse = {
   plugin: WASMPlugin;
   plan: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
+  remote_install_plan: WASMPluginRemoteInstallPlan;
   sandbox?: Record<string, unknown>;
 };
 
@@ -199,7 +282,10 @@ function trimBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-function mergeHeaders(base: HeadersInit | undefined, extra?: HeadersInit): Headers {
+function mergeHeaders(
+  base: HeadersInit | undefined,
+  extra?: HeadersInit,
+): Headers {
   const headers = new Headers(base);
   if (!extra) return headers;
   new Headers(extra).forEach((value, key) => headers.set(key, value));
@@ -248,7 +334,8 @@ export class WASMPluginClient {
   constructor(options: WASMPluginClientOptions) {
     if (!options.baseUrl) throw new Error("WASMPluginClient requires baseUrl");
     const fetchImpl = options.fetch ?? globalThis.fetch;
-    if (!fetchImpl) throw new Error("WASMPluginClient requires a fetch implementation");
+    if (!fetchImpl)
+      throw new Error("WASMPluginClient requires a fetch implementation");
     this.baseUrl = trimBaseUrl(options.baseUrl);
     this.fetchImpl = fetchImpl.bind(globalThis) as typeof fetch;
     this.headers = options.headers;
@@ -257,41 +344,87 @@ export class WASMPluginClient {
   }
 
   status(): Promise<WASMPluginStatusResponse> {
-    return this.request<WASMPluginStatusResponse>("GET", "/v1/wasm-plugin/status");
+    return this.request<WASMPluginStatusResponse>(
+      "GET",
+      "/v1/wasm-plugin/status",
+    );
   }
 
   plugins(): Promise<WASMPluginListResponse> {
-    return this.request<WASMPluginListResponse>("GET", "/v1/wasm-plugin/plugins");
+    return this.request<WASMPluginListResponse>(
+      "GET",
+      "/v1/wasm-plugin/plugins",
+    );
   }
 
-  installPlugin(input: WASMPluginInstallRequest): Promise<WASMPluginInstallResponse> {
-    return this.request<WASMPluginInstallResponse>("POST", "/v1/wasm-plugin/plugins", input);
+  installPlugin(
+    input: WASMPluginInstallRequest,
+  ): Promise<WASMPluginInstallResponse> {
+    return this.request<WASMPluginInstallResponse>(
+      "POST",
+      "/v1/wasm-plugin/plugins",
+      input,
+    );
   }
 
   plugin(slug: string): Promise<WASMPluginResponse> {
-    return this.request<WASMPluginResponse>("GET", `/v1/wasm-plugin/plugins/${enc(slug)}`);
+    return this.request<WASMPluginResponse>(
+      "GET",
+      `/v1/wasm-plugin/plugins/${enc(slug)}`,
+    );
   }
 
   load(slug: string): Promise<WASMPluginLifecycleResponse> {
-    return this.request<WASMPluginLifecycleResponse>("POST", "/v1/wasm-plugin/plugins/load", { slug });
+    return this.request<WASMPluginLifecycleResponse>(
+      "POST",
+      "/v1/wasm-plugin/plugins/load",
+      { slug },
+    );
   }
 
   unload(slug: string): Promise<WASMPluginLifecycleResponse> {
-    return this.request<WASMPluginLifecycleResponse>("POST", "/v1/wasm-plugin/plugins/unload", { slug });
+    return this.request<WASMPluginLifecycleResponse>(
+      "POST",
+      "/v1/wasm-plugin/plugins/unload",
+      { slug },
+    );
   }
 
   execute(input: WASMPluginExecuteRequest): Promise<WASMPluginExecuteResponse> {
-    return this.request<WASMPluginExecuteResponse>("POST", "/v1/wasm-plugin/execute", input);
+    return this.request<WASMPluginExecuteResponse>(
+      "POST",
+      "/v1/wasm-plugin/execute",
+      input,
+    );
+  }
+
+  remoteInstallPlan(
+    input: WASMPluginRemoteInstallPlanRequest,
+  ): Promise<WASMPluginRemoteInstallPlanResponse> {
+    return this.request<WASMPluginRemoteInstallPlanResponse>(
+      "POST",
+      "/v1/wasm-plugin/remote-install/plan",
+      input,
+    );
   }
 
   evidence(slug: string): Promise<WASMPluginEvidenceResponse> {
-    return this.request<WASMPluginEvidenceResponse>("GET", `/v1/wasm-plugin/evidence/${enc(slug)}`);
+    return this.request<WASMPluginEvidenceResponse>(
+      "GET",
+      `/v1/wasm-plugin/evidence/${enc(slug)}`,
+    );
   }
 
-  private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     const headers = mergeHeaders(this.headers);
-    if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`);
-    if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey);
+    if (this.token && !headers.has("authorization"))
+      headers.set("Authorization", `Bearer ${this.token}`);
+    if (this.apiKey && !headers.has("x-api-key"))
+      headers.set("X-API-Key", this.apiKey);
 
     const init: RequestInit = { method, headers };
     if (body !== undefined) {
@@ -299,13 +432,23 @@ export class WASMPluginClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await this.fetchImpl(new URL(`${this.baseUrl}${path}`), init);
+    const response = await this.fetchImpl(
+      new URL(`${this.baseUrl}${path}`),
+      init,
+    );
     const parsed = await parseResponse(response);
-    if (!response.ok) throw new WASMPluginClientError(response.status, parsed, messageFromErrorBody(parsed));
+    if (!response.ok)
+      throw new WASMPluginClientError(
+        response.status,
+        parsed,
+        messageFromErrorBody(parsed),
+      );
     return parsed as T;
   }
 }
 
-export function createWASMPluginClient(options: WASMPluginClientOptions): WASMPluginClient {
+export function createWASMPluginClient(
+  options: WASMPluginClientOptions,
+): WASMPluginClient {
   return new WASMPluginClient(options);
 }
