@@ -327,6 +327,9 @@ func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
 	if body.Modules[0].Routes[0].Method != http.MethodGet {
 		t.Fatalf("expected mounted route method to be preserved, got %#v", body.Modules[0].Routes[0])
 	}
+	if body.Modules[0].Routes[0].Auth != "" {
+		t.Fatalf("default mounted route auth should be omitted, got %#v", body.Modules[0].Routes[0])
+	}
 }
 
 func TestBackendPackMultiMethodRouteInfoAndGate(t *testing.T) {
@@ -399,6 +402,79 @@ func TestBackendPackMultiMethodRouteInfoAndGate(t *testing.T) {
 	got := body.Modules[0].Routes[0]
 	if got.Method != http.MethodGet || strings.Join(got.Methods, ",") != "GET,PATCH" {
 		t.Fatalf("expected multi-method metadata to preserve primary and methods, got %#v", got)
+	}
+}
+
+func TestBackendPackPassthroughAuthRouteKeepsPackGate(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.passthrough",
+		Name:         "Passthrough Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Routes:     []string{"/v1/passthrough/session"},
+			RouteSpecs: []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/passthrough/session"}},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.passthrough",
+		routes: []packruntime.BackendRoute{{
+			Method: http.MethodPost,
+			Path:   "/v1/passthrough/session",
+			Auth:   packruntime.BackendRouteAuthPassthrough,
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"token": r.Header.Get("Authorization")})
+			},
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("passthrough-pack")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/passthrough/session", nil)
+	req.Header.Set("Authorization", "Bearer external-token")
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("passthrough route should skip host requireAuth but keep route gate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "external-token") {
+		t.Fatalf("passthrough route should preserve protocol-specific auth token, body=%s", w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/passthrough/session", nil)
+	req.Header.Set("Authorization", "Bearer external-token")
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("passthrough route should still enforce method gate, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/backend-modules", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("modules status=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Modules []packruntime.BackendModuleInfo `json:"modules"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Modules) != 1 || len(body.Modules[0].Routes) != 1 {
+		t.Fatalf("unexpected modules body: %#v", body)
+	}
+	if body.Modules[0].Routes[0].Auth != string(packruntime.BackendRouteAuthPassthrough) {
+		t.Fatalf("expected passthrough auth metadata, got %#v", body.Modules[0].Routes[0])
 	}
 }
 

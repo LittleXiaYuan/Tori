@@ -105,12 +105,16 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/controlplane/gateway/handlers_cogni.go")
   + "\n"
+  + readText("internal/controlplane/gateway/handlers_browser_pack.go")
+  + "\n"
   + readText("internal/controlplane/gateway/handlers_cogni_experience_test.go")
   + "\n"
   + readText("internal/packs/lora/handler.go")
   + "\n"
-  + readText("internal/packs/cognikernel/handler.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "HandleCogniKernelPack", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/packs/cognikernel/handler.go")
+  + "\n"
+  + readText("internal/packs/browserintent/handler.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -118,7 +122,7 @@ if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
 }
 
 const backendContract = readText("pkg/packruntime/backend.go") + "\n" + readText("pkg/packruntime/registry.go");
-for (const token of ["type BackendRoute", "Method  string", "Methods []string", "Path    string", "type BackendRouteInfo", "Method  string", "Methods []string", "json:\"methods,omitempty\"", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
+for (const token of ["type BackendRoute", "Method  string", "Methods []string", "Path    string", "Auth    BackendRouteAuthMode", "type BackendRouteAuthMode", "BackendRouteAuthPassthrough", "type BackendRouteInfo", "Method  string", "Methods []string", "json:\"methods,omitempty\"", "json:\"auth,omitempty\"", "type BackendModuleInfo", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
   if (!backendContract.includes(token)) fail(`packruntime backend contract missing token: ${token}`);
 }
 
@@ -258,6 +262,51 @@ const hardcodedCogniShell = [
 ].map(readText).join("\n");
 if (hardcodedCogniShell.includes('href: "/cognis"') || hardcodedCogniShell.includes("nav-cognis")) {
   fail("Cogni Kernel must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
+}
+
+const browserIntentManifest = readJSON("packs/examples/browser-intent-pack/pack.json");
+const browserIntentSource = readText("internal/packs/browserintent/handler.go");
+const browserIntentBridge = readText("internal/controlplane/gateway/handlers_browser_pack.go");
+const browserIntentPage = readText("heroui-web/src/app/packs/browser/page.tsx");
+const legacyBrowserPage = readText("heroui-web/src/app/browser/page.tsx");
+const browserIntentClient = readText("heroui-web/src/lib/browser-intent-pack-client.ts");
+if (browserIntentManifest) {
+  if (!browserIntentSource.includes(`const PackID = "${browserIntentManifest.id}"`)) {
+    fail("Browser Intent pack handler PackID must match packs/examples/browser-intent-pack/pack.json");
+  }
+  for (const route of browserIntentManifest.backend?.routes ?? []) {
+    if (!browserIntentSource.includes(route)) fail(`Browser Intent handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!browserIntentSource.includes(method)) fail(`Browser Intent handler missing method gate declaration: ${method}`);
+  }
+  if (!browserIntentSource.includes("BackendRouteAuthPassthrough")) fail("Browser Intent session route must declare passthrough auth for extension grant bridge");
+  if (browserIntentManifest.frontend?.menus?.[0]?.path !== "/packs/browser") fail("Browser Intent menu path must stay under /packs/browser");
+  if (browserIntentManifest.sdk?.typescript !== "yunque-client/browser") fail("Browser Intent SDK import must stay yunque-client/browser");
+}
+if (!browserIntentBridge.includes("HandleBrowserIntentPack") || !browserIntentBridge.includes("HandleBrowserIntentSession") || !browserIntentBridge.includes("requireBrowserSessionAuth")) {
+  fail("Browser Intent Gateway bridge must delegate through HandleBrowserIntentPack and preserve extension session auth");
+}
+if (browserIntentPage.includes('from "@/lib/api"') || browserIntentPage.includes("api.browser") || !browserIntentPage.includes("createBrowserIntentPackClient")) {
+  fail("Browser Intent pack page must use browser-intent-pack-client instead of monolithic api object");
+}
+const apiSource = readText("heroui-web/src/lib/api.ts");
+for (const token of ["browserNavigate:", "browserScreenshot:", "browserOcr:", "browserStatus:", "browserConfig:", "browserExtStatus:", "browserExtAction:", "browserExtScenarios:", "browserExtRunScenario:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Browser Intent method: ${token}`);
+}
+if (!legacyBrowserPage.includes('redirect("/packs/browser")')) {
+  fail("legacy /browser page should redirect to /packs/browser");
+}
+for (const token of ["createBrowserIntentPackClient", "/v1/browser/status", "/v1/browser/ocr", "/api/browser/ext/session", "/api/browser/ext/scenarios/run", 'method: "POST"']) {
+  if (!browserIntentClient.includes(token)) fail(`browser-intent-pack-client missing token: ${token}`);
+}
+const hardcodedBrowserShell = [
+  "heroui-web/src/components/sidebar.tsx",
+  "heroui-web/src/lib/nav-items.tsx",
+  "heroui-web/src/components/command-palette.tsx",
+].map(readText).join("\n");
+if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) {
+  fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 }
 
 if (failures.length > 0) {

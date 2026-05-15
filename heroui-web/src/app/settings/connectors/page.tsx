@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Spinner } from "@heroui/react";
 import { api } from "@/lib/api";
+import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
 import type { ConnectorView } from "@/lib/api-types";
 import { formatErrorMessage } from "@/lib/error-utils";
 import {
@@ -21,6 +22,8 @@ const iconMap: Record<string, React.ElementType> = {
   jira: ClipboardList,
 };
 
+const browserIntentClient = createBrowserIntentPackClient();
+
 export default function ConnectorsPage() {
   const [connectors, setConnectors] = useState<ConnectorView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ export default function ConnectorsPage() {
     try {
       const [connectorRes, browserRes] = await Promise.all([
         api.connectorList(),
-        api.browserExtStatus().catch(() => ({ connected: false })),
+        browserIntentClient.extensionStatus().catch(() => ({ connected: false })),
       ]);
       setConnectors(connectorRes.connectors || []);
       setBrowserConnected(!!browserRes.connected);

@@ -38,7 +38,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "nav-plugins", href: "/plugins", label: "插件", group: "工作", icon: <Puzzle size={16} />, keywords: "plugins 插件" },
   { id: "nav-packs", href: "/packs", label: "增量包", group: "工作", icon: <Boxes size={16} />, keywords: "packs pack runtime 增量包 热插拔 可选能力" },
   { id: "nav-tools", href: "/tools", label: "终端", group: "工作", icon: <Wrench size={16} />, keywords: "tools terminal shell 工具" },
-  { id: "nav-browser", href: "/browser", label: "浏览器", group: "工作", icon: <Globe size={16} />, keywords: "browser 浏览器 connector" },
 
   { id: "nav-knowledge", href: "/knowledge", label: "知识库", group: "智能", icon: <BookOpen size={16} />, keywords: "knowledge 知识 RAG" },
   { id: "nav-memory", href: "/memory", label: "记忆", group: "智能", icon: <Brain size={16} />, keywords: "memory 记忆" },

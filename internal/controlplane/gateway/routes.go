@@ -337,21 +337,9 @@ func (g *Gateway) registerTraceRoutes() {
 // ──────────────────────────────────────────────
 
 func (g *Gateway) registerBrowserRoutes() {
-	g.mux.HandleFunc("/v1/browser/status", g.requireAuth(g.handleBrowserStatus))
-	g.mux.HandleFunc("/v1/browser/config", g.requireAuth(g.handleBrowserConfig))
-	g.mux.HandleFunc("/v1/browser/navigate", g.requireAuth(g.handleBrowserNavigate))
-	g.mux.HandleFunc("/v1/browser/screenshot", g.requireAuth(g.handleBrowserScreenshot))
-	g.mux.HandleFunc("/v1/browser/ocr", g.requireAuth(g.handleBrowserOCR))
-	g.mux.HandleFunc("/v1/browser/screenshot/latest", g.requireAuth(g.handleBrowserScreenshotLatest))
-	g.mux.HandleFunc("/v1/browser/opp/pending", g.requireAuth(g.handleOPPPending))
-	g.mux.HandleFunc("/v1/browser/opp/decide", g.requireAuth(g.handleOPPDecide))
-
-	// Browser Extension (Connector) API
-	g.mux.HandleFunc("/api/browser/ext/status", g.requireAuth(g.handleBrowserExtStatus))
-	g.mux.HandleFunc("/api/browser/ext/session", g.requireBrowserSessionAuth(g.handleBrowserExtSession))
-	g.mux.HandleFunc("/api/browser/ext/action", g.requireAuth(g.handleBrowserExtAction))
-	g.mux.HandleFunc("/api/browser/ext/scenarios", g.requireAuth(g.handleBrowserScenarios))
-	g.mux.HandleFunc("/api/browser/ext/scenarios/run", g.requireAuth(g.handleBrowserRunScenario))
+	// Browser Intent HTTP surfaces are mounted as an optional Pack Runtime backend
+	// module (internal/packs/browserintent). The WebSocket endpoint remains on
+	// Gateway because it is attached when SetBrowserHub wires a concrete hub.
 }
 
 // Connector and Notify routes are registered via sub-packages

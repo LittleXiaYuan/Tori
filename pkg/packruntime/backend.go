@@ -10,7 +10,20 @@ type BackendRoute struct {
 	Methods []string
 	Path    string
 	Handler http.HandlerFunc
+	Auth    BackendRouteAuthMode
 }
+
+// BackendRouteAuthMode describes how the host Gateway should authenticate a
+// backend pack route. The default mode uses the host's normal tenant/JWT/API key
+// auth middleware. Passthrough is reserved for bridge routes that must perform
+// their own protocol-specific authentication inside the handler while still
+// keeping Pack Runtime's method and enabled-state gates.
+type BackendRouteAuthMode string
+
+const (
+	BackendRouteAuthDefault     BackendRouteAuthMode = ""
+	BackendRouteAuthPassthrough BackendRouteAuthMode = "passthrough"
+)
 
 // BackendRouteInfo is the serializable route metadata exposed by the host for
 // pack runtime introspection. It intentionally omits the handler so external
@@ -20,6 +33,7 @@ type BackendRouteInfo struct {
 	Method  string   `json:"method,omitempty"`
 	Methods []string `json:"methods,omitempty"`
 	Path    string   `json:"path"`
+	Auth    string   `json:"auth,omitempty"`
 }
 
 // BackendModuleInfo describes a backend capability pack that has been mounted

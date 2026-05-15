@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Button, Input, ListBox, Label, Description, Spinner } from "@heroui/react";
 import { api } from "@/lib/api";
+import { createBrowserIntentPackClient } from "@/lib/browser-intent-pack-client";
 import type { ConnectorView, ConnectorDef } from "@/lib/api-types";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -32,6 +33,8 @@ const iconMap: Record<string, React.ElementType> = {
   linear: Layers,
   jira: ClipboardList,
 };
+
+const browserIntentClient = createBrowserIntentPackClient();
 
 interface Props {
   open: boolean;
@@ -81,7 +84,7 @@ export function ConnectorPopover({ open, onClose, browserConnected }: Props) {
     if (!open) return;
     setLoading(true);
     load();
-    api.browserExtStatus()
+    browserIntentClient.extensionStatus()
       .then((res) => setBrowserState(!!res.connected))
       .catch(() => setBrowserState(!!browserConnected));
   }, [open, load, browserConnected]);
