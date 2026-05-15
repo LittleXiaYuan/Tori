@@ -3,7 +3,8 @@
  *
  * This keeps adversarial guardrail corpus management, deterministic fuzz runs,
  * bypass reports, rule-candidate hints, non-destructive CI/rule/alert plans,
- * and evidence export usable without importing the full generated OpenAPI SDK:
+ * Go native fuzz corpus planning, and evidence export usable without importing
+ * the full generated OpenAPI SDK:
  *
  *   import { createGuardrailFuzzerClient } from "yunque-client/guardrail-fuzzer";
  */
@@ -41,6 +42,10 @@ export type GuardrailFuzzerStatusResponse = {
   rule_writeback_ready: boolean;
   alert_plan_ready: boolean;
   alert_ready: boolean;
+  native_corpus_plan_ready: boolean;
+  native_corpus_sync_ready: boolean;
+  go_native_fuzz_plan_ready: boolean;
+  go_native_fuzz_ready: boolean;
   seed_count: number;
   report_count: number;
   store_dir?: string;
@@ -195,6 +200,64 @@ export type GuardrailFuzzerCIGatePlanResponse = {
   plan: GuardrailFuzzerCIGatePlan;
 };
 
+export type GuardrailFuzzerNativeCorpusPlanRequest = {
+  categories?: string[];
+  include_benign?: boolean;
+  max_seeds?: number;
+  package?: string;
+  fuzz_target?: string;
+  corpus_dir?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
+export type GuardrailFuzzerNativeCorpusSeedPlan = {
+  seed_id: string;
+  category: string;
+  source: string;
+  expected_blocked: boolean;
+  tags?: string[];
+  testdata_file: string;
+  add_call: string;
+  corpus_entry: string;
+};
+
+export type GuardrailFuzzerNativeFuzzCommandPlan = {
+  name: string;
+  command: string;
+  artifacts: string[];
+  writes_files: boolean;
+  ready: boolean;
+};
+
+export type GuardrailFuzzerNativeCorpusPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  package: string;
+  fuzz_target: string;
+  corpus_dir: string;
+  native_corpus_plan_ready: boolean;
+  native_corpus_sync_ready: boolean;
+  go_native_fuzz_plan_ready: boolean;
+  go_native_fuzz_ready: boolean;
+  seed_count: number;
+  attack_seed_count: number;
+  benign_seed_count: number;
+  seeds: GuardrailFuzzerNativeCorpusSeedPlan[];
+  commands: GuardrailFuzzerNativeFuzzCommandPlan[];
+  requested_by?: string;
+  reason?: string;
+  actions: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type GuardrailFuzzerNativeCorpusPlanResponse = {
+  plan: GuardrailFuzzerNativeCorpusPlan;
+};
+
 export type GuardrailFuzzerReportsResponse = {
   reports: GuardrailFuzzerReportSummary[];
   count: number;
@@ -211,6 +274,7 @@ export type GuardrailFuzzerEvidenceResponse = {
   files: string[];
   report: GuardrailFuzzerReport;
   ci_gate_plan?: GuardrailFuzzerCIGatePlan;
+  native_corpus_plan?: GuardrailFuzzerNativeCorpusPlan;
 };
 
 export type GuardrailFuzzerClientOptions = {
@@ -312,6 +376,10 @@ export class GuardrailFuzzerClient {
 
   ciGatePlan(input: GuardrailFuzzerCIGatePlanRequest = {}): Promise<GuardrailFuzzerCIGatePlanResponse> {
     return this.request<GuardrailFuzzerCIGatePlanResponse>("POST", "/v1/guardrail-fuzzer/ci-gate/plan", input);
+  }
+
+  nativeCorpusPlan(input: GuardrailFuzzerNativeCorpusPlanRequest = {}): Promise<GuardrailFuzzerNativeCorpusPlanResponse> {
+    return this.request<GuardrailFuzzerNativeCorpusPlanResponse>("POST", "/v1/guardrail-fuzzer/native-corpus/plan", input);
   }
 
   reports(): Promise<GuardrailFuzzerReportsResponse> {
