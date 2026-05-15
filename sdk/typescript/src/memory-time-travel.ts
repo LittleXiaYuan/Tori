@@ -11,6 +11,7 @@
 export type MemoryTimeTravelPolicy = {
   retention_days: number;
   max_versions_per_key: number;
+  max_snapshots_per_namespace: number;
   max_snapshot_bytes: number;
   max_keys_per_snapshot: number;
   evidence_max_snapshots: number;
@@ -50,6 +51,8 @@ export type MemoryTimeTravelStatusResponse = {
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
   rollback_writeback_ready: boolean;
+  retention_plan_ready?: boolean;
+  retention_prune_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
   store_dir?: string;
@@ -179,6 +182,41 @@ export type MemoryTimeTravelRollbackPlanResponse = {
   plan: MemoryTimeTravelRollbackPlan;
 };
 
+export type MemoryTimeTravelRetentionCandidate = {
+  id: string;
+  namespace: string;
+  created_at: string;
+  hash: string;
+  size_bytes: number;
+  key_count: number;
+  reasons: string[];
+  action: string;
+};
+
+export type MemoryTimeTravelRetentionPlan = {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  dry_run: boolean;
+  status: string;
+  policy: MemoryTimeTravelPolicy;
+  cutoff_at: string;
+  scopes: string[];
+  snapshot_count: number;
+  keep_count: number;
+  candidate_count: number;
+  reclaimable_bytes: number;
+  temporal_history_ready: boolean;
+  temporal_prune_ready: boolean;
+  candidates: MemoryTimeTravelRetentionCandidate[];
+  actions: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRetentionPlanResponse = {
+  plan: MemoryTimeTravelRetentionPlan;
+};
+
 export type MemoryTimeTravelEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -186,6 +224,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   files: string[];
   snapshot: MemoryTimeTravelSnapshot;
   history: MemoryTimeTravelSnapshotSummary[];
+  retention_plan?: MemoryTimeTravelRetentionPlan;
+  retention_plan_error?: string;
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
   audit_verification_error?: string;
 };
@@ -304,6 +344,10 @@ export class MemoryTimeTravelClient {
 
   rollbackPlan(input: MemoryTimeTravelRollbackPlanRequest): Promise<MemoryTimeTravelRollbackPlanResponse> {
     return this.request<MemoryTimeTravelRollbackPlanResponse>("POST", "/v1/memory-time-travel/rollback-plan", input);
+  }
+
+  retentionPlan(namespace?: string): Promise<MemoryTimeTravelRetentionPlanResponse> {
+    return this.request<MemoryTimeTravelRetentionPlanResponse>("GET", `/v1/memory-time-travel/retention/plan${query({ namespace })}`);
   }
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {

@@ -34,8 +34,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -52,14 +52,15 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/memory-time-travel/status":        {http.MethodGet},
-		"/v1/memory-time-travel/snapshots":     {http.MethodGet, http.MethodPost},
-		"/v1/memory-time-travel/snapshots/":    {http.MethodGet},
-		"/v1/memory-time-travel/snapshot-at":   {http.MethodPost},
-		"/v1/memory-time-travel/diff":          {http.MethodPost},
-		"/v1/memory-time-travel/rollback-plan": {http.MethodPost},
-		"/v1/memory-time-travel/audit/verify":  {http.MethodGet},
-		"/v1/memory-time-travel/evidence/":     {http.MethodGet},
+		"/v1/memory-time-travel/status":         {http.MethodGet},
+		"/v1/memory-time-travel/snapshots":      {http.MethodGet, http.MethodPost},
+		"/v1/memory-time-travel/snapshots/":     {http.MethodGet},
+		"/v1/memory-time-travel/snapshot-at":    {http.MethodPost},
+		"/v1/memory-time-travel/diff":           {http.MethodPost},
+		"/v1/memory-time-travel/rollback-plan":  {http.MethodPost},
+		"/v1/memory-time-travel/retention/plan": {http.MethodGet},
+		"/v1/memory-time-travel/audit/verify":   {http.MethodGet},
+		"/v1/memory-time-travel/evidence/":      {http.MethodGet},
 	}
 	for path, methods := range expected {
 		got := strings.Join(byPath[path], ",")
@@ -125,7 +126,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -177,6 +178,66 @@ func TestMemoryTimeTravelSnapshotAtUsesLedgerTemporalKVWhenAttached(t *testing.T
 	h.Status(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"memory_persister_writeback_ready":true`) {
 		t.Fatalf("status should expose Memory Persister temporal write-back readiness, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
+	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+	h := New(Config{
+		DataDir: t.TempDir(),
+		Now:     func() time.Time { return now },
+		Policy:  RetentionPolicy{RetentionDays: 7, MaxSnapshotsPerNamespace: 2},
+	})
+
+	for _, item := range []struct {
+		id string
+		at time.Time
+	}{
+		{id: "old-baseline", at: now.AddDate(0, 0, -10)},
+		{id: "middle-baseline", at: now.Add(-time.Hour)},
+		{id: "new-baseline", at: now},
+	} {
+		now = item.at
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"`+item.id+`","namespace":"memory_snapshot","values":{"goal":"ship"}}`))
+		h.Snapshots(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("save %s status=%d body=%s", item.id, w.Code, w.Body.String())
+		}
+	}
+	now = time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
+	h.Status(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") {
+		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", nil)
+	h.RetentionPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan RetentionPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode retention plan: %v", err)
+	}
+	if !got.Plan.DryRun || got.Plan.Status != "dry_run" || got.Plan.CandidateCount != 1 || got.Plan.KeepCount != 2 {
+		t.Fatalf("unexpected retention plan: %#v", got.Plan)
+	}
+	if got.Plan.Candidates[0].ID != "old-baseline" || !containsString(got.Plan.Candidates[0].Reasons, "older_than_retention_days:7") || !strings.Contains(got.Plan.Actions[0], "would delete pack-local snapshot") {
+		t.Fatalf("unexpected retention candidate: %#v", got.Plan.Candidates)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/snapshots/old-baseline", nil)
+	h.SnapshotDetail(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention plan must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -254,8 +315,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files             []string           `json:"files"`
-		AuditVerification MerkleVerification `json:"audit_verification"`
+		Files             []string            `json:"files"`
+		RetentionPlan     RetentionPlanReport `json:"retention_plan"`
+		AuditVerification MerkleVerification  `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -265,6 +327,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "audit-verification.json") {
 		t.Fatalf("evidence files should include audit-verification.json: %#v", got.Files)
+	}
+	if !containsString(got.Files, "retention-plan.json") || !got.RetentionPlan.DryRun {
+		t.Fatalf("evidence should include dry-run retention plan: files=%#v plan=%#v", got.Files, got.RetentionPlan)
 	}
 }
 

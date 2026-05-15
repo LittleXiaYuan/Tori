@@ -48,7 +48,7 @@ test("MemoryTimeTravelClient reads status and snapshots with bearer token", asyn
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", stage: "pack-shell-before-ledger-kv-history", snapshot_store_ready: true, temporal_query_ready: true, ledger_history_ready: false, merkle_verification_ready: false, rollback_writeback_ready: false, snapshot_count: 1, namespace_count: 1, policy: {}, capabilities: [] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", stage: "pack-shell-before-ledger-kv-history", snapshot_store_ready: true, temporal_query_ready: true, ledger_history_ready: false, merkle_verification_ready: false, rollback_writeback_ready: false, retention_plan_ready: true, retention_prune_ready: false, snapshot_count: 1, namespace_count: 1, policy: {}, capabilities: [] });
       return jsonResponse({ snapshots: [snapshot], count: 1 });
     },
   });
@@ -101,7 +101,7 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
       if (String(url).includes("/snapshots/")) return jsonResponse({ snapshot });
-      return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "audit-verification.json"], snapshot, history: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } });
+      return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "retention-plan.json", "audit-verification.json"], snapshot, history: [], retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } });
     },
   });
 
@@ -110,10 +110,29 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
 
   assertEqual(detail.snapshot.id, "baseline");
   assertEqual(evidence.format, "json-memory-time-travel-evidence");
-  assertDeepEqual(evidence.files, ["snapshot.json", "audit-verification.json"]);
+  assertDeepEqual(evidence.files, ["snapshot.json", "retention-plan.json", "audit-verification.json"]);
+  assertEqual(evidence.retention_plan?.dry_run, true);
   assertEqual(evidence.audit_verification?.valid, true);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/snapshots/baseline");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/memory-time-travel/evidence/baseline");
+});
+
+test("MemoryTimeTravelClient builds retention dry-run plans", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createMemoryTimeTravelClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ plan: { pack_id: "yunque.pack.memory-time-travel", namespace: "memory_snapshot", generated_at: "2026-05-15T13:00:00Z", dry_run: true, status: "dry_run", policy: { retention_days: 30, max_versions_per_key: 100, max_snapshots_per_namespace: 100, max_snapshot_bytes: 262144, max_keys_per_snapshot: 256, evidence_max_snapshots: 20 }, cutoff_at: "2026-04-15T13:00:00Z", scopes: ["pack-local-snapshots"], snapshot_count: 1, keep_count: 1, candidate_count: 0, reclaimable_bytes: 0, temporal_history_ready: true, temporal_prune_ready: false, candidates: [], actions: ["no pack-local snapshot prune action required under the current policy"] } });
+    },
+  });
+
+  const plan = await client.retentionPlan("memory_snapshot");
+
+  assertEqual(plan.plan.dry_run, true);
+  assertEqual(plan.plan.temporal_prune_ready, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/retention/plan?namespace=memory_snapshot");
+  assertEqual(calls[0]?.init?.method, "GET");
 });
 
 test("MemoryTimeTravelClient verifies Merkle audit chains", async () => {
