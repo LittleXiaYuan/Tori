@@ -27,6 +27,7 @@ import { formatErrorMessage } from "@/lib/error-utils";
 import {
   createWASMPluginPackClient,
   type WASMPluginExecuteResult,
+  type WASMPluginRemoteInstallApprovalDecisionPlan,
   type WASMPluginRemoteInstallApprovalPlan,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginStatus,
@@ -128,6 +129,37 @@ function sampleRemoteApprovalPlan(slug: string) {
   );
 }
 
+function sampleRemoteApprovalDecisionPlan(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      name: "Calculator Remote WASM",
+      version: "0.2.0",
+      package_url: `https://packs.yunque.local/wasm/${slug}-0.2.0.tgz`,
+      manifest_url: `https://packs.yunque.local/wasm/${slug}.json`,
+      module_path: `${slug}.wasm`,
+      sha256:
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      signature: "sig-ed25519-preview",
+      signature_algorithm: "ed25519",
+      public_key_id: "yunque-root-2026",
+      trust_root: "yunque-root-bundle-2026",
+      requested_by: "operator",
+      reason: "remote WASM package must be approved before install wiring",
+      risk_tier: "high",
+      approvers: ["security", "platform"],
+      request_id: "wasm-remote-install-preview",
+      request_key: "preview-request-key",
+      decision: "approved",
+      decision_by: "security",
+      decision_reason: "plan-only preview; do not apply or persist",
+      metadata: { ticket: "WASM-REMOTE-DECISION-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -140,6 +172,7 @@ export default function WASMPluginPackPage() {
     | "evidence"
     | "remote-install"
     | "remote-approval"
+    | "remote-approval-decision"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +190,11 @@ export default function WASMPluginPackPage() {
   );
   const [remoteApprovalPlan, setRemoteApprovalPlan] =
     useState<WASMPluginRemoteInstallApprovalPlan | null>(null);
+  const [remoteDecisionJSON, setRemoteDecisionJSON] = useState(() =>
+    sampleRemoteApprovalDecisionPlan("calculator-remote"),
+  );
+  const [remoteDecisionPlan, setRemoteDecisionPlan] =
+    useState<WASMPluginRemoteInstallApprovalDecisionPlan | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -240,6 +278,21 @@ export default function WASMPluginPackPage() {
       showToast("已生成远程安装审批 gate 计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成远程安装审批 gate 计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planRemoteApprovalDecision = async () => {
+    setBusy("remote-approval-decision");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteDecisionJSON);
+      const res = await wasmPluginPack.remoteInstallApprovalDecisionPlan(payload);
+      setRemoteDecisionPlan(res.plan);
+      showToast("已生成远程安装审批决策计划", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成远程安装审批决策计划失败"));
     } finally {
       setBusy(null);
     }
@@ -395,6 +448,10 @@ export default function WASMPluginPackPage() {
                 approval_gate_ready:{" "}
                 {String(status?.approval_gate_ready ?? false)}
               </Chip>
+              <Chip size="sm">
+                approval_decision_plan_ready:{" "}
+                {String(status?.approval_decision_plan_ready ?? false)}
+              </Chip>
               <span
                 className="text-xs"
                 style={{ color: "var(--yunque-text-muted)" }}
@@ -409,11 +466,11 @@ export default function WASMPluginPackPage() {
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
               dry-run、权限计划、Host ABI plan preview、真实执行前 Host ABI
               execution gate、远程签名包安装计划、远程安装审批 gate
-              计划和证据包放进可选 Pack。请求 ledger_kv / memory_search /
+              计划、审批决策 plan-only 预览和证据包放进可选 Pack。请求 ledger_kv / memory_search /
               http_fetch / env_get 的插件在 host_abi_enforcement_ready=false
               时会被真实执行前阻断；本地 WASM 模块 SHA-256 与注册元数据不一致时也会被
               module integrity gate 阻断，不进入 sandbox；真实下载、签名验证、审批队列写回、
-              install 写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
+              审批决策应用、install 写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
@@ -494,6 +551,15 @@ export default function WASMPluginPackPage() {
             {status?.stage || "pack-shell"}
           </div>
         </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">审批决策</div>
+          <div className="kpi-value text-lg">
+            {status?.approval_decision_plan_ready ? "plan" : "pending"}
+          </div>
+          <div className="kpi-label mt-1">
+            ready: {String(status?.approval_decision_ready ?? false)}
+          </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
@@ -572,6 +638,113 @@ export default function WASMPluginPackPage() {
                 校验 / 注册插件
               </Button>
             </div>
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  远程安装审批决策计划
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  plan-only 契约：固定 approved / denied / expired
+                  的后续 installer 策略，只生成 approval-decision-plan.json
+                  预览；不写审批队列、不应用决策、不下载、不联网、不安装。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-approval-decision"}
+                onPress={planRemoteApprovalDecision}
+              >
+                生成决策计划
+              </Button>
+            </div>
+            <TextField value={remoteDecisionJSON} onChange={setRemoteDecisionJSON}>
+              <TextArea
+                rows={8}
+                aria-label="WASM remote install approval decision plan JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                approval_decision_plan_ready:{" "}
+                {String(
+                  remoteDecisionPlan?.approval_decision_plan_ready ??
+                    status?.approval_decision_plan_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_decision_ready:{" "}
+                {String(
+                  remoteDecisionPlan?.approval_decision_ready ??
+                    status?.approval_decision_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                applies_approval_decision:{" "}
+                {String(remoteDecisionPlan?.applies_approval_decision ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_approval_queue:{" "}
+                {String(remoteDecisionPlan?.writes_approval_queue ?? false)}
+              </Chip>
+              <Chip size="sm">
+                decision: {remoteDecisionPlan?.decision || "approved"}
+              </Chip>
+              <Chip size="sm">
+                decision_by: {remoteDecisionPlan?.decision_by || "security"}
+              </Chip>
+              <Chip size="sm">
+                would_allow_installer_continue:{" "}
+                {String(
+                  remoteDecisionPlan?.would_allow_installer_continue ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                blocks_installer:{" "}
+                {String(remoteDecisionPlan?.blocks_installer ?? true)}
+              </Chip>
+              <Chip size="sm">
+                request_id: {remoteDecisionPlan?.request_id || "pending"}
+              </Chip>
+              <Chip size="sm">
+                decision_key:{" "}
+                {remoteDecisionPlan?.decision_plan?.decision_key || "pending"}
+              </Chip>
+              <Chip size="sm">
+                downloads: {String(remoteDecisionPlan?.downloads ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_files: {String(remoteDecisionPlan?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteDecisionPlan?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">artifact: approval-decision-plan.json</Chip>
+            </div>
+            {remoteDecisionPlan && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteDecisionPlan, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM remote install approval decision plan result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
           </Card>
 
           <Card className="section-card p-4">

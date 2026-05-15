@@ -12,6 +12,7 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "remote-install-plan.json",
   "approval-gate-plan.json",
   "approval-queue-entry.json",
+  "approval-decision-plan.json",
   "signature-verification.json",
 ] as const;
 
@@ -38,6 +39,9 @@ export const WASM_PLUGIN_APPROVAL_QUEUE_ENTRY_ARTIFACT =
 
 export const WASM_PLUGIN_APPROVAL_QUEUE_BLOCKED_STATUS =
   "blocked_until_approval_queue";
+
+export const WASM_PLUGIN_APPROVAL_DECISION_PLAN_ARTIFACT =
+  "approval-decision-plan.json";
 
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
@@ -87,6 +91,8 @@ export type WASMPluginStatusResponse = {
   approval_gate_ready: boolean;
   approval_queue_plan_ready: boolean;
   approval_queue_ready: boolean;
+  approval_decision_plan_ready: boolean;
+  approval_decision_ready: boolean;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -256,6 +262,15 @@ export type WASMPluginRemoteInstallApprovalPlanRequest = {
   metadata?: Record<string, string>;
 };
 
+export type WASMPluginRemoteInstallApprovalDecisionPlanRequest =
+  WASMPluginRemoteInstallApprovalPlanRequest & {
+    request_id?: string;
+    request_key?: string;
+    decision: "approved" | "denied" | "expired";
+    decision_by?: string;
+    decision_reason?: string;
+  };
+
 export type WASMPluginRemoteInstallPluginPlan = {
   slug: string;
   name: string;
@@ -408,6 +423,82 @@ export type WASMPluginApprovalQueueEntryPlan = {
   notes?: string[];
 };
 
+export type WASMPluginApprovalDecisionPlan = {
+  pack_id: string;
+  generated_at: string;
+  approval_decision_plan_ready: boolean;
+  approval_decision_ready: boolean;
+  applies_approval_decision: boolean;
+  approval_queue_plan_ready: boolean;
+  approval_queue_ready: boolean;
+  writes_approval_queue: boolean;
+  requires_approval: boolean;
+  status: string;
+  queue_name: string;
+  request_id: string;
+  request_key: string;
+  decision_key: string;
+  decision: "approved" | "denied" | "expired";
+  decision_by: string;
+  decision_reason?: string;
+  would_allow_installer_continue: boolean;
+  blocks_installer: boolean;
+  required_fields: string[];
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  signature_gate_status: string;
+  canonical_payload_sha256: string;
+  artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  checks: WASMPluginRemoteInstallCheck[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallApprovalDecisionPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_decision_plan_ready: boolean;
+  approval_decision_ready: boolean;
+  applies_approval_decision: boolean;
+  approval_queue_plan_ready: boolean;
+  approval_queue_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_files: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  decision: "approved" | "denied" | "expired";
+  decision_by: string;
+  decision_reason?: string;
+  request_id: string;
+  request_key: string;
+  would_allow_installer_continue: boolean;
+  blocks_installer: boolean;
+  plugin: WASMPluginRemoteInstallPluginPlan;
+  package: WASMPluginRemoteInstallPackagePlan;
+  signature_verification: WASMPluginSignatureVerificationPlan;
+  approval_queue_entry: WASMPluginApprovalQueueEntryPlan;
+  decision_plan: WASMPluginApprovalDecisionPlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  approval_gate_plan_summary: WASMPluginRemoteInstallApprovalPlan;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallApprovalDecisionPlanResponse = {
+  plan: WASMPluginRemoteInstallApprovalDecisionPlan;
+};
+
 export type WASMPluginRemoteInstallApprovalPlanResponse = {
   plan: WASMPluginRemoteInstallApprovalPlan;
 };
@@ -448,6 +539,7 @@ export type WASMPluginEvidenceResponse = {
   remote_install_plan: WASMPluginRemoteInstallPlan;
   signature_verification: WASMPluginSignatureVerificationPlan;
   approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
+  approval_decision_plan: WASMPluginRemoteInstallApprovalDecisionPlan;
   sandbox?: Record<string, unknown>;
 };
 
@@ -607,6 +699,16 @@ export class WASMPluginClient {
     return this.request<WASMPluginRemoteInstallApprovalPlanResponse>(
       "POST",
       "/v1/wasm-plugin/remote-install/approval/plan",
+      input,
+    );
+  }
+
+  remoteInstallApprovalDecisionPlan(
+    input: WASMPluginRemoteInstallApprovalDecisionPlanRequest,
+  ): Promise<WASMPluginRemoteInstallApprovalDecisionPlanResponse> {
+    return this.request<WASMPluginRemoteInstallApprovalDecisionPlanResponse>(
+      "POST",
+      "/v1/wasm-plugin/remote-install/approval/decision/plan",
       input,
     );
   }
