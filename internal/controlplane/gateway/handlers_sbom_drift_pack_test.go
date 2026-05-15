@@ -98,7 +98,7 @@ func TestSBOMDriftPackCanExportCycloneDXAndPlanCIGate(t *testing.T) {
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"ci_gate_ready":false`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"ci_gate_ready":false`) || !strings.Contains(w.Body.String(), `"govulncheck_plan_ready":true`) || !strings.Contains(w.Body.String(), `"govulncheck_ready":false`) {
 		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
 	}
 }

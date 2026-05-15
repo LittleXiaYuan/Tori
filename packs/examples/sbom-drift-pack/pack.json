@@ -15,6 +15,7 @@
       "sbom.drift.diff",
       "sbom.cyclonedx.export",
       "sbom.ci_gate.plan",
+      "sbom.govulncheck.plan",
       "sbom.evidence.export"
     ],
     "routes": [
