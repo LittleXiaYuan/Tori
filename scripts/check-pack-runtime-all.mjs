@@ -57,7 +57,7 @@ const checks = [
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|CognitiveCanary|GuardrailFuzzer|MemoryTimeTravel|TemporalKV|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|ChaosProbe|CognitiveCanary|GuardrailFuzzer|MemoryTimeTravel|TemporalKV|LedgerPersister|RPAReplay|SBOMDrift|SkillAnomaly|WASMPlugin|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },

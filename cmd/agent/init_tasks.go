@@ -93,7 +93,11 @@ func initTasks(app *agentrt.App) error {
 			chaosprobepack.New(chaosprobepack.Config{DataDir: cfg.DataPath("chaos-probe")}),
 			cognitivecanarypack.New(cognitivecanarypack.Config{DataDir: cfg.DataPath("cognitive-canary")}),
 			guardrailfuzzerpack.New(guardrailfuzzerpack.Config{DataDir: cfg.DataPath("guardrail-fuzzer")}),
-			memorytimetravelpack.New(memorytimetravelpack.Config{DataDir: cfg.DataPath("memory-time-travel"), TemporalKV: iledger.NewTemporalKVStore(app.Ledger)}),
+			memorytimetravelpack.New(memorytimetravelpack.Config{
+				DataDir:                  cfg.DataPath("memory-time-travel"),
+				TemporalKV:               memoryTimeTravelTemporalKV(app),
+				MemoryPersisterWriteback: memoryPersisterTemporalWritebackReady(app),
+			}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
 			skillanomalypack.New(skillanomalypack.Config{DataDir: cfg.DataPath("skill-anomaly")}),
@@ -381,6 +385,25 @@ func appEvolutionCoordinator(app *agentrt.App) *localbrain.EvolutionCoordinator 
 		}
 	}
 	return nil
+}
+
+func memoryPersisterTemporalWritebackReady(app *agentrt.App) bool {
+	if app == nil {
+		return false
+	}
+	persister, ok := app.Get(agentrt.CompMemPersister)
+	if !ok {
+		return false
+	}
+	ready, ok := persister.(interface{ TemporalWritebackReady() bool })
+	return ok && ready.TemporalWritebackReady()
+}
+
+func memoryTimeTravelTemporalKV(app *agentrt.App) *iledger.TemporalKVStore {
+	if app == nil || app.Ledger == nil {
+		return nil
+	}
+	return iledger.NewTemporalKVStore(app.Ledger)
 }
 
 func ensureBuiltinPacks(registry *packruntime.Registry) {
