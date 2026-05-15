@@ -17,6 +17,7 @@
       "wasm.plugin.execute",
       "wasm.host_abi.plan",
       "wasm.remote_install.plan",
+      "wasm.remote_install.approval_plan",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -27,6 +28,7 @@
       "/v1/wasm-plugin/plugins/unload",
       "/v1/wasm-plugin/execute",
       "/v1/wasm-plugin/remote-install/plan",
+      "/v1/wasm-plugin/remote-install/approval/plan",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -75,6 +77,11 @@
         "method": "POST",
         "path": "/v1/wasm-plugin/remote-install/plan",
         "description": "Preview a non-destructive remote signed WASM package install plan."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/approval/plan",
+        "description": "Preview a non-destructive approval gate plan required before remote signed WASM package install."
       },
       {
         "method": "GET",
