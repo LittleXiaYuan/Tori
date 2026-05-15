@@ -25,7 +25,11 @@ export interface SBOMDriftStatus {
   pack_id: string;
   stage: string;
   scanner_ready: boolean;
+  cyclonedx_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
   vulnerability_ready: boolean;
+  govulncheck_ready: boolean;
   snapshot_count: number;
   repo_root?: string;
   store_dir?: string;
@@ -52,13 +56,53 @@ export interface SBOMDriftDiff {
   notes?: string[];
 }
 
+export interface SBOMDriftCycloneDXDocument {
+  bomFormat: string;
+  specVersion: string;
+  version: number;
+  metadata: Record<string, unknown>;
+  components: Array<Record<string, unknown>>;
+  dependencies?: Array<Record<string, unknown>>;
+}
+
+export interface SBOMDriftCIGatePlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  blocked: boolean;
+  fail_on_risk: string;
+  cyclonedx_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  diff: SBOMDriftDiff;
+  artifacts: string[];
+  commands: string[];
+  actions: string[];
+  notes?: string[];
+}
+
+export interface SBOMDriftEvidence {
+  pack_id: string;
+  exported_at: string;
+  format: string;
+  files: string[];
+  snapshot: SBOMDriftSnapshot;
+  cyclonedx?: SBOMDriftCycloneDXDocument;
+  ci_gate_plan?: SBOMDriftCIGatePlan;
+}
+
 export interface SBOMDriftPackClient {
   status(): Promise<SBOMDriftStatus>;
   snapshots(): Promise<{ snapshots: SBOMDriftSnapshotSummary[]; count: number }>;
   createSnapshot(input?: { id?: string; source?: string }): Promise<{ snapshot: SBOMDriftSnapshot; status: string }>;
   snapshot(id: string): Promise<{ snapshot: SBOMDriftSnapshot }>;
   diff(input: { base_id: string; target_id?: string; target_current?: boolean }): Promise<{ diff: SBOMDriftDiff }>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: SBOMDriftSnapshot }>;
+  cycloneDX(id?: string): Promise<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>;
+  ciGatePlan(input: { base_id: string; target_id?: string; target_current?: boolean; fail_on_risk?: string; requested_by?: string; reason?: string }): Promise<{ plan: SBOMDriftCIGatePlan }>;
+  evidence(id: string): Promise<SBOMDriftEvidence>;
 }
 
 function enc(value: string): string {
@@ -80,6 +124,12 @@ export function createSBOMDriftPackClient(): SBOMDriftPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
-    evidence: (id) => fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: SBOMDriftSnapshot }>(`/v1/sbom-drift/evidence/${enc(id)}`),
+    cycloneDX: (id = "current") => fetcher<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>(`/v1/sbom-drift/cyclonedx/${enc(id)}`),
+    ciGatePlan: (input) =>
+      fetcher<{ plan: SBOMDriftCIGatePlan }>("/v1/sbom-drift/ci-gate/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    evidence: (id) => fetcher<SBOMDriftEvidence>(`/v1/sbom-drift/evidence/${enc(id)}`),
   };
 }

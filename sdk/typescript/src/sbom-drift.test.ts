@@ -37,7 +37,7 @@ test("SBOMDriftClient reads status and snapshots with bearer token", async () =>
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, vulnerability_ready: false, snapshot_count: 1, capabilities: [] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, vulnerability_ready: false, govulncheck_ready: false, snapshot_count: 1, capabilities: [] });
       return jsonResponse({ snapshots: [{ id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 } }], count: 1 });
     },
   });
@@ -87,15 +87,24 @@ test("SBOMDriftClient exports snapshot evidence packs", async () => {
     baseUrl: "http://localhost:9090",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
+      if (String(url).includes("/cyclonedx/")) return jsonResponse({ bom: { bomFormat: "CycloneDX", specVersion: "1.5", version: 1, metadata: {}, components: [] }, snapshot: { id: "baseline", source: "unit", created_at: "now", component_count: 0, ecosystems: {} } });
+      if (String(url).includes("/ci-gate/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.sbom-drift", generated_at: "now", status: "ci_gate_pass_plan", blocked: false, fail_on_risk: "high", cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, govulncheck_ready: false, diff: { base: { id: "baseline", source: "unit", created_at: "now", component_count: 0, ecosystems: {} }, target: { id: "current", source: "working-tree", created_at: "now", component_count: 0, ecosystems: {} }, added: [], removed: [], changed: [], risk_level: "none" }, artifacts: ["dist/sbom.cdx.json"], commands: [], actions: [] } });
       return jsonResponse({ pack_id: "yunque.pack.sbom-drift", exported_at: "now", format: "json-sbom-drift-evidence", files: ["snapshot.json"], snapshot: { id: "baseline", source: "unit", created_at: "now", component_count: 0, ecosystems: {}, components: [] } });
     },
   });
 
+  const bom = await client.cycloneDX("baseline");
+  const plan = await client.ciGatePlan({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
   const evidence = await client.evidence("baseline");
 
+  assertEqual(bom.bom.bomFormat, "CycloneDX");
+  assertEqual(plan.plan.ci_gate_ready, false);
   assertEqual(evidence.format, "json-sbom-drift-evidence");
   assertDeepEqual(evidence.files, ["snapshot.json"]);
-  assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/evidence/baseline");
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/cyclonedx/baseline");
+  assertEqual(calls[1]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/plan");
+  assertEqual(calls[1]?.init?.body, JSON.stringify({ base_id: "baseline", target_current: true, fail_on_risk: "high" }));
+  assertEqual(calls[2]?.url, "http://localhost:9090/v1/sbom-drift/evidence/baseline");
 });
 
 test("SBOMDriftClient throws SBOMDriftClientError with nested gateway messages", async () => {
