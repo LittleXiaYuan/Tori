@@ -1,5 +1,14 @@
 import { fetcher } from "./api-core";
 
+export const SKILL_ANOMALY_APPROVAL_QUEUE_STORE_ARTIFACT =
+  "approval-queue-store.json";
+
+export const SKILL_ANOMALY_APPROVAL_QUEUE_RECORD_ARTIFACT =
+  "approval-queue-record.json";
+
+export const SKILL_ANOMALY_APPROVAL_QUEUE_WRITEBACK_CAPABILITY =
+  "skill.approval_queue.writeback";
+
 export interface SkillAnomalyPolicy {
   window_size: number;
   min_observations: number;
@@ -50,6 +59,8 @@ export interface SkillAnomalyStatus {
   trust_mutation_plan_ready: boolean;
   trust_mutation_ready: boolean;
   approval_writeback_ready: boolean;
+  approval_queue_store_ready: boolean;
+  approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
   profile_count: number;
   active_profiles: number;
   anomaly_count: number;
@@ -93,6 +104,8 @@ export interface SkillAnomalyObservationInput {
 export interface SkillAnomalyAuditHookPlanInput extends SkillAnomalyObservationInput {
   requested_by?: string;
   reason?: string;
+  request_id?: string;
+  request_key?: string;
 }
 
 export interface SkillAnomalyAuditRecordPlan {
@@ -114,9 +127,16 @@ export interface SkillAnomalyTrustMutationPlan {
 
 export interface SkillAnomalyApprovalQueuePlan {
   required: boolean;
+  queue_name: string;
   queue_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_queue_store: boolean;
+  request_id: string;
+  request_key: string;
+  status: string;
   requested_by?: string;
   reason?: string;
+  store_artifact: string;
 }
 
 export interface SkillAnomalyAuditHookPlan {
@@ -139,6 +159,82 @@ export interface SkillAnomalyAuditHookPlan {
   notes?: string[];
 }
 
+export interface SkillAnomalyApprovalQueueStoreSummary {
+  pack_id: string;
+  queue_name: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_ready: boolean;
+  notes?: string[];
+}
+
+export interface SkillAnomalyApprovalQueueRecord {
+  pack_id: string;
+  queue_name: string;
+  request_id: string;
+  request_key: string;
+  skill_slug: string;
+  status: string;
+  severity: string;
+  score: number;
+  approval_required: boolean;
+  requested_by?: string;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  action_allowed: boolean;
+  execution_blocked: boolean;
+  detection: SkillAnomalyResult;
+  audit_record: SkillAnomalyAuditRecordPlan;
+  trust_mutation: SkillAnomalyTrustMutationPlan;
+  approval_queue: SkillAnomalyApprovalQueuePlan;
+  store_artifact: string;
+  artifacts: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface SkillAnomalyApprovalQueueWriteback {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_required: boolean;
+  approval_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  action_allowed: boolean;
+  execution_blocked: boolean;
+  request_id: string;
+  request_key: string;
+  approval_queue_record: SkillAnomalyApprovalQueueRecord;
+  approval_queue_store: SkillAnomalyApprovalQueueStoreSummary;
+  plan_summary: SkillAnomalyAuditHookPlan;
+  artifacts: string[];
+  actions: string[];
+  notes?: string[];
+}
+
+export type SkillAnomalyApprovalQueueWritebackInput =
+  SkillAnomalyAuditHookPlanInput;
+
 export interface SkillAnomalyEvidence {
   pack_id: string;
   exported_at: string;
@@ -150,6 +246,8 @@ export interface SkillAnomalyEvidence {
   audit_hook_plan?: SkillAnomalyAuditHookPlan;
   trust_mutation_plan?: SkillAnomalyTrustMutationPlan;
   approval_queue_plan?: SkillAnomalyApprovalQueuePlan;
+  approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
+  approval_queue_record?: SkillAnomalyApprovalQueueRecord;
 }
 
 export interface SkillAnomalyPackClient {
@@ -160,6 +258,7 @@ export interface SkillAnomalyPackClient {
   profile(skillSlug: string): Promise<{ profile: SkillAnomalyProfile }>;
   detect(input: SkillAnomalyObservationInput): Promise<{ result: SkillAnomalyResult }>;
   auditHookPlan(input: SkillAnomalyAuditHookPlanInput): Promise<{ plan: SkillAnomalyAuditHookPlan }>;
+  approvalQueueWriteback(input: SkillAnomalyApprovalQueueWritebackInput): Promise<{ writeback: SkillAnomalyApprovalQueueWriteback }>;
   evidence(skillSlug: string): Promise<SkillAnomalyEvidence>;
 }
 
@@ -193,6 +292,11 @@ export function createSkillAnomalyPackClient(): SkillAnomalyPackClient {
       }),
     auditHookPlan: (input) =>
       fetcher<{ plan: SkillAnomalyAuditHookPlan }>("/v1/skill-anomaly/audit-hook/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    approvalQueueWriteback: (input) =>
+      fetcher<{ writeback: SkillAnomalyApprovalQueueWriteback }>("/v1/skill-anomaly/approval-queue/writeback", {
         method: "POST",
         body: JSON.stringify(input),
       }),

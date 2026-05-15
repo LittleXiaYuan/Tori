@@ -2,11 +2,18 @@
  * Lightweight Skill Anomaly Pack SDK slice.
  *
  * This keeps skill behavior profiles, anomaly dry-runs, NeedsApproval plans,
- * audit-hook / Trust mutation plans, and evidence export usable without
- * importing the full generated OpenAPI SDK:
+ * audit-hook / Trust mutation plans, pack-local Approval queue writeback
+ * persistence, and evidence export usable without importing the full generated
+ * OpenAPI SDK:
  *
  *   import { createSkillAnomalyClient } from "yunque-client/skill-anomaly";
  */
+
+export const SKILL_ANOMALY_APPROVAL_QUEUE_STORE_ARTIFACT =
+  "approval-queue-store.json";
+
+export const SKILL_ANOMALY_APPROVAL_QUEUE_WRITEBACK_CAPABILITY =
+  "skill.approval_queue.writeback";
 
 export type SkillAnomalyPolicy = {
   window_size: number;
@@ -58,6 +65,8 @@ export type SkillAnomalyStatusResponse = {
   trust_mutation_plan_ready: boolean;
   trust_mutation_ready: boolean;
   approval_writeback_ready: boolean;
+  approval_queue_store_ready: boolean;
+  approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
   profile_count: number;
   active_profiles: number;
   anomaly_count: number;
@@ -101,6 +110,8 @@ export type SkillAnomalyObservationRequest = {
 export type SkillAnomalyAuditHookPlanRequest = SkillAnomalyObservationRequest & {
   requested_by?: string;
   reason?: string;
+  request_id?: string;
+  request_key?: string;
 };
 
 export type SkillAnomalyEventsResponse = {
@@ -146,9 +157,16 @@ export type SkillAnomalyTrustMutationPlan = {
 
 export type SkillAnomalyApprovalQueuePlan = {
   required: boolean;
+  queue_name: string;
   queue_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_queue_store: boolean;
+  request_id: string;
+  request_key: string;
+  status: string;
   requested_by?: string;
   reason?: string;
+  store_artifact: string;
 };
 
 export type SkillAnomalyAuditHookPlan = {
@@ -175,6 +193,86 @@ export type SkillAnomalyAuditHookPlanResponse = {
   plan: SkillAnomalyAuditHookPlan;
 };
 
+export type SkillAnomalyApprovalQueueStoreSummary = {
+  pack_id: string;
+  queue_name: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_ready: boolean;
+  notes?: string[];
+};
+
+export type SkillAnomalyApprovalQueueRecord = {
+  pack_id: string;
+  queue_name: string;
+  request_id: string;
+  request_key: string;
+  skill_slug: string;
+  status: string;
+  severity: string;
+  score: number;
+  approval_required: boolean;
+  requested_by?: string;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  action_allowed: boolean;
+  execution_blocked: boolean;
+  detection: SkillAnomalyResult;
+  audit_record: SkillAnomalyAuditRecordPlan;
+  trust_mutation: SkillAnomalyTrustMutationPlan;
+  approval_queue: SkillAnomalyApprovalQueuePlan;
+  store_artifact: string;
+  artifacts: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type SkillAnomalyApprovalQueueWriteback = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_required: boolean;
+  approval_writeback_ready: boolean;
+  writes_approval_queue: boolean;
+  writes_approval_queue_file: boolean;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  action_allowed: boolean;
+  execution_blocked: boolean;
+  request_id: string;
+  request_key: string;
+  approval_queue_record: SkillAnomalyApprovalQueueRecord;
+  approval_queue_store: SkillAnomalyApprovalQueueStoreSummary;
+  plan_summary: SkillAnomalyAuditHookPlan;
+  artifacts: string[];
+  actions: string[];
+  notes?: string[];
+};
+
+export type SkillAnomalyApprovalQueueWritebackRequest =
+  SkillAnomalyAuditHookPlanRequest;
+
+export type SkillAnomalyApprovalQueueWritebackResponse = {
+  writeback: SkillAnomalyApprovalQueueWriteback;
+};
+
 export type SkillAnomalyEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -186,6 +284,8 @@ export type SkillAnomalyEvidenceResponse = {
   audit_hook_plan?: SkillAnomalyAuditHookPlan;
   trust_mutation_plan?: SkillAnomalyTrustMutationPlan;
   approval_queue_plan?: SkillAnomalyApprovalQueuePlan;
+  approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
+  approval_queue_record?: SkillAnomalyApprovalQueueRecord;
 };
 
 export type SkillAnomalyClientOptions = {
@@ -303,6 +403,10 @@ export class SkillAnomalyClient {
 
   auditHookPlan(input: SkillAnomalyAuditHookPlanRequest): Promise<SkillAnomalyAuditHookPlanResponse> {
     return this.request<SkillAnomalyAuditHookPlanResponse>("POST", "/v1/skill-anomaly/audit-hook/plan", input);
+  }
+
+  approvalQueueWriteback(input: SkillAnomalyApprovalQueueWritebackRequest): Promise<SkillAnomalyApprovalQueueWritebackResponse> {
+    return this.request<SkillAnomalyApprovalQueueWritebackResponse>("POST", "/v1/skill-anomaly/approval-queue/writeback", input);
   }
 
   evidence(skillSlug: string): Promise<SkillAnomalyEvidenceResponse> {

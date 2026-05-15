@@ -8,6 +8,8 @@ package skillanomaly
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -96,6 +98,8 @@ type AuditHookPlanRequest struct {
 	DurationMS  int64          `json:"duration_ms"`
 	Reason      string         `json:"reason"`
 	RequestedBy string         `json:"requested_by"`
+	RequestID   string         `json:"request_id"`
+	RequestKey  string         `json:"request_key"`
 	DryRun      bool           `json:"dry_run"`
 }
 
@@ -165,9 +169,16 @@ type TrustMutationPlan struct {
 
 type ApprovalQueuePlan struct {
 	Required            bool   `json:"required"`
+	QueueName           string `json:"queue_name"`
 	QueueWritebackReady bool   `json:"queue_writeback_ready"`
+	WritesApprovalQueue bool   `json:"writes_approval_queue"`
+	WritesQueueStore    bool   `json:"writes_queue_store"`
+	RequestID           string `json:"request_id"`
+	RequestKey          string `json:"request_key"`
+	Status              string `json:"status"`
 	RequestedBy         string `json:"requested_by,omitempty"`
 	Reason              string `json:"reason,omitempty"`
+	StoreArtifact       string `json:"store_artifact"`
 }
 
 type AuditHookPlanReport struct {
@@ -188,6 +199,79 @@ type AuditHookPlanReport struct {
 	ApprovalQueue          ApprovalQueuePlan   `json:"approval_queue"`
 	Actions                []string            `json:"actions"`
 	Notes                  []string            `json:"notes,omitempty"`
+}
+
+type ApprovalQueueStoreSummary struct {
+	PackID                  string   `json:"pack_id"`
+	QueueName               string   `json:"queue_name"`
+	Store                   string   `json:"store"`
+	StoreReady              bool     `json:"store_ready"`
+	RecordCount             int      `json:"record_count"`
+	Artifact                string   `json:"artifact"`
+	WritesApprovalQueue     bool     `json:"writes_approval_queue"`
+	WritesApprovalQueueFile bool     `json:"writes_approval_queue_file"`
+	MerkleAppendReady       bool     `json:"merkle_append_ready"`
+	TrustMutationReady      bool     `json:"trust_mutation_ready"`
+	Notes                   []string `json:"notes,omitempty"`
+}
+
+type ApprovalQueueRecord struct {
+	PackID                  string              `json:"pack_id"`
+	QueueName               string              `json:"queue_name"`
+	RequestID               string              `json:"request_id"`
+	RequestKey              string              `json:"request_key"`
+	SkillSlug               string              `json:"skill_slug"`
+	Status                  string              `json:"status"`
+	Severity                string              `json:"severity"`
+	Score                   float64             `json:"score"`
+	ApprovalRequired        bool                `json:"approval_required"`
+	RequestedBy             string              `json:"requested_by,omitempty"`
+	Reason                  string              `json:"reason,omitempty"`
+	CreatedAt               time.Time           `json:"created_at"`
+	UpdatedAt               time.Time           `json:"updated_at"`
+	AuditHookPlanReady      bool                `json:"audit_hook_plan_ready"`
+	AuditHookReady          bool                `json:"audit_hook_ready"`
+	MerkleAppendReady       bool                `json:"merkle_append_ready"`
+	TrustMutationPlanReady  bool                `json:"trust_mutation_plan_ready"`
+	TrustMutationReady      bool                `json:"trust_mutation_ready"`
+	ApprovalWritebackReady  bool                `json:"approval_writeback_ready"`
+	WritesApprovalQueue     bool                `json:"writes_approval_queue"`
+	WritesApprovalQueueFile bool                `json:"writes_approval_queue_file"`
+	ActionAllowed           bool                `json:"action_allowed"`
+	ExecutionBlocked        bool                `json:"execution_blocked"`
+	Detection               DetectionResult     `json:"detection"`
+	AuditRecord             AuditHookRecordPlan `json:"audit_record"`
+	TrustMutation           TrustMutationPlan   `json:"trust_mutation"`
+	ApprovalQueue           ApprovalQueuePlan   `json:"approval_queue"`
+	StoreArtifact           string              `json:"store_artifact"`
+	Artifacts               []string            `json:"artifacts"`
+	Labels                  []string            `json:"labels"`
+	Notes                   []string            `json:"notes,omitempty"`
+}
+
+type ApprovalQueueWritebackReport struct {
+	PackID                  string                    `json:"pack_id"`
+	GeneratedAt             time.Time                 `json:"generated_at"`
+	Status                  string                    `json:"status"`
+	ApprovalRequired        bool                      `json:"approval_required"`
+	ApprovalWritebackReady  bool                      `json:"approval_writeback_ready"`
+	WritesApprovalQueue     bool                      `json:"writes_approval_queue"`
+	WritesApprovalQueueFile bool                      `json:"writes_approval_queue_file"`
+	AuditHookPlanReady      bool                      `json:"audit_hook_plan_ready"`
+	AuditHookReady          bool                      `json:"audit_hook_ready"`
+	MerkleAppendReady       bool                      `json:"merkle_append_ready"`
+	TrustMutationPlanReady  bool                      `json:"trust_mutation_plan_ready"`
+	TrustMutationReady      bool                      `json:"trust_mutation_ready"`
+	ActionAllowed           bool                      `json:"action_allowed"`
+	ExecutionBlocked        bool                      `json:"execution_blocked"`
+	RequestID               string                    `json:"request_id"`
+	RequestKey              string                    `json:"request_key"`
+	ApprovalQueueRecord     ApprovalQueueRecord       `json:"approval_queue_record"`
+	ApprovalQueueStore      ApprovalQueueStoreSummary `json:"approval_queue_store"`
+	PlanSummary             AuditHookPlanReport       `json:"plan_summary"`
+	Artifacts               []string                  `json:"artifacts"`
+	Actions                 []string                  `json:"actions"`
+	Notes                   []string                  `json:"notes,omitempty"`
 }
 
 var safeSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
@@ -220,6 +304,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/skill-anomaly/profiles/", Handler: h.ProfileDetail},
 		{Method: http.MethodPost, Path: "/v1/skill-anomaly/detect", Handler: h.Detect},
 		{Method: http.MethodPost, Path: "/v1/skill-anomaly/audit-hook/plan", Handler: h.AuditHookPlan},
+		{Method: http.MethodPost, Path: "/v1/skill-anomaly/approval-queue/writeback", Handler: h.ApprovalQueueWriteback},
 		{Method: http.MethodGet, Path: "/v1/skill-anomaly/evidence/", Handler: h.Evidence},
 	}
 }
@@ -242,29 +327,33 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 		anomalies += profile.AnomalyCount
 	}
+	approvalQueueSummary := h.approvalQueueStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                   PackID,
-		"stage":                     "pack-shell-before-audit-hook",
-		"detector_ready":            true,
-		"audit_hook_plan_ready":     true,
-		"audit_hook_ready":          false,
-		"trust_mutation_plan_ready": true,
-		"trust_mutation_ready":      false,
-		"approval_writeback_ready":  false,
-		"profile_count":             len(profiles),
-		"active_profiles":           active,
-		"anomaly_count":             anomalies,
-		"store_dir":                 h.dataDir,
-		"policy":                    h.policy,
+		"pack_id":                    PackID,
+		"stage":                      "pack-shell-before-audit-hook",
+		"detector_ready":             true,
+		"audit_hook_plan_ready":      true,
+		"audit_hook_ready":           false,
+		"trust_mutation_plan_ready":  true,
+		"trust_mutation_ready":       false,
+		"approval_writeback_ready":   true,
+		"approval_queue_store_ready": true,
+		"profile_count":              len(profiles),
+		"active_profiles":            active,
+		"anomaly_count":              anomalies,
+		"store_dir":                  h.dataDir,
+		"policy":                     h.policy,
+		"approval_queue_store":       approvalQueueSummary,
 		"capabilities": []string{
 			"skill.behavior.profile",
 			"skill.anomaly.detect",
 			"skill.needs_approval.plan",
 			"skill.audit_hook.plan",
 			"skill.trust_mutation.plan",
+			"skill.approval_queue.writeback",
 			"skill.evidence.export",
 		},
-		"notes": []string{"Audit-hook and Trust mutation plans are non-destructive; direct Merkle Chain append, Trust Score mutation, and Approval queue write-back remain follow-up wiring."},
+		"notes": []string{"Audit-hook and Trust mutation plans are non-destructive; pack-local Approval queue write-back is available, while direct Merkle Chain append, Trust Score mutation, and runtime action release remain follow-up wiring."},
 	})
 }
 
@@ -398,8 +487,26 @@ func (h *Handler) AuditHookPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := h.score(profile, event)
-	plan := h.buildAuditHookPlan(result, req.RequestedBy, req.Reason)
+	plan := h.buildAuditHookPlan(result, req.RequestedBy, req.Reason, req.RequestID, req.RequestKey)
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
+func (h *Handler) ApprovalQueueWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req AuditHookPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid skill anomaly approval queue writeback payload")
+		return
+	}
+	report, err := h.writeApprovalQueueRecord(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
 }
 
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
@@ -415,17 +522,20 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	}
 	events, _ := h.listEvents(profile.SkillSlug, h.policy.WindowSize)
 	auditHookPlan := h.buildEvidenceAuditHookPlan(profile)
+	queueRecord := h.approvalQueueRecordPreview(auditHookPlan)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":             PackID,
-		"exported_at":         h.now().UTC(),
-		"format":              "json-skill-anomaly-evidence",
-		"files":               []string{"profile.json", "recent-events.json", "detection-policy.json", "audit-hook-plan.json", "trust-mutation-plan.json"},
-		"profile":             profile,
-		"events":              events,
-		"policy":              h.policy,
-		"audit_hook_plan":     auditHookPlan,
-		"trust_mutation_plan": auditHookPlan.TrustMutation,
-		"approval_queue_plan": auditHookPlan.ApprovalQueue,
+		"pack_id":               PackID,
+		"exported_at":           h.now().UTC(),
+		"format":                "json-skill-anomaly-evidence",
+		"files":                 []string{"profile.json", "recent-events.json", "detection-policy.json", "audit-hook-plan.json", "trust-mutation-plan.json", "approval-queue-plan.json", "approval-queue-store.json", "approval-queue-record.json"},
+		"profile":               profile,
+		"events":                events,
+		"policy":                h.policy,
+		"audit_hook_plan":       auditHookPlan,
+		"trust_mutation_plan":   auditHookPlan.TrustMutation,
+		"approval_queue_plan":   auditHookPlan.ApprovalQueue,
+		"approval_queue_store":  h.approvalQueueStoreSummary(),
+		"approval_queue_record": queueRecord,
 	})
 }
 
@@ -577,13 +687,13 @@ func (h *Handler) buildEvidenceAuditHookPlan(profile Profile) AuditHookPlanRepor
 			Profile:   summarize(profile),
 			Event:     event,
 			Notes:     []string{"No recent skill behavior event is available; evidence carries the non-destructive audit hook plan contract only."},
-		}, "evidence-export", "evidence export schema snapshot")
+		}, "evidence-export", "evidence export schema snapshot", "", "")
 	}
 	event := profile.Recent[len(profile.Recent)-1]
-	return h.buildAuditHookPlan(h.score(profile, event), "evidence-export", "latest profile event schema snapshot")
+	return h.buildAuditHookPlan(h.score(profile, event), "evidence-export", "latest profile event schema snapshot", "", "")
 }
 
-func (h *Handler) buildAuditHookPlan(result DetectionResult, requestedBy, reason string) AuditHookPlanReport {
+func (h *Handler) buildAuditHookPlan(result DetectionResult, requestedBy, reason, requestID, requestKey string) AuditHookPlanReport {
 	approvalRequired := result.NeedsApproval || result.Block
 	status := "no_op"
 	if result.Severity == "learning" {
@@ -593,6 +703,12 @@ func (h *Handler) buildAuditHookPlan(result DetectionResult, requestedBy, reason
 		status = "approval_plan"
 	}
 	delta := trustDelta(result)
+	requestedBy = strings.TrimSpace(requestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	queueReason := approvalReason(result, reason)
+	requestID, requestKey = approvalQueueIdentifiers(result, requestedBy, queueReason, requestID, requestKey)
 	actions := []string{}
 	if approvalRequired {
 		actions = append(actions,
@@ -648,14 +764,150 @@ func (h *Handler) buildAuditHookPlan(result DetectionResult, requestedBy, reason
 		},
 		ApprovalQueue: ApprovalQueuePlan{
 			Required:            approvalRequired,
+			QueueName:           "skill_anomaly_approval",
 			QueueWritebackReady: false,
-			RequestedBy:         strings.TrimSpace(requestedBy),
-			Reason:              approvalReason(result, reason),
+			WritesApprovalQueue: false,
+			WritesQueueStore:    false,
+			RequestID:           requestID,
+			RequestKey:          requestKey,
+			Status:              boolString(approvalRequired, "blocked_until_approval_queue_writeback", "not_required"),
+			RequestedBy:         requestedBy,
+			Reason:              queueReason,
+			StoreArtifact:       "approval-queue-store.json",
 		},
 		Actions: actions,
 		Notes: []string{
 			"This route is non-destructive: it does not append to the Merkle audit chain, mutate Trust Score, or write Approval queue items.",
 			"Use the plan shape as the contract for the later audit hook / Trust / Approval write-back slice.",
+		},
+	}
+}
+
+func (h *Handler) writeApprovalQueueRecord(req AuditHookPlanRequest) (ApprovalQueueWritebackReport, error) {
+	event, err := h.eventFromAuditHookPlan(req)
+	if err != nil {
+		return ApprovalQueueWritebackReport{}, err
+	}
+	profile, err := h.loadOrNewProfile(event.SkillSlug)
+	if err != nil {
+		return ApprovalQueueWritebackReport{}, err
+	}
+	result := h.score(profile, event)
+	plan := h.buildAuditHookPlan(result, req.RequestedBy, req.Reason, req.RequestID, req.RequestKey)
+	record := h.approvalQueueRecordFromPlan(plan, true)
+	if err := h.saveApprovalQueueRecord(record); err != nil {
+		return ApprovalQueueWritebackReport{}, err
+	}
+	store := h.approvalQueueStoreSummary()
+	return ApprovalQueueWritebackReport{
+		PackID:                  PackID,
+		GeneratedAt:             h.now().UTC(),
+		Status:                  "approval_queue_written_pending_audit_trust_wiring",
+		ApprovalRequired:        plan.ApprovalRequired,
+		ApprovalWritebackReady:  true,
+		WritesApprovalQueue:     true,
+		WritesApprovalQueueFile: true,
+		AuditHookPlanReady:      plan.AuditHookPlanReady,
+		AuditHookReady:          false,
+		MerkleAppendReady:       false,
+		TrustMutationPlanReady:  plan.TrustMutationPlanReady,
+		TrustMutationReady:      false,
+		ActionAllowed:           false,
+		ExecutionBlocked:        true,
+		RequestID:               record.RequestID,
+		RequestKey:              record.RequestKey,
+		ApprovalQueueRecord:     record,
+		ApprovalQueueStore:      store,
+		PlanSummary:             plan,
+		Artifacts:               []string{"approval-queue-store.json", "approval-queue-record.json", "audit-hook-plan.json", "trust-mutation-plan.json", "approval-queue-plan.json"},
+		Actions: []string{
+			"persisted the anomalous skill behavior approval request into the pack-local approval queue store",
+			"kept Merkle audit append, Trust Score mutation, and runtime action release blocked until explicit wiring consumes the queue record",
+		},
+		Notes: []string{
+			"This route writes only the pack-local Skill Anomaly approval queue store.",
+			"It does not append Merkle audit records, mutate Trust Score, approve the action, or release runtime execution.",
+		},
+	}, nil
+}
+
+func (h *Handler) approvalQueueRecordPreview(plan AuditHookPlanReport) ApprovalQueueRecord {
+	return h.approvalQueueRecordFromPlan(plan, false)
+}
+
+func (h *Handler) approvalQueueRecordFromPlan(plan AuditHookPlanReport, persisted bool) ApprovalQueueRecord {
+	now := h.now().UTC()
+	status := "preview_not_persisted"
+	if persisted {
+		status = "written_pending_audit_trust_wiring"
+	}
+	queue := plan.ApprovalQueue
+	return ApprovalQueueRecord{
+		PackID:                  PackID,
+		QueueName:               "skill_anomaly_approval",
+		RequestID:               queue.RequestID,
+		RequestKey:              queue.RequestKey,
+		SkillSlug:               plan.SkillSlug,
+		Status:                  status,
+		Severity:                plan.Detection.Severity,
+		Score:                   plan.Detection.Score,
+		ApprovalRequired:        plan.ApprovalRequired,
+		RequestedBy:             queue.RequestedBy,
+		Reason:                  queue.Reason,
+		CreatedAt:               now,
+		UpdatedAt:               now,
+		AuditHookPlanReady:      plan.AuditHookPlanReady,
+		AuditHookReady:          false,
+		MerkleAppendReady:       false,
+		TrustMutationPlanReady:  plan.TrustMutationPlanReady,
+		TrustMutationReady:      false,
+		ApprovalWritebackReady:  persisted,
+		WritesApprovalQueue:     persisted,
+		WritesApprovalQueueFile: persisted,
+		ActionAllowed:           false,
+		ExecutionBlocked:        true,
+		Detection:               plan.Detection,
+		AuditRecord:             plan.AuditRecord,
+		TrustMutation:           plan.TrustMutation,
+		ApprovalQueue: ApprovalQueuePlan{
+			Required:            queue.Required,
+			QueueName:           "skill_anomaly_approval",
+			QueueWritebackReady: persisted,
+			WritesApprovalQueue: persisted,
+			WritesQueueStore:    persisted,
+			RequestID:           queue.RequestID,
+			RequestKey:          queue.RequestKey,
+			Status:              boolString(persisted, "written_pending_audit_trust_wiring", queue.Status),
+			RequestedBy:         queue.RequestedBy,
+			Reason:              queue.Reason,
+			StoreArtifact:       "approval-queue-store.json",
+		},
+		StoreArtifact: "approval-queue-store.json",
+		Artifacts:     []string{"approval-queue-store.json", "approval-queue-record.json", "audit-hook-plan.json", "trust-mutation-plan.json", "approval-queue-plan.json"},
+		Labels:        []string{"skill-anomaly", "approval-queue", "pack-local-store", "audit-trust-blocked", "severity-" + plan.Detection.Severity},
+		Notes: []string{
+			"Pack-local Skill Anomaly approval queue record.",
+			"Merkle audit append, Trust mutation, and action release remain blocked until a later route consumes this record.",
+		},
+	}
+}
+
+func (h *Handler) approvalQueueStoreSummary() ApprovalQueueStoreSummary {
+	records, _ := h.loadApprovalQueueRecords()
+	return ApprovalQueueStoreSummary{
+		PackID:                  PackID,
+		QueueName:               "skill_anomaly_approval",
+		Store:                   "pack-local-json",
+		StoreReady:              true,
+		RecordCount:             len(records),
+		Artifact:                "approval-queue-store.json",
+		WritesApprovalQueue:     false,
+		WritesApprovalQueueFile: false,
+		MerkleAppendReady:       false,
+		TrustMutationReady:      false,
+		Notes: []string{
+			"Store readiness covers only the pack-local JSON approval queue bridge.",
+			"Merkle append, Trust Score mutation, and runtime action release remain disabled until later explicit wiring.",
 		},
 	}
 }
@@ -716,6 +968,35 @@ func approvalReason(result DetectionResult, explicit string) string {
 		return "profile is still collecting the minimum baseline observations"
 	}
 	return "no approval required"
+}
+
+func approvalQueueIdentifiers(result DetectionResult, requestedBy, reason, requestID, requestKey string) (string, string) {
+	requestKey = strings.TrimSpace(requestKey)
+	if requestKey == "" {
+		payload := strings.Join([]string{
+			"pack_id=" + PackID,
+			"skill_slug=" + result.SkillSlug,
+			"event_id=" + result.Event.ID,
+			"action=" + result.Event.Action,
+			"severity=" + result.Severity,
+			fmt.Sprintf("score=%.3f", result.Score),
+			"requested_by=" + requestedBy,
+			"reason=" + reason,
+		}, "\n")
+		requestKey = sha256Hex(payload)
+	}
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		requestID = "skill-anomaly-" + requestKey[:16]
+	}
+	return requestID, requestKey
+}
+
+func boolString(ok bool, yes, no string) string {
+	if ok {
+		return yes
+	}
+	return no
 }
 
 func consecutiveFailures(events []Event) int {
@@ -888,6 +1169,58 @@ func (h *Handler) appendEventLog(event Event) error {
 	return err
 }
 
+func (h *Handler) saveApprovalQueueRecord(record ApprovalQueueRecord) error {
+	records, _ := h.loadApprovalQueueRecords()
+	replaced := false
+	for idx := range records {
+		if records[idx].RequestKey == record.RequestKey || records[idx].RequestID == record.RequestID {
+			if !records[idx].CreatedAt.IsZero() {
+				record.CreatedAt = records[idx].CreatedAt
+			}
+			records[idx] = record
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].UpdatedAt.After(records[j].UpdatedAt) })
+	store := map[string]any{
+		"pack_id":      PackID,
+		"queue_name":   "skill_anomaly_approval",
+		"format":       "json-skill-anomaly-approval-queue-store",
+		"record_count": len(records),
+		"updated_at":   h.now().UTC(),
+		"records":      records,
+	}
+	if err := os.MkdirAll(filepath.Dir(h.approvalQueueStorePath()), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(store, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.approvalQueueStorePath(), data, 0o644)
+}
+
+func (h *Handler) loadApprovalQueueRecords() ([]ApprovalQueueRecord, error) {
+	data, err := os.ReadFile(h.approvalQueueStorePath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var store struct {
+		Records []ApprovalQueueRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &store); err != nil {
+		return nil, err
+	}
+	return store.Records, nil
+}
+
 func (h *Handler) listEvents(slug string, limit int) ([]Event, error) {
 	if strings.TrimSpace(slug) == "" {
 		return h.listAllEvents(limit)
@@ -956,6 +1289,10 @@ func (h *Handler) eventLogPath(slug string) string {
 	return filepath.Join(h.dataDir, "events", slug+".jsonl")
 }
 
+func (h *Handler) approvalQueueStorePath() string {
+	return filepath.Join(h.dataDir, "approval-queue-store.json")
+}
+
 func summarize(profile Profile) ProfileSummary {
 	return ProfileSummary{
 		SkillSlug:      profile.SkillSlug,
@@ -986,4 +1323,9 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"error": message})
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
