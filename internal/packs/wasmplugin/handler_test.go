@@ -149,6 +149,13 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/status", nil)
+	h.Status(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_plan") {
+		t.Fatalf("status should expose approval queue plan readiness and capability: status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalPlan(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") {
@@ -160,7 +167,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&approvalPlanResp); err != nil {
 		t.Fatalf("decode remote install approval plan: %v", err)
 	}
-	if !approvalPlanResp.Plan.ApprovalGatePlanReady || approvalPlanResp.Plan.ApprovalGateReady || !approvalPlanResp.Plan.RequiresApproval || approvalPlanResp.Plan.WritesApprovalQueue || approvalPlanResp.Plan.Downloads || approvalPlanResp.Plan.WritesFiles || approvalPlanResp.Plan.NetworkAccess || approvalPlanResp.Plan.InstallsPlugin {
+	if !approvalPlanResp.Plan.ApprovalGatePlanReady || approvalPlanResp.Plan.ApprovalGateReady || !approvalPlanResp.Plan.RequiresApproval || !approvalPlanResp.Plan.ApprovalQueuePlanReady || approvalPlanResp.Plan.ApprovalQueueReady || approvalPlanResp.Plan.WritesApprovalQueue || approvalPlanResp.Plan.Downloads || approvalPlanResp.Plan.WritesFiles || approvalPlanResp.Plan.NetworkAccess || approvalPlanResp.Plan.InstallsPlugin {
 		t.Fatalf("remote approval plan should be plan-only and non-destructive: %#v", approvalPlanResp.Plan)
 	}
 	if approvalPlanResp.Plan.Decision != "requires_approval" || approvalPlanResp.Plan.RiskTier != "critical" || approvalPlanResp.Plan.RequestedBy != "operator" || len(approvalPlanResp.Plan.Approvers) != 2 {
@@ -168,6 +175,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !approvalPlanResp.Plan.SignatureVerification.SignatureVerificationPlanReady || approvalPlanResp.Plan.SignatureVerification.VerificationGateReady || approvalPlanResp.Plan.SignatureVerification.AllowsInstall {
 		t.Fatalf("remote approval plan should embed the same signature verification gate preview: %#v", approvalPlanResp.Plan.SignatureVerification)
+	}
+	if !approvalPlanResp.Plan.ApprovalQueueEntry.ApprovalQueuePlanReady || approvalPlanResp.Plan.ApprovalQueueEntry.ApprovalQueueReady || approvalPlanResp.Plan.ApprovalQueueEntry.WritesApprovalQueue || approvalPlanResp.Plan.ApprovalQueueEntry.RequestID == "" || approvalPlanResp.Plan.ApprovalQueueEntry.RequestKey == "" || approvalPlanResp.Plan.ApprovalQueueEntry.Artifact != "approval-queue-entry.json" {
+		t.Fatalf("remote approval plan should include deterministic approval queue entry preview: %#v", approvalPlanResp.Plan.ApprovalQueueEntry)
 	}
 
 	w = httptest.NewRecorder()
@@ -270,8 +280,39 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if !containsString(evidenceResp.Files, "signature-verification.json") || !evidenceResp.SignatureVerification.SignatureVerificationPlanReady || evidenceResp.SignatureVerification.SignatureVerifyReady || evidenceResp.SignatureVerification.AllowsInstall {
 		t.Fatalf("evidence should include signature verification gate preview: files=%#v gate=%#v", evidenceResp.Files, evidenceResp.SignatureVerification)
 	}
-	if !evidenceResp.ApprovalGatePlan.ApprovalGatePlanReady || evidenceResp.ApprovalGatePlan.ApprovalGateReady || !evidenceResp.ApprovalGatePlan.RequiresApproval {
+	if !evidenceResp.ApprovalGatePlan.ApprovalGatePlanReady || evidenceResp.ApprovalGatePlan.ApprovalGateReady || !evidenceResp.ApprovalGatePlan.RequiresApproval || !evidenceResp.ApprovalGatePlan.ApprovalQueuePlanReady {
 		t.Fatalf("evidence should include approval gate plan preview: %#v", evidenceResp.ApprovalGatePlan)
+	}
+}
+
+func TestWASMPluginRemoteInstallApprovalQueueEntryPlan(t *testing.T) {
+	now := time.Date(2026, 5, 15, 14, 0, 0, 0, time.UTC)
+	h := New(Config{PluginDir: t.TempDir(), DataDir: t.TempDir(), Sandbox: &fakeWasmExecutor{}, Now: func() time.Time { return now }})
+	body := `{"slug":"queued-calc","name":"Queued Calculator","version":"1.0.0","package_url":"https://packs.yunque.local/wasm/queued-calc-1.0.0.tgz","manifest_url":"https://packs.yunque.local/wasm/queued-calc.json","module_path":"queued-calc.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"ed25519:preview","signature_algorithm":"ed25519","public_key_id":"yunque-root-2026","trust_root":"yunque-root-bundle-2026","requested_by":"operator","reason":"queue preview","risk_tier":"critical","approvers":["security","platform"],"metadata":{"ticket":"WASM-Q-1"}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(body))
+	h.RemoteInstallApprovalPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_entry") || !strings.Contains(w.Body.String(), "approval-queue-entry.json") {
+		t.Fatalf("remote approval queue plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Plan RemoteInstallApprovalPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode remote approval queue plan: %v", err)
+	}
+	entry := resp.Plan.ApprovalQueueEntry
+	if !resp.Plan.ApprovalQueuePlanReady || !entry.ApprovalQueuePlanReady || entry.ApprovalQueueReady || entry.WritesApprovalQueue {
+		t.Fatalf("approval queue entry should be plan-only and not persisted: plan=%#v entry=%#v", resp.Plan, entry)
+	}
+	if entry.Status != "blocked_until_approval_queue" || entry.QueueName != "wasm_remote_install" || entry.RequestID == "" || entry.RequestKey == "" || entry.Decision != "requires_approval" || len(entry.DecisionStates) != 4 {
+		t.Fatalf("approval queue entry should expose deterministic routing fields: %#v", entry)
+	}
+	if entry.RiskTier != "critical" || entry.RequestedBy != "operator" || entry.Reason != "queue preview" || len(entry.Approvers) != 2 || entry.Metadata["ticket"] != "WASM-Q-1" {
+		t.Fatalf("approval queue entry should preserve approval metadata: %#v", entry)
+	}
+	if entry.Downloads || entry.WritesFiles || entry.NetworkAccess || entry.InstallsPlugin || entry.Artifact != "approval-queue-entry.json" {
+		t.Fatalf("approval queue entry should be non-destructive: %#v", entry)
 	}
 }
 

@@ -134,6 +134,7 @@ describe("wasm-plugin-pack-client", () => {
     approval_gate_plan_ready: true,
     approval_gate_ready: false,
     requires_approval: true,
+    approval_queue_plan_ready: true,
     approval_queue_ready: false,
     writes_approval_queue: false,
     writes_files: false,
@@ -147,10 +148,41 @@ describe("wasm-plugin-pack-client", () => {
     plugin: remoteInstallPlan.plugin,
     package: remoteInstallPlan.package,
     signature_verification: remoteInstallPlan.signature_verification,
+    approval_queue_entry: {
+      pack_id: "yunque.pack.wasm-plugin",
+      generated_at: "now",
+      approval_queue_plan_ready: true,
+      approval_queue_ready: false,
+      writes_approval_queue: false,
+      requires_approval: true,
+      status: "blocked_until_approval_queue",
+      queue_name: "wasm_remote_install",
+      request_id: "wasm-remote-install-preview",
+      request_key: "request-key",
+      decision: "requires_approval",
+      decision_states: ["pending", "approved", "denied", "expired"],
+      risk_tier: "high",
+      requested_by: "operator",
+      reason: "preview approval gate",
+      approvers: ["security"],
+      required_fields: ["request_id", "decision"],
+      plugin: remoteInstallPlan.plugin,
+      package: remoteInstallPlan.package,
+      signature_gate_status: "blocked_until_signature_verifier",
+      canonical_payload_sha256: "payload-digest",
+      artifact: "approval-queue-entry.json",
+      downloads: false,
+      writes_files: false,
+      network_access: false,
+      installs_plugin: false,
+      checks: [],
+      labels: ["approval-queue", "plan-only", "no-queue-write"],
+    },
     checks: [],
     approvers: ["security"],
     artifacts: [
       "approval-gate-plan.json",
+      "approval-queue-entry.json",
       "remote-install-plan.json",
       "signature-verification.json",
     ],
@@ -179,6 +211,8 @@ describe("wasm-plugin-pack-client", () => {
             signature_verify_ready: false,
             approval_gate_plan_ready: true,
             approval_gate_ready: false,
+            approval_queue_plan_ready: true,
+            approval_queue_ready: false,
             plugin_count: 1,
             loaded_count: 0,
             capabilities: [
@@ -187,6 +221,7 @@ describe("wasm-plugin-pack-client", () => {
               "wasm.module.integrity_gate",
               "wasm.remote_install.plan",
               "wasm.remote_install.signature_verification_plan",
+              "wasm.remote_install.approval_queue_plan",
               "wasm.remote_install.approval_plan",
             ],
           }),
@@ -261,12 +296,17 @@ describe("wasm-plugin-pack-client", () => {
     expect(status.signature_verify_ready).toBe(false);
     expect(status.approval_gate_plan_ready).toBe(true);
     expect(status.approval_gate_ready).toBe(false);
+    expect(status.approval_queue_plan_ready).toBe(true);
+    expect(status.approval_queue_ready).toBe(false);
     expect(status.capabilities).toContain("wasm.host_abi.plan");
     expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
     expect(status.capabilities).toContain("wasm.module.integrity_gate");
     expect(status.capabilities).toContain("wasm.remote_install.plan");
     expect(status.capabilities).toContain(
       "wasm.remote_install.signature_verification_plan",
+    );
+    expect(status.capabilities).toContain(
+      "wasm.remote_install.approval_queue_plan",
     );
     expect(status.capabilities).toContain("wasm.remote_install.approval_plan");
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
@@ -393,10 +433,17 @@ describe("wasm-plugin-pack-client", () => {
     expect(gatePlan.plan.approval_gate_plan_ready).toBe(true);
     expect(gatePlan.plan.approval_gate_ready).toBe(false);
     expect(gatePlan.plan.requires_approval).toBe(true);
+    expect(gatePlan.plan.approval_queue_plan_ready).toBe(true);
     expect(gatePlan.plan.writes_approval_queue).toBe(false);
     expect(
       gatePlan.plan.signature_verification.signature_verification_plan_ready,
     ).toBe(true);
+    expect(gatePlan.plan.approval_queue_entry.approval_queue_plan_ready).toBe(
+      true,
+    );
+    expect(gatePlan.plan.approval_queue_entry.writes_approval_queue).toBe(
+      false,
+    );
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/plugins");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(
@@ -463,6 +510,7 @@ describe("wasm-plugin-pack-client", () => {
               "module-integrity-gate.json",
               "remote-install-plan.json",
               "signature-verification.json",
+              "approval-queue-entry.json",
               "approval-gate-plan.json",
             ],
             plugin: { slug: "calculator" },
@@ -494,6 +542,10 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.signature_verification.signature_verify_ready).toBe(false);
     expect(evidence.signature_verification.allows_install).toBe(false);
     expect(evidence.approval_gate_plan.requires_approval).toBe(true);
+    expect(evidence.approval_gate_plan.approval_queue_plan_ready).toBe(true);
+    expect(evidence.approval_gate_plan.approval_queue_entry.artifact).toBe(
+      "approval-queue-entry.json",
+    );
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");
   });
 });

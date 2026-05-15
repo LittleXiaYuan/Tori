@@ -77,8 +77,12 @@ for (const token of [
   "WASMPluginSignatureVerificationPlan",
   "wasm.remote_install.signature_verification_plan",
   "approval_gate_plan_ready",
+  "approval_queue_plan_ready",
+  "approval_queue_entry",
+  "WASMPluginApprovalQueueEntryPlan",
   "remote-install-plan.json",
   "approval-gate-plan.json",
+  "approval-queue-entry.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",
@@ -97,12 +101,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createWASMPluginPackClient") || page.includes('from "@/lib/api"') || page.includes("api.wasm")) {
   fail("WASM Plugin pack page must use wasm-plugin-pack-client instead of monolithic api.ts");
 }
-for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "Host ABI execution gate", "module integrity gate", "module_integrity_gate_ready", "integrity_gate_ready", "sha256_blocked", "execution_gate_ready", "allows_execution", "blocked", "远程签名包安装计划", "远程安装审批 Gate 计划", "remote_install_plan_ready", "remote_install_ready", "approval_gate_plan_ready", "approval_gate_ready", "download_ready", "signature_verify_ready", "signature_verification_plan_ready", "signature_verification", "verifier_gate_ready", "allows_install", "remote-install-plan.json", "approval-gate-plan.json", "signature-verification.json", "enforcement_ready", "writes_files", "pack-shell"]) {
+for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "Host ABI execution gate", "module integrity gate", "module_integrity_gate_ready", "integrity_gate_ready", "sha256_blocked", "execution_gate_ready", "allows_execution", "blocked", "远程签名包安装计划", "远程安装审批 Gate 计划", "remote_install_plan_ready", "remote_install_ready", "approval_gate_plan_ready", "approval_gate_ready", "approval_queue_plan_ready", "approval_queue_ready", "queue_status", "blocked_until_approval_queue", "download_ready", "signature_verify_ready", "signature_verification_plan_ready", "signature_verification", "verifier_gate_ready", "allows_install", "remote-install-plan.json", "approval-gate-plan.json", "approval-queue-entry.json", "signature-verification.json", "enforcement_ready", "writes_files", "pack-shell"]) {
   if (!page.includes(token)) fail(`WASM Plugin pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json"]) {
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json"]) {
   if (!frontendTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
 
@@ -123,6 +127,10 @@ for (const token of [
   "SignatureVerificationPlan",
   "wasm.remote_install.signature_verification_plan",
   "approval_gate_plan_ready",
+  "approval_queue_plan_ready",
+  "approval_queue_entry",
+  "ApprovalQueueEntryPlan",
+  "blocked_until_approval_queue",
   "wasm.remote_install.plan",
   "wasm.remote_install.approval_plan",
   "host_abi_plan",
@@ -205,8 +213,12 @@ for (const token of [
   "WASMPluginSignatureVerificationPlan",
   "wasm.remote_install.signature_verification_plan",
   "approval_gate_plan_ready",
+  "approval_queue_plan_ready",
+  "approval_queue_entry",
+  "WASMPluginApprovalQueueEntryPlan",
   "remote-install-plan.json",
   "approval-gate-plan.json",
+  "approval-queue-entry.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",

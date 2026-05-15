@@ -94,7 +94,7 @@ func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "requires_approval") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "approval-queue-entry.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "requires_approval") {
 		t.Fatalf("remote install approval plan status=%d body=%s", w.Code, w.Body.String())
 	}
 }
