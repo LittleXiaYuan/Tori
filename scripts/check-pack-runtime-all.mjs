@@ -46,10 +46,11 @@ const checks = [
       "./internal/packs/cognikernel",
       "./internal/packs/browserintent",
       "./internal/packs/rpareplay",
+      "./internal/packs/sbomdrift",
       "./internal/controlplane/gateway",
       "./cmd/agent",
       "-run",
-      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|RPAReplay|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
+      "Test(PackRoutes|BackupRoutes|LoRAPackRoutes|LoRAPack|CogniKernel|CogniExperience|BrowserIntent|RPAReplay|SBOMDrift|BackendPack|RegisterBackendPack|Manifest|Registry|EnsureBuiltinPacks)|^$",
       "-count=1",
     ],
   },
@@ -101,6 +102,12 @@ const checks = [
     cwd: "heroui-web",
   },
   {
+    name: "Frontend SBOM Drift pack client tests",
+    command: process.execPath,
+    args: [npmCli, "run", "test", "--", "src/lib/__tests__/sbom-drift-pack-client.test.ts"],
+    cwd: "heroui-web",
+  },
+  {
     name: "Frontend shell pack entry tests",
     command: process.execPath,
     args: [npmCli, "run", "test", "--", "src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx"],
@@ -127,7 +134,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs", "rpa-replay"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "rpa-replay", "sbom-drift"],
     cwd: "sdk/typescript",
   },
   {
