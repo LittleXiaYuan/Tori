@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeCognitiveCanaryGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -61,6 +61,17 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeG
 	}
 	if chaosProbe.Manifest.SDK.TypeScript != "yunque-client/chaos-probe" {
 		t.Fatalf("unexpected Chaos Probe SDK import: %s", chaosProbe.Manifest.SDK.TypeScript)
+	}
+
+	cognitiveCanary, ok := registry.Get("yunque.pack.cognitive-canary")
+	if !ok {
+		t.Fatal("expected Cognitive Canary builtin pack to be installed")
+	}
+	if cognitiveCanary.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Cognitive Canary default disabled, got %s", cognitiveCanary.Status)
+	}
+	if cognitiveCanary.Manifest.SDK.TypeScript != "yunque-client/cognitive-canary" {
+		t.Fatalf("unexpected Cognitive Canary SDK import: %s", cognitiveCanary.Manifest.SDK.TypeScript)
 	}
 
 	guardrailFuzzer, ok := registry.Get("yunque.pack.guardrail-fuzzer")
@@ -119,7 +130,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeG
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 10 {
+	if got := len(registry.List()); got != 11 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

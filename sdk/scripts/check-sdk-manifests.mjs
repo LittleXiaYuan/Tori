@@ -49,6 +49,7 @@ const checks = [
   ["Cogni Kernel Pack SDK manifest", "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"],
   ["Browser Intent Pack SDK manifest", "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"],
   ["Chaos Probe Pack SDK manifest", "sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs"],
+  ["Cognitive Canary Pack SDK manifest", "sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs"],
   ["Guardrail Fuzzer Pack SDK manifest", "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"],
   ["RPA Replay Pack SDK manifest", "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"],
   ["SBOM Drift Pack SDK manifest", "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"],

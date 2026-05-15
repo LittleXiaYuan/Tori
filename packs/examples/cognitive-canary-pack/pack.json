@@ -1,0 +1,112 @@
+{
+  "id": "yunque.pack.cognitive-canary",
+  "name": "Cognitive Canary Pack",
+  "version": "0.1.0",
+  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策和证据包导出作为可选能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "cognitive_canary.status",
+      "cognitive_canary.scenarios.list",
+      "cognitive_canary.scenarios.save",
+      "cognitive_canary.evaluate",
+      "cognitive_canary.report.list",
+      "cognitive_canary.report.detail",
+      "cognitive_canary.evidence.export"
+    ],
+    "routes": [
+      "/v1/cognitive-canary/status",
+      "/v1/cognitive-canary/scenarios",
+      "/v1/cognitive-canary/evaluate",
+      "/v1/cognitive-canary/reports",
+      "/v1/cognitive-canary/reports/",
+      "/v1/cognitive-canary/evidence/"
+    ],
+    "permissions": [
+      "cognitive_canary:read",
+      "cognitive_canary:write",
+      "cognitive_canary:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/cognitive-canary/status",
+        "description": "Read Cognitive Canary pack shell status, readiness flags and latest SLI summary."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognitive-canary/scenarios",
+        "description": "List deterministic local canary scenario definitions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognitive-canary/scenarios",
+        "description": "Save or merge canary scenario definitions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognitive-canary/evaluate",
+        "description": "Evaluate selected stable/canary shadow pairs and generate a cognitive quality report."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognitive-canary/reports",
+        "description": "List saved Cognitive Canary reports."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognitive-canary/reports/",
+        "description": "Read one saved Cognitive Canary report by id."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognitive-canary/evidence/",
+        "description": "Export a JSON evidence pack for one Cognitive Canary report."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "cognitive-canary",
+        "label": "Cognitive Canary",
+        "path": "/packs/cognitive-canary",
+        "icon": "activity",
+        "order": 97
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/cognitive-canary",
+        "component": "ops/CognitiveCanaryPackPage",
+        "title": "Cognitive Canary"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "ops/CognitiveCanaryPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/cognitive-canary"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/COGNITIVE-CANARY.md",
+    "stage": "pack-shell-before-shadow-traffic",
+    "risk": "cognitive-governance",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/cognitive-canary-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/cognitive-canary-pack/cognitive-canary-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/cognitive-canary-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}

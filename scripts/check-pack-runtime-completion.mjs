@@ -51,6 +51,7 @@ const gateway = [
   "internal/controlplane/gateway/handlers_browser_pack.go",
   "internal/controlplane/gateway/handlers_browser_pack_test.go",
   "internal/controlplane/gateway/handlers_chaos_probe_pack_test.go",
+  "internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go",
   "internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go",
   "internal/controlplane/gateway/handlers_rpa_replay_pack_test.go",
   "internal/controlplane/gateway/handlers_sbom_drift_pack_test.go",
@@ -69,6 +70,8 @@ const browserIntentPack = read("internal/packs/browserintent/handler.go");
 const browserIntentManifest = read("packs/examples/browser-intent-pack/pack.json");
 const chaosProbePack = read("internal/packs/chaosprobe/handler.go");
 const chaosProbeManifest = read("packs/examples/chaos-probe-pack/pack.json");
+const cognitiveCanaryPack = read("internal/packs/cognitivecanary/handler.go");
+const cognitiveCanaryManifest = read("packs/examples/cognitive-canary-pack/pack.json");
 const guardrailFuzzerPack = read("internal/packs/guardrailfuzzer/handler.go");
 const guardrailFuzzerManifest = read("packs/examples/guardrail-fuzzer-pack/pack.json");
 const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
@@ -104,6 +107,9 @@ const frontend = [
   "heroui-web/src/app/packs/chaos-probe/page.tsx",
   "heroui-web/src/lib/chaos-probe-pack-client.ts",
   "heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
+  "heroui-web/src/app/packs/cognitive-canary/page.tsx",
+  "heroui-web/src/lib/cognitive-canary-pack-client.ts",
+  "heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts",
   "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx",
   "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
   "heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts",
@@ -132,6 +138,7 @@ const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
 const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
 const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
 const chaosProbePackPage = read("heroui-web/src/app/packs/chaos-probe/page.tsx");
+const cognitiveCanaryPackPage = read("heroui-web/src/app/packs/cognitive-canary/page.tsx");
 const guardrailFuzzerPackPage = read("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
 const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
 const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
@@ -150,11 +157,14 @@ const sdk = [
   "sdk/manifest/cogni-kernel-pack-sdk.json",
   "sdk/manifest/browser-intent-pack-sdk.json",
   "sdk/manifest/chaos-probe-pack-sdk.json",
+  "sdk/manifest/cognitive-canary-pack-sdk.json",
   "sdk/manifest/guardrail-fuzzer-pack-sdk.json",
   "sdk/manifest/rpa-replay-pack-sdk.json",
   "sdk/manifest/sbom-drift-pack-sdk.json",
   "sdk/manifest/skill-anomaly-pack-sdk.json",
   "sdk/manifest/wasm-plugin-pack-sdk.json",
+  "sdk/typescript/src/cognitive-canary.ts",
+  "sdk/typescript/src/cognitive-canary.test.ts",
   "sdk/typescript/src/guardrail-fuzzer.ts",
   "sdk/typescript/src/guardrail-fuzzer.test.ts",
   "sdk/typescript/src/rpa-replay.ts",
@@ -172,6 +182,7 @@ const sdk = [
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
   "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs",
   "sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs",
+  "sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs",
   "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs",
   "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs",
   "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs",
@@ -224,6 +235,7 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "packs/examples/cogni-kernel-pack/pack.json",
   "packs/examples/browser-intent-pack/pack.json",
   "packs/examples/chaos-probe-pack/pack.json",
+  "packs/examples/cognitive-canary-pack/pack.json",
   "packs/examples/guardrail-fuzzer-pack/pack.json",
   "packs/examples/rpa-replay-pack/pack.json",
   "packs/examples/sbom-drift-pack/pack.json",
@@ -340,6 +352,33 @@ requireTokens("chaos-probe 蓝图能力包", chaosProbePack + chaosProbeManifest
   "TestChaosProbePackGateReturnsNotFoundWhenDisabled",
   "/packs/chaos-probe",
   "pack-shell-before-scheduler",
+  "distribution",
+  "rollback",
+]);
+
+requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiveCanaryManifest + frontend + gateway + sdk + docs, [
+  'const PackID = "yunque.pack.cognitive-canary"',
+  "func (h *Handler) Routes() []packruntime.BackendRoute",
+  "/v1/cognitive-canary/status",
+  "/v1/cognitive-canary/scenarios",
+  "/v1/cognitive-canary/evaluate",
+  "/v1/cognitive-canary/reports",
+  "/v1/cognitive-canary/evidence/",
+  "shadow_traffic_ready",
+  "judge_pipeline_ready",
+  "quality_sli_ready",
+  "auto_rollback_ready",
+  "cfg.DataPath(\"cognitive-canary\")",
+  "json-cognitive-canary-evidence",
+  "http.MethodPost",
+  "yunque-client/cognitive-canary",
+  "Cognitive Canary Pack",
+  "createCognitiveCanaryPackClient",
+  "createCognitiveCanaryClient",
+  "cognitive-canary-pack-client",
+  "TestCognitiveCanaryPackGateReturnsNotFoundWhenDisabled",
+  "/packs/cognitive-canary",
+  "pack-shell-before-shadow-traffic",
   "distribution",
   "rollback",
 ]);
@@ -490,6 +529,7 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "Frontend Cogni Kernel pack client tests",
   "Frontend Browser Intent pack client tests",
   "Frontend Chaos Probe pack client tests",
+  "Frontend Cognitive Canary pack client tests",
   "Frontend Guardrail Fuzzer pack client tests",
   "Frontend RPA Replay pack client tests",
   "Frontend SBOM Drift pack client tests",
@@ -583,6 +623,12 @@ if (chaosProbePackPage.includes("api.chaosProbe") || chaosProbePackPage.includes
   fail("前端同步菜单/路由/资源/控制台", "Chaos Probe pack page must use chaos-probe-pack-client instead of the monolithic api object");
 } else {
   ok("前端 Chaos Probe pack 客户端拆分", "Chaos Probe page uses chaos-probe-pack-client instead of monolithic api chaos probe methods");
+}
+
+if (cognitiveCanaryPackPage.includes("api.cognitiveCanary") || cognitiveCanaryPackPage.includes('from "@/lib/api"') || !cognitiveCanaryPackPage.includes("createCognitiveCanaryPackClient")) {
+  fail("前端同步菜单/路由/资源/控制台", "Cognitive Canary pack page must use cognitive-canary-pack-client instead of the monolithic api object");
+} else {
+  ok("前端 Cognitive Canary pack 客户端拆分", "Cognitive Canary page uses cognitive-canary-pack-client instead of monolithic api cognitive canary methods");
 }
 
 if (guardrailFuzzerPackPage.includes("api.guardrailFuzzer") || guardrailFuzzerPackPage.includes('from "@/lib/api"') || !guardrailFuzzerPackPage.includes("createGuardrailFuzzerPackClient")) {
@@ -682,6 +728,9 @@ const forbiddenMonolithicPackMethods = [
   "chaosProbeStatus:",
   "chaosProbeRun:",
   "chaosProbeEvidence:",
+  "cognitiveCanaryStatus:",
+  "cognitiveCanaryEvaluate:",
+  "cognitiveCanaryEvidence:",
   "guardrailFuzzerStatus:",
   "guardrailFuzzerRun:",
   "guardrailFuzzerEvidence:",
@@ -706,7 +755,7 @@ const leakedMonolithicMethods = forbiddenMonolithicPackMethods.filter((token) =>
 if (leakedMonolithicMethods.length > 0) {
   fail("前端轻内核 API 拆分", `monolithic api.ts still exposes pack methods: ${leakedMonolithicMethods.join(", ")}`);
 } else {
-  ok("前端轻内核 API 拆分", "backup/pack/browser/chaos-probe/guardrail-fuzzer/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
+  ok("前端轻内核 API 拆分", "backup/pack/browser/chaos-probe/cognitive-canary/guardrail-fuzzer/rpa/sbom/skill-anomaly/wasm methods live in lightweight clients instead of monolithic api.ts");
 }
 
 if (cherrySettings.includes("createBackupPackClient") || cherrySettings.includes("backupPack.export") || cherrySettings.includes("api.backup")) {
@@ -735,6 +784,8 @@ requireTokens("TypeScript packs SDK", sdk, [
   "PackPruneResponse",
   "createChaosProbeClient",
   "ChaosProbeClientError",
+  "createCognitiveCanaryClient",
+  "CognitiveCanaryClientError",
   "createGuardrailFuzzerClient",
   "GuardrailFuzzerClientError",
   "createRPAReplayClient",
@@ -774,6 +825,7 @@ runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pac
 runCheck("cogni kernel pack sdk checker", process.execPath, ["sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"]);
 runCheck("browser intent pack sdk checker", process.execPath, ["sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"]);
 runCheck("chaos probe pack sdk checker", process.execPath, ["sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs"]);
+runCheck("cognitive canary pack sdk checker", process.execPath, ["sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs"]);
 runCheck("guardrail fuzzer pack sdk checker", process.execPath, ["sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"]);
 runCheck("rpa replay pack sdk checker", process.execPath, ["sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"]);
 runCheck("sbom drift pack sdk checker", process.execPath, ["sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"]);
