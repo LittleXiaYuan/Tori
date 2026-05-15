@@ -48,7 +48,7 @@ test("CognitiveCanaryClient reads status and scenarios with bearer token", async
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.cognitive-canary", stage: "pack-shell-before-shadow-traffic", shadow_plan_ready: true, shadow_traffic_ready: false, judge_plan_ready: true, judge_pipeline_ready: false, metrics_plan_ready: true, prometheus_ready: false, quality_sli_ready: true, auto_rollback_plan_ready: true, auto_rollback_ready: false, scenario_count: 1, report_count: 0, policy: {}, capabilities: [] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.cognitive-canary", stage: "pack-shell-before-shadow-traffic", shadow_plan_ready: true, shadow_traffic_ready: false, judge_plan_ready: true, judge_pipeline_ready: false, response_collector_plan_ready: true, response_collector_ready: false, metrics_plan_ready: true, prometheus_ready: false, quality_sli_ready: true, auto_rollback_plan_ready: true, auto_rollback_ready: false, scenario_count: 1, report_count: 0, policy: {}, capabilities: ["canary.response_collector.plan"] });
       return jsonResponse({ scenarios: [scenario], count: 1 });
     },
   });
@@ -72,7 +72,7 @@ test("CognitiveCanaryClient saves scenarios, evaluates canaries, plans shadow tr
       calls.push({ url: String(url), init });
       if (String(url).endsWith("/scenarios") && init?.method === "POST") return jsonResponse({ scenarios: [], count: 0, status: "saved" }, { status: 201 });
       if (String(url).endsWith("/evaluate")) return jsonResponse({ report: { id: "canary-1", pack_id: "yunque.pack.cognitive-canary", created_at: "now", stage: "pack-shell-before-shadow-traffic", scenario_count: 1, safety_failure_count: 0, error_count: 0, quality_score: 4.2, safety_pass_rate: 100, delta_score: 0.1, latency_p99_ratio: 1.1, canary_error_rate: 0, gate_status: "pass", promotion_decision: "promote", results: [] }, status: "dry_run" });
-      if (String(url).endsWith("/shadow/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.cognitive-canary", generated_at: "now", status: "shadow_plan", report_id: "canary-1", candidate_version: "1.1.0-rc1", stable_version: "1.0.0", traffic_percent: 5, sample_percent: 5, shadow_plan_ready: true, shadow_traffic_ready: false, judge_plan_ready: true, judge_pipeline_ready: false, metrics_plan_ready: true, prometheus_ready: false, auto_rollback_plan_ready: true, auto_rollback_ready: false, quality_score: 4.2, safety_pass_rate: 100, delta_score: 0.1, latency_p99_ratio: 1.1, canary_error_rate: 0, gate_status: "pass", promotion_decision: "promote", shadow_pairs: [], judge_batches: [], metrics: [], rollback_actions: [], actions: [] } });
+      if (String(url).endsWith("/shadow/plan")) return jsonResponse({ plan: { pack_id: "yunque.pack.cognitive-canary", generated_at: "now", status: "shadow_plan", report_id: "canary-1", candidate_version: "1.1.0-rc1", stable_version: "1.0.0", traffic_percent: 5, sample_percent: 5, shadow_plan_ready: true, shadow_traffic_ready: false, judge_plan_ready: true, judge_pipeline_ready: false, response_collector_plan_ready: true, response_collector_ready: false, metrics_plan_ready: true, prometheus_ready: false, auto_rollback_plan_ready: true, auto_rollback_ready: false, quality_score: 4.2, safety_pass_rate: 100, delta_score: 0.1, latency_p99_ratio: 1.1, canary_error_rate: 0, gate_status: "pass", promotion_decision: "promote", shadow_pairs: [], response_collectors: [{ pair_id: "runtime-quality-check-abc", scenario_id: "runtime-quality-check", category: "planner", stable_version: "1.0.0", candidate_version: "1.1.0-rc1", sample_percent: 5, collector_route: "/v1/cognitive-canary/shadow/collect", artifact: "response-collector/runtime-quality-check-abc.json", artifact_sha256: "a".repeat(64), artifact_bytes: 128, writes_files: false, ready: false, labels: { pack_id: "yunque.pack.cognitive-canary" } }], response_collector_summary: { collector_count: 1, artifact_count: 1, writes_files: false, deterministic: true, hash_algorithm: "sha256", ready: false }, judge_batches: [], metrics: [], rollback_actions: [], actions: [] } });
       return jsonResponse({ report: { id: "canary-1", results: [] } });
     },
   });
@@ -86,6 +86,9 @@ test("CognitiveCanaryClient saves scenarios, evaluates canaries, plans shadow tr
   assertEqual(run.report.gate_status, "pass");
   assertEqual(plan.plan.shadow_plan_ready, true);
   assertEqual(plan.plan.shadow_traffic_ready, false);
+  assertEqual(plan.plan.response_collector_plan_ready, true);
+  assertEqual(plan.plan.response_collector_summary.writes_files, false);
+  assertEqual(plan.plan.response_collectors[0]?.artifact_sha256.length, 64);
   assertEqual(report.report.id, "canary-1");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/cognitive-canary/scenarios");
   assertEqual(calls[0]?.init?.method, "POST");
@@ -105,7 +108,7 @@ test("CognitiveCanaryClient lists reports and exports evidence packs", async () 
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
       if (String(url).endsWith("/reports")) return jsonResponse({ reports: [{ id: "canary-1", created_at: "now", scenario_count: 1, safety_failure_count: 0, error_count: 0, quality_score: 4.2, safety_pass_rate: 100, delta_score: 0.1, latency_p99_ratio: 1.1, canary_error_rate: 0, gate_status: "pass", promotion_decision: "promote" }], count: 1 });
-      return jsonResponse({ pack_id: "yunque.pack.cognitive-canary", exported_at: "now", format: "json-cognitive-canary-evidence", files: ["canary-report.json", "shadow-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"], report: { id: "canary-1", results: [] }, shadow_plan: { shadow_plan_ready: true, shadow_traffic_ready: false } });
+      return jsonResponse({ pack_id: "yunque.pack.cognitive-canary", exported_at: "now", format: "json-cognitive-canary-evidence", files: ["canary-report.json", "shadow-plan.json", "response-collector-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"], report: { id: "canary-1", results: [] }, shadow_plan: { shadow_plan_ready: true, shadow_traffic_ready: false, response_collector_plan_ready: true, response_collector_ready: false, response_collectors: [], response_collector_summary: { writes_files: false, hash_algorithm: "sha256" } } });
     },
   });
 
@@ -114,7 +117,8 @@ test("CognitiveCanaryClient lists reports and exports evidence packs", async () 
 
   assertEqual(reports.count, 1);
   assertEqual(evidence.format, "json-cognitive-canary-evidence");
-  assertDeepEqual(evidence.files, ["canary-report.json", "shadow-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"]);
+  assertDeepEqual(evidence.files, ["canary-report.json", "shadow-plan.json", "response-collector-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"]);
+  assertEqual(evidence.shadow_plan?.response_collector_summary.writes_files, false);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/cognitive-canary/reports");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/cognitive-canary/evidence/canary-1");
 });

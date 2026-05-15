@@ -27,6 +27,7 @@ if (pack.update?.rollback !== true) fail("Cognitive Canary pack must be rollback
 if (pack.defaultState !== "disabled") fail("Cognitive Canary pack should stay default disabled until shadow traffic and automatic rollback are wired");
 if (pack.metadata?.stage !== "pack-shell-before-shadow-traffic") fail("Cognitive Canary pack should declare pack-shell-before-shadow-traffic stage");
 if (pack.metadata?.blueprint !== "doc/COGNITIVE-CANARY.md") fail("Cognitive Canary pack should point to doc/COGNITIVE-CANARY.md");
+if (!(pack.backend?.capabilities ?? []).includes("cognitive_canary.response_collector.plan")) fail("Cognitive Canary pack should expose response collector plan capability");
 
 const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
 for (const route of manifest.routes ?? []) {
@@ -44,6 +45,11 @@ for (const token of [
   "/v1/cognitive-canary/evidence/",
   "shadowPlan",
   "shadow_plan_ready",
+  "response_collector_plan_ready",
+  "response_collector_summary",
+  "response_collectors",
+  "artifact_sha256",
+  "writes_files",
   "judge_plan_ready",
   "metrics_plan_ready",
   "prometheus_ready",
@@ -57,12 +63,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createCognitiveCanaryPackClient") || page.includes('from "@/lib/api"') || page.includes("api.cognitiveCanary")) {
   fail("Cognitive Canary pack page must use cognitive-canary-pack-client instead of monolithic api.ts");
 }
-for (const token of ["Cognitive Canary", "保存 Scenarios", "运行评估", "导出证据包", "Plan shell", "Shadow 计划"]) {
+for (const token of ["Cognitive Canary", "保存 Scenarios", "运行评估", "导出证据包", "Plan shell", "Shadow 计划", "response collector", "writes_files"]) {
   if (!page.includes(token)) fail(`Cognitive Canary pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
-for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/canary-1"]) {
+for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/canary-1", "response_collector_summary", "artifact_sha256", "response-collector-plan.json"]) {
   if (!frontendTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
 }
 
@@ -77,6 +83,13 @@ for (const token of [
   "shadow_traffic_ready",
   "judge_plan_ready",
   "judge_pipeline_ready",
+  "response_collector_plan_ready",
+  "response_collector_ready",
+  "canary.response_collector.plan",
+  "response_collectors",
+  "response_collector_summary",
+  "artifact_sha256",
+  "writes_files",
   "metrics_plan_ready",
   "prometheus_ready",
   "quality_sli_ready",
@@ -88,6 +101,7 @@ for (const token of [
   "canary.rollback.plan",
   "json-cognitive-canary-evidence",
   "shadow-plan.json",
+  "response-collector-plan.json",
   "judge-plan.json",
   "metrics-plan.json",
   "rollback-plan.json",
@@ -111,6 +125,11 @@ for (const token of [
   "/v1/cognitive-canary/evidence/",
   "shadowPlan",
   "CognitiveCanaryShadowPlan",
+  "CognitiveCanaryResponseCollectorPlan",
+  "response_collector_plan_ready",
+  "response_collectors",
+  "artifact_sha256",
+  "writes_files",
   "Cognitive Canary request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript Cognitive Canary SDK slice missing token: ${token}`);

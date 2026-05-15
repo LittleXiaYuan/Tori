@@ -394,16 +394,24 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "shadow_traffic_ready",
   "judge_plan_ready",
   "judge_pipeline_ready",
+  "response_collector_plan_ready",
+  "response_collector_ready",
   "metrics_plan_ready",
   "prometheus_ready",
   "quality_sli_ready",
   "auto_rollback_plan_ready",
   "auto_rollback_ready",
   "canary.shadow.plan",
+  "canary.response_collector.plan",
   "canary.judge.plan",
   "canary.metrics.plan",
   "canary.rollback.plan",
   "shadow-plan.json",
+  "response-collector-plan.json",
+  "response_collectors",
+  "response_collector_summary",
+  "artifact_sha256",
+  "writes_files",
   "judge-plan.json",
   "metrics-plan.json",
   "rollback-plan.json",
@@ -776,6 +784,11 @@ if (cognitiveCanaryPackPage.includes("api.cognitiveCanary") || cognitiveCanaryPa
   fail("前端同步菜单/路由/资源/控制台", "Cognitive Canary pack page must use cognitive-canary-pack-client instead of the monolithic api object");
 } else {
   ok("前端 Cognitive Canary pack 客户端拆分", "Cognitive Canary page uses cognitive-canary-pack-client instead of monolithic api cognitive canary methods");
+}
+if (!cognitiveCanaryPackPage.includes("response collector") || !cognitiveCanaryPackPage.includes("writes_files")) {
+  fail("前端同步菜单/路由/资源/控制台", "Cognitive Canary pack page should preview response collector plan boundaries");
+} else {
+  ok("前端 Cognitive Canary response collector 预览", "Cognitive Canary page shows response collector plan metadata and writes_files boundary");
 }
 
 if (guardrailFuzzerPackPage.includes("api.guardrailFuzzer") || guardrailFuzzerPackPage.includes('from "@/lib/api"') || !guardrailFuzzerPackPage.includes("createGuardrailFuzzerPackClient")) {
