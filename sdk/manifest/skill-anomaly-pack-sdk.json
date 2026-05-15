@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "skill-anomaly-pack",
-  "description": "Skill Anomaly capability pack manifest binding for Pack Runtime route gates, frontend sync, behavior profiles, anomaly detection dry-runs, NeedsApproval plans, evidence export, and lightweight SDK import discovery.",
+  "description": "Skill Anomaly capability pack manifest binding for Pack Runtime route gates, frontend sync, behavior profiles, anomaly detection dry-runs, NeedsApproval plans, audit hook / Trust mutation plans, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose skill behavior profiles, anomaly scoring, NeedsApproval planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Expose skill behavior profiles, anomaly scoring, NeedsApproval planning, audit hook / Trust mutation planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
     "Keep skill anomaly method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/skill-anomaly only when the Skill Anomaly pack is installed and enabled."
   ],
@@ -16,6 +16,7 @@
     "GET /v1/skill-anomaly/profiles",
     "GET /v1/skill-anomaly/profiles/",
     "POST /v1/skill-anomaly/detect",
+    "POST /v1/skill-anomaly/audit-hook/plan",
     "GET /v1/skill-anomaly/evidence/"
   ],
   "frontend": {

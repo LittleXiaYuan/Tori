@@ -75,6 +75,14 @@ func TestSkillAnomalyPackCanObserveAndDetect(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "needs_approval") || !strings.Contains(w.Body.String(), "new_action") {
 		t.Fatalf("detect status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/skill-anomaly/audit-hook/plan", strings.NewReader(`{"skill_slug":"text_processing","action":"shell_exec","params":{"command":"whoami","exfil_url":"https://example.invalid"},"success":false,"duration_ms":500,"requested_by":"operator","reason":"review anomalous shell execution"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_plan") || !strings.Contains(w.Body.String(), "trust_mutation") || !strings.Contains(w.Body.String(), "merkle_append_ready") {
+		t.Fatalf("audit hook plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -96,6 +104,7 @@ func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackSta
 				"/v1/skill-anomaly/profiles",
 				"/v1/skill-anomaly/profiles/",
 				"/v1/skill-anomaly/detect",
+				"/v1/skill-anomaly/audit-hook/plan",
 				"/v1/skill-anomaly/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -105,6 +114,7 @@ func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackSta
 				{Method: http.MethodGet, Path: "/v1/skill-anomaly/profiles"},
 				{Method: http.MethodGet, Path: "/v1/skill-anomaly/profiles/"},
 				{Method: http.MethodPost, Path: "/v1/skill-anomaly/detect"},
+				{Method: http.MethodPost, Path: "/v1/skill-anomaly/audit-hook/plan"},
 				{Method: http.MethodGet, Path: "/v1/skill-anomaly/evidence/"},
 			},
 		},

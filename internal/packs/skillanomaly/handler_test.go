@@ -15,8 +15,8 @@ func TestSkillAnomalyHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 6 {
-		t.Fatalf("expected 6 Skill Anomaly routes, got %d", len(routes))
+	if len(routes) != 7 {
+		t.Fatalf("expected 7 Skill Anomaly routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -30,12 +30,13 @@ func TestSkillAnomalyHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/skill-anomaly/status":    {http.MethodGet},
-		"/v1/skill-anomaly/events":    {http.MethodGet, http.MethodPost},
-		"/v1/skill-anomaly/profiles":  {http.MethodGet},
-		"/v1/skill-anomaly/profiles/": {http.MethodGet},
-		"/v1/skill-anomaly/detect":    {http.MethodPost},
-		"/v1/skill-anomaly/evidence/": {http.MethodGet},
+		"/v1/skill-anomaly/status":          {http.MethodGet},
+		"/v1/skill-anomaly/events":          {http.MethodGet, http.MethodPost},
+		"/v1/skill-anomaly/profiles":        {http.MethodGet},
+		"/v1/skill-anomaly/profiles/":       {http.MethodGet},
+		"/v1/skill-anomaly/detect":          {http.MethodPost},
+		"/v1/skill-anomaly/audit-hook/plan": {http.MethodPost},
+		"/v1/skill-anomaly/evidence/":       {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -78,6 +79,25 @@ func TestSkillAnomalyObserveDetectAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/skill-anomaly/audit-hook/plan", strings.NewReader(`{"skill_slug":"text_processing","action":"shell_exec","params":{"command":"whoami","exfil_url":"https://example.invalid"},"success":false,"duration_ms":500,"requested_by":"operator","reason":"review anomalous shell execution"}`))
+	h.AuditHookPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_plan") || !strings.Contains(w.Body.String(), "trust_mutation") || !strings.Contains(w.Body.String(), "merkle_append_ready") {
+		t.Fatalf("audit hook plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var auditPlan struct {
+		Plan AuditHookPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&auditPlan); err != nil {
+		t.Fatalf("decode audit hook plan: %v", err)
+	}
+	if !auditPlan.Plan.ApprovalRequired || auditPlan.Plan.AuditHookReady || auditPlan.Plan.TrustMutationReady || auditPlan.Plan.ApprovalWritebackReady {
+		t.Fatalf("expected non-destructive approval plan boundaries, got %#v", auditPlan.Plan)
+	}
+	if auditPlan.Plan.TrustMutation.Delta >= 0 || auditPlan.Plan.ApprovalQueue.Reason != "review anomalous shell execution" {
+		t.Fatalf("unexpected trust/approval plan: %#v", auditPlan.Plan)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/skill-anomaly/profiles/text_processing", nil)
 	h.ProfileDetail(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "read_file") {
@@ -87,7 +107,7 @@ func TestSkillAnomalyObserveDetectAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/skill-anomaly/evidence/text_processing", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-skill-anomaly-evidence") || !strings.Contains(w.Body.String(), "detection-policy.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-skill-anomaly-evidence") || !strings.Contains(w.Body.String(), "detection-policy.json") || !strings.Contains(w.Body.String(), "audit-hook-plan.json") || !strings.Contains(w.Body.String(), "trust-mutation-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }

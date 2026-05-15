@@ -2,7 +2,7 @@
   "id": "yunque.pack.skill-anomaly",
   "name": "Skill Anomaly Pack",
   "version": "0.1.0",
-  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划和证据包导出作为可选治理能力包暴露。",
+  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划、audit-hook / Trust mutation 计划和证据包导出作为可选治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -14,6 +14,7 @@
       "skill_anomaly.profile.list",
       "skill_anomaly.profile.detail",
       "skill_anomaly.detect",
+      "skill_anomaly.audit_hook.plan",
       "skill_anomaly.evidence.export"
     ],
     "routes": [
@@ -22,6 +23,7 @@
       "/v1/skill-anomaly/profiles",
       "/v1/skill-anomaly/profiles/",
       "/v1/skill-anomaly/detect",
+      "/v1/skill-anomaly/audit-hook/plan",
       "/v1/skill-anomaly/evidence/"
     ],
     "permissions": [
@@ -59,6 +61,11 @@
         "method": "POST",
         "path": "/v1/skill-anomaly/detect",
         "description": "Score one candidate skill behavior event without requiring a direct audit hook."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/skill-anomaly/audit-hook/plan",
+        "description": "Build a non-destructive Merkle audit hook, Trust mutation, and Approval queue plan for one candidate skill behavior event."
       },
       {
         "method": "GET",

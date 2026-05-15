@@ -1,8 +1,9 @@
 // Package skillanomaly contains the backend implementation for the built-in
 // skill behavior anomaly capability pack. The first delivery is intentionally a
 // pack shell: it owns manifest-gated HTTP routes, behavior-profile metadata,
-// sliding-window anomaly scoring, dry-run detection, and evidence export while
-// direct audit-chain hooks and Trust/Approval mutations are wired later.
+// sliding-window anomaly scoring, dry-run detection, audit-hook/trust mutation
+// plans, and evidence export while direct audit-chain hooks and Trust/Approval
+// mutations are wired later.
 package skillanomaly
 
 import (
@@ -85,6 +86,19 @@ type DetectionRequest struct {
 	DryRun     bool           `json:"dry_run"`
 }
 
+type AuditHookPlanRequest struct {
+	SkillSlug   string         `json:"skill_slug"`
+	Actor       string         `json:"actor"`
+	Action      string         `json:"action"`
+	Params      map[string]any `json:"params"`
+	ParamKeys   []string       `json:"param_keys"`
+	Success     *bool          `json:"success"`
+	DurationMS  int64          `json:"duration_ms"`
+	Reason      string         `json:"reason"`
+	RequestedBy string         `json:"requested_by"`
+	DryRun      bool           `json:"dry_run"`
+}
+
 type Profile struct {
 	SkillSlug      string             `json:"skill_slug"`
 	WindowSize     int                `json:"window_size"`
@@ -132,6 +146,50 @@ type DetectionResult struct {
 	Notes         []string          `json:"notes,omitempty"`
 }
 
+type AuditHookRecordPlan struct {
+	EventType         string         `json:"event_type"`
+	Action            string         `json:"action"`
+	Subject           string         `json:"subject"`
+	Severity          string         `json:"severity"`
+	MerkleAppendReady bool           `json:"merkle_append_ready"`
+	Payload           map[string]any `json:"payload"`
+}
+
+type TrustMutationPlan struct {
+	TargetSkill        string `json:"target_skill"`
+	Mutation           string `json:"mutation"`
+	Delta              int    `json:"delta"`
+	RecordFailureReady bool   `json:"record_failure_ready"`
+	Reason             string `json:"reason"`
+}
+
+type ApprovalQueuePlan struct {
+	Required            bool   `json:"required"`
+	QueueWritebackReady bool   `json:"queue_writeback_ready"`
+	RequestedBy         string `json:"requested_by,omitempty"`
+	Reason              string `json:"reason,omitempty"`
+}
+
+type AuditHookPlanReport struct {
+	PackID                 string              `json:"pack_id"`
+	SkillSlug              string              `json:"skill_slug"`
+	GeneratedAt            time.Time           `json:"generated_at"`
+	DryRun                 bool                `json:"dry_run"`
+	Status                 string              `json:"status"`
+	ApprovalRequired       bool                `json:"approval_required"`
+	AuditHookPlanReady     bool                `json:"audit_hook_plan_ready"`
+	AuditHookReady         bool                `json:"audit_hook_ready"`
+	TrustMutationPlanReady bool                `json:"trust_mutation_plan_ready"`
+	TrustMutationReady     bool                `json:"trust_mutation_ready"`
+	ApprovalWritebackReady bool                `json:"approval_writeback_ready"`
+	Detection              DetectionResult     `json:"detection"`
+	AuditRecord            AuditHookRecordPlan `json:"audit_record"`
+	TrustMutation          TrustMutationPlan   `json:"trust_mutation"`
+	ApprovalQueue          ApprovalQueuePlan   `json:"approval_queue"`
+	Actions                []string            `json:"actions"`
+	Notes                  []string            `json:"notes,omitempty"`
+}
+
 var safeSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a skill anomaly pack handler.
@@ -161,6 +219,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/skill-anomaly/profiles", Handler: h.Profiles},
 		{Method: http.MethodGet, Path: "/v1/skill-anomaly/profiles/", Handler: h.ProfileDetail},
 		{Method: http.MethodPost, Path: "/v1/skill-anomaly/detect", Handler: h.Detect},
+		{Method: http.MethodPost, Path: "/v1/skill-anomaly/audit-hook/plan", Handler: h.AuditHookPlan},
 		{Method: http.MethodGet, Path: "/v1/skill-anomaly/evidence/", Handler: h.Evidence},
 	}
 }
@@ -184,17 +243,28 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		anomalies += profile.AnomalyCount
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":          PackID,
-		"stage":            "pack-shell-before-audit-hook",
-		"detector_ready":   true,
-		"audit_hook_ready": false,
-		"profile_count":    len(profiles),
-		"active_profiles":  active,
-		"anomaly_count":    anomalies,
-		"store_dir":        h.dataDir,
-		"policy":           h.policy,
-		"capabilities":     []string{"skill.behavior.profile", "skill.anomaly.detect", "skill.needs_approval.plan", "skill.evidence.export"},
-		"notes":            []string{"Direct Merkle Chain hook, Trust Score mutation, and Approval queue write-back remain follow-up wiring."},
+		"pack_id":                   PackID,
+		"stage":                     "pack-shell-before-audit-hook",
+		"detector_ready":            true,
+		"audit_hook_plan_ready":     true,
+		"audit_hook_ready":          false,
+		"trust_mutation_plan_ready": true,
+		"trust_mutation_ready":      false,
+		"approval_writeback_ready":  false,
+		"profile_count":             len(profiles),
+		"active_profiles":           active,
+		"anomaly_count":             anomalies,
+		"store_dir":                 h.dataDir,
+		"policy":                    h.policy,
+		"capabilities": []string{
+			"skill.behavior.profile",
+			"skill.anomaly.detect",
+			"skill.needs_approval.plan",
+			"skill.audit_hook.plan",
+			"skill.trust_mutation.plan",
+			"skill.evidence.export",
+		},
+		"notes": []string{"Audit-hook and Trust mutation plans are non-destructive; direct Merkle Chain append, Trust Score mutation, and Approval queue write-back remain follow-up wiring."},
 	})
 }
 
@@ -307,6 +377,31 @@ func (h *Handler) Detect(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
+func (h *Handler) AuditHookPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req AuditHookPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid skill anomaly audit-hook plan payload")
+		return
+	}
+	event, err := h.eventFromAuditHookPlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	profile, err := h.loadOrNewProfile(event.SkillSlug)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	result := h.score(profile, event)
+	plan := h.buildAuditHookPlan(result, req.RequestedBy, req.Reason)
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -319,14 +414,18 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	events, _ := h.listEvents(profile.SkillSlug, h.policy.WindowSize)
+	auditHookPlan := h.buildEvidenceAuditHookPlan(profile)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-skill-anomaly-evidence",
-		"files":       []string{"profile.json", "recent-events.json", "detection-policy.json"},
-		"profile":     profile,
-		"events":      events,
-		"policy":      h.policy,
+		"pack_id":             PackID,
+		"exported_at":         h.now().UTC(),
+		"format":              "json-skill-anomaly-evidence",
+		"files":               []string{"profile.json", "recent-events.json", "detection-policy.json", "audit-hook-plan.json", "trust-mutation-plan.json"},
+		"profile":             profile,
+		"events":              events,
+		"policy":              h.policy,
+		"audit_hook_plan":     auditHookPlan,
+		"trust_mutation_plan": auditHookPlan.TrustMutation,
+		"approval_queue_plan": auditHookPlan.ApprovalQueue,
 	})
 }
 
@@ -366,6 +465,10 @@ func (h *Handler) eventFromObserve(req ObserveRequest) (Event, error) {
 }
 
 func (h *Handler) eventFromDetection(req DetectionRequest) (Event, error) {
+	return h.normalizeEvent(req.SkillSlug, req.Actor, req.Action, req.Params, req.ParamKeys, req.Success, req.DurationMS, time.Time{})
+}
+
+func (h *Handler) eventFromAuditHookPlan(req AuditHookPlanRequest) (Event, error) {
 	return h.normalizeEvent(req.SkillSlug, req.Actor, req.Action, req.Params, req.ParamKeys, req.Success, req.DurationMS, time.Time{})
 }
 
@@ -463,6 +566,156 @@ func (h *Handler) score(profile Profile, event Event) DetectionResult {
 		result.Notes = []string{"behavior matches current baseline"}
 	}
 	return result
+}
+
+func (h *Handler) buildEvidenceAuditHookPlan(profile Profile) AuditHookPlanReport {
+	if len(profile.Recent) == 0 {
+		event := Event{SkillSlug: profile.SkillSlug, Action: "no_recent_event", Success: true, Timestamp: h.now().UTC()}
+		return h.buildAuditHookPlan(DetectionResult{
+			SkillSlug: profile.SkillSlug,
+			Severity:  "normal",
+			Profile:   summarize(profile),
+			Event:     event,
+			Notes:     []string{"No recent skill behavior event is available; evidence carries the non-destructive audit hook plan contract only."},
+		}, "evidence-export", "evidence export schema snapshot")
+	}
+	event := profile.Recent[len(profile.Recent)-1]
+	return h.buildAuditHookPlan(h.score(profile, event), "evidence-export", "latest profile event schema snapshot")
+}
+
+func (h *Handler) buildAuditHookPlan(result DetectionResult, requestedBy, reason string) AuditHookPlanReport {
+	approvalRequired := result.NeedsApproval || result.Block
+	status := "no_op"
+	if result.Severity == "learning" {
+		status = "learning"
+	}
+	if approvalRequired {
+		status = "approval_plan"
+	}
+	delta := trustDelta(result)
+	actions := []string{}
+	if approvalRequired {
+		actions = append(actions,
+			fmt.Sprintf("would append Merkle audit record skill_anomaly_%s for %s", result.Severity, result.SkillSlug),
+			fmt.Sprintf("would request Trust Score mutation %+d for %s", delta, result.SkillSlug),
+			fmt.Sprintf("would enqueue Approval queue item for %s before allowing the anomalous action", result.SkillSlug),
+		)
+	} else {
+		actions = append(actions,
+			"no Merkle audit append required for the current detection result",
+			"no Trust Score mutation required for the current detection result",
+			"no Approval queue write-back required for the current detection result",
+		)
+	}
+	payload := map[string]any{
+		"skill_slug":     result.SkillSlug,
+		"score":          result.Score,
+		"severity":       result.Severity,
+		"needs_approval": result.NeedsApproval,
+		"block":          result.Block,
+		"reason_count":   len(result.Reasons),
+	}
+	if result.Event.ID != "" {
+		payload["event_id"] = result.Event.ID
+	}
+	return AuditHookPlanReport{
+		PackID:                 PackID,
+		SkillSlug:              result.SkillSlug,
+		GeneratedAt:            h.now().UTC(),
+		DryRun:                 true,
+		Status:                 status,
+		ApprovalRequired:       approvalRequired,
+		AuditHookPlanReady:     true,
+		AuditHookReady:         false,
+		TrustMutationPlanReady: true,
+		TrustMutationReady:     false,
+		ApprovalWritebackReady: false,
+		Detection:              result,
+		AuditRecord: AuditHookRecordPlan{
+			EventType:         "system",
+			Action:            auditActionFor(result),
+			Subject:           result.SkillSlug,
+			Severity:          result.Severity,
+			MerkleAppendReady: false,
+			Payload:           payload,
+		},
+		TrustMutation: TrustMutationPlan{
+			TargetSkill:        result.SkillSlug,
+			Mutation:           trustMutationName(result),
+			Delta:              delta,
+			RecordFailureReady: false,
+			Reason:             trustMutationReason(result),
+		},
+		ApprovalQueue: ApprovalQueuePlan{
+			Required:            approvalRequired,
+			QueueWritebackReady: false,
+			RequestedBy:         strings.TrimSpace(requestedBy),
+			Reason:              approvalReason(result, reason),
+		},
+		Actions: actions,
+		Notes: []string{
+			"This route is non-destructive: it does not append to the Merkle audit chain, mutate Trust Score, or write Approval queue items.",
+			"Use the plan shape as the contract for the later audit hook / Trust / Approval write-back slice.",
+		},
+	}
+}
+
+func trustDelta(result DetectionResult) int {
+	if result.Block {
+		return -10
+	}
+	if result.NeedsApproval {
+		return -3
+	}
+	return 0
+}
+
+func auditActionFor(result DetectionResult) string {
+	if result.Block {
+		return "skill_anomaly_block_plan"
+	}
+	if result.NeedsApproval {
+		return "skill_anomaly_needs_approval_plan"
+	}
+	return "skill_anomaly_noop_plan"
+}
+
+func trustMutationName(result DetectionResult) string {
+	if result.Block {
+		return "record_failure_high"
+	}
+	if result.NeedsApproval {
+		return "record_failure_medium"
+	}
+	return "none"
+}
+
+func trustMutationReason(result DetectionResult) string {
+	if len(result.Reasons) == 0 {
+		return "behavior matches current baseline or is still collecting baseline"
+	}
+	names := make([]string, 0, len(result.Reasons))
+	for _, reason := range result.Reasons {
+		names = append(names, reason.Name)
+	}
+	return strings.Join(names, ",")
+}
+
+func approvalReason(result DetectionResult, explicit string) string {
+	explicit = strings.TrimSpace(explicit)
+	if explicit != "" {
+		return explicit
+	}
+	if result.Block {
+		return "candidate skill behavior reaches the block threshold"
+	}
+	if result.NeedsApproval {
+		return "candidate skill behavior deviates from the learned baseline"
+	}
+	if result.Severity == "learning" {
+		return "profile is still collecting the minimum baseline observations"
+	}
+	return "no approval required"
 }
 
 func consecutiveFailures(events []Event) int {

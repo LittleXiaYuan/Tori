@@ -45,7 +45,11 @@ export interface SkillAnomalyStatus {
   pack_id: string;
   stage: string;
   detector_ready: boolean;
+  audit_hook_plan_ready: boolean;
   audit_hook_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
   profile_count: number;
   active_profiles: number;
   anomaly_count: number;
@@ -86,6 +90,68 @@ export interface SkillAnomalyObservationInput {
   dry_run?: boolean;
 }
 
+export interface SkillAnomalyAuditHookPlanInput extends SkillAnomalyObservationInput {
+  requested_by?: string;
+  reason?: string;
+}
+
+export interface SkillAnomalyAuditRecordPlan {
+  event_type: string;
+  action: string;
+  subject: string;
+  severity: string;
+  merkle_append_ready: boolean;
+  payload: Record<string, unknown>;
+}
+
+export interface SkillAnomalyTrustMutationPlan {
+  target_skill: string;
+  mutation: string;
+  delta: number;
+  record_failure_ready: boolean;
+  reason: string;
+}
+
+export interface SkillAnomalyApprovalQueuePlan {
+  required: boolean;
+  queue_writeback_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+}
+
+export interface SkillAnomalyAuditHookPlan {
+  pack_id: string;
+  skill_slug: string;
+  generated_at: string;
+  dry_run: boolean;
+  status: string;
+  approval_required: boolean;
+  audit_hook_plan_ready: boolean;
+  audit_hook_ready: boolean;
+  trust_mutation_plan_ready: boolean;
+  trust_mutation_ready: boolean;
+  approval_writeback_ready: boolean;
+  detection: SkillAnomalyResult;
+  audit_record: SkillAnomalyAuditRecordPlan;
+  trust_mutation: SkillAnomalyTrustMutationPlan;
+  approval_queue: SkillAnomalyApprovalQueuePlan;
+  actions: string[];
+  notes?: string[];
+}
+
+export interface SkillAnomalyEvidence {
+  pack_id: string;
+  exported_at: string;
+  format: string;
+  files: string[];
+  profile: SkillAnomalyProfile;
+  events: SkillAnomalyEvent[];
+  policy: SkillAnomalyPolicy;
+  audit_hook_plan?: SkillAnomalyAuditHookPlan;
+  trust_mutation_plan?: SkillAnomalyTrustMutationPlan;
+  approval_queue_plan?: SkillAnomalyApprovalQueuePlan;
+}
+
 export interface SkillAnomalyPackClient {
   status(): Promise<SkillAnomalyStatus>;
   events(input?: { skill_slug?: string; limit?: number }): Promise<{ events: SkillAnomalyEvent[]; count: number }>;
@@ -93,7 +159,8 @@ export interface SkillAnomalyPackClient {
   profiles(): Promise<{ profiles: SkillAnomalyProfileSummary[]; count: number }>;
   profile(skillSlug: string): Promise<{ profile: SkillAnomalyProfile }>;
   detect(input: SkillAnomalyObservationInput): Promise<{ result: SkillAnomalyResult }>;
-  evidence(skillSlug: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; profile: SkillAnomalyProfile; events: SkillAnomalyEvent[]; policy: SkillAnomalyPolicy }>;
+  auditHookPlan(input: SkillAnomalyAuditHookPlanInput): Promise<{ plan: SkillAnomalyAuditHookPlan }>;
+  evidence(skillSlug: string): Promise<SkillAnomalyEvidence>;
 }
 
 function enc(value: string): string {
@@ -124,7 +191,12 @@ export function createSkillAnomalyPackClient(): SkillAnomalyPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    auditHookPlan: (input) =>
+      fetcher<{ plan: SkillAnomalyAuditHookPlan }>("/v1/skill-anomaly/audit-hook/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     evidence: (skillSlug) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; profile: SkillAnomalyProfile; events: SkillAnomalyEvent[]; policy: SkillAnomalyPolicy }>(`/v1/skill-anomaly/evidence/${enc(skillSlug)}`),
+      fetcher<SkillAnomalyEvidence>(`/v1/skill-anomaly/evidence/${enc(skillSlug)}`),
   };
 }
