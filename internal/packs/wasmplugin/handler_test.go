@@ -113,6 +113,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if dryRunResp.Result.HostABIPlan.WritesFiles || dryRunResp.Result.HostABIPlan.Summary.EnabledCount == 0 {
 		t.Fatalf("host ABI plan should be non-destructive and reflect enabled functions: %#v", dryRunResp.Result.HostABIPlan)
 	}
+	if !dryRunResp.Result.HostABIGate.ExecutionGateReady || dryRunResp.Result.HostABIGate.AllowsExecution || !dryRunResp.Result.HostABIGate.Blocked || dryRunResp.Result.HostABIGate.Status != "blocked_until_host_abi_enforcement" || len(dryRunResp.Result.HostABIGate.BlockedFunctions) == 0 {
+		t.Fatalf("privileged host ABI dry-run should expose a blocking execution gate: %#v", dryRunResp.Result.HostABIGate)
+	}
+	if dryRunResp.Result.HostABIGate.EnforcementReady || dryRunResp.Result.HostABIGate.WritesFiles || dryRunResp.Result.HostABIGate.NetworkAccess {
+		t.Fatalf("host ABI execution gate should remain non-destructive until enforcement is wired: %#v", dryRunResp.Result.HostABIGate)
+	}
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","capabilities":["math.add"],"tags":["remote"]}`))
@@ -155,8 +161,37 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"hello"}`))
 	h.Execute(w, req)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "host ABI execution blocked") || fake.calls != 0 {
+		t.Fatalf("privileged execute should be blocked before sandbox execution, status=%d calls=%d body=%s", w.Code, fake.calls, w.Body.String())
+	}
+	var blockedResp struct {
+		Result ExecuteResult `json:"result"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&blockedResp); err != nil {
+		t.Fatalf("decode blocked execute: %v", err)
+	}
+	if blockedResp.Result.Success || blockedResp.Result.ExitCode != -3 || !blockedResp.Result.HostABIGate.Blocked || blockedResp.Result.HostABIGate.AllowsExecution {
+		t.Fatalf("unexpected blocked execute result: %#v", blockedResp.Result)
+	}
+
+	statelessBody := `{"slug":"stateless","name":"Stateless","module_path":"calculator.wasm","entrypoint":"plugin_exec","permissions":{"ledger_kv":false,"memory_search":false,"http_fetch":false,"max_memory_mb":32,"timeout_seconds":5},"capabilities":["math.add"]}`
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/plugins", strings.NewReader(statelessBody))
+	h.Plugins(w, req)
+	if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), "stateless") {
+		t.Fatalf("install stateless status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/plugins/load", strings.NewReader(`{"slug":"stateless"}`))
+	h.Load(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "loaded") {
+		t.Fatalf("load stateless status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"stateless","input":"hello"}`))
+	h.Execute(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "last_input") || fake.calls != 1 {
-		t.Fatalf("execute status=%d calls=%d body=%s", w.Code, fake.calls, w.Body.String())
+		t.Fatalf("stateless execute status=%d calls=%d body=%s", w.Code, fake.calls, w.Body.String())
 	}
 	var execResp struct {
 		Result ExecuteResult `json:"result"`
@@ -164,8 +199,8 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&execResp); err != nil {
 		t.Fatalf("decode execute: %v", err)
 	}
-	if !execResp.Result.Success || execResp.Result.Stdout != "hello" {
-		t.Fatalf("unexpected execute result: %#v", execResp.Result)
+	if !execResp.Result.Success || execResp.Result.Stdout != "hello" || !execResp.Result.HostABIGate.AllowsExecution || execResp.Result.HostABIGate.Blocked || execResp.Result.HostABIGate.Status != "allowed_no_privileged_host_abi" {
+		t.Fatalf("unexpected stateless execute result: %#v", execResp.Result)
 	}
 
 	w = httptest.NewRecorder()
@@ -176,6 +211,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	var evidenceResp struct {
 		HostABIPlan       HostABIPlan                     `json:"host_abi_plan"`
+		HostABIGate       HostABIExecutionGate            `json:"host_abi_gate"`
 		RemoteInstallPlan RemoteInstallPlanReport         `json:"remote_install_plan"`
 		ApprovalGatePlan  RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
 	}
@@ -184,6 +220,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !evidenceResp.HostABIPlan.PlanReady || evidenceResp.HostABIPlan.Status != "plan_only" {
 		t.Fatalf("evidence should include host ABI plan preview: %#v", evidenceResp.HostABIPlan)
+	}
+	if !evidenceResp.HostABIGate.ExecutionGateReady || !evidenceResp.HostABIGate.Blocked || evidenceResp.HostABIGate.EnforcementReady {
+		t.Fatalf("evidence should include conservative Host ABI execution gate: %#v", evidenceResp.HostABIGate)
 	}
 	if !evidenceResp.RemoteInstallPlan.RemoteInstallPlanReady || evidenceResp.RemoteInstallPlan.RemoteInstallReady {
 		t.Fatalf("evidence should include remote install plan preview: %#v", evidenceResp.RemoteInstallPlan)
