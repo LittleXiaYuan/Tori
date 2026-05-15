@@ -28,18 +28,20 @@ const PackID = "yunque.pack.memory-time-travel"
 
 // Config describes runtime dependencies for the Memory Time Travel pack shell.
 type Config struct {
-	DataDir    string
-	Now        func() time.Time
-	Policy     RetentionPolicy
-	TemporalKV TemporalKVReader
+	DataDir                  string
+	Now                      func() time.Time
+	Policy                   RetentionPolicy
+	TemporalKV               TemporalKVReader
+	MemoryPersisterWriteback bool
 }
 
 // Handler serves the Memory Time Travel pack API surface.
 type Handler struct {
-	dataDir    string
-	now        func() time.Time
-	policy     RetentionPolicy
-	temporalKV TemporalKVReader
+	dataDir                  string
+	now                      func() time.Time
+	policy                   RetentionPolicy
+	temporalKV               TemporalKVReader
+	memoryPersisterWriteback bool
 }
 
 // TemporalKVReader is the narrow Memory Time Travel dependency on Ledger KV
@@ -173,7 +175,13 @@ func New(cfg Config) *Handler {
 	if now == nil {
 		now = time.Now
 	}
-	return &Handler{dataDir: dataDir, now: now, policy: normalizePolicy(cfg.Policy), temporalKV: cfg.TemporalKV}
+	return &Handler{
+		dataDir:                  dataDir,
+		now:                      now,
+		policy:                   normalizePolicy(cfg.Policy),
+		temporalKV:               cfg.TemporalKV,
+		memoryPersisterWriteback: cfg.MemoryPersisterWriteback,
+	}
 }
 
 // DefaultHandler returns a handler bound to the default local data directory.
@@ -210,18 +218,19 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		namespaces[snapshot.Namespace] = true
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                   PackID,
-		"stage":                     "pack-shell-before-ledger-kv-history",
-		"snapshot_store_ready":      true,
-		"temporal_query_ready":      true,
-		"ledger_history_ready":      h.temporalKV != nil,
-		"merkle_verification_ready": false,
-		"rollback_writeback_ready":  false,
-		"snapshot_count":            len(snapshots),
-		"namespace_count":           len(namespaces),
-		"store_dir":                 h.dataDir,
-		"policy":                    h.policy,
-		"last_snapshot":             firstSnapshot(snapshots),
+		"pack_id":                          PackID,
+		"stage":                            "pack-shell-before-ledger-kv-history",
+		"snapshot_store_ready":             true,
+		"temporal_query_ready":             true,
+		"ledger_history_ready":             h.temporalKV != nil,
+		"merkle_verification_ready":        false,
+		"memory_persister_writeback_ready": h.memoryPersisterWriteback,
+		"rollback_writeback_ready":         false,
+		"snapshot_count":                   len(snapshots),
+		"namespace_count":                  len(namespaces),
+		"store_dir":                        h.dataDir,
+		"policy":                           h.policy,
+		"last_snapshot":                    firstSnapshot(snapshots),
 		"capabilities": []string{
 			"memory.snapshot.store",
 			"memory.snapshot_at.reconstruct",
@@ -395,7 +404,11 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) statusNotes() []string {
 	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, and evidence export are available."}
 	if h.temporalKV != nil {
-		notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Merkle audit-chain verification, retention cron, and Memory Persister write-back remain follow-up wiring.")
+		if h.memoryPersisterWriteback {
+			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; Merkle audit-chain verification, retention cron, and approved rollback execution remain follow-up wiring.")
+		} else {
+			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, Merkle audit-chain verification, retention cron, and approved rollback execution remain follow-up wiring.")
+		}
 	} else {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
 	}

@@ -2,9 +2,13 @@ package ledger
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,23 +24,79 @@ import (
 // Architecture: memory layers do computation in-memory (TF-IDF, BM25, vector);
 // LedgerPersister handles persistence only — load on startup, flush periodically.
 type LedgerPersister struct {
-	ldg  *ledger.Ledger
-	mid  *memory.MidTerm
-	long *memory.LongTerm
-	mu   sync.Mutex
-	dirty bool
-	stop chan struct{}
+	ldg               *ledger.Ledger
+	mid               *memory.MidTerm
+	long              *memory.LongTerm
+	temporalKV        *TemporalKVStore
+	temporalNamespace string
+	now               func() time.Time
+	mu                sync.Mutex
+	dirty             bool
+	stop              chan struct{}
+}
+
+type temporalMemoryRecord struct {
+	TenantID   string    `json:"tenant_id"`
+	Layer      string    `json:"layer"`
+	ID         string    `json:"id,omitempty"`
+	Key        string    `json:"key"`
+	Value      string    `json:"value"`
+	Source     string    `json:"source,omitempty"`
+	Category   string    `json:"category,omitempty"`
+	Score      float64   `json:"score,omitempty"`
+	AccessCnt  int       `json:"access_cnt,omitempty"`
+	LastAccess time.Time `json:"last_access,omitempty"`
+	CreatedAt  time.Time `json:"created_at,omitempty"`
+	ExpiresAt  time.Time `json:"expires_at,omitempty"`
+	FlushedAt  time.Time `json:"flushed_at"`
+}
+
+// LedgerPersisterOption configures the Ledger-backed memory persister.
+type LedgerPersisterOption func(*LedgerPersister)
+
+// WithLedgerPersisterTemporalKV mirrors dirty Mid/Long memory flushes into the
+// temporal KV adapter used by Memory Time Travel. The primary Ledger Memory
+// write remains authoritative; temporal write-back is best-effort and
+// rollback-friendly.
+func WithLedgerPersisterTemporalKV(store *TemporalKVStore) LedgerPersisterOption {
+	return func(p *LedgerPersister) {
+		p.temporalKV = store
+	}
+}
+
+// WithLedgerPersisterTemporalNamespace overrides the namespace used for Memory
+// Time Travel snapshots. Most callers should keep the default memory_snapshot.
+func WithLedgerPersisterTemporalNamespace(namespace string) LedgerPersisterOption {
+	return func(p *LedgerPersister) {
+		if strings.TrimSpace(namespace) != "" {
+			p.temporalNamespace = strings.TrimSpace(namespace)
+		}
+	}
+}
+
+// WithLedgerPersisterNow overrides the flush clock, primarily for tests.
+func WithLedgerPersisterNow(now func() time.Time) LedgerPersisterOption {
+	return func(p *LedgerPersister) {
+		if now != nil {
+			p.now = now
+		}
+	}
 }
 
 // NewLedgerPersister creates a persister backed by Ledger Memory.
 // It loads existing data immediately and starts a background flush loop.
 // If a legacy JSON file exists at legacyPath, it will be migrated.
-func NewLedgerPersister(ldg *ledger.Ledger, mid *memory.MidTerm, long *memory.LongTerm, legacyPath string) *LedgerPersister {
+func NewLedgerPersister(ldg *ledger.Ledger, mid *memory.MidTerm, long *memory.LongTerm, legacyPath string, opts ...LedgerPersisterOption) *LedgerPersister {
 	p := &LedgerPersister{
-		ldg:  ldg,
-		mid:  mid,
-		long: long,
-		stop: make(chan struct{}),
+		ldg:               ldg,
+		mid:               mid,
+		long:              long,
+		temporalNamespace: "memory_snapshot",
+		now:               func() time.Time { return time.Now().UTC() },
+		stop:              make(chan struct{}),
+	}
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	// Migrate legacy JSON if it exists
@@ -49,6 +109,13 @@ func NewLedgerPersister(ldg *ledger.Ledger, mid *memory.MidTerm, long *memory.Lo
 
 	go p.flushLoop()
 	return p
+}
+
+// TemporalWritebackReady reports whether the Memory Time Travel temporal mirror
+// is attached. It is intentionally narrow so pack status can avoid importing
+// LedgerPersister internals.
+func (p *LedgerPersister) TemporalWritebackReady() bool {
+	return p != nil && p.temporalKV != nil
 }
 
 // MarkDirty signals that data has changed and needs saving.
@@ -124,6 +191,8 @@ func (p *LedgerPersister) flush() {
 
 	ctx := context.Background()
 	total := 0
+	temporalTotal := 0
+	flushedAt := p.now().UTC()
 
 	// Export and persist Mid-term items
 	midItems := p.exportMid()
@@ -134,6 +203,11 @@ func (p *LedgerPersister) flush() {
 				slog.Warn("ledger persister: mid flush error", "key", item.Key, "err", err)
 			} else {
 				total++
+				if err := p.writeTemporalMemory(ctx, "mid", tenantID, item, flushedAt); err != nil {
+					slog.Warn("ledger persister: temporal mid write-back error", "key", item.Key, "err", err)
+				} else if p.temporalKV != nil {
+					temporalTotal++
+				}
 			}
 		}
 	}
@@ -151,11 +225,16 @@ func (p *LedgerPersister) flush() {
 				slog.Warn("ledger persister: long flush error", "key", item.Key, "err", err)
 			} else {
 				total++
+				if err := p.writeTemporalMemory(ctx, "long", tenantID, item, flushedAt); err != nil {
+					slog.Warn("ledger persister: temporal long write-back error", "key", item.Key, "err", err)
+				} else if p.temporalKV != nil {
+					temporalTotal++
+				}
 			}
 		}
 	}
 
-	slog.Debug("ledger persister: flushed to Ledger", "items", total)
+	slog.Debug("ledger persister: flushed to Ledger", "items", total, "temporal_items", temporalTotal)
 }
 
 func (p *LedgerPersister) flushLoop() {
@@ -279,4 +358,45 @@ func (p *LedgerPersister) exportMid() map[string][]memory.Item {
 
 func (p *LedgerPersister) exportLong() map[string][]memory.Item {
 	return p.long.ExportAll()
+}
+
+func (p *LedgerPersister) writeTemporalMemory(ctx context.Context, layer, tenantID string, item memory.Item, flushedAt time.Time) error {
+	if p.temporalKV == nil {
+		return nil
+	}
+	record := temporalMemoryRecord{
+		TenantID:   tenantID,
+		Layer:      layer,
+		ID:         item.ID,
+		Key:        item.Key,
+		Value:      item.Value,
+		Source:     item.Source,
+		Category:   item.Category,
+		Score:      item.Score,
+		AccessCnt:  item.AccessCnt,
+		LastAccess: item.LastAccess,
+		CreatedAt:  item.CreatedAt,
+		ExpiresAt:  item.ExpiresAt,
+		FlushedAt:  flushedAt,
+	}
+	data, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	return p.temporalKV.PutRawVersionedAt(ctx, p.temporalNamespace, temporalMemoryKey(layer, tenantID, item), data, flushedAt)
+}
+
+func temporalMemoryKey(layer, tenantID string, item memory.Item) string {
+	identity := strings.TrimSpace(item.Key)
+	if layer == "long" && strings.TrimSpace(item.ID) != "" {
+		identity = item.ID
+	}
+	if identity == "" {
+		identity = strings.TrimSpace(item.ID)
+	}
+	if identity == "" {
+		sum := sha256.Sum256([]byte(layer + "\x00" + tenantID + "\x00" + item.Value))
+		identity = hex.EncodeToString(sum[:8])
+	}
+	return fmt.Sprintf("%s/%s/%s", tenantID, layer, identity)
 }

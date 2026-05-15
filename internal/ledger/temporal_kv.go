@@ -99,6 +99,9 @@ func (s *TemporalKVStore) PutRawVersionedAt(ctx context.Context, namespace, key 
 	if err != nil && !errors.Is(err, baseledger.ErrKVNotFound) {
 		return err
 	}
+	if current != nil && bytes.Equal(current.Value, value) {
+		return nil
+	}
 	if current != nil && !bytes.Equal(current.Value, value) {
 		doc, err := s.loadHistory(ctx, namespace, key)
 		if err != nil {

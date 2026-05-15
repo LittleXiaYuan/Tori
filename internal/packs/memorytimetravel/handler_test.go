@@ -138,7 +138,8 @@ func TestMemoryTimeTravelDryRunDoesNotPersistSnapshot(t *testing.T) {
 
 func TestMemoryTimeTravelSnapshotAtUsesLedgerTemporalKVWhenAttached(t *testing.T) {
 	h := New(Config{
-		DataDir: t.TempDir(),
+		DataDir:                  t.TempDir(),
+		MemoryPersisterWriteback: true,
 		TemporalKV: fakeTemporalKV{snapshot: map[string][]byte{
 			"goal":    []byte(`"ship temporal kv"`),
 			"persona": []byte(`{"mode":"careful"}`),
@@ -158,5 +159,12 @@ func TestMemoryTimeTravelSnapshotAtUsesLedgerTemporalKVWhenAttached(t *testing.T
 	}
 	if got.Source != "ledger-kv-history" || got.Values["goal"] != "ship temporal kv" || got.Values["persona"] != `{"mode":"careful"}` {
 		t.Fatalf("unexpected temporal kv snapshot-at response: %#v", got)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
+	h.Status(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"memory_persister_writeback_ready":true`) {
+		t.Fatalf("status should expose Memory Persister temporal write-back readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 }

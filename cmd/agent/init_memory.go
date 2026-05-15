@@ -39,10 +39,16 @@ func initMemory(app *agentrt.App) error {
 	// Persistence: prefer Ledger (SQLite), fallback to JSON file
 	if ldgRaw, ok := app.Get("github.com/LittleXiaYuan/ledger"); ok {
 		if ldg, ok := ldgRaw.(*ledger.Ledger); ok {
-			ledgerPersister := iledger.NewLedgerPersister(ldg, app.MidMem, app.LongMem, cfg.DataPath("memory.json"))
+			ledgerPersister := iledger.NewLedgerPersister(
+				ldg,
+				app.MidMem,
+				app.LongMem,
+				cfg.DataPath("memory.json"),
+				iledger.WithLedgerPersisterTemporalKV(iledger.NewTemporalKVStore(ldg)),
+			)
 			app.MemManager.SetPersister(ledgerPersister)
 			app.Set(agentrt.CompMemPersister, ledgerPersister)
-			slog.Info("memory persistence: Ledger (SQLite)")
+			slog.Info("memory persistence: Ledger (SQLite)", "temporal_writeback", ledgerPersister.TemporalWritebackReady())
 		}
 	} else {
 		memPersister := memory.NewPersister(cfg.DataPath("memory.json"), app.MidMem, app.LongMem)
