@@ -2,7 +2,7 @@
   "id": "yunque.pack.memory-time-travel",
   "name": "Memory Time Travel Pack",
   "version": "0.1.0",
-  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、retention dry-run plan 和证据包导出作为可选记忆治理能力包暴露。",
+  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、retention dry-run plan、KV audit link schema 和证据包导出作为可选记忆治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -16,6 +16,7 @@
       "memory_time_travel.diff",
       "memory_time_travel.rollback_plan",
       "memory_time_travel.retention.plan",
+      "memory_time_travel.audit.links",
       "memory_time_travel.audit.verify",
       "memory_time_travel.evidence.export"
     ],
@@ -27,6 +28,7 @@
       "/v1/memory-time-travel/diff",
       "/v1/memory-time-travel/rollback-plan",
       "/v1/memory-time-travel/retention/plan",
+      "/v1/memory-time-travel/audit/links",
       "/v1/memory-time-travel/audit/verify",
       "/v1/memory-time-travel/evidence/"
     ],
@@ -75,6 +77,11 @@
         "method": "GET",
         "path": "/v1/memory-time-travel/retention/plan",
         "description": "Build a dry-run retention plan for pack-local memory snapshots without deleting data."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/audit/links",
+        "description": "Expose the placeholder schema for future per-KV audit proof links before native Ledger kv_history linkage is wired."
       },
       {
         "method": "GET",

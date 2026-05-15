@@ -2,8 +2,9 @@
  * Lightweight Memory Time Travel Pack SDK slice.
  *
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
- * rollback plan generation, and evidence export usable without importing the
- * full generated OpenAPI SDK:
+ * rollback plan generation, retention planning, KV audit proof-link schema
+ * inspection, and evidence export usable without importing the full generated
+ * OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
  */
@@ -53,6 +54,8 @@ export type MemoryTimeTravelStatusResponse = {
   rollback_writeback_ready: boolean;
   retention_plan_ready?: boolean;
   retention_prune_ready?: boolean;
+  kv_audit_link_schema_ready?: boolean;
+  kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
   store_dir?: string;
@@ -82,6 +85,36 @@ export type MemoryTimeTravelAuditVerificationResponse = {
   checked_at: string;
   recent_records?: MemoryTimeTravelAuditRecord[];
   notes?: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLink = {
+  namespace: string;
+  key: string;
+  snapshot_id?: string;
+  kv_version_at?: string;
+  value_hash?: string;
+  audit_seq?: number;
+  audit_hash?: string;
+  proof_status: string;
+  notes?: string[];
+};
+
+export type MemoryTimeTravelKVAuditLinksResponse = {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  schema_ready: boolean;
+  linkage_ready: boolean;
+  native_kv_history_ready: boolean;
+  merkle_verification_ready: boolean;
+  source: string;
+  kv_audit_links: MemoryTimeTravelKVAuditProofLink[];
+  required_fields: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelKVAuditLinksEnvelope = {
+  links: MemoryTimeTravelKVAuditLinksResponse;
 };
 
 export type MemoryTimeTravelSnapshotsResponse = {
@@ -226,6 +259,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   history: MemoryTimeTravelSnapshotSummary[];
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
+  kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksResponse;
+  kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
   audit_verification_error?: string;
 };
@@ -348,6 +383,10 @@ export class MemoryTimeTravelClient {
 
   retentionPlan(namespace?: string): Promise<MemoryTimeTravelRetentionPlanResponse> {
     return this.request<MemoryTimeTravelRetentionPlanResponse>("GET", `/v1/memory-time-travel/retention/plan${query({ namespace })}`);
+  }
+
+  auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {
+    return this.request<MemoryTimeTravelKVAuditLinksEnvelope>("GET", `/v1/memory-time-travel/audit/links${query({ namespace })}`);
   }
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {

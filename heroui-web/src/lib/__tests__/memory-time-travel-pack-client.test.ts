@@ -9,7 +9,7 @@ describe("memory-time-travel-pack-client", () => {
   it("reads Memory Time Travel status, snapshots, and detail through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", stage: "pack-shell-before-ledger-kv-history", snapshot_store_ready: true, temporal_query_ready: true, ledger_history_ready: false, merkle_verification_ready: false, rollback_writeback_ready: false, retention_plan_ready: true, retention_prune_ready: false, snapshot_count: 1, namespace_count: 1, policy: {}, capabilities: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", stage: "pack-shell-before-ledger-kv-history", snapshot_store_ready: true, temporal_query_ready: true, ledger_history_ready: false, merkle_verification_ready: false, rollback_writeback_ready: false, retention_plan_ready: true, retention_prune_ready: false, kv_audit_link_schema_ready: true, kv_audit_linkage_ready: false, snapshot_count: 1, namespace_count: 1, policy: {}, capabilities: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshots: [{ id: "baseline", namespace: "memory_snapshot", created_at: "now", hash: "h", size_bytes: 12, key_count: 2, version: 1 }], count: 1 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshot: { id: "baseline", namespace: "memory_snapshot", created_at: "now", values: { goal: "ship" }, hash: "h", size_bytes: 12, key_count: 1, version: 1 } }), { status: 200 }));
 
@@ -49,13 +49,15 @@ describe("memory-time-travel-pack-client", () => {
   it("exports JSON evidence packs by snapshot id", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "retention-plan.json", "audit-verification.json"], snapshot: { id: "baseline", values: {} }, history: [], retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "retention-plan.json", "audit-links.json", "audit-verification.json"], snapshot: { id: "baseline", values: {} }, history: [], retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, kv_audit_link_schema: { schema_ready: true, linkage_ready: false, kv_audit_links: [] }, kv_audit_links: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } }), { status: 200 }));
 
     const client = createMemoryTimeTravelPackClient();
     const evidence = await client.evidence("baseline");
 
     expect(evidence.audit_verification?.valid).toBe(true);
     expect(evidence.retention_plan?.dry_run).toBe(true);
+    expect(evidence.kv_audit_link_schema?.schema_ready).toBe(true);
+    expect(evidence.kv_audit_links).toEqual([]);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/evidence/baseline");
   });
 
@@ -82,5 +84,19 @@ describe("memory-time-travel-pack-client", () => {
 
     expect(result.valid).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/audit/verify?limit=3");
+  });
+
+  it("reads the KV audit proof-link schema placeholder through pack-owned route", async () => {
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ links: { pack_id: "yunque.pack.memory-time-travel", namespace: "memory_snapshot", generated_at: "2026-05-15T15:00:00Z", schema_ready: true, linkage_ready: false, native_kv_history_ready: false, merkle_verification_ready: false, source: "schema-placeholder-before-native-kv-history", kv_audit_links: [], required_fields: ["namespace", "key", "audit_hash", "proof_status"] } }), { status: 200 }));
+
+    const client = createMemoryTimeTravelPackClient();
+    const result = await client.auditLinks("memory_snapshot");
+
+    expect(result.links.schema_ready).toBe(true);
+    expect(result.links.linkage_ready).toBe(false);
+    expect(result.links.kv_audit_links).toEqual([]);
+    expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/audit/links?namespace=memory_snapshot");
   });
 });

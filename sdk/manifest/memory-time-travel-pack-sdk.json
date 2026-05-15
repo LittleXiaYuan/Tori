@@ -12,6 +12,7 @@
     "POST /v1/memory-time-travel/diff",
     "POST /v1/memory-time-travel/rollback-plan",
     "GET /v1/memory-time-travel/retention/plan",
+    "GET /v1/memory-time-travel/audit/links",
     "GET /v1/memory-time-travel/audit/verify",
     "GET /v1/memory-time-travel/evidence/"
   ],
@@ -27,6 +28,7 @@
     "driftDiff",
     "rollbackPlan",
     "retentionPlan",
+    "auditLinks",
     "auditVerify",
     "evidenceExport"
   ]

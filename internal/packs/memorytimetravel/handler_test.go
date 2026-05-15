@@ -34,8 +34,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 9 {
-		t.Fatalf("expected 9 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 10 {
+		t.Fatalf("expected 10 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -59,6 +59,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/diff":           {http.MethodPost},
 		"/v1/memory-time-travel/rollback-plan":  {http.MethodPost},
 		"/v1/memory-time-travel/retention/plan": {http.MethodGet},
+		"/v1/memory-time-travel/audit/links":    {http.MethodGet},
 		"/v1/memory-time-travel/audit/verify":   {http.MethodGet},
 		"/v1/memory-time-travel/evidence/":      {http.MethodGet},
 	}
@@ -126,7 +127,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -210,7 +211,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -238,6 +239,31 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	h.SnapshotDetail(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("retention plan must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelAuditLinksExposeSchemaPlaceholder(t *testing.T) {
+	now := time.Date(2026, 5, 15, 15, 0, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", nil)
+	h.AuditLinks(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit links status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var got struct {
+		Links KVAuditLinksReport `json:"links"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode audit links: %v", err)
+	}
+	if !got.Links.SchemaReady || got.Links.LinkageReady || got.Links.NativeKVHistoryReady || got.Links.Namespace != "memory-snapshot" {
+		t.Fatalf("unexpected audit links placeholder: %#v", got.Links)
+	}
+	if len(got.Links.KVAuditLinks) != 0 || !containsString(got.Links.RequiredFields, "audit_hash") || got.Links.Source != "schema-placeholder-before-native-kv-history" {
+		t.Fatalf("unexpected audit link schema: %#v", got.Links)
 	}
 }
 
@@ -317,6 +343,8 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	var got struct {
 		Files             []string            `json:"files"`
 		RetentionPlan     RetentionPlanReport `json:"retention_plan"`
+		KVAuditLinkSchema KVAuditLinksReport  `json:"kv_audit_link_schema"`
+		KVAuditLinks      []KVAuditProofLink  `json:"kv_audit_links"`
 		AuditVerification MerkleVerification  `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
@@ -327,6 +355,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "audit-verification.json") {
 		t.Fatalf("evidence files should include audit-verification.json: %#v", got.Files)
+	}
+	if !containsString(got.Files, "audit-links.json") || !got.KVAuditLinkSchema.SchemaReady || got.KVAuditLinkSchema.LinkageReady || len(got.KVAuditLinks) != 0 {
+		t.Fatalf("evidence should include KV audit link schema placeholder: files=%#v schema=%#v links=%#v", got.Files, got.KVAuditLinkSchema, got.KVAuditLinks)
 	}
 	if !containsString(got.Files, "retention-plan.json") || !got.RetentionPlan.DryRun {
 		t.Fatalf("evidence should include dry-run retention plan: files=%#v plan=%#v", got.Files, got.RetentionPlan)
