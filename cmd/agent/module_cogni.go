@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"yunque-agent/internal/agentcore/llm"
@@ -18,6 +19,7 @@ import (
 	mcpkg "yunque-agent/internal/mcp"
 	cognikernelpack "yunque-agent/internal/packs/cognikernel"
 	"yunque-agent/pkg/cogni"
+	"yunque-agent/pkg/packruntime"
 	"yunque-agent/pkg/skills"
 )
 
@@ -61,6 +63,9 @@ type cogniModule struct {
 	scheduler      *cogni.PerceptionScheduler
 	costTracker    *cogni.CostTracker
 	autoOrganizer  *cogni.AutoOrganizer
+	packRegistry   *packruntime.Registry
+	runtimeMu      sync.Mutex
+	runtimeActive  bool
 }
 
 func (m *cogniModule) Name() string { return "cogni" }
@@ -88,6 +93,11 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 
 	app.Set(agentrt.CompCogniRegistry, m.registry)
 	app.Set(agentrt.CompCogniTraces, m.store)
+	if raw, ok := app.Get(agentrt.CompPackRuntimeRegistry); ok {
+		if registry, ok := raw.(*packruntime.Registry); ok {
+			m.packRegistry = registry
+		}
+	}
 
 	m.sentinel = cogni.NewSentinel(m.store, m.registry, cogni.SentinelPolicy{
 		Interval:              5 * time.Minute,
@@ -312,6 +322,9 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			return m.experiences[cogniID]
 		})
 		app.Planner.SetCogniContext(func(_ context.Context, message, tenantID, channel string) string {
+			if !m.cogniKernelPackEnabled() {
+				return ""
+			}
 			return hook.BuildContext(cogni.ContextRequest{
 				Message:  message,
 				TenantID: tenantID,
@@ -319,6 +332,9 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			})
 		})
 		app.Planner.SetCogniSkillFilter(func(message, tenantID, channel string, in []skills.Skill) []skills.Skill {
+			if !m.cogniKernelPackEnabled() {
+				return in
+			}
 			return hook.FilterSkills(cogni.ContextRequest{
 				Message:  message,
 				TenantID: tenantID,
@@ -326,6 +342,9 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			}, in)
 		})
 		app.Planner.SetCogniTrace(func(message, tenantID, channel string) (planner.CogniTraceDetail, bool) {
+			if !m.cogniKernelPackEnabled() {
+				return planner.CogniTraceDetail{}, false
+			}
 			trace, ok := hook.TraceSnapshot(cogni.ContextRequest{
 				Message:  message,
 				TenantID: tenantID,
@@ -404,7 +423,7 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 	return nil
 }
 
-func (m *cogniModule) Start(_ context.Context) error {
+func (m *cogniModule) Start(ctx context.Context) error {
 	summary, err := m.registry.ReloadFromDir(m.dir)
 	if err != nil {
 		slog.Warn("cogni: initial reload failed", "dir", m.dir, "err", err)
@@ -422,7 +441,7 @@ func (m *cogniModule) Start(_ context.Context) error {
 	}
 
 	// Auto-organize: create cognis from installed skills
-	if m.autoOrganizer != nil {
+	if m.cogniKernelPackEnabled() && m.autoOrganizer != nil {
 		result := m.autoOrganizer.Sync(context.Background())
 		if result.Created > 0 || result.Updated > 0 {
 			slog.Info("cogni: auto-organized skills into cognis",
@@ -432,30 +451,89 @@ func (m *cogniModule) Start(_ context.Context) error {
 		}
 	}
 
-	m.initExperienceStores()
-
 	// Re-initialize experience stores when cognis are added/updated/removed.
 	m.registry.OnChange(func(event, id string) {
-		m.initExperienceStores()
+		// pkg/cogni.Registry invokes hooks while holding its mutation lock.
+		// Rebuild runtime projections asynchronously so sync can call
+		// Registry.Active() without self-deadlocking the add/update path.
+		go m.syncCogniKernelPackRuntime(ctx)
 	})
 
-	if m.sentinel != nil {
-		m.sentinel.Start(context.Background())
+	m.watchCogniKernelPackState(ctx)
+	m.syncCogniKernelPackRuntime(ctx)
+
+	return nil
+}
+
+func (m *cogniModule) cogniKernelPackEnabled() bool {
+	if m.packRegistry == nil {
+		return true
+	}
+	pack, ok := m.packRegistry.Get(cognikernelpack.PackID)
+	return ok && pack.Status == packruntime.PackStatusEnabled
+}
+
+func (m *cogniModule) watchCogniKernelPackState(ctx context.Context) {
+	if m.packRegistry == nil {
+		return
+	}
+	m.packRegistry.OnChange(func(event packruntime.ChangeEvent) {
+		if event.Pack.Manifest.ID != cognikernelpack.PackID {
+			return
+		}
+		m.syncCogniKernelPackRuntime(ctx)
+	})
+}
+
+func (m *cogniModule) syncCogniKernelPackRuntime(ctx context.Context) {
+	enabled := m.cogniKernelPackEnabled()
+
+	m.runtimeMu.Lock()
+	defer m.runtimeMu.Unlock()
+
+	if !enabled {
+		m.clearCogniRuntimeState()
+		if m.runtimeActive {
+			if m.scheduler != nil {
+				m.scheduler.Stop()
+			}
+			if m.sentinel != nil {
+				m.sentinel.Stop()
+			}
+			m.runtimeActive = false
+			slog.Info("cogni: runtime loops stopped by pack state", "pack", cognikernelpack.PackID)
+		}
+		return
 	}
 
-	// Start perception scheduler for cron-based activation + webhook registration.
+	m.initExperienceStores()
+
+	if m.sentinel != nil {
+		m.sentinel.Start(ctx)
+	}
 	if m.hook != nil {
-		m.scheduler = cogni.NewPerceptionScheduler(m.registry, m.hook, func(ctx context.Context, cogniID string, signal *cogni.PerceptionSignal) {
-			slog.Info("cogni: perception event", "cogni", cogniID, "schedule", signal.ScheduleTriggered, "webhook", signal.WebhookTriggered)
-		})
+		if m.scheduler == nil {
+			m.scheduler = cogni.NewPerceptionScheduler(m.registry, m.hook, func(ctx context.Context, cogniID string, signal *cogni.PerceptionSignal) {
+				slog.Info("cogni: perception event", "cogni", cogniID, "schedule", signal.ScheduleTriggered, "webhook", signal.WebhookTriggered)
+			})
+		}
 		m.scheduler.Start()
+		m.scheduler.Refresh()
 		paths := m.scheduler.WebhookPaths()
 		if len(paths) > 0 {
 			slog.Info("cogni: perception webhook paths registered", "paths", paths)
 		}
 	}
+	if !m.runtimeActive {
+		slog.Info("cogni: runtime loops enabled by pack state", "pack", cognikernelpack.PackID)
+	}
+	m.runtimeActive = true
+}
 
-	return nil
+func (m *cogniModule) cogniRuntimeActive() bool {
+	m.runtimeMu.Lock()
+	defer m.runtimeMu.Unlock()
+	return m.runtimeActive
 }
 
 // initExperienceStores creates/updates per-cogni ExperienceStore instances
@@ -500,6 +578,18 @@ func (m *cogniModule) initExperienceStores() {
 	}
 }
 
+func (m *cogniModule) clearCogniRuntimeState() {
+	for id := range m.experiences {
+		delete(m.experiences, id)
+	}
+	if m.mcpMgr != nil {
+		m.mcpMgr.CloseAll()
+	}
+	if m.bus != nil {
+		m.bus.Clear()
+	}
+}
+
 func (m *cogniModule) Stop() error {
 	if m.scheduler != nil {
 		m.scheduler.Stop()
@@ -513,6 +603,9 @@ func (m *cogniModule) Stop() error {
 	if m.fileLog != nil {
 		_ = m.fileLog.Close()
 	}
+	m.runtimeMu.Lock()
+	m.runtimeActive = false
+	m.runtimeMu.Unlock()
 	return nil
 }
 
@@ -567,11 +660,12 @@ func cogniAutoDisableFromEnv() bool {
 }
 
 func (m *cogniModule) Status() agentrt.ModuleStatus {
+	enabled := m.registry != nil && m.cogniKernelPackEnabled()
 	return agentrt.ModuleStatus{
 		Name:        m.Name(),
 		Description: m.Description(),
 		Profile:     m.Profile(),
-		Enabled:     m.registry != nil,
-		Running:     m.registry != nil,
+		Enabled:     enabled,
+		Running:     enabled && m.cogniRuntimeActive(),
 	}
 }

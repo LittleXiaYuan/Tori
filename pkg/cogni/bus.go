@@ -193,6 +193,16 @@ func (b *CogniBus) ActiveCognis() int {
 	return len(b.cognis)
 }
 
+// Clear removes all registered cognis and custom bidders. Runtime owners call
+// this when the Cogni Kernel pack is disabled so stale declarations no longer
+// participate in background routing.
+func (b *CogniBus) Clear() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.cognis = make(map[string]*Declaration)
+	b.bidders = make(map[string]Bidder)
+}
+
 func joinReasons(reasons []string) string {
 	if len(reasons) == 0 {
 		return ""

@@ -70,6 +70,12 @@ func (ps *PerceptionScheduler) Stop() {
 	ps.done = make(chan struct{})
 }
 
+// Refresh rebuilds the cron table from the current declaration registry. It is
+// safe to call while the scheduler is running or stopped.
+func (ps *PerceptionScheduler) Refresh() {
+	ps.refresh()
+}
+
 func (ps *PerceptionScheduler) loop() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
