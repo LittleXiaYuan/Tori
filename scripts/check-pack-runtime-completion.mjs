@@ -448,6 +448,8 @@ requireTokens("memory-time-travel 蓝图能力包", memoryTimeTravelPack + memor
   "rollback_writeback_ready",
   "cfg.DataPath(\"memory-time-travel\")",
   "json-memory-time-travel-evidence",
+  "audit-verification.json",
+  "audit_verification",
   "http.MethodPost",
   "yunque-client/memory-time-travel",
   "Memory Time Travel Pack",

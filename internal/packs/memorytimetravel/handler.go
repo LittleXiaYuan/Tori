@@ -463,14 +463,26 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	snapshots, _ := h.listSnapshots(snapshot.Namespace)
-	writeJSON(w, http.StatusOK, map[string]any{
+	payload := map[string]any{
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
-	})
+	}
+	if h.merkleVerifier != nil {
+		auditVerification, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), 10)
+		if err != nil {
+			payload["audit_verification_error"] = err.Error()
+		} else {
+			if auditVerification.CheckedAt.IsZero() {
+				auditVerification.CheckedAt = h.now().UTC()
+			}
+			payload["audit_verification"] = auditVerification
+		}
+	}
+	writeJSON(w, http.StatusOK, payload)
 }
 
 func (h *Handler) statusNotes() []string {

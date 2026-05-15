@@ -125,7 +125,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -218,4 +218,61 @@ func TestMemoryTimeTravelAuditVerifyUsesMerkleVerifier(t *testing.T) {
 	if got.CheckedAt != now {
 		t.Fatalf("expected handler to fill checked_at from Now when verifier omits it, got %s", got.CheckedAt)
 	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/missing", nil)
+	h.Evidence(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("missing evidence should still 404 before audit verification, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *testing.T) {
+	now := time.Date(2026, 5, 15, 14, 0, 0, 0, time.UTC)
+	verifier := &fakeMerkleVerifier{result: MerkleVerification{
+		Ready:        true,
+		Valid:        true,
+		InvalidIndex: -1,
+		RecordCount:  1,
+		LastSeq:      1,
+		LastHash:     "hash-1",
+	}}
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, MerkleVerifier: verifier})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"baseline","values":{"goal":"ship"}}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save snapshot status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
+	h.Evidence(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var got struct {
+		Files             []string           `json:"files"`
+		AuditVerification MerkleVerification `json:"audit_verification"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode evidence: %v", err)
+	}
+	if verifier.limit != 10 || got.AuditVerification.LastHash != "hash-1" || got.AuditVerification.CheckedAt != now {
+		t.Fatalf("unexpected audit verification evidence: limit=%d got=%#v", verifier.limit, got.AuditVerification)
+	}
+	if !containsString(got.Files, "audit-verification.json") {
+		t.Fatalf("evidence files should include audit-verification.json: %#v", got.Files)
+	}
+}
+
+func containsString(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }

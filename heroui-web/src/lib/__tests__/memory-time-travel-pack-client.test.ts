@@ -49,11 +49,12 @@ describe("memory-time-travel-pack-client", () => {
   it("exports JSON evidence packs by snapshot id", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json"], snapshot: { id: "baseline", values: {} }, history: [] }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "audit-verification.json"], snapshot: { id: "baseline", values: {} }, history: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } }), { status: 200 }));
 
     const client = createMemoryTimeTravelPackClient();
-    await client.evidence("baseline");
+    const evidence = await client.evidence("baseline");
 
+    expect(evidence.audit_verification?.valid).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/evidence/baseline");
   });
 
