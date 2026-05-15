@@ -46,6 +46,7 @@ import (
 	cognitivecanarypack "yunque-agent/internal/packs/cognitivecanary"
 	guardrailfuzzerpack "yunque-agent/internal/packs/guardrailfuzzer"
 	lorapack "yunque-agent/internal/packs/lora"
+	memorytimetravelpack "yunque-agent/internal/packs/memorytimetravel"
 	rpareplaypack "yunque-agent/internal/packs/rpareplay"
 	sbomdriftpack "yunque-agent/internal/packs/sbomdrift"
 	skillanomalypack "yunque-agent/internal/packs/skillanomaly"
@@ -92,6 +93,7 @@ func initTasks(app *agentrt.App) error {
 			chaosprobepack.New(chaosprobepack.Config{DataDir: cfg.DataPath("chaos-probe")}),
 			cognitivecanarypack.New(cognitivecanarypack.Config{DataDir: cfg.DataPath("cognitive-canary")}),
 			guardrailfuzzerpack.New(guardrailfuzzerpack.Config{DataDir: cfg.DataPath("guardrail-fuzzer")}),
+			memorytimetravelpack.New(memorytimetravelpack.Config{DataDir: cfg.DataPath("memory-time-travel")}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
 			skillanomalypack.New(skillanomalypack.Config{DataDir: cfg.DataPath("skill-anomaly")}),
@@ -393,6 +395,7 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		"packs/examples/chaos-probe-pack/pack.json",
 		"packs/examples/cognitive-canary-pack/pack.json",
 		"packs/examples/guardrail-fuzzer-pack/pack.json",
+		"packs/examples/memory-time-travel-pack/pack.json",
 		"packs/examples/rpa-replay-pack/pack.json",
 		"packs/examples/sbom-drift-pack/pack.json",
 		"packs/examples/skill-anomaly-pack/pack.json",

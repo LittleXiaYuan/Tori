@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "domain": "memory-time-travel-pack",
+  "packManifest": "packs/examples/memory-time-travel-pack/pack.json",
+  "sdkImport": "yunque-client/memory-time-travel",
+  "routes": [
+    "GET /v1/memory-time-travel/status",
+    "GET /v1/memory-time-travel/snapshots",
+    "POST /v1/memory-time-travel/snapshots",
+    "GET /v1/memory-time-travel/snapshots/",
+    "POST /v1/memory-time-travel/snapshot-at",
+    "POST /v1/memory-time-travel/diff",
+    "POST /v1/memory-time-travel/rollback-plan",
+    "GET /v1/memory-time-travel/evidence/"
+  ],
+  "frontend": {
+    "menuPath": "/packs/memory-time-travel",
+    "component": "memory/MemoryTimeTravelPackPage",
+    "page": "heroui-web/src/app/packs/memory-time-travel/page.tsx",
+    "client": "heroui-web/src/lib/memory-time-travel-pack-client.ts"
+  },
+  "capabilities": [
+    "snapshotStore",
+    "snapshotAt",
+    "driftDiff",
+    "rollbackPlan",
+    "evidenceExport"
+  ]
+}

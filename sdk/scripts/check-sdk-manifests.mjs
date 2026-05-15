@@ -51,6 +51,7 @@ const checks = [
   ["Chaos Probe Pack SDK manifest", "sdk/scripts/check-chaos-probe-pack-sdk-manifest.mjs"],
   ["Cognitive Canary Pack SDK manifest", "sdk/scripts/check-cognitive-canary-pack-sdk-manifest.mjs"],
   ["Guardrail Fuzzer Pack SDK manifest", "sdk/scripts/check-guardrail-fuzzer-pack-sdk-manifest.mjs"],
+  ["Memory Time Travel Pack SDK manifest", "sdk/scripts/check-memory-time-travel-pack-sdk-manifest.mjs"],
   ["RPA Replay Pack SDK manifest", "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"],
   ["SBOM Drift Pack SDK manifest", "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"],
   ["Skill Anomaly Pack SDK manifest", "sdk/scripts/check-skill-anomaly-pack-sdk-manifest.mjs"],

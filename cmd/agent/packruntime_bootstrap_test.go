@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeCognitiveCanaryGuardrailFuzzerRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeCognitiveCanaryGuardrailFuzzerMemoryTimeTravelRPAReplaySBOMDriftSkillAnomalyAndWASMPlugin(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -85,6 +85,17 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 		t.Fatalf("unexpected Guardrail Fuzzer SDK import: %s", guardrailFuzzer.Manifest.SDK.TypeScript)
 	}
 
+	memoryTimeTravel, ok := registry.Get("yunque.pack.memory-time-travel")
+	if !ok {
+		t.Fatal("expected Memory Time Travel builtin pack to be installed")
+	}
+	if memoryTimeTravel.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected Memory Time Travel default disabled, got %s", memoryTimeTravel.Status)
+	}
+	if memoryTimeTravel.Manifest.SDK.TypeScript != "yunque-client/memory-time-travel" {
+		t.Fatalf("unexpected Memory Time Travel SDK import: %s", memoryTimeTravel.Manifest.SDK.TypeScript)
+	}
+
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
 	if !ok {
 		t.Fatal("expected RPA Replay builtin pack to be installed")
@@ -130,7 +141,7 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	}
 
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 11 {
+	if got := len(registry.List()); got != 12 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

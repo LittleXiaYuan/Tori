@@ -1,0 +1,119 @@
+{
+  "id": "yunque.pack.memory-time-travel",
+  "name": "Memory Time Travel Pack",
+  "version": "0.1.0",
+  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划和证据包导出作为可选记忆治理能力包暴露。",
+  "requiresCore": ">=0.1.0",
+  "optional": true,
+  "defaultState": "disabled",
+  "backend": {
+    "capabilities": [
+      "memory_time_travel.status",
+      "memory_time_travel.snapshot.list",
+      "memory_time_travel.snapshot.save",
+      "memory_time_travel.snapshot.detail",
+      "memory_time_travel.snapshot_at",
+      "memory_time_travel.diff",
+      "memory_time_travel.rollback_plan",
+      "memory_time_travel.evidence.export"
+    ],
+    "routes": [
+      "/v1/memory-time-travel/status",
+      "/v1/memory-time-travel/snapshots",
+      "/v1/memory-time-travel/snapshots/",
+      "/v1/memory-time-travel/snapshot-at",
+      "/v1/memory-time-travel/diff",
+      "/v1/memory-time-travel/rollback-plan",
+      "/v1/memory-time-travel/evidence/"
+    ],
+    "permissions": [
+      "memory_time_travel:read",
+      "memory_time_travel:write",
+      "memory_time_travel:audit"
+    ],
+    "routeSpecs": [
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/status",
+        "description": "Read Memory Time Travel pack shell status, readiness flags and retention policy."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/snapshots",
+        "description": "List stored memory snapshot summaries, optionally filtered by namespace."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/snapshots",
+        "description": "Save or dry-run validate one memory namespace snapshot."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/snapshots/",
+        "description": "Read one saved memory snapshot by id."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/snapshot-at",
+        "description": "Reconstruct the latest snapshot at or before a requested timestamp."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/diff",
+        "description": "Diff two memory snapshots and return drift risk plus rollback plan actions."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/rollback-plan",
+        "description": "Build a dry-run rollback plan for a selected memory snapshot."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/evidence/",
+        "description": "Export a JSON evidence pack for one memory snapshot and nearby history."
+      }
+    ]
+  },
+  "frontend": {
+    "menus": [
+      {
+        "key": "memory-time-travel",
+        "label": "Memory Time Travel",
+        "path": "/packs/memory-time-travel",
+        "icon": "history",
+        "order": 96
+      }
+    ],
+    "routes": [
+      {
+        "path": "/packs/memory-time-travel",
+        "component": "memory/MemoryTimeTravelPackPage",
+        "title": "Memory Time Travel"
+      }
+    ],
+    "assets": {
+      "type": "builtin",
+      "entry": "memory/MemoryTimeTravelPackPage"
+    }
+  },
+  "sdk": {
+    "typescript": "yunque-client/memory-time-travel"
+  },
+  "update": {
+    "channel": "stable",
+    "rollback": true
+  },
+  "metadata": {
+    "blueprint": "doc/MEMORY-TIME-TRAVEL.md",
+    "stage": "pack-shell-before-ledger-kv-history",
+    "risk": "memory-governance",
+    "sync": "backend-registry-drives-frontend"
+  },
+  "distribution": {
+    "manifestUrl": "https://packs.yunque.local/memory-time-travel-pack/pack.json",
+    "packageUrl": "https://packs.yunque.local/memory-time-travel-pack/memory-time-travel-pack-0.1.0.tgz",
+    "frontendUrl": "https://packs.yunque.local/memory-time-travel-pack/frontend/remoteEntry.js",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sizeBytes": 4096
+  }
+}
