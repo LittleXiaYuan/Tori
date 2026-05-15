@@ -99,6 +99,62 @@ type ChaosReport struct {
 	Notes         []string          `json:"notes,omitempty"`
 }
 
+type SchedulerPlanRequest struct {
+	ReportID    string            `json:"report_id,omitempty"`
+	Interval    string            `json:"interval,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type SchedulerPlanReport struct {
+	PackID                    string             `json:"pack_id"`
+	GeneratedAt               time.Time          `json:"generated_at"`
+	Status                    string             `json:"status"`
+	ReportID                  string             `json:"report_id,omitempty"`
+	Interval                  string             `json:"interval"`
+	SchedulerPlanReady        bool               `json:"scheduler_plan_ready"`
+	SchedulerReady            bool               `json:"scheduler_ready"`
+	MetricsPlanReady          bool               `json:"metrics_plan_ready"`
+	PrometheusReady           bool               `json:"prometheus_ready"`
+	DegradeWritebackPlanReady bool               `json:"degrade_writeback_plan_ready"`
+	DegradeEngineReady        bool               `json:"degrade_engine_ready"`
+	AlertWritebackPlanReady   bool               `json:"alert_writeback_plan_ready"`
+	AlertWritebackReady       bool               `json:"alert_writeback_ready"`
+	RequestedBy               string             `json:"requested_by,omitempty"`
+	Reason                    string             `json:"reason,omitempty"`
+	HealthScore               float64            `json:"health_score"`
+	DegradeLevel              int                `json:"degrade_level"`
+	GateStatus                string             `json:"gate_status"`
+	Metrics                   []MetricPlan       `json:"metrics"`
+	Alerts                    []AlertPlan        `json:"alerts,omitempty"`
+	Writebacks                []DegradeWriteback `json:"writebacks,omitempty"`
+	Actions                   []string           `json:"actions"`
+	Metadata                  map[string]string  `json:"metadata,omitempty"`
+	Notes                     []string           `json:"notes,omitempty"`
+}
+
+type MetricPlan struct {
+	Name   string            `json:"name"`
+	Type   string            `json:"type"`
+	Value  float64           `json:"value"`
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+type AlertPlan struct {
+	Severity       string `json:"severity"`
+	Route          string `json:"route"`
+	Message        string `json:"message"`
+	WritebackReady bool   `json:"writeback_ready"`
+}
+
+type DegradeWriteback struct {
+	Target         string `json:"target"`
+	Level          int    `json:"level"`
+	Reason         string `json:"reason"`
+	WritebackReady bool   `json:"writeback_ready"`
+}
+
 type ReportSummary struct {
 	ID            string    `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -138,6 +194,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/status", Handler: h.Status},
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/chaos-probe/probes", Handler: h.Probes},
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/run", Handler: h.Run},
+		{Method: http.MethodPost, Path: "/v1/chaos-probe/scheduler/plan", Handler: h.SchedulerPlan},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/evidence/", Handler: h.Evidence},
@@ -160,25 +217,33 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":               PackID,
-		"stage":                 "pack-shell-before-scheduler",
-		"safe_probe_ready":      true,
-		"scheduler_ready":       false,
-		"degrade_engine_ready":  false,
-		"alert_writeback_ready": false,
-		"probe_count":           len(probes),
-		"report_count":          len(reports),
-		"store_dir":             h.dataDir,
-		"policy":                h.policy,
-		"last_report":           firstSummary(reports),
+		"pack_id":                      PackID,
+		"stage":                        "pack-shell-before-scheduler",
+		"safe_probe_ready":             true,
+		"scheduler_plan_ready":         true,
+		"scheduler_ready":              false,
+		"metrics_plan_ready":           true,
+		"prometheus_ready":             false,
+		"degrade_writeback_plan_ready": true,
+		"degrade_engine_ready":         false,
+		"alert_writeback_plan_ready":   true,
+		"alert_writeback_ready":        false,
+		"probe_count":                  len(probes),
+		"report_count":                 len(reports),
+		"store_dir":                    h.dataDir,
+		"policy":                       h.policy,
+		"last_report":                  firstSummary(reports),
 		"capabilities": []string{
 			"chaos.probe.registry",
 			"chaos.probe.safe_run",
 			"chaos.health.score",
+			"chaos.scheduler.plan",
+			"chaos.metrics.plan",
 			"chaos.degrade.plan",
+			"chaos.alert.writeback.plan",
 			"chaos.evidence.export",
 		},
-		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, and automatic degrade-state write-back remain follow-up wiring."},
+		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, and automatic degrade-state write-back plans are available as non-destructive contracts; real scheduler/metrics/alert/degrade write-back remain follow-up wiring."},
 	})
 }
 
@@ -251,6 +316,24 @@ func (h *Handler) Run(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"report": report, "status": status})
 }
 
+func (h *Handler) SchedulerPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req SchedulerPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid chaos scheduler plan payload")
+		return
+	}
+	report, err := h.reportForSchedulerPlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildSchedulerPlan(report, req)})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -289,12 +372,14 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	plan := h.buildSchedulerPlan(report, SchedulerPlanRequest{ReportID: report.ID, Interval: "5m", RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-chaos-probe-evidence",
-		"files":       []string{"chaos-report.json", "probe-definitions.json"},
-		"report":      report,
+		"pack_id":        PackID,
+		"exported_at":    h.now().UTC(),
+		"format":         "json-chaos-probe-evidence",
+		"files":          []string{"chaos-report.json", "probe-definitions.json", "scheduler-plan.json", "metrics-plan.json", "degrade-writeback-plan.json"},
+		"report":         report,
+		"scheduler_plan": plan,
 	})
 }
 
@@ -353,6 +438,80 @@ func (h *Handler) buildReport(ctx context.Context, req ProbeRunRequest) (ChaosRe
 	}
 	summarizeReport(&report, defs, h.policy)
 	return report, nil
+}
+
+func (h *Handler) reportForSchedulerPlan(ctx context.Context, req SchedulerPlanRequest) (ChaosReport, error) {
+	if strings.TrimSpace(req.ReportID) != "" {
+		return h.loadReport(req.ReportID)
+	}
+	reports, err := h.listReports()
+	if err == nil && len(reports) > 0 {
+		if report, loadErr := h.loadReport(reports[0].ID); loadErr == nil {
+			return report, nil
+		}
+	}
+	report, err := h.buildReport(ctx, ProbeRunRequest{DryRun: true, Metadata: map[string]string{"source": "scheduler-plan"}})
+	if err != nil {
+		return ChaosReport{}, err
+	}
+	return report, nil
+}
+
+func (h *Handler) buildSchedulerPlan(report ChaosReport, req SchedulerPlanRequest) SchedulerPlanReport {
+	interval := strings.TrimSpace(req.Interval)
+	if interval == "" {
+		interval = recommendedInterval(report)
+	}
+	status := "schedule_plan"
+	if report.GateStatus == "fail" {
+		status = "degrade_writeback_plan"
+	}
+	metrics := []MetricPlan{
+		{Name: "yunque_chaos_probe_health_score", Type: "gauge", Value: report.HealthScore, Labels: map[string]string{"pack_id": PackID, "report_id": report.ID}},
+		{Name: "yunque_chaos_probe_degrade_level", Type: "gauge", Value: float64(report.DegradeLevel), Labels: map[string]string{"pack_id": PackID, "report_id": report.ID}},
+		{Name: "yunque_chaos_probe_fail_total", Type: "gauge", Value: float64(report.FailCount), Labels: map[string]string{"pack_id": PackID, "report_id": report.ID}},
+	}
+	alerts := buildAlertPlans(report)
+	writebacks := buildDegradeWritebacks(report)
+	actions := []string{
+		fmt.Sprintf("would schedule safe chaos probes every %s", interval),
+		"would expose health/degrade metrics through the Prometheus scrape surface",
+	}
+	if len(alerts) > 0 {
+		actions = append(actions, "would route alert notifications for degraded or failed probe reports")
+	}
+	if len(writebacks) > 0 {
+		actions = append(actions, "would write degrade-state changes after explicit approval")
+	}
+	return SchedulerPlanReport{
+		PackID:                    PackID,
+		GeneratedAt:               h.now().UTC(),
+		Status:                    status,
+		ReportID:                  report.ID,
+		Interval:                  interval,
+		SchedulerPlanReady:        true,
+		SchedulerReady:            false,
+		MetricsPlanReady:          true,
+		PrometheusReady:           false,
+		DegradeWritebackPlanReady: true,
+		DegradeEngineReady:        false,
+		AlertWritebackPlanReady:   true,
+		AlertWritebackReady:       false,
+		RequestedBy:               strings.TrimSpace(req.RequestedBy),
+		Reason:                    strings.TrimSpace(req.Reason),
+		HealthScore:               report.HealthScore,
+		DegradeLevel:              report.DegradeLevel,
+		GateStatus:                report.GateStatus,
+		Metrics:                   metrics,
+		Alerts:                    alerts,
+		Writebacks:                writebacks,
+		Actions:                   actions,
+		Metadata:                  req.Metadata,
+		Notes: []string{
+			"This route is non-destructive: it does not create scheduler jobs, publish Prometheus metrics, send alerts, or write degrade-state.",
+			"Use the plan shape as the contract for the later scheduler / metrics / alert / degrade write-back slice.",
+		},
+	}
 }
 
 func (h *Handler) executeProbe(ctx context.Context, def ProbeDefinition) ProbeResult {
@@ -691,6 +850,39 @@ func firstSummary(reports []ReportSummary) *ReportSummary {
 
 func reportSummary(report ChaosReport) ReportSummary {
 	return ReportSummary{ID: report.ID, CreatedAt: report.CreatedAt, ProbeCount: report.ProbeCount, PassCount: report.PassCount, DegradedCount: report.DegradedCount, FailCount: report.FailCount, HealthScore: report.HealthScore, DegradeLevel: report.DegradeLevel, GateStatus: report.GateStatus}
+}
+
+func recommendedInterval(report ChaosReport) string {
+	if report.GateStatus == "fail" {
+		return "1m"
+	}
+	if report.GateStatus == "warn" || report.DegradeLevel > 0 {
+		return "5m"
+	}
+	return "15m"
+}
+
+func buildAlertPlans(report ChaosReport) []AlertPlan {
+	if report.GateStatus == "pass" && report.DegradeLevel == 0 {
+		return nil
+	}
+	severity := "warning"
+	if report.GateStatus == "fail" || report.DegradeLevel >= 2 {
+		severity = "critical"
+	}
+	message := fmt.Sprintf("Chaos Probe %s: health %.1f, degrade level %d", report.GateStatus, report.HealthScore, report.DegradeLevel)
+	return []AlertPlan{{Severity: severity, Route: "ops.alerts.chaos_probe", Message: message, WritebackReady: false}}
+}
+
+func buildDegradeWritebacks(report ChaosReport) []DegradeWriteback {
+	if report.DegradeLevel <= 0 && report.GateStatus == "pass" {
+		return nil
+	}
+	reason := "chaos probe reported degraded health"
+	if len(report.Remediations) > 0 {
+		reason = report.Remediations[0]
+	}
+	return []DegradeWriteback{{Target: "runtime.degrade_state", Level: report.DegradeLevel, Reason: reason, WritebackReady: false}}
 }
 
 func (h *Handler) definitionsPath() string { return filepath.Join(h.dataDir, "probe-definitions.json") }

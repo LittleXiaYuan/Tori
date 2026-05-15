@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "chaos-probe-pack",
-  "description": "Chaos Probe capability pack manifest binding for Pack Runtime route gates, frontend sync, safe probe definitions, one-shot health checks, degrade summaries, remediation hints, evidence export, and lightweight SDK import discovery.",
+  "description": "Chaos Probe capability pack manifest binding for Pack Runtime route gates, frontend sync, safe probe definitions, one-shot health checks, scheduler planning, metrics planning, degrade summaries, remediation hints, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose safe chaos probes, health scoring, degrade planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded operations console feature.",
+    "Expose safe chaos probes, health scoring, scheduler/metrics/degrade/alert planning, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded operations console feature.",
     "Keep Chaos Probe method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/chaos-probe only when the Chaos Probe pack is installed and enabled."
   ],
@@ -14,6 +14,7 @@
     "GET /v1/chaos-probe/probes",
     "POST /v1/chaos-probe/probes",
     "POST /v1/chaos-probe/run",
+    "POST /v1/chaos-probe/scheduler/plan",
     "GET /v1/chaos-probe/reports",
     "GET /v1/chaos-probe/reports/",
     "GET /v1/chaos-probe/evidence/"

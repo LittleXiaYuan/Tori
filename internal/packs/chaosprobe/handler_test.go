@@ -15,8 +15,8 @@ func TestChaosProbeHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 6 {
-		t.Fatalf("expected 6 Chaos Probe routes, got %d", len(routes))
+	if len(routes) != 7 {
+		t.Fatalf("expected 7 Chaos Probe routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -30,17 +30,30 @@ func TestChaosProbeHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/chaos-probe/status":    {http.MethodGet},
-		"/v1/chaos-probe/probes":    {http.MethodGet, http.MethodPost},
-		"/v1/chaos-probe/run":       {http.MethodPost},
-		"/v1/chaos-probe/reports":   {http.MethodGet},
-		"/v1/chaos-probe/reports/":  {http.MethodGet},
-		"/v1/chaos-probe/evidence/": {http.MethodGet},
+		"/v1/chaos-probe/status":         {http.MethodGet},
+		"/v1/chaos-probe/probes":         {http.MethodGet, http.MethodPost},
+		"/v1/chaos-probe/run":            {http.MethodPost},
+		"/v1/chaos-probe/scheduler/plan": {http.MethodPost},
+		"/v1/chaos-probe/reports":        {http.MethodGet},
+		"/v1/chaos-probe/reports/":       {http.MethodGet},
+		"/v1/chaos-probe/evidence/":      {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
 			t.Fatalf("expected %s methods %s, got %s", path, want, got)
 		}
+	}
+}
+
+func TestChaosProbeSchedulerPlanIsNonDestructive(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, Policy: ProbePolicy{MemoryWarnBytes: ^uint64(0)}})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/scheduler/plan", strings.NewReader(`{"interval":"2m","requested_by":"unit"}`))
+	h.SchedulerPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"scheduler_plan_ready":true`) || !strings.Contains(w.Body.String(), `"scheduler_ready":false`) || !strings.Contains(w.Body.String(), "yunque_chaos_probe_health_score") {
+		t.Fatalf("scheduler plan status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

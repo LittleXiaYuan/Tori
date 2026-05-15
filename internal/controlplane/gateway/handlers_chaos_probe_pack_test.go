@@ -76,6 +76,20 @@ func TestChaosProbePackCanSaveDefinitionsAndRunProbe(t *testing.T) {
 	}
 }
 
+func TestChaosProbePackCanPlanScheduler(t *testing.T) {
+	gw, tm := newTestGatewayWithChaosProbePack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("chaos-probe-scheduler-plan")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/scheduler/plan", strings.NewReader(`{"interval":"5m","requested_by":"gateway-test"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"scheduler_plan_ready":true`) || !strings.Contains(w.Body.String(), `"scheduler_ready":false`) {
+		t.Fatalf("scheduler plan status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
 	t.Helper()
 	registry, err := packruntime.NewRegistry(t.TempDir())
@@ -93,6 +107,7 @@ func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatu
 				"/v1/chaos-probe/status",
 				"/v1/chaos-probe/probes",
 				"/v1/chaos-probe/run",
+				"/v1/chaos-probe/scheduler/plan",
 				"/v1/chaos-probe/reports",
 				"/v1/chaos-probe/reports/",
 				"/v1/chaos-probe/evidence/",
@@ -102,6 +117,7 @@ func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatu
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/probes"},
 				{Method: http.MethodPost, Path: "/v1/chaos-probe/probes"},
 				{Method: http.MethodPost, Path: "/v1/chaos-probe/run"},
+				{Method: http.MethodPost, Path: "/v1/chaos-probe/scheduler/plan"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/reports"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/reports/"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/evidence/"},

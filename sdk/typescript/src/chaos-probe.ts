@@ -1,9 +1,9 @@
 /**
  * Lightweight Chaos Probe Pack SDK slice.
  *
- * This keeps safe probe definitions, one-shot health checks, degrade summaries,
- * remediation hints, and evidence export usable without importing the full
- * generated OpenAPI SDK:
+ * This keeps safe probe definitions, one-shot health checks, scheduler /
+ * metrics / alert write-back plans, degrade summaries, remediation hints, and
+ * evidence export usable without importing the full generated OpenAPI SDK:
  *
  *   import { createChaosProbeClient } from "yunque-client/chaos-probe";
  */
@@ -73,8 +73,13 @@ export type ChaosProbeStatusResponse = {
   pack_id: string;
   stage: string;
   safe_probe_ready: boolean;
+  scheduler_plan_ready: boolean;
   scheduler_ready: boolean;
+  metrics_plan_ready: boolean;
+  prometheus_ready: boolean;
+  degrade_writeback_plan_ready: boolean;
   degrade_engine_ready: boolean;
+  alert_writeback_plan_ready: boolean;
   alert_writeback_ready: boolean;
   probe_count: number;
   report_count: number;
@@ -109,6 +114,66 @@ export type ChaosProbeRunResponse = {
   status: string;
 };
 
+export type ChaosProbeSchedulerPlanRequest = {
+  report_id?: string;
+  interval?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
+export type ChaosProbeMetricPlan = {
+  name: string;
+  type: string;
+  value: number;
+  labels?: Record<string, string>;
+};
+
+export type ChaosProbeAlertPlan = {
+  severity: string;
+  route: string;
+  message: string;
+  writeback_ready: boolean;
+};
+
+export type ChaosProbeDegradeWritebackPlan = {
+  target: string;
+  level: number;
+  reason: string;
+  writeback_ready: boolean;
+};
+
+export type ChaosProbeSchedulerPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id?: string;
+  interval: string;
+  scheduler_plan_ready: boolean;
+  scheduler_ready: boolean;
+  metrics_plan_ready: boolean;
+  prometheus_ready: boolean;
+  degrade_writeback_plan_ready: boolean;
+  degrade_engine_ready: boolean;
+  alert_writeback_plan_ready: boolean;
+  alert_writeback_ready: boolean;
+  requested_by?: string;
+  reason?: string;
+  health_score: number;
+  degrade_level: number;
+  gate_status: string;
+  metrics: ChaosProbeMetricPlan[];
+  alerts?: ChaosProbeAlertPlan[];
+  writebacks?: ChaosProbeDegradeWritebackPlan[];
+  actions: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type ChaosProbeSchedulerPlanResponse = {
+  plan: ChaosProbeSchedulerPlan;
+};
+
 export type ChaosProbeReportsResponse = {
   reports: ChaosProbeReportSummary[];
   count: number;
@@ -124,6 +189,7 @@ export type ChaosProbeEvidenceResponse = {
   format: string;
   files: string[];
   report: ChaosProbeReport;
+  scheduler_plan?: ChaosProbeSchedulerPlan;
 };
 
 export type ChaosProbeClientOptions = {
@@ -221,6 +287,10 @@ export class ChaosProbeClient {
 
   run(input: ChaosProbeRunRequest = {}): Promise<ChaosProbeRunResponse> {
     return this.request<ChaosProbeRunResponse>("POST", "/v1/chaos-probe/run", input);
+  }
+
+  schedulerPlan(input: ChaosProbeSchedulerPlanRequest = {}): Promise<ChaosProbeSchedulerPlanResponse> {
+    return this.request<ChaosProbeSchedulerPlanResponse>("POST", "/v1/chaos-probe/scheduler/plan", input);
   }
 
   reports(): Promise<ChaosProbeReportsResponse> {
