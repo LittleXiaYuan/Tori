@@ -547,6 +547,10 @@
       "types": "./src/rpa-replay.ts",
       "import": "./src/rpa-replay.ts"
     },
+    "./sbom-drift": {
+      "types": "./src/sbom-drift.ts",
+      "import": "./src/sbom-drift.ts"
+    },
     "./browser-status": {
       "types": "./src/browser-status.ts",
       "import": "./src/browser-status.ts"

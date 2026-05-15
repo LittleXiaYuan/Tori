@@ -117,8 +117,12 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + "\n"
   + readText("internal/packs/browserintent/handler.go")
   + "\n"
-  + readText("internal/packs/rpareplay/handler.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+  + readText("internal/packs/rpareplay/handler.go")
+  + "\n"
+  + readText("internal/packs/sbomdrift/handler.go")
+  + "\n"
+  + readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go");
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackBackendModules", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackBackendModulesExposeMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "HandleCogniKernelPack", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -355,6 +359,52 @@ for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-
 }
 for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", "rpaReplayEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes RPA Replay method: ${token}`);
+}
+
+
+const sbomDriftManifest = readJSON("packs/examples/sbom-drift-pack/pack.json");
+const sbomDriftSource = readText("internal/packs/sbomdrift/handler.go");
+const sbomDriftGateTest = readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go");
+const sbomDriftPage = readText("heroui-web/src/app/packs/sbom-drift/page.tsx");
+const sbomDriftClient = readText("heroui-web/src/lib/sbom-drift-pack-client.ts");
+const sbomDriftClientTest = readText("heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
+const sbomDriftSdk = readText("sdk/typescript/src/sbom-drift.ts") + "\n" + readText("sdk/typescript/src/sbom-drift.test.ts");
+if (sbomDriftManifest) {
+  if (!sbomDriftSource.includes(`const PackID = "${sbomDriftManifest.id}"`)) {
+    fail("SBOM Drift pack handler PackID must match packs/examples/sbom-drift-pack/pack.json");
+  }
+  for (const route of sbomDriftManifest.backend?.routes ?? []) {
+    if (!sbomDriftSource.includes(route)) fail(`SBOM Drift handler missing route declared in manifest: ${route}`);
+  }
+  for (const method of ["http.MethodGet", "http.MethodPost"]) {
+    if (!sbomDriftSource.includes(method)) fail(`SBOM Drift handler missing method gate declaration: ${method}`);
+  }
+  if (sbomDriftManifest.frontend?.menus?.[0]?.path !== "/packs/sbom-drift") fail("SBOM Drift menu path must stay under /packs/sbom-drift");
+  if (sbomDriftManifest.frontend?.routes?.[0]?.component !== "sbom/SBOMDriftPackPage") fail("SBOM Drift frontend route component drifted");
+  if (sbomDriftManifest.sdk?.typescript !== "yunque-client/sbom-drift") fail("SBOM Drift SDK import must stay yunque-client/sbom-drift");
+  if (sbomDriftManifest.defaultState !== "disabled") fail("SBOM Drift pack must remain default disabled before CI scanner readiness");
+  if (sbomDriftManifest.metadata?.stage !== "pack-shell-before-ci") fail("SBOM Drift pack stage must remain pack-shell-before-ci");
+}
+if (sbomDriftPage.includes('from "@/lib/api"') || sbomDriftPage.includes("api.sbom") || !sbomDriftPage.includes("createSBOMDriftPackClient")) {
+  fail("SBOM Drift pack page must use sbom-drift-pack-client instead of monolithic api object");
+}
+for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/evidence/", 'method: "POST"']) {
+  if (!sbomDriftClient.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
+}
+if (!gatewaySource.includes('cfg.DataPath("sbom-drift")')) {
+  fail("SBOM Drift runtime store must be wired through the configured data directory");
+}
+for (const token of ["TestSBOMDrift", "StatusNotFound", "StatusMethodNotAllowed", "/v1/sbom-drift/diff"]) {
+  if (!sbomDriftGateTest.includes(token)) fail(`SBOM Drift gateway gate test missing token: ${token}`);
+}
+for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/evidence/"]) {
+  if (!sbomDriftSdk.includes(token)) fail(`SBOM Drift TypeScript SDK missing token: ${token}`);
+}
+for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/evidence/baseline"]) {
+  if (!sbomDriftClientTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
+}
+for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
+  if (apiSource.includes(token)) fail(`monolithic api.ts still exposes SBOM Drift method: ${token}`);
 }
 
 if (failures.length > 0) {

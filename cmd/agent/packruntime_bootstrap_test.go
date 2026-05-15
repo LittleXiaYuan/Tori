@@ -6,7 +6,7 @@ import (
 	"yunque-agent/pkg/packruntime"
 )
 
-func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentAndRPAReplay(t *testing.T) {
+func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentRPAReplayAndSBOMDrift(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -63,8 +63,19 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentAndRPARepla
 		t.Fatalf("unexpected RPA Replay SDK import: %s", rpaReplay.Manifest.SDK.TypeScript)
 	}
 
+	sbomDrift, ok := registry.Get("yunque.pack.sbom-drift")
+	if !ok {
+		t.Fatal("expected SBOM Drift builtin pack to be installed")
+	}
+	if sbomDrift.Status != packruntime.PackStatusDisabled {
+		t.Fatalf("expected SBOM Drift default disabled, got %s", sbomDrift.Status)
+	}
+	if sbomDrift.Manifest.SDK.TypeScript != "yunque-client/sbom-drift" {
+		t.Fatalf("unexpected SBOM Drift SDK import: %s", sbomDrift.Manifest.SDK.TypeScript)
+	}
+
 	ensureBuiltinPacks(registry)
-	if got := len(registry.List()); got != 5 {
+	if got := len(registry.List()); got != 6 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
 }

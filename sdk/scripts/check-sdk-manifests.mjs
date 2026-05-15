@@ -49,6 +49,7 @@ const checks = [
   ["Cogni Kernel Pack SDK manifest", "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs"],
   ["Browser Intent Pack SDK manifest", "sdk/scripts/check-browser-intent-pack-sdk-manifest.mjs"],
   ["RPA Replay Pack SDK manifest", "sdk/scripts/check-rpa-replay-pack-sdk-manifest.mjs"],
+  ["SBOM Drift Pack SDK manifest", "sdk/scripts/check-sbom-drift-pack-sdk-manifest.mjs"],
   ["Workflow SDK manifest", "sdk/scripts/check-workflow-sdk-manifest.mjs"],
   ["Connectors SDK manifest", "sdk/scripts/check-connectors-sdk-manifest.mjs"],
   ["Notify SDK manifest", "sdk/scripts/check-notify-sdk-manifest.mjs"],
