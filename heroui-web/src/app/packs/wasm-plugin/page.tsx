@@ -87,7 +87,9 @@ function sampleRemoteInstallPlan(slug: string) {
       sha256:
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       signature: "sig-ed25519-preview",
+      signature_algorithm: "ed25519",
       public_key_id: "yunque-root-2026",
+      trust_root: "yunque-root-bundle-2026",
       capabilities: ["tool.calculator", "wasm.sandbox.execute"],
       tags: ["remote", "signed-package"],
       requested_by: "operator",
@@ -97,6 +99,8 @@ function sampleRemoteInstallPlan(slug: string) {
     2,
   );
 }
+
+const remoteSignatureBlockedStatus = "blocked_until_signature_verifier";
 
 function sampleRemoteApprovalPlan(slug: string) {
   return JSON.stringify(
@@ -110,7 +114,9 @@ function sampleRemoteApprovalPlan(slug: string) {
       sha256:
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       signature: "sig-ed25519-preview",
+      signature_algorithm: "ed25519",
       public_key_id: "yunque-root-2026",
+      trust_root: "yunque-root-bundle-2026",
       requested_by: "operator",
       reason: "remote WASM package must be approved before install wiring",
       risk_tier: "high",
@@ -628,6 +634,11 @@ export default function WASMPluginPackPage() {
                 {String(remoteApprovalPlan?.writes_approval_queue ?? false)}
               </Chip>
               <Chip size="sm">
+                signature_gate:{" "}
+                {remoteApprovalPlan?.signature_verification?.status ||
+                  "pending"}
+              </Chip>
+              <Chip size="sm">
                 downloads: {String(remoteApprovalPlan?.downloads ?? false)}
               </Chip>
               <Chip size="sm">
@@ -669,7 +680,8 @@ export default function WASMPluginPackPage() {
                 >
                   plan-only 契约：只生成 remote-install-plan.json /
                   signature-verification.json
-                  预览，不下载、不联网、不写文件、不注册插件、不验证真实签名。
+                  预览，并固定 signature verification gate
+                  的算法、信任根和阻断状态；不下载、不联网、不写文件、不注册插件、不验证真实签名。
                 </div>
               </div>
               <Button
@@ -714,6 +726,44 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 signature_verify_ready:{" "}
                 {String(remoteInstallPlan?.signature_verify_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                signature_verification_plan_ready:{" "}
+                {String(
+                  remoteInstallPlan?.signature_verification
+                    ?.signature_verification_plan_ready ??
+                    status?.signature_verification_plan_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                verifier_gate_ready:{" "}
+                {String(
+                  remoteInstallPlan?.signature_verification
+                    ?.verification_gate_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                signature_status:{" "}
+                {remoteInstallPlan?.signature_verification?.status ||
+                  remoteSignatureBlockedStatus}
+              </Chip>
+              <Chip size="sm">
+                allows_install:{" "}
+                {String(
+                  remoteInstallPlan?.signature_verification?.allows_install ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                signature_algorithm:{" "}
+                {remoteInstallPlan?.signature_verification?.algorithm ||
+                  "ed25519"}
+              </Chip>
+              <Chip size="sm">
+                trust_root:{" "}
+                {remoteInstallPlan?.signature_verification?.trust_root ||
+                  "yunque-root-bundle-2026"}
               </Chip>
               <Chip size="sm">
                 downloads: {String(remoteInstallPlan?.downloads ?? false)}

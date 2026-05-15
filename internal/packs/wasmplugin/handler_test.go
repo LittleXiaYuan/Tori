@@ -126,7 +126,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","capabilities":["math.add"],"tags":["remote"]}`))
 	h.RemoteInstallPlan(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "signature-verification.json") {
 		t.Fatalf("remote install plan status=%d body=%s", w.Code, w.Body.String())
 	}
 	var remotePlanResp struct {
@@ -140,6 +140,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if remotePlanResp.Plan.SignatureVerifyReady || remotePlanResp.Plan.Package.Signature != "sig-ed25519" || remotePlanResp.Plan.Package.PublicKeyID != "yunque-root-2026" || remotePlanResp.Plan.Plugin.Slug != "calculator-remote" {
 		t.Fatalf("remote install plan should capture signature metadata and plugin slug: %#v", remotePlanResp.Plan)
+	}
+	if !remotePlanResp.Plan.SignatureVerification.SignatureVerificationPlanReady || remotePlanResp.Plan.SignatureVerification.VerificationGateReady || remotePlanResp.Plan.SignatureVerification.SignatureVerifyReady || remotePlanResp.Plan.SignatureVerification.AllowsInstall || !remotePlanResp.Plan.SignatureVerification.Blocked {
+		t.Fatalf("remote install plan should expose a conservative signature verification gate preview: %#v", remotePlanResp.Plan.SignatureVerification)
+	}
+	if remotePlanResp.Plan.SignatureVerification.Algorithm != "ed25519" || remotePlanResp.Plan.SignatureVerification.Status != "blocked_invalid_sha256" || remotePlanResp.Plan.SignatureVerification.Downloads || remotePlanResp.Plan.SignatureVerification.WritesFiles || remotePlanResp.Plan.SignatureVerification.NetworkAccess || remotePlanResp.Plan.SignatureVerification.CanonicalPayloadSHA256 == "" {
+		t.Fatalf("signature verification gate should be deterministic and non-destructive: %#v", remotePlanResp.Plan.SignatureVerification)
 	}
 
 	w = httptest.NewRecorder()
@@ -159,6 +165,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if approvalPlanResp.Plan.Decision != "requires_approval" || approvalPlanResp.Plan.RiskTier != "critical" || approvalPlanResp.Plan.RequestedBy != "operator" || len(approvalPlanResp.Plan.Approvers) != 2 {
 		t.Fatalf("remote approval plan should capture approval routing metadata: %#v", approvalPlanResp.Plan)
+	}
+	if !approvalPlanResp.Plan.SignatureVerification.SignatureVerificationPlanReady || approvalPlanResp.Plan.SignatureVerification.VerificationGateReady || approvalPlanResp.Plan.SignatureVerification.AllowsInstall {
+		t.Fatalf("remote approval plan should embed the same signature verification gate preview: %#v", approvalPlanResp.Plan.SignatureVerification)
 	}
 
 	w = httptest.NewRecorder()
@@ -235,12 +244,13 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		Files               []string                        `json:"files"`
-		HostABIPlan         HostABIPlan                     `json:"host_abi_plan"`
-		HostABIGate         HostABIExecutionGate            `json:"host_abi_gate"`
-		ModuleIntegrityGate ModuleIntegrityGate             `json:"module_integrity_gate"`
-		RemoteInstallPlan   RemoteInstallPlanReport         `json:"remote_install_plan"`
-		ApprovalGatePlan    RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
+		Files                 []string                        `json:"files"`
+		HostABIPlan           HostABIPlan                     `json:"host_abi_plan"`
+		HostABIGate           HostABIExecutionGate            `json:"host_abi_gate"`
+		ModuleIntegrityGate   ModuleIntegrityGate             `json:"module_integrity_gate"`
+		RemoteInstallPlan     RemoteInstallPlanReport         `json:"remote_install_plan"`
+		SignatureVerification SignatureVerificationPlan       `json:"signature_verification"`
+		ApprovalGatePlan      RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -257,8 +267,39 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if !evidenceResp.RemoteInstallPlan.RemoteInstallPlanReady || evidenceResp.RemoteInstallPlan.RemoteInstallReady {
 		t.Fatalf("evidence should include remote install plan preview: %#v", evidenceResp.RemoteInstallPlan)
 	}
+	if !containsString(evidenceResp.Files, "signature-verification.json") || !evidenceResp.SignatureVerification.SignatureVerificationPlanReady || evidenceResp.SignatureVerification.SignatureVerifyReady || evidenceResp.SignatureVerification.AllowsInstall {
+		t.Fatalf("evidence should include signature verification gate preview: files=%#v gate=%#v", evidenceResp.Files, evidenceResp.SignatureVerification)
+	}
 	if !evidenceResp.ApprovalGatePlan.ApprovalGatePlanReady || evidenceResp.ApprovalGatePlan.ApprovalGateReady || !evidenceResp.ApprovalGatePlan.RequiresApproval {
 		t.Fatalf("evidence should include approval gate plan preview: %#v", evidenceResp.ApprovalGatePlan)
+	}
+}
+
+func TestWASMPluginRemoteInstallSignatureVerificationPlan(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
+	h := New(Config{PluginDir: t.TempDir(), DataDir: t.TempDir(), Sandbox: &fakeWasmExecutor{}, Now: func() time.Time { return now }})
+	body := `{"slug":"signed-calc","name":"Signed Calculator","version":"1.0.0","package_url":"https://packs.yunque.local/wasm/signed-calc-1.0.0.tgz","manifest_url":"https://packs.yunque.local/wasm/signed-calc.json","module_path":"signed-calc.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"ed25519:preview","signature_algorithm":"Ed25519","public_key_id":"yunque-root-2026","trust_root":"yunque-root-bundle-2026"}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(body))
+	h.RemoteInstallPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "signature_verification") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") {
+		t.Fatalf("remote install signature plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Plan RemoteInstallPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode remote signature plan: %v", err)
+	}
+	sig := resp.Plan.SignatureVerification
+	if !sig.SignatureVerificationPlanReady || sig.VerificationGateReady || sig.SignatureVerifyReady || !sig.Required || sig.AllowsInstall || !sig.Blocked {
+		t.Fatalf("signature verification plan should be a blocking plan-only gate: %#v", sig)
+	}
+	if sig.Status != "blocked_until_signature_verifier" || sig.Algorithm != "ed25519" || !sig.SignatureProvided || !sig.PublicKeyIDPresent || !sig.ExpectedSHA256FormatValid {
+		t.Fatalf("signature verification plan should normalize metadata and valid SHA-256: %#v", sig)
+	}
+	if sig.TrustRoot != "yunque-root-bundle-2026" || sig.CanonicalPayloadSHA256 == "" || sig.Downloads || sig.WritesFiles || sig.NetworkAccess || sig.Artifact != "signature-verification.json" {
+		t.Fatalf("signature verification plan should remain deterministic and non-destructive: %#v", sig)
 	}
 }
 

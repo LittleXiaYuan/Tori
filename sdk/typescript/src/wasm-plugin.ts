@@ -26,6 +26,12 @@ export const WASM_PLUGIN_MODULE_INTEGRITY_GATE_CAPABILITY =
 export const WASM_PLUGIN_MODULE_INTEGRITY_BLOCKED_STATUS =
   "blocked_module_sha256_mismatch";
 
+export const WASM_PLUGIN_REMOTE_SIGNATURE_VERIFICATION_CAPABILITY =
+  "wasm.remote_install.signature_verification_plan";
+
+export const WASM_PLUGIN_REMOTE_SIGNATURE_BLOCKED_STATUS =
+  "blocked_until_signature_verifier";
+
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -68,6 +74,8 @@ export type WASMPluginStatusResponse = {
   module_integrity_gate_ready: boolean;
   remote_install_plan_ready: boolean;
   remote_install_ready: boolean;
+  signature_verification_plan_ready: boolean;
+  signature_verify_ready: boolean;
   approval_gate_plan_ready: boolean;
   approval_gate_ready: boolean;
   plugin_count: number;
@@ -208,7 +216,9 @@ export type WASMPluginRemoteInstallPlanRequest = {
   module_path?: string;
   sha256?: string;
   signature?: string;
+  signature_algorithm?: string;
   public_key_id?: string;
+  trust_root?: string;
   entrypoint?: string;
   requested_by?: string;
   reason?: string;
@@ -226,7 +236,9 @@ export type WASMPluginRemoteInstallApprovalPlanRequest = {
   module_path?: string;
   sha256?: string;
   signature?: string;
+  signature_algorithm?: string;
   public_key_id?: string;
+  trust_root?: string;
   entrypoint?: string;
   requested_by?: string;
   reason?: string;
@@ -251,10 +263,39 @@ export type WASMPluginRemoteInstallPackagePlan = {
   package_url: string;
   expected_sha256?: string;
   signature?: string;
+  signature_algorithm?: string;
   public_key_id?: string;
+  trust_root?: string;
   manifest_artifact: string;
   package_artifact: string;
   cache_key: string;
+};
+
+export type WASMPluginSignatureVerificationPlan = {
+  pack_id: string;
+  generated_at: string;
+  signature_verification_plan_ready: boolean;
+  verification_gate_ready: boolean;
+  signature_verify_ready: boolean;
+  required: boolean;
+  allows_install: boolean;
+  blocked: boolean;
+  status: string;
+  algorithm: string;
+  signature_provided: boolean;
+  public_key_id_present: boolean;
+  public_key_id?: string;
+  trust_root?: string;
+  expected_sha256?: string;
+  expected_sha256_format_valid: boolean;
+  canonical_payload_sha256: string;
+  artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  checks: WASMPluginRemoteInstallCheck[];
+  labels: string[];
+  notes?: string[];
 };
 
 export type WASMPluginRemoteInstallCheck = {
@@ -278,6 +319,7 @@ export type WASMPluginRemoteInstallPlan = {
   network_access: boolean;
   plugin: WASMPluginRemoteInstallPluginPlan;
   package: WASMPluginRemoteInstallPackagePlan;
+  signature_verification: WASMPluginSignatureVerificationPlan;
   checks: WASMPluginRemoteInstallCheck[];
   artifacts: string[];
   actions: string[];
@@ -311,6 +353,7 @@ export type WASMPluginRemoteInstallApprovalPlan = {
   reason?: string;
   plugin: WASMPluginRemoteInstallPluginPlan;
   package: WASMPluginRemoteInstallPackagePlan;
+  signature_verification: WASMPluginSignatureVerificationPlan;
   checks: WASMPluginRemoteInstallCheck[];
   approvers?: string[];
   artifacts: string[];
@@ -359,6 +402,7 @@ export type WASMPluginEvidenceResponse = {
   host_abi_gate: WASMPluginHostABIExecutionGate;
   module_integrity_gate: WASMPluginModuleIntegrityGate;
   remote_install_plan: WASMPluginRemoteInstallPlan;
+  signature_verification: WASMPluginSignatureVerificationPlan;
   approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
   sandbox?: Record<string, unknown>;
 };

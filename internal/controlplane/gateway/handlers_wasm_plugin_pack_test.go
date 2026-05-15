@@ -34,7 +34,7 @@ func TestWASMPluginPackRoutesStatusWhenEnabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "host_abi_execution_gate_ready") || !strings.Contains(w.Body.String(), "host_abi_enforcement_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.execution_gate") || !strings.Contains(w.Body.String(), "module_integrity_gate_ready") || !strings.Contains(w.Body.String(), "wasm.module.integrity_gate") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "host_abi_execution_gate_ready") || !strings.Contains(w.Body.String(), "host_abi_enforcement_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.execution_gate") || !strings.Contains(w.Body.String(), "module_integrity_gate_ready") || !strings.Contains(w.Body.String(), "wasm.module.integrity_gate") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.signature_verification_plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") {
 		t.Fatalf("enabled WASM Plugin pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
@@ -82,15 +82,15 @@ func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
 		t.Fatalf("dry-run execute status=%d body=%s", w.Code, w.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","package_url":"https://packs.yunque.local/wasm/calculator-remote.tgz","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig","public_key_id":"root"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","package_url":"https://packs.yunque.local/wasm/calculator-remote.tgz","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"sig","public_key_id":"root"}`))
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "blocked_until_signature_verifier") || !strings.Contains(w.Body.String(), "signature-verification.json") {
 		t.Fatalf("remote install plan status=%d body=%s", w.Code, w.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","package_url":"https://packs.yunque.local/wasm/calculator-remote.tgz","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig","public_key_id":"root","requested_by":"operator","reason":"test approval","risk_tier":"high","approvers":["security"]}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","package_url":"https://packs.yunque.local/wasm/calculator-remote.tgz","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","signature":"sig","public_key_id":"root","requested_by":"operator","reason":"test approval","risk_tier":"high","approvers":["security"]}`))
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
