@@ -644,6 +644,7 @@ const memoryTimeTravelGateTest = readText("internal/controlplane/gateway/handler
 const memoryTimeTravelPage = readText("heroui-web/src/app/packs/memory-time-travel/page.tsx");
 const memoryTimeTravelClient = readText("heroui-web/src/lib/memory-time-travel-pack-client.ts");
 const memoryTimeTravelClientTest = readText("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
+const temporalKVSource = readText("internal/ledger/temporal_kv.go") + "\n" + readText("internal/ledger/temporal_kv_test.go");
 const memoryTimeTravelSdk = readText("sdk/typescript/src/memory-time-travel.ts") + "\n" + readText("sdk/typescript/src/memory-time-travel.test.ts");
 if (memoryTimeTravelManifest) {
   if (!memoryTimeTravelSource.includes(`const PackID = "${memoryTimeTravelManifest.id}"`)) {
@@ -680,8 +681,14 @@ for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientErro
 for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!memoryTimeTravelClientTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
-for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "merkle_verification_ready", "rollback_writeback_ready"]) {
+for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "rollback_writeback_ready"]) {
   if (!memoryTimeTravelSource.includes(token)) fail(`Memory Time Travel handler missing memory governance shell token: ${token}`);
+}
+for (const token of ["NewTemporalKVStore", "PutRawVersionedAt", "GetRawAt", "ListVersions", "SnapshotRawAt", "__kv_history__", "TestTemporalKVStorePutVersionedAndGetRawAt", "TestTemporalKVStoreListVersionsAndSnapshotRawAt"]) {
+  if (!temporalKVSource.includes(token)) fail(`Temporal KV history slice missing token: ${token}`);
+}
+if (!gatewaySource.includes("NewTemporalKVStore(app.Ledger)")) {
+  fail("Memory Time Travel pack must wire the Ledger temporal KV history reader in cmd/agent/init_tasks.go");
 }
 for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memoryTimeTravelEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Memory Time Travel method: ${token}`);

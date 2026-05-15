@@ -1,6 +1,7 @@
 package memorytimetravel
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,14 @@ import (
 	"testing"
 	"time"
 )
+
+type fakeTemporalKV struct {
+	snapshot map[string][]byte
+}
+
+func (f fakeTemporalKV) SnapshotRawAt(context.Context, string, time.Time) (map[string][]byte, error) {
+	return f.snapshot, nil
+}
 
 func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 	h := New(Config{DataDir: t.TempDir()})
@@ -124,5 +133,30 @@ func TestMemoryTimeTravelDryRunDoesNotPersistSnapshot(t *testing.T) {
 	h.SnapshotDetail(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("dry-run snapshot should not persist, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelSnapshotAtUsesLedgerTemporalKVWhenAttached(t *testing.T) {
+	h := New(Config{
+		DataDir: t.TempDir(),
+		TemporalKV: fakeTemporalKV{snapshot: map[string][]byte{
+			"goal":    []byte(`"ship temporal kv"`),
+			"persona": []byte(`{"mode":"careful"}`),
+		}},
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshot-at", strings.NewReader(`{"namespace":"memory_snapshot","at":"2026-05-15T12:30:00Z"}`))
+	h.SnapshotAt(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("snapshot-at status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var got SnapshotAtResponse
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode snapshot-at: %v", err)
+	}
+	if got.Source != "ledger-kv-history" || got.Values["goal"] != "ship temporal kv" || got.Values["persona"] != `{"mode":"careful"}` {
+		t.Fatalf("unexpected temporal kv snapshot-at response: %#v", got)
 	}
 }

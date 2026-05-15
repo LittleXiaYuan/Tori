@@ -7,6 +7,7 @@
 package memorytimetravel
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -27,16 +28,25 @@ const PackID = "yunque.pack.memory-time-travel"
 
 // Config describes runtime dependencies for the Memory Time Travel pack shell.
 type Config struct {
-	DataDir string
-	Now     func() time.Time
-	Policy  RetentionPolicy
+	DataDir    string
+	Now        func() time.Time
+	Policy     RetentionPolicy
+	TemporalKV TemporalKVReader
 }
 
 // Handler serves the Memory Time Travel pack API surface.
 type Handler struct {
-	dataDir string
-	now     func() time.Time
-	policy  RetentionPolicy
+	dataDir    string
+	now        func() time.Time
+	policy     RetentionPolicy
+	temporalKV TemporalKVReader
+}
+
+// TemporalKVReader is the narrow Memory Time Travel dependency on Ledger KV
+// history. It lets the pack read versioned memory snapshots without importing
+// the concrete Ledger implementation into the pack shell.
+type TemporalKVReader interface {
+	SnapshotRawAt(ctx context.Context, namespace string, at time.Time) (map[string][]byte, error)
 }
 
 // RetentionPolicy models the future kv_history retention contract at pack level.
@@ -95,6 +105,7 @@ type SnapshotAtResponse struct {
 	Values    map[string]string `json:"values"`
 	MatchedID string            `json:"matched_id,omitempty"`
 	Status    string            `json:"status"`
+	Source    string            `json:"source,omitempty"`
 }
 
 type DiffRequest struct {
@@ -162,7 +173,7 @@ func New(cfg Config) *Handler {
 	if now == nil {
 		now = time.Now
 	}
-	return &Handler{dataDir: dataDir, now: now, policy: normalizePolicy(cfg.Policy)}
+	return &Handler{dataDir: dataDir, now: now, policy: normalizePolicy(cfg.Policy), temporalKV: cfg.TemporalKV}
 }
 
 // DefaultHandler returns a handler bound to the default local data directory.
@@ -203,7 +214,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"stage":                     "pack-shell-before-ledger-kv-history",
 		"snapshot_store_ready":      true,
 		"temporal_query_ready":      true,
-		"ledger_history_ready":      false,
+		"ledger_history_ready":      h.temporalKV != nil,
 		"merkle_verification_ready": false,
 		"rollback_writeback_ready":  false,
 		"snapshot_count":            len(snapshots),
@@ -218,7 +229,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"memory.rollback.plan",
 			"memory.evidence.export",
 		},
-		"notes": []string{"Ledger KV kv_history schema, Merkle audit-chain verification, retention cron, and Memory Persister write-back remain follow-up wiring."},
+		"notes": h.statusNotes(),
 	})
 }
 
@@ -288,6 +299,17 @@ func (h *Handler) SnapshotAt(w http.ResponseWriter, r *http.Request) {
 	if at.IsZero() {
 		at = h.now().UTC()
 	}
+	if h.temporalKV != nil {
+		values, err := h.temporalSnapshotValues(r.Context(), namespace, at)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if len(values) > 0 {
+			writeJSON(w, http.StatusOK, SnapshotAtResponse{Namespace: namespace, At: at, Values: values, Status: "reconstructed", Source: "ledger-kv-history"})
+			return
+		}
+	}
 	snapshots, err := h.listSnapshots(namespace)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -306,10 +328,10 @@ func (h *Handler) SnapshotAt(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 	if matched == nil {
-		writeJSON(w, http.StatusOK, SnapshotAtResponse{Namespace: namespace, At: at, Values: map[string]string{}, Status: "not_found"})
+		writeJSON(w, http.StatusOK, SnapshotAtResponse{Namespace: namespace, At: at, Values: map[string]string{}, Status: "not_found", Source: "pack-local-snapshots"})
 		return
 	}
-	writeJSON(w, http.StatusOK, SnapshotAtResponse{Namespace: namespace, At: at, Snapshot: matched, Values: matched.Values, MatchedID: matched.ID, Status: "reconstructed"})
+	writeJSON(w, http.StatusOK, SnapshotAtResponse{Namespace: namespace, At: at, Snapshot: matched, Values: matched.Values, MatchedID: matched.ID, Status: "reconstructed", Source: "pack-local-snapshots"})
 }
 
 func (h *Handler) Diff(w http.ResponseWriter, r *http.Request) {
@@ -368,6 +390,41 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	})
+}
+
+func (h *Handler) statusNotes() []string {
+	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, and evidence export are available."}
+	if h.temporalKV != nil {
+		notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Merkle audit-chain verification, retention cron, and Memory Persister write-back remain follow-up wiring.")
+	} else {
+		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
+	}
+	return notes
+}
+
+func (h *Handler) temporalSnapshotValues(ctx context.Context, namespace string, at time.Time) (map[string]string, error) {
+	raw, err := h.temporalKV.SnapshotRawAt(ctx, namespace, at)
+	if err != nil {
+		return nil, err
+	}
+	values := make(map[string]string, len(raw))
+	for key, value := range raw {
+		values[key] = decodeTemporalValue(value)
+	}
+	return values, nil
+}
+
+func decodeTemporalValue(value []byte) string {
+	var s string
+	if err := json.Unmarshal(value, &s); err == nil {
+		return s
+	}
+	var decoded any
+	if err := json.Unmarshal(value, &decoded); err == nil {
+		data, _ := json.Marshal(decoded)
+		return string(data)
+	}
+	return string(value)
 }
 
 func (h *Handler) normalizeSnapshot(req SaveSnapshotRequest) (Snapshot, error) {

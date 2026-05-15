@@ -93,7 +93,7 @@ func initTasks(app *agentrt.App) error {
 			chaosprobepack.New(chaosprobepack.Config{DataDir: cfg.DataPath("chaos-probe")}),
 			cognitivecanarypack.New(cognitivecanarypack.Config{DataDir: cfg.DataPath("cognitive-canary")}),
 			guardrailfuzzerpack.New(guardrailfuzzerpack.Config{DataDir: cfg.DataPath("guardrail-fuzzer")}),
-			memorytimetravelpack.New(memorytimetravelpack.Config{DataDir: cfg.DataPath("memory-time-travel")}),
+			memorytimetravelpack.New(memorytimetravelpack.Config{DataDir: cfg.DataPath("memory-time-travel"), TemporalKV: iledger.NewTemporalKVStore(app.Ledger)}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
 			skillanomalypack.New(skillanomalypack.Config{DataDir: cfg.DataPath("skill-anomaly")}),
