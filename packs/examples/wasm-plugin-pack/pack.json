@@ -15,6 +15,7 @@
       "wasm.plugin.load",
       "wasm.plugin.unload",
       "wasm.plugin.execute",
+      "wasm.host_abi.plan",
       "wasm.evidence.export"
     ],
     "routes": [

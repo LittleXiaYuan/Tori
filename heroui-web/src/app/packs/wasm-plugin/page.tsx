@@ -163,10 +163,13 @@ export default function WASMPluginPackPage() {
               <Chip size="sm" style={{ background: tone.bg, color: tone.fg }}>
                 {status?.abi_ready ? "ABI ready" : status?.runtime_ready ? "Runtime shell" : "Disabled"}
               </Chip>
+              <Chip size="sm" style={{ background: status?.abi_plan_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.abi_plan_ready ? "#38bdf8" : "#facc15" }}>
+                {status?.abi_plan_ready ? "Host ABI plan" : "ABI plan pending"}
+              </Chip>
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.wasm-plugin"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行 dry-run、权限计划和证据包放进可选 Pack。Host ABI 权限强执行、远程签名包安装和 TinyGo 示例会在后续切片继续接入。
+              当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行 dry-run、权限计划、Host ABI plan preview 和证据包放进可选 Pack。Host ABI 权限强执行、远程签名包安装和 TinyGo 示例会在后续切片继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -179,10 +182,11 @@ export default function WASMPluginPackPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <Card className="section-card p-4"><div className="kpi-label">插件数量</div><div className="kpi-value">{status?.plugin_count ?? plugins.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">已加载</div><div className="kpi-value">{status?.loaded_count ?? plugins.filter((p) => p.status === "loaded").length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Runtime</div><div className="kpi-value text-lg">{status?.runtime_ready ? "wazero" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Host ABI</div><div className="kpi-value text-lg">{status?.abi_plan_ready ? "plan" : "pending"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">阶段</div><div className="kpi-value text-lg">{status?.stage || "pack-shell"}</div></Card>
       </div>
 
@@ -233,9 +237,20 @@ export default function WASMPluginPackPage() {
             {result ? (
               <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Chip size="sm">{result.dry_run ? "dry-run" : "execute"}</Chip><span>{result.entrypoint}</span></div>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Chip size="sm">abi_plan_ready: {String(result.host_abi_plan?.plan_ready)}</Chip>
+                  <Chip size="sm">abi_ready: {String(result.host_abi_plan?.ready)}</Chip>
+                  <Chip size="sm">enforcement_ready: {String(result.host_abi_plan?.enforcement_ready)}</Chip>
+                  <Chip size="sm">writes_files: {String(result.host_abi_plan?.writes_files)}</Chip>
+                  <Chip size="sm">network_access: {String(result.host_abi_plan?.network_access)}</Chip>
+                  <Chip size="sm">enabled ABI: {result.host_abi_plan?.summary?.enabled_count ?? 0}/{result.host_abi_plan?.summary?.function_count ?? 0}</Chip>
+                </div>
                 <TextField value={JSON.stringify(result, null, 2)} onChange={() => undefined}>
                   <TextArea rows={10} aria-label="WASM Plugin execution result" className="font-mono text-xs" readOnly />
                 </TextField>
+                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  Host ABI plan preview 仅固定后续 host function 权限强执行契约：当前不会绑定 wazero host functions、不会写文件，也不会绕过 Pack Runtime gate。
+                </div>
               </Card>
             ) : (
               <div className="mt-3 rounded-xl border border-dashed p-6 text-center text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>选择 loaded 插件后，可以先生成权限计划与沙箱 dry-run 执行计划。</div>

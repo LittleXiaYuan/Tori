@@ -34,7 +34,7 @@ func TestWASMPluginPackRoutesStatusWhenEnabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") {
 		t.Fatalf("enabled WASM Plugin pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
@@ -78,7 +78,7 @@ func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || !strings.Contains(w.Body.String(), "plugin_exec") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || !strings.Contains(w.Body.String(), "plugin_exec") || !strings.Contains(w.Body.String(), "host_abi_plan") || !strings.Contains(w.Body.String(), "enforcement_ready") {
 		t.Fatalf("dry-run execute status=%d body=%s", w.Code, w.Body.String())
 	}
 }

@@ -815,6 +815,9 @@ if (wasmPluginPage.includes('from "@/lib/api"') || wasmPluginPage.includes("api.
 for (const token of ["createWASMPluginPackClient", "/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/", 'method: "POST"']) {
   if (!wasmPluginClient.includes(token)) fail(`wasm-plugin-pack-client missing token: ${token}`);
 }
+for (const token of ["abi_plan_ready", "host_abi_plan", "WASMPluginHostABIPlan", "enforcement_ready", "writes_files"]) {
+  if (!wasmPluginClient.includes(token)) fail(`wasm-plugin-pack-client missing Host ABI plan token: ${token}`);
+}
 if (!gatewaySource.includes('cfg.DataPath("wasm-plugin")')) {
   fail("WASM Plugin runtime store must be wired through the configured data directory");
 }
@@ -824,10 +827,13 @@ for (const token of ["TestWASMPlugin", "StatusNotFound", "StatusMethodNotAllowed
 for (const token of ["createWASMPluginClient", "WASMPluginClientError", "/v1/wasm-plugin/status", "/v1/wasm-plugin/evidence/"]) {
   if (!wasmPluginSdk.includes(token)) fail(`WASM Plugin TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/calculator"]) {
+for (const token of ["WASMPluginHostABIPlan", "host_abi_plan", "enforcement_ready", "writes_files"]) {
+  if (!wasmPluginSdk.includes(token)) fail(`WASM Plugin TypeScript SDK missing Host ABI plan token: ${token}`);
+}
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/evidence/calculator", "host-abi-plan.json"]) {
   if (!wasmPluginClientTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
-for (const token of ["normalizeModulePath", "validateModulePath", "module_path must not contain traversal segments"]) {
+for (const token of ["normalizeModulePath", "validateModulePath", "module_path must not contain traversal segments", "abi_plan_ready", "wasm.host_abi.plan", "host_abi_plan", "host-abi-plan.json", "enforcement_ready", "writes_files"]) {
   if (!wasmPluginSource.includes(token)) fail(`WASM Plugin handler missing module path safety token: ${token}`);
 }
 for (const token of ["wasmPluginStatus:", "createWASMPlugin:", "wasmPluginExecute:", "wasmPluginEvidence:"]) {

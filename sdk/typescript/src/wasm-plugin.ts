@@ -2,7 +2,8 @@
  * Lightweight WASM Plugin Pack SDK slice.
  *
  * This keeps WASM plugin registration, lifecycle control, dry-run execution,
- * and evidence export usable without importing the full generated OpenAPI SDK:
+ * Host ABI plan previews, and evidence export usable without importing the full
+ * generated OpenAPI SDK:
  *
  *   import { createWASMPluginClient } from "yunque-client/wasm-plugin";
  */
@@ -42,6 +43,7 @@ export type WASMPluginStatusResponse = {
   pack_id: string;
   stage: string;
   runtime_ready: boolean;
+  abi_plan_ready: boolean;
   abi_ready: boolean;
   plugin_count: number;
   loaded_count: number;
@@ -77,6 +79,7 @@ export type WASMPluginInstallRequest = {
 export type WASMPluginInstallResponse = WASMPluginResponse & {
   status: string;
   plan?: WASMPluginPermissionCheck[];
+  host_abi_plan?: WASMPluginHostABIPlan;
 };
 
 export type WASMPluginLifecycleResponse = WASMPluginResponse & {
@@ -96,6 +99,50 @@ export type WASMPluginPermissionCheck = {
   reason?: string;
 };
 
+export type WASMPluginHostABIFunctionPlan = {
+  name: string;
+  category: string;
+  permission: string;
+  enabled: boolean;
+  enforcement_ready: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  constraints?: string[];
+  reason?: string;
+};
+
+export type WASMPluginHostABISummary = {
+  function_count: number;
+  enabled_count: number;
+  ledger_kv: boolean;
+  memory_search: boolean;
+  http_fetch: boolean;
+  env_get: boolean;
+  allowed_host_count: number;
+  env_allowlist_count: number;
+};
+
+export type WASMPluginHostABIResourceLimits = {
+  max_memory_mb: number;
+  timeout_seconds: number;
+  allowed_hosts: string[];
+  env_allowlist: string[];
+};
+
+export type WASMPluginHostABIPlan = {
+  plan_ready: boolean;
+  ready: boolean;
+  status: string;
+  enforcement_ready: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  functions: WASMPluginHostABIFunctionPlan[];
+  summary: WASMPluginHostABISummary;
+  resource_limits: WASMPluginHostABIResourceLimits;
+  labels: string[];
+  notes?: string[];
+};
+
 export type WASMPluginExecuteResult = {
   slug: string;
   dry_run: boolean;
@@ -109,6 +156,7 @@ export type WASMPluginExecuteResult = {
   exports?: string[];
   kv_writes?: Record<string, string>;
   plan?: WASMPluginPermissionCheck[];
+  host_abi_plan: WASMPluginHostABIPlan;
   notes?: string[];
 };
 
@@ -123,6 +171,7 @@ export type WASMPluginEvidenceResponse = {
   files: string[];
   plugin: WASMPlugin;
   plan: WASMPluginPermissionCheck[];
+  host_abi_plan: WASMPluginHostABIPlan;
   sandbox?: Record<string, unknown>;
 };
 

@@ -99,6 +99,18 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || fake.calls != 0 {
 		t.Fatalf("dry-run execute status=%d calls=%d body=%s", w.Code, fake.calls, w.Body.String())
 	}
+	var dryRunResp struct {
+		Result ExecuteResult `json:"result"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&dryRunResp); err != nil {
+		t.Fatalf("decode dry-run execute: %v", err)
+	}
+	if !dryRunResp.Result.HostABIPlan.PlanReady || dryRunResp.Result.HostABIPlan.Ready || dryRunResp.Result.HostABIPlan.EnforcementReady {
+		t.Fatalf("unexpected host ABI plan readiness: %#v", dryRunResp.Result.HostABIPlan)
+	}
+	if dryRunResp.Result.HostABIPlan.WritesFiles || dryRunResp.Result.HostABIPlan.Summary.EnabledCount == 0 {
+		t.Fatalf("host ABI plan should be non-destructive and reflect enabled functions: %#v", dryRunResp.Result.HostABIPlan)
+	}
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"hello"}`))
@@ -119,8 +131,17 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
+	}
+	var evidenceResp struct {
+		HostABIPlan HostABIPlan `json:"host_abi_plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
+		t.Fatalf("decode evidence: %v", err)
+	}
+	if !evidenceResp.HostABIPlan.PlanReady || evidenceResp.HostABIPlan.Status != "plan_only" {
+		t.Fatalf("evidence should include host ABI plan preview: %#v", evidenceResp.HostABIPlan)
 	}
 }
 
