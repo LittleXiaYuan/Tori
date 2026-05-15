@@ -2,9 +2,9 @@
  * Lightweight Memory Time Travel Pack SDK slice.
  *
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
- * rollback plan generation, retention planning, KV audit proof-link schema
- * inspection, and evidence export usable without importing the full generated
- * OpenAPI SDK:
+ * rollback plan generation, retention dry-run/prune planning, KV audit
+ * proof-link schema inspection, and evidence export usable without importing
+ * the full generated OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
  */
@@ -53,6 +53,7 @@ export type MemoryTimeTravelStatusResponse = {
   memory_persister_writeback_ready?: boolean;
   rollback_writeback_ready: boolean;
   retention_plan_ready?: boolean;
+  retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
   kv_audit_link_schema_ready?: boolean;
   kv_audit_linkage_ready?: boolean;
@@ -250,6 +251,39 @@ export type MemoryTimeTravelRetentionPlanResponse = {
   plan: MemoryTimeTravelRetentionPlan;
 };
 
+export type MemoryTimeTravelRetentionPrunePlanRequest = {
+  namespace?: string;
+  candidate_ids?: string[];
+  reason?: string;
+  requested_by?: string;
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelRetentionPrunePlan = {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  dry_run: boolean;
+  status: string;
+  approval_required: boolean;
+  prune_ready: boolean;
+  temporal_prune_ready: boolean;
+  candidate_count: number;
+  selected_candidate_count: number;
+  reclaimable_bytes: number;
+  action_count: number;
+  requested_by?: string;
+  reason?: string;
+  retention_plan_generated_at: string;
+  candidates: MemoryTimeTravelRetentionCandidate[];
+  actions: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRetentionPrunePlanResponse = {
+  plan: MemoryTimeTravelRetentionPrunePlan;
+};
+
 export type MemoryTimeTravelEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -259,6 +293,7 @@ export type MemoryTimeTravelEvidenceResponse = {
   history: MemoryTimeTravelSnapshotSummary[];
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
+  retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksResponse;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
@@ -383,6 +418,10 @@ export class MemoryTimeTravelClient {
 
   retentionPlan(namespace?: string): Promise<MemoryTimeTravelRetentionPlanResponse> {
     return this.request<MemoryTimeTravelRetentionPlanResponse>("GET", `/v1/memory-time-travel/retention/plan${query({ namespace })}`);
+  }
+
+  retentionPrunePlan(input: MemoryTimeTravelRetentionPrunePlanRequest = {}): Promise<MemoryTimeTravelRetentionPrunePlanResponse> {
+    return this.request<MemoryTimeTravelRetentionPrunePlanResponse>("POST", "/v1/memory-time-travel/retention/prune-plan", input);
   }
 
   auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {

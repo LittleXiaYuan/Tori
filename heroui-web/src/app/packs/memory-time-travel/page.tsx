@@ -6,7 +6,7 @@ import { AlertTriangle, Clock3, Download, GitCompare, History, Link2, RefreshCw,
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -36,9 +36,10 @@ export default function MemoryTimeTravelPackPage() {
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
   const [auditLinks, setAuditLinks] = useState<MemoryTimeTravelKVAuditLinksReport | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
+  const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | "audit-links" | "retention" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | "audit-links" | "retention" | "retention-prune" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -156,6 +157,30 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const buildRetentionPrunePlan = async () => {
+    setBusy("retention-prune");
+    setError(null);
+    try {
+      const candidateIds = retentionPlan?.candidates?.map((item) => item.id) || [];
+      const res = await memoryTimeTravelPack.retentionPrunePlan({
+        namespace,
+        candidate_ids: candidateIds,
+        requested_by: "pack-console",
+        reason: "operator dry-run approval preview",
+        dry_run: true,
+      });
+      setRetentionPrunePlan(res.plan);
+      showToast(
+        res.plan.selected_candidate_count > 0 ? `已生成 ${res.plan.selected_candidate_count} 个候选的审批计划` : "当前没有可审批清理候选",
+        "success",
+      );
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 retention prune approval plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportEvidence = async () => {
     const target = baseId || selectedBase?.id;
     if (!target) return;
@@ -229,7 +254,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、retention dry-run plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、retention dry-run/prune plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -254,10 +279,13 @@ export default function MemoryTimeTravelPackPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><Trash2 size={16} />Retention dry-run plan</div>
             <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              只计算 pack-local snapshots 的保留策略与候选清理动作，不删除文件，也不清理 Ledger temporal KV。后续再接 native kv_history purge 与 cron。
+              只计算 pack-local snapshots 的保留策略、候选清理动作和审批计划，不删除文件，也不清理 Ledger temporal KV。后续再接 native kv_history purge 与 cron。
             </div>
           </div>
-          <Button variant="outline" isPending={busy === "retention"} onPress={buildRetentionPlan}><Trash2 size={14} />生成保留计划</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" isPending={busy === "retention"} onPress={buildRetentionPlan}><Trash2 size={14} />生成保留计划</Button>
+            <Button variant="outline" isPending={busy === "retention-prune"} onPress={buildRetentionPrunePlan}><ShieldCheck size={14} />生成审批计划</Button>
+          </div>
         </div>
         {retentionPlan ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
@@ -274,6 +302,19 @@ export default function MemoryTimeTravelPackPage() {
         ) : (
           <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
             尚未生成保留计划。此入口当前只做 dry-run，用于上线前确认策略不会误删记忆快照。
+          </div>
+        )}
+        {retentionPrunePlan && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: "rgba(250,204,21,0.12)", color: "#facc15" }}>{retentionPrunePlan.status}</Chip>
+              <div className="mt-3 text-2xl font-semibold">{retentionPrunePlan.selected_candidate_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>selected · approval {retentionPrunePlan.approval_required ? "required" : "not required"}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>prune {retentionPrunePlan.prune_ready ? "ready" : "blocked"} · reclaimable {retentionPrunePlan.reclaimable_bytes} bytes</div>
+            </div>
+            <TextField value={JSON.stringify(retentionPrunePlan, null, 2)} onChange={() => undefined}>
+              <TextArea rows={8} aria-label="Memory Time Travel retention prune plan JSON" className="font-mono text-xs" readOnly />
+            </TextField>
           </div>
         )}
       </Card>
