@@ -165,10 +165,13 @@ export default function SBOMDriftPackPage() {
               <Chip size="sm" style={{ background: status?.scanner_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.scanner_ready ? "#22c55e" : "#facc15" }}>
                 {status?.scanner_ready ? "Snapshot scanner" : "Pack shell"}
               </Chip>
+              <Chip size="sm" style={{ background: status?.govulncheck_plan_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.govulncheck_plan_ready ? "#38bdf8" : "#facc15" }}>
+                {status?.govulncheck_plan_ready ? "govulncheck plan" : "vuln plan pending"}
+              </Chip>
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.sbom-drift"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan 和证据包导出。govulncheck 执行和真实 CI 阻断仍保持后续写回。
+              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan、govulncheck plan preview 和证据包导出。govulncheck 执行和真实 CI 阻断仍保持后续写回。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -184,7 +187,7 @@ export default function SBOMDriftPackPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">扫描器</div><div className="kpi-value text-lg">{status?.scanner_ready ? "ready" : "shell"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">CycloneDX / CI Gate</div><div className="kpi-value text-lg">{status?.cyclonedx_ready && status?.ci_gate_plan_ready ? "plan" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">CycloneDX / CI / Vuln</div><div className="kpi-value text-lg">{status?.cyclonedx_ready && status?.ci_gate_plan_ready && status?.govulncheck_plan_ready ? "plan" : "pending"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">阶段</div><div className="kpi-value text-lg">{status?.stage || "pack-shell"}</div></Card>
       </div>
 
@@ -249,12 +252,16 @@ export default function SBOMDriftPackPage() {
                 {cycloneDX && <Chip size="sm">CycloneDX {cycloneDX.specVersion}</Chip>}
                 {ciGatePlan && <Chip size="sm" style={{ background: ciGatePlan.blocked ? "rgba(239,68,68,0.16)" : "rgba(34,197,94,0.12)", color: ciGatePlan.blocked ? "#ef4444" : "#22c55e" }}>{ciGatePlan.status}</Chip>}
                 {ciGatePlan && <Chip size="sm">threshold: {ciGatePlan.fail_on_risk}</Chip>}
+                {ciGatePlan && <Chip size="sm">govulncheck_plan_ready: {String(ciGatePlan.govulncheck_plan_ready)}</Chip>}
+                {ciGatePlan && <Chip size="sm">govulncheck_ready: {String(ciGatePlan.govulncheck_ready)}</Chip>}
+                {ciGatePlan?.govulncheck_plan && <Chip size="sm">writes_files: {String(ciGatePlan.govulncheck_plan.writes_files)}</Chip>}
+                {ciGatePlan?.govulncheck_plan && <Chip size="sm">{ciGatePlan.govulncheck_plan.report_artifact}</Chip>}
               </div>
               <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan }, null, 2)} onChange={() => undefined}>
                 <TextArea rows={12} aria-label="SBOM CycloneDX and CI Gate JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                这里仍是非破坏性计划：不会修改 GitHub Actions、不会执行 govulncheck，也不会真实阻断 release。
+                这里仍是非破坏性计划：会预览 govulncheck -json ./... 的执行对象和 govulncheck-report.json 制品，但不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
               </div>
             </Card>
           )}

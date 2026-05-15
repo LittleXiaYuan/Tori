@@ -141,6 +141,24 @@ require github.com/example/direct v2.0.0
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"blocked":true`) || !strings.Contains(w.Body.String(), `"ci_gate_ready":false`) || !strings.Contains(w.Body.String(), "dist/sbom.cdx.json") {
 		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
 	}
+	var planResp struct {
+		Plan CIGatePlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&planResp); err != nil {
+		t.Fatalf("decode ci gate plan: %v", err)
+	}
+	if !planResp.Plan.GovulncheckPlanReady || planResp.Plan.GovulncheckReady {
+		t.Fatalf("expected plan-only govulncheck readiness, got %#v", planResp.Plan)
+	}
+	if planResp.Plan.GovulncheckPlan.Command != "govulncheck -json ./..." || planResp.Plan.GovulncheckPlan.ReportArtifact != "govulncheck-report.json" {
+		t.Fatalf("unexpected govulncheck plan: %#v", planResp.Plan.GovulncheckPlan)
+	}
+	if planResp.Plan.GovulncheckPlan.WritesFiles || planResp.Plan.GovulncheckPlan.Executes || planResp.Plan.GovulncheckPlan.VulnerabilityDBFetch {
+		t.Fatalf("govulncheck plan must remain non-destructive: %#v", planResp.Plan.GovulncheckPlan)
+	}
+	if planResp.Plan.GovulncheckPlan.ModuleCount != 1 || len(planResp.Plan.GovulncheckPlan.Packages) != 1 {
+		t.Fatalf("expected one Go module in govulncheck plan, got %#v", planResp.Plan.GovulncheckPlan)
+	}
 }
 
 func TestSBOMDriftIgnoresNodeModulesPackageJSON(t *testing.T) {

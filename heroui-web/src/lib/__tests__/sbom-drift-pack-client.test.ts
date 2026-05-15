@@ -9,15 +9,17 @@ describe("sbom-drift-pack-client", () => {
   it("reads SBOM Drift pack status and snapshots through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, vulnerability_ready: false, govulncheck_ready: false, snapshot_count: 1, capabilities: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, vulnerability_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, snapshot_count: 1, capabilities: ["sbom.govulncheck.plan"] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshots: [{ id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 } }], count: 1 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ snapshot: { id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 }, components: [] } }), { status: 200 }));
 
     const client = createSBOMDriftPackClient();
-    await client.status();
+    const status = await client.status();
     await client.snapshots();
     await client.snapshot("baseline");
 
+    expect(status.govulncheck_plan_ready).toBe(true);
+    expect(status.govulncheck_ready).toBe(false);
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/sbom-drift/status",
       "/v1/sbom-drift/snapshots",
@@ -46,14 +48,18 @@ describe("sbom-drift-pack-client", () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ bom: { bomFormat: "CycloneDX", specVersion: "1.5", version: 1, metadata: {}, components: [] }, snapshot: { id: "baseline" } }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ plan: { pack_id: "yunque.pack.sbom-drift", blocked: false, ci_gate_plan_ready: true, ci_gate_ready: false, artifacts: ["dist/sbom.cdx.json"], commands: [], actions: [], diff: { risk_level: "none" } } }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", exported_at: "now", format: "json-sbom-drift-evidence", files: ["snapshot.json", "sbom.cdx.json", "ci-gate-plan.json"], snapshot: { id: "baseline" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ plan: { pack_id: "yunque.pack.sbom-drift", blocked: false, ci_gate_plan_ready: true, ci_gate_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, govulncheck_plan: { plan_ready: true, ready: false, command: "govulncheck -json ./...", report_artifact: "govulncheck-report.json", executes: false, writes_files: false, package_count: 1, module_count: 1, packages: [] }, artifacts: ["dist/sbom.cdx.json", "govulncheck-plan.json"], commands: [], actions: [], diff: { risk_level: "none" } } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.sbom-drift", exported_at: "now", format: "json-sbom-drift-evidence", files: ["snapshot.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json"], snapshot: { id: "baseline" }, govulncheck_plan: { writes_files: false } }), { status: 200 }));
 
     const client = createSBOMDriftPackClient();
     await client.cycloneDX("baseline");
-    await client.ciGatePlan({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
-    await client.evidence("baseline");
+    const plan = await client.ciGatePlan({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
+    const evidence = await client.evidence("baseline");
 
+    expect(plan.plan.govulncheck_plan_ready).toBe(true);
+    expect(plan.plan.govulncheck_plan.writes_files).toBe(false);
+    expect(evidence.files).toContain("govulncheck-plan.json");
+    expect(evidence.govulncheck_plan?.writes_files).toBe(false);
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/sbom-drift/cyclonedx/baseline",
       "/v1/sbom-drift/ci-gate/plan",

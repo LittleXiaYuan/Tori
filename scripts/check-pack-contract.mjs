@@ -592,14 +592,14 @@ if (sbomDriftManifest) {
   if (sbomDriftManifest.sdk?.typescript !== "yunque-client/sbom-drift") fail("SBOM Drift SDK import must stay yunque-client/sbom-drift");
   if (sbomDriftManifest.defaultState !== "disabled") fail("SBOM Drift pack must remain default disabled before CI scanner readiness");
   if (sbomDriftManifest.metadata?.stage !== "pack-shell-before-ci") fail("SBOM Drift pack stage must remain pack-shell-before-ci");
-  for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan"]) {
+  for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.govulncheck.plan"]) {
     if (!sbomDriftManifest.backend?.capabilities?.includes(capability)) fail(`SBOM Drift manifest missing capability: ${capability}`);
   }
 }
 if (sbomDriftPage.includes('from "@/lib/api"') || sbomDriftPage.includes("api.sbom") || !sbomDriftPage.includes("createSBOMDriftPackClient")) {
   fail("SBOM Drift pack page must use sbom-drift-pack-client instead of monolithic api object");
 }
-for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/evidence/", 'method: "POST"']) {
+for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/evidence/", "govulncheck_plan_ready", "govulncheck_plan", "writes_files", 'method: "POST"']) {
   if (!sbomDriftClient.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("sbom-drift")')) {
@@ -608,11 +608,14 @@ if (!gatewaySource.includes('cfg.DataPath("sbom-drift")')) {
 for (const token of ["TestSBOMDrift", "StatusNotFound", "StatusMethodNotAllowed", "/v1/sbom-drift/diff"]) {
   if (!sbomDriftGateTest.includes(token)) fail(`SBOM Drift gateway gate test missing token: ${token}`);
 }
-for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/evidence/"]) {
+for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/evidence/", "SBOMDriftGovulncheckPlan", "govulncheck_plan_ready", "govulncheck_plan", "govulncheck-report.json", "writes_files"]) {
   if (!sbomDriftSdk.includes(token)) fail(`SBOM Drift TypeScript SDK missing token: ${token}`);
 }
 for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/evidence/baseline"]) {
   if (!sbomDriftClientTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
+}
+for (const token of ["govulncheck_plan_ready", "govulncheck_ready", "govulncheck-report.json", "writes_files", "govulncheck-plan.json"]) {
+  if (!sbomDriftSource.includes(token)) fail(`SBOM Drift handler missing govulncheck plan token: ${token}`);
 }
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes SBOM Drift method: ${token}`);

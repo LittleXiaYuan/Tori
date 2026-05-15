@@ -26,7 +26,7 @@ if (pack.frontend?.routes?.[0]?.component !== manifest.frontend.component) fail(
 if (pack.update?.rollback !== true) fail("SBOM Drift pack must be rollbackable");
 if (pack.defaultState !== "disabled") fail("SBOM Drift pack should stay default disabled until CI scanner wiring is complete");
 if (pack.metadata?.stage !== "pack-shell-before-ci") fail("SBOM Drift pack should declare pack-shell-before-ci stage");
-for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan"]) {
+for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.govulncheck.plan"]) {
   if (!pack.backend?.capabilities?.includes(capability)) fail(`SBOM Drift pack capability missing: ${capability}`);
 }
 
@@ -72,7 +72,12 @@ for (const token of [
   "cyclonedx_ready",
   "ci_gate_plan_ready",
   "ci_gate_ready",
+  "govulncheck_plan_ready",
   "govulncheck_ready",
+  "GovulncheckPlan",
+  "govulncheck-report.json",
+  "govulncheck-plan.json",
+  "writes_files",
   "CycloneDX",
   "CIGatePlan",
   "json-sbom-drift-evidence",
@@ -97,6 +102,11 @@ for (const token of [
   "/v1/sbom-drift/evidence/",
   "SBOMDriftCycloneDXDocument",
   "SBOMDriftCIGatePlan",
+  "SBOMDriftGovulncheckPlan",
+  "govulncheck_plan_ready",
+  "govulncheck_plan",
+  "govulncheck-report.json",
+  "writes_files",
   "SBOM Drift request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript SBOM Drift SDK slice missing token: ${token}`);

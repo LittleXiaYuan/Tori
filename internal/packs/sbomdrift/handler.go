@@ -132,22 +132,51 @@ type CIGatePlanRequest struct {
 }
 
 type CIGatePlanReport struct {
-	PackID           string     `json:"pack_id"`
-	GeneratedAt      time.Time  `json:"generated_at"`
-	Status           string     `json:"status"`
-	Blocked          bool       `json:"blocked"`
-	FailOnRisk       string     `json:"fail_on_risk"`
-	CycloneDXReady   bool       `json:"cyclonedx_ready"`
-	CIGatePlanReady  bool       `json:"ci_gate_plan_ready"`
-	CIGateReady      bool       `json:"ci_gate_ready"`
-	GovulncheckReady bool       `json:"govulncheck_ready"`
-	RequestedBy      string     `json:"requested_by,omitempty"`
-	Reason           string     `json:"reason,omitempty"`
-	Diff             DiffResult `json:"diff"`
-	Artifacts        []string   `json:"artifacts"`
-	Commands         []string   `json:"commands"`
-	Actions          []string   `json:"actions"`
-	Notes            []string   `json:"notes,omitempty"`
+	PackID               string          `json:"pack_id"`
+	GeneratedAt          time.Time       `json:"generated_at"`
+	Status               string          `json:"status"`
+	Blocked              bool            `json:"blocked"`
+	FailOnRisk           string          `json:"fail_on_risk"`
+	CycloneDXReady       bool            `json:"cyclonedx_ready"`
+	CIGatePlanReady      bool            `json:"ci_gate_plan_ready"`
+	CIGateReady          bool            `json:"ci_gate_ready"`
+	GovulncheckPlanReady bool            `json:"govulncheck_plan_ready"`
+	GovulncheckReady     bool            `json:"govulncheck_ready"`
+	RequestedBy          string          `json:"requested_by,omitempty"`
+	Reason               string          `json:"reason,omitempty"`
+	Diff                 DiffResult      `json:"diff"`
+	GovulncheckPlan      GovulncheckPlan `json:"govulncheck_plan"`
+	Artifacts            []string        `json:"artifacts"`
+	Commands             []string        `json:"commands"`
+	Actions              []string        `json:"actions"`
+	Notes                []string        `json:"notes,omitempty"`
+}
+
+type GovulncheckPlan struct {
+	PlanReady            bool                     `json:"plan_ready"`
+	Ready                bool                     `json:"ready"`
+	Status               string                   `json:"status"`
+	Command              string                   `json:"command"`
+	TargetPackage        string                   `json:"target_package"`
+	ReportArtifact       string                   `json:"report_artifact"`
+	Executes             bool                     `json:"executes"`
+	WritesFiles          bool                     `json:"writes_files"`
+	VulnerabilityDBFetch bool                     `json:"vulnerability_db_fetch"`
+	PackageCount         int                      `json:"package_count"`
+	ModuleCount          int                      `json:"module_count"`
+	Packages             []GovulncheckPackagePlan `json:"packages"`
+	Labels               []string                 `json:"labels"`
+	Notes                []string                 `json:"notes,omitempty"`
+}
+
+type GovulncheckPackagePlan struct {
+	Ecosystem string   `json:"ecosystem"`
+	Module    string   `json:"module"`
+	Version   string   `json:"version,omitempty"`
+	Scope     string   `json:"scope,omitempty"`
+	Path      string   `json:"path,omitempty"`
+	Direct    bool     `json:"direct"`
+	Labels    []string `json:"labels,omitempty"`
 }
 
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
@@ -195,26 +224,28 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":             PackID,
-		"stage":               "pack-shell-before-ci",
-		"scanner_ready":       true,
-		"cyclonedx_ready":     true,
-		"ci_gate_plan_ready":  true,
-		"ci_gate_ready":       false,
-		"vulnerability_ready": false,
-		"govulncheck_ready":   false,
-		"snapshot_count":      len(snapshots),
-		"repo_root":           h.repoRoot,
-		"store_dir":           h.dataDir,
+		"pack_id":                PackID,
+		"stage":                  "pack-shell-before-ci",
+		"scanner_ready":          true,
+		"cyclonedx_ready":        true,
+		"ci_gate_plan_ready":     true,
+		"ci_gate_ready":          false,
+		"vulnerability_ready":    false,
+		"govulncheck_plan_ready": true,
+		"govulncheck_ready":      false,
+		"snapshot_count":         len(snapshots),
+		"repo_root":              h.repoRoot,
+		"store_dir":              h.dataDir,
 		"capabilities": []string{
 			"sbom.snapshot.go_mod",
 			"sbom.snapshot.npm_package_json",
 			"sbom.drift.diff",
 			"sbom.cyclonedx.export",
 			"sbom.ci_gate.plan",
+			"sbom.govulncheck.plan",
 			"sbom.evidence.export",
 		},
-		"notes": []string{"CycloneDX JSON export and CI gate plan are available as non-destructive pack contracts; govulncheck execution and CI write-back remain follow-up wiring."},
+		"notes": []string{"CycloneDX JSON export, CI gate plan, and govulncheck command preview are available as non-destructive pack contracts; govulncheck execution and CI write-back remain follow-up wiring."},
 	})
 }
 
@@ -328,7 +359,7 @@ func (h *Handler) CIGatePlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	plan := h.buildCIGatePlan(diffSnapshots(base, target), req.FailOnRisk, req.RequestedBy, req.Reason)
+	plan := h.buildCIGatePlan(diffSnapshots(base, target), target, req.FailOnRisk, req.RequestedBy, req.Reason)
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
@@ -343,15 +374,16 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	ciGatePlan := h.buildCIGatePlan(diffSnapshots(snapshot, snapshot), "high", "evidence-export", "snapshot evidence schema snapshot")
+	ciGatePlan := h.buildCIGatePlan(diffSnapshots(snapshot, snapshot), snapshot, "high", "evidence-export", "snapshot evidence schema snapshot")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":      PackID,
-		"exported_at":  h.now().UTC(),
-		"format":       "json-sbom-drift-evidence",
-		"files":        []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json"},
-		"snapshot":     snapshot,
-		"cyclonedx":    h.buildCycloneDX(snapshot),
-		"ci_gate_plan": ciGatePlan,
+		"pack_id":          PackID,
+		"exported_at":      h.now().UTC(),
+		"format":           "json-sbom-drift-evidence",
+		"files":            []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json"},
+		"snapshot":         snapshot,
+		"cyclonedx":        h.buildCycloneDX(snapshot),
+		"ci_gate_plan":     ciGatePlan,
+		"govulncheck_plan": ciGatePlan.GovulncheckPlan,
 	})
 }
 
@@ -442,7 +474,7 @@ func (h *Handler) buildCycloneDX(snapshot Snapshot) CycloneDXDocument {
 	}
 }
 
-func (h *Handler) buildCIGatePlan(diff DiffResult, failOnRisk, requestedBy, reason string) CIGatePlanReport {
+func (h *Handler) buildCIGatePlan(diff DiffResult, target Snapshot, failOnRisk, requestedBy, reason string) CIGatePlanReport {
 	threshold := normalizeRisk(failOnRisk)
 	if threshold == "" {
 		threshold = "high"
@@ -455,31 +487,92 @@ func (h *Handler) buildCIGatePlan(diff DiffResult, failOnRisk, requestedBy, reas
 	actions := []string{
 		"would export CycloneDX JSON as dist/sbom.cdx.json during release packaging",
 		"would compare the generated SBOM against the selected baseline before release",
+		"would run govulncheck -json ./... and attach govulncheck-report.json to release evidence",
 	}
 	if blocked {
 		actions = append(actions, fmt.Sprintf("would block release because risk %s reaches threshold %s", diff.RiskLevel, threshold))
 	} else {
 		actions = append(actions, fmt.Sprintf("would allow release because risk %s is below threshold %s", diff.RiskLevel, threshold))
 	}
+	govulncheckPlan := buildGovulncheckPlan(target)
 	return CIGatePlanReport{
-		PackID:           PackID,
-		GeneratedAt:      h.now().UTC(),
-		Status:           status,
-		Blocked:          blocked,
-		FailOnRisk:       threshold,
-		CycloneDXReady:   true,
-		CIGatePlanReady:  true,
-		CIGateReady:      false,
-		GovulncheckReady: false,
-		RequestedBy:      strings.TrimSpace(requestedBy),
-		Reason:           strings.TrimSpace(reason),
-		Diff:             diff,
-		Artifacts:        []string{"dist/sbom.cdx.json", "sbom-drift-report.json", "ci-gate-plan.json"},
-		Commands:         []string{"make sbom", "make vulncheck", "node scripts/check-pack-runtime-all.mjs"},
-		Actions:          actions,
+		PackID:               PackID,
+		GeneratedAt:          h.now().UTC(),
+		Status:               status,
+		Blocked:              blocked,
+		FailOnRisk:           threshold,
+		CycloneDXReady:       true,
+		CIGatePlanReady:      true,
+		CIGateReady:          false,
+		GovulncheckPlanReady: true,
+		GovulncheckReady:     false,
+		RequestedBy:          strings.TrimSpace(requestedBy),
+		Reason:               strings.TrimSpace(reason),
+		Diff:                 diff,
+		GovulncheckPlan:      govulncheckPlan,
+		Artifacts:            []string{"dist/sbom.cdx.json", "sbom-drift-report.json", "ci-gate-plan.json", "govulncheck-plan.json", govulncheckPlan.ReportArtifact},
+		Commands:             []string{"make sbom", "govulncheck -json ./... > govulncheck-report.json", "node scripts/check-pack-runtime-all.mjs"},
+		Actions:              actions,
 		Notes: []string{
-			"This route is non-destructive: it does not write CI workflow files, invoke govulncheck, or block a release by itself.",
-			"Use the plan shape as the contract for the later CI baseline gate and govulncheck write-back slice.",
+			"This route is non-destructive: it does not write CI workflow files, invoke govulncheck, fetch the vulnerability database, or block a release by itself.",
+			"Use the plan shape as the contract for the later CI baseline gate and govulncheck runtime write-back slice.",
+		},
+	}
+}
+
+func buildGovulncheckPlan(snapshot Snapshot) GovulncheckPlan {
+	packages := make([]GovulncheckPackagePlan, 0)
+	moduleSet := map[string]struct{}{}
+	for _, component := range snapshot.Components {
+		if component.Ecosystem != "gomod" {
+			continue
+		}
+		moduleSet[component.Name] = struct{}{}
+		labels := []string{"gomod"}
+		if component.Direct {
+			labels = append(labels, "direct")
+		} else {
+			labels = append(labels, "indirect")
+		}
+		if component.Path != "" {
+			labels = append(labels, "path:"+component.Path)
+		}
+		packages = append(packages, GovulncheckPackagePlan{
+			Ecosystem: component.Ecosystem,
+			Module:    component.Name,
+			Version:   component.Version,
+			Scope:     component.Scope,
+			Path:      component.Path,
+			Direct:    component.Direct,
+			Labels:    labels,
+		})
+	}
+	sort.Slice(packages, func(i, j int) bool {
+		if packages[i].Module != packages[j].Module {
+			return packages[i].Module < packages[j].Module
+		}
+		if packages[i].Version != packages[j].Version {
+			return packages[i].Version < packages[j].Version
+		}
+		return packages[i].Path < packages[j].Path
+	})
+	return GovulncheckPlan{
+		PlanReady:            true,
+		Ready:                false,
+		Status:               "plan_only",
+		Command:              "govulncheck -json ./...",
+		TargetPackage:        "./...",
+		ReportArtifact:       "govulncheck-report.json",
+		Executes:             false,
+		WritesFiles:          false,
+		VulnerabilityDBFetch: false,
+		PackageCount:         len(packages),
+		ModuleCount:          len(moduleSet),
+		Packages:             packages,
+		Labels:               []string{"plan-only", "govulncheck", "no-exec", "no-file-write"},
+		Notes: []string{
+			"Preview only: the pack does not execute govulncheck or fetch vulnerability data in this route.",
+			"Only Go module components are included; npm vulnerability scanning remains a separate future scanner slice.",
 		},
 	}
 }

@@ -2,8 +2,8 @@
  * Lightweight SBOM Drift Pack SDK slice.
  *
  * This keeps dependency snapshots, drift diffing, CycloneDX export, CI gate
- * planning, and evidence export usable without importing the full generated
- * OpenAPI SDK:
+ * planning, govulncheck command previews, and evidence export usable without
+ * importing the full generated OpenAPI SDK:
  *
  *   import { createSBOMDriftClient } from "yunque-client/sbom-drift";
  */
@@ -37,6 +37,7 @@ export type SBOMDriftStatusResponse = {
   ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
   vulnerability_ready: boolean;
+  govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
   snapshot_count: number;
   repo_root?: string;
@@ -106,6 +107,33 @@ export type SBOMDriftCycloneDXResponse = {
   snapshot: SBOMDriftSnapshotSummary;
 };
 
+export type SBOMDriftGovulncheckPackagePlan = {
+  ecosystem: string;
+  module: string;
+  version?: string;
+  scope?: string;
+  path?: string;
+  direct: boolean;
+  labels?: string[];
+};
+
+export type SBOMDriftGovulncheckPlan = {
+  plan_ready: boolean;
+  ready: boolean;
+  status: string;
+  command: string;
+  target_package: string;
+  report_artifact: string;
+  executes: boolean;
+  writes_files: boolean;
+  vulnerability_db_fetch: boolean;
+  package_count: number;
+  module_count: number;
+  packages: SBOMDriftGovulncheckPackagePlan[];
+  labels: string[];
+  notes?: string[];
+};
+
 export type SBOMDriftCIGatePlanRequest = {
   base_id: string;
   target_id?: string;
@@ -124,10 +152,12 @@ export type SBOMDriftCIGatePlan = {
   cyclonedx_ready: boolean;
   ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
   requested_by?: string;
   reason?: string;
   diff: SBOMDriftDiff;
+  govulncheck_plan: SBOMDriftGovulncheckPlan;
   artifacts: string[];
   commands: string[];
   actions: string[];
@@ -146,6 +176,7 @@ export type SBOMDriftEvidenceResponse = {
   snapshot: SBOMDriftSnapshot;
   cyclonedx?: SBOMDriftCycloneDXDocument;
   ci_gate_plan?: SBOMDriftCIGatePlan;
+  govulncheck_plan?: SBOMDriftGovulncheckPlan;
 };
 
 export type SBOMDriftClientOptions = {

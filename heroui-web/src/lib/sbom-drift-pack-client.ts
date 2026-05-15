@@ -29,6 +29,7 @@ export interface SBOMDriftStatus {
   ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
   vulnerability_ready: boolean;
+  govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
   snapshot_count: number;
   repo_root?: string;
@@ -65,6 +66,33 @@ export interface SBOMDriftCycloneDXDocument {
   dependencies?: Array<Record<string, unknown>>;
 }
 
+export interface SBOMDriftGovulncheckPackagePlan {
+  ecosystem: string;
+  module: string;
+  version?: string;
+  scope?: string;
+  path?: string;
+  direct: boolean;
+  labels?: string[];
+}
+
+export interface SBOMDriftGovulncheckPlan {
+  plan_ready: boolean;
+  ready: boolean;
+  status: string;
+  command: string;
+  target_package: string;
+  report_artifact: string;
+  executes: boolean;
+  writes_files: boolean;
+  vulnerability_db_fetch: boolean;
+  package_count: number;
+  module_count: number;
+  packages: SBOMDriftGovulncheckPackagePlan[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface SBOMDriftCIGatePlan {
   pack_id: string;
   generated_at: string;
@@ -74,10 +102,12 @@ export interface SBOMDriftCIGatePlan {
   cyclonedx_ready: boolean;
   ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
   requested_by?: string;
   reason?: string;
   diff: SBOMDriftDiff;
+  govulncheck_plan: SBOMDriftGovulncheckPlan;
   artifacts: string[];
   commands: string[];
   actions: string[];
@@ -92,6 +122,7 @@ export interface SBOMDriftEvidence {
   snapshot: SBOMDriftSnapshot;
   cyclonedx?: SBOMDriftCycloneDXDocument;
   ci_gate_plan?: SBOMDriftCIGatePlan;
+  govulncheck_plan?: SBOMDriftGovulncheckPlan;
 }
 
 export interface SBOMDriftPackClient {
