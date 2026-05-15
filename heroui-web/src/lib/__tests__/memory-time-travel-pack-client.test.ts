@@ -56,4 +56,16 @@ describe("memory-time-travel-pack-client", () => {
 
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/evidence/baseline");
   });
+
+  it("runs read-only Merkle audit-chain verification through pack-owned route", async () => {
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ready: true, valid: true, invalid_index: -1, record_count: 2, last_hash: "hash-2", last_seq: 2, checked_at: "2026-05-15T13:00:00Z", recent_records: [{ seq: 2, timestamp: "2026-05-15T13:00:00Z", type: "memory", action: "flush", hash: "hash-2" }] }), { status: 200 }));
+
+    const client = createMemoryTimeTravelPackClient();
+    const result = await client.auditVerify(3);
+
+    expect(result.valid).toBe(true);
+    expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/audit/verify?limit=3");
+  });
 });

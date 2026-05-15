@@ -18,14 +18,24 @@ func (f fakeTemporalKV) SnapshotRawAt(context.Context, string, time.Time) (map[s
 	return f.snapshot, nil
 }
 
+type fakeMerkleVerifier struct {
+	result MerkleVerification
+	limit  int
+}
+
+func (f *fakeMerkleVerifier) VerifyMerkleAuditChain(_ context.Context, limit int) (MerkleVerification, error) {
+	f.limit = limit
+	return f.result, nil
+}
+
 func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 	h := New(Config{DataDir: t.TempDir()})
 	if h.PackID() != PackID {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 7 {
-		t.Fatalf("expected 7 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 8 {
+		t.Fatalf("expected 8 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -48,6 +58,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/snapshot-at":   {http.MethodPost},
 		"/v1/memory-time-travel/diff":          {http.MethodPost},
 		"/v1/memory-time-travel/rollback-plan": {http.MethodPost},
+		"/v1/memory-time-travel/audit/verify":  {http.MethodGet},
 		"/v1/memory-time-travel/evidence/":     {http.MethodGet},
 	}
 	for path, methods := range expected {
@@ -166,5 +177,45 @@ func TestMemoryTimeTravelSnapshotAtUsesLedgerTemporalKVWhenAttached(t *testing.T
 	h.Status(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"memory_persister_writeback_ready":true`) {
 		t.Fatalf("status should expose Memory Persister temporal write-back readiness, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelAuditVerifyUsesMerkleVerifier(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
+	verifier := &fakeMerkleVerifier{result: MerkleVerification{
+		Ready:        true,
+		Valid:        true,
+		InvalidIndex: -1,
+		RecordCount:  2,
+		LastSeq:      2,
+		LastHash:     "hash-2",
+		RecentRecords: []MerkleAuditRecord{
+			{Seq: 2, Timestamp: now, Type: "memory", Actor: "tenant", Action: "flush", PrevHash: "hash-1", Hash: "hash-2"},
+		},
+	}}
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, MerkleVerifier: verifier})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
+	h.Status(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"merkle_verification_ready":true`) || !strings.Contains(w.Body.String(), "memory.audit.verify") {
+		t.Fatalf("status should expose Merkle verifier readiness, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/audit/verify?limit=3", nil)
+	h.AuditVerify(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit verify status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got MerkleVerification
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode audit verify: %v", err)
+	}
+	if verifier.limit != 3 || !got.Ready || !got.Valid || got.RecordCount != 2 || got.LastHash != "hash-2" || len(got.RecentRecords) != 1 {
+		t.Fatalf("unexpected Merkle verification response: limit=%d got=%#v", verifier.limit, got)
+	}
+	if got.CheckedAt != now {
+		t.Fatalf("expected handler to fill checked_at from Now when verifier omits it, got %s", got.CheckedAt)
 	}
 }
