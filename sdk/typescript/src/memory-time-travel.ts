@@ -48,6 +48,7 @@ export type MemoryTimeTravelStatusResponse = {
   temporal_query_ready: boolean;
   ledger_history_ready: boolean;
   merkle_verification_ready: boolean;
+  memory_persister_writeback_ready?: boolean;
   rollback_writeback_ready: boolean;
   snapshot_count: number;
   namespace_count: number;
@@ -55,6 +56,28 @@ export type MemoryTimeTravelStatusResponse = {
   policy: MemoryTimeTravelPolicy;
   last_snapshot?: MemoryTimeTravelSnapshotSummary | null;
   capabilities: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelAuditRecord = {
+  seq: number;
+  timestamp: string;
+  type: string;
+  actor?: string;
+  action: string;
+  prev_hash?: string;
+  hash: string;
+};
+
+export type MemoryTimeTravelAuditVerificationResponse = {
+  ready: boolean;
+  valid: boolean;
+  invalid_index: number;
+  record_count: number;
+  last_hash?: string;
+  last_seq?: number;
+  checked_at: string;
+  recent_records?: MemoryTimeTravelAuditRecord[];
   notes?: string[];
 };
 
@@ -283,6 +306,10 @@ export class MemoryTimeTravelClient {
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {
     return this.request<MemoryTimeTravelEvidenceResponse>("GET", `/v1/memory-time-travel/evidence/${enc(id)}`);
+  }
+
+  auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerificationResponse> {
+    return this.request<MemoryTimeTravelAuditVerificationResponse>("GET", `/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`);
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {

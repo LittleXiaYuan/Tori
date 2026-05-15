@@ -40,6 +40,7 @@ export interface MemoryTimeTravelStatus {
   temporal_query_ready: boolean;
   ledger_history_ready: boolean;
   merkle_verification_ready: boolean;
+  memory_persister_writeback_ready?: boolean;
   rollback_writeback_ready: boolean;
   snapshot_count: number;
   namespace_count: number;
@@ -47,6 +48,28 @@ export interface MemoryTimeTravelStatus {
   policy: MemoryTimeTravelPolicy;
   last_snapshot?: MemoryTimeTravelSnapshotSummary | null;
   capabilities: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelAuditRecord {
+  seq: number;
+  timestamp: string;
+  type: string;
+  actor?: string;
+  action: string;
+  prev_hash?: string;
+  hash: string;
+}
+
+export interface MemoryTimeTravelAuditVerification {
+  ready: boolean;
+  valid: boolean;
+  invalid_index: number;
+  record_count: number;
+  last_hash?: string;
+  last_seq?: number;
+  checked_at: string;
+  recent_records?: MemoryTimeTravelAuditRecord[];
   notes?: string[];
 }
 
@@ -134,6 +157,7 @@ export interface MemoryTimeTravelPackClient {
   snapshotAt(input: MemoryTimeTravelSnapshotAtInput): Promise<MemoryTimeTravelSnapshotAtResponse>;
   diff(input: MemoryTimeTravelDiffInput): Promise<{ diff: MemoryTimeTravelDiffReport }>;
   rollbackPlan(input: MemoryTimeTravelRollbackPlanInput): Promise<{ plan: MemoryTimeTravelRollbackPlan }>;
+  auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
   evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[] }>;
 }
 
@@ -174,6 +198,8 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    auditVerify: (limit) =>
+      fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
       fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[] }>(
         `/v1/memory-time-travel/evidence/${enc(id)}`,

@@ -667,7 +667,7 @@ if (memoryTimeTravelManifest) {
 if (memoryTimeTravelPage.includes('from "@/lib/api"') || memoryTimeTravelPage.includes("api.memoryTimeTravel") || !memoryTimeTravelPage.includes("createMemoryTimeTravelPackClient")) {
   fail("Memory Time Travel pack page must use memory-time-travel-pack-client instead of monolithic api object");
 }
-for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/evidence/", 'method: "POST"']) {
+for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", 'method: "POST"']) {
   if (!memoryTimeTravelClient.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
@@ -676,13 +676,13 @@ if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
 for (const token of ["TestMemoryTimeTravel", "StatusMethodNotAllowed", "/v1/memory-time-travel/diff"]) {
   if (!memoryTimeTravelGateTest.includes(token)) fail(`Memory Time Travel gateway gate test missing token: ${token}`);
 }
-for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientError", "/v1/memory-time-travel/status", "/v1/memory-time-travel/evidence/"]) {
+for (const token of ["createMemoryTimeTravelClient", "MemoryTimeTravelClientError", "/v1/memory-time-travel/status", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", "auditVerify"]) {
   if (!memoryTimeTravelSdk.includes(token)) fail(`Memory Time Travel TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!memoryTimeTravelClientTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
-for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "rollback_writeback_ready"]) {
+for (const token of ["json-memory-time-travel-evidence", "snapshot_store_ready", "temporal_query_ready", "ledger_history_ready", "memory_persister_writeback_ready", "TemporalKVReader", "SnapshotRawAt", "ledger-kv-history", "merkle_verification_ready", "memory.audit.verify", "MerkleVerifier", "VerifyMerkleAuditChain", "rollback_writeback_ready"]) {
   if (!memoryTimeTravelSource.includes(token)) fail(`Memory Time Travel handler missing memory governance shell token: ${token}`);
 }
 for (const token of ["NewTemporalKVStore", "PutRawVersionedAt", "GetRawAt", "ListVersions", "SnapshotRawAt", "__kv_history__", "TestTemporalKVStorePutVersionedAndGetRawAt", "TestTemporalKVStoreListVersionsAndSnapshotRawAt"]) {
@@ -696,6 +696,9 @@ if (!gatewaySource.includes("memoryTimeTravelTemporalKV") || !gatewaySource.incl
 }
 if (!gatewaySource.includes("MemoryPersisterWriteback") || !gatewaySource.includes("memoryPersisterTemporalWritebackReady")) {
   fail("Memory Time Travel pack status must receive Memory Persister temporal write-back readiness from cmd/agent/init_tasks.go");
+}
+if (!gatewaySource.includes("memoryTimeTravelMerkleVerifier") || !gatewaySource.includes("VerifyMerkleAuditChain")) {
+  fail("Memory Time Travel pack must wire read-only Merkle audit-chain verification from cmd/agent/init_tasks.go");
 }
 for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memoryTimeTravelEvidence:"]) {
   if (apiSource.includes(token)) fail(`monolithic api.ts still exposes Memory Time Travel method: ${token}`);

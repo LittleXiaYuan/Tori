@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, Clock3, Download, GitCompare, History, RefreshCw, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, Clock3, Download, GitCompare, History, RefreshCw, RotateCcw, Save, ShieldCheck } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelDiffReport, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -33,9 +33,10 @@ function sampleValues() {
 
 export default function MemoryTimeTravelPackPage() {
   const [status, setStatus] = useState<MemoryTimeTravelStatus | null>(null);
+  const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -160,6 +161,23 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const verifyAuditChain = async () => {
+    setBusy("audit");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.auditVerify(8);
+      setAuditVerification(res);
+      showToast(
+        res.ready ? (res.valid ? "Merkle 审计链验证通过" : `Merkle 审计链异常：index ${res.invalid_index}`) : "Merkle 审计链验证器尚未接入",
+        !res.ready ? "info" : res.valid ? "success" : "warning",
+      );
+    } catch (e) {
+      setError(formatErrorMessage(e, "Merkle 审计链验证失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -178,7 +196,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划和证据包导出。Ledger KV kv_history、Merkle 审计验证和真实写回会在后续切片接入。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention cron 和真实写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -197,6 +215,37 @@ export default function MemoryTimeTravelPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Merkle 验证</div><div className="kpi-value text-lg">{status?.merkle_verification_ready ? "ready" : "pending"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">阶段</div><div className="kpi-value text-lg">{status?.stage || "pack-shell"}</div></Card>
       </div>
+
+      <Card className="section-card p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck size={16} />Merkle 审计链验证</div>
+            <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              通过 Pack Runtime 只读验证内存中的 audit chain，并展示最近记录摘要；这里不执行回滚写回，也不声称 KV history 已具备逐条审计证明。
+            </div>
+          </div>
+          <Button variant="outline" isPending={busy === "audit"} onPress={verifyAuditChain}><ShieldCheck size={14} />验证审计链</Button>
+        </div>
+        {auditVerification ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: auditVerification.ready && auditVerification.valid ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: auditVerification.ready && auditVerification.valid ? "#22c55e" : "#facc15" }}>
+                {auditVerification.ready ? (auditVerification.valid ? "valid" : "invalid") : "not attached"}
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{auditVerification.record_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>records · last seq {auditVerification.last_seq ?? "-"}</div>
+              <div className="mt-2 truncate text-xs" style={{ color: "var(--yunque-text-muted)" }}>{auditVerification.last_hash || "no hash"}</div>
+            </div>
+            <TextField value={JSON.stringify(auditVerification, null, 2)} onChange={() => undefined}>
+              <TextArea rows={8} aria-label="Memory Time Travel audit verification JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+            尚未运行本页验证。启用 pack 后可通过 `/v1/memory-time-travel/audit/verify` 获取只读验证结果。
+          </div>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
         <Card className="section-card overflow-hidden">

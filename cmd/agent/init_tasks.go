@@ -97,6 +97,7 @@ func initTasks(app *agentrt.App) error {
 				DataDir:                  cfg.DataPath("memory-time-travel"),
 				TemporalKV:               memoryTimeTravelTemporalKV(app),
 				MemoryPersisterWriteback: memoryPersisterTemporalWritebackReady(app),
+				MerkleVerifier:           memoryTimeTravelMerkleVerifier(app),
 			}),
 			rpareplaypack.New(rpareplaypack.Config{DataDir: cfg.DataPath("rpa-replay")}),
 			sbomdriftpack.New(sbomdriftpack.Config{RepoRoot: ".", DataDir: cfg.DataPath("sbom-drift")}),
@@ -404,6 +405,67 @@ func memoryTimeTravelTemporalKV(app *agentrt.App) *iledger.TemporalKVStore {
 		return nil
 	}
 	return iledger.NewTemporalKVStore(app.Ledger)
+}
+
+func memoryTimeTravelMerkleVerifier(app *agentrt.App) memorytimetravelpack.MerkleVerifier {
+	return memorytimetravelpack.MerkleVerifierFunc(func(_ context.Context, limit int) (memorytimetravelpack.MerkleVerification, error) {
+		checkedAt := time.Now().UTC()
+		if app == nil {
+			return memorytimetravelpack.MerkleVerification{
+				Ready:        false,
+				Valid:        false,
+				InvalidIndex: -1,
+				CheckedAt:    checkedAt,
+				Notes:        []string{"App runtime is not available; Merkle audit-chain verification cannot run."},
+			}, nil
+		}
+		value, ok := app.Get(agentrt.CompAuditChain)
+		if !ok || value == nil {
+			return memorytimetravelpack.MerkleVerification{
+				Ready:        false,
+				Valid:        false,
+				InvalidIndex: -1,
+				CheckedAt:    checkedAt,
+				Notes:        []string{"Audit chain component is not initialized yet; retry after runtime bootstrap completes."},
+			}, nil
+		}
+		chain, ok := value.(*audit.Chain)
+		if !ok || chain == nil {
+			return memorytimetravelpack.MerkleVerification{
+				Ready:        false,
+				Valid:        false,
+				InvalidIndex: -1,
+				CheckedAt:    checkedAt,
+				Notes:        []string{"Audit chain component has an unexpected runtime type."},
+			}, nil
+		}
+		invalidIndex := chain.Verify()
+		last := chain.Last()
+		out := memorytimetravelpack.MerkleVerification{
+			Ready:        true,
+			Valid:        invalidIndex == -1,
+			InvalidIndex: invalidIndex,
+			RecordCount:  chain.Len(),
+			CheckedAt:    checkedAt,
+			Notes:        []string{"Read-only verification checks the in-memory Merkle audit chain; historical file rehydration and per-KV proof linkage remain separate follow-up work."},
+		}
+		if last != nil {
+			out.LastHash = last.Hash
+			out.LastSeq = last.Seq
+		}
+		for _, rec := range chain.Tail(limit) {
+			out.RecentRecords = append(out.RecentRecords, memorytimetravelpack.MerkleAuditRecord{
+				Seq:       rec.Seq,
+				Timestamp: rec.Timestamp,
+				Type:      string(rec.Type),
+				Actor:     rec.Actor,
+				Action:    rec.Action,
+				PrevHash:  rec.PrevHash,
+				Hash:      rec.Hash,
+			})
+		}
+		return out, nil
+	})
 }
 
 func ensureBuiltinPacks(registry *packruntime.Registry) {

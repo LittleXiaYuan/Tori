@@ -1,9 +1,9 @@
 // Package memorytimetravel contains the backend implementation for the built-in
 // Memory Time Travel capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
-// point-in-time reconstruction, drift diff summaries, rollback plans, and JSON
-// evidence export while Ledger KV kv_history and Merkle audit-chain verification
-// are wired later.
+// point-in-time reconstruction, drift diff summaries, rollback plans, JSON
+// evidence export, and read-only Merkle audit-chain verification while native
+// Ledger KV kv_history write-back remains a later slice.
 package memorytimetravel
 
 import (
@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ type Config struct {
 	Policy                   RetentionPolicy
 	TemporalKV               TemporalKVReader
 	MemoryPersisterWriteback bool
+	MerkleVerifier           MerkleVerifier
 }
 
 // Handler serves the Memory Time Travel pack API surface.
@@ -42,6 +44,7 @@ type Handler struct {
 	policy                   RetentionPolicy
 	temporalKV               TemporalKVReader
 	memoryPersisterWriteback bool
+	merkleVerifier           MerkleVerifier
 }
 
 // TemporalKVReader is the narrow Memory Time Travel dependency on Ledger KV
@@ -49,6 +52,20 @@ type Handler struct {
 // the concrete Ledger implementation into the pack shell.
 type TemporalKVReader interface {
 	SnapshotRawAt(ctx context.Context, namespace string, at time.Time) (map[string][]byte, error)
+}
+
+// MerkleVerifier is the pack-local adapter boundary for the global audit chain.
+// The pack only asks for read-only verification output so it does not need to
+// import the concrete agentcore/audit implementation.
+type MerkleVerifier interface {
+	VerifyMerkleAuditChain(ctx context.Context, limit int) (MerkleVerification, error)
+}
+
+// MerkleVerifierFunc adapts a function into a MerkleVerifier.
+type MerkleVerifierFunc func(ctx context.Context, limit int) (MerkleVerification, error)
+
+func (fn MerkleVerifierFunc) VerifyMerkleAuditChain(ctx context.Context, limit int) (MerkleVerification, error) {
+	return fn(ctx, limit)
 }
 
 // RetentionPolicy models the future kv_history retention contract at pack level.
@@ -163,6 +180,28 @@ type RollbackPlan struct {
 	Notes         []string          `json:"notes,omitempty"`
 }
 
+type MerkleAuditRecord struct {
+	Seq       uint64    `json:"seq"`
+	Timestamp time.Time `json:"timestamp"`
+	Type      string    `json:"type"`
+	Actor     string    `json:"actor,omitempty"`
+	Action    string    `json:"action"`
+	PrevHash  string    `json:"prev_hash,omitempty"`
+	Hash      string    `json:"hash"`
+}
+
+type MerkleVerification struct {
+	Ready         bool                `json:"ready"`
+	Valid         bool                `json:"valid"`
+	InvalidIndex  int                 `json:"invalid_index"`
+	RecordCount   int                 `json:"record_count"`
+	LastHash      string              `json:"last_hash,omitempty"`
+	LastSeq       uint64              `json:"last_seq,omitempty"`
+	CheckedAt     time.Time           `json:"checked_at"`
+	RecentRecords []MerkleAuditRecord `json:"recent_records,omitempty"`
+	Notes         []string            `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a Memory Time Travel pack handler.
@@ -181,6 +220,7 @@ func New(cfg Config) *Handler {
 		policy:                   normalizePolicy(cfg.Policy),
 		temporalKV:               cfg.TemporalKV,
 		memoryPersisterWriteback: cfg.MemoryPersisterWriteback,
+		merkleVerifier:           cfg.MerkleVerifier,
 	}
 }
 
@@ -199,6 +239,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/snapshot-at", Handler: h.SnapshotAt},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff", Handler: h.Diff},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan", Handler: h.RollbackPlan},
+		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
 	}
 }
@@ -217,13 +258,23 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	for _, snapshot := range snapshots {
 		namespaces[snapshot.Namespace] = true
 	}
+	capabilities := []string{
+		"memory.snapshot.store",
+		"memory.snapshot_at.reconstruct",
+		"memory.drift.diff",
+		"memory.rollback.plan",
+		"memory.evidence.export",
+	}
+	if h.merkleVerifier != nil {
+		capabilities = append(capabilities, "memory.audit.verify")
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                          PackID,
 		"stage":                            "pack-shell-before-ledger-kv-history",
 		"snapshot_store_ready":             true,
 		"temporal_query_ready":             true,
 		"ledger_history_ready":             h.temporalKV != nil,
-		"merkle_verification_ready":        false,
+		"merkle_verification_ready":        h.merkleVerifier != nil,
 		"memory_persister_writeback_ready": h.memoryPersisterWriteback,
 		"rollback_writeback_ready":         false,
 		"snapshot_count":                   len(snapshots),
@@ -231,14 +282,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"store_dir":                        h.dataDir,
 		"policy":                           h.policy,
 		"last_snapshot":                    firstSnapshot(snapshots),
-		"capabilities": []string{
-			"memory.snapshot.store",
-			"memory.snapshot_at.reconstruct",
-			"memory.drift.diff",
-			"memory.rollback.plan",
-			"memory.evidence.export",
-		},
-		"notes": h.statusNotes(),
+		"capabilities":                     capabilities,
+		"notes":                            h.statusNotes(),
 	})
 }
 
@@ -379,6 +424,33 @@ func (h *Handler) RollbackPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) AuditVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	limit := parseAuditLimit(r.URL.Query().Get("limit"))
+	if h.merkleVerifier == nil {
+		writeJSON(w, http.StatusOK, MerkleVerification{
+			Ready:        false,
+			Valid:        false,
+			InvalidIndex: -1,
+			CheckedAt:    h.now().UTC(),
+			Notes:        []string{"Merkle audit-chain verifier is not attached to this Memory Time Travel pack instance."},
+		})
+		return
+	}
+	result, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if result.CheckedAt.IsZero() {
+		result.CheckedAt = h.now().UTC()
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -405,12 +477,17 @@ func (h *Handler) statusNotes() []string {
 	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, and evidence export are available."}
 	if h.temporalKV != nil {
 		if h.memoryPersisterWriteback {
-			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; Merkle audit-chain verification, retention cron, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; native kv_history tables, retention cron, and approved rollback execution remain follow-up wiring.")
 		} else {
-			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, Merkle audit-chain verification, retention cron, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, native kv_history tables, retention cron, and approved rollback execution remain follow-up wiring.")
 		}
 	} else {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
+	}
+	if h.merkleVerifier != nil {
+		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
+	} else {
+		notes = append(notes, "Merkle audit-chain verification is not attached to this pack instance yet.")
 	}
 	return notes
 }
@@ -438,6 +515,22 @@ func decodeTemporalValue(value []byte) string {
 		return string(data)
 	}
 	return string(value)
+}
+
+func parseAuditLimit(raw string) int {
+	limit := 10
+	if strings.TrimSpace(raw) != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil {
+			limit = parsed
+		}
+	}
+	if limit <= 0 {
+		return 10
+	}
+	if limit > 50 {
+		return 50
+	}
+	return limit
 }
 
 func (h *Handler) normalizeSnapshot(req SaveSnapshotRequest) (Snapshot, error) {

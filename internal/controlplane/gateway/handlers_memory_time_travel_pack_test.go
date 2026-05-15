@@ -99,6 +99,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/snapshot-at",
 				"/v1/memory-time-travel/diff",
 				"/v1/memory-time-travel/rollback-plan",
+				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -109,6 +110,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/snapshot-at"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan"},
+				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},
 			},
 		},

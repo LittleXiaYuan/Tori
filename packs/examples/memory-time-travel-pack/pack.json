@@ -15,6 +15,7 @@
       "memory_time_travel.snapshot_at",
       "memory_time_travel.diff",
       "memory_time_travel.rollback_plan",
+      "memory_time_travel.audit.verify",
       "memory_time_travel.evidence.export"
     ],
     "routes": [
@@ -24,6 +25,7 @@
       "/v1/memory-time-travel/snapshot-at",
       "/v1/memory-time-travel/diff",
       "/v1/memory-time-travel/rollback-plan",
+      "/v1/memory-time-travel/audit/verify",
       "/v1/memory-time-travel/evidence/"
     ],
     "permissions": [
@@ -66,6 +68,11 @@
         "method": "POST",
         "path": "/v1/memory-time-travel/rollback-plan",
         "description": "Build a dry-run rollback plan for a selected memory snapshot."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/memory-time-travel/audit/verify",
+        "description": "Run read-only Merkle audit-chain verification and return recent audit record summaries."
       },
       {
         "method": "GET",

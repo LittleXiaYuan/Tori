@@ -115,6 +115,25 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/memory-time-travel/evidence/baseline");
 });
 
+test("MemoryTimeTravelClient verifies Merkle audit chains", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createMemoryTimeTravelClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ ready: true, valid: true, invalid_index: -1, record_count: 2, last_hash: "hash-2", last_seq: 2, checked_at: "2026-05-15T13:00:00Z", recent_records: [{ seq: 2, timestamp: "2026-05-15T13:00:00Z", type: "memory", action: "flush", hash: "hash-2" }] });
+    },
+  });
+
+  const verify = await client.auditVerify(3);
+
+  assertEqual(verify.ready, true);
+  assertEqual(verify.valid, true);
+  assertEqual(verify.last_hash, "hash-2");
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/audit/verify?limit=3");
+  assertEqual(calls[0]?.init?.method, "GET");
+});
+
 test("MemoryTimeTravelClient throws MemoryTimeTravelClientError with nested gateway messages", async () => {
   const client = createMemoryTimeTravelClient({
     baseUrl: "http://localhost:9090",
