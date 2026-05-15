@@ -47,6 +47,22 @@ describe("wasm-plugin-pack-client", () => {
     labels: ["host-abi", "execution-gate", "blocked", "needs-enforcement"],
   };
 
+  const moduleIntegrityGate = {
+    integrity_gate_ready: true,
+    allows_execution: true,
+    blocked: false,
+    status: "verified",
+    expected_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    actual_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    module_path: "calculator.wasm",
+    writes_files: false,
+    network_access: false,
+    reason: "registered SHA-256 matches local module bytes",
+    labels: ["module-integrity", "execution-gate", "verified"],
+  };
+
   const remoteInstallPlan = {
     pack_id: "yunque.pack.wasm-plugin",
     generated_at: "now",
@@ -123,6 +139,7 @@ describe("wasm-plugin-pack-client", () => {
             abi_ready: false,
             host_abi_execution_gate_ready: true,
             host_abi_enforcement_ready: false,
+            module_integrity_gate_ready: true,
             remote_install_plan_ready: true,
             remote_install_ready: false,
             approval_gate_plan_ready: true,
@@ -132,6 +149,7 @@ describe("wasm-plugin-pack-client", () => {
             capabilities: [
               "wasm.host_abi.plan",
               "wasm.host_abi.execution_gate",
+              "wasm.module.integrity_gate",
               "wasm.remote_install.plan",
               "wasm.remote_install.approval_plan",
             ],
@@ -200,12 +218,14 @@ describe("wasm-plugin-pack-client", () => {
     expect(status.abi_ready).toBe(false);
     expect(status.host_abi_execution_gate_ready).toBe(true);
     expect(status.host_abi_enforcement_ready).toBe(false);
+    expect(status.module_integrity_gate_ready).toBe(true);
     expect(status.remote_install_plan_ready).toBe(true);
     expect(status.remote_install_ready).toBe(false);
     expect(status.approval_gate_plan_ready).toBe(true);
     expect(status.approval_gate_ready).toBe(false);
     expect(status.capabilities).toContain("wasm.host_abi.plan");
     expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
+    expect(status.capabilities).toContain("wasm.module.integrity_gate");
     expect(status.capabilities).toContain("wasm.remote_install.plan");
     expect(status.capabilities).toContain("wasm.remote_install.approval_plan");
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
@@ -248,6 +268,7 @@ describe("wasm-plugin-pack-client", () => {
               plan: [],
               host_abi_plan: hostABIPlan,
               host_abi_gate: hostABIGate,
+              module_integrity_gate: moduleIntegrityGate,
             },
           }),
           { status: 200 },
@@ -314,6 +335,10 @@ describe("wasm-plugin-pack-client", () => {
     expect(executed.result.host_abi_gate.execution_gate_ready).toBe(true);
     expect(executed.result.host_abi_gate.allows_execution).toBe(false);
     expect(executed.result.host_abi_gate.enforcement_ready).toBe(false);
+    expect(executed.result.module_integrity_gate.integrity_gate_ready).toBe(
+      true,
+    );
+    expect(executed.result.module_integrity_gate.status).toBe("verified");
     expect(remotePlan.plan.remote_install_plan_ready).toBe(true);
     expect(remotePlan.plan.remote_install_ready).toBe(false);
     expect(remotePlan.plan.writes_files).toBe(false);
@@ -384,6 +409,7 @@ describe("wasm-plugin-pack-client", () => {
             files: [
               "plugin.json",
               "host-abi-plan.json",
+              "module-integrity-gate.json",
               "remote-install-plan.json",
               "approval-gate-plan.json",
             ],
@@ -391,6 +417,7 @@ describe("wasm-plugin-pack-client", () => {
             plan: [],
             host_abi_plan: hostABIPlan,
             host_abi_gate: hostABIGate,
+            module_integrity_gate: moduleIntegrityGate,
             remote_install_plan: remoteInstallPlan,
             approval_gate_plan: approvalPlan,
           }),
@@ -402,11 +429,13 @@ describe("wasm-plugin-pack-client", () => {
     const evidence = await client.evidence("calculator");
 
     expect(evidence.files).toContain("host-abi-plan.json");
+    expect(evidence.files).toContain("module-integrity-gate.json");
     expect(evidence.files).toContain("remote-install-plan.json");
     expect(evidence.files).toContain("approval-gate-plan.json");
     expect(evidence.host_abi_plan.status).toBe("plan_only");
     expect(evidence.host_abi_gate.enforcement_ready).toBe(false);
     expect(evidence.host_abi_gate.blocked).toBe(true);
+    expect(evidence.module_integrity_gate.status).toBe("verified");
     expect(evidence.remote_install_plan.downloads).toBe(false);
     expect(evidence.approval_gate_plan.requires_approval).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");

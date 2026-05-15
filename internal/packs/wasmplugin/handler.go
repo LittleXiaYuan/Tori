@@ -227,21 +227,22 @@ type RemoteInstallCheck struct {
 }
 
 type ExecuteResult struct {
-	Slug        string               `json:"slug"`
-	DryRun      bool                 `json:"dry_run"`
-	Entrypoint  string               `json:"entrypoint"`
-	Success     bool                 `json:"success"`
-	ExitCode    int                  `json:"exit_code"`
-	Stdout      string               `json:"stdout,omitempty"`
-	Stderr      string               `json:"stderr,omitempty"`
-	Duration    string               `json:"duration,omitempty"`
-	MemUsed     uint32               `json:"mem_used_bytes,omitempty"`
-	Exports     []string             `json:"exports,omitempty"`
-	KVWrites    map[string]string    `json:"kv_writes,omitempty"`
-	Plan        []PermissionCheck    `json:"plan,omitempty"`
-	HostABIPlan HostABIPlan          `json:"host_abi_plan"`
-	HostABIGate HostABIExecutionGate `json:"host_abi_gate"`
-	Notes       []string             `json:"notes,omitempty"`
+	Slug                string               `json:"slug"`
+	DryRun              bool                 `json:"dry_run"`
+	Entrypoint          string               `json:"entrypoint"`
+	Success             bool                 `json:"success"`
+	ExitCode            int                  `json:"exit_code"`
+	Stdout              string               `json:"stdout,omitempty"`
+	Stderr              string               `json:"stderr,omitempty"`
+	Duration            string               `json:"duration,omitempty"`
+	MemUsed             uint32               `json:"mem_used_bytes,omitempty"`
+	Exports             []string             `json:"exports,omitempty"`
+	KVWrites            map[string]string    `json:"kv_writes,omitempty"`
+	Plan                []PermissionCheck    `json:"plan,omitempty"`
+	HostABIPlan         HostABIPlan          `json:"host_abi_plan"`
+	HostABIGate         HostABIExecutionGate `json:"host_abi_gate"`
+	ModuleIntegrityGate ModuleIntegrityGate  `json:"module_integrity_gate"`
+	Notes               []string             `json:"notes,omitempty"`
 }
 
 type PermissionCheck struct {
@@ -262,6 +263,21 @@ type HostABIPlan struct {
 	ResourceLimits   HostABIResourceLimits `json:"resource_limits"`
 	Labels           []string              `json:"labels"`
 	Notes            []string              `json:"notes,omitempty"`
+}
+
+type ModuleIntegrityGate struct {
+	IntegrityGateReady bool     `json:"integrity_gate_ready"`
+	AllowsExecution    bool     `json:"allows_execution"`
+	Blocked            bool     `json:"blocked"`
+	Status             string   `json:"status"`
+	ExpectedSHA256     string   `json:"expected_sha256,omitempty"`
+	ActualSHA256       string   `json:"actual_sha256,omitempty"`
+	ModulePath         string   `json:"module_path"`
+	WritesFiles        bool     `json:"writes_files"`
+	NetworkAccess      bool     `json:"network_access"`
+	Reason             string   `json:"reason,omitempty"`
+	Labels             []string `json:"labels"`
+	Notes              []string `json:"notes,omitempty"`
 }
 
 type HostABIExecutionGate struct {
@@ -376,6 +392,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"abi_ready":                     false,
 		"host_abi_execution_gate_ready": true,
 		"host_abi_enforcement_ready":    false,
+		"module_integrity_gate_ready":   true,
 		"remote_install_plan_ready":     true,
 		"remote_install_ready":          false,
 		"approval_gate_plan_ready":      true,
@@ -392,11 +409,12 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.permission.plan",
 			"wasm.host_abi.plan",
 			"wasm.host_abi.execution_gate",
+			"wasm.module.integrity_gate",
 			"wasm.remote_install.plan",
 			"wasm.remote_install.approval_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, remote signed package install plan preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -515,9 +533,9 @@ func (h *Handler) Execute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "plugin is not loaded", "plugin": plugin.Slug})
 		return
 	}
-	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions), HostABIPlan: hostABIPlan(plugin.Permissions), HostABIGate: hostABIExecutionGate(plugin.Permissions)}
+	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions), HostABIPlan: hostABIPlan(plugin.Permissions), HostABIGate: hostABIExecutionGate(plugin.Permissions), ModuleIntegrityGate: moduleIntegrityGate(plugin, "")}
 	if req.DryRun {
-		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, Host ABI plan, Host ABI execution gate, and entrypoint selection."}
+		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, Host ABI plan, Host ABI execution gate, module integrity gate contract, and entrypoint selection."}
 		writeJSON(w, http.StatusOK, map[string]any{"result": result})
 		return
 	}
@@ -537,6 +555,16 @@ func (h *Handler) Execute(w http.ResponseWriter, r *http.Request) {
 	wasmBytes, err := os.ReadFile(modulePath)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("wasm module not found: %s", plugin.ModulePath))
+		return
+	}
+	actualSHA := sha256Bytes(wasmBytes)
+	result.ModuleIntegrityGate = moduleIntegrityGate(plugin, actualSHA)
+	if !result.ModuleIntegrityGate.AllowsExecution {
+		result.Success = false
+		result.ExitCode = -4
+		result.Stderr = "wasm module integrity check failed before sandbox execution"
+		result.Notes = []string{"Conservative Pack Runtime gate: local WASM module bytes must match the registered SHA-256 before sandbox execution."}
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "wasm module integrity blocked by pack gate", "result": result})
 		return
 	}
 	sandboxResult, err := h.sandbox.Execute(r.Context(), wasmBytes, req.Input, entrypoint)
@@ -606,17 +634,18 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":             PackID,
-		"exported_at":         h.now().UTC(),
-		"format":              "json-wasm-plugin-evidence",
-		"files":               []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "remote-install-plan.json", "approval-gate-plan.json", "sandbox-stats.json"},
-		"plugin":              plugin,
-		"plan":                permissionPlan(plugin.Permissions),
-		"host_abi_plan":       hostABIPlan(plugin.Permissions),
-		"host_abi_gate":       hostABIExecutionGate(plugin.Permissions),
-		"remote_install_plan": h.remoteInstallPlanForPlugin(plugin),
-		"approval_gate_plan":  h.remoteInstallApprovalPlanForPlugin(plugin),
-		"sandbox":             h.sandbox.Stats(),
+		"pack_id":               PackID,
+		"exported_at":           h.now().UTC(),
+		"format":                "json-wasm-plugin-evidence",
+		"files":                 []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "approval-gate-plan.json", "sandbox-stats.json"},
+		"plugin":                plugin,
+		"plan":                  permissionPlan(plugin.Permissions),
+		"host_abi_plan":         hostABIPlan(plugin.Permissions),
+		"host_abi_gate":         hostABIExecutionGate(plugin.Permissions),
+		"module_integrity_gate": moduleIntegrityGate(plugin, h.computeSHA256(plugin.ModulePath)),
+		"remote_install_plan":   h.remoteInstallPlanForPlugin(plugin),
+		"approval_gate_plan":    h.remoteInstallApprovalPlanForPlugin(plugin),
+		"sandbox":               h.sandbox.Stats(),
 	})
 }
 
@@ -693,6 +722,52 @@ func permissionPlan(policy PluginPermissionPolicy) []PermissionCheck {
 		{Name: "env_get", Allowed: len(policy.EnvAllowlist) > 0, Reason: fmt.Sprintf("allowlist entries: %d", len(policy.EnvAllowlist))},
 	}
 	return checks
+}
+
+func moduleIntegrityGate(plugin Plugin, actualSHA string) ModuleIntegrityGate {
+	expectedSHA := strings.ToLower(strings.TrimSpace(plugin.SHA256))
+	actualSHA = strings.ToLower(strings.TrimSpace(actualSHA))
+	allowsExecution := expectedSHA == "" || actualSHA == "" || expectedSHA == actualSHA
+	status := "pending_runtime_sha256"
+	reason := "runtime module SHA-256 will be checked after loading module bytes"
+	labels := []string{"module-integrity", "execution-gate", "pending-runtime-check"}
+	notes := []string{"Dry-run exposes the integrity gate contract without reading or hashing module bytes."}
+	if actualSHA != "" {
+		status = "verified"
+		reason = "registered SHA-256 matches local module bytes"
+		labels = []string{"module-integrity", "execution-gate", "verified"}
+		notes = []string{"Local module bytes were hashed before sandbox execution."}
+	}
+	if expectedSHA == "" {
+		status = "allowed_no_registered_sha256"
+		reason = "plugin has no registered SHA-256; integrity gate is ready but cannot compare bytes"
+		labels = []string{"module-integrity", "execution-gate", "no-registered-sha256"}
+		notes = []string{"Register plugins through the pack installer to persist a SHA-256 before real execution."}
+	}
+	if expectedSHA != "" && actualSHA != "" && expectedSHA != actualSHA {
+		allowsExecution = false
+		status = "blocked_module_sha256_mismatch"
+		reason = "local WASM module SHA-256 does not match the registered plugin metadata"
+		labels = []string{"module-integrity", "execution-gate", "blocked", "sha256-mismatch"}
+		notes = []string{
+			"Real execution is blocked before sandbox execution because module bytes drifted after registration.",
+			"Re-register or reinstall the plugin to update trusted metadata after reviewing the module change.",
+		}
+	}
+	return ModuleIntegrityGate{
+		IntegrityGateReady: true,
+		AllowsExecution:    allowsExecution,
+		Blocked:            !allowsExecution,
+		Status:             status,
+		ExpectedSHA256:     expectedSHA,
+		ActualSHA256:       actualSHA,
+		ModulePath:         plugin.ModulePath,
+		WritesFiles:        false,
+		NetworkAccess:      false,
+		Reason:             reason,
+		Labels:             labels,
+		Notes:              notes,
+	}
 }
 
 func hostABIExecutionGate(policy PluginPermissionPolicy) HostABIExecutionGate {
@@ -1200,6 +1275,10 @@ func (h *Handler) computeSHA256(modulePath string) string {
 	if err != nil {
 		return ""
 	}
+	return sha256Bytes(data)
+}
+
+func sha256Bytes(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }

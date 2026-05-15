@@ -12,6 +12,12 @@ export const WASM_PLUGIN_HOST_ABI_EXECUTION_GATE_CAPABILITY =
 export const WASM_PLUGIN_HOST_ABI_BLOCKED_STATUS =
   "blocked_until_host_abi_enforcement";
 
+export const WASM_PLUGIN_MODULE_INTEGRITY_GATE_CAPABILITY =
+  "wasm.module.integrity_gate";
+
+export const WASM_PLUGIN_MODULE_INTEGRITY_BLOCKED_STATUS =
+  "blocked_module_sha256_mismatch";
+
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -51,6 +57,7 @@ export interface WASMPluginStatus {
   abi_ready: boolean;
   host_abi_execution_gate_ready: boolean;
   host_abi_enforcement_ready: boolean;
+  module_integrity_gate_ready: boolean;
   remote_install_plan_ready: boolean;
   remote_install_ready: boolean;
   approval_gate_plan_ready: boolean;
@@ -125,6 +132,21 @@ export interface WASMPluginHostABIExecutionGate {
   requested_functions?: string[];
   allowed_functions?: string[];
   blocked_functions?: string[];
+  reason?: string;
+  labels: string[];
+  notes?: string[];
+}
+
+export interface WASMPluginModuleIntegrityGate {
+  integrity_gate_ready: boolean;
+  allows_execution: boolean;
+  blocked: boolean;
+  status: string;
+  expected_sha256?: string;
+  actual_sha256?: string;
+  module_path: string;
+  writes_files: boolean;
+  network_access: boolean;
   reason?: string;
   labels: string[];
   notes?: string[];
@@ -263,6 +285,7 @@ export interface WASMPluginExecuteResult {
   plan?: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
   host_abi_gate: WASMPluginHostABIExecutionGate;
+  module_integrity_gate: WASMPluginModuleIntegrityGate;
   notes?: string[];
 }
 
@@ -316,6 +339,7 @@ export interface WASMPluginPackClient {
     plan: WASMPluginPermissionCheck[];
     host_abi_plan: WASMPluginHostABIPlan;
     host_abi_gate: WASMPluginHostABIExecutionGate;
+    module_integrity_gate: WASMPluginModuleIntegrityGate;
     remote_install_plan: WASMPluginRemoteInstallPlan;
     approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
     sandbox?: Record<string, unknown>;
@@ -392,6 +416,7 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         plan: WASMPluginPermissionCheck[];
         host_abi_plan: WASMPluginHostABIPlan;
         host_abi_gate: WASMPluginHostABIExecutionGate;
+        module_integrity_gate: WASMPluginModuleIntegrityGate;
         remote_install_plan: WASMPluginRemoteInstallPlan;
         approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
         sandbox?: Record<string, unknown>;

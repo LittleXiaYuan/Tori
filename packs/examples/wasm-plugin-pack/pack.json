@@ -17,6 +17,7 @@
       "wasm.plugin.execute",
       "wasm.host_abi.plan",
       "wasm.host_abi.execution_gate",
+      "wasm.module.integrity_gate",
       "wasm.remote_install.plan",
       "wasm.remote_install.approval_plan",
       "wasm.evidence.export"

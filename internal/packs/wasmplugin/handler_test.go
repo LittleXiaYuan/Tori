@@ -119,6 +119,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if dryRunResp.Result.HostABIGate.EnforcementReady || dryRunResp.Result.HostABIGate.WritesFiles || dryRunResp.Result.HostABIGate.NetworkAccess {
 		t.Fatalf("host ABI execution gate should remain non-destructive until enforcement is wired: %#v", dryRunResp.Result.HostABIGate)
 	}
+	if !dryRunResp.Result.ModuleIntegrityGate.IntegrityGateReady || dryRunResp.Result.ModuleIntegrityGate.Blocked || dryRunResp.Result.ModuleIntegrityGate.WritesFiles || dryRunResp.Result.ModuleIntegrityGate.NetworkAccess || dryRunResp.Result.ModuleIntegrityGate.Status != "pending_runtime_sha256" {
+		t.Fatalf("dry-run should expose a non-destructive module integrity gate contract: %#v", dryRunResp.Result.ModuleIntegrityGate)
+	}
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","capabilities":["math.add"],"tags":["remote"]}`))
@@ -202,6 +205,28 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if !execResp.Result.Success || execResp.Result.Stdout != "hello" || !execResp.Result.HostABIGate.AllowsExecution || execResp.Result.HostABIGate.Blocked || execResp.Result.HostABIGate.Status != "allowed_no_privileged_host_abi" {
 		t.Fatalf("unexpected stateless execute result: %#v", execResp.Result)
 	}
+	if !execResp.Result.ModuleIntegrityGate.IntegrityGateReady || !execResp.Result.ModuleIntegrityGate.AllowsExecution || execResp.Result.ModuleIntegrityGate.Status != "verified" || execResp.Result.ModuleIntegrityGate.ExpectedSHA256 == "" || execResp.Result.ModuleIntegrityGate.ActualSHA256 == "" {
+		t.Fatalf("stateless execute should verify local module integrity before sandbox execution: %#v", execResp.Result.ModuleIntegrityGate)
+	}
+
+	if err := os.WriteFile(wasmPath, []byte("tampered wasm bytes"), 0o644); err != nil {
+		t.Fatalf("tamper wasm: %v", err)
+	}
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"stateless","input":"tampered"}`))
+	h.Execute(w, req)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "wasm module integrity blocked") || fake.calls != 1 {
+		t.Fatalf("tampered execute should be blocked before sandbox execution, status=%d calls=%d body=%s", w.Code, fake.calls, w.Body.String())
+	}
+	var tamperedResp struct {
+		Result ExecuteResult `json:"result"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&tamperedResp); err != nil {
+		t.Fatalf("decode tampered execute: %v", err)
+	}
+	if tamperedResp.Result.Success || tamperedResp.Result.ExitCode != -4 || !tamperedResp.Result.ModuleIntegrityGate.Blocked || tamperedResp.Result.ModuleIntegrityGate.Status != "blocked_module_sha256_mismatch" {
+		t.Fatalf("unexpected tampered execute result: %#v", tamperedResp.Result)
+	}
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
@@ -210,10 +235,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		HostABIPlan       HostABIPlan                     `json:"host_abi_plan"`
-		HostABIGate       HostABIExecutionGate            `json:"host_abi_gate"`
-		RemoteInstallPlan RemoteInstallPlanReport         `json:"remote_install_plan"`
-		ApprovalGatePlan  RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
+		Files               []string                        `json:"files"`
+		HostABIPlan         HostABIPlan                     `json:"host_abi_plan"`
+		HostABIGate         HostABIExecutionGate            `json:"host_abi_gate"`
+		ModuleIntegrityGate ModuleIntegrityGate             `json:"module_integrity_gate"`
+		RemoteInstallPlan   RemoteInstallPlanReport         `json:"remote_install_plan"`
+		ApprovalGatePlan    RemoteInstallApprovalPlanReport `json:"approval_gate_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -223,6 +250,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !evidenceResp.HostABIGate.ExecutionGateReady || !evidenceResp.HostABIGate.Blocked || evidenceResp.HostABIGate.EnforcementReady {
 		t.Fatalf("evidence should include conservative Host ABI execution gate: %#v", evidenceResp.HostABIGate)
+	}
+	if !containsString(evidenceResp.Files, "module-integrity-gate.json") || !evidenceResp.ModuleIntegrityGate.IntegrityGateReady || evidenceResp.ModuleIntegrityGate.Status != "blocked_module_sha256_mismatch" {
+		t.Fatalf("evidence should include module integrity gate state and artifact: files=%#v gate=%#v", evidenceResp.Files, evidenceResp.ModuleIntegrityGate)
 	}
 	if !evidenceResp.RemoteInstallPlan.RemoteInstallPlanReady || evidenceResp.RemoteInstallPlan.RemoteInstallReady {
 		t.Fatalf("evidence should include remote install plan preview: %#v", evidenceResp.RemoteInstallPlan)
@@ -254,4 +284,13 @@ func TestWASMPluginRejectsTraversalModulePath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
