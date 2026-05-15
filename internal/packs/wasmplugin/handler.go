@@ -227,20 +227,21 @@ type RemoteInstallCheck struct {
 }
 
 type ExecuteResult struct {
-	Slug        string            `json:"slug"`
-	DryRun      bool              `json:"dry_run"`
-	Entrypoint  string            `json:"entrypoint"`
-	Success     bool              `json:"success"`
-	ExitCode    int               `json:"exit_code"`
-	Stdout      string            `json:"stdout,omitempty"`
-	Stderr      string            `json:"stderr,omitempty"`
-	Duration    string            `json:"duration,omitempty"`
-	MemUsed     uint32            `json:"mem_used_bytes,omitempty"`
-	Exports     []string          `json:"exports,omitempty"`
-	KVWrites    map[string]string `json:"kv_writes,omitempty"`
-	Plan        []PermissionCheck `json:"plan,omitempty"`
-	HostABIPlan HostABIPlan       `json:"host_abi_plan"`
-	Notes       []string          `json:"notes,omitempty"`
+	Slug        string               `json:"slug"`
+	DryRun      bool                 `json:"dry_run"`
+	Entrypoint  string               `json:"entrypoint"`
+	Success     bool                 `json:"success"`
+	ExitCode    int                  `json:"exit_code"`
+	Stdout      string               `json:"stdout,omitempty"`
+	Stderr      string               `json:"stderr,omitempty"`
+	Duration    string               `json:"duration,omitempty"`
+	MemUsed     uint32               `json:"mem_used_bytes,omitempty"`
+	Exports     []string             `json:"exports,omitempty"`
+	KVWrites    map[string]string    `json:"kv_writes,omitempty"`
+	Plan        []PermissionCheck    `json:"plan,omitempty"`
+	HostABIPlan HostABIPlan          `json:"host_abi_plan"`
+	HostABIGate HostABIExecutionGate `json:"host_abi_gate"`
+	Notes       []string             `json:"notes,omitempty"`
 }
 
 type PermissionCheck struct {
@@ -261,6 +262,22 @@ type HostABIPlan struct {
 	ResourceLimits   HostABIResourceLimits `json:"resource_limits"`
 	Labels           []string              `json:"labels"`
 	Notes            []string              `json:"notes,omitempty"`
+}
+
+type HostABIExecutionGate struct {
+	ExecutionGateReady bool     `json:"execution_gate_ready"`
+	AllowsExecution    bool     `json:"allows_execution"`
+	Blocked            bool     `json:"blocked"`
+	Status             string   `json:"status"`
+	EnforcementReady   bool     `json:"enforcement_ready"`
+	WritesFiles        bool     `json:"writes_files"`
+	NetworkAccess      bool     `json:"network_access"`
+	RequestedFunctions []string `json:"requested_functions,omitempty"`
+	AllowedFunctions   []string `json:"allowed_functions,omitempty"`
+	BlockedFunctions   []string `json:"blocked_functions,omitempty"`
+	Reason             string   `json:"reason,omitempty"`
+	Labels             []string `json:"labels"`
+	Notes              []string `json:"notes,omitempty"`
 }
 
 type HostABIFunctionPlan struct {
@@ -352,31 +369,34 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                   PackID,
-		"stage":                     "pack-shell-before-runtime-hosts",
-		"runtime_ready":             true,
-		"abi_plan_ready":            true,
-		"abi_ready":                 false,
-		"remote_install_plan_ready": true,
-		"remote_install_ready":      false,
-		"approval_gate_plan_ready":  true,
-		"approval_gate_ready":       false,
-		"plugin_count":              len(plugins),
-		"loaded_count":              loaded,
-		"plugin_dir":                h.pluginDir,
-		"store_dir":                 h.dataDir,
-		"sandbox":                   h.sandbox.Stats(),
+		"pack_id":                       PackID,
+		"stage":                         "pack-shell-before-runtime-hosts",
+		"runtime_ready":                 true,
+		"abi_plan_ready":                true,
+		"abi_ready":                     false,
+		"host_abi_execution_gate_ready": true,
+		"host_abi_enforcement_ready":    false,
+		"remote_install_plan_ready":     true,
+		"remote_install_ready":          false,
+		"approval_gate_plan_ready":      true,
+		"approval_gate_ready":           false,
+		"plugin_count":                  len(plugins),
+		"loaded_count":                  loaded,
+		"plugin_dir":                    h.pluginDir,
+		"store_dir":                     h.dataDir,
+		"sandbox":                       h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
 			"wasm.plugin.lifecycle",
 			"wasm.sandbox.execute",
 			"wasm.permission.plan",
 			"wasm.host_abi.plan",
+			"wasm.host_abi.execution_gate",
 			"wasm.remote_install.plan",
 			"wasm.remote_install.approval_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, remote signed package install plan preview, and approval gate plan preview are available as non-destructive contracts; runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, remote signed package install plan preview, and approval gate plan preview are available as contracts; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, and runtime host function binding/enforcement, package download, signature verification, approval queue write-back, and install write-back remain follow-up wiring."},
 	})
 }
 
@@ -495,10 +515,18 @@ func (h *Handler) Execute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "plugin is not loaded", "plugin": plugin.Slug})
 		return
 	}
-	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions), HostABIPlan: hostABIPlan(plugin.Permissions)}
+	result := ExecuteResult{Slug: plugin.Slug, DryRun: req.DryRun, Entrypoint: entrypoint, Success: true, ExitCode: 0, Plan: permissionPlan(plugin.Permissions), HostABIPlan: hostABIPlan(plugin.Permissions), HostABIGate: hostABIExecutionGate(plugin.Permissions)}
 	if req.DryRun {
-		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, Host ABI plan, and entrypoint selection."}
+		result.Notes = []string{"dry-run only validates manifest metadata, permission plan, Host ABI plan, Host ABI execution gate, and entrypoint selection."}
 		writeJSON(w, http.StatusOK, map[string]any{"result": result})
+		return
+	}
+	if !result.HostABIGate.AllowsExecution {
+		result.Success = false
+		result.ExitCode = -3
+		result.Stderr = "host ABI execution blocked until permission enforcement is ready"
+		result.Notes = []string{"Conservative Pack Runtime gate: privileged Host ABI requests cannot execute until host function permission enforcement is wired."}
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "host ABI execution blocked by pack gate", "result": result})
 		return
 	}
 	modulePath, err := h.resolveModulePath(plugin.ModulePath)
@@ -585,6 +613,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"plugin":              plugin,
 		"plan":                permissionPlan(plugin.Permissions),
 		"host_abi_plan":       hostABIPlan(plugin.Permissions),
+		"host_abi_gate":       hostABIExecutionGate(plugin.Permissions),
 		"remote_install_plan": h.remoteInstallPlanForPlugin(plugin),
 		"approval_gate_plan":  h.remoteInstallApprovalPlanForPlugin(plugin),
 		"sandbox":             h.sandbox.Stats(),
@@ -664,6 +693,55 @@ func permissionPlan(policy PluginPermissionPolicy) []PermissionCheck {
 		{Name: "env_get", Allowed: len(policy.EnvAllowlist) > 0, Reason: fmt.Sprintf("allowlist entries: %d", len(policy.EnvAllowlist))},
 	}
 	return checks
+}
+
+func hostABIExecutionGate(policy PluginPermissionPolicy) HostABIExecutionGate {
+	policy = normalizePolicy(policy)
+	requested := []string{}
+	if policy.LedgerKV {
+		requested = append(requested, "ledger_kv_get", "ledger_kv_put")
+	}
+	if policy.MemorySearch {
+		requested = append(requested, "ledger_memory_search")
+	}
+	if policy.HTTPFetch {
+		requested = append(requested, "http_fetch")
+	}
+	if len(policy.EnvAllowlist) > 0 {
+		requested = append(requested, "env_get")
+	}
+	sort.Strings(requested)
+	allowed := []string{"log_write"}
+	blocked := append([]string{}, requested...)
+	allowsExecution := len(blocked) == 0
+	status := "allowed_no_privileged_host_abi"
+	reason := "plugin does not request privileged Host ABI functions; sandbox execution may proceed without Host ABI enforcement"
+	labels := []string{"host-abi", "execution-gate", "no-privileged-host-abi"}
+	notes := []string{"The gate is active before real sandbox execution and keeps privileged Host ABI calls unavailable until enforcement is wired."}
+	if !allowsExecution {
+		status = "blocked_until_host_abi_enforcement"
+		reason = "plugin requests privileged Host ABI functions while enforcement_ready=false"
+		labels = []string{"host-abi", "execution-gate", "blocked", "needs-enforcement"}
+		notes = []string{
+			"Real execution is blocked before loading the WASM module because privileged Host ABI permission enforcement is not wired yet.",
+			"Dry-run remains available for manifest, permission, and Host ABI planning.",
+		}
+	}
+	return HostABIExecutionGate{
+		ExecutionGateReady: true,
+		AllowsExecution:    allowsExecution,
+		Blocked:            !allowsExecution,
+		Status:             status,
+		EnforcementReady:   false,
+		WritesFiles:        false,
+		NetworkAccess:      false,
+		RequestedFunctions: requested,
+		AllowedFunctions:   allowed,
+		BlockedFunctions:   blocked,
+		Reason:             reason,
+		Labels:             labels,
+		Notes:              notes,
+	}
 }
 
 func hostABIPlan(policy PluginPermissionPolicy) HostABIPlan {

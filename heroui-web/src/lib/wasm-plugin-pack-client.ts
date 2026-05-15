@@ -6,6 +6,12 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "signature-verification.json",
 ] as const;
 
+export const WASM_PLUGIN_HOST_ABI_EXECUTION_GATE_CAPABILITY =
+  "wasm.host_abi.execution_gate";
+
+export const WASM_PLUGIN_HOST_ABI_BLOCKED_STATUS =
+  "blocked_until_host_abi_enforcement";
+
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -43,6 +49,8 @@ export interface WASMPluginStatus {
   runtime_ready: boolean;
   abi_plan_ready: boolean;
   abi_ready: boolean;
+  host_abi_execution_gate_ready: boolean;
+  host_abi_enforcement_ready: boolean;
   remote_install_plan_ready: boolean;
   remote_install_ready: boolean;
   approval_gate_plan_ready: boolean;
@@ -102,6 +110,22 @@ export interface WASMPluginHostABIPlan {
   functions: WASMPluginHostABIFunctionPlan[];
   summary: WASMPluginHostABISummary;
   resource_limits: WASMPluginHostABIResourceLimits;
+  labels: string[];
+  notes?: string[];
+}
+
+export interface WASMPluginHostABIExecutionGate {
+  execution_gate_ready: boolean;
+  allows_execution: boolean;
+  blocked: boolean;
+  status: string;
+  enforcement_ready: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  requested_functions?: string[];
+  allowed_functions?: string[];
+  blocked_functions?: string[];
+  reason?: string;
   labels: string[];
   notes?: string[];
 }
@@ -238,6 +262,7 @@ export interface WASMPluginExecuteResult {
   kv_writes?: Record<string, string>;
   plan?: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
+  host_abi_gate: WASMPluginHostABIExecutionGate;
   notes?: string[];
 }
 
@@ -290,6 +315,7 @@ export interface WASMPluginPackClient {
     plugin: WASMPlugin;
     plan: WASMPluginPermissionCheck[];
     host_abi_plan: WASMPluginHostABIPlan;
+    host_abi_gate: WASMPluginHostABIExecutionGate;
     remote_install_plan: WASMPluginRemoteInstallPlan;
     approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
     sandbox?: Record<string, unknown>;
@@ -365,6 +391,7 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         plugin: WASMPlugin;
         plan: WASMPluginPermissionCheck[];
         host_abi_plan: WASMPluginHostABIPlan;
+        host_abi_gate: WASMPluginHostABIExecutionGate;
         remote_install_plan: WASMPluginRemoteInstallPlan;
         approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
         sandbox?: Record<string, unknown>;

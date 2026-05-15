@@ -34,7 +34,7 @@ func TestWASMPluginPackRoutesStatusWhenEnabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "yunque.pack.wasm-plugin") || !strings.Contains(w.Body.String(), "abi_plan_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.plan") || !strings.Contains(w.Body.String(), "host_abi_execution_gate_ready") || !strings.Contains(w.Body.String(), "host_abi_enforcement_ready") || !strings.Contains(w.Body.String(), "wasm.host_abi.execution_gate") || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.plan") || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_plan") {
 		t.Fatalf("enabled WASM Plugin pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
 	}
 }
@@ -78,7 +78,7 @@ func TestWASMPluginPackCanInstallLoadAndDryRunExecute(t *testing.T) {
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || !strings.Contains(w.Body.String(), "plugin_exec") || !strings.Contains(w.Body.String(), "host_abi_plan") || !strings.Contains(w.Body.String(), "enforcement_ready") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "permission") || !strings.Contains(w.Body.String(), "plugin_exec") || !strings.Contains(w.Body.String(), "host_abi_plan") || !strings.Contains(w.Body.String(), "host_abi_gate") || !strings.Contains(w.Body.String(), "execution_gate_ready") || !strings.Contains(w.Body.String(), "enforcement_ready") {
 		t.Fatalf("dry-run execute status=%d body=%s", w.Code, w.Body.String())
 	}
 

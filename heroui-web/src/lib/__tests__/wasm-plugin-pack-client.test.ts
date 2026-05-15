@@ -32,6 +32,21 @@ describe("wasm-plugin-pack-client", () => {
     },
     labels: ["host-abi", "plan-only"],
   };
+  const hostABIGate = {
+    execution_gate_ready: true,
+    allows_execution: false,
+    blocked: true,
+    status: "blocked_until_host_abi_enforcement",
+    enforcement_ready: false,
+    writes_files: false,
+    network_access: false,
+    requested_functions: ["ledger_kv_get", "ledger_kv_put"],
+    allowed_functions: ["log_write"],
+    blocked_functions: ["ledger_kv_get", "ledger_kv_put"],
+    reason: "plugin requests privileged Host ABI functions while enforcement_ready=false",
+    labels: ["host-abi", "execution-gate", "blocked", "needs-enforcement"],
+  };
+
   const remoteInstallPlan = {
     pack_id: "yunque.pack.wasm-plugin",
     generated_at: "now",
@@ -106,6 +121,8 @@ describe("wasm-plugin-pack-client", () => {
             runtime_ready: true,
             abi_plan_ready: true,
             abi_ready: false,
+            host_abi_execution_gate_ready: true,
+            host_abi_enforcement_ready: false,
             remote_install_plan_ready: true,
             remote_install_ready: false,
             approval_gate_plan_ready: true,
@@ -114,6 +131,7 @@ describe("wasm-plugin-pack-client", () => {
             loaded_count: 0,
             capabilities: [
               "wasm.host_abi.plan",
+              "wasm.host_abi.execution_gate",
               "wasm.remote_install.plan",
               "wasm.remote_install.approval_plan",
             ],
@@ -180,11 +198,14 @@ describe("wasm-plugin-pack-client", () => {
 
     expect(status.abi_plan_ready).toBe(true);
     expect(status.abi_ready).toBe(false);
+    expect(status.host_abi_execution_gate_ready).toBe(true);
+    expect(status.host_abi_enforcement_ready).toBe(false);
     expect(status.remote_install_plan_ready).toBe(true);
     expect(status.remote_install_ready).toBe(false);
     expect(status.approval_gate_plan_ready).toBe(true);
     expect(status.approval_gate_ready).toBe(false);
     expect(status.capabilities).toContain("wasm.host_abi.plan");
+    expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
     expect(status.capabilities).toContain("wasm.remote_install.plan");
     expect(status.capabilities).toContain("wasm.remote_install.approval_plan");
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
@@ -226,6 +247,7 @@ describe("wasm-plugin-pack-client", () => {
               exit_code: 0,
               plan: [],
               host_abi_plan: hostABIPlan,
+              host_abi_gate: hostABIGate,
             },
           }),
           { status: 200 },
@@ -289,6 +311,9 @@ describe("wasm-plugin-pack-client", () => {
     expect(executed.result.host_abi_plan.plan_ready).toBe(true);
     expect(executed.result.host_abi_plan.enforcement_ready).toBe(false);
     expect(executed.result.host_abi_plan.writes_files).toBe(false);
+    expect(executed.result.host_abi_gate.execution_gate_ready).toBe(true);
+    expect(executed.result.host_abi_gate.allows_execution).toBe(false);
+    expect(executed.result.host_abi_gate.enforcement_ready).toBe(false);
     expect(remotePlan.plan.remote_install_plan_ready).toBe(true);
     expect(remotePlan.plan.remote_install_ready).toBe(false);
     expect(remotePlan.plan.writes_files).toBe(false);
@@ -365,6 +390,7 @@ describe("wasm-plugin-pack-client", () => {
             plugin: { slug: "calculator" },
             plan: [],
             host_abi_plan: hostABIPlan,
+            host_abi_gate: hostABIGate,
             remote_install_plan: remoteInstallPlan,
             approval_gate_plan: approvalPlan,
           }),
@@ -379,6 +405,8 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.files).toContain("remote-install-plan.json");
     expect(evidence.files).toContain("approval-gate-plan.json");
     expect(evidence.host_abi_plan.status).toBe("plan_only");
+    expect(evidence.host_abi_gate.enforcement_ready).toBe(false);
+    expect(evidence.host_abi_gate.blocked).toBe(true);
     expect(evidence.remote_install_plan.downloads).toBe(false);
     expect(evidence.approval_gate_plan.requires_approval).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");

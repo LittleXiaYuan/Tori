@@ -350,6 +350,21 @@ export default function WASMPluginPackPage() {
               <Chip
                 size="sm"
                 style={{
+                  background: status?.host_abi_execution_gate_ready
+                    ? "rgba(34,197,94,0.12)"
+                    : "rgba(250,204,21,0.12)",
+                  color: status?.host_abi_execution_gate_ready
+                    ? "#22c55e"
+                    : "#facc15",
+                }}
+              >
+                {status?.host_abi_execution_gate_ready
+                  ? "Host ABI execution gate"
+                  : "Host ABI gate pending"}
+              </Chip>
+              <Chip
+                size="sm"
+                style={{
                   background: status?.remote_install_plan_ready
                     ? "rgba(168,85,247,0.12)"
                     : "rgba(250,204,21,0.12)",
@@ -382,9 +397,11 @@ export default function WASMPluginPackPage() {
               style={{ color: "var(--yunque-text-muted)" }}
             >
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
-              dry-run、权限计划、Host ABI plan
-              preview、远程签名包安装计划、远程安装审批 gate
-              计划和证据包放进可选 Pack。真实下载、签名验证、审批队列写回、install
+              dry-run、权限计划、Host ABI plan preview、真实执行前 Host ABI
+              execution gate、远程签名包安装计划、远程安装审批 gate
+              计划和证据包放进可选 Pack。请求 ledger_kv / memory_search /
+              http_fetch / env_get 的插件在 host_abi_enforcement_ready=false
+              时会被真实执行前阻断；真实下载、签名验证、审批队列写回、install
               写回、Host ABI 权限强执行和 TinyGo 示例会在后续切片继续接入。
             </div>
           </div>
@@ -407,7 +424,7 @@ export default function WASMPluginPackPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-8">
         <Card className="section-card p-4">
           <div className="kpi-label">插件数量</div>
           <div className="kpi-value">
@@ -431,6 +448,15 @@ export default function WASMPluginPackPage() {
           <div className="kpi-label">Host ABI</div>
           <div className="kpi-value text-lg">
             {status?.abi_plan_ready ? "plan" : "pending"}
+          </div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">执行 Gate</div>
+          <div className="kpi-value text-lg">
+            {status?.host_abi_execution_gate_ready ? "gate" : "pending"}
+          </div>
+          <div className="kpi-label mt-1">
+            enforcement: {String(status?.host_abi_enforcement_ready ?? false)}
           </div>
         </Card>
         <Card className="section-card p-4">
@@ -797,6 +823,20 @@ export default function WASMPluginPackPage() {
                     {result.host_abi_plan?.summary?.enabled_count ?? 0}/
                     {result.host_abi_plan?.summary?.function_count ?? 0}
                   </Chip>
+                  <Chip size="sm">
+                    execution_gate_ready:{" "}
+                    {String(result.host_abi_gate?.execution_gate_ready)}
+                  </Chip>
+                  <Chip size="sm">
+                    allows_execution:{" "}
+                    {String(result.host_abi_gate?.allows_execution)}
+                  </Chip>
+                  <Chip size="sm">
+                    blocked: {String(result.host_abi_gate?.blocked)}
+                  </Chip>
+                  <Chip size="sm">
+                    gate: {result.host_abi_gate?.status || "unknown"}
+                  </Chip>
                 </div>
                 <TextField
                   value={JSON.stringify(result, null, 2)}
@@ -814,8 +854,9 @@ export default function WASMPluginPackPage() {
                   style={{ color: "var(--yunque-text-muted)" }}
                 >
                   Host ABI plan preview 仅固定后续 host function
-                  权限强执行契约：当前不会绑定 wazero host
-                  functions、不会写文件，也不会绕过 Pack Runtime gate。
+                  权限强执行契约；Host ABI execution gate 会在真实执行前阻断已请求特权
+                  Host ABI 的插件，直到 enforcement_ready=true。当前不会绑定 wazero
+                  host functions、不会写文件，也不会绕过 Pack Runtime gate。
                 </div>
               </Card>
             ) : (

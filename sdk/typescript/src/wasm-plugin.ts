@@ -2,7 +2,7 @@
  * Lightweight WASM Plugin Pack SDK slice.
  *
  * This keeps WASM plugin registration, lifecycle control, dry-run execution,
- * Host ABI plan previews, and evidence export usable without importing the full
+ * Host ABI plan/gate previews, and evidence export usable without importing the full
  * generated OpenAPI SDK:
  *
  *   import { createWASMPluginClient } from "yunque-client/wasm-plugin";
@@ -13,6 +13,12 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "approval-gate-plan.json",
   "signature-verification.json",
 ] as const;
+
+export const WASM_PLUGIN_HOST_ABI_EXECUTION_GATE_CAPABILITY =
+  "wasm.host_abi.execution_gate";
+
+export const WASM_PLUGIN_HOST_ABI_BLOCKED_STATUS =
+  "blocked_until_host_abi_enforcement";
 
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
@@ -51,6 +57,8 @@ export type WASMPluginStatusResponse = {
   runtime_ready: boolean;
   abi_plan_ready: boolean;
   abi_ready: boolean;
+  host_abi_execution_gate_ready: boolean;
+  host_abi_enforcement_ready: boolean;
   remote_install_plan_ready: boolean;
   remote_install_ready: boolean;
   approval_gate_plan_ready: boolean;
@@ -149,6 +157,22 @@ export type WASMPluginHostABIPlan = {
   functions: WASMPluginHostABIFunctionPlan[];
   summary: WASMPluginHostABISummary;
   resource_limits: WASMPluginHostABIResourceLimits;
+  labels: string[];
+  notes?: string[];
+};
+
+export type WASMPluginHostABIExecutionGate = {
+  execution_gate_ready: boolean;
+  allows_execution: boolean;
+  blocked: boolean;
+  status: string;
+  enforcement_ready: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  requested_functions?: string[];
+  allowed_functions?: string[];
+  blocked_functions?: string[];
+  reason?: string;
   labels: string[];
   notes?: string[];
 };
@@ -293,6 +317,7 @@ export type WASMPluginExecuteResult = {
   kv_writes?: Record<string, string>;
   plan?: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
+  host_abi_gate: WASMPluginHostABIExecutionGate;
   notes?: string[];
 };
 
@@ -308,6 +333,7 @@ export type WASMPluginEvidenceResponse = {
   plugin: WASMPlugin;
   plan: WASMPluginPermissionCheck[];
   host_abi_plan: WASMPluginHostABIPlan;
+  host_abi_gate: WASMPluginHostABIExecutionGate;
   remote_install_plan: WASMPluginRemoteInstallPlan;
   approval_gate_plan: WASMPluginRemoteInstallApprovalPlan;
   sandbox?: Record<string, unknown>;
