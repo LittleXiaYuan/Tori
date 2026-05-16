@@ -411,6 +411,7 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "/v1/cognitive-canary/evaluate",
   "/v1/cognitive-canary/shadow/plan",
   "/v1/cognitive-canary/response-collector/writeback",
+  "/v1/cognitive-canary/response-collector/pipeline/plan",
   "/v1/cognitive-canary/reports",
   "/v1/cognitive-canary/evidence/",
   "shadow_plan_ready",
@@ -421,6 +422,9 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "response_collector_store_ready",
   "response_collector_writeback_ready",
   "writes_response_collector_store",
+  "response_collector_pipeline_plan_ready",
+  "consumes_response_collector_store",
+  "response_collector_pipeline_ready",
   "response_collector_ready",
   "metrics_plan_ready",
   "prometheus_ready",
@@ -430,6 +434,7 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "canary.shadow.plan",
   "canary.response_collector.plan",
   "canary.response_collector.writeback",
+  "canary.response_collector.pipeline.plan",
   "canary.judge.plan",
   "canary.metrics.plan",
   "canary.rollback.plan",
@@ -437,10 +442,13 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "response-collector-plan.json",
   "response-collector-store.json",
   "response-collector-record.json",
+  "response-collector-pipeline-plan.json",
+  "response-collector-handoff-plan.json",
   "response_collectors",
   "response_collector_summary",
   "response_collector_store",
   "response_collector_records",
+  "response_collector_pipeline_plan",
   "artifact_sha256",
   "writes_files",
   "judge-plan.json",
@@ -455,6 +463,7 @@ requireTokens("cognitive-canary 蓝图能力包", cognitiveCanaryPack + cognitiv
   "createCognitiveCanaryClient",
   "shadowPlan",
   "responseCollectorWriteback",
+  "responseCollectorPipelinePlan",
   "cognitive-canary-pack-client",
   "TestCognitiveCanaryPackGateReturnsNotFoundWhenDisabled",
   "/packs/cognitive-canary",
@@ -970,6 +979,11 @@ if (!cognitiveCanaryPackPage.includes("response collector") || !cognitiveCanaryP
   fail("前端同步菜单/路由/资源/控制台", "Cognitive Canary pack page should preview response collector plan boundaries");
 } else {
   ok("前端 Cognitive Canary response collector 预览", "Cognitive Canary page shows response collector plan metadata and writes_files boundary");
+}
+if (!cognitiveCanaryPackPage.includes("Collector Pipeline 计划") || !cognitiveCanaryPackPage.includes("consumes_response_collector_store")) {
+  fail("前端同步菜单/路由/资源/控制台", "Cognitive Canary pack page should preview response collector pipeline handoff boundaries");
+} else {
+  ok("前端 Cognitive Canary response collector pipeline 预览", "Cognitive Canary page shows plan-only collector pipeline handoff boundaries");
 }
 
 if (guardrailFuzzerPackPage.includes("api.guardrailFuzzer") || guardrailFuzzerPackPage.includes('from "@/lib/api"') || !guardrailFuzzerPackPage.includes("createGuardrailFuzzerPackClient")) {

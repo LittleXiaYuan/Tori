@@ -16,8 +16,8 @@ func TestCognitiveCanaryHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 Cognitive Canary routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 Cognitive Canary routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -31,14 +31,15 @@ func TestCognitiveCanaryHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/cognitive-canary/status":                       {http.MethodGet},
-		"/v1/cognitive-canary/scenarios":                    {http.MethodGet, http.MethodPost},
-		"/v1/cognitive-canary/evaluate":                     {http.MethodPost},
-		"/v1/cognitive-canary/shadow/plan":                  {http.MethodPost},
-		"/v1/cognitive-canary/response-collector/writeback": {http.MethodPost},
-		"/v1/cognitive-canary/reports":                      {http.MethodGet},
-		"/v1/cognitive-canary/reports/":                     {http.MethodGet},
-		"/v1/cognitive-canary/evidence/":                    {http.MethodGet},
+		"/v1/cognitive-canary/status":                           {http.MethodGet},
+		"/v1/cognitive-canary/scenarios":                        {http.MethodGet, http.MethodPost},
+		"/v1/cognitive-canary/evaluate":                         {http.MethodPost},
+		"/v1/cognitive-canary/shadow/plan":                      {http.MethodPost},
+		"/v1/cognitive-canary/response-collector/writeback":     {http.MethodPost},
+		"/v1/cognitive-canary/response-collector/pipeline/plan": {http.MethodPost},
+		"/v1/cognitive-canary/reports":                          {http.MethodGet},
+		"/v1/cognitive-canary/reports/":                         {http.MethodGet},
+		"/v1/cognitive-canary/evidence/":                        {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -144,6 +145,74 @@ func TestCognitiveCanaryResponseCollectorWritebackPersistsPackLocalStoreOnly(t *
 	h.Evidence(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "response-collector-store.json") || !strings.Contains(w.Body.String(), "response_collector_records") {
 		t.Fatalf("evidence should include response collector store/records, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCognitiveCanaryResponseCollectorPipelinePlanConsumesPackLocalStoreOnly(t *testing.T) {
+	now := time.Date(2026, 5, 15, 14, 45, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, Policy: CanaryPolicy{MinSamplesForPromotion: 1}})
+
+	body := `{"scenario_ids":["troubleshooting-summary","tool-safety-decision"],"persist":true,"candidate_version":"1.1.0-rc1","stable_version":"1.0.0","metadata":{"source":"unit"}}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/evaluate", strings.NewReader(body))
+	h.Evaluate(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("evaluate status=%d body=%s", w.Code, w.Body.String())
+	}
+	var run struct {
+		Report CanaryReport `json:"report"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&run); err != nil {
+		t.Fatalf("decode evaluate: %v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/response-collector/pipeline/plan", strings.NewReader(`{"report_id":"`+run.Report.ID+`"}`))
+	h.ResponseCollectorPipelinePlan(w, req)
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "response collector record not found") {
+		t.Fatalf("pipeline plan should require the pack-local collector store first, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	writebackBody := `{"report_id":"` + run.Report.ID + `","candidate_version":"1.1.0-rc1","stable_version":"1.0.0","sample_percent":3,"requested_by":"unit","reason":"persist collector metadata","metadata":{"ticket":"CANARY-1"}}`
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/response-collector/writeback", strings.NewReader(writebackBody))
+	h.ResponseCollectorWriteback(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	pipelineBody := `{"report_id":"` + run.Report.ID + `","requested_by":"unit","reason":"plan collector pipeline handoff","metadata":{"ticket":"CANARY-1"}}`
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/response-collector/pipeline/plan", strings.NewReader(pipelineBody))
+	h.ResponseCollectorPipelinePlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"response_collector_pipeline_plan_ready":true`) || !strings.Contains(w.Body.String(), `"consumes_response_collector_store":true`) || !strings.Contains(w.Body.String(), `"response_collector_pipeline_ready":false`) || !strings.Contains(w.Body.String(), `"response_collector_ready":false`) {
+		t.Fatalf("pipeline plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var res struct {
+		Plan ResponseCollectorPipelinePlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode pipeline plan: %v", err)
+	}
+	plan := res.Plan
+	if plan.ReportID != run.Report.ID || plan.RecordCount != 2 || !plan.ResponseCollectorPipelinePlanReady || !plan.ConsumesResponseCollectorStore || !plan.ResponseCollectorStoreReady {
+		t.Fatalf("unexpected pipeline plan identity/readiness: %#v", plan)
+	}
+	if plan.ResponseCollectorPipelineReady || plan.ResponseCollectorReady || plan.ShadowTrafficReady || plan.JudgePipelineReady || plan.PrometheusReady || plan.AutoRollbackReady || plan.WritesFiles {
+		t.Fatalf("pipeline plan should remain plan-only: %#v", plan)
+	}
+	if plan.ResponseCollectorPipelinePlan.Artifact != "response-collector-handoff-plan.json" || len(plan.ResponseCollectorPipelinePlan.ArtifactSHA256) != 64 || plan.ResponseCollectorPipelinePlan.WritesLiveResponseArtifacts {
+		t.Fatalf("pipeline handoff should expose deterministic non-writing artifact metadata: %#v", plan.ResponseCollectorPipelinePlan)
+	}
+	if !strings.Contains(strings.Join(plan.Artifacts, ","), "response-collector-pipeline-plan.json") || !strings.Contains(strings.Join(plan.Artifacts, ","), "response-collector-handoff-plan.json") {
+		t.Fatalf("pipeline plan should declare handoff artifacts: %#v", plan.Artifacts)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognitive-canary/evidence/"+run.Report.ID, nil)
+	h.Evidence(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "response-collector-pipeline-plan.json") || !strings.Contains(w.Body.String(), "response_collector_pipeline_plan_ready") {
+		t.Fatalf("evidence should include response collector pipeline plan, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

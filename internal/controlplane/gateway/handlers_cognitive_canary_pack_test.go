@@ -69,6 +69,15 @@ func TestCognitiveCanaryPackRouteSpecsGateByMethod(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET /v1/cognitive-canary/response-collector/writeback should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognitive-canary/response-collector/pipeline/plan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/cognitive-canary/response-collector/pipeline/plan should be blocked by pack method gate, status = %d, body = %s", w.Code, w.Body.String())
+	}
 }
 
 func TestCognitiveCanaryPackCanSaveScenariosAndEvaluate(t *testing.T) {
@@ -110,6 +119,15 @@ func TestCognitiveCanaryPackCanSaveScenariosAndEvaluate(t *testing.T) {
 	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), `"response_collector_writeback_ready":true`) || !strings.Contains(w.Body.String(), `"writes_response_collector_store":true`) || !strings.Contains(w.Body.String(), `"response_collector_ready":false`) || !strings.Contains(w.Body.String(), `"shadow_traffic_ready":false`) {
 		t.Fatalf("response collector writeback status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	pipelineBody := `{"requested_by":"unit","reason":"plan live collector pipeline handoff"}`
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognitive-canary/response-collector/pipeline/plan", strings.NewReader(pipelineBody))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"response_collector_pipeline_plan_ready":true`) || !strings.Contains(w.Body.String(), `"consumes_response_collector_store":true`) || !strings.Contains(w.Body.String(), `"response_collector_ready":false`) || !strings.Contains(w.Body.String(), `"prometheus_ready":false`) {
+		t.Fatalf("response collector pipeline plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -131,6 +149,7 @@ func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.Pack
 				"/v1/cognitive-canary/evaluate",
 				"/v1/cognitive-canary/shadow/plan",
 				"/v1/cognitive-canary/response-collector/writeback",
+				"/v1/cognitive-canary/response-collector/pipeline/plan",
 				"/v1/cognitive-canary/reports",
 				"/v1/cognitive-canary/reports/",
 				"/v1/cognitive-canary/evidence/",
@@ -142,6 +161,7 @@ func newTestGatewayWithCognitiveCanaryPack(t *testing.T, status packruntime.Pack
 				{Method: http.MethodPost, Path: "/v1/cognitive-canary/evaluate"},
 				{Method: http.MethodPost, Path: "/v1/cognitive-canary/shadow/plan"},
 				{Method: http.MethodPost, Path: "/v1/cognitive-canary/response-collector/writeback"},
+				{Method: http.MethodPost, Path: "/v1/cognitive-canary/response-collector/pipeline/plan"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports/"},
 				{Method: http.MethodGet, Path: "/v1/cognitive-canary/evidence/"},

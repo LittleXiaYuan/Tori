@@ -2,7 +2,7 @@
   "id": "yunque.pack.cognitive-canary",
   "name": "Cognitive Canary Pack",
   "version": "0.1.0",
-  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策、shadow response collector / judge / metrics / rollback plan、pack-local response collector writeback store 和证据包导出作为可选能力包暴露。",
+  "description": "将认知质量灰度评估、场景集、deterministic local judge、SLI 汇总、promotion/block 决策、shadow response collector / judge / metrics / rollback plan、pack-local response collector writeback store、response collector pipeline plan-only handoff 和证据包导出作为可选能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -15,6 +15,7 @@
       "cognitive_canary.shadow.plan",
       "cognitive_canary.response_collector.plan",
       "cognitive_canary.response_collector.writeback",
+      "cognitive_canary.response_collector.pipeline.plan",
       "cognitive_canary.judge.plan",
       "cognitive_canary.metrics.plan",
       "cognitive_canary.rollback.plan",
@@ -28,6 +29,7 @@
       "/v1/cognitive-canary/evaluate",
       "/v1/cognitive-canary/shadow/plan",
       "/v1/cognitive-canary/response-collector/writeback",
+      "/v1/cognitive-canary/response-collector/pipeline/plan",
       "/v1/cognitive-canary/reports",
       "/v1/cognitive-canary/reports/",
       "/v1/cognitive-canary/evidence/"
@@ -67,6 +69,11 @@
         "method": "POST",
         "path": "/v1/cognitive-canary/response-collector/writeback",
         "description": "Persist deterministic response collector plan metadata into the pack-local JSON store without mirroring live traffic or writing release state."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/cognitive-canary/response-collector/pipeline/plan",
+        "description": "Build a plan-only live response collector pipeline handoff from the pack-local response collector store without mirroring traffic, writing response artifacts, invoking LLM-as-Judge, publishing metrics, or rolling back releases."
       },
       {
         "method": "GET",
