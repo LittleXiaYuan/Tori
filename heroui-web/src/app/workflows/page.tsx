@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type WorkflowDef, type WorkflowInstance } from "@/lib/api";
-import { Card, Button, Spinner, Chip, Tooltip, Table } from "@heroui/react";
+import { Card, Button, Spinner, Chip, Tooltip, Table, TextArea } from "@heroui/react";
 import {
-  GitBranch, Plus, Trash2, Play, Eye, RefreshCw, Clock,
-  CheckCircle2, XCircle, Pause, Square, Layers, Settings2,
+  GitBranch, Plus, Trash2, Play, RefreshCw,
+  CheckCircle2, Square, Layers, Settings2, Sparkles, Wand2, ArrowRight,
 } from "lucide-react";
 import { showToast } from "@/components/toast-provider";
 import { STATUS_COLORS, relTime } from "@/lib/constants";
@@ -17,6 +17,12 @@ const statusLabel: Record<string, string> = {
   pending: "待执行", running: "运行中", paused: "已暂停",
   completed: "已完成", failed: "失败", cancelled: "已取消",
 };
+
+const workflowExamples = [
+  "每天早上 9 点读取知识库中的项目周报模板，汇总昨天任务，生成日报并发送给团队。",
+  "当客户反馈里出现高风险关键词时，检索历史工单，生成处理建议，并创建跟进任务。",
+  "每周五整理本周研发进度，生成 PPT 大纲，列出风险、下周计划和负责人。",
+];
 
 export default function WorkflowsPage() {
   const router = useRouter();
@@ -34,6 +40,33 @@ export default function WorkflowsPage() {
   const { workflows, instances } = data;
   const [tab, setTab] = useState<"definitions" | "instances">("definitions");
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [requirement, setRequirement] = useState(workflowExamples[0]);
+  const [generating, setGenerating] = useState(false);
+  const [generatedWorkflow, setGeneratedWorkflow] = useState<WorkflowDef | null>(null);
+  const [generatedBy, setGeneratedBy] = useState<string | null>(null);
+  const [generateMessage, setGenerateMessage] = useState<string>("");
+
+  const handleGenerate = async () => {
+    const trimmed = requirement.trim();
+    if (!trimmed) {
+      showToast("请先描述你想自动化的流程", "warning");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const res = await api.workflowGenerate(trimmed);
+      setGeneratedWorkflow(res.workflow);
+      setGeneratedBy(res.generated_by);
+      setGenerateMessage(res.message || "工作流已生成");
+      setTab("definitions");
+      await refresh();
+      showToast(res.generated_by === "template" ? "已用内置模板生成工作流" : "已通过模型生成工作流", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "生成失败", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleRun = async (defId: string) => {
     setRunningId(defId);
@@ -98,6 +131,106 @@ export default function WorkflowsPage() {
           </Button>
         </div>
       </div>
+
+      {/* NL2Workflow */}
+      <Card className="section-card overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.24)" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-0">
+          <div className="p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.14))", color: "#a78bfa" }}>
+                  <Wand2 size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>自然语言生成工作流</h2>
+                    <Chip size="sm" style={{ background: "rgba(139,92,246,0.14)", color: "#a78bfa" }}>NL2Workflow</Chip>
+                  </div>
+                  <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>描述目标即可生成可编辑 DAG；模型不可用时自动使用模板兜底，演示不会断流。</p>
+                </div>
+              </div>
+              {generatedWorkflow && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5"
+                  onPress={() => router.push(`/workflow-editor?id=${generatedWorkflow.id}`)}
+                >
+                  打开编辑器 <ArrowRight size={13} />
+                </Button>
+              )}
+            </div>
+
+            <TextArea
+              aria-label="自然语言工作流需求"
+              rows={4}
+              value={requirement}
+              onChange={(e) => setRequirement(e.target.value)}
+              placeholder="例如：每天早上 9 点读取知识库中的项目周报模板，汇总昨天任务，生成日报并发送给团队。"
+              style={{ fontSize: "var(--text-sm)" }}
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              {workflowExamples.map((example, index) => (
+                <button
+                  key={index}
+                  className="filter-pill"
+                  data-active={requirement === example}
+                  onClick={() => setRequirement(example)}
+                  type="button"
+                >
+                  示例 {index + 1}
+                </button>
+              ))}
+              <div className="flex-1" />
+              <Button
+                className="gap-1.5 rounded-lg btn-accent"
+                isPending={generating}
+                onPress={handleGenerate}
+              >
+                <Sparkles size={14} /> 生成工作流
+              </Button>
+            </div>
+
+            {generatedWorkflow && (
+              <div
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3"
+                style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)" }}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                    <CheckCircle2 size={15} style={{ color: "#22c55e" }} />
+                    已生成：{generatedWorkflow.name}
+                    <Chip size="sm" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-secondary)" }}>
+                      {generatedBy === "llm" ? "模型生成" : "模板兜底"}
+                    </Chip>
+                  </div>
+                  <div className="text-xs mt-1 truncate" style={{ color: "var(--yunque-text-muted)" }}>{generateMessage || generatedWorkflow.description}</div>
+                </div>
+                <Button size="sm" variant="outline" onPress={() => router.push(`/workflow-editor?id=${generatedWorkflow.id}`)}>
+                  查看 DAG
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="p-5 space-y-3" style={{ background: "linear-gradient(180deg, rgba(139,92,246,0.10), rgba(59,130,246,0.04))", borderLeft: "1px solid var(--yunque-border)" }}>
+            {[
+              ["1", "理解意图", "把自然语言拆成节点与依赖"],
+              ["2", "保存定义", "直接进入工作流列表与编辑器"],
+              ["3", "试运行", "复用现有实例与审计记录"],
+            ].map(([n, title, desc]) => (
+              <div key={n} className="flex gap-3">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: "rgba(139,92,246,0.16)", color: "#a78bfa" }}>{n}</div>
+                <div>
+                  <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{title}</div>
+                  <div className="text-xs mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
