@@ -47,6 +47,7 @@ export interface MemoryTimeTravelStatus {
   native_kv_history_preview_ready?: boolean;
   kv_history_cutover_plan_ready?: boolean;
   dual_read_plan_ready?: boolean;
+  dual_read_parity_check_ready?: boolean;
   dual_write_plan_ready?: boolean;
   native_kv_history_ready?: boolean;
   writes_native_kv_history?: boolean;
@@ -229,6 +230,12 @@ export interface MemoryTimeTravelKVHistoryCutoverPlanInput {
   dry_run?: boolean;
 }
 
+export interface MemoryTimeTravelKVHistoryDualReadParityInput {
+  namespace?: string;
+  at?: string;
+  limit?: number;
+}
+
 export interface MemoryTimeTravelKVHistoryCutoverPhasePlan {
   step: number;
   name: string;
@@ -318,6 +325,55 @@ export interface MemoryTimeTravelKVHistoryCutoverPlan {
   dual_read_plan: MemoryTimeTravelKVHistoryDualReadPlan;
   dual_write_plan: MemoryTimeTravelKVHistoryDualWritePlan;
   cutover_rollback_plan: MemoryTimeTravelKVHistoryCutoverRollbackPlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryDualReadParityMismatch {
+  key: string;
+  kind: string;
+  reserved_value?: string;
+  native_preview_value?: string;
+  reserved_hash?: string;
+  native_preview_hash?: string;
+}
+
+export interface MemoryTimeTravelKVHistoryDualReadParity {
+  pack_id: string;
+  namespace: string;
+  temporal_namespace: string;
+  generated_at: string;
+  at: string;
+  stage: string;
+  status: string;
+  source: string;
+  native_table: string;
+  current_history_namespace: string;
+  limit: number;
+  preview_row_count: number;
+  returned_preview_row_count: number;
+  temporal_key_count: number;
+  native_preview_key_count: number;
+  matched_key_count: number;
+  mismatch_count: number;
+  missing_from_native_count: number;
+  extra_in_native_count: number;
+  value_mismatch_count: number;
+  dual_read_parity_check_ready: boolean;
+  dual_read_parity_ready: boolean;
+  parity_passed: boolean;
+  preview_complete: boolean;
+  reads_temporal_kv: boolean;
+  reads_native_kv_history: boolean;
+  reads_native_kv_history_preview: boolean;
+  switches_temporal_adapter: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview;
+  mismatches: MemoryTimeTravelKVHistoryDualReadParityMismatch[];
   artifacts: string[];
   actions: string[];
   blocked_by: string[];
@@ -563,6 +619,8 @@ export interface MemoryTimeTravelEvidenceResponse {
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
   kv_history_migration_preview?: MemoryTimeTravelNativeKVHistoryMigrationPreview;
   kv_history_migration_preview_error?: string;
+  kv_history_dual_read_parity?: MemoryTimeTravelKVHistoryDualReadParity;
+  kv_history_dual_read_parity_error?: string;
   kv_history_cutover_plan?: MemoryTimeTravelKVHistoryCutoverPlan;
   kv_history_cutover_plan_error?: string;
   kv_history_dual_read_plan?: MemoryTimeTravelKVHistoryDualReadPlan;
@@ -587,6 +645,7 @@ export interface MemoryTimeTravelPackClient {
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
   nativeKVHistoryPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>;
   nativeKVHistoryMigrationPreview(namespace?: string, limit?: number): Promise<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>;
+  kvHistoryDualReadParity(input?: MemoryTimeTravelKVHistoryDualReadParityInput): Promise<{ parity: MemoryTimeTravelKVHistoryDualReadParity }>;
   kvHistoryCutoverPlan(input?: MemoryTimeTravelKVHistoryCutoverPlanInput): Promise<{ plan: MemoryTimeTravelKVHistoryCutoverPlan }>;
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
@@ -648,6 +707,11 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       fetcher<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>(
         `/v1/memory-time-travel/kv-history/migration-preview${query({ namespace, limit: limit ? String(limit) : undefined })}`,
       ),
+    kvHistoryDualReadParity: (input = {}) =>
+      fetcher<{ parity: MemoryTimeTravelKVHistoryDualReadParity }>("/v1/memory-time-travel/kv-history/dual-read/parity", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     kvHistoryCutoverPlan: (input = {}) =>
       fetcher<{ plan: MemoryTimeTravelKVHistoryCutoverPlan }>("/v1/memory-time-travel/kv-history/cutover/plan", {
         method: "POST",

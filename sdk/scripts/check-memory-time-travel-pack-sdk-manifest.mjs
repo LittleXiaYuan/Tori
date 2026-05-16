@@ -46,6 +46,7 @@ for (const token of [
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/kv-history/native-plan",
   "/v1/memory-time-travel/kv-history/migration-preview",
+  "/v1/memory-time-travel/kv-history/dual-read/parity",
   "/v1/memory-time-travel/kv-history/cutover/plan",
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
@@ -74,9 +75,12 @@ for (const token of ["Native kv_history plan", "buildNativeKVHistoryPlan", "prev
 for (const token of ["cutover plan", "buildKVHistoryCutoverPlan", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "dual_read_ready", "dual_write_ready", "switches_temporal_adapter"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing kv_history cutover plan token: ${token}`);
 }
+for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-history-dual-read-parity.json", "dual_read_parity_ready", "parity_passed", "switches_temporal_adapter"]) {
+  if (!page.includes(token)) fail(`Memory Time Travel pack page missing kv_history dual-read parity token: ${token}`);
+}
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -105,7 +109,9 @@ for (const token of [
   "kv-history-migration-plan.json",
   "kv-history-index-plan.json",
   "kv-history-migration-preview.json",
+  "kv-history-dual-read-parity.json",
   "kv_history_migration_preview",
+  "kv_history_dual_read_parity",
   "kv-history-cutover-plan.json",
   "kv-history-dual-read-plan.json",
   "kv-history-dual-write-plan.json",
@@ -114,6 +120,9 @@ for (const token of [
   "kv_history_dual_write_plan",
   "kv_history_cutover_plan_ready",
   "dual_read_plan_ready",
+  "dual_read_parity_check_ready",
+  "dual_read_parity_ready",
+  "parity_passed",
   "dual_write_plan_ready",
   "dual_read_ready",
   "dual_write_ready",
@@ -127,6 +136,7 @@ for (const token of [
   "migrates_kv_history",
   "/v1/memory-time-travel/kv-history/native-plan",
   "/v1/memory-time-travel/kv-history/migration-preview",
+  "/v1/memory-time-travel/kv-history/dual-read/parity",
   "/v1/memory-time-travel/kv-history/cutover/plan",
   "approved-rollback-plan.json",
   "rollback-writeback-plan.json",
@@ -188,17 +198,22 @@ for (const token of [
   "retentionPrunePlan",
   "nativeKVHistoryPlan",
   "nativeKVHistoryMigrationPreview",
+  "kvHistoryDualReadParity",
   "kvHistoryCutoverPlan",
   "native_kv_history_plan",
   "kv_history_migration_plan",
   "kv_history_index_plan",
   "kv_history_migration_preview",
+  "kv_history_dual_read_parity",
   "native_kv_history_preview_ready",
   "kv_history_cutover_plan",
   "kv_history_dual_read_plan",
   "kv_history_dual_write_plan",
   "kv_history_cutover_plan_ready",
   "dual_read_plan_ready",
+  "dual_read_parity_check_ready",
+  "dual_read_parity_ready",
+  "parity_passed",
   "dual_write_plan_ready",
   "cutover_ready",
   "approvedRollbackPlan",
