@@ -17,8 +17,8 @@ func TestSBOMDriftHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 9 {
-		t.Fatalf("expected 9 SBOM drift routes, got %d", len(routes))
+	if len(routes) != 10 {
+		t.Fatalf("expected 10 SBOM drift routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -38,6 +38,7 @@ func TestSBOMDriftHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/sbom-drift/diff":                            {http.MethodPost},
 		"/v1/sbom-drift/cyclonedx/":                      {http.MethodGet},
 		"/v1/sbom-drift/ci-gate/plan":                    {http.MethodPost},
+		"/v1/sbom-drift/baseline/artifact-source/plan":   {http.MethodPost},
 		"/v1/sbom-drift/ci-gate/baseline/writeback":      {http.MethodPost},
 		"/v1/sbom-drift/ci-gate/workflow/writeback/plan": {http.MethodPost},
 		"/v1/sbom-drift/evidence/":                       {http.MethodGet},
@@ -229,6 +230,46 @@ require github.com/example/direct v2.0.0
 	}
 	if len(records) != 1 || records[0].RequestKey != "sbom-baseline" {
 		t.Fatalf("CI baseline store should replace by request key, records=%#v", records)
+	}
+}
+
+func TestSBOMDriftBaselineArtifactSourcePlanStaysPlanOnly(t *testing.T) {
+	h := New(Config{RepoRoot: t.TempDir(), DataDir: t.TempDir(), Now: func() time.Time {
+		return time.Date(2026, 5, 15, 13, 30, 0, 0, time.UTC)
+	}})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/baseline/artifact-source/plan", strings.NewReader(`{"source_name":"release-ci","provider":"github-actions","artifact_url":"artifact://repo/actions/runs/42/sbom-baseline-evidence.json","artifact_name":"sbom-baseline-evidence.json","baseline_id":"release-baseline","expected_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","auth_ref":"secret:ci-artifact-token","requested_by":"unit"}`))
+	h.BaselineArtifactSourcePlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("baseline artifact source plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan BaselineArtifactSourcePlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode baseline artifact source plan: %v", err)
+	}
+	if got.Plan.Status != "baseline_artifact_source_plan_ready_pending_fetcher" || !got.Plan.ArtifactSourcePlanReady || !got.Plan.BaselineFetchPlanReady {
+		t.Fatalf("unexpected baseline artifact plan identity: %#v", got.Plan)
+	}
+	if got.Plan.BaselineFetchReady || got.Plan.ArtifactBaselineReady || got.Plan.ConsumesArtifactRepository || got.Plan.FetchesArtifactBaseline || got.Plan.WritesBaselineSnapshot || got.Plan.WritesCIBaselineStore || got.Plan.WritesCIWorkflow || got.Plan.ExecutesGovulncheck || got.Plan.BlocksRelease {
+		t.Fatalf("baseline artifact source plan must stay non-destructive: %#v", got.Plan)
+	}
+	if got.Plan.Source.BaselineID != "release-baseline" || got.Plan.Source.Provider != "github-actions" || got.Plan.Source.FetchesNetwork || got.Plan.Source.UsesCredentials || got.Plan.Source.WritesBaseline {
+		t.Fatalf("unexpected normalized source: %#v", got.Plan.Source)
+	}
+	for _, artifact := range []string{"baseline-artifact-source-plan.json", "baseline-fetch-handoff-plan.json", "ci-baseline-store.json"} {
+		if !containsString(got.Plan.Artifacts, artifact) {
+			t.Fatalf("baseline artifact source plan missing artifact %s: %#v", artifact, got.Plan.Artifacts)
+		}
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/baseline/artifact-source/plan", strings.NewReader(`{"baseline_id":"../bad"}`))
+	h.BaselineArtifactSourcePlan(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("invalid baseline_id should be rejected, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

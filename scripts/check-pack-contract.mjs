@@ -657,31 +657,34 @@ if (sbomDriftManifest) {
   if (sbomDriftManifest.sdk?.typescript !== "yunque-client/sbom-drift") fail("SBOM Drift SDK import must stay yunque-client/sbom-drift");
   if (sbomDriftManifest.defaultState !== "disabled") fail("SBOM Drift pack must remain default disabled before CI scanner readiness");
   if (sbomDriftManifest.metadata?.stage !== "pack-shell-before-ci") fail("SBOM Drift pack stage must remain pack-shell-before-ci");
-  for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.ci_baseline.writeback", "sbom.ci_workflow.writeback_plan", "sbom.govulncheck.plan"]) {
+  for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.baseline.artifact_source.plan", "sbom.baseline.fetch.plan", "sbom.ci_baseline.writeback", "sbom.ci_workflow.writeback_plan", "sbom.govulncheck.plan"]) {
     if (!sbomDriftManifest.backend?.capabilities?.includes(capability)) fail(`SBOM Drift manifest missing capability: ${capability}`);
   }
 }
 if (sbomDriftPage.includes('from "@/lib/api"') || sbomDriftPage.includes("api.sbom") || !sbomDriftPage.includes("createSBOMDriftPackClient")) {
   fail("SBOM Drift pack page must use sbom-drift-pack-client instead of monolithic api object");
 }
-for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "govulncheck_plan_ready", "govulncheck_plan", "writes_files", "writes_ci_baseline_store", "ci_workflow_writeback_plan_ready", "consumes_ci_baseline_store", 'method: "POST"']) {
+for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "govulncheck_plan_ready", "govulncheck_plan", "writes_files", "writes_ci_baseline_store", "artifact_source_plan_ready", "baseline_fetch_plan_ready", "fetches_artifact_baseline", "writes_baseline_snapshot", "ci_workflow_writeback_plan_ready", "consumes_ci_baseline_store", 'method: "POST"']) {
   if (!sbomDriftClient.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("sbom-drift")')) {
   fail("SBOM Drift runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestSBOMDrift", "StatusNotFound", "StatusMethodNotAllowed", "/v1/sbom-drift/diff", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan"]) {
+for (const token of ["TestSBOMDrift", "StatusNotFound", "StatusMethodNotAllowed", "/v1/sbom-drift/diff", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan"]) {
   if (!sbomDriftGateTest.includes(token)) fail(`SBOM Drift gateway gate test missing token: ${token}`);
 }
-for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "SBOMDriftGovulncheckPlan", "SBOMDriftCIWorkflowWritebackPlan", "govulncheck_plan_ready", "govulncheck_plan", "govulncheck-report.json", "writes_files", "writes_ci_baseline_store", "ciWorkflowWritebackPlan", "consumes_ci_baseline_store"]) {
+for (const token of ["createSBOMDriftClient", "SBOMDriftClientError", "/v1/sbom-drift/status", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "SBOMDriftGovulncheckPlan", "SBOMDriftBaselineArtifactSourcePlan", "SBOMDriftCIWorkflowWritebackPlan", "govulncheck_plan_ready", "govulncheck_plan", "govulncheck-report.json", "writes_files", "writes_ci_baseline_store", "baselineArtifactSourcePlan", "artifact_source_plan_ready", "baseline_fetch_plan_ready", "fetches_artifact_baseline", "writes_baseline_snapshot", "ciWorkflowWritebackPlan", "consumes_ci_baseline_store"]) {
   if (!sbomDriftSdk.includes(token)) fail(`SBOM Drift TypeScript SDK missing token: ${token}`);
 }
-if (!readText("sdk/typescript/src/sbom-drift-ci.ts").includes("createSBOMDriftCIClient")) fail("SBOM Drift CI helper slice missing createSBOMDriftCIClient");
-for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/baseline"]) {
+if (!readText("sdk/typescript/src/sbom-drift-ci.ts").includes("createSBOMDriftCIClient") || !readText("sdk/typescript/src/sbom-drift-ci.ts").includes("baselineArtifactSourcePlan")) fail("SBOM Drift CI helper slice missing createSBOMDriftCIClient or baselineArtifactSourcePlan");
+for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/baseline"]) {
   if (!sbomDriftClientTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
 }
 for (const token of ["govulncheck_plan_ready", "govulncheck_ready", "govulncheck-report.json", "writes_files", "govulncheck-plan.json"]) {
   if (!sbomDriftSource.includes(token)) fail(`SBOM Drift handler missing govulncheck plan token: ${token}`);
+}
+for (const token of ["BaselineArtifactSourcePlan", "baseline-artifact-source-plan.json", "baseline-fetch-handoff-plan.json", "artifact_source_plan_ready", "baseline_fetch_plan_ready", "fetches_artifact_baseline", "writes_baseline_snapshot"]) {
+  if (!sbomDriftSource.includes(token)) fail(`SBOM Drift handler missing artifact baseline source plan token: ${token}`);
 }
 for (const token of ["CIBaselineWriteback", "ci-baseline-store.json", "ci-baseline-record.json", "ci_baseline_writeback_ready", "writes_ci_baseline_store", "writes_ci_workflow", "executes_govulncheck", "blocks_release"]) {
   if (!sbomDriftSource.includes(token)) fail(`SBOM Drift handler missing CI baseline writeback token: ${token}`);

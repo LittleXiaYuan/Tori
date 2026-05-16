@@ -1,4 +1,4 @@
-import { type SBOMDriftClientOptions, type SBOMDriftCIWorkflowWritebackPlan, createSBOMDriftClient } from "./sbom-drift.js";
+import { type SBOMDriftBaselineArtifactSourcePlan, type SBOMDriftBaselineArtifactSourcePlanRequest, type SBOMDriftClientOptions, type SBOMDriftCIWorkflowWritebackPlan, createSBOMDriftClient } from "./sbom-drift.js";
 
 export type SBOMDriftCIWorkflowWritebackPlanRequest = {
   record_id?: string;
@@ -12,10 +12,14 @@ export type SBOMDriftCIWorkflowWritebackPlanRequest = {
 };
 
 export type { SBOMDriftCIWorkflowWritebackPlan };
+export type { SBOMDriftBaselineArtifactSourcePlan, SBOMDriftBaselineArtifactSourcePlanRequest };
 
 export function createSBOMDriftCIClient(options: SBOMDriftClientOptions) {
   const client = createSBOMDriftClient(options);
   return {
+    baselineArtifactSourcePlan(input: SBOMDriftBaselineArtifactSourcePlanRequest = {}) {
+      return client.baselineArtifactSourcePlan(input);
+    },
     workflowWritebackPlan(input: SBOMDriftCIWorkflowWritebackPlanRequest = {}) {
       return client.ciWorkflowWritebackPlan(input);
     },

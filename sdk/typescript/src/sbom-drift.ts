@@ -19,6 +19,22 @@ export type SBOMDriftSnapshot = SBOMDriftSnapshotSummary & {
   components: SBOMDriftComponent[];
 };
 
+export type SBOMDriftPlanOnlyBoundaryFlags = {
+  artifact_source_plan_ready: boolean;
+  baseline_fetch_plan_ready: boolean;
+  baseline_fetch_ready: boolean;
+  artifact_baseline_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  consumes_artifact_repository: boolean;
+  fetches_artifact_baseline: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_baseline_snapshot: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+};
+
 export type SBOMDriftStatusResponse = {
   pack_id: string;
   stage: string;
@@ -37,7 +53,7 @@ export type SBOMDriftStatusResponse = {
   store_dir?: string;
   capabilities: string[];
   notes?: string[];
-};
+} & Partial<SBOMDriftPlanOnlyBoundaryFlags>;
 
 export type SBOMDriftSnapshotsResponse = {
   snapshots: SBOMDriftSnapshotSummary[];
@@ -161,7 +177,16 @@ export type SBOMDriftCIGatePlanResponse = {
   plan: SBOMDriftCIGatePlan;
 };
 
-export type SBOMDriftCIBaselineWritebackRequest = SBOMDriftCIGatePlanRequest;
+export type SBOMDriftBaselineArtifactSourcePlanRequest = Partial<Record<"source_name" | "provider" | "artifact_url" | "artifact_name" | "baseline_id" | "expected_sha256" | "auth_ref" | "requested_by" | "reason", string>>;
+export type SBOMDriftBaselineArtifactSourcePlan = Record<string, unknown> & SBOMDriftPlanOnlyBoundaryFlags & { status: string; source: Record<string, unknown> & { uses_credentials?: boolean }; baseline_fetch_handoff_plan: Record<string, unknown>; artifacts: string[] };
+export type SBOMDriftBaselineFetchHandoffPlan = SBOMDriftBaselineArtifactSourcePlan["baseline_fetch_handoff_plan"];
+export type SBOMDriftBaselineArtifactSourcePlanResponse = { plan: SBOMDriftBaselineArtifactSourcePlan };
+
+export type SBOMDriftCIBaselineWritebackRequest = SBOMDriftCIGatePlanRequest & {
+  approval_id?: string;
+  request_id?: string;
+  request_key?: string;
+};
 
 export type SBOMDriftCIBaselineWriteback = SBOMDriftCIGatePlan & {
   writes_ci_baseline_store: boolean;
@@ -188,6 +213,8 @@ export type SBOMDriftEvidenceResponse = {
   cyclonedx?: SBOMDriftCycloneDXDocument;
   ci_gate_plan?: SBOMDriftCIGatePlan;
   govulncheck_plan?: SBOMDriftGovulncheckPlan;
+  baseline_artifact_source_plan?: SBOMDriftBaselineArtifactSourcePlan;
+  baseline_fetch_handoff_plan?: SBOMDriftBaselineFetchHandoffPlan;
   ci_workflow_writeback_plan?: SBOMDriftCIWorkflowWritebackPlan;
 };
 
@@ -298,6 +325,10 @@ export class SBOMDriftClient {
 
   ciGatePlan(input: SBOMDriftCIGatePlanRequest): Promise<SBOMDriftCIGatePlanResponse> {
     return this.request<SBOMDriftCIGatePlanResponse>("POST", "/v1/sbom-drift/ci-gate/plan", input);
+  }
+
+  baselineArtifactSourcePlan(input: SBOMDriftBaselineArtifactSourcePlanRequest = {}): Promise<SBOMDriftBaselineArtifactSourcePlanResponse> {
+    return this.request<SBOMDriftBaselineArtifactSourcePlanResponse>("POST", "/v1/sbom-drift/baseline/artifact-source/plan", input);
   }
 
   ciBaselineWriteback(input: SBOMDriftCIBaselineWritebackRequest): Promise<SBOMDriftCIBaselineWritebackResponse> {

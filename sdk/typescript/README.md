@@ -1180,6 +1180,7 @@ const sbomDrift = createSBOMDriftClient({
 console.log((await sbomDrift.status()).stage);
 
 const sbomDriftCI = createSBOMDriftCIClient({ baseUrl: "http://localhost:9090", apiKey: "<your-api-key>" });
+console.log((await sbomDriftCI.baselineArtifactSourcePlan({ baseline_id: "release-baseline" })).plan.status);
 console.log((await sbomDriftCI.workflowWritebackPlan({ request_key: "sbom-baseline" })).plan.status);
 
 const runtimeQueue = createRuntimeQueueClient({
@@ -2224,7 +2225,7 @@ Events SDK exposes lightweight Server-Sent Events helpers (`stream`, `parse`) fo
 
 ### SBOM Drift Pack SDK
 
-SBOM Drift Pack SDK exposes optional Pack Runtime helpers (`status`, `snapshots`, `createSnapshot`, `snapshot`, `diff`, `ciGatePlan`, `ciBaselineWriteback`, `ciWorkflowWritebackPlan`, `evidence`) for external compliance pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/sbom-drift/status`, `/v1/sbom-drift/snapshots`, `/v1/sbom-drift/diff`, `/v1/sbom-drift/ci-gate/workflow/writeback/plan`, and `/v1/sbom-drift/evidence/*`; install and enable `yunque.pack.sbom-drift` through Pack Runtime before calling the route-gated surface. Use `yunque-client/sbom-drift-ci` when a CI sidecar only needs the workflow write-back handoff plan.
+SBOM Drift Pack SDK exposes optional Pack Runtime helpers (`status`, `snapshots`, `createSnapshot`, `snapshot`, `diff`, `ciGatePlan`, `baselineArtifactSourcePlan`, `ciBaselineWriteback`, `ciWorkflowWritebackPlan`, `evidence`) for external compliance pages, plugin UIs, CLIs, sidecars, and automation scripts without importing the full platform client. It maps directly to `/v1/sbom-drift/status`, `/v1/sbom-drift/baseline/artifact-source/plan`, workflow handoff, and evidence routes; install and enable `yunque.pack.sbom-drift` before calling the gated surface. Use `yunque-client/sbom-drift-ci` when a CI sidecar only needs artifact baseline source and workflow handoff plans. The artifact-source route is plan-only: no artifact fetch, credential resolution, baseline overwrite, govulncheck run, workflow mutation, or release block.
 
 ### Runtime SDK
 

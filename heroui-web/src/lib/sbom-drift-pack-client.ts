@@ -32,11 +32,18 @@ export interface SBOMDriftStatus {
   ci_baseline_writeback_ready?: boolean;
   ci_workflow_writeback_plan_ready?: boolean;
   ci_workflow_writeback_ready?: boolean;
+  artifact_source_plan_ready?: boolean;
+  baseline_fetch_plan_ready?: boolean;
+  baseline_fetch_ready?: boolean;
+  artifact_baseline_ready?: boolean;
+  consumes_artifact_repository?: boolean;
+  fetches_artifact_baseline?: boolean;
   consumes_ci_baseline_store?: boolean;
   vulnerability_ready: boolean;
   govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
   writes_ci_baseline_store?: boolean;
+  writes_baseline_snapshot?: boolean;
   writes_ci_workflow?: boolean;
   executes_govulncheck?: boolean;
   blocks_release?: boolean;
@@ -124,6 +131,89 @@ export interface SBOMDriftReleaseBlockerPlan {
   source_record_id: string;
   source_record_artifact: string;
   blocked_by: string[];
+  notes?: string[];
+}
+
+export interface SBOMDriftBaselineArtifactSourceInput {
+  source_name?: string;
+  provider?: string;
+  artifact_url?: string;
+  artifact_name?: string;
+  baseline_id?: string;
+  expected_sha256?: string;
+  auth_ref?: string;
+  requested_by?: string;
+  reason?: string;
+}
+
+export interface SBOMDriftBaselineArtifactSourceSpec {
+  source_name: string;
+  provider: string;
+  artifact_url: string;
+  artifact_name: string;
+  baseline_id: string;
+  expected_sha256?: string;
+  auth_ref?: string;
+  fetches_network: boolean;
+  uses_credentials: boolean;
+  writes_baseline: boolean;
+  notes?: string[];
+}
+
+export interface SBOMDriftBaselineFetchHandoffPlan {
+  target: string;
+  dedup_key: string;
+  source: SBOMDriftBaselineArtifactSourceSpec;
+  artifact_source_plan_ready: boolean;
+  baseline_fetch_plan_ready: boolean;
+  baseline_fetch_ready: boolean;
+  artifact_baseline_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  consumes_artifact_repository: boolean;
+  fetches_artifact_baseline: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_baseline_snapshot: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  expected_artifacts: string[];
+  blocked_by: string[];
+  notes?: string[];
+}
+
+export interface SBOMDriftBaselineArtifactSourcePlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  stage: string;
+  requested_by?: string;
+  reason?: string;
+  artifact_source_plan_ready: boolean;
+  baseline_fetch_plan_ready: boolean;
+  baseline_fetch_ready: boolean;
+  artifact_baseline_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  consumes_artifact_repository: boolean;
+  fetches_artifact_baseline: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_baseline_snapshot: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  source: SBOMDriftBaselineArtifactSourceSpec;
+  baseline_fetch_handoff_plan: SBOMDriftBaselineFetchHandoffPlan;
+  ci_baseline_store: SBOMDriftCIBaselineStoreSummary;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
   notes?: string[];
 }
 
@@ -340,6 +430,8 @@ export interface SBOMDriftEvidence {
   ci_baseline_records?: SBOMDriftCIBaselineRecord[];
   ci_workflow_writeback_plan?: SBOMDriftCIWorkflowWritebackPlan;
   ci_workflow_handoff_plan?: SBOMDriftCIWorkflowHandoffPlan;
+  baseline_artifact_source_plan?: SBOMDriftBaselineArtifactSourcePlan;
+  baseline_fetch_handoff_plan?: SBOMDriftBaselineFetchHandoffPlan;
   release_blocker_plan?: SBOMDriftReleaseBlockerPlan;
 }
 
@@ -351,6 +443,7 @@ export interface SBOMDriftPackClient {
   diff(input: { base_id: string; target_id?: string; target_current?: boolean }): Promise<{ diff: SBOMDriftDiff }>;
   cycloneDX(id?: string): Promise<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>;
   ciGatePlan(input: { base_id: string; target_id?: string; target_current?: boolean; fail_on_risk?: string; requested_by?: string; reason?: string }): Promise<{ plan: SBOMDriftCIGatePlan }>;
+  baselineArtifactSourcePlan(input?: SBOMDriftBaselineArtifactSourceInput): Promise<{ plan: SBOMDriftBaselineArtifactSourcePlan }>;
   ciBaselineWriteback(input: SBOMDriftCIBaselineWritebackInput): Promise<{ writeback: SBOMDriftCIBaselineWriteback }>;
   ciWorkflowWritebackPlan(input?: SBOMDriftCIWorkflowWritebackInput): Promise<{ plan: SBOMDriftCIWorkflowWritebackPlan }>;
   evidence(id: string): Promise<SBOMDriftEvidence>;
@@ -378,6 +471,11 @@ export function createSBOMDriftPackClient(): SBOMDriftPackClient {
     cycloneDX: (id = "current") => fetcher<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>(`/v1/sbom-drift/cyclonedx/${enc(id)}`),
     ciGatePlan: (input) =>
       fetcher<{ plan: SBOMDriftCIGatePlan }>("/v1/sbom-drift/ci-gate/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    baselineArtifactSourcePlan: (input = {}) =>
+      fetcher<{ plan: SBOMDriftBaselineArtifactSourcePlan }>("/v1/sbom-drift/baseline/artifact-source/plan", {
         method: "POST",
         body: JSON.stringify(input),
       }),
