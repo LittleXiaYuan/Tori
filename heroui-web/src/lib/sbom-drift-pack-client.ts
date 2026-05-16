@@ -28,13 +28,41 @@ export interface SBOMDriftStatus {
   cyclonedx_ready: boolean;
   ci_gate_plan_ready: boolean;
   ci_gate_ready: boolean;
+  ci_baseline_store_ready?: boolean;
+  ci_baseline_writeback_ready?: boolean;
   vulnerability_ready: boolean;
   govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
+  writes_ci_baseline_store?: boolean;
+  writes_ci_workflow?: boolean;
+  executes_govulncheck?: boolean;
+  blocks_release?: boolean;
+  ci_baseline_store?: SBOMDriftCIBaselineStoreSummary;
   snapshot_count: number;
   repo_root?: string;
   store_dir?: string;
   capabilities: string[];
+  notes?: string[];
+}
+
+export interface SBOMDriftCIBaselineStoreSummary {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  record_count: number;
+  artifact: string;
+  record_artifact: string;
   notes?: string[];
 }
 
@@ -114,6 +142,92 @@ export interface SBOMDriftCIGatePlan {
   notes?: string[];
 }
 
+export interface SBOMDriftCIBaselineWritebackInput {
+  base_id: string;
+  target_id?: string;
+  target_current?: boolean;
+  fail_on_risk?: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  request_id?: string;
+  request_key?: string;
+}
+
+export interface SBOMDriftCIBaselineRecord {
+  pack_id: string;
+  created_at: string;
+  status: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  approval_id?: string;
+  base_id: string;
+  target_id: string;
+  target_current: boolean;
+  fail_on_risk: string;
+  requested_by?: string;
+  reason?: string;
+  blocked: boolean;
+  risk_level: string;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  writes_ci_baseline_store: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  base: SBOMDriftSnapshotSummary;
+  target: SBOMDriftSnapshotSummary;
+  ci_gate_plan: SBOMDriftCIGatePlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface SBOMDriftCIBaselineWriteback {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  approval_id?: string;
+  base_id: string;
+  target_id: string;
+  target_current: boolean;
+  fail_on_risk: string;
+  requested_by?: string;
+  reason?: string;
+  blocked: boolean;
+  risk_level: string;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  writes_ci_baseline_store: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  ci_gate_plan: SBOMDriftCIGatePlan;
+  ci_baseline_store: SBOMDriftCIBaselineStoreSummary;
+  ci_baseline_record: SBOMDriftCIBaselineRecord;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface SBOMDriftEvidence {
   pack_id: string;
   exported_at: string;
@@ -123,6 +237,8 @@ export interface SBOMDriftEvidence {
   cyclonedx?: SBOMDriftCycloneDXDocument;
   ci_gate_plan?: SBOMDriftCIGatePlan;
   govulncheck_plan?: SBOMDriftGovulncheckPlan;
+  ci_baseline_store?: SBOMDriftCIBaselineStoreSummary;
+  ci_baseline_records?: SBOMDriftCIBaselineRecord[];
 }
 
 export interface SBOMDriftPackClient {
@@ -133,6 +249,7 @@ export interface SBOMDriftPackClient {
   diff(input: { base_id: string; target_id?: string; target_current?: boolean }): Promise<{ diff: SBOMDriftDiff }>;
   cycloneDX(id?: string): Promise<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>;
   ciGatePlan(input: { base_id: string; target_id?: string; target_current?: boolean; fail_on_risk?: string; requested_by?: string; reason?: string }): Promise<{ plan: SBOMDriftCIGatePlan }>;
+  ciBaselineWriteback(input: SBOMDriftCIBaselineWritebackInput): Promise<{ writeback: SBOMDriftCIBaselineWriteback }>;
   evidence(id: string): Promise<SBOMDriftEvidence>;
 }
 
@@ -158,6 +275,11 @@ export function createSBOMDriftPackClient(): SBOMDriftPackClient {
     cycloneDX: (id = "current") => fetcher<{ bom: SBOMDriftCycloneDXDocument; snapshot: SBOMDriftSnapshotSummary }>(`/v1/sbom-drift/cyclonedx/${enc(id)}`),
     ciGatePlan: (input) =>
       fetcher<{ plan: SBOMDriftCIGatePlan }>("/v1/sbom-drift/ci-gate/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ciBaselineWriteback: (input) =>
+      fetcher<{ writeback: SBOMDriftCIBaselineWriteback }>("/v1/sbom-drift/ci-gate/baseline/writeback", {
         method: "POST",
         body: JSON.stringify(input),
       }),

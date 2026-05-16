@@ -138,6 +138,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if sbomDrift.Manifest.SDK.TypeScript != "yunque-client/sbom-drift" {
 		t.Fatalf("unexpected SBOM Drift SDK import: %s", sbomDrift.Manifest.SDK.TypeScript)
 	}
+	if !hasRouteSpec(sbomDrift.Manifest.Backend.RouteSpecs, "POST", "/v1/sbom-drift/ci-gate/baseline/writeback") {
+		t.Fatal("expected SBOM Drift CI baseline writeback routeSpec")
+	}
 
 	skillAnomaly, ok := registry.Get("yunque.pack.skill-anomaly")
 	if !ok {
@@ -170,6 +173,15 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 func hasBackendRoute(manifest packruntime.Manifest, path string) bool {
 	for _, route := range manifest.Backend.Routes {
 		if route == path {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRouteSpec(routes []packruntime.BackendRouteSpec, method string, path string) bool {
+	for _, route := range routes {
+		if route.Method == method && route.Path == path {
 			return true
 		}
 	}

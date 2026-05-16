@@ -1,13 +1,3 @@
-/**
- * Lightweight SBOM Drift Pack SDK slice.
- *
- * This keeps dependency snapshots, drift diffing, CycloneDX export, CI gate
- * planning, govulncheck command previews, and evidence export usable without
- * importing the full generated OpenAPI SDK:
- *
- *   import { createSBOMDriftClient } from "yunque-client/sbom-drift";
- */
-
 export type SBOMDriftComponent = {
   ecosystem: string;
   name: string;
@@ -168,6 +158,16 @@ export type SBOMDriftCIGatePlanResponse = {
   plan: SBOMDriftCIGatePlan;
 };
 
+export type SBOMDriftCIBaselineWritebackRequest = SBOMDriftCIGatePlanRequest;
+
+export type SBOMDriftCIBaselineWriteback = SBOMDriftCIGatePlan & {
+  writes_ci_baseline_store: boolean;
+};
+
+export type SBOMDriftCIBaselineWritebackResponse = {
+  writeback: SBOMDriftCIBaselineWriteback;
+};
+
 export type SBOMDriftEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -286,6 +286,10 @@ export class SBOMDriftClient {
 
   ciGatePlan(input: SBOMDriftCIGatePlanRequest): Promise<SBOMDriftCIGatePlanResponse> {
     return this.request<SBOMDriftCIGatePlanResponse>("POST", "/v1/sbom-drift/ci-gate/plan", input);
+  }
+
+  ciBaselineWriteback(input: SBOMDriftCIBaselineWritebackRequest): Promise<SBOMDriftCIBaselineWritebackResponse> {
+    return this.request<SBOMDriftCIBaselineWritebackResponse>("POST", "/v1/sbom-drift/ci-gate/baseline/writeback", input);
   }
 
   evidence(id: string): Promise<SBOMDriftEvidenceResponse> {

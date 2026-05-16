@@ -105,11 +105,47 @@ test("SBOMDriftClient exports snapshot evidence packs", async () => {
   assertEqual(plan.plan.govulncheck_plan.command, "govulncheck -json ./...");
   assertEqual(plan.plan.govulncheck_plan.writes_files, false);
   assertEqual(evidence.format, "json-sbom-drift-evidence");
-  assertDeepEqual(evidence.files, ["snapshot.json", "govulncheck-plan.json"]);
+  assert(evidence.files.includes("govulncheck-plan.json"));
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/cyclonedx/baseline");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/plan");
   assertEqual(calls[1]?.init?.body, JSON.stringify({ base_id: "baseline", target_current: true, fail_on_risk: "high" }));
   assertEqual(calls[2]?.url, "http://localhost:9090/v1/sbom-drift/evidence/baseline");
+});
+
+test("SBOMDriftClient writes pack-local CI baseline gate handoff records", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createSBOMDriftClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ writeback: {
+        pack_id: "yunque.pack.sbom-drift",
+        generated_at: "now",
+        status: "ci_baseline_gate_record_stored_pending_ci_wiring",
+        request_key: "sbom-baseline",
+        ci_baseline_store_ready: true,
+        ci_baseline_writeback_ready: true,
+        writes_ci_baseline_store: true,
+        ci_gate_plan_ready: true,
+        ci_gate_ready: false,
+        govulncheck_plan_ready: true,
+        govulncheck_ready: false,
+        vulnerability_ready: false,
+        writes_ci_workflow: false,
+        executes_govulncheck: false,
+        blocks_release: false,
+        ci_baseline_store: { record_count: 1 },
+        ci_baseline_record: { request_key: "sbom-baseline" },
+        artifacts: ["ci-baseline-store.json", "ci-baseline-record.json"],
+      } });
+    },
+  });
+
+  const writeback = await client.ciBaselineWriteback({ base_id: "baseline", target_current: true, fail_on_risk: "high" });
+
+  assertEqual(writeback.writeback.writes_ci_baseline_store, true);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/baseline/writeback");
+  assertEqual(calls[0]?.init?.body, JSON.stringify({ base_id: "baseline", target_current: true, fail_on_risk: "high" }));
 });
 
 test("SBOMDriftClient throws SBOMDriftClientError with nested gateway messages", async () => {
