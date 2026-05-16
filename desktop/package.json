@@ -6,10 +6,12 @@
     "tauri": "tauri",
     "predev": "node scripts/copy-sidecar.mjs",
     "dev": "tauri dev",
-    "prebuild": "node scripts/copy-sidecar.mjs --all",
+    "prebuild": "node scripts/sync-frontend.mjs --build && node scripts/copy-sidecar.mjs --all",
     "build": "tauri build",
     "copy-sidecar": "node scripts/copy-sidecar.mjs",
-    "copy-sidecar:all": "node scripts/copy-sidecar.mjs --all"
+    "copy-sidecar:all": "node scripts/copy-sidecar.mjs --all",
+    "sync-frontend": "node scripts/sync-frontend.mjs",
+    "sync-frontend:build": "node scripts/sync-frontend.mjs --build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
