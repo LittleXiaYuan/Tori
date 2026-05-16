@@ -98,6 +98,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/kv-history/migration-preview") {
 		t.Fatal("expected Memory Time Travel native kv_history migration preview route to be installed from manifest")
 	}
+	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/kv-history/dual-read/parity") {
+		t.Fatal("expected Memory Time Travel dual-read parity gate route to be installed from manifest")
+	}
 
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
 	if !ok {

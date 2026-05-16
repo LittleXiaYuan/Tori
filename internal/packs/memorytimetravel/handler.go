@@ -5,9 +5,10 @@
 // rollback write-back planning, retention dry-run planning, JSON evidence
 // export, read-only Merkle audit-chain verification, and a conservative KV
 // audit proof-link schema placeholder plus native kv_history table/index/
-// migration planning, read-only migration row previews, and non-destructive
-// dual-read/dual-write cutover planning while native Ledger KV kv_history
-// write-back remains a later slice.
+// migration planning, read-only migration row previews, dual-read parity
+// validation against the reserved adapter, and non-destructive dual-read/
+// dual-write cutover planning while native Ledger KV kv_history write-back
+// remains a later slice.
 package memorytimetravel
 
 import (
@@ -583,6 +584,61 @@ type KVHistoryCutoverPlanReport struct {
 	Notes                       []string                        `json:"notes,omitempty"`
 }
 
+type KVHistoryDualReadParityRequest struct {
+	Namespace string    `json:"namespace,omitempty"`
+	At        time.Time `json:"at,omitempty"`
+	Limit     int       `json:"limit,omitempty"`
+}
+
+type KVHistoryDualReadParityMismatch struct {
+	Key                string `json:"key"`
+	Kind               string `json:"kind"`
+	ReservedValue      string `json:"reserved_value,omitempty"`
+	NativePreviewValue string `json:"native_preview_value,omitempty"`
+	ReservedHash       string `json:"reserved_hash,omitempty"`
+	NativePreviewHash  string `json:"native_preview_hash,omitempty"`
+}
+
+type KVHistoryDualReadParityReport struct {
+	PackID                      string                            `json:"pack_id"`
+	Namespace                   string                            `json:"namespace"`
+	TemporalNamespace           string                            `json:"temporal_namespace"`
+	GeneratedAt                 time.Time                         `json:"generated_at"`
+	At                          time.Time                         `json:"at"`
+	Stage                       string                            `json:"stage"`
+	Status                      string                            `json:"status"`
+	Source                      string                            `json:"source"`
+	NativeTable                 string                            `json:"native_table"`
+	CurrentHistoryNamespace     string                            `json:"current_history_namespace"`
+	Limit                       int                               `json:"limit"`
+	PreviewRowCount             int                               `json:"preview_row_count"`
+	ReturnedPreviewRowCount     int                               `json:"returned_preview_row_count"`
+	TemporalKeyCount            int                               `json:"temporal_key_count"`
+	NativePreviewKeyCount       int                               `json:"native_preview_key_count"`
+	MatchedKeyCount             int                               `json:"matched_key_count"`
+	MismatchCount               int                               `json:"mismatch_count"`
+	MissingFromNativeCount      int                               `json:"missing_from_native_count"`
+	ExtraInNativeCount          int                               `json:"extra_in_native_count"`
+	ValueMismatchCount          int                               `json:"value_mismatch_count"`
+	DualReadParityCheckReady    bool                              `json:"dual_read_parity_check_ready"`
+	DualReadParityReady         bool                              `json:"dual_read_parity_ready"`
+	ParityPassed                bool                              `json:"parity_passed"`
+	PreviewComplete             bool                              `json:"preview_complete"`
+	ReadsTemporalKV             bool                              `json:"reads_temporal_kv"`
+	ReadsNativeKVHistory        bool                              `json:"reads_native_kv_history"`
+	ReadsNativeKVHistoryPreview bool                              `json:"reads_native_kv_history_preview"`
+	SwitchesTemporalAdapter     bool                              `json:"switches_temporal_adapter"`
+	WritesLedgerKV              bool                              `json:"writes_ledger_kv"`
+	WritesNativeKVHistory       bool                              `json:"writes_native_kv_history"`
+	KVHistoryMigrationPreview   NativeKVHistoryMigrationPreview   `json:"kv_history_migration_preview"`
+	Mismatches                  []KVHistoryDualReadParityMismatch `json:"mismatches"`
+	Artifacts                   []string                          `json:"artifacts"`
+	Actions                     []string                          `json:"actions"`
+	BlockedBy                   []string                          `json:"blocked_by"`
+	Labels                      []string                          `json:"labels"`
+	Notes                       []string                          `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a Memory Time Travel pack handler.
@@ -626,6 +682,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan", Handler: h.NativeKVHistoryPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview", Handler: h.NativeKVHistoryMigrationPreview},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/dual-read/parity", Handler: h.KVHistoryDualReadParity},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/plan", Handler: h.KVHistoryCutoverPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
@@ -658,6 +715,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.retention.prune_plan",
 		"memory.kv_history.native_plan",
 		"memory.kv_history.migration_preview",
+		"memory.kv_history.dual_read.parity",
 		"memory.kv_history.cutover.plan",
 		"memory.audit.links.schema",
 		"memory.evidence.export",
@@ -678,6 +736,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		NativeKVHistoryPreviewReady:    h.nativeKVHistoryPreviewer != nil,
 		KVHistoryCutoverPlanReady:      true,
 		DualReadPlanReady:              true,
+		DualReadParityCheckReady:       h.temporalKV != nil && h.nativeKVHistoryPreviewer != nil,
 		DualWritePlanReady:             true,
 		NativeKVHistoryReady:           false,
 		WritesNativeKVHistory:          false,
@@ -724,6 +783,7 @@ type statusResponse struct {
 	NativeKVHistoryPreviewReady    bool             `json:"native_kv_history_preview_ready"`
 	KVHistoryCutoverPlanReady      bool             `json:"kv_history_cutover_plan_ready"`
 	DualReadPlanReady              bool             `json:"dual_read_plan_ready"`
+	DualReadParityCheckReady       bool             `json:"dual_read_parity_check_ready"`
 	DualWritePlanReady             bool             `json:"dual_write_plan_ready"`
 	NativeKVHistoryReady           bool             `json:"native_kv_history_ready"`
 	WritesNativeKVHistory          bool             `json:"writes_native_kv_history"`
@@ -823,7 +883,7 @@ func (h *Handler) SnapshotAt(w http.ResponseWriter, r *http.Request) {
 		at = h.now().UTC()
 	}
 	if h.temporalKV != nil {
-		values, err := h.temporalSnapshotValues(r.Context(), namespace, at)
+		values, err := h.temporalSnapshotValues(r.Context(), temporalNamespaceFor(namespace), at)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -966,6 +1026,31 @@ func (h *Handler) NativeKVHistoryMigrationPreview(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": preview})
 }
 
+func (h *Handler) KVHistoryDualReadParity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req KVHistoryDualReadParityRequest
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid kv_history dual-read parity payload")
+		return
+	}
+	if strings.TrimSpace(string(body)) != "" {
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid kv_history dual-read parity payload")
+			return
+		}
+	}
+	report, err := h.buildKVHistoryDualReadParity(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"parity": report})
+}
+
 func (h *Handler) buildNativeKVHistoryMigrationPreview(ctx context.Context, namespace string, limit int) (NativeKVHistoryMigrationPreview, error) {
 	namespace = normalizeNamespace(namespace)
 	if limit <= 0 {
@@ -992,7 +1077,7 @@ func (h *Handler) buildNativeKVHistoryMigrationPreview(ctx context.Context, name
 			Notes:                       []string{"Native kv_history migration previewer is not attached to this pack instance; no scan was executed."},
 		}, nil
 	}
-	preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(ctx, namespace, limit)
+	preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(ctx, temporalNamespaceFor(namespace), limit)
 	if err != nil {
 		return NativeKVHistoryMigrationPreview{}, err
 	}
@@ -1017,6 +1102,130 @@ func (h *Handler) buildNativeKVHistoryMigrationPreview(ctx context.Context, name
 		"native_kv_history_preview_ready=true does not mean native_kv_history_ready; writes_native_kv_history and migrates_kv_history remain false.",
 	)
 	return preview, nil
+}
+
+func (h *Handler) buildKVHistoryDualReadParity(ctx context.Context, req KVHistoryDualReadParityRequest) (KVHistoryDualReadParityReport, error) {
+	namespace := normalizeNamespace(req.Namespace)
+	at := req.At
+	if at.IsZero() {
+		at = h.now().UTC()
+	}
+	at = at.UTC()
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	preview, err := h.buildNativeKVHistoryMigrationPreview(ctx, namespace, limit)
+	if err != nil {
+		return KVHistoryDualReadParityReport{}, err
+	}
+	previewRows := preview.PreviewRowCount
+	if previewRows == 0 {
+		previewRows = len(preview.Rows)
+	}
+	returnedRows := preview.ReturnedRowCount
+	if returnedRows == 0 {
+		returnedRows = len(preview.Rows)
+	}
+
+	temporalNamespace := temporalNamespaceFor(namespace)
+	reservedValues := map[string][]byte{}
+	temporalAttached := h.temporalKV != nil
+	if temporalAttached {
+		raw, err := h.temporalKV.SnapshotRawAt(ctx, temporalNamespace, at)
+		if err != nil {
+			return KVHistoryDualReadParityReport{}, err
+		}
+		for key, value := range raw {
+			reservedValues[key] = append([]byte(nil), value...)
+		}
+	}
+
+	nativeValues := snapshotFromNativePreviewRows(preview.Rows, at)
+	previewComplete := previewRows == returnedRows
+	mismatches := compareKVHistoryParity(reservedValues, nativeValues)
+	missing, extra, changed := classifyKVHistoryParityMismatches(mismatches)
+	matched := 0
+	for key, reserved := range reservedValues {
+		native, ok := nativeValues[key]
+		if ok && string(native) == string(reserved) {
+			matched++
+		}
+	}
+	parityPassed := temporalAttached && preview.NativeKVHistoryPreviewReady && previewComplete && len(mismatches) == 0
+	status := "passed"
+	if !temporalAttached || !preview.NativeKVHistoryPreviewReady {
+		status = "not_attached"
+	} else if !previewComplete {
+		status = "incomplete_preview"
+	} else if len(mismatches) > 0 {
+		status = "mismatch"
+	}
+
+	blockedBy := []string{"native-kv-history-read-adapter-not-wired", "adapter-switch-not-enabled"}
+	if !temporalAttached {
+		blockedBy = append([]string{"reserved-temporal-kv-reader-not-attached"}, blockedBy...)
+	}
+	if !preview.NativeKVHistoryPreviewReady {
+		blockedBy = append([]string{"native-kv-history-preview-adapter-not-attached"}, blockedBy...)
+	}
+	if !previewComplete {
+		blockedBy = append([]string{"migration-preview-limit-truncated"}, blockedBy...)
+	}
+	if len(mismatches) > 0 {
+		blockedBy = append([]string{"dual-read-parity-mismatch"}, blockedBy...)
+	}
+	return KVHistoryDualReadParityReport{
+		PackID:                      PackID,
+		Namespace:                   namespace,
+		TemporalNamespace:           temporalNamespace,
+		GeneratedAt:                 h.now().UTC(),
+		At:                          at,
+		Stage:                       "kv-history-dual-read-parity-before-adapter-switch",
+		Status:                      status,
+		Source:                      "reserved-temporal-kv-versus-native-row-preview",
+		NativeTable:                 "kv_history",
+		CurrentHistoryNamespace:     "__kv_history__",
+		Limit:                       limit,
+		PreviewRowCount:             previewRows,
+		ReturnedPreviewRowCount:     returnedRows,
+		TemporalKeyCount:            len(reservedValues),
+		NativePreviewKeyCount:       len(nativeValues),
+		MatchedKeyCount:             matched,
+		MismatchCount:               len(mismatches),
+		MissingFromNativeCount:      missing,
+		ExtraInNativeCount:          extra,
+		ValueMismatchCount:          changed,
+		DualReadParityCheckReady:    temporalAttached && preview.NativeKVHistoryPreviewReady,
+		DualReadParityReady:         parityPassed,
+		ParityPassed:                parityPassed,
+		PreviewComplete:             previewComplete,
+		ReadsTemporalKV:             temporalAttached,
+		ReadsNativeKVHistory:        false,
+		ReadsNativeKVHistoryPreview: preview.NativeKVHistoryPreviewReady,
+		SwitchesTemporalAdapter:     false,
+		WritesLedgerKV:              false,
+		WritesNativeKVHistory:       false,
+		KVHistoryMigrationPreview:   preview,
+		Mismatches:                  mismatches,
+		Artifacts:                   []string{"kv-history-dual-read-parity.json", "kv-history-migration-preview.json"},
+		Actions: []string{
+			"compare reserved TemporalKV SnapshotRawAt output with reconstructed rows from native kv_history migration preview",
+			"require complete preview coverage and zero mismatches before any future adapter switch can be considered",
+			"keep TemporalKVReader pinned to the reserved __kv_history__ adapter; no native read adapter is enabled by this route",
+		},
+		BlockedBy: blockedBy,
+		Labels:    []string{"memory-time-travel", "dual-read-parity", "read-only", "no-adapter-switch", "no-native-write"},
+		Notes: []string{
+			"This route is read-only: it reads the current reserved TemporalKV snapshot and migration row preview, then compares them in memory.",
+			"dual_read_parity_ready=true only means the preview matches the reserved adapter for this timestamp; reads_native_kv_history, switches_temporal_adapter, writes_ledger_kv, and writes_native_kv_history remain false.",
+			"Use kv-history-dual-read-parity.json as the evidence gate before a later native kv_history adapter implementation.",
+		},
+	}, nil
 }
 
 func (h *Handler) KVHistoryCutoverPlan(w http.ResponseWriter, r *http.Request) {
@@ -1249,7 +1458,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -1302,23 +1511,20 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		payload["kv_history_dual_write_plan"] = cutoverPlan.DualWritePlan
 		payload["kv_history_cutover_rollback_plan"] = cutoverPlan.CutoverRollbackPlan
 	}
+	if parity, err := h.buildKVHistoryDualReadParity(r.Context(), KVHistoryDualReadParityRequest{
+		Namespace: snapshot.Namespace,
+		At:        snapshot.CreatedAt,
+		Limit:     500,
+	}); err != nil {
+		payload["kv_history_dual_read_parity_error"] = err.Error()
+	} else {
+		payload["kv_history_dual_read_parity"] = parity
+	}
 	if h.nativeKVHistoryPreviewer != nil {
-		preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(r.Context(), snapshot.Namespace, 50)
+		preview, err := h.buildNativeKVHistoryMigrationPreview(r.Context(), snapshot.Namespace, 50)
 		if err != nil {
 			payload["kv_history_migration_preview_error"] = err.Error()
 		} else {
-			preview.PackID = PackID
-			preview.Stage = "native-kv-history-migration-preview-before-native-write"
-			preview.Status = "preview_only"
-			preview.NativeKVHistoryPreviewReady = true
-			preview.WritesNativeKVHistory = false
-			preview.MigratesKVHistory = false
-			preview.UsesReservedKVNamespace = true
-			preview.Artifacts = []string{"kv-history-migration-preview.json"}
-			preview.Labels = []string{"memory-time-travel", "native-kv-history", "migration-preview", "preview-only", "no-native-write"}
-			if len(preview.Rows) == 0 {
-				preview.Rows = []NativeKVHistoryRowPreview{}
-			}
 			payload["kv_history_migration_preview"] = preview
 		}
 	}
@@ -1353,6 +1559,9 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Native kv_history migration preview can scan reserved __kv_history__ documents into deterministic future row previews, but it remains read-only and does not create tables, migrate rows, or change TemporalKVStore behavior.")
 	} else {
 		notes = append(notes, "Native kv_history migration preview route is shaped, but the TemporalKVStore preview adapter is not attached to this pack instance.")
+	}
+	if h.temporalKV != nil && h.nativeKVHistoryPreviewer != nil {
+		notes = append(notes, "Dual-read parity checks can compare reserved TemporalKV SnapshotRawAt output with native kv_history row previews as a read-only gate; this still does not enable adapter switching.")
 	}
 	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
 	if h.merkleVerifier != nil {
@@ -1490,6 +1699,100 @@ func decodeTemporalValue(value []byte) string {
 		return string(data)
 	}
 	return string(value)
+}
+
+func snapshotFromNativePreviewRows(rows []NativeKVHistoryRowPreview, at time.Time) map[string][]byte {
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	at = at.UTC()
+	type candidate struct {
+		value     []byte
+		version   int
+		updatedAt time.Time
+	}
+	selected := map[string]candidate{}
+	for _, row := range rows {
+		updatedAt := row.UpdatedAt.UTC()
+		if updatedAt.IsZero() || updatedAt.After(at) {
+			continue
+		}
+		current, ok := selected[row.Key]
+		if ok {
+			if current.version > row.Version {
+				continue
+			}
+			if current.version == row.Version && !updatedAt.After(current.updatedAt) {
+				continue
+			}
+		}
+		selected[row.Key] = candidate{value: append([]byte(nil), row.Value...), version: row.Version, updatedAt: updatedAt}
+	}
+	out := make(map[string][]byte, len(selected))
+	for key, item := range selected {
+		out[key] = append([]byte(nil), item.value...)
+	}
+	return out
+}
+
+func compareKVHistoryParity(reserved, nativePreview map[string][]byte) []KVHistoryDualReadParityMismatch {
+	keys := map[string]bool{}
+	for key := range reserved {
+		keys[key] = true
+	}
+	for key := range nativePreview {
+		keys[key] = true
+	}
+	sorted := make([]string, 0, len(keys))
+	for key := range keys {
+		sorted = append(sorted, key)
+	}
+	sort.Strings(sorted)
+	mismatches := make([]KVHistoryDualReadParityMismatch, 0)
+	for _, key := range sorted {
+		reservedValue, hasReserved := reserved[key]
+		nativeValue, hasNative := nativePreview[key]
+		switch {
+		case hasReserved && !hasNative:
+			mismatches = append(mismatches, KVHistoryDualReadParityMismatch{
+				Key:           key,
+				Kind:          "missing_from_native_preview",
+				ReservedValue: decodeTemporalValue(reservedValue),
+				ReservedHash:  valueHash(string(reservedValue)),
+			})
+		case !hasReserved && hasNative:
+			mismatches = append(mismatches, KVHistoryDualReadParityMismatch{
+				Key:                key,
+				Kind:               "extra_in_native_preview",
+				NativePreviewValue: decodeTemporalValue(nativeValue),
+				NativePreviewHash:  valueHash(string(nativeValue)),
+			})
+		case hasReserved && hasNative && string(reservedValue) != string(nativeValue):
+			mismatches = append(mismatches, KVHistoryDualReadParityMismatch{
+				Key:                key,
+				Kind:               "value_mismatch",
+				ReservedValue:      decodeTemporalValue(reservedValue),
+				NativePreviewValue: decodeTemporalValue(nativeValue),
+				ReservedHash:       valueHash(string(reservedValue)),
+				NativePreviewHash:  valueHash(string(nativeValue)),
+			})
+		}
+	}
+	return mismatches
+}
+
+func classifyKVHistoryParityMismatches(mismatches []KVHistoryDualReadParityMismatch) (missingFromNative, extraInNative, valueMismatch int) {
+	for _, mismatch := range mismatches {
+		switch mismatch.Kind {
+		case "missing_from_native_preview":
+			missingFromNative++
+		case "extra_in_native_preview":
+			extraInNative++
+		case "value_mismatch":
+			valueMismatch++
+		}
+	}
+	return missingFromNative, extraInNative, valueMismatch
 }
 
 func parseAuditLimit(raw string) int {
@@ -2083,7 +2386,7 @@ func deterministicID(prefix string, parts ...string) string {
 func normalizeNamespace(namespace string) string {
 	namespace = strings.ToLower(strings.TrimSpace(namespace))
 	if namespace == "" {
-		return "memory_snapshot"
+		return "memory-snapshot"
 	}
 	var b strings.Builder
 	lastDash := false
@@ -2107,6 +2410,14 @@ func normalizeNamespace(namespace string) string {
 		out = strings.Trim(out[:80], "-")
 	}
 	return out
+}
+
+func temporalNamespaceFor(namespace string) string {
+	normalized := normalizeNamespace(namespace)
+	if normalized == "memory-snapshot" {
+		return "memory_snapshot"
+	}
+	return normalized
 }
 
 func snapshotDigest(namespace string, values map[string]string) (string, int, error) {
