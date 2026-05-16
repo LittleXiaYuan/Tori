@@ -119,14 +119,38 @@ func (r *ModuleRegistry) List() []ModuleStatus {
 
 	out := make([]ModuleStatus, len(r.entries))
 	for i, e := range r.entries {
-		out[i] = ModuleStatus{
-			Name:        e.mod.Name(),
-			Description: e.mod.Description(),
-			Profile:     e.mod.Profile(),
-			Enabled:     e.enabled,
-			Running:     e.running,
-			Error:       e.err,
+		status := e.mod.Status()
+		if !moduleStatusReported(status) {
+			out[i] = ModuleStatus{
+				Name:        e.mod.Name(),
+				Description: e.mod.Description(),
+				Profile:     e.mod.Profile(),
+				Enabled:     e.enabled,
+				Running:     e.running,
+				Error:       e.err,
+			}
+			continue
 		}
+		if status.Name == "" {
+			status.Name = e.mod.Name()
+		}
+		if status.Description == "" {
+			status.Description = e.mod.Description()
+		}
+		if status.Profile == "" {
+			status.Profile = e.mod.Profile()
+		}
+		if status.Error == "" {
+			status.Error = e.err
+		}
+		// Module implementations own fine-grained runtime state such as
+		// pack enablement gates. The registry's entry flags only describe
+		// whether Init/Start completed, so combine them here: a started entry
+		// may still report Enabled/Running=false when an optional pack is
+		// disabled at runtime.
+		status.Enabled = e.enabled && status.Enabled
+		status.Running = e.running && status.Running
+		out[i] = status
 	}
 	return out
 }
@@ -137,8 +161,21 @@ func (r *ModuleRegistry) IsEnabled(name string) bool {
 	defer r.mu.RUnlock()
 	for _, e := range r.entries {
 		if e.mod.Name() == name {
-			return e.running
+			status := e.mod.Status()
+			if !moduleStatusReported(status) {
+				return e.running
+			}
+			return e.running && status.Enabled && status.Running
 		}
 	}
 	return false
+}
+
+func moduleStatusReported(status ModuleStatus) bool {
+	return status.Name != "" ||
+		status.Description != "" ||
+		status.Profile != "" ||
+		status.Enabled ||
+		status.Running ||
+		status.Error != ""
 }

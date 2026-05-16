@@ -20,11 +20,14 @@
       "cognis.experience",
       "cognis.evolution",
       "cognis.federation",
-      "cognis.economics"
+      "cognis.economics",
+      "cognis.runtime.pack_state",
+      "cognis.runtime.loop_gate"
     ],
     "routes": [
       "/v1/cognis",
-      "/v1/cognis/"
+      "/v1/cognis/",
+      "/v1/cognis/runtime/pack-state"
     ],
     "permissions": [
       "cognis:read",
@@ -57,6 +60,11 @@
         "method": "DELETE",
         "path": "/v1/cognis/",
         "description": "Remove a Cogni declaration."
+      },
+      {
+        "method": "GET",
+        "path": "/v1/cognis/runtime/pack-state",
+        "description": "Read live Cogni runtime-loop and pack-state gate status."
       }
     ]
   },
@@ -91,8 +99,9 @@
   },
   "metadata": {
     "blueprint": "doc/PACK-RUNTIME-BLUEPRINT.md",
-    "stage": "bridge-gateway-to-pack",
-    "sync": "backend-registry-drives-frontend"
+    "stage": "runtime-loop-pack-state-gate",
+    "sync": "backend-registry-drives-frontend",
+    "runtimeArtifact": "cogni-runtime-pack-state.json"
   },
   "distribution": {
     "manifestUrl": "https://packs.yunque.local/cogni-kernel-pack/pack.json",

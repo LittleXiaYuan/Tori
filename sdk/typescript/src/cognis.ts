@@ -16,6 +16,7 @@ export type CogniExperienceSummary = { stats?: CogniExperienceStats; top_tools?:
 export type CogniExperienceRecordType = "tool_memory" | "pattern" | "fact" | string;
 export type CogniExperienceRecordRequest = { type: CogniExperienceRecordType; data: Record<string, unknown> };
 export type CogniExperienceResponse = { id?: string; enabled?: boolean; summary?: CogniExperienceSummary; stats?: CogniExperienceStats; tool_memory?: CogniToolExperience[]; patterns?: CogniExperiencePattern[]; domain_facts?: CogniDomainFact[]; [key: string]: unknown };
+export type CogniRuntimePackStateResponse = { pack_id?: string; stage?: string; pack_installed?: boolean; pack_enabled?: boolean; pack_status?: string; runtime_loop_pack_state_ready?: boolean; runtime_loop_running?: boolean; stops_runtime_loops?: boolean; starts_runtime_loops?: boolean; clears_runtime_state?: boolean; sentinel_ready?: boolean; scheduler_ready?: boolean; bus_ready?: boolean; experience_store_ready?: boolean; active_bus_cognis?: number; experience_store_count?: number; generated_at?: string; capabilities?: string[]; artifacts?: string[]; notes?: string[]; [key: string]: unknown };
 export type CognisClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 
 export class CognisClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Cognis request failed with HTTP ${status}`); this.name = "CognisClientError"; this.status = status; this.body = body; } }
@@ -38,6 +39,7 @@ export class CognisClient {
   enable(id: string): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/enable`); }
   disable(id: string): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", `/v1/cognis/${enc(id)}/disable`); }
   reload(): Promise<CogniMutationResponse> { return this.request<CogniMutationResponse>("POST", "/v1/cognis/reload"); }
+  runtimePackState(): Promise<CogniRuntimePackStateResponse> { return this.request<CogniRuntimePackStateResponse>("GET", "/v1/cognis/runtime/pack-state"); }
 
   traces(limit?: number): Promise<CogniTraceResponse> { return this.request<CogniTraceResponse>("GET", "/v1/cognis/traces", undefined, { limit }); }
   trace(id: string, limit?: number): Promise<CogniTraceResponse> { return this.request<CogniTraceResponse>("GET", `/v1/cognis/${enc(id)}/trace`, undefined, { limit }); }

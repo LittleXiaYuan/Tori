@@ -240,3 +240,51 @@ func TestAgentPool(t *testing.T) {
 		t.Error("second Remove should fail")
 	}
 }
+
+func TestModuleRegistryListUsesLiveModuleStatus(t *testing.T) {
+	registry := NewModuleRegistry()
+	module := &testStatusModule{enabled: true, running: true}
+	registry.Register(module)
+	registry.InitAll(context.Background(), &App{}, "lite", map[string]bool{})
+
+	statuses := registry.List()
+	if len(statuses) != 1 || !statuses[0].Enabled || !statuses[0].Running {
+		t.Fatalf("expected live module status enabled/running, got %#v", statuses)
+	}
+	if !registry.IsEnabled("test-status") {
+		t.Fatalf("expected IsEnabled to use live running status")
+	}
+
+	module.enabled = false
+	module.running = false
+	statuses = registry.List()
+	if len(statuses) != 1 || statuses[0].Enabled || statuses[0].Running {
+		t.Fatalf("expected live module status to reflect runtime gate off, got %#v", statuses)
+	}
+	if registry.IsEnabled("test-status") {
+		t.Fatalf("expected IsEnabled to reflect runtime gate off")
+	}
+}
+
+type testStatusModule struct {
+	enabled bool
+	running bool
+}
+
+func (m *testStatusModule) Name() string        { return "test-status" }
+func (m *testStatusModule) Description() string { return "test dynamic status module" }
+func (m *testStatusModule) Profile() string     { return "lite" }
+func (m *testStatusModule) Init(context.Context, *App) error {
+	return nil
+}
+func (m *testStatusModule) Start(context.Context) error { return nil }
+func (m *testStatusModule) Stop() error                 { return nil }
+func (m *testStatusModule) Status() ModuleStatus {
+	return ModuleStatus{
+		Name:        m.Name(),
+		Description: m.Description(),
+		Profile:     m.Profile(),
+		Enabled:     m.enabled,
+		Running:     m.running,
+	}
+}

@@ -100,7 +100,68 @@ func TestCogniKernelPackGateReturnsNotFoundWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestCogniKernelRuntimePackStateRouteIsExactPackGated(t *testing.T) {
+	reporter := fakeCogniKernelRuntimeStateReporter{
+		report: cognikernelpack.RuntimeStateReport{
+			PackID:                    cognikernelpack.PackID,
+			Stage:                     "runtime-loop-pack-state-gate",
+			PackInstalled:             true,
+			PackEnabled:               true,
+			RuntimeLoopPackStateReady: true,
+			RuntimeLoopRunning:        true,
+			Artifacts:                 []string{"cogni-runtime-pack-state.json"},
+		},
+	}
+	gw, tm := newTestGatewayWithCogniKernelPackAndReporter(t, packruntime.PackStatusEnabled, reporter)
+	tenant := tm.Register("cogni-pack-runtime-state")
+
+	reg := cogni.NewRegistry()
+	if err := reg.Add(&cogni.Declaration{ID: "reviewer"}, "test"); err != nil {
+		t.Fatalf("add cogni declaration: %v", err)
+	}
+	gw.SetCogniRegistry(reg, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/runtime/pack-state", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("runtime pack-state route status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var body cognikernelpack.RuntimeStateReport
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode runtime state report: %v", err)
+	}
+	if !body.RuntimeLoopPackStateReady || !body.RuntimeLoopRunning || len(body.Artifacts) == 0 {
+		t.Fatalf("unexpected runtime state report: %#v", body)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/cognis/runtime/pack-state", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("runtime pack-state route should be GET-only, status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	if _, err := gw.packRegistry.Disable(cognikernelpack.PackID); err != nil {
+		t.Fatalf("Disable Cogni Kernel pack: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/v1/cognis/runtime/pack-state", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("disabled pack should gate exact runtime pack-state route, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
 func newTestGatewayWithCogniKernelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
+	return newTestGatewayWithCogniKernelPackAndReporter(t, status, nil)
+}
+
+func newTestGatewayWithCogniKernelPackAndReporter(t *testing.T, status packruntime.PackStatus, reporter cognikernelpack.RuntimeStateReporter) (*Gateway, *tenant.Manager) {
 	t.Helper()
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
@@ -113,13 +174,14 @@ func newTestGatewayWithCogniKernelPack(t *testing.T, status packruntime.PackStat
 		Optional:     true,
 		DefaultState: "enabled",
 		Backend: packruntime.BackendManifest{
-			Routes: []string{"/v1/cognis", "/v1/cognis/"},
+			Routes: []string{"/v1/cognis", "/v1/cognis/", "/v1/cognis/runtime/pack-state"},
 			RouteSpecs: []packruntime.BackendRouteSpec{
 				{Method: http.MethodGet, Path: "/v1/cognis"},
 				{Method: http.MethodPost, Path: "/v1/cognis"},
 				{Method: http.MethodGet, Path: "/v1/cognis/"},
 				{Method: http.MethodPost, Path: "/v1/cognis/"},
 				{Method: http.MethodDelete, Path: "/v1/cognis/"},
+				{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state"},
 			},
 		},
 		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "cognis", Label: "智体内核", Path: "/packs/cognis"}}},
@@ -134,6 +196,20 @@ func newTestGatewayWithCogniKernelPack(t *testing.T, status packruntime.PackStat
 		}
 	}
 	gw, tm := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
-	gw.RegisterBackendPack(cognikernelpack.NewHandler(gw))
+	if reporter == nil {
+		gw.RegisterBackendPack(cognikernelpack.NewHandler(gw))
+	} else {
+		handler := cognikernelpack.NewHandlerWithRuntimeState(gw, reporter)
+		gw.SetCogniKernelRuntimeStateHandler(handler.HandleRuntimePackState)
+		gw.RegisterBackendPack(handler)
+	}
 	return gw, tm
+}
+
+type fakeCogniKernelRuntimeStateReporter struct {
+	report cognikernelpack.RuntimeStateReport
+}
+
+func (r fakeCogniKernelRuntimeStateReporter) CogniKernelRuntimeState() cognikernelpack.RuntimeStateReport {
+	return r.report
 }

@@ -40,6 +40,12 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case path == "":
 		g.cogniCollection(w, r)
+	case path == "runtime/pack-state":
+		if g.cogniKernelRuntimeState == nil {
+			apperror.WriteCode(w, apperror.CodeInternal, "cogni runtime state reporter not configured")
+			return
+		}
+		g.cogniKernelRuntimeState(w, r)
 	case path == "reload":
 		g.cogniReload(w, r)
 	case path == "traces":
