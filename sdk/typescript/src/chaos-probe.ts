@@ -2,8 +2,9 @@
  * Lightweight Chaos Probe Pack SDK slice.
  *
  * This keeps safe probe definitions, one-shot health checks, scheduler /
- * metrics / alert write-back plans, degrade summaries, remediation hints, and
- * evidence export usable without importing the full generated OpenAPI SDK:
+ * metrics / alert write-back plans, pack-local degrade-state write-back
+ * persistence, degrade summaries, remediation hints, and evidence export usable
+ * without importing the full generated OpenAPI SDK:
  *
  *   import { createChaosProbeClient } from "yunque-client/chaos-probe";
  */
@@ -78,6 +79,10 @@ export type ChaosProbeStatusResponse = {
   metrics_plan_ready: boolean;
   prometheus_ready: boolean;
   degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready?: boolean;
+  degrade_state_store_ready?: boolean;
+  writes_degrade_state_store?: boolean;
+  runtime_degrade_state_ready?: boolean;
   degrade_engine_ready: boolean;
   alert_writeback_plan_ready: boolean;
   alert_writeback_ready: boolean;
@@ -86,6 +91,7 @@ export type ChaosProbeStatusResponse = {
   store_dir?: string;
   policy: ChaosProbePolicy;
   last_report?: ChaosProbeReportSummary | null;
+  degrade_state_store?: ChaosProbeDegradeStateStoreSummary;
   capabilities: string[];
   notes?: string[];
 };
@@ -174,6 +180,102 @@ export type ChaosProbeSchedulerPlanResponse = {
   plan: ChaosProbeSchedulerPlan;
 };
 
+export type ChaosProbeDegradeStateWritebackRequest = {
+  report_id?: string;
+  target?: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  metadata?: Record<string, string>;
+};
+
+export type ChaosProbeDegradeStateStoreSummary = {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  degrade_state_store_ready: boolean;
+  degrade_writeback_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  latest_record_id?: string;
+  notes?: string[];
+};
+
+export type ChaosProbeDegradeStateRecord = {
+  pack_id: string;
+  record_id: string;
+  record_key: string;
+  report_id: string;
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  status: string;
+  reason: string;
+  requested_by?: string;
+  approval_id?: string;
+  created_at: string;
+  updated_at: string;
+  report_summary: ChaosProbeReportSummary;
+  degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready: boolean;
+  degrade_state_store_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  scheduler_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  writebacks?: ChaosProbeDegradeWritebackPlan[];
+  remediations?: string[];
+  metadata?: Record<string, string>;
+  artifacts: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type ChaosProbeDegradeStateWritebackReport = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id: string;
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  degrade_state_store_ready: boolean;
+  degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  scheduler_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  record_id: string;
+  record_key: string;
+  degrade_state_record: ChaosProbeDegradeStateRecord;
+  degrade_state_store: ChaosProbeDegradeStateStoreSummary;
+  plan_summary: ChaosProbeSchedulerPlan;
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type ChaosProbeDegradeStateWritebackResponse = {
+  writeback: ChaosProbeDegradeStateWritebackReport;
+};
+
 export type ChaosProbeReportsResponse = {
   reports: ChaosProbeReportSummary[];
   count: number;
@@ -190,6 +292,9 @@ export type ChaosProbeEvidenceResponse = {
   files: string[];
   report: ChaosProbeReport;
   scheduler_plan?: ChaosProbeSchedulerPlan;
+  degrade_state_store?: ChaosProbeDegradeStateStoreSummary;
+  degrade_state_record?: ChaosProbeDegradeStateRecord;
+  degrade_state_record_persisted?: boolean;
 };
 
 export type ChaosProbeClientOptions = {
@@ -216,7 +321,10 @@ function trimBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-function mergeHeaders(base: HeadersInit | undefined, extra?: HeadersInit): Headers {
+function mergeHeaders(
+  base: HeadersInit | undefined,
+  extra?: HeadersInit,
+): Headers {
   const headers = new Headers(base);
   if (!extra) return headers;
   new Headers(extra).forEach((value, key) => headers.set(key, value));
@@ -265,7 +373,8 @@ export class ChaosProbeClient {
   constructor(options: ChaosProbeClientOptions) {
     if (!options.baseUrl) throw new Error("ChaosProbeClient requires baseUrl");
     const fetchImpl = options.fetch ?? globalThis.fetch;
-    if (!fetchImpl) throw new Error("ChaosProbeClient requires a fetch implementation");
+    if (!fetchImpl)
+      throw new Error("ChaosProbeClient requires a fetch implementation");
     this.baseUrl = trimBaseUrl(options.baseUrl);
     this.fetchImpl = fetchImpl.bind(globalThis) as typeof fetch;
     this.headers = options.headers;
@@ -274,41 +383,88 @@ export class ChaosProbeClient {
   }
 
   status(): Promise<ChaosProbeStatusResponse> {
-    return this.request<ChaosProbeStatusResponse>("GET", "/v1/chaos-probe/status");
+    return this.request<ChaosProbeStatusResponse>(
+      "GET",
+      "/v1/chaos-probe/status",
+    );
   }
 
   probes(): Promise<ChaosProbeDefinitionsResponse> {
-    return this.request<ChaosProbeDefinitionsResponse>("GET", "/v1/chaos-probe/probes");
+    return this.request<ChaosProbeDefinitionsResponse>(
+      "GET",
+      "/v1/chaos-probe/probes",
+    );
   }
 
-  saveProbes(input: ChaosProbeSaveDefinitionsRequest): Promise<ChaosProbeDefinitionsResponse & { status: string }> {
-    return this.request<ChaosProbeDefinitionsResponse & { status: string }>("POST", "/v1/chaos-probe/probes", input);
+  saveProbes(
+    input: ChaosProbeSaveDefinitionsRequest,
+  ): Promise<ChaosProbeDefinitionsResponse & { status: string }> {
+    return this.request<ChaosProbeDefinitionsResponse & { status: string }>(
+      "POST",
+      "/v1/chaos-probe/probes",
+      input,
+    );
   }
 
   run(input: ChaosProbeRunRequest = {}): Promise<ChaosProbeRunResponse> {
-    return this.request<ChaosProbeRunResponse>("POST", "/v1/chaos-probe/run", input);
+    return this.request<ChaosProbeRunResponse>(
+      "POST",
+      "/v1/chaos-probe/run",
+      input,
+    );
   }
 
-  schedulerPlan(input: ChaosProbeSchedulerPlanRequest = {}): Promise<ChaosProbeSchedulerPlanResponse> {
-    return this.request<ChaosProbeSchedulerPlanResponse>("POST", "/v1/chaos-probe/scheduler/plan", input);
+  schedulerPlan(
+    input: ChaosProbeSchedulerPlanRequest = {},
+  ): Promise<ChaosProbeSchedulerPlanResponse> {
+    return this.request<ChaosProbeSchedulerPlanResponse>(
+      "POST",
+      "/v1/chaos-probe/scheduler/plan",
+      input,
+    );
+  }
+
+  writeDegradeState(
+    input: ChaosProbeDegradeStateWritebackRequest = {},
+  ): Promise<ChaosProbeDegradeStateWritebackResponse> {
+    return this.request<ChaosProbeDegradeStateWritebackResponse>(
+      "POST",
+      "/v1/chaos-probe/degrade-state/writeback",
+      input,
+    );
   }
 
   reports(): Promise<ChaosProbeReportsResponse> {
-    return this.request<ChaosProbeReportsResponse>("GET", "/v1/chaos-probe/reports");
+    return this.request<ChaosProbeReportsResponse>(
+      "GET",
+      "/v1/chaos-probe/reports",
+    );
   }
 
   report(id: string): Promise<ChaosProbeReportResponse> {
-    return this.request<ChaosProbeReportResponse>("GET", `/v1/chaos-probe/reports/${enc(id)}`);
+    return this.request<ChaosProbeReportResponse>(
+      "GET",
+      `/v1/chaos-probe/reports/${enc(id)}`,
+    );
   }
 
   evidence(id: string): Promise<ChaosProbeEvidenceResponse> {
-    return this.request<ChaosProbeEvidenceResponse>("GET", `/v1/chaos-probe/evidence/${enc(id)}`);
+    return this.request<ChaosProbeEvidenceResponse>(
+      "GET",
+      `/v1/chaos-probe/evidence/${enc(id)}`,
+    );
   }
 
-  private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     const headers = mergeHeaders(this.headers);
-    if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`);
-    if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey);
+    if (this.token && !headers.has("authorization"))
+      headers.set("Authorization", `Bearer ${this.token}`);
+    if (this.apiKey && !headers.has("x-api-key"))
+      headers.set("X-API-Key", this.apiKey);
 
     const init: RequestInit = { method, headers };
     if (body !== undefined) {
@@ -316,13 +472,23 @@ export class ChaosProbeClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await this.fetchImpl(new URL(`${this.baseUrl}${path}`), init);
+    const response = await this.fetchImpl(
+      new URL(`${this.baseUrl}${path}`),
+      init,
+    );
     const parsed = await parseResponse(response);
-    if (!response.ok) throw new ChaosProbeClientError(response.status, parsed, messageFromErrorBody(parsed));
+    if (!response.ok)
+      throw new ChaosProbeClientError(
+        response.status,
+        parsed,
+        messageFromErrorBody(parsed),
+      );
     return parsed as T;
   }
 }
 
-export function createChaosProbeClient(options: ChaosProbeClientOptions): ChaosProbeClient {
+export function createChaosProbeClient(
+  options: ChaosProbeClientOptions,
+): ChaosProbeClient {
   return new ChaosProbeClient(options);
 }

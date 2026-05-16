@@ -70,6 +70,10 @@ export interface ChaosProbeStatus {
   metrics_plan_ready: boolean;
   prometheus_ready: boolean;
   degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready?: boolean;
+  degrade_state_store_ready?: boolean;
+  writes_degrade_state_store?: boolean;
+  runtime_degrade_state_ready?: boolean;
   degrade_engine_ready: boolean;
   alert_writeback_plan_ready: boolean;
   alert_writeback_ready: boolean;
@@ -78,6 +82,7 @@ export interface ChaosProbeStatus {
   store_dir?: string;
   policy: ChaosProbePolicy;
   last_report?: ChaosProbeReportSummary | null;
+  degrade_state_store?: ChaosProbeDegradeStateStoreSummary;
   capabilities: string[];
   notes?: string[];
 }
@@ -139,6 +144,98 @@ export interface ChaosProbeSchedulerPlan {
   notes?: string[];
 }
 
+export interface ChaosProbeDegradeStateWritebackInput {
+  report_id?: string;
+  target?: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ChaosProbeDegradeStateStoreSummary {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  degrade_state_store_ready: boolean;
+  degrade_writeback_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  latest_record_id?: string;
+  notes?: string[];
+}
+
+export interface ChaosProbeDegradeStateRecord {
+  pack_id: string;
+  record_id: string;
+  record_key: string;
+  report_id: string;
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  status: string;
+  reason: string;
+  requested_by?: string;
+  approval_id?: string;
+  created_at: string;
+  updated_at: string;
+  report_summary: ChaosProbeReportSummary;
+  degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready: boolean;
+  degrade_state_store_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  scheduler_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  writebacks?: ChaosProbeDegradeWritebackPlan[];
+  remediations?: string[];
+  metadata?: Record<string, string>;
+  artifacts: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface ChaosProbeDegradeStateWriteback {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id: string;
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  degrade_state_store_ready: boolean;
+  degrade_writeback_plan_ready: boolean;
+  degrade_writeback_ready: boolean;
+  writes_degrade_state_store: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  scheduler_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  record_id: string;
+  record_key: string;
+  degrade_state_record: ChaosProbeDegradeStateRecord;
+  degrade_state_store: ChaosProbeDegradeStateStoreSummary;
+  plan_summary: ChaosProbeSchedulerPlan;
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface ChaosProbeEvidence {
   pack_id: string;
   exported_at: string;
@@ -146,14 +243,35 @@ export interface ChaosProbeEvidence {
   files: string[];
   report: ChaosProbeReport;
   scheduler_plan?: ChaosProbeSchedulerPlan;
+  degrade_state_store?: ChaosProbeDegradeStateStoreSummary;
+  degrade_state_record?: ChaosProbeDegradeStateRecord;
+  degrade_state_record_persisted?: boolean;
 }
 
 export interface ChaosProbePackClient {
   status(): Promise<ChaosProbeStatus>;
   probes(): Promise<{ probes: ChaosProbeDefinition[]; count: number }>;
-  saveProbes(input: { probes: ChaosProbeDefinition[]; replace?: boolean }): Promise<{ probes: ChaosProbeDefinition[]; count: number; status: string }>;
-  run(input?: ChaosProbeRunInput): Promise<{ report: ChaosProbeReport; status: string }>;
-  schedulerPlan(input?: { report_id?: string; interval?: string; requested_by?: string; reason?: string; metadata?: Record<string, string> }): Promise<{ plan: ChaosProbeSchedulerPlan }>;
+  saveProbes(input: {
+    probes: ChaosProbeDefinition[];
+    replace?: boolean;
+  }): Promise<{
+    probes: ChaosProbeDefinition[];
+    count: number;
+    status: string;
+  }>;
+  run(
+    input?: ChaosProbeRunInput,
+  ): Promise<{ report: ChaosProbeReport; status: string }>;
+  schedulerPlan(input?: {
+    report_id?: string;
+    interval?: string;
+    requested_by?: string;
+    reason?: string;
+    metadata?: Record<string, string>;
+  }): Promise<{ plan: ChaosProbeSchedulerPlan }>;
+  writeDegradeState(
+    input?: ChaosProbeDegradeStateWritebackInput,
+  ): Promise<{ writeback: ChaosProbeDegradeStateWriteback }>;
   reports(): Promise<{ reports: ChaosProbeReportSummary[]; count: number }>;
   report(id: string): Promise<{ report: ChaosProbeReport }>;
   evidence(id: string): Promise<ChaosProbeEvidence>;
@@ -166,24 +284,52 @@ function enc(value: string): string {
 export function createChaosProbePackClient(): ChaosProbePackClient {
   return {
     status: () => fetcher<ChaosProbeStatus>("/v1/chaos-probe/status"),
-    probes: () => fetcher<{ probes: ChaosProbeDefinition[]; count: number }>("/v1/chaos-probe/probes"),
+    probes: () =>
+      fetcher<{ probes: ChaosProbeDefinition[]; count: number }>(
+        "/v1/chaos-probe/probes",
+      ),
     saveProbes: (input) =>
-      fetcher<{ probes: ChaosProbeDefinition[]; count: number; status: string }>("/v1/chaos-probe/probes", {
+      fetcher<{
+        probes: ChaosProbeDefinition[];
+        count: number;
+        status: string;
+      }>("/v1/chaos-probe/probes", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     run: (input = {}) =>
-      fetcher<{ report: ChaosProbeReport; status: string }>("/v1/chaos-probe/run", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+      fetcher<{ report: ChaosProbeReport; status: string }>(
+        "/v1/chaos-probe/run",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
     schedulerPlan: (input = {}) =>
-      fetcher<{ plan: ChaosProbeSchedulerPlan }>("/v1/chaos-probe/scheduler/plan", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    reports: () => fetcher<{ reports: ChaosProbeReportSummary[]; count: number }>("/v1/chaos-probe/reports"),
-    report: (id) => fetcher<{ report: ChaosProbeReport }>(`/v1/chaos-probe/reports/${enc(id)}`),
-    evidence: (id) => fetcher<ChaosProbeEvidence>(`/v1/chaos-probe/evidence/${enc(id)}`),
+      fetcher<{ plan: ChaosProbeSchedulerPlan }>(
+        "/v1/chaos-probe/scheduler/plan",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
+    writeDegradeState: (input = {}) =>
+      fetcher<{ writeback: ChaosProbeDegradeStateWriteback }>(
+        "/v1/chaos-probe/degrade-state/writeback",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
+    reports: () =>
+      fetcher<{ reports: ChaosProbeReportSummary[]; count: number }>(
+        "/v1/chaos-probe/reports",
+      ),
+    report: (id) =>
+      fetcher<{ report: ChaosProbeReport }>(
+        `/v1/chaos-probe/reports/${enc(id)}`,
+      ),
+    evidence: (id) =>
+      fetcher<ChaosProbeEvidence>(`/v1/chaos-probe/evidence/${enc(id)}`),
   };
 }

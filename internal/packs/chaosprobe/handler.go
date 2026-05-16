@@ -8,6 +8,8 @@ package chaosprobe
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -155,6 +157,98 @@ type DegradeWriteback struct {
 	WritebackReady bool   `json:"writeback_ready"`
 }
 
+type DegradeStateWritebackRequest struct {
+	ReportID    string            `json:"report_id,omitempty"`
+	Target      string            `json:"target,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	ApprovalID  string            `json:"approval_id,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type DegradeStateStoreSummary struct {
+	PackID                   string   `json:"pack_id"`
+	Store                    string   `json:"store"`
+	StoreReady               bool     `json:"store_ready"`
+	RecordCount              int      `json:"record_count"`
+	Artifact                 string   `json:"artifact"`
+	DegradeStateStoreReady   bool     `json:"degrade_state_store_ready"`
+	DegradeWritebackReady    bool     `json:"degrade_writeback_ready"`
+	WritesDegradeStateStore  bool     `json:"writes_degrade_state_store"`
+	RuntimeDegradeStateReady bool     `json:"runtime_degrade_state_ready"`
+	DegradeEngineReady       bool     `json:"degrade_engine_ready"`
+	PrometheusReady          bool     `json:"prometheus_ready"`
+	AlertWritebackReady      bool     `json:"alert_writeback_ready"`
+	LatestRecordID           string   `json:"latest_record_id,omitempty"`
+	Notes                    []string `json:"notes,omitempty"`
+}
+
+type DegradeStateRecord struct {
+	PackID                    string             `json:"pack_id"`
+	RecordID                  string             `json:"record_id"`
+	RecordKey                 string             `json:"record_key"`
+	ReportID                  string             `json:"report_id"`
+	Target                    string             `json:"target"`
+	Level                     int                `json:"level"`
+	GateStatus                string             `json:"gate_status"`
+	HealthScore               float64            `json:"health_score"`
+	Status                    string             `json:"status"`
+	Reason                    string             `json:"reason"`
+	RequestedBy               string             `json:"requested_by,omitempty"`
+	ApprovalID                string             `json:"approval_id,omitempty"`
+	CreatedAt                 time.Time          `json:"created_at"`
+	UpdatedAt                 time.Time          `json:"updated_at"`
+	ReportSummary             ReportSummary      `json:"report_summary"`
+	DegradeWritebackPlanReady bool               `json:"degrade_writeback_plan_ready"`
+	DegradeWritebackReady     bool               `json:"degrade_writeback_ready"`
+	DegradeStateStoreReady    bool               `json:"degrade_state_store_ready"`
+	WritesDegradeStateStore   bool               `json:"writes_degrade_state_store"`
+	RuntimeDegradeStateReady  bool               `json:"runtime_degrade_state_ready"`
+	DegradeEngineReady        bool               `json:"degrade_engine_ready"`
+	SchedulerReady            bool               `json:"scheduler_ready"`
+	PrometheusReady           bool               `json:"prometheus_ready"`
+	AlertWritebackReady       bool               `json:"alert_writeback_ready"`
+	Writebacks                []DegradeWriteback `json:"writebacks,omitempty"`
+	Remediations              []string           `json:"remediations,omitempty"`
+	Metadata                  map[string]string  `json:"metadata,omitempty"`
+	Artifacts                 []string           `json:"artifacts"`
+	Labels                    []string           `json:"labels"`
+	Notes                     []string           `json:"notes,omitempty"`
+}
+
+type DegradeStateWritebackReport struct {
+	PackID                    string                   `json:"pack_id"`
+	GeneratedAt               time.Time                `json:"generated_at"`
+	Status                    string                   `json:"status"`
+	ReportID                  string                   `json:"report_id"`
+	Target                    string                   `json:"target"`
+	Level                     int                      `json:"level"`
+	GateStatus                string                   `json:"gate_status"`
+	HealthScore               float64                  `json:"health_score"`
+	RequestedBy               string                   `json:"requested_by,omitempty"`
+	Reason                    string                   `json:"reason,omitempty"`
+	ApprovalID                string                   `json:"approval_id,omitempty"`
+	DegradeStateStoreReady    bool                     `json:"degrade_state_store_ready"`
+	DegradeWritebackPlanReady bool                     `json:"degrade_writeback_plan_ready"`
+	DegradeWritebackReady     bool                     `json:"degrade_writeback_ready"`
+	WritesDegradeStateStore   bool                     `json:"writes_degrade_state_store"`
+	RuntimeDegradeStateReady  bool                     `json:"runtime_degrade_state_ready"`
+	DegradeEngineReady        bool                     `json:"degrade_engine_ready"`
+	SchedulerReady            bool                     `json:"scheduler_ready"`
+	PrometheusReady           bool                     `json:"prometheus_ready"`
+	AlertWritebackReady       bool                     `json:"alert_writeback_ready"`
+	RecordID                  string                   `json:"record_id"`
+	RecordKey                 string                   `json:"record_key"`
+	DegradeStateRecord        DegradeStateRecord       `json:"degrade_state_record"`
+	DegradeStateStore         DegradeStateStoreSummary `json:"degrade_state_store"`
+	PlanSummary               SchedulerPlanReport      `json:"plan_summary"`
+	Artifacts                 []string                 `json:"artifacts"`
+	Actions                   []string                 `json:"actions"`
+	Labels                    []string                 `json:"labels"`
+	Metadata                  map[string]string        `json:"metadata,omitempty"`
+	Notes                     []string                 `json:"notes,omitempty"`
+}
+
 type ReportSummary struct {
 	ID            string    `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -195,6 +289,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/chaos-probe/probes", Handler: h.Probes},
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/run", Handler: h.Run},
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/scheduler/plan", Handler: h.SchedulerPlan},
+		{Method: http.MethodPost, Path: "/v1/chaos-probe/degrade-state/writeback", Handler: h.DegradeStateWriteback},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/evidence/", Handler: h.Evidence},
@@ -216,6 +311,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	degradeStore := h.degradeStateStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                      PackID,
 		"stage":                        "pack-shell-before-scheduler",
@@ -225,6 +321,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"metrics_plan_ready":           true,
 		"prometheus_ready":             false,
 		"degrade_writeback_plan_ready": true,
+		"degrade_writeback_ready":      true,
+		"degrade_state_store_ready":    true,
+		"writes_degrade_state_store":   true,
+		"runtime_degrade_state_ready":  false,
 		"degrade_engine_ready":         false,
 		"alert_writeback_plan_ready":   true,
 		"alert_writeback_ready":        false,
@@ -233,6 +333,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"store_dir":                    h.dataDir,
 		"policy":                       h.policy,
 		"last_report":                  firstSummary(reports),
+		"degrade_state_store":          degradeStore,
 		"capabilities": []string{
 			"chaos.probe.registry",
 			"chaos.probe.safe_run",
@@ -240,10 +341,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"chaos.scheduler.plan",
 			"chaos.metrics.plan",
 			"chaos.degrade.plan",
+			"chaos.degrade_state.writeback",
 			"chaos.alert.writeback.plan",
 			"chaos.evidence.export",
 		},
-		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, and automatic degrade-state write-back plans are available as non-destructive contracts; real scheduler/metrics/alert/degrade write-back remain follow-up wiring."},
+		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, and automatic runtime degrade-state write-back plans are available as non-destructive contracts; pack-local degrade-state write-back persistence is available, while real scheduler/metrics/alert routing and runtime degrade-state engine remain follow-up wiring."},
 	})
 }
 
@@ -334,6 +436,24 @@ func (h *Handler) SchedulerPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildSchedulerPlan(report, req)})
 }
 
+func (h *Handler) DegradeStateWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req DegradeStateWritebackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid chaos degrade-state writeback payload")
+		return
+	}
+	writeback, err := h.writeDegradeStateRecord(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": writeback})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -373,13 +493,17 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan := h.buildSchedulerPlan(report, SchedulerPlanRequest{ReportID: report.ID, Interval: "5m", RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
+	record, recordPersisted := h.latestDegradeStateRecordForReport(report.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":        PackID,
-		"exported_at":    h.now().UTC(),
-		"format":         "json-chaos-probe-evidence",
-		"files":          []string{"chaos-report.json", "probe-definitions.json", "scheduler-plan.json", "metrics-plan.json", "degrade-writeback-plan.json"},
-		"report":         report,
-		"scheduler_plan": plan,
+		"pack_id":                        PackID,
+		"exported_at":                    h.now().UTC(),
+		"format":                         "json-chaos-probe-evidence",
+		"files":                          []string{"chaos-report.json", "probe-definitions.json", "scheduler-plan.json", "metrics-plan.json", "degrade-writeback-plan.json", "degrade-state-store.json", "degrade-state-record.json"},
+		"report":                         report,
+		"scheduler_plan":                 plan,
+		"degrade_state_store":            h.degradeStateStoreSummary(),
+		"degrade_state_record":           record,
+		"degrade_state_record_persisted": recordPersisted,
 	})
 }
 
@@ -512,6 +636,128 @@ func (h *Handler) buildSchedulerPlan(report ChaosReport, req SchedulerPlanReques
 			"Use the plan shape as the contract for the later scheduler / metrics / alert / degrade write-back slice.",
 		},
 	}
+}
+
+func (h *Handler) writeDegradeStateRecord(ctx context.Context, req DegradeStateWritebackRequest) (DegradeStateWritebackReport, error) {
+	report, err := h.reportForDegradeStateWriteback(ctx, req)
+	if err != nil {
+		return DegradeStateWritebackReport{}, err
+	}
+	plan := h.buildSchedulerPlan(report, SchedulerPlanRequest{
+		ReportID:    report.ID,
+		Interval:    recommendedInterval(report),
+		RequestedBy: req.RequestedBy,
+		Reason:      req.Reason,
+		Metadata:    req.Metadata,
+	})
+	target := strings.TrimSpace(req.Target)
+	if target == "" {
+		target = "runtime.degrade_state"
+	}
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = degradeStateReason(report)
+	}
+	recordKey := degradeStateRecordKey(report, target, requestedBy, reason, req.ApprovalID)
+	record := DegradeStateRecord{
+		PackID:                    PackID,
+		RecordID:                  "chaos-degrade-" + recordKey[:16],
+		RecordKey:                 recordKey,
+		ReportID:                  report.ID,
+		Target:                    target,
+		Level:                     report.DegradeLevel,
+		GateStatus:                report.GateStatus,
+		HealthScore:               report.HealthScore,
+		Status:                    "pack_local_degrade_state_written_pending_runtime_engine",
+		Reason:                    reason,
+		RequestedBy:               requestedBy,
+		ApprovalID:                strings.TrimSpace(req.ApprovalID),
+		CreatedAt:                 h.now().UTC(),
+		UpdatedAt:                 h.now().UTC(),
+		ReportSummary:             reportSummary(report),
+		DegradeWritebackPlanReady: true,
+		DegradeWritebackReady:     true,
+		DegradeStateStoreReady:    true,
+		WritesDegradeStateStore:   true,
+		RuntimeDegradeStateReady:  false,
+		DegradeEngineReady:        false,
+		SchedulerReady:            false,
+		PrometheusReady:           false,
+		AlertWritebackReady:       false,
+		Writebacks:                buildDegradeWritebacks(report),
+		Remediations:              append([]string{}, report.Remediations...),
+		Metadata:                  cleanStringMap(req.Metadata),
+		Artifacts:                 []string{"degrade-state-store.json", "degrade-state-record.json", "scheduler-plan.json", "degrade-writeback-plan.json", "chaos-report.json"},
+		Labels:                    []string{"chaos-probe", "degrade-state", "pack-local-store", "no-runtime-degrade-engine", "no-prometheus-publish", "no-alert-route"},
+		Notes: []string{
+			"This route writes only the pack-local Chaos Probe degrade-state JSON store.",
+			"It does not mutate the runtime degrade engine, create scheduler jobs, publish Prometheus metrics, send alerts, or append audit-chain records.",
+		},
+	}
+	if err := h.saveDegradeStateRecord(record); err != nil {
+		return DegradeStateWritebackReport{}, err
+	}
+	store := h.degradeStateStoreSummary()
+	return DegradeStateWritebackReport{
+		PackID:                    PackID,
+		GeneratedAt:               h.now().UTC(),
+		Status:                    record.Status,
+		ReportID:                  record.ReportID,
+		Target:                    record.Target,
+		Level:                     record.Level,
+		GateStatus:                record.GateStatus,
+		HealthScore:               record.HealthScore,
+		RequestedBy:               record.RequestedBy,
+		Reason:                    record.Reason,
+		ApprovalID:                record.ApprovalID,
+		DegradeStateStoreReady:    true,
+		DegradeWritebackPlanReady: true,
+		DegradeWritebackReady:     true,
+		WritesDegradeStateStore:   true,
+		RuntimeDegradeStateReady:  false,
+		DegradeEngineReady:        false,
+		SchedulerReady:            false,
+		PrometheusReady:           false,
+		AlertWritebackReady:       false,
+		RecordID:                  record.RecordID,
+		RecordKey:                 record.RecordKey,
+		DegradeStateRecord:        record,
+		DegradeStateStore:         store,
+		PlanSummary:               plan,
+		Artifacts:                 record.Artifacts,
+		Actions: []string{
+			"persisted the latest Chaos Probe health/degrade summary into the pack-local degrade-state store",
+			"kept runtime degrade-state mutation, scheduler creation, Prometheus publishing, alert routing, and audit append blocked until explicit engine wiring consumes the stored record",
+		},
+		Labels:   record.Labels,
+		Metadata: record.Metadata,
+		Notes: []string{
+			"This is pack-local write-back persistence only; it is safe to use as evidence and as the future runtime degrade engine input contract.",
+			"runtime_degrade_state_ready=false and degrade_engine_ready=false mean the live runtime does not consume this record yet.",
+		},
+	}, nil
+}
+
+func (h *Handler) reportForDegradeStateWriteback(ctx context.Context, req DegradeStateWritebackRequest) (ChaosReport, error) {
+	if strings.TrimSpace(req.ReportID) != "" {
+		return h.loadReport(req.ReportID)
+	}
+	reports, err := h.listReports()
+	if err != nil {
+		return ChaosReport{}, err
+	}
+	if len(reports) > 0 {
+		return h.loadReport(reports[0].ID)
+	}
+	report, err := h.buildReport(ctx, ProbeRunRequest{DryRun: true, Metadata: map[string]string{"source": "degrade-state-writeback"}})
+	if err != nil {
+		return ChaosReport{}, err
+	}
+	return report, nil
 }
 
 func (h *Handler) executeProbe(ctx context.Context, def ProbeDefinition) ProbeResult {
@@ -885,8 +1131,147 @@ func buildDegradeWritebacks(report ChaosReport) []DegradeWriteback {
 	return []DegradeWriteback{{Target: "runtime.degrade_state", Level: report.DegradeLevel, Reason: reason, WritebackReady: false}}
 }
 
+func degradeStateReason(report ChaosReport) string {
+	if len(report.Remediations) > 0 {
+		return report.Remediations[0]
+	}
+	if report.GateStatus == "pass" {
+		return "chaos probe reports healthy state"
+	}
+	return "chaos probe reported degraded health"
+}
+
+func degradeStateRecordKey(report ChaosReport, target, requestedBy, reason, approvalID string) string {
+	payload := strings.Join([]string{
+		"pack_id=" + PackID,
+		"report_id=" + report.ID,
+		"target=" + target,
+		fmt.Sprintf("level=%d", report.DegradeLevel),
+		"gate_status=" + report.GateStatus,
+		fmt.Sprintf("health_score=%.3f", report.HealthScore),
+		"requested_by=" + requestedBy,
+		"reason=" + reason,
+		"approval_id=" + strings.TrimSpace(approvalID),
+	}, "\n")
+	return sha256Hex(payload)
+}
+
+func cleanStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for key, value := range input {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key != "" && value != "" {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func (h *Handler) saveDegradeStateRecord(record DegradeStateRecord) error {
+	records, _ := h.loadDegradeStateRecords()
+	replaced := false
+	for idx := range records {
+		if records[idx].RecordKey == record.RecordKey || records[idx].RecordID == record.RecordID {
+			if !records[idx].CreatedAt.IsZero() {
+				record.CreatedAt = records[idx].CreatedAt
+			}
+			records[idx] = record
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		records = append(records, record)
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].UpdatedAt.After(records[j].UpdatedAt) })
+	store := map[string]any{
+		"pack_id":      PackID,
+		"format":       "json-chaos-probe-degrade-state-store",
+		"record_count": len(records),
+		"updated_at":   h.now().UTC(),
+		"records":      records,
+		"notes": []string{
+			"Pack-local store only; runtime degrade engine consumption is not wired yet.",
+			"Use record_key to deduplicate later runtime degrade-state handoff without changing this write-back route.",
+		},
+	}
+	if err := os.MkdirAll(filepath.Dir(h.degradeStateStorePath()), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(store, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.degradeStateStorePath(), append(data, '\n'), 0o644)
+}
+
+func (h *Handler) loadDegradeStateRecords() ([]DegradeStateRecord, error) {
+	data, err := os.ReadFile(h.degradeStateStorePath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var store struct {
+		Records []DegradeStateRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &store); err != nil {
+		return nil, err
+	}
+	return store.Records, nil
+}
+
+func (h *Handler) degradeStateStoreSummary() DegradeStateStoreSummary {
+	records, _ := h.loadDegradeStateRecords()
+	latest := ""
+	if len(records) > 0 {
+		latest = records[0].RecordID
+	}
+	return DegradeStateStoreSummary{
+		PackID:                   PackID,
+		Store:                    "pack-local-json",
+		StoreReady:               true,
+		RecordCount:              len(records),
+		Artifact:                 "degrade-state-store.json",
+		DegradeStateStoreReady:   true,
+		DegradeWritebackReady:    true,
+		WritesDegradeStateStore:  true,
+		RuntimeDegradeStateReady: false,
+		DegradeEngineReady:       false,
+		PrometheusReady:          false,
+		AlertWritebackReady:      false,
+		LatestRecordID:           latest,
+		Notes: []string{
+			"Store readiness covers only the pack-local JSON degrade-state bridge.",
+			"Runtime degrade engine mutation, Prometheus publishing, alert routing, and audit-chain append remain disabled until later explicit wiring.",
+		},
+	}
+}
+
+func (h *Handler) latestDegradeStateRecordForReport(reportID string) (DegradeStateRecord, bool) {
+	reportID = strings.TrimSpace(reportID)
+	records, _ := h.loadDegradeStateRecords()
+	for _, record := range records {
+		if reportID == "" || record.ReportID == reportID {
+			return record, true
+		}
+	}
+	return DegradeStateRecord{}, false
+}
+
 func (h *Handler) definitionsPath() string { return filepath.Join(h.dataDir, "probe-definitions.json") }
 func (h *Handler) reportsRoot() string     { return filepath.Join(h.dataDir, "reports") }
+func (h *Handler) degradeStateStorePath() string {
+	return filepath.Join(h.dataDir, "degrade-state-store.json")
+}
 
 func (h *Handler) reportDir(id string) (string, error) {
 	id = strings.Trim(strings.TrimSpace(id), "/")
@@ -904,4 +1289,9 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"error": message})
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }

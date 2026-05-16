@@ -2,8 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const manifest = JSON.parse(readFileSync(resolve(repoRoot, "sdk/manifest/chaos-probe-pack-sdk.json"), "utf8"));
-const pack = JSON.parse(readFileSync(resolve(repoRoot, manifest.packManifest), "utf8"));
+const manifest = JSON.parse(
+  readFileSync(
+    resolve(repoRoot, "sdk/manifest/chaos-probe-pack-sdk.json"),
+    "utf8",
+  ),
+);
+const pack = JSON.parse(
+  readFileSync(resolve(repoRoot, manifest.packManifest), "utf8"),
+);
 const failures = [];
 
 function fail(message) {
@@ -19,26 +26,45 @@ function readRepoFile(path) {
   return readFileSync(fullPath, "utf8");
 }
 
-if (pack.id !== "yunque.pack.chaos-probe") fail(`unexpected Chaos Probe pack id: ${pack.id}`);
-if (pack.sdk?.typescript !== manifest.sdkImport) fail("Chaos Probe pack sdk.typescript must match chaos-probe-pack-sdk.json sdkImport");
-if (pack.frontend?.menus?.[0]?.path !== manifest.frontend.menuPath) fail("Chaos Probe pack frontend menu path must remain /packs/chaos-probe");
-if (pack.frontend?.routes?.[0]?.component !== manifest.frontend.component) fail("Chaos Probe pack frontend route component drifted");
-if (pack.update?.rollback !== true) fail("Chaos Probe pack must be rollbackable");
-if (pack.defaultState !== "disabled") fail("Chaos Probe pack should stay default disabled until scheduler and degrade write-back are wired");
-if (pack.metadata?.stage !== "pack-shell-before-scheduler") fail("Chaos Probe pack should declare pack-shell-before-scheduler stage");
-if (pack.metadata?.blueprint !== "doc/CHAOS-PROBE.md") fail("Chaos Probe pack should point to doc/CHAOS-PROBE.md");
+if (pack.id !== "yunque.pack.chaos-probe")
+  fail(`unexpected Chaos Probe pack id: ${pack.id}`);
+if (pack.sdk?.typescript !== manifest.sdkImport)
+  fail(
+    "Chaos Probe pack sdk.typescript must match chaos-probe-pack-sdk.json sdkImport",
+  );
+if (pack.frontend?.menus?.[0]?.path !== manifest.frontend.menuPath)
+  fail("Chaos Probe pack frontend menu path must remain /packs/chaos-probe");
+if (pack.frontend?.routes?.[0]?.component !== manifest.frontend.component)
+  fail("Chaos Probe pack frontend route component drifted");
+if (pack.update?.rollback !== true)
+  fail("Chaos Probe pack must be rollbackable");
+if (pack.defaultState !== "disabled")
+  fail(
+    "Chaos Probe pack should stay default disabled until scheduler and degrade write-back are wired",
+  );
+if (pack.metadata?.stage !== "pack-shell-before-scheduler")
+  fail("Chaos Probe pack should declare pack-shell-before-scheduler stage");
+if (pack.metadata?.blueprint !== "doc/CHAOS-PROBE.md")
+  fail("Chaos Probe pack should point to doc/CHAOS-PROBE.md");
 
-const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
+const routeSpecs = new Set(
+  (pack.backend?.routeSpecs ?? []).map(
+    (route) => `${route.method} ${route.path}`,
+  ),
+);
 for (const route of manifest.routes ?? []) {
-  if (!routeSpecs.has(route)) fail(`Chaos Probe pack manifest missing routeSpec: ${route}`);
+  if (!routeSpecs.has(route))
+    fail(`Chaos Probe pack manifest missing routeSpec: ${route}`);
 }
 for (const capability of [
   "chaos_probe.scheduler.plan",
   "chaos_probe.metrics.plan",
   "chaos_probe.degrade.writeback.plan",
+  "chaos_probe.degrade_state.writeback",
   "chaos_probe.alert.writeback.plan",
 ]) {
-  if (!pack.backend?.capabilities?.includes(capability)) fail(`Chaos Probe pack manifest missing capability: ${capability}`);
+  if (!pack.backend?.capabilities?.includes(capability))
+    fail(`Chaos Probe pack manifest missing capability: ${capability}`);
 }
 
 const client = readRepoFile(manifest.frontend.client);
@@ -48,94 +74,158 @@ for (const token of [
   "/v1/chaos-probe/probes",
   "/v1/chaos-probe/run",
   "/v1/chaos-probe/scheduler/plan",
+  "/v1/chaos-probe/degrade-state/writeback",
   "/v1/chaos-probe/reports",
   "/v1/chaos-probe/evidence/",
   "scheduler_plan_ready",
   "metrics_plan_ready",
   "prometheus_ready",
   "degrade_writeback_plan_ready",
+  "degrade_state_store_ready",
+  "runtime_degrade_state_ready",
   "alert_writeback_plan_ready",
   "schedulerPlan",
-  "method: \"POST\"",
+  "writeDegradeState",
+  'method: "POST"',
 ]) {
-  if (!client.includes(token)) fail(`chaos-probe-pack-client missing token: ${token}`);
+  if (!client.includes(token))
+    fail(`chaos-probe-pack-client missing token: ${token}`);
 }
 
 const page = readRepoFile(manifest.frontend.page);
-if (!page.includes("createChaosProbePackClient") || page.includes('from "@/lib/api"') || page.includes("api.chaosProbe")) {
-  fail("Chaos Probe pack page must use chaos-probe-pack-client instead of monolithic api.ts");
+if (
+  !page.includes("createChaosProbePackClient") ||
+  page.includes('from "@/lib/api"') ||
+  page.includes("api.chaosProbe")
+) {
+  fail(
+    "Chaos Probe pack page must use chaos-probe-pack-client instead of monolithic api.ts",
+  );
 }
-for (const token of ["Chaos Probe", "保存 Definitions", "运行探针", "导出证据包", "Pack shell"]) {
-  if (!page.includes(token)) fail(`Chaos Probe pack page missing product token: ${token}`);
-}
-for (const token of ["调度计划", "scheduler_ready", "prometheus_ready", "runtime degrade state"]) {
-  if (!page.includes(token)) fail(`Chaos Probe pack page missing scheduler-plan token: ${token}`);
-}
-
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts");
-for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/evidence/chaos-1"]) {
-  if (!frontendTest.includes(token)) fail(`Chaos Probe frontend client test missing token: ${token}`);
-}
-
-const backend = readRepoFile("internal/packs/chaosprobe/handler.go")
-  + "\n" + readRepoFile("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go")
-  + "\n" + readRepoFile("cmd/agent/init_tasks.go")
-  + "\n" + readRepoFile("cmd/agent/packruntime_bootstrap_test.go");
 for (const token of [
-  "const PackID = \"yunque.pack.chaos-probe\"",
+  "Chaos Probe",
+  "保存 Definitions",
+  "运行探针",
+  "导出证据包",
+  "Pack shell",
+]) {
+  if (!page.includes(token))
+    fail(`Chaos Probe pack page missing product token: ${token}`);
+}
+for (const token of [
+  "调度计划",
+  "写本地降级状态",
+  "scheduler_ready",
+  "prometheus_ready",
+  "runtime degrade state",
+  "degrade-state-store.json",
+]) {
+  if (!page.includes(token))
+    fail(`Chaos Probe pack page missing scheduler-plan token: ${token}`);
+}
+
+const frontendTest = readRepoFile(
+  "heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
+);
+for (const token of [
+  "/v1/chaos-probe/status",
+  "/v1/chaos-probe/run",
+  "/v1/chaos-probe/scheduler/plan",
+  "/v1/chaos-probe/degrade-state/writeback",
+  "/v1/chaos-probe/evidence/chaos-1",
+]) {
+  if (!frontendTest.includes(token))
+    fail(`Chaos Probe frontend client test missing token: ${token}`);
+}
+
+const backend =
+  readRepoFile("internal/packs/chaosprobe/handler.go") +
+  "\n" +
+  readRepoFile(
+    "internal/controlplane/gateway/handlers_chaos_probe_pack_test.go",
+  ) +
+  "\n" +
+  readRepoFile("cmd/agent/init_tasks.go") +
+  "\n" +
+  readRepoFile("cmd/agent/packruntime_bootstrap_test.go");
+for (const token of [
+  'const PackID = "yunque.pack.chaos-probe"',
   "safe_probe_ready",
   "scheduler_plan_ready",
   "scheduler_ready",
   "metrics_plan_ready",
   "prometheus_ready",
   "degrade_writeback_plan_ready",
+  "degrade_writeback_ready",
+  "degrade_state_store_ready",
+  "writes_degrade_state_store",
+  "runtime_degrade_state_ready",
   "degrade_engine_ready",
   "alert_writeback_plan_ready",
   "alert_writeback_ready",
   "chaos.scheduler.plan",
   "chaos.metrics.plan",
   "chaos.degrade.plan",
+  "chaos.degrade_state.writeback",
   "chaos.alert.writeback.plan",
   "/v1/chaos-probe/scheduler/plan",
+  "/v1/chaos-probe/degrade-state/writeback",
   "scheduler-plan.json",
   "metrics-plan.json",
   "degrade-writeback-plan.json",
+  "degrade-state-store.json",
+  "degrade-state-record.json",
   "json-chaos-probe-evidence",
-  "cfg.DataPath(\"chaos-probe\")",
+  'cfg.DataPath("chaos-probe")',
   "chaosprobepack.New",
   "packs/examples/chaos-probe-pack/pack.json",
   "ensureBuiltinPacks",
   "TestChaosProbePackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",
 ]) {
-  if (!backend.includes(token)) fail(`Chaos Probe backend pack or gate missing token: ${token}`);
+  if (!backend.includes(token))
+    fail(`Chaos Probe backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/chaos-probe.ts") + "\n" + readRepoFile("sdk/typescript/src/chaos-probe.test.ts");
+const sdk =
+  readRepoFile("sdk/typescript/src/chaos-probe.ts") +
+  "\n" +
+  readRepoFile("sdk/typescript/src/chaos-probe.test.ts");
 for (const token of [
   "createChaosProbeClient",
   "ChaosProbeClientError",
   "/v1/chaos-probe/status",
   "/v1/chaos-probe/run",
   "/v1/chaos-probe/scheduler/plan",
+  "/v1/chaos-probe/degrade-state/writeback",
   "/v1/chaos-probe/evidence/",
   "schedulerPlan",
+  "writeDegradeState",
   "scheduler_plan_ready",
   "metrics_plan_ready",
   "prometheus_ready",
   "degrade_writeback_plan_ready",
+  "degrade_state_store_ready",
+  "runtime_degrade_state_ready",
   "alert_writeback_plan_ready",
   "Chaos Probe request failed",
 ]) {
-  if (!sdk.includes(token)) fail(`TypeScript Chaos Probe SDK slice missing token: ${token}`);
+  if (!sdk.includes(token))
+    fail(`TypeScript Chaos Probe SDK slice missing token: ${token}`);
 }
 
 const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
-if (pkg.exports?.["./chaos-probe"]?.import !== "./src/chaos-probe.ts") fail("yunque-client/chaos-probe subpath export is missing or drifted");
+if (pkg.exports?.["./chaos-probe"]?.import !== "./src/chaos-probe.ts")
+  fail("yunque-client/chaos-probe subpath export is missing or drifted");
 
 const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
-for (const token of ["chaosProbeStatus:", "chaosProbeRun:", "chaosProbeEvidence:"]) {
-  if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose Chaos Probe method: ${token}`);
+for (const token of [
+  "chaosProbeStatus:",
+  "chaosProbeRun:",
+  "chaosProbeEvidence:",
+]) {
+  if (monolithicApi.includes(token))
+    fail(`monolithic api.ts should not expose Chaos Probe method: ${token}`);
 }
 
 if (failures.length) {
@@ -144,4 +234,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Chaos Probe Pack SDK manifest ok: ${routeSpecs.size} route specs, ${manifest.sdkImport} import`);
+console.log(
+  `Chaos Probe Pack SDK manifest ok: ${routeSpecs.size} route specs, ${manifest.sdkImport} import`,
+);

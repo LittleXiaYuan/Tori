@@ -15,6 +15,7 @@
       "chaos_probe.scheduler.plan",
       "chaos_probe.metrics.plan",
       "chaos_probe.degrade.writeback.plan",
+      "chaos_probe.degrade_state.writeback",
       "chaos_probe.alert.writeback.plan",
       "chaos_probe.report.list",
       "chaos_probe.report.detail",
@@ -25,6 +26,7 @@
       "/v1/chaos-probe/probes",
       "/v1/chaos-probe/run",
       "/v1/chaos-probe/scheduler/plan",
+      "/v1/chaos-probe/degrade-state/writeback",
       "/v1/chaos-probe/reports",
       "/v1/chaos-probe/reports/",
       "/v1/chaos-probe/evidence/"
@@ -59,6 +61,11 @@
         "method": "POST",
         "path": "/v1/chaos-probe/scheduler/plan",
         "description": "Build a non-destructive scheduler, metrics, alert, and degrade-state write-back plan for Chaos Probe."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/chaos-probe/degrade-state/writeback",
+        "description": "Persist the latest Chaos Probe degrade-state summary into the pack-local JSON store without mutating runtime degrade state."
       },
       {
         "method": "GET",
