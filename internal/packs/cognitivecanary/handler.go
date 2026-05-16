@@ -4,8 +4,9 @@
 // deterministic local judge scoring, cognitive SLI summaries, promotion/block
 // recommendations, non-destructive shadow/judge/metrics/rollback planning,
 // pack-local response collector write-back persistence, and JSON evidence
-// export while real shadow traffic, LLM-as-Judge, Prometheus metrics, and
-// automatic rollback/write-back are wired later.
+// export while real shadow traffic, live response collector consumption,
+// LLM-as-Judge, Prometheus metrics, and automatic rollback/write-back are wired
+// later.
 package cognitivecanary
 
 import (
@@ -115,6 +116,16 @@ type ResponseCollectorWritebackRequest struct {
 	Metadata         map[string]string `json:"metadata,omitempty"`
 }
 
+// ResponseCollectorPipelinePlanRequest builds a plan-only handoff from the
+// pack-local response collector store into the future live collector pipeline.
+type ResponseCollectorPipelinePlanRequest struct {
+	ReportID    string            `json:"report_id,omitempty"`
+	RecordID    string            `json:"record_id,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
 type ShadowPlanReport struct {
 	PackID                     string                   `json:"pack_id"`
 	GeneratedAt                time.Time                `json:"generated_at"`
@@ -190,21 +201,24 @@ type ResponseCollectorSummary struct {
 }
 
 type ResponseCollectorStoreSummary struct {
-	PackID                          string   `json:"pack_id"`
-	Store                           string   `json:"store"`
-	StoreReady                      bool     `json:"store_ready"`
-	RecordCount                     int      `json:"record_count"`
-	Artifact                        string   `json:"artifact"`
-	ResponseCollectorStoreReady     bool     `json:"response_collector_store_ready"`
-	ResponseCollectorWritebackReady bool     `json:"response_collector_writeback_ready"`
-	WritesResponseCollectorStore    bool     `json:"writes_response_collector_store"`
-	ResponseCollectorReady          bool     `json:"response_collector_ready"`
-	ShadowTrafficReady              bool     `json:"shadow_traffic_ready"`
-	JudgePipelineReady              bool     `json:"judge_pipeline_ready"`
-	PrometheusReady                 bool     `json:"prometheus_ready"`
-	AutoRollbackReady               bool     `json:"auto_rollback_ready"`
-	LatestRecordID                  string   `json:"latest_record_id,omitempty"`
-	Notes                           []string `json:"notes,omitempty"`
+	PackID                             string   `json:"pack_id"`
+	Store                              string   `json:"store"`
+	StoreReady                         bool     `json:"store_ready"`
+	RecordCount                        int      `json:"record_count"`
+	Artifact                           string   `json:"artifact"`
+	ResponseCollectorStoreReady        bool     `json:"response_collector_store_ready"`
+	ResponseCollectorWritebackReady    bool     `json:"response_collector_writeback_ready"`
+	WritesResponseCollectorStore       bool     `json:"writes_response_collector_store"`
+	ResponseCollectorPipelinePlanReady bool     `json:"response_collector_pipeline_plan_ready"`
+	ConsumesResponseCollectorStore     bool     `json:"consumes_response_collector_store"`
+	ResponseCollectorPipelineReady     bool     `json:"response_collector_pipeline_ready"`
+	ResponseCollectorReady             bool     `json:"response_collector_ready"`
+	ShadowTrafficReady                 bool     `json:"shadow_traffic_ready"`
+	JudgePipelineReady                 bool     `json:"judge_pipeline_ready"`
+	PrometheusReady                    bool     `json:"prometheus_ready"`
+	AutoRollbackReady                  bool     `json:"auto_rollback_ready"`
+	LatestRecordID                     string   `json:"latest_record_id,omitempty"`
+	Notes                              []string `json:"notes,omitempty"`
 }
 
 type ResponseCollectorRecord struct {
@@ -273,6 +287,66 @@ type ResponseCollectorWritebackReport struct {
 	Labels                          []string                      `json:"labels"`
 	Metadata                        map[string]string             `json:"metadata,omitempty"`
 	Notes                           []string                      `json:"notes,omitempty"`
+}
+
+type ResponseCollectorPipelineHandoffPlan struct {
+	Target                         string            `json:"target"`
+	SourceStore                    string            `json:"source_store"`
+	ReportID                       string            `json:"report_id"`
+	RecordIDs                      []string          `json:"record_ids"`
+	PairIDs                        []string          `json:"pair_ids"`
+	Artifacts                      []string          `json:"artifacts"`
+	Artifact                       string            `json:"artifact"`
+	ArtifactSHA256                 string            `json:"artifact_sha256"`
+	ArtifactBytes                  int               `json:"artifact_bytes"`
+	DedupKey                       string            `json:"dedup_key"`
+	ConsumesResponseCollectorStore bool              `json:"consumes_response_collector_store"`
+	WritesLiveResponseArtifacts    bool              `json:"writes_live_response_artifacts"`
+	WritesJudgeBatches             bool              `json:"writes_judge_batches"`
+	WritesPrometheusMetrics        bool              `json:"writes_prometheus_metrics"`
+	WritesRollbackState            bool              `json:"writes_rollback_state"`
+	ResponseCollectorPipelineReady bool              `json:"response_collector_pipeline_ready"`
+	ResponseCollectorReady         bool              `json:"response_collector_ready"`
+	ShadowTrafficReady             bool              `json:"shadow_traffic_ready"`
+	JudgePipelineReady             bool              `json:"judge_pipeline_ready"`
+	PrometheusReady                bool              `json:"prometheus_ready"`
+	AutoRollbackReady              bool              `json:"auto_rollback_ready"`
+	ApprovalRequired               bool              `json:"approval_required"`
+	Metadata                       map[string]string `json:"metadata,omitempty"`
+	Actions                        []string          `json:"actions"`
+	BlockedBy                      []string          `json:"blocked_by"`
+	Notes                          []string          `json:"notes,omitempty"`
+}
+
+type ResponseCollectorPipelinePlanReport struct {
+	PackID                             string                               `json:"pack_id"`
+	GeneratedAt                        time.Time                            `json:"generated_at"`
+	Status                             string                               `json:"status"`
+	ReportID                           string                               `json:"report_id"`
+	RecordID                           string                               `json:"record_id,omitempty"`
+	RecordCount                        int                                  `json:"record_count"`
+	RequestedBy                        string                               `json:"requested_by,omitempty"`
+	Reason                             string                               `json:"reason,omitempty"`
+	ResponseCollectorPipelinePlanReady bool                                 `json:"response_collector_pipeline_plan_ready"`
+	ResponseCollectorPipelineReady     bool                                 `json:"response_collector_pipeline_ready"`
+	ConsumesResponseCollectorStore     bool                                 `json:"consumes_response_collector_store"`
+	ResponseCollectorStoreReady        bool                                 `json:"response_collector_store_ready"`
+	ResponseCollectorWritebackReady    bool                                 `json:"response_collector_writeback_ready"`
+	WritesResponseCollectorStore       bool                                 `json:"writes_response_collector_store"`
+	ResponseCollectorReady             bool                                 `json:"response_collector_ready"`
+	ShadowTrafficReady                 bool                                 `json:"shadow_traffic_ready"`
+	JudgePipelineReady                 bool                                 `json:"judge_pipeline_ready"`
+	PrometheusReady                    bool                                 `json:"prometheus_ready"`
+	AutoRollbackReady                  bool                                 `json:"auto_rollback_ready"`
+	WritesFiles                        bool                                 `json:"writes_files"`
+	Records                            []ResponseCollectorRecord            `json:"records"`
+	ResponseCollectorStore             ResponseCollectorStoreSummary        `json:"response_collector_store"`
+	ResponseCollectorPipelinePlan      ResponseCollectorPipelineHandoffPlan `json:"response_collector_pipeline_plan"`
+	Artifacts                          []string                             `json:"artifacts"`
+	Actions                            []string                             `json:"actions"`
+	Labels                             []string                             `json:"labels"`
+	Metadata                           map[string]string                    `json:"metadata,omitempty"`
+	Notes                              []string                             `json:"notes,omitempty"`
 }
 
 type JudgeBatchPlan struct {
@@ -394,6 +468,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/cognitive-canary/evaluate", Handler: h.Evaluate},
 		{Method: http.MethodPost, Path: "/v1/cognitive-canary/shadow/plan", Handler: h.ShadowPlan},
 		{Method: http.MethodPost, Path: "/v1/cognitive-canary/response-collector/writeback", Handler: h.ResponseCollectorWriteback},
+		{Method: http.MethodPost, Path: "/v1/cognitive-canary/response-collector/pipeline/plan", Handler: h.ResponseCollectorPipelinePlan},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/cognitive-canary/evidence/", Handler: h.Evidence},
@@ -417,28 +492,31 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 	collectorStore := h.responseCollectorStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                            PackID,
-		"stage":                              "pack-shell-before-shadow-traffic",
-		"shadow_plan_ready":                  true,
-		"shadow_traffic_ready":               false,
-		"judge_plan_ready":                   true,
-		"judge_pipeline_ready":               false,
-		"response_collector_plan_ready":      true,
-		"response_collector_store_ready":     true,
-		"response_collector_writeback_ready": true,
-		"writes_response_collector_store":    true,
-		"response_collector_ready":           false,
-		"response_collector_store":           collectorStore,
-		"metrics_plan_ready":                 true,
-		"prometheus_ready":                   false,
-		"quality_sli_ready":                  true,
-		"auto_rollback_plan_ready":           true,
-		"auto_rollback_ready":                false,
-		"scenario_count":                     len(scenarios),
-		"report_count":                       len(reports),
-		"store_dir":                          h.dataDir,
-		"policy":                             h.policy,
-		"last_report":                        firstSummary(reports),
+		"pack_id":                                PackID,
+		"stage":                                  "pack-shell-before-shadow-traffic",
+		"shadow_plan_ready":                      true,
+		"shadow_traffic_ready":                   false,
+		"judge_plan_ready":                       true,
+		"judge_pipeline_ready":                   false,
+		"response_collector_plan_ready":          true,
+		"response_collector_store_ready":         true,
+		"response_collector_writeback_ready":     true,
+		"writes_response_collector_store":        true,
+		"response_collector_pipeline_plan_ready": true,
+		"response_collector_pipeline_ready":      false,
+		"consumes_response_collector_store":      true,
+		"response_collector_ready":               false,
+		"response_collector_store":               collectorStore,
+		"metrics_plan_ready":                     true,
+		"prometheus_ready":                       false,
+		"quality_sli_ready":                      true,
+		"auto_rollback_plan_ready":               true,
+		"auto_rollback_ready":                    false,
+		"scenario_count":                         len(scenarios),
+		"report_count":                           len(reports),
+		"store_dir":                              h.dataDir,
+		"policy":                                 h.policy,
+		"last_report":                            firstSummary(reports),
 		"capabilities": []string{
 			"canary.scenario.store",
 			"canary.local_judge.evaluate",
@@ -447,12 +525,13 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"canary.shadow.plan",
 			"canary.response_collector.plan",
 			"canary.response_collector.writeback",
+			"canary.response_collector.pipeline.plan",
 			"canary.judge.plan",
 			"canary.metrics.plan",
 			"canary.rollback.plan",
 			"canary.evidence.export",
 		},
-		"notes": []string{"Shadow traffic, response collector, LLM-as-Judge, metrics, and automatic rollback plans are available as non-destructive contracts; pack-local response collector store write-back is available as a JSON bridge only; real shadow traffic replication, live response collection, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
+		"notes": []string{"Shadow traffic, response collector, LLM-as-Judge, metrics, and automatic rollback plans are available as non-destructive contracts; pack-local response collector store write-back is available as a JSON bridge only; the response collector pipeline plan only consumes stored metadata into a future handoff contract; real shadow traffic replication, live response collection, LLM-as-Judge batching, Prometheus metrics, and automatic rollback write-back remain follow-up wiring."},
 	})
 }
 
@@ -561,6 +640,24 @@ func (h *Handler) ResponseCollectorWriteback(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": writeback})
 }
 
+func (h *Handler) ResponseCollectorPipelinePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ResponseCollectorPipelinePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid cognitive canary response collector pipeline plan payload")
+		return
+	}
+	plan, err := h.buildResponseCollectorPipelinePlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -602,15 +699,18 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	plan := h.buildShadowPlan(report, ShadowPlanRequest{ReportID: report.ID, RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
 	collectorStore := h.responseCollectorStoreSummary()
 	collectorRecords := h.responseCollectorRecordsForReport(report.ID)
+	pipelinePlan, pipelinePlanReady := h.responseCollectorPipelinePlanForEvidence(report.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                    PackID,
-		"exported_at":                h.now().UTC(),
-		"format":                     "json-cognitive-canary-evidence",
-		"files":                      []string{"canary-report.json", "scenario-set.json", "sli-summary.json", "shadow-plan.json", "response-collector-plan.json", "response-collector-store.json", "response-collector-record.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"},
-		"report":                     report,
-		"shadow_plan":                plan,
-		"response_collector_store":   collectorStore,
-		"response_collector_records": collectorRecords,
+		"pack_id":                                PackID,
+		"exported_at":                            h.now().UTC(),
+		"format":                                 "json-cognitive-canary-evidence",
+		"files":                                  []string{"canary-report.json", "scenario-set.json", "sli-summary.json", "shadow-plan.json", "response-collector-plan.json", "response-collector-store.json", "response-collector-record.json", "response-collector-pipeline-plan.json", "response-collector-handoff-plan.json", "judge-plan.json", "metrics-plan.json", "rollback-plan.json"},
+		"report":                                 report,
+		"shadow_plan":                            plan,
+		"response_collector_store":               collectorStore,
+		"response_collector_records":             collectorRecords,
+		"response_collector_pipeline_plan":       pipelinePlan,
+		"response_collector_pipeline_plan_ready": pipelinePlanReady,
 	})
 }
 
@@ -911,6 +1011,126 @@ func (h *Handler) reportForResponseCollectorWriteback(ctx context.Context, req R
 		return CanaryReport{}, err
 	}
 	return report, nil
+}
+
+func (h *Handler) buildResponseCollectorPipelinePlan(_ context.Context, req ResponseCollectorPipelinePlanRequest) (ResponseCollectorPipelinePlanReport, error) {
+	records, ok := h.responseCollectorRecordsForPipelinePlan(req)
+	if !ok {
+		return ResponseCollectorPipelinePlanReport{}, fmt.Errorf("response collector record not found; run /v1/cognitive-canary/response-collector/writeback before planning collector pipeline handoff")
+	}
+	reportID := records[0].ReportID
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = records[0].RequestedBy
+	}
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = records[0].Reason
+	}
+	if reason == "" {
+		reason = "plan response collector pipeline handoff from pack-local store"
+	}
+	metadata := cleanStringMap(req.Metadata)
+	if metadata == nil {
+		metadata = records[0].Metadata
+	}
+	recordIDs := make([]string, 0, len(records))
+	pairIDs := make([]string, 0, len(records))
+	collectorArtifacts := make([]string, 0, len(records))
+	approvalRequired := false
+	for _, record := range records {
+		recordIDs = append(recordIDs, record.RecordID)
+		pairIDs = append(pairIDs, record.PairID)
+		collectorArtifacts = append(collectorArtifacts, record.Artifact)
+		if record.ReportSummary.GateStatus != "pass" || record.ReportSummary.PromotionDecision != "promote" {
+			approvalRequired = true
+		}
+	}
+	dedupKey := responseCollectorPipelineDedupKey(records)
+	handoffContent := responseCollectorPipelineArtifactContent(reportID, recordIDs, pairIDs, collectorArtifacts, dedupKey)
+	handoff := ResponseCollectorPipelineHandoffPlan{
+		Target:                         "runtime.cognitive_canary.response_collector_pipeline",
+		SourceStore:                    "response-collector-store.json",
+		ReportID:                       reportID,
+		RecordIDs:                      recordIDs,
+		PairIDs:                        pairIDs,
+		Artifacts:                      collectorArtifacts,
+		Artifact:                       "response-collector-handoff-plan.json",
+		ArtifactSHA256:                 sha256Hex(handoffContent),
+		ArtifactBytes:                  len([]byte(handoffContent)),
+		DedupKey:                       dedupKey,
+		ConsumesResponseCollectorStore: true,
+		WritesLiveResponseArtifacts:    false,
+		WritesJudgeBatches:             false,
+		WritesPrometheusMetrics:        false,
+		WritesRollbackState:            false,
+		ResponseCollectorPipelineReady: false,
+		ResponseCollectorReady:         false,
+		ShadowTrafficReady:             false,
+		JudgePipelineReady:             false,
+		PrometheusReady:                false,
+		AutoRollbackReady:              false,
+		ApprovalRequired:               approvalRequired,
+		Metadata:                       metadata,
+		Actions: []string{
+			"would validate the pack-local response collector records and map them to the future live response collector pipeline input contract",
+			"would require explicit shadow traffic, collector, judge, metrics, and rollback writers before consuming live responses",
+		},
+		BlockedBy: []string{
+			"shadow-traffic-mirror-not-wired",
+			"live-response-collector-not-wired",
+			"llm-judge-batch-not-wired",
+			"prometheus-exporter-not-wired",
+			"release-rollback-writer-not-wired",
+		},
+		Notes: []string{
+			"Plan-only handoff contract; no stable/candidate response payloads are collected or written.",
+			"Use dedup_key with record_key to make later collector pipeline consumption idempotent.",
+		},
+	}
+	recordID := ""
+	if len(recordIDs) == 1 {
+		recordID = recordIDs[0]
+	}
+	return ResponseCollectorPipelinePlanReport{
+		PackID:                             PackID,
+		GeneratedAt:                        h.now().UTC(),
+		Status:                             "response_collector_pipeline_handoff_plan",
+		ReportID:                           reportID,
+		RecordID:                           recordID,
+		RecordCount:                        len(records),
+		RequestedBy:                        requestedBy,
+		Reason:                             reason,
+		ResponseCollectorPipelinePlanReady: true,
+		ResponseCollectorPipelineReady:     false,
+		ConsumesResponseCollectorStore:     true,
+		ResponseCollectorStoreReady:        true,
+		ResponseCollectorWritebackReady:    true,
+		WritesResponseCollectorStore:       true,
+		ResponseCollectorReady:             false,
+		ShadowTrafficReady:                 false,
+		JudgePipelineReady:                 false,
+		PrometheusReady:                    false,
+		AutoRollbackReady:                  false,
+		WritesFiles:                        false,
+		Records:                            records,
+		ResponseCollectorStore:             h.responseCollectorStoreSummary(),
+		ResponseCollectorPipelinePlan:      handoff,
+		Artifacts:                          []string{"response-collector-pipeline-plan.json", "response-collector-handoff-plan.json", "response-collector-store.json", "response-collector-record.json", "response-collector-plan.json", "shadow-plan.json", "canary-report.json"},
+		Actions: []string{
+			"mapped pack-local response collector store records into the future live collector pipeline handoff contract",
+			"kept live shadow traffic, response payload writes, LLM-as-Judge batches, Prometheus publishing, and release rollback blocked until explicit runtime wiring consumes this plan",
+		},
+		Labels:   []string{"cognitive-canary", "response-collector-pipeline-plan", "pack-local-store-consumer", "no-live-shadow-traffic", "no-llm-judge-call", "no-prometheus-publish", "no-release-rollback"},
+		Metadata: metadata,
+		Notes: []string{
+			"response_collector_pipeline_plan_ready=true means the consumer handoff shape is available.",
+			"response_collector_pipeline_ready=false, response_collector_ready=false, and shadow_traffic_ready=false keep this slice plan-only and reversible.",
+		},
+	}, nil
 }
 
 func (h *Handler) selectScenarios(req EvaluateRequest) ([]Scenario, error) {
@@ -1257,6 +1477,46 @@ func responseCollectorRecordKey(report CanaryReport, collector ResponseCollector
 		"reason=" + reason,
 	}, "\n")
 	return sha256Hex(payload)
+}
+
+func responseCollectorPipelineDedupKey(records []ResponseCollectorRecord) string {
+	parts := []string{"pack_id=" + PackID}
+	for _, record := range records {
+		parts = append(parts,
+			"record_id="+record.RecordID,
+			"record_key="+record.RecordKey,
+			"report_id="+record.ReportID,
+			"pair_id="+record.PairID,
+			"artifact_sha256="+record.ArtifactSHA256,
+		)
+	}
+	return sha256Hex(strings.Join(parts, "\n"))
+}
+
+func responseCollectorPipelineArtifactContent(reportID string, recordIDs, pairIDs, artifacts []string, dedupKey string) string {
+	payload := struct {
+		Format                         string   `json:"format"`
+		ReportID                       string   `json:"report_id"`
+		RecordIDs                      []string `json:"record_ids"`
+		PairIDs                        []string `json:"pair_ids"`
+		Artifacts                      []string `json:"artifacts"`
+		DedupKey                       string   `json:"dedup_key"`
+		ConsumesResponseCollectorStore bool     `json:"consumes_response_collector_store"`
+		WritesLiveResponseArtifacts    bool     `json:"writes_live_response_artifacts"`
+		ResponseCollectorPipelineReady bool     `json:"response_collector_pipeline_ready"`
+	}{
+		Format:                         "yunque.cognitive_canary.response_collector_pipeline_plan.v1",
+		ReportID:                       reportID,
+		RecordIDs:                      recordIDs,
+		PairIDs:                        pairIDs,
+		Artifacts:                      artifacts,
+		DedupKey:                       dedupKey,
+		ConsumesResponseCollectorStore: true,
+		WritesLiveResponseArtifacts:    false,
+		ResponseCollectorPipelineReady: false,
+	}
+	data, _ := json.Marshal(payload)
+	return string(data) + "\n"
 }
 
 func summarizeResponseCollectors(collectors []ResponseCollectorPlan) ResponseCollectorSummary {
@@ -1706,22 +1966,26 @@ func (h *Handler) responseCollectorStoreSummary() ResponseCollectorStoreSummary 
 		latest = records[0].RecordID
 	}
 	return ResponseCollectorStoreSummary{
-		PackID:                          PackID,
-		Store:                           "pack-local-json",
-		StoreReady:                      true,
-		RecordCount:                     len(records),
-		Artifact:                        "response-collector-store.json",
-		ResponseCollectorStoreReady:     true,
-		ResponseCollectorWritebackReady: true,
-		WritesResponseCollectorStore:    true,
-		ResponseCollectorReady:          false,
-		ShadowTrafficReady:              false,
-		JudgePipelineReady:              false,
-		PrometheusReady:                 false,
-		AutoRollbackReady:               false,
-		LatestRecordID:                  latest,
+		PackID:                             PackID,
+		Store:                              "pack-local-json",
+		StoreReady:                         true,
+		RecordCount:                        len(records),
+		Artifact:                           "response-collector-store.json",
+		ResponseCollectorStoreReady:        true,
+		ResponseCollectorWritebackReady:    true,
+		WritesResponseCollectorStore:       true,
+		ResponseCollectorPipelinePlanReady: true,
+		ConsumesResponseCollectorStore:     true,
+		ResponseCollectorPipelineReady:     false,
+		ResponseCollectorReady:             false,
+		ShadowTrafficReady:                 false,
+		JudgePipelineReady:                 false,
+		PrometheusReady:                    false,
+		AutoRollbackReady:                  false,
+		LatestRecordID:                     latest,
 		Notes: []string{
 			"Store readiness covers only the pack-local JSON response collector bridge.",
+			"Pipeline plan readiness covers only a plan-only handoff shape that consumes stored collector metadata.",
 			"Live traffic mirroring, response artifact capture, LLM-as-Judge batching, Prometheus publishing, and release rollback write-back remain disabled until later explicit wiring.",
 		},
 	}
@@ -1740,6 +2004,46 @@ func (h *Handler) responseCollectorRecordsForReport(reportID string) []ResponseC
 		}
 	}
 	return out
+}
+
+func (h *Handler) responseCollectorRecordsForPipelinePlan(req ResponseCollectorPipelinePlanRequest) ([]ResponseCollectorRecord, bool) {
+	recordID := strings.TrimSpace(req.RecordID)
+	reportID := strings.TrimSpace(req.ReportID)
+	records, _ := h.loadResponseCollectorRecords()
+	if recordID != "" {
+		for _, record := range records {
+			if record.RecordID == recordID {
+				return []ResponseCollectorRecord{record}, true
+			}
+		}
+		return nil, false
+	}
+	out := make([]ResponseCollectorRecord, 0, len(records))
+	for _, record := range records {
+		if reportID == "" || record.ReportID == reportID {
+			out = append(out, record)
+		}
+	}
+	if len(out) == 0 {
+		return nil, false
+	}
+	return out, true
+}
+
+func (h *Handler) responseCollectorPipelinePlanForEvidence(reportID string) (ResponseCollectorPipelinePlanReport, bool) {
+	records, ok := h.responseCollectorRecordsForPipelinePlan(ResponseCollectorPipelinePlanRequest{ReportID: reportID})
+	if !ok {
+		return ResponseCollectorPipelinePlanReport{}, false
+	}
+	plan, err := h.buildResponseCollectorPipelinePlan(context.Background(), ResponseCollectorPipelinePlanRequest{
+		ReportID:    records[0].ReportID,
+		RequestedBy: "evidence-export",
+		Reason:      "report evidence response collector pipeline handoff snapshot",
+	})
+	if err != nil {
+		return ResponseCollectorPipelinePlanReport{}, false
+	}
+	return plan, true
 }
 
 func firstSummary(reports []ReportSummary) *ReportSummary {
