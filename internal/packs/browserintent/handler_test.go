@@ -1,8 +1,10 @@
 package browserintent
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -30,8 +32,8 @@ func TestBrowserIntentHandlerRoutesExposeSurface(t *testing.T) {
 	}
 
 	routes := handler.Routes()
-	if len(routes) != 13 {
-		t.Fatalf("expected 13 Browser Intent routes, got %d", len(routes))
+	if len(routes) != 14 {
+		t.Fatalf("expected 14 Browser Intent routes, got %d", len(routes))
 	}
 
 	byPath := map[string]string{}
@@ -48,6 +50,7 @@ func TestBrowserIntentHandlerRoutesExposeSurface(t *testing.T) {
 	expected := map[string]string{
 		"/v1/browser/status":             http.MethodGet,
 		"/v1/browser/config":             http.MethodGet,
+		"/v1/browser/intent/plan":        http.MethodPost,
 		"/v1/browser/navigate":           http.MethodPost,
 		"/v1/browser/screenshot":         http.MethodGet,
 		"/v1/browser/ocr":                http.MethodPost,
@@ -84,4 +87,53 @@ func TestBrowserIntentHandlerRoutesExposeSurface(t *testing.T) {
 	if w.Code != http.StatusAccepted || gateway.sessionCalls != 1 {
 		t.Fatalf("expected session route to use session bridge, status=%d calls=%d", w.Code, gateway.sessionCalls)
 	}
+}
+
+func TestBrowserActPlanIsNonDestructiveGate(t *testing.T) {
+	handler := NewHandler(&fakeBrowserGateway{})
+	body := `{"intent":"open_url","target_url":"https://example.com/report","selector":"button[data-export]","requested_by":"unit","reason":"policy review","dry_run":true}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/browser/intent/plan", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	handler.BrowserActPlan(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("browser_act plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var res struct {
+		Plan BrowserActPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode browser_act plan: %v", err)
+	}
+	if !res.Plan.BrowserActPlanReady || res.Plan.BrowserActReady || !res.Plan.PermissionGateReady || !res.Plan.RuntimeSkillGateReady || !res.Plan.OPPGateReady {
+		t.Fatalf("unexpected browser_act readiness: %#v", res.Plan)
+	}
+	if res.Plan.ConsumesBrowserSession || res.Plan.ExecutesBrowserActions || res.Plan.WritesBrowserState || res.Plan.WritesFiles || res.Plan.NetworkAccess {
+		t.Fatalf("browser_act plan must remain non-destructive: %#v", res.Plan)
+	}
+	if res.Plan.ActionCount != 1 || len(res.Plan.PlannedActions) != 1 {
+		t.Fatalf("expected one planned action: %#v", res.Plan.PlannedActions)
+	}
+	action := res.Plan.PlannedActions[0]
+	if action.Intent != "open_url" || action.ExecutorAction != "browser.navigate" || action.RequiresPermission != "browser:write" {
+		t.Fatalf("unexpected planned browser action: %#v", action)
+	}
+	if !res.Plan.RequiresHumanApproval || !res.Plan.PermissionGate.RequiresHumanApproval || !res.Plan.OPPGate.RequiresHumanApproval {
+		t.Fatalf("browser_act plan should require human approval: %#v", res.Plan)
+	}
+	for _, artifact := range []string{"browser-act-plan.json", "browser-permission-gate.json", "runtime-skill-gate.json", "opp-gate-plan.json"} {
+		if !containsString(res.Plan.Artifacts, artifact) {
+			t.Fatalf("browser_act plan missing artifact %s: %#v", artifact, res.Plan.Artifacts)
+		}
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, Button, Chip, Tooltip, Tabs, Switch, Select, ListBox } from "@heroui/react";
-import { createBrowserIntentPackClient, type BrowserStatus, type OPPItem, type BrowserScenario } from "@/lib/browser-intent-pack-client";
+import { createBrowserIntentPackClient, type BrowserActPlan, type BrowserStatus, type OPPItem, type BrowserScenario } from "@/lib/browser-intent-pack-client";
 import { Globe, RefreshCw, Camera, Monitor, ShieldAlert, Check, XCircle, Play, Zap, Download, Cloud, CloudOff, Loader2, ExternalLink, Search, ArrowUpDown, Keyboard, Link2, Hand, FileText } from "lucide-react";
 
 const BRAND_ICONS: Record<string, string> = {
@@ -59,6 +59,8 @@ export default function BrowserIntentPackPage() {
   const [extConnected, setExtConnected] = useState(false);
   const [desktopSandbox, setDesktopSandbox] = useState<{ id: string; stream_url: string; created_at: string; vnc_log?: string[] } | null>(null);
   const [desktopLoading, setDesktopLoading] = useState(false);
+  const [browserActPlan, setBrowserActPlan] = useState<BrowserActPlan | null>(null);
+  const [browserActPlanning, setBrowserActPlanning] = useState(false);
 
   const { t } = useI18n();
 
@@ -127,6 +129,27 @@ export default function BrowserIntentPackPage() {
       setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] OCR failed`, ...prev].slice(0, 50));
     }
     setOcrLoading(false);
+  };
+
+  const buildBrowserActPlan = async () => {
+    setBrowserActPlanning(true);
+    try {
+      const res = await browserIntentClient.browserActPlan({
+        intent: "open_url",
+        target_url: typeof browserStatus?.current_url === "string" ? browserStatus.current_url : "https://example.com",
+        selector: "button[data-action=export]",
+        text: "Export",
+        requested_by: "pack-console",
+        reason: "operator semantic browser_act review",
+        dry_run: true,
+      });
+      setBrowserActPlan(res.plan);
+      setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [OK] browser_act plan gate ready`, ...prev].slice(0, 50));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "browser_act 计划生成失败", "error");
+      setActionLog((prev) => [`[${new Date().toLocaleTimeString()}] [FAIL] browser_act plan failed`, ...prev].slice(0, 50));
+    }
+    setBrowserActPlanning(false);
   };
 
   const handleOPPDecide = async (id: string, decision: "allow" | "deny") => {
@@ -293,6 +316,7 @@ export default function BrowserIntentPackPage() {
             <Tabs.Tab id="browser">{t("browserPage.tab.browser")}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="ocr"><Tabs.Separator />{t("browserPage.tab.ocr")}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="opp"><Tabs.Separator />{t("browserPage.tab.opp")}{oppItems.length > 0 && <Chip size="sm" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>{oppItems.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="intent"><Tabs.Separator /><FileText size={12} className="mr-1 inline" />browser_act<Chip size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>PLAN</Chip><Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="log"><Tabs.Separator />{t("browserPage.tab.actionLog")}{actionLog.length > 0 && <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{actionLog.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="scenarios"><Tabs.Separator /><Zap size={12} className="mr-1 inline" />{t("browserPage.tab.scenarios")}{scenarios.length > 0 && <Chip size="sm" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: "var(--text-2xs)" }}>{scenarios.length}</Chip>}<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="desktop"><Tabs.Separator /><Cloud size={12} className="mr-1 inline" />云电脑{desktopSandbox && <Chip size="sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontSize: "var(--text-2xs)" }}>LIVE</Chip>}<Tabs.Indicator /></Tabs.Tab>
@@ -375,6 +399,96 @@ export default function BrowserIntentPackPage() {
                 </div>
               </Card>
             ))}
+          </div>
+        </Tabs.Panel>
+
+        <Tabs.Panel id="intent">
+          <div className="mt-4 space-y-4">
+            <Card className="section-card p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+                    <FileText size={16} /> browser_act 语义计划 Gate
+                  </div>
+                  <p className="mt-2 max-w-3xl text-xs leading-5" style={{ color: "var(--yunque-text-muted)" }}>
+                    这里先把「打开页面 / 点击 / 输入 / 截图 / 提取」等语义意图塑形成未来 executor 可消费的契约，并同时展示权限 gate、runtime skill gate 与 OPP 审批 gate。当前仍是 plan-only：不消费浏览器会话、不执行扩展动作、不写浏览器状态、不写文件、无网络访问。
+                  </p>
+                </div>
+                <Button size="sm" onPress={buildBrowserActPlan} isPending={browserActPlanning} className="btn-accent">
+                  生成计划
+                </Button>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-6">
+                {[
+                  ["browser_act_plan_ready", browserActPlan?.browser_act_plan_ready],
+                  ["browser_act_ready", browserActPlan?.browser_act_ready],
+                  ["permission_gate_ready", browserActPlan?.permission_gate_ready],
+                  ["runtime_skill_gate_ready", browserActPlan?.runtime_skill_gate_ready],
+                  ["opp_gate_ready", browserActPlan?.opp_gate_ready],
+                  ["network_access", browserActPlan?.network_access],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-lg p-2" style={{ background: "var(--yunque-bg-hover)", border: "1px solid var(--yunque-border)" }}>
+                    <div className="truncate text-[10px]" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+                    <div className="mt-1 text-xs font-semibold" style={{ color: value ? "#22c55e" : "#f59e0b" }}>{String(value ?? "pending")}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {browserActPlan ? (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <Card className="section-card p-4">
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Planned actions</div>
+                  <div className="space-y-2">
+                    {browserActPlan.planned_actions.map((action) => (
+                      <div key={action.index} className="rounded-lg p-3" style={{ background: "var(--yunque-bg-hover)" }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold">{action.intent}</span>
+                          <Chip size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{action.executor_action}</Chip>
+                        </div>
+                        {action.target_url && <div className="mt-2 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.target_url}</div>}
+                        {action.selector && <div className="mt-1 truncate text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>{action.selector}</div>}
+                        <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]" style={{ color: "var(--yunque-text-secondary)" }}>
+                          <span>permission: {action.requires_permission}</span>
+                          <span>skill: {action.requires_runtime_skill}</span>
+                          <span>executes: {String(action.executes_browser_action)}</span>
+                          <span>writes: {String(action.writes_browser_state)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+                {[
+                  ["Permission gate", browserActPlan.permission_gate],
+                  ["Runtime skill gate", browserActPlan.runtime_skill_gate],
+                  ["OPP gate", browserActPlan.opp_gate],
+                ].map(([title, gate]) => (
+                  <Card key={String(title)} className="section-card p-4">
+                    <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{String(title)}</div>
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg p-3 text-[11px] font-mono" style={{ background: "var(--yunque-bg-hover)", color: "var(--yunque-text-muted)" }}>
+                      {JSON.stringify(gate, null, 2)}
+                    </pre>
+                  </Card>
+                ))}
+                <Card className="section-card p-4 lg:col-span-3">
+                  <div className="mb-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>Artifacts / blocked_by</div>
+                  <div className="flex flex-wrap gap-2">
+                    {browserActPlan.artifacts.map((artifact) => (
+                      <Chip key={artifact} size="sm" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: "var(--text-2xs)" }}>{artifact}</Chip>
+                    ))}
+                    {browserActPlan.blocked_by.map((blocker) => (
+                      <Chip key={blocker} size="sm" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>{blocker}</Chip>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            ) : (
+              <Card className="section-card p-12 text-center">
+                <FileText size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
+                <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>尚未生成 browser_act plan。</div>
+                <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-secondary)" }}>点击「生成计划」查看保守 gate 和不可执行边界。</div>
+              </Card>
+            )}
           </div>
         </Tabs.Panel>
 

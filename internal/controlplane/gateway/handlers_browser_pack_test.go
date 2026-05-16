@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,6 +37,35 @@ func TestBrowserIntentPackRoutesStatusWhenEnabled(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("enabled Browser Intent pack should expose status, status = %d, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBrowserIntentPackRoutesBrowserActPlanWhenEnabled(t *testing.T) {
+	gw, tm := newTestGatewayWithBrowserIntentPack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("browser-intent-plan-enabled")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/browser/intent/plan", strings.NewReader(`{"intent":"click","selector":"button.export","requested_by":"unit"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("enabled Browser Intent pack should expose browser_act plan, status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var res struct {
+		Plan browserintentpack.BrowserActPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("decode browser_act plan: %v", err)
+	}
+	if !res.Plan.BrowserActPlanReady || res.Plan.BrowserActReady || !res.Plan.PermissionGateReady || !res.Plan.RuntimeSkillGateReady || !res.Plan.OPPGateReady {
+		t.Fatalf("unexpected browser_act plan readiness: %#v", res.Plan)
+	}
+	if res.Plan.ConsumesBrowserSession || res.Plan.ExecutesBrowserActions || res.Plan.WritesBrowserState || res.Plan.WritesFiles || res.Plan.NetworkAccess {
+		t.Fatalf("browser_act plan must not execute browser side effects: %#v", res.Plan)
+	}
+	if res.Plan.PlannedActions[0].Intent != "click" || res.Plan.PlannedActions[0].ExecutorAction != "browser.click" {
+		t.Fatalf("unexpected planned browser_act action: %#v", res.Plan.PlannedActions)
 	}
 }
 
@@ -120,6 +150,7 @@ func newTestGatewayWithBrowserIntentPack(t *testing.T, status packruntime.PackSt
 			Routes: []string{
 				"/v1/browser/status",
 				"/v1/browser/config",
+				"/v1/browser/intent/plan",
 				"/v1/browser/navigate",
 				"/v1/browser/screenshot",
 				"/v1/browser/ocr",
@@ -135,6 +166,7 @@ func newTestGatewayWithBrowserIntentPack(t *testing.T, status packruntime.PackSt
 			RouteSpecs: []packruntime.BackendRouteSpec{
 				{Method: http.MethodGet, Path: "/v1/browser/status"},
 				{Method: http.MethodGet, Path: "/v1/browser/config"},
+				{Method: http.MethodPost, Path: "/v1/browser/intent/plan"},
 				{Method: http.MethodPost, Path: "/v1/browser/navigate"},
 				{Method: http.MethodGet, Path: "/v1/browser/screenshot"},
 				{Method: http.MethodPost, Path: "/v1/browser/ocr"},

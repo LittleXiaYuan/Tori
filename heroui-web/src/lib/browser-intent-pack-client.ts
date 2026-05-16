@@ -43,9 +43,78 @@ export interface BrowserDesktopSandbox {
   vnc_log?: string[];
 }
 
+export interface BrowserActPlanRequest {
+  intent?: string;
+  target_url?: string;
+  selector?: string;
+  text?: string;
+  value?: string;
+  requested_by?: string;
+  reason?: string;
+  dry_run?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface BrowserActPlannedAction {
+  index: number;
+  intent: string;
+  executor_action: string;
+  target_url?: string;
+  selector?: string;
+  text?: string;
+  value?: string;
+  requires_permission: string;
+  requires_runtime_skill: string;
+  requires_opp_gate: boolean;
+  consumes_browser_session: boolean;
+  executes_browser_action: boolean;
+  writes_browser_state: boolean;
+  network_access: boolean;
+}
+
+export interface BrowserActGatePlan {
+  gate: string;
+  blocked_by: string[];
+  notes?: string[];
+  [key: string]: unknown;
+}
+
+export interface BrowserActPlan {
+  pack_id: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  intent: string;
+  requested_by?: string;
+  reason?: string;
+  browser_act_plan_ready: boolean;
+  browser_act_ready: boolean;
+  permission_gate_ready: boolean;
+  runtime_skill_gate_ready: boolean;
+  opp_gate_ready: boolean;
+  consumes_browser_session: boolean;
+  executes_browser_actions: boolean;
+  writes_browser_state: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  requires_human_approval: boolean;
+  action_count: number;
+  planned_actions: BrowserActPlannedAction[];
+  permission_gate: BrowserActGatePlan;
+  runtime_skill_gate: BrowserActGatePlan;
+  opp_gate: BrowserActGatePlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface BrowserIntentPackClient {
   status(): Promise<BrowserStatus>;
   config(): Promise<BrowserConfig>;
+  browserActPlan(input: BrowserActPlanRequest): Promise<{ plan: BrowserActPlan }>;
   navigate(url: string): Promise<{ screenshot?: string; title?: string; url?: string }>;
   screenshot(): Promise<BrowserScreenshotResponse>;
   screenshotLatest(): Promise<BrowserScreenshotResponse>;
@@ -66,6 +135,11 @@ export function createBrowserIntentPackClient(): BrowserIntentPackClient {
   return {
     status: () => fetcher<BrowserStatus>("/v1/browser/status"),
     config: () => fetcher<BrowserConfig>("/v1/browser/config"),
+    browserActPlan: (input) =>
+      fetcher<{ plan: BrowserActPlan }>("/v1/browser/intent/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     navigate: (url) =>
       fetcher<{ screenshot?: string; title?: string; url?: string }>("/v1/browser/navigate", {
         method: "POST",

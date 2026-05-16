@@ -10,6 +10,10 @@
     "capabilities": [
       "browser.status",
       "browser.config",
+      "browser.intent.plan",
+      "browser.permission.gate_plan",
+      "browser.runtime_skill.gate_plan",
+      "browser.opp.gate_plan",
       "browser.navigate",
       "browser.capture",
       "browser.ocr",
@@ -22,6 +26,7 @@
     "routes": [
       "/v1/browser/status",
       "/v1/browser/config",
+      "/v1/browser/intent/plan",
       "/v1/browser/navigate",
       "/v1/browser/screenshot",
       "/v1/browser/ocr",
@@ -49,6 +54,11 @@
         "method": "GET",
         "path": "/v1/browser/config",
         "description": "Read browser connector runtime mode and basic configuration."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/browser/intent/plan",
+        "description": "Build a non-destructive semantic browser_act intent plan with permission, runtime skill and OPP gates before execution is wired."
       },
       {
         "method": "POST",

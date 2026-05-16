@@ -443,6 +443,9 @@ if (!legacyBrowserPage.includes('redirect("/packs/browser")')) {
 for (const token of ["createBrowserIntentPackClient", "/v1/browser/status", "/v1/browser/ocr", "/api/browser/ext/session", "/api/browser/ext/scenarios/run", 'method: "POST"']) {
   if (!browserIntentClient.includes(token)) fail(`browser-intent-pack-client missing token: ${token}`);
 }
+for (const token of ["/v1/browser/intent/plan", "BrowserActPlan", "browserActPlan", "browser_act_plan_ready", "browser_act_ready", "permission_gate_ready", "runtime_skill_gate_ready", "opp_gate_ready", "consumes_browser_session", "executes_browser_actions", "writes_browser_state", "network_access", "browser-act-plan.json", "browser-permission-gate.json", "runtime-skill-gate.json", "opp-gate-plan.json"]) {
+  if (!browserIntentSource.includes(token) && !browserIntentClient.includes(token) && !browserIntentPage.includes(token)) fail(`Browser Intent browser_act plan gate missing token: ${token}`);
+}
 const hardcodedBrowserShell = [
   "heroui-web/src/components/sidebar.tsx",
   "heroui-web/src/lib/nav-items.tsx",

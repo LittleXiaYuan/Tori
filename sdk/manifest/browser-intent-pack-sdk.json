@@ -12,6 +12,7 @@
   "routes": [
     "GET /v1/browser/status",
     "GET /v1/browser/config",
+    "POST /v1/browser/intent/plan",
     "POST /v1/browser/navigate",
     "GET /v1/browser/screenshot",
     "GET /v1/browser/screenshot/latest",
