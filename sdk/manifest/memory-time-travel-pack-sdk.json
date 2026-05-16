@@ -20,6 +20,7 @@
     "POST /v1/memory-time-travel/kv-history/cutover/plan",
     "POST /v1/memory-time-travel/kv-history/cutover/readiness",
     "GET /v1/memory-time-travel/audit/links",
+    "POST /v1/memory-time-travel/audit/links/preview",
     "GET /v1/memory-time-travel/audit/verify",
     "GET /v1/memory-time-travel/evidence/"
   ],
@@ -44,6 +45,7 @@
     "kvHistoryCutoverPlan",
     "kvHistoryCutoverReadiness",
     "auditLinks",
+    "auditLinksPreview",
     "auditVerify",
     "evidenceExport"
   ]

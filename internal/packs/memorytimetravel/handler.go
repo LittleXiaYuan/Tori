@@ -3,8 +3,9 @@
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
 // point-in-time reconstruction, drift diff summaries, rollback plans, approved
 // rollback write-back planning, retention dry-run planning, JSON evidence
-// export, read-only Merkle audit-chain verification, and a conservative KV
-// audit proof-link schema placeholder plus native kv_history table/index/
+// export, read-only Merkle audit-chain verification, and conservative KV
+// audit proof-link schema plus plan-only proof-link preview gates over native
+// kv_history row previews and Merkle records, native kv_history table/index/
 // migration planning, read-only migration row previews, dual-read parity
 // validation against the reserved adapter, cutover readiness gate reporting,
 // and non-destructive dual-read/dual-write cutover planning while native Ledger
@@ -361,15 +362,19 @@ type MerkleVerification struct {
 }
 
 type KVAuditProofLink struct {
-	Namespace   string    `json:"namespace"`
-	Key         string    `json:"key"`
-	SnapshotID  string    `json:"snapshot_id,omitempty"`
-	KVVersionAt time.Time `json:"kv_version_at,omitempty"`
-	ValueHash   string    `json:"value_hash,omitempty"`
-	AuditSeq    uint64    `json:"audit_seq,omitempty"`
-	AuditHash   string    `json:"audit_hash,omitempty"`
-	ProofStatus string    `json:"proof_status"`
-	Notes       []string  `json:"notes,omitempty"`
+	Namespace        string    `json:"namespace"`
+	Key              string    `json:"key"`
+	SnapshotID       string    `json:"snapshot_id,omitempty"`
+	KVVersionAt      time.Time `json:"kv_version_at,omitempty"`
+	ValueHash        string    `json:"value_hash,omitempty"`
+	AuditSeq         uint64    `json:"audit_seq,omitempty"`
+	AuditHash        string    `json:"audit_hash,omitempty"`
+	ProofStatus      string    `json:"proof_status"`
+	MatchedBy        string    `json:"matched_by,omitempty"`
+	NativeRowID      string    `json:"native_row_id,omitempty"`
+	NativeRowVersion int       `json:"native_row_version,omitempty"`
+	AuditAction      string    `json:"audit_action,omitempty"`
+	Notes            []string  `json:"notes,omitempty"`
 }
 
 type KVAuditLinksReport struct {
@@ -378,12 +383,63 @@ type KVAuditLinksReport struct {
 	GeneratedAt             time.Time          `json:"generated_at"`
 	SchemaReady             bool               `json:"schema_ready"`
 	LinkageReady            bool               `json:"linkage_ready"`
+	PreviewReady            bool               `json:"preview_ready,omitempty"`
 	NativeKVHistoryReady    bool               `json:"native_kv_history_ready"`
 	MerkleVerificationReady bool               `json:"merkle_verification_ready"`
 	Source                  string             `json:"source"`
 	KVAuditLinks            []KVAuditProofLink `json:"kv_audit_links"`
 	RequiredFields          []string           `json:"required_fields"`
 	Notes                   []string           `json:"notes,omitempty"`
+}
+
+type KVAuditProofLinkPreviewRequest struct {
+	Namespace string    `json:"namespace,omitempty"`
+	At        time.Time `json:"at,omitempty"`
+	Limit     int       `json:"limit,omitempty"`
+	DryRun    bool      `json:"dry_run,omitempty"`
+}
+
+type KVAuditProofLinkPreviewReport struct {
+	PackID                      string                          `json:"pack_id"`
+	Namespace                   string                          `json:"namespace"`
+	TemporalNamespace           string                          `json:"temporal_namespace"`
+	GeneratedAt                 time.Time                       `json:"generated_at"`
+	At                          time.Time                       `json:"at"`
+	Stage                       string                          `json:"stage"`
+	Status                      string                          `json:"status"`
+	DryRun                      bool                            `json:"dry_run"`
+	Source                      string                          `json:"source"`
+	NativeTable                 string                          `json:"native_table"`
+	PreviewReady                bool                            `json:"preview_ready"`
+	LinkageReady                bool                            `json:"linkage_ready"`
+	KVAuditLinkPreviewReady     bool                            `json:"kv_audit_link_preview_ready"`
+	KVAuditLinkageReady         bool                            `json:"kv_audit_linkage_ready"`
+	NativeKVHistoryPreviewReady bool                            `json:"native_kv_history_preview_ready"`
+	MerkleVerificationReady     bool                            `json:"merkle_verification_ready"`
+	MerkleAppendReady           bool                            `json:"merkle_append_ready"`
+	WritesLedgerKV              bool                            `json:"writes_ledger_kv"`
+	WritesNativeKVHistory       bool                            `json:"writes_native_kv_history"`
+	MergesAuditProofs           bool                            `json:"merges_audit_proofs"`
+	Limit                       int                             `json:"limit"`
+	PreviewRowCount             int                             `json:"preview_row_count"`
+	ReturnedPreviewRowCount     int                             `json:"returned_preview_row_count"`
+	RecentAuditRecordCount      int                             `json:"recent_audit_record_count"`
+	CandidateLinkCount          int                             `json:"candidate_link_count"`
+	MatchedLinkCount            int                             `json:"matched_link_count"`
+	PendingLinkCount            int                             `json:"pending_link_count"`
+	UnmatchedRowCount           int                             `json:"unmatched_row_count"`
+	UnmatchedAuditRecordCount   int                             `json:"unmatched_audit_record_count"`
+	Schema                      KVAuditLinksReport              `json:"schema"`
+	KVHistoryMigrationPreview   NativeKVHistoryMigrationPreview `json:"kv_history_migration_preview"`
+	AuditVerification           MerkleVerification              `json:"audit_verification"`
+	CandidateLinks              []KVAuditProofLink              `json:"candidate_links"`
+	UnmatchedRows               []NativeKVHistoryRowPreview     `json:"unmatched_rows"`
+	UnmatchedAuditRecords       []MerkleAuditRecord             `json:"unmatched_audit_records"`
+	Artifacts                   []string                        `json:"artifacts"`
+	Actions                     []string                        `json:"actions"`
+	BlockedBy                   []string                        `json:"blocked_by"`
+	Labels                      []string                        `json:"labels"`
+	Notes                       []string                        `json:"notes,omitempty"`
 }
 
 type NativeKVHistoryColumnPlan struct {
@@ -751,6 +807,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/plan", Handler: h.KVHistoryCutoverPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/readiness", Handler: h.KVHistoryCutoverReadiness},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/preview", Handler: h.AuditLinksPreview},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
 	}
@@ -785,6 +842,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.kv_history.cutover.plan",
 		"memory.kv_history.cutover.readiness",
 		"memory.audit.links.schema",
+		"memory.audit.links.preview",
 		"memory.evidence.export",
 	}
 	if h.merkleVerifier != nil {
@@ -827,6 +885,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		RetentionPrunePlanReady:        true,
 		RetentionPruneReady:            false,
 		KVAuditLinkSchemaReady:         true,
+		KVAuditLinkPreviewReady:        true,
 		KVAuditLinkageReady:            false,
 		SnapshotCount:                  len(snapshots),
 		NamespaceCount:                 len(namespaces),
@@ -875,6 +934,7 @@ type statusResponse struct {
 	RetentionPrunePlanReady        bool             `json:"retention_prune_plan_ready"`
 	RetentionPruneReady            bool             `json:"retention_prune_ready"`
 	KVAuditLinkSchemaReady         bool             `json:"kv_audit_link_schema_ready"`
+	KVAuditLinkPreviewReady        bool             `json:"kv_audit_link_preview_ready"`
 	KVAuditLinkageReady            bool             `json:"kv_audit_linkage_ready"`
 	SnapshotCount                  int              `json:"snapshot_count"`
 	NamespaceCount                 int              `json:"namespace_count"`
@@ -1438,9 +1498,9 @@ func (h *Handler) buildKVHistoryCutoverReadiness(ctx context.Context, req KVHist
 			Ready:       false,
 			Required:    true,
 			Status:      "blocked",
-			Evidence:    []string{"audit-links.json", "audit-verification.json"},
+			Evidence:    []string{"audit-links.json", "audit-link-preview.json", "audit-verification.json"},
 			BlockedBy:   []string{"per-kv-merkle-proof-link-not-wired"},
-			Description: "native kv_history rows are not yet linked to per-KV Merkle audit proofs",
+			Description: "native kv_history rows have a read-only proof-link preview, but per-KV Merkle proof write-back is not enabled",
 		},
 	}
 	blockedBy := []string{}
@@ -1503,8 +1563,8 @@ func (h *Handler) buildKVHistoryCutoverReadiness(ctx context.Context, req KVHist
 		Gates:                       gates,
 		CutoverPlan:                 cutoverPlan,
 		DualReadParity:              parity,
-		Artifacts:                   []string{"kv-history-cutover-readiness.json", "kv-history-cutover-plan.json", "kv-history-dual-read-parity.json"},
-		Actions:                     []string{"review cutover readiness gates before any adapter switch", "keep native reads, native writes, Ledger writes, and cutover rollback execution blocked until every required gate is ready"},
+		Artifacts:                   []string{"kv-history-cutover-readiness.json", "kv-history-cutover-plan.json", "kv-history-dual-read-parity.json", "audit-link-preview.json"},
+		Actions:                     []string{"review cutover readiness gates before any adapter switch", "review audit-link-preview.json before claiming per-KV proof linkage", "keep native reads, native writes, Ledger writes, and cutover rollback execution blocked until every required gate is ready"},
 		BlockedBy:                   blockedBy,
 		Labels:                      []string{"memory-time-travel", "kv-history-cutover-readiness", "read-only", "no-adapter-switch", "no-native-write"},
 		Notes: []string{
@@ -1676,6 +1736,31 @@ func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"links": report})
 }
 
+func (h *Handler) AuditLinksPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req KVAuditProofLinkPreviewRequest
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid KV audit proof-link preview payload")
+		return
+	}
+	if strings.TrimSpace(string(body)) != "" {
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid KV audit proof-link preview payload")
+			return
+		}
+	}
+	report, err := h.buildKVAuditProofLinkPreview(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"preview": report})
+}
+
 func (h *Handler) AuditVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1719,7 +1804,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-link-preview.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -1754,6 +1839,16 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	auditLinks := h.buildKVAuditLinksReport(snapshot.Namespace)
 	payload["kv_audit_link_schema"] = auditLinks
 	payload["kv_audit_links"] = auditLinks.KVAuditLinks
+	if auditPreview, err := h.buildKVAuditProofLinkPreview(r.Context(), KVAuditProofLinkPreviewRequest{
+		Namespace: snapshot.Namespace,
+		At:        snapshot.CreatedAt,
+		Limit:     50,
+		DryRun:    true,
+	}); err != nil {
+		payload["kv_audit_link_preview_error"] = err.Error()
+	} else {
+		payload["kv_audit_link_preview"] = auditPreview
+	}
 	nativeKVHistoryPlan := h.buildNativeKVHistoryPlan(snapshot.Namespace)
 	payload["native_kv_history_plan"] = nativeKVHistoryPlan
 	payload["kv_history_migration_plan"] = nativeKVHistoryPlan.KVHistoryMigrationPlan
@@ -1837,7 +1932,7 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Dual-read parity checks can compare reserved TemporalKV SnapshotRawAt output with native kv_history row previews as a read-only gate; this still does not enable adapter switching.")
 	}
 	notes = append(notes, "Cutover readiness checks aggregate native plan, migration preview, dual-read parity, adapter, write-path, approval, rollback, and audit-proof gates into a read-only report; cutover_ready remains false.")
-	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
+	notes = append(notes, "KV audit proof-link schema and read-only preview gates are exposed; native kv_history rows can be joined to Merkle record candidates for review, but linkage_ready remains false until real proof write-back is wired.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
 	} else {
@@ -1948,6 +2043,187 @@ func (h *Handler) buildKVAuditLinksReport(namespace string) KVAuditLinksReport {
 			"The current Merkle verification route remains read-only audit-chain verification, not per-KV proof validation.",
 		},
 	}
+}
+
+func (h *Handler) buildKVAuditProofLinkPreview(ctx context.Context, req KVAuditProofLinkPreviewRequest) (KVAuditProofLinkPreviewReport, error) {
+	namespace := normalizeNamespace(req.Namespace)
+	at := req.At
+	if at.IsZero() {
+		at = h.now().UTC()
+	}
+	at = at.UTC()
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	schema := h.buildKVAuditLinksReport(namespace)
+	schema.Source = "schema-plus-proof-link-preview"
+	schema.PreviewReady = true
+
+	preview, err := h.buildNativeKVHistoryMigrationPreview(ctx, namespace, limit)
+	if err != nil {
+		return KVAuditProofLinkPreviewReport{}, err
+	}
+	auditVerification := MerkleVerification{
+		Ready:        false,
+		Valid:        false,
+		InvalidIndex: -1,
+		CheckedAt:    h.now().UTC(),
+		Notes:        []string{"Merkle audit-chain verifier is not attached to this Memory Time Travel pack instance."},
+	}
+	if h.merkleVerifier != nil {
+		auditVerification, err = h.merkleVerifier.VerifyMerkleAuditChain(ctx, limit)
+		if err != nil {
+			return KVAuditProofLinkPreviewReport{}, err
+		}
+		if auditVerification.CheckedAt.IsZero() {
+			auditVerification.CheckedAt = h.now().UTC()
+		}
+	}
+
+	candidateLinks, unmatchedRows, unmatchedRecords := h.buildKVAuditProofLinkCandidates(preview.Rows, auditVerification.RecentRecords)
+	matched := 0
+	for _, link := range candidateLinks {
+		if link.ProofStatus == "candidate_matched" {
+			matched++
+		}
+	}
+	pending := len(candidateLinks) - matched
+	previewRows := preview.PreviewRowCount
+	if previewRows == 0 {
+		previewRows = len(preview.Rows)
+	}
+	returnedRows := preview.ReturnedRowCount
+	if returnedRows == 0 {
+		returnedRows = len(preview.Rows)
+	}
+	blockedBy := []string{"per-kv-merkle-proof-link-not-wired", "merkle-append-not-wired", "native-kv-history-writeback-not-wired"}
+	if !preview.NativeKVHistoryPreviewReady {
+		blockedBy = append(blockedBy, "native-kv-history-preview-adapter-not-attached")
+	}
+	if !auditVerification.Ready {
+		blockedBy = append(blockedBy, "merkle-verifier-not-attached")
+	}
+	if auditVerification.Ready && !auditVerification.Valid {
+		blockedBy = append(blockedBy, "merkle-audit-chain-invalid")
+	}
+
+	return KVAuditProofLinkPreviewReport{
+		PackID:                      PackID,
+		Namespace:                   namespace,
+		TemporalNamespace:           temporalNamespaceFor(namespace),
+		GeneratedAt:                 h.now().UTC(),
+		At:                          at,
+		Stage:                       "kv-audit-proof-link-preview-before-merkle-writeback",
+		Status:                      "preview_only",
+		DryRun:                      true,
+		Source:                      "native-row-preview-plus-merkle-audit-records",
+		NativeTable:                 "kv_history",
+		PreviewReady:                true,
+		LinkageReady:                false,
+		KVAuditLinkPreviewReady:     true,
+		KVAuditLinkageReady:         false,
+		NativeKVHistoryPreviewReady: preview.NativeKVHistoryPreviewReady,
+		MerkleVerificationReady:     auditVerification.Ready,
+		MerkleAppendReady:           false,
+		WritesLedgerKV:              false,
+		WritesNativeKVHistory:       false,
+		MergesAuditProofs:           false,
+		Limit:                       limit,
+		PreviewRowCount:             previewRows,
+		ReturnedPreviewRowCount:     returnedRows,
+		RecentAuditRecordCount:      len(auditVerification.RecentRecords),
+		CandidateLinkCount:          len(candidateLinks),
+		MatchedLinkCount:            matched,
+		PendingLinkCount:            pending,
+		UnmatchedRowCount:           len(unmatchedRows),
+		UnmatchedAuditRecordCount:   len(unmatchedRecords),
+		Schema:                      schema,
+		KVHistoryMigrationPreview:   preview,
+		AuditVerification:           auditVerification,
+		CandidateLinks:              candidateLinks,
+		UnmatchedRows:               unmatchedRows,
+		UnmatchedAuditRecords:       unmatchedRecords,
+		Artifacts:                   []string{"audit-link-preview.json", "audit-links.json", "audit-verification.json", "kv-history-migration-preview.json"},
+		Actions: []string{
+			"review candidate per-KV proof links before enabling Merkle proof write-back",
+			"keep audit_seq/audit_hash backfill, native kv_history writes, Ledger writes, and Merkle append blocked",
+		},
+		BlockedBy: dedupeStrings(blockedBy),
+		Labels:    []string{"memory-time-travel", "audit-proof-link", "preview-only", "no-ledger-write", "no-native-write", "no-merkle-append"},
+		Notes: []string{
+			"This endpoint is plan-only: it joins native row previews and Merkle audit records in memory, then returns candidate proof links for review.",
+			"linkage_ready remains false because no audit_seq/audit_hash backfill, Merkle append, native kv_history write-back, or Ledger mutation is performed.",
+		},
+	}, nil
+}
+
+func (h *Handler) buildKVAuditProofLinkCandidates(rows []NativeKVHistoryRowPreview, records []MerkleAuditRecord) ([]KVAuditProofLink, []NativeKVHistoryRowPreview, []MerkleAuditRecord) {
+	recordsBySeqHash := map[string]MerkleAuditRecord{}
+	usedRecordKeys := map[string]bool{}
+	for _, record := range records {
+		if record.Seq == 0 && strings.TrimSpace(record.Hash) == "" {
+			continue
+		}
+		recordsBySeqHash[auditRecordKey(record.Seq, record.Hash)] = record
+	}
+
+	links := make([]KVAuditProofLink, 0, len(rows))
+	unmatchedRows := make([]NativeKVHistoryRowPreview, 0)
+	for _, row := range rows {
+		link := KVAuditProofLink{
+			Namespace:        row.Namespace,
+			Key:              row.Key,
+			KVVersionAt:      row.UpdatedAt,
+			ValueHash:        row.ValueSHA256,
+			AuditSeq:         row.AuditSeq,
+			AuditHash:        row.AuditHash,
+			NativeRowID:      row.ID,
+			NativeRowVersion: row.Version,
+			ProofStatus:      "pending_audit_link_backfill",
+			MatchedBy:        "native-row-preview",
+			Notes: []string{
+				"Native row preview is available, but proof linkage is not written back.",
+			},
+		}
+		record, matched := recordsBySeqHash[auditRecordKey(row.AuditSeq, row.AuditHash)]
+		if matched {
+			key := auditRecordKey(record.Seq, record.Hash)
+			usedRecordKeys[key] = true
+			link.ProofStatus = "candidate_matched"
+			link.MatchedBy = "audit_seq+audit_hash"
+			link.AuditAction = record.Action
+			link.Notes = []string{
+				"Native row preview carries audit_seq/audit_hash that matches a recent Merkle audit record.",
+				"This is still preview-only; linkage_ready remains false until write-back and proof verification are wired.",
+			}
+		} else {
+			unmatchedRows = append(unmatchedRows, row)
+		}
+		links = append(links, link)
+	}
+
+	unmatchedRecords := make([]MerkleAuditRecord, 0)
+	for _, record := range records {
+		key := auditRecordKey(record.Seq, record.Hash)
+		if key == "" || usedRecordKeys[key] {
+			continue
+		}
+		unmatchedRecords = append(unmatchedRecords, record)
+	}
+	return links, unmatchedRows, unmatchedRecords
+}
+
+func auditRecordKey(seq uint64, hash string) string {
+	hash = strings.TrimSpace(hash)
+	if seq == 0 || hash == "" {
+		return ""
+	}
+	return fmt.Sprintf("%d:%s", seq, hash)
 }
 
 func (h *Handler) temporalSnapshotValues(ctx context.Context, namespace string, at time.Time) (map[string]string, error) {

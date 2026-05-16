@@ -50,6 +50,7 @@ for (const token of [
   "/v1/memory-time-travel/kv-history/cutover/plan",
   "/v1/memory-time-travel/kv-history/cutover/readiness",
   "/v1/memory-time-travel/audit/links",
+  "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "method: \"POST\"",
@@ -67,7 +68,7 @@ for (const token of ["Memory Time Travel", "保存快照", "生成 diff", "导�
 for (const token of ["Approved rollback write-back plan", "buildApprovedRollbackPlan", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "global_approval_enqueue_ready"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing approved rollback token: ${token}`);
 }
-for (const token of ["KV audit proof-link schema", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划"]) {
+for (const token of ["KV audit proof-link schema", "previewAuditLinks", "audit-link-preview.json", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing KV audit link token: ${token}`);
 }
 for (const token of ["Native kv_history plan", "buildNativeKVHistoryPlan", "previewNativeKVHistoryMigration", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "writes_native_kv_history"]) {
@@ -84,7 +85,7 @@ for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -147,6 +148,7 @@ for (const token of [
   "/v1/memory-time-travel/kv-history/dual-read/parity",
   "/v1/memory-time-travel/kv-history/cutover/plan",
   "/v1/memory-time-travel/kv-history/cutover/readiness",
+  "/v1/memory-time-travel/audit/links/preview",
   "approved-rollback-plan.json",
   "rollback-writeback-plan.json",
   "approval-request-plan.json",
@@ -166,8 +168,12 @@ for (const token of [
   "kv_audit_link_schema",
   "kv_audit_links",
   "kv_audit_link_schema_ready",
+  "kv_audit_link_preview_ready",
   "kv_audit_linkage_ready",
   "memory.audit.links.schema",
+  "memory.audit.links.preview",
+  "audit-link-preview.json",
+  "kv_audit_link_preview",
   "MerkleVerifier",
   "VerifyMerkleAuditChain",
   "/v1/memory-time-travel/retention/plan",
@@ -177,6 +183,7 @@ for (const token of [
   "/v1/memory-time-travel/kv-history/cutover/plan",
   "/v1/memory-time-travel/kv-history/cutover/readiness",
   "/v1/memory-time-travel/audit/links",
+  "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/verify",
   "rollback_writeback_ready",
   "json-memory-time-travel-evidence",
@@ -202,8 +209,10 @@ for (const token of [
   "/v1/memory-time-travel/kv-history/native-plan",
   "/v1/memory-time-travel/kv-history/migration-preview",
   "/v1/memory-time-travel/kv-history/dual-read/parity",
+  "/v1/memory-time-travel/kv-history/cutover/plan",
   "/v1/memory-time-travel/kv-history/cutover/readiness",
   "/v1/memory-time-travel/audit/links",
+  "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "retentionPlan",
@@ -213,6 +222,7 @@ for (const token of [
   "kvHistoryDualReadParity",
   "kvHistoryCutoverPlan",
   "kvHistoryCutoverReadiness",
+  "auditLinksPreview",
   "native_kv_history_plan",
   "kv_history_migration_plan",
   "kv_history_index_plan",
@@ -237,8 +247,11 @@ for (const token of [
   "rollback_writeback_plan",
   "approval_request_plan",
   "auditLinks",
+  "auditLinksPreview",
   "auditVerify",
   "kv_audit_link_schema",
+  "kv_audit_link_preview",
+  "kv_audit_link_preview_ready",
   "retention_prune_plan",
   "Memory Time Travel request failed",
 ]) {

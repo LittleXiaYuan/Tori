@@ -4,8 +4,9 @@
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
  * rollback plan generation, approved rollback write-back planning, retention
  * dry-run/prune planning, native kv_history migration/index planning, KV audit
- * proof-link schema inspection, dual-read parity validation, cutover readiness
- * gate reporting, dual-read/dual-write cutover planning, and evidence export
+ * proof-link schema inspection plus read-only proof-link preview gates,
+ * dual-read parity validation, cutover readiness gate reporting,
+ * dual-read/dual-write cutover planning, and evidence export
  * usable without importing the full generated OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
@@ -82,6 +83,7 @@ export type MemoryTimeTravelStatusResponse = {
   retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
   kv_audit_link_schema_ready?: boolean;
+  kv_audit_link_preview_ready?: boolean;
   kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
@@ -123,6 +125,10 @@ export type MemoryTimeTravelKVAuditProofLink = {
   audit_seq?: number;
   audit_hash?: string;
   proof_status: string;
+  matched_by?: string;
+  native_row_id?: string;
+  native_row_version?: number;
+  audit_action?: string;
   notes?: string[];
 };
 
@@ -132,6 +138,7 @@ export type MemoryTimeTravelKVAuditLinksResponse = {
   generated_at: string;
   schema_ready: boolean;
   linkage_ready: boolean;
+  preview_ready?: boolean;
   native_kv_history_ready: boolean;
   merkle_verification_ready: boolean;
   source: string;
@@ -142,6 +149,13 @@ export type MemoryTimeTravelKVAuditLinksResponse = {
 
 export type MemoryTimeTravelKVAuditLinksEnvelope = {
   links: MemoryTimeTravelKVAuditLinksResponse;
+};
+
+export type MemoryTimeTravelKVAuditProofLinkPreviewRequest = {
+  namespace?: string;
+  at?: string;
+  limit?: number;
+  dry_run?: boolean;
 };
 
 export type MemoryTimeTravelNativeKVHistoryColumnPlan = {
@@ -482,6 +496,53 @@ export type MemoryTimeTravelKVHistoryCutoverReadinessResponse = {
   readiness: MemoryTimeTravelKVHistoryCutoverReadiness;
 };
 
+export type MemoryTimeTravelKVAuditProofLinkPreview = {
+  pack_id: string;
+  namespace: string;
+  temporal_namespace: string;
+  generated_at: string;
+  at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  source: string;
+  native_table: string;
+  preview_ready: boolean;
+  linkage_ready: boolean;
+  kv_audit_link_preview_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  native_kv_history_preview_ready: boolean;
+  merkle_verification_ready: boolean;
+  merkle_append_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  merges_audit_proofs: boolean;
+  limit: number;
+  preview_row_count: number;
+  returned_preview_row_count: number;
+  recent_audit_record_count: number;
+  candidate_link_count: number;
+  matched_link_count: number;
+  pending_link_count: number;
+  unmatched_row_count: number;
+  unmatched_audit_record_count: number;
+  schema: MemoryTimeTravelKVAuditLinksResponse;
+  kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview;
+  audit_verification: MemoryTimeTravelAuditVerificationResponse;
+  candidate_links: MemoryTimeTravelKVAuditProofLink[];
+  unmatched_rows: MemoryTimeTravelNativeKVHistoryRowPreview[];
+  unmatched_audit_records: MemoryTimeTravelAuditRecord[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkPreviewResponse = {
+  preview: MemoryTimeTravelKVAuditProofLinkPreview;
+};
+
 export type MemoryTimeTravelSnapshotsResponse = {
   snapshots: MemoryTimeTravelSnapshotSummary[];
   count: number;
@@ -765,6 +826,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   kv_history_cutover_rollback_plan?: MemoryTimeTravelKVHistoryCutoverRollbackPlan;
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksResponse;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
+  kv_audit_link_preview?: MemoryTimeTravelKVAuditProofLinkPreview;
+  kv_audit_link_preview_error?: string;
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
   audit_verification_error?: string;
 };
@@ -919,6 +982,10 @@ export class MemoryTimeTravelClient {
 
   auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {
     return this.request<MemoryTimeTravelKVAuditLinksEnvelope>("GET", `/v1/memory-time-travel/audit/links${query({ namespace })}`);
+  }
+
+  auditLinksPreview(input: MemoryTimeTravelKVAuditProofLinkPreviewRequest = {}): Promise<MemoryTimeTravelKVAuditProofLinkPreviewResponse> {
+    return this.request<MemoryTimeTravelKVAuditProofLinkPreviewResponse>("POST", "/v1/memory-time-travel/audit/links/preview", input);
   }
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {
