@@ -124,6 +124,7 @@ export interface ProviderInfo {
   id: string;
   display_name?: string;
   type: string;
+  source?: string;
   model: string;
   base_url: string;
   enabled: boolean;

@@ -55,7 +55,9 @@ export function useChatInit(): ChatInitState {
         type: p.id.split("-")[0] || p.id,
         tier: p.tier, capabilities: p.capabilities,
       })));
-      const primary = providers.find(p => p.enabled);
+      const primary = providers.find(p => p.enabled && /minimax/i.test(`${p.id} ${p.display_name || ""} ${p.model}`))
+        || providers.find(p => p.enabled && p.source === "direct")
+        || providers.find(p => p.enabled);
       if (primary) {
         setCurrentModel(primary.model || primary.display_name || primary.id);
         setCurrentModelId(primary.id);
