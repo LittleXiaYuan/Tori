@@ -191,6 +191,7 @@ func initTaskEngine(
 	)
 	gw.SetWorkflowStore(wfStore)
 	gw.SetWorkflowEngine(wfEngine)
+	gw.SetLLMCall(workflow.LLMCallFunc(costAwareLLM))
 	slog.Info("workflow engine initialized", "dir", cfg.DataPath("workflows"))
 
 	wireWorkflowExecutors(gw, wfEngine, knowledgeStore, cfg)

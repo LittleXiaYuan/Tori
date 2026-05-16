@@ -270,6 +270,9 @@ func (g *Gateway) SetAuditTrail(at *audit.Trail) { g.auditTrail = at }
 // SetProviderRegistry attaches the LLM provider registry.
 func (g *Gateway) SetProviderRegistry(pr *llm.ProviderRegistry) { g.providerReg = pr }
 
+// SetLLMCall attaches the shared LLM caller used by extracted route groups.
+func (g *Gateway) SetLLMCall(fn workflow.LLMCallFunc) { g.llmCall = fn }
+
 // SetSpeechRegistry attaches the TTS/STT speech registry.
 func (g *Gateway) SetSpeechRegistry(sr *speech.Registry) { g.speechReg = sr }
 
