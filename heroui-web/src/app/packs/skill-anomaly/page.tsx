@@ -6,7 +6,7 @@ import { Activity, AlertTriangle, ClipboardCheck, Download, Radar, RefreshCw, Sh
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createSkillAnomalyPackClient, type SkillAnomalyApprovalQueueWriteback, type SkillAnomalyAuditHookPlan, type SkillAnomalyProfileSummary, type SkillAnomalyResult, type SkillAnomalyStatus } from "@/lib/skill-anomaly-pack-client";
+import { createSkillAnomalyPackClient, type SkillAnomalyApprovalManagerBridgePlan, type SkillAnomalyApprovalQueueWriteback, type SkillAnomalyAuditHookPlan, type SkillAnomalyProfileSummary, type SkillAnomalyResult, type SkillAnomalyStatus } from "@/lib/skill-anomaly-pack-client";
 
 const skillAnomalyPack = createSkillAnomalyPackClient();
 
@@ -40,7 +40,7 @@ export default function SkillAnomalyPackPage() {
   const [status, setStatus] = useState<SkillAnomalyStatus | null>(null);
   const [profiles, setProfiles] = useState<SkillAnomalyProfileSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"observe" | "detect" | "audit-plan" | "approval-writeback" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"observe" | "detect" | "audit-plan" | "approval-writeback" | "approval-bridge-plan" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [skillSlug, setSkillSlug] = useState("text_processing");
   const [normalJSON, setNormalJSON] = useState(() => sampleEvent("text_processing"));
@@ -48,6 +48,7 @@ export default function SkillAnomalyPackPage() {
   const [result, setResult] = useState<SkillAnomalyResult | null>(null);
   const [auditPlan, setAuditPlan] = useState<SkillAnomalyAuditHookPlan | null>(null);
   const [approvalWriteback, setApprovalWriteback] = useState<SkillAnomalyApprovalQueueWriteback | null>(null);
+  const [approvalBridgePlan, setApprovalBridgePlan] = useState<SkillAnomalyApprovalManagerBridgePlan | null>(null);
 
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.skill_slug === skillSlug) || profiles[0] || null, [profiles, skillSlug]);
   const tone = severityTone(result?.severity);
@@ -95,6 +96,7 @@ export default function SkillAnomalyPackPage() {
       setResult(res.result);
       setAuditPlan(null);
       setApprovalWriteback(null);
+      setApprovalBridgePlan(null);
       showToast(res.result.needs_approval ? "已生成 NeedsApproval 异常计划" : "候选行为符合当前基线", "success");
       if (!payload.dry_run) await load();
     } catch (e) {
@@ -117,6 +119,7 @@ export default function SkillAnomalyPackPage() {
       setAuditPlan(res.plan);
       setResult(res.plan.detection);
       setApprovalWriteback(null);
+      setApprovalBridgePlan(null);
       showToast(res.plan.approval_required ? "已生成 audit hook / Trust mutation 审批计划" : "当前候选不需要写回计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成 audit hook / Trust mutation 计划失败"));
@@ -138,10 +141,36 @@ export default function SkillAnomalyPackPage() {
       setApprovalWriteback(res.writeback);
       setAuditPlan(res.writeback.plan_summary);
       setResult(res.writeback.plan_summary.detection);
+      setApprovalBridgePlan(null);
       await load();
       showToast("已写入 pack-local Approval queue store", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "写入 pack-local Approval queue 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planApprovalManagerBridge = async () => {
+    setBusy("approval-bridge-plan");
+    setError(null);
+    try {
+      const payload = JSON.parse(candidateJSON);
+      const requestID = approvalWriteback?.request_id || (typeof payload.request_id === "string" ? payload.request_id : "");
+      const requestKey = approvalWriteback?.request_key || (typeof payload.request_key === "string" ? payload.request_key : "");
+      const res = await skillAnomalyPack.approvalManagerBridgePlan({
+        ...payload,
+        requested_by: payload.requested_by || "operator",
+        reason: payload.reason || "map pack-local approval queue record to global Approval Manager request",
+        ...(requestID ? { request_id: requestID } : {}),
+        ...(requestKey ? { request_key: requestKey } : {}),
+      });
+      setApprovalBridgePlan(res.plan);
+      setAuditPlan(res.plan.plan_summary);
+      setResult(res.plan.detection);
+      showToast("已生成 Approval Manager bridge plan", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 Approval Manager bridge plan 失败"));
     } finally {
       setBusy(null);
     }
@@ -190,7 +219,7 @@ export default function SkillAnomalyPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>stage {status?.stage || "pack-shell"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先把 skill 行为基线、滑动窗口异常评分、NeedsApproval 计划、audit hook / Trust mutation 审批计划、pack-local queue 写回和证据包放进可选 Pack。队列写回只落到 pack-local approval-queue-store.json；全局 Approval Manager、Merkle Chain append、Trust Score 扣分和 runtime action release 仍保持后续接入。
+              当前切片先把 skill 行为基线、滑动窗口异常评分、NeedsApproval 计划、audit hook / Trust mutation 审批计划、pack-local queue 写回、Approval Manager bridge plan 和证据包放进可选 Pack。队列写回只落到 pack-local approval-queue-store.json；bridge plan 只生成 approval-manager-bridge-plan.json，不调用全局 Approval Manager；Merkle Chain append、Trust Score 扣分和 runtime action release 仍保持后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -223,6 +252,11 @@ export default function SkillAnomalyPackPage() {
           <div className="kpi-label">真实写回</div>
           <div className="mt-2"><Chip size="sm" style={{ background: status?.approval_queue_store_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: status?.approval_queue_store_ready ? "#22c55e" : "#facc15" }}>{status?.approval_queue_store_ready ? "queue ready" : "plan-only"}</Chip></div>
           <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>仅 pack-local JSON store</div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">Approval Manager bridge</div>
+          <div className="mt-2"><Chip size="sm" style={{ background: status?.approval_manager_bridge_plan_ready ? "rgba(34,197,94,0.12)" : "rgba(148,163,184,0.12)", color: status?.approval_manager_bridge_plan_ready ? "#22c55e" : "var(--yunque-text-muted)" }}>{status?.approval_manager_bridge_plan_ready ? "bridge plan ready" : "not ready"}</Chip></div>
+          <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>global enqueue: {status?.global_approval_enqueue_ready ? "ready" : "blocked"}</div>
         </Card>
       </div>
 
@@ -264,6 +298,7 @@ export default function SkillAnomalyPackPage() {
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedProfile && !skillSlug}><Download size={14} />导出证据包</Button>
                 <Button variant="outline" isPending={busy === "audit-plan"} onPress={planAuditHook}><ClipboardCheck size={14} />写回计划</Button>
                 <Button variant="outline" isPending={busy === "approval-writeback"} onPress={writeApprovalQueue}><ClipboardCheck size={14} />写入审批队列</Button>
+                <Button variant="outline" isPending={busy === "approval-bridge-plan"} onPress={planApprovalManagerBridge}><ClipboardCheck size={14} />全局审批桥计划</Button>
                 <Button className="btn-accent" isPending={busy === "detect"} onPress={detectCandidate}>Dry-run 检测</Button>
               </div>
             </div>
@@ -308,6 +343,23 @@ export default function SkillAnomalyPackPage() {
                 </div>
                 <TextField value={JSON.stringify(approvalWriteback, null, 2)} onChange={() => undefined}>
                   <TextArea rows={12} aria-label="Skill anomaly approval queue writeback JSON" className="font-mono text-xs" readOnly />
+                </TextField>
+              </Card>
+            ) : null}
+            {approvalBridgePlan ? (
+              <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <ClipboardCheck size={15} />
+                  <span>Approval Manager bridge plan</span>
+                  <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>approval-manager-bridge-plan.json</Chip>
+                  <Chip size="sm">{approvalBridgePlan.proposed_global_approval_request.category}</Chip>
+                  <Chip size="sm">risk {approvalBridgePlan.proposed_global_approval_request.risk_level}</Chip>
+                </div>
+                <div className="mb-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  该桥接计划只把 pack-local approval-queue-record.json 映射成未来全局 Approval Manager 请求形状；global_approval_enqueue_ready=false，不调用全局审批中心，不追加 Merkle Chain，不扣 Trust Score，也不会释放 runtime action。
+                </div>
+                <TextField value={JSON.stringify(approvalBridgePlan, null, 2)} onChange={() => undefined}>
+                  <TextArea rows={12} aria-label="Skill anomaly approval manager bridge plan JSON" className="font-mono text-xs" readOnly />
                 </TextField>
               </Card>
             ) : null}

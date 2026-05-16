@@ -40,6 +40,9 @@ func TestSkillAnomalyPackRoutesStatusWhenEnabled(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "skill.approval_queue.writeback") {
 		t.Fatalf("enabled Skill Anomaly pack should expose approval queue writeback readiness, body = %s", w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), "approval_manager_bridge_plan_ready") || !strings.Contains(w.Body.String(), "skill.approval_manager.bridge.plan") {
+		t.Fatalf("enabled Skill Anomaly pack should expose Approval Manager bridge plan readiness, body = %s", w.Body.String())
+	}
 }
 
 func TestSkillAnomalyPackRouteSpecsGateByMethod(t *testing.T) {
@@ -94,6 +97,14 @@ func TestSkillAnomalyPackCanObserveAndDetect(t *testing.T) {
 	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "writes_approval_queue_file") || !strings.Contains(w.Body.String(), "execution_blocked") || !strings.Contains(w.Body.String(), "action_allowed") {
 		t.Fatalf("approval queue writeback status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/skill-anomaly/approval-queue/bridge/plan", strings.NewReader(`{"skill_slug":"text_processing","action":"shell_exec","params":{"command":"whoami","exfil_url":"https://example.invalid"},"success":false,"duration_ms":500,"requested_by":"operator","reason":"review anomalous shell execution","request_id":"skill-anomaly-gateway","request_key":"skill-anomaly-gateway-key"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval-manager-bridge-plan.json") || !strings.Contains(w.Body.String(), "global_approval_enqueue_ready") || !strings.Contains(w.Body.String(), "approval_manager_bridge_plan_ready") {
+		t.Fatalf("approval manager bridge plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -117,6 +128,7 @@ func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackSta
 				"/v1/skill-anomaly/detect",
 				"/v1/skill-anomaly/audit-hook/plan",
 				"/v1/skill-anomaly/approval-queue/writeback",
+				"/v1/skill-anomaly/approval-queue/bridge/plan",
 				"/v1/skill-anomaly/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -128,6 +140,7 @@ func newTestGatewayWithSkillAnomalyPack(t *testing.T, status packruntime.PackSta
 				{Method: http.MethodPost, Path: "/v1/skill-anomaly/detect"},
 				{Method: http.MethodPost, Path: "/v1/skill-anomaly/audit-hook/plan"},
 				{Method: http.MethodPost, Path: "/v1/skill-anomaly/approval-queue/writeback"},
+				{Method: http.MethodPost, Path: "/v1/skill-anomaly/approval-queue/bridge/plan"},
 				{Method: http.MethodGet, Path: "/v1/skill-anomaly/evidence/"},
 			},
 		},

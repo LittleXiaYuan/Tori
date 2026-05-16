@@ -767,19 +767,19 @@ if (skillAnomalyManifest) {
 if (skillAnomalyPage.includes('from "@/lib/api"') || skillAnomalyPage.includes("api.skillAnomaly") || !skillAnomalyPage.includes("createSkillAnomalyPackClient")) {
   fail("Skill Anomaly pack page must use skill-anomaly-pack-client instead of monolithic api object");
 }
-for (const token of ["createSkillAnomalyPackClient", "/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/evidence/", "approval_queue_store_ready", "approval_queue_store", "approval_queue_record", "approval-queue-store.json", "approval-queue-record.json", "SkillAnomalyApprovalQueueWriteback", 'method: "POST"']) {
+for (const token of ["createSkillAnomalyPackClient", "/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/approval-queue/bridge/plan", "/v1/skill-anomaly/evidence/", "approval_queue_store_ready", "approval_manager_bridge_plan_ready", "global_approval_enqueue_ready", "approval_queue_store", "approval_queue_record", "approval_manager_bridge_plan", "approval-queue-store.json", "approval-queue-record.json", "approval-manager-bridge-plan.json", "SkillAnomalyApprovalQueueWriteback", "SkillAnomalyApprovalManagerBridgePlan", "approvalManagerBridgePlan", 'method: "POST"']) {
   if (!skillAnomalyClient.includes(token)) fail(`skill-anomaly-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("skill-anomaly")')) {
   fail("Skill Anomaly runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestSkillAnomaly", "StatusNotFound", "StatusMethodNotAllowed", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/approval-queue/writeback", "approval_queue_store_ready", "skill.approval_queue.writeback", "writes_approval_queue_file", "execution_blocked", "action_allowed"]) {
+for (const token of ["TestSkillAnomaly", "StatusNotFound", "StatusMethodNotAllowed", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/approval-queue/bridge/plan", "approval_queue_store_ready", "approval_manager_bridge_plan_ready", "global_approval_enqueue_ready", "skill.approval_queue.writeback", "skill.approval_manager.bridge.plan", "writes_approval_queue_file", "execution_blocked", "action_allowed"]) {
   if (!skillAnomalyGateTest.includes(token)) fail(`Skill Anomaly gateway gate test missing token: ${token}`);
 }
-for (const token of ["createSkillAnomalyClient", "SkillAnomalyClientError", "/v1/skill-anomaly/status", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/evidence/", "SkillAnomalyApprovalQueueWriteback", "approvalQueueWriteback", "approval_queue_store", "approval_queue_record"]) {
+for (const token of ["createSkillAnomalyClient", "SkillAnomalyClientError", "/v1/skill-anomaly/status", "/v1/skill-anomaly/audit-hook/plan", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/approval-queue/bridge/plan", "/v1/skill-anomaly/evidence/", "SkillAnomalyApprovalQueueWriteback", "SkillAnomalyApprovalManagerBridgePlan", "approvalQueueWriteback", "approvalManagerBridgePlan", "approval_queue_store", "approval_queue_record", "approval_manager_bridge_plan"]) {
   if (!skillAnomalySdk.includes(token)) fail(`Skill Anomaly TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/evidence/text_processing", "approval-queue-store.json", "approval-queue-record.json"]) {
+for (const token of ["/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/approval-queue/bridge/plan", "/v1/skill-anomaly/evidence/text_processing", "approval-queue-store.json", "approval-queue-record.json", "approval-manager-bridge-plan.json"]) {
   if (!skillAnomalyClientTest.includes(token)) fail(`Skill Anomaly frontend client test missing token: ${token}`);
 }
 for (const token of ["skillAnomalyStatus:", "createSkillAnomalyEvent:", "skillAnomalyDetect:", "skillAnomalyEvidence:"]) {
