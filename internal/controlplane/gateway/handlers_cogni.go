@@ -116,11 +116,11 @@ func (g *Gateway) handleCognis(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleCogniKernelPack is the narrow public bridge used by the Cogni Kernel
-// backend pack. Keeping this wrapper tiny lets Pack Runtime own route mounting
-// and enablement now, while the existing Cogni handler can be extracted into a
-// standalone package in a later reversible step.
-func (g *Gateway) HandleCogniKernelPack(w http.ResponseWriter, r *http.Request) {
+// ServeCogniKernel is the temporary Gateway adapter for the Cogni Kernel pack's
+// API interface. Pack Runtime owns the public /v1/cognis* route mounting and
+// gates; Gateway only supplies existing business operations until those handlers
+// are extracted behind a standalone Cogni service in later reversible steps.
+func (g *Gateway) ServeCogniKernel(w http.ResponseWriter, r *http.Request) {
 	g.handleCognis(w, r)
 }
 

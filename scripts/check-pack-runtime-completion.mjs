@@ -313,8 +313,10 @@ requireTokens("lora-pack 蓝图能力包", loraPack + loraManifest + frontend, [
 
 requireTokens("cogni-kernel 蓝图能力包", cogniKernelPack + cogniKernelManifest + frontend + gateway, [
   'const PackID = "yunque.pack.cogni-kernel"',
-  "type CogniGateway interface",
-  "HandleCogniKernelPack",
+  "type API interface",
+  "ServeCogniKernel",
+  "type Router struct",
+  "NewRouter",
   "func (h *Handler) Routes() []packruntime.BackendRoute",
   "/v1/cognis",
   "/v1/cognis/",
