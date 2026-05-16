@@ -107,6 +107,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/audit/links/preview") {
 		t.Fatal("expected Memory Time Travel audit proof-link preview route to be installed from manifest")
 	}
+	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/audit/links/writeback-plan") {
+		t.Fatal("expected Memory Time Travel audit proof-link writeback plan route to be installed from manifest")
+	}
 
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
 	if !ok {

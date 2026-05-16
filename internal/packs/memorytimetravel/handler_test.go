@@ -50,8 +50,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 18 {
-		t.Fatalf("expected 18 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 19 {
+		t.Fatalf("expected 19 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -84,6 +84,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/kv-history/cutover/readiness": {http.MethodPost},
 		"/v1/memory-time-travel/audit/links":                  {http.MethodGet},
 		"/v1/memory-time-travel/audit/links/preview":          {http.MethodPost},
+		"/v1/memory-time-travel/audit/links/writeback-plan":   {http.MethodPost},
 		"/v1/memory-time-travel/audit/verify":                 {http.MethodGet},
 		"/v1/memory-time-travel/evidence/":                    {http.MethodGet},
 	}
@@ -170,7 +171,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "native-kv-history-plan.json") || !strings.Contains(w.Body.String(), "kv-history-migration-plan.json") || !strings.Contains(w.Body.String(), "kv-history-index-plan.json") || !strings.Contains(w.Body.String(), "kv-history-cutover-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-read-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-write-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-link-preview.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "native-kv-history-plan.json") || !strings.Contains(w.Body.String(), "kv-history-migration-plan.json") || !strings.Contains(w.Body.String(), "kv-history-index-plan.json") || !strings.Contains(w.Body.String(), "kv-history-cutover-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-read-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-write-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-link-preview.json") || !strings.Contains(w.Body.String(), "audit-link-writeback-plan.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -254,7 +255,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_plan") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -421,6 +422,77 @@ func TestMemoryTimeTravelAuditProofLinkPreviewJoinsNativeRowsAndMerkleRecordsWit
 	for _, blocker := range []string{"per-kv-merkle-proof-link-not-wired", "merkle-append-not-wired", "native-kv-history-writeback-not-wired"} {
 		if !containsString(got.Preview.BlockedBy, blocker) {
 			t.Fatalf("proof-link preview missing blocker %s: %#v", blocker, got.Preview.BlockedBy)
+		}
+	}
+}
+
+func TestMemoryTimeTravelAuditProofLinkWritebackPlanConsumesPreviewWithoutWriting(t *testing.T) {
+	now := time.Date(2026, 5, 15, 15, 45, 0, 0, time.UTC)
+	previewer := &fakeNativeKVHistoryPreviewer{preview: NativeKVHistoryMigrationPreview{
+		Namespace:            "memory_snapshot",
+		GeneratedAt:          now,
+		SourceNamespace:      "__kv_history__",
+		NativeTable:          "kv_history",
+		ScannedDocumentCount: 1,
+		PreviewRowCount:      2,
+		ReturnedRowCount:     2,
+		Rows: []NativeKVHistoryRowPreview{
+			{ID: "kvh-goal", Namespace: "memory_snapshot", Key: "goal", Version: 1, Value: []byte(`"ship"`), ValueSHA256: valueHash(`"ship"`), UpdatedAt: now.Add(-time.Hour), Current: true, AuditSeq: 7, AuditHash: "audit-hash-7", SourceAdapter: "reserved-ledger-kv-namespace"},
+			{ID: "kvh-persona", Namespace: "memory_snapshot", Key: "persona", Version: 1, Value: []byte(`"careful"`), ValueSHA256: valueHash(`"careful"`), UpdatedAt: now.Add(-time.Hour), Current: true, AuditSeq: 8, AuditHash: "missing-hash-8", SourceAdapter: "reserved-ledger-kv-namespace"},
+		},
+	}}
+	verifier := &fakeMerkleVerifier{result: MerkleVerification{
+		Ready:        true,
+		Valid:        true,
+		InvalidIndex: -1,
+		RecordCount:  1,
+		LastSeq:      7,
+		LastHash:     "audit-hash-7",
+		RecentRecords: []MerkleAuditRecord{
+			{Seq: 7, Timestamp: now.Add(-time.Hour), Type: "memory", Actor: "tenant", Action: "memory.flush", Hash: "audit-hash-7"},
+		},
+	}}
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, NativeKVHistoryPreviewer: previewer, MerkleVerifier: verifier})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback-plan", strings.NewReader(`{"namespace":"memory_snapshot","at":"2026-05-15T15:45:00Z","limit":20,"requested_by":"operator","reason":"proof link review","approval_id":"approval-link-1","dry_run":true}`))
+	h.AuditLinksWritebackPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit proof-link writeback plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan KVAuditProofLinkWritebackPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode audit proof-link writeback plan: %v", err)
+	}
+	if got.Plan.Stage != "kv-audit-proof-link-writeback-plan-before-ledger-mutation" || got.Plan.Status != "audit_proof_link_writeback_plan" || !got.Plan.KVAuditLinkWritebackPlanReady || !got.Plan.ConsumesAuditLinkPreview {
+		t.Fatalf("unexpected writeback plan identity: %#v", got.Plan)
+	}
+	if got.Plan.KVAuditLinkWritebackReady || got.Plan.KVAuditLinkageReady || got.Plan.AuditProofLinkReady || got.Plan.WritesLedgerKV || got.Plan.WritesNativeKVHistory || got.Plan.BackfillsAuditSeq || got.Plan.BackfillsAuditHash || got.Plan.MerkleAppendReady || got.Plan.AppendsMerkle || got.Plan.GlobalApprovalEnqueueReady {
+		t.Fatalf("writeback plan must remain non-destructive and plan-only: %#v", got.Plan)
+	}
+	if previewer.limit != 20 || verifier.limit != 20 {
+		t.Fatalf("previewer/verifier should receive requested limit, previewer=%d verifier=%d", previewer.limit, verifier.limit)
+	}
+	if got.Plan.CandidateLinkCount != 2 || got.Plan.MatchedLinkCount != 1 || got.Plan.PendingLinkCount != 1 || got.Plan.ActionCount != 1 || len(got.Plan.WritebackActions) != 1 {
+		t.Fatalf("unexpected writeback plan counts/actions: %#v", got.Plan)
+	}
+	action := got.Plan.WritebackActions[0]
+	if action.Operation != "kv_history_audit_proof_link_backfill_preview" || action.NativeRowID != "kvh-goal" || action.AuditSeq != 7 || action.AuditHash != "audit-hash-7" || action.ProofStatus != "would_backfill_audit_seq_hash" || !action.RequiresApproval || action.ApprovalID != "approval-link-1" {
+		t.Fatalf("unexpected writeback action: %#v", action)
+	}
+	if got.Plan.ProposedApprovalRequest.QueueName != "memory_time_travel_audit_proof_link" || got.Plan.ProposedApprovalRequest.SourceArtifact != "audit-link-writeback-plan.json" || got.Plan.ProposedApprovalRequest.GlobalApprovalEnqueueReady {
+		t.Fatalf("approval request should be shaped but not enqueued: %#v", got.Plan.ProposedApprovalRequest)
+	}
+	for _, artifact := range []string{"audit-link-writeback-plan.json", "audit-link-preview.json", "audit-links.json", "audit-verification.json", "kv-history-migration-preview.json"} {
+		if !containsString(got.Plan.Artifacts, artifact) {
+			t.Fatalf("writeback plan missing artifact %s: %#v", artifact, got.Plan.Artifacts)
+		}
+	}
+	for _, blocker := range []string{"native-kv-history-writeback-not-wired", "merkle-append-not-wired", "audit-proof-link-executor-not-wired", "global-approval-manager-not-consumed"} {
+		if !containsString(got.Plan.BlockedBy, blocker) {
+			t.Fatalf("writeback plan missing blocker %s: %#v", blocker, got.Plan.BlockedBy)
 		}
 	}
 }
@@ -804,25 +876,27 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files                     []string                            `json:"files"`
-		ApprovedRollbackPlan      ApprovedRollbackExecutionPlanReport `json:"approved_rollback_plan"`
-		RollbackWritebackPlan     []RollbackWritebackActionPlan       `json:"rollback_writeback_plan"`
-		ApprovalRequestPlan       GlobalApprovalRequestPlan           `json:"approval_request_plan"`
-		RetentionPlan             RetentionPlanReport                 `json:"retention_plan"`
-		RetentionPrunePlan        RetentionPrunePlanReport            `json:"retention_prune_plan"`
-		NativeKVHistoryPlan       NativeKVHistoryPlanReport           `json:"native_kv_history_plan"`
-		KVHistoryMigrationPlan    []KVHistoryMigrationStepPlan        `json:"kv_history_migration_plan"`
-		KVHistoryIndexPlan        []NativeKVHistoryIndexPlan          `json:"kv_history_index_plan"`
-		KVHistoryCutoverPlan      KVHistoryCutoverPlanReport          `json:"kv_history_cutover_plan"`
-		KVHistoryCutoverReadiness KVHistoryCutoverReadinessReport     `json:"kv_history_cutover_readiness"`
-		KVHistoryDualReadParity   KVHistoryDualReadParityReport       `json:"kv_history_dual_read_parity"`
-		KVHistoryDualReadPlan     KVHistoryDualReadPlan               `json:"kv_history_dual_read_plan"`
-		KVHistoryDualWritePlan    KVHistoryDualWritePlan              `json:"kv_history_dual_write_plan"`
-		KVHistoryMigrationPreview NativeKVHistoryMigrationPreview     `json:"kv_history_migration_preview"`
-		KVAuditLinkSchema         KVAuditLinksReport                  `json:"kv_audit_link_schema"`
-		KVAuditLinks              []KVAuditProofLink                  `json:"kv_audit_links"`
-		KVAuditLinkPreview        KVAuditProofLinkPreviewReport       `json:"kv_audit_link_preview"`
-		AuditVerification         MerkleVerification                  `json:"audit_verification"`
+		Files                     []string                              `json:"files"`
+		ApprovedRollbackPlan      ApprovedRollbackExecutionPlanReport   `json:"approved_rollback_plan"`
+		RollbackWritebackPlan     []RollbackWritebackActionPlan         `json:"rollback_writeback_plan"`
+		ApprovalRequestPlan       GlobalApprovalRequestPlan             `json:"approval_request_plan"`
+		RetentionPlan             RetentionPlanReport                   `json:"retention_plan"`
+		RetentionPrunePlan        RetentionPrunePlanReport              `json:"retention_prune_plan"`
+		NativeKVHistoryPlan       NativeKVHistoryPlanReport             `json:"native_kv_history_plan"`
+		KVHistoryMigrationPlan    []KVHistoryMigrationStepPlan          `json:"kv_history_migration_plan"`
+		KVHistoryIndexPlan        []NativeKVHistoryIndexPlan            `json:"kv_history_index_plan"`
+		KVHistoryCutoverPlan      KVHistoryCutoverPlanReport            `json:"kv_history_cutover_plan"`
+		KVHistoryCutoverReadiness KVHistoryCutoverReadinessReport       `json:"kv_history_cutover_readiness"`
+		KVHistoryDualReadParity   KVHistoryDualReadParityReport         `json:"kv_history_dual_read_parity"`
+		KVHistoryDualReadPlan     KVHistoryDualReadPlan                 `json:"kv_history_dual_read_plan"`
+		KVHistoryDualWritePlan    KVHistoryDualWritePlan                `json:"kv_history_dual_write_plan"`
+		KVHistoryMigrationPreview NativeKVHistoryMigrationPreview       `json:"kv_history_migration_preview"`
+		KVAuditLinkSchema         KVAuditLinksReport                    `json:"kv_audit_link_schema"`
+		KVAuditLinks              []KVAuditProofLink                    `json:"kv_audit_links"`
+		KVAuditLinkPreview        KVAuditProofLinkPreviewReport         `json:"kv_audit_link_preview"`
+		KVAuditLinkWritebackPlan  KVAuditProofLinkWritebackPlanReport   `json:"kv_audit_link_writeback_plan"`
+		KVAuditLinkWritebacks     []KVAuditProofLinkWritebackActionPlan `json:"kv_audit_link_writeback_actions"`
+		AuditVerification         MerkleVerification                    `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -838,6 +912,12 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if got.KVAuditLinkPreview.MatchedLinkCount != 1 || got.KVAuditLinkPreview.CandidateLinks[0].ProofStatus != "candidate_matched" {
 		t.Fatalf("proof-link preview should expose matched candidate without write-back: %#v", got.KVAuditLinkPreview)
+	}
+	if !containsString(got.Files, "audit-link-writeback-plan.json") || !got.KVAuditLinkWritebackPlan.KVAuditLinkWritebackPlanReady || got.KVAuditLinkWritebackPlan.KVAuditLinkWritebackReady || got.KVAuditLinkWritebackPlan.WritesLedgerKV || got.KVAuditLinkWritebackPlan.WritesNativeKVHistory || got.KVAuditLinkWritebackPlan.BackfillsAuditSeq || got.KVAuditLinkWritebackPlan.MerkleAppendReady {
+		t.Fatalf("evidence should include plan-only KV audit proof-link writeback bridge: files=%#v plan=%#v", got.Files, got.KVAuditLinkWritebackPlan)
+	}
+	if got.KVAuditLinkWritebackPlan.ActionCount != 1 || len(got.KVAuditLinkWritebacks) != 1 || got.KVAuditLinkWritebacks[0].ProofStatus != "would_backfill_audit_seq_hash" {
+		t.Fatalf("evidence should expose one proposed proof-link writeback action: plan=%#v actions=%#v", got.KVAuditLinkWritebackPlan, got.KVAuditLinkWritebacks)
 	}
 	if !containsString(got.Files, "approved-rollback-plan.json") || !containsString(got.Files, "rollback-writeback-plan.json") || !containsString(got.Files, "approval-request-plan.json") || !got.ApprovedRollbackPlan.ApprovedRollbackPlanReady || got.ApprovedRollbackPlan.RollbackWritebackReady || got.ApprovalRequestPlan.GlobalApprovalEnqueueReady || len(got.RollbackWritebackPlan) == 0 {
 		t.Fatalf("evidence should include approved rollback writeback plan preview: files=%#v approved=%#v approval=%#v writebacks=%#v", got.Files, got.ApprovedRollbackPlan, got.ApprovalRequestPlan, got.RollbackWritebackPlan)

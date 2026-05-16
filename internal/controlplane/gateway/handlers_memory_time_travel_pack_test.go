@@ -133,6 +133,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_audit_link_preview_ready") || !strings.Contains(w.Body.String(), "audit-link-preview.json") || !strings.Contains(w.Body.String(), `"linkage_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"merkle_append_ready":false`) {
 		t.Fatalf("audit proof-link preview gate status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback-plan", strings.NewReader(`{"namespace":"memory_snapshot","at":"2026-05-15T12:00:00Z","limit":50,"requested_by":"operator","reason":"gateway writeback smoke","approval_id":"approval-link-gateway","dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_audit_link_writeback_plan_ready") || !strings.Contains(w.Body.String(), "audit-link-writeback-plan.json") || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) || !strings.Contains(w.Body.String(), `"backfills_audit_seq":false`) {
+		t.Fatalf("audit proof-link writeback plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -165,6 +173,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/kv-history/cutover/readiness",
 				"/v1/memory-time-travel/audit/links",
 				"/v1/memory-time-travel/audit/links/preview",
+				"/v1/memory-time-travel/audit/links/writeback-plan",
 				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
 			},
@@ -186,6 +195,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/readiness"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/preview"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},
 			},
