@@ -127,6 +127,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if rpaReplay.Manifest.SDK.TypeScript != "yunque-client/rpa-replay" {
 		t.Fatalf("unexpected RPA Replay SDK import: %s", rpaReplay.Manifest.SDK.TypeScript)
 	}
+	if !hasRouteSpec(rpaReplay.Manifest.Backend.RouteSpecs, "POST", "/v1/rpa-replay/executor/plan") {
+		t.Fatal("expected RPA Replay executor plan routeSpec")
+	}
 
 	sbomDrift, ok := registry.Get("yunque.pack.sbom-drift")
 	if !ok {

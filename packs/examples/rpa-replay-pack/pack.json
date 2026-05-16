@@ -2,7 +2,7 @@
   "id": "yunque.pack.rpa-replay",
   "name": "RPA Replay Pack",
   "version": "0.1.0",
-  "description": "将 RPA 录制、轨迹存储、参数化回放计划和证据包导出作为可选增量包暴露。",
+  "description": "将 RPA 录制、轨迹存储、参数化回放计划、Browser Intent / ActionTracer executor handoff plan 和证据包导出作为可选增量包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -14,6 +14,9 @@
       "rpa.recording.start",
       "rpa.recording.stop",
       "rpa.replay.dry_run",
+      "rpa.executor.plan",
+      "rpa.browser_intent.gate_plan",
+      "rpa.action_tracer.handoff_plan",
       "rpa.evidence.export"
     ],
     "routes": [
@@ -23,6 +26,7 @@
       "/v1/rpa-replay/recordings/start",
       "/v1/rpa-replay/recordings/stop",
       "/v1/rpa-replay/replay",
+      "/v1/rpa-replay/executor/plan",
       "/v1/rpa-replay/evidence/"
     ],
     "permissions": [
@@ -65,6 +69,11 @@
         "method": "POST",
         "path": "/v1/rpa-replay/replay",
         "description": "Build a parameter-substituted dry-run replay plan for a trace."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/rpa-replay/executor/plan",
+        "description": "Build a non-destructive Browser Intent / ActionTracer executor handoff plan without consuming browser intent, executing browser actions, writing browser state, writing files or opening network targets."
       },
       {
         "method": "GET",

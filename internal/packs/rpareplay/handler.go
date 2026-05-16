@@ -5,6 +5,8 @@
 package rpareplay
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -63,6 +65,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/rpa-replay/recordings/start", Handler: h.StartRecording},
 		{Method: http.MethodPost, Path: "/v1/rpa-replay/recordings/stop", Handler: h.StopRecording},
 		{Method: http.MethodPost, Path: "/v1/rpa-replay/replay", Handler: h.Replay},
+		{Method: http.MethodPost, Path: "/v1/rpa-replay/executor/plan", Handler: h.ExecutorPlan},
 		{Method: http.MethodGet, Path: "/v1/rpa-replay/evidence/", Handler: h.Evidence},
 	}
 }
@@ -137,6 +140,110 @@ type ReplayResult struct {
 	PlannedSteps []TraceStep `json:"planned_steps,omitempty"`
 }
 
+type ExecutorPlanRequest struct {
+	Slug        string            `json:"slug"`
+	Params      map[string]string `json:"params,omitempty"`
+	Executor    string            `json:"executor,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	DryRun      *bool             `json:"dry_run,omitempty"`
+}
+
+type ExecutorStepPlan struct {
+	Index                  int            `json:"index"`
+	Action                 string         `json:"action"`
+	ExecutorAction         string         `json:"executor_action"`
+	Selector               string         `json:"selector,omitempty"`
+	Value                  string         `json:"value,omitempty"`
+	Assertion              *StepAssertion `json:"assertion,omitempty"`
+	RequiresBrowserIntent  bool           `json:"requires_browser_intent"`
+	RequiresActionTracer   bool           `json:"requires_action_tracer"`
+	ExecutesBrowserAction  bool           `json:"executes_browser_action"`
+	WritesBrowserState     bool           `json:"writes_browser_state"`
+	ConsumesExternalTarget bool           `json:"consumes_external_target"`
+}
+
+type BrowserIntentGatePlan struct {
+	Target                     string   `json:"target"`
+	RequiredPackID             string   `json:"required_pack_id"`
+	Capability                 string   `json:"capability"`
+	BrowserIntentGatePlanReady bool     `json:"browser_intent_gate_plan_ready"`
+	BrowserIntentReady         bool     `json:"browser_intent_ready"`
+	ConsumesBrowserIntent      bool     `json:"consumes_browser_intent"`
+	ExecutesBrowserActions     bool     `json:"executes_browser_actions"`
+	WritesBrowserState         bool     `json:"writes_browser_state"`
+	NetworkAccess              bool     `json:"network_access"`
+	BlockedBy                  []string `json:"blocked_by"`
+	Notes                      []string `json:"notes,omitempty"`
+}
+
+type ActionTracerHandoffPlan struct {
+	Target                string   `json:"target"`
+	ActionTracerPlanReady bool     `json:"action_tracer_plan_ready"`
+	ActionTracerReady     bool     `json:"action_tracer_ready"`
+	CapturesRuntimeTrace  bool     `json:"captures_runtime_trace"`
+	WritesTraceStore      bool     `json:"writes_trace_store"`
+	ExpectedArtifacts     []string `json:"expected_artifacts"`
+	BlockedBy             []string `json:"blocked_by"`
+	Notes                 []string `json:"notes,omitempty"`
+}
+
+type ExecutorHandoffPlan struct {
+	Target                     string             `json:"target"`
+	DedupKey                   string             `json:"dedup_key"`
+	TraceSlug                  string             `json:"trace_slug"`
+	Executor                   string             `json:"executor"`
+	ExecutorPlanReady          bool               `json:"executor_plan_ready"`
+	ExecutorReady              bool               `json:"executor_ready"`
+	ActionTracerPlanReady      bool               `json:"action_tracer_plan_ready"`
+	ActionTracerReady          bool               `json:"action_tracer_ready"`
+	BrowserIntentGatePlanReady bool               `json:"browser_intent_gate_plan_ready"`
+	BrowserIntentReady         bool               `json:"browser_intent_ready"`
+	ConsumesBrowserIntent      bool               `json:"consumes_browser_intent"`
+	ExecutesBrowserActions     bool               `json:"executes_browser_actions"`
+	WritesBrowserState         bool               `json:"writes_browser_state"`
+	WritesFiles                bool               `json:"writes_files"`
+	NetworkAccess              bool               `json:"network_access"`
+	StepCount                  int                `json:"step_count"`
+	Steps                      []ExecutorStepPlan `json:"steps"`
+	BlockedBy                  []string           `json:"blocked_by"`
+	Notes                      []string           `json:"notes,omitempty"`
+}
+
+type ExecutorPlanReport struct {
+	PackID                     string                  `json:"pack_id"`
+	GeneratedAt                time.Time               `json:"generated_at"`
+	Status                     string                  `json:"status"`
+	Stage                      string                  `json:"stage"`
+	DryRun                     bool                    `json:"dry_run"`
+	TraceSlug                  string                  `json:"trace_slug"`
+	TraceName                  string                  `json:"trace_name"`
+	Executor                   string                  `json:"executor"`
+	RequestedBy                string                  `json:"requested_by,omitempty"`
+	Reason                     string                  `json:"reason,omitempty"`
+	ExecutorPlanReady          bool                    `json:"executor_plan_ready"`
+	ExecutorReady              bool                    `json:"executor_ready"`
+	ActionTracerPlanReady      bool                    `json:"action_tracer_plan_ready"`
+	ActionTracerReady          bool                    `json:"action_tracer_ready"`
+	BrowserIntentGatePlanReady bool                    `json:"browser_intent_gate_plan_ready"`
+	BrowserIntentReady         bool                    `json:"browser_intent_ready"`
+	ConsumesBrowserIntent      bool                    `json:"consumes_browser_intent"`
+	ExecutesBrowserActions     bool                    `json:"executes_browser_actions"`
+	WritesBrowserState         bool                    `json:"writes_browser_state"`
+	WritesFiles                bool                    `json:"writes_files"`
+	NetworkAccess              bool                    `json:"network_access"`
+	ActionCount                int                     `json:"action_count"`
+	PlannedSteps               []ExecutorStepPlan      `json:"planned_steps"`
+	ExecutorHandoffPlan        ExecutorHandoffPlan     `json:"executor_handoff_plan"`
+	BrowserIntentGatePlan      BrowserIntentGatePlan   `json:"browser_intent_gate_plan"`
+	ActionTracerHandoffPlan    ActionTracerHandoffPlan `json:"action_tracer_handoff_plan"`
+	Artifacts                  []string                `json:"artifacts"`
+	Actions                    []string                `json:"actions"`
+	BlockedBy                  []string                `json:"blocked_by"`
+	Labels                     []string                `json:"labels"`
+	Notes                      []string                `json:"notes,omitempty"`
+}
+
 var safeSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
 
 func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
@@ -153,17 +260,34 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	active := len(h.sessions)
 	h.sessionsMu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":           PackID,
-		"stage":             "pack-shell",
-		"executor_ready":    false,
-		"trace_count":       len(traces),
-		"active_recordings": active,
-		"store_dir":         h.dataDir,
+		"pack_id":                        PackID,
+		"stage":                          "pack-shell-before-executor",
+		"executor_plan_ready":            true,
+		"executor_ready":                 false,
+		"action_tracer_plan_ready":       true,
+		"action_tracer_ready":            false,
+		"browser_intent_gate_plan_ready": true,
+		"browser_intent_ready":           false,
+		"consumes_browser_intent":        false,
+		"executes_browser_actions":       false,
+		"writes_browser_state":           false,
+		"writes_files":                   false,
+		"network_access":                 false,
+		"trace_count":                    len(traces),
+		"active_recordings":              active,
+		"store_dir":                      h.dataDir,
 		"capabilities": []string{
 			"rpa.trace.store",
 			"rpa.recording.session",
 			"rpa.replay.dry_run",
+			"rpa.executor.plan",
+			"rpa.browser_intent.gate_plan",
+			"rpa.action_tracer.handoff_plan",
 			"rpa.evidence.export",
+		},
+		"notes": []string{
+			"Executor planning is a non-destructive handoff contract for a future Browser Intent / ActionTracer executor.",
+			"executor_ready=false, consumes_browser_intent=false, executes_browser_actions=false, writes_browser_state=false, writes_files=false, and network_access=false keep this pack shell plan-only.",
 		},
 	})
 }
@@ -330,6 +454,28 @@ func (h *Handler) Replay(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"result": result, "trace": trace.Slug})
 }
 
+func (h *Handler) ExecutorPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ExecutorPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid executor plan payload")
+		return
+	}
+	if strings.TrimSpace(req.Slug) == "" {
+		writeError(w, http.StatusBadRequest, "slug is required")
+		return
+	}
+	trace, err := h.loadTrace(req.Slug)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": h.buildExecutorPlan(trace, req)})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -341,13 +487,158 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":     PackID,
-		"exported_at": h.now().UTC(),
-		"format":      "json-evidence-pack",
-		"files":       []string{"meta.json", "trace.json"},
-		"trace":       trace,
+	executorPlan := h.buildExecutorPlan(trace, ExecutorPlanRequest{
+		Slug:        trace.Slug,
+		RequestedBy: "evidence-export",
+		Reason:      "trace executor handoff evidence",
 	})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"pack_id":                    PackID,
+		"exported_at":                h.now().UTC(),
+		"format":                     "json-evidence-pack",
+		"files":                      []string{"meta.json", "trace.json", "executor-handoff-plan.json", "browser-intent-gate-plan.json", "action-tracer-plan.json"},
+		"trace":                      trace,
+		"executor_plan":              executorPlan,
+		"executor_handoff_plan":      executorPlan.ExecutorHandoffPlan,
+		"browser_intent_gate_plan":   executorPlan.BrowserIntentGatePlan,
+		"action_tracer_handoff_plan": executorPlan.ActionTracerHandoffPlan,
+	})
+}
+
+func (h *Handler) buildExecutorPlan(trace Trace, req ExecutorPlanRequest) ExecutorPlanReport {
+	executor := strings.ToLower(strings.TrimSpace(req.Executor))
+	if executor == "" {
+		executor = "browser-intent"
+	}
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "plan browser/computer-use executor handoff for recorded RPA trace"
+	}
+	dryRun := true
+	if req.DryRun != nil {
+		dryRun = *req.DryRun
+	}
+	substituted := substituteSteps(trace.Steps, req.Params)
+	steps := make([]ExecutorStepPlan, 0, len(substituted))
+	for _, step := range substituted {
+		steps = append(steps, executorStepPlan(step))
+	}
+	blockedBy := []string{"browser-intent-runtime-not-wired", "action-tracer-not-wired", "computer-use-executor-not-wired", "pack-runtime-executor-not-wired"}
+	artifacts := []string{"executor-handoff-plan.json", "browser-intent-gate-plan.json", "action-tracer-plan.json", "trace.json"}
+	dedupKey := deterministicID("rpa-executor-plan", trace.Slug, executor, fmt.Sprintf("%d", len(steps)))
+	browserGate := BrowserIntentGatePlan{
+		Target:                     "yunque.pack.browser-intent",
+		RequiredPackID:             "yunque.pack.browser-intent",
+		Capability:                 "browser.intent.action",
+		BrowserIntentGatePlanReady: true,
+		BrowserIntentReady:         false,
+		ConsumesBrowserIntent:      false,
+		ExecutesBrowserActions:     false,
+		WritesBrowserState:         false,
+		NetworkAccess:              false,
+		BlockedBy:                  blockedBy,
+		Notes: []string{
+			"This gate only describes the future Browser Intent dependency; it does not call browser_act or extension routes.",
+			"Browser actions remain blocked until an enabled Browser Intent runtime and executor policy are wired.",
+		},
+	}
+	actionTracer := ActionTracerHandoffPlan{
+		Target:                "rpa.action_tracer.trace_sink",
+		ActionTracerPlanReady: true,
+		ActionTracerReady:     false,
+		CapturesRuntimeTrace:  false,
+		WritesTraceStore:      false,
+		ExpectedArtifacts:     []string{"runtime-trace.json", "screenshots/", "assertions.json"},
+		BlockedBy:             []string{"action-tracer-not-wired", "runtime-trace-sink-not-wired"},
+		Notes:                 []string{"ActionTracer handoff is plan-only; the route does not capture screenshots, browser events, or runtime traces."},
+	}
+	handoff := ExecutorHandoffPlan{
+		Target:                     "rpa.replay.executor.browser_intent",
+		DedupKey:                   dedupKey,
+		TraceSlug:                  trace.Slug,
+		Executor:                   executor,
+		ExecutorPlanReady:          true,
+		ExecutorReady:              false,
+		ActionTracerPlanReady:      true,
+		ActionTracerReady:          false,
+		BrowserIntentGatePlanReady: true,
+		BrowserIntentReady:         false,
+		ConsumesBrowserIntent:      false,
+		ExecutesBrowserActions:     false,
+		WritesBrowserState:         false,
+		WritesFiles:                false,
+		NetworkAccess:              false,
+		StepCount:                  len(steps),
+		Steps:                      steps,
+		BlockedBy:                  blockedBy,
+		Notes: []string{
+			"Executor handoff maps parameter-substituted trace steps into a future Browser Intent executor input contract.",
+			"No browser session, network target, file system, or trace sink is touched by this route.",
+		},
+	}
+	return ExecutorPlanReport{
+		PackID:                     PackID,
+		GeneratedAt:                h.now().UTC(),
+		Status:                     "rpa_executor_handoff_plan_ready_pending_executor",
+		Stage:                      "executor-plan-before-runtime",
+		DryRun:                     dryRun,
+		TraceSlug:                  trace.Slug,
+		TraceName:                  trace.Name,
+		Executor:                   executor,
+		RequestedBy:                requestedBy,
+		Reason:                     reason,
+		ExecutorPlanReady:          true,
+		ExecutorReady:              false,
+		ActionTracerPlanReady:      true,
+		ActionTracerReady:          false,
+		BrowserIntentGatePlanReady: true,
+		BrowserIntentReady:         false,
+		ConsumesBrowserIntent:      false,
+		ExecutesBrowserActions:     false,
+		WritesBrowserState:         false,
+		WritesFiles:                false,
+		NetworkAccess:              false,
+		ActionCount:                len(steps),
+		PlannedSteps:               steps,
+		ExecutorHandoffPlan:        handoff,
+		BrowserIntentGatePlan:      browserGate,
+		ActionTracerHandoffPlan:    actionTracer,
+		Artifacts:                  artifacts,
+		Actions: []string{
+			"mapped recorded RPA trace steps into a Browser Intent executor handoff contract",
+			"kept Browser Intent consumption, ActionTracer capture, browser action execution, file writes, and network access disabled",
+		},
+		BlockedBy: blockedBy,
+		Labels:    []string{"rpa-replay", "executor-handoff", "browser-intent-gate", "action-tracer-plan", "no-browser-execution"},
+		Notes: []string{
+			"executor_plan_ready=true means only the future executor input shape is available.",
+			"executor_ready=false, consumes_browser_intent=false, executes_browser_actions=false, writes_browser_state=false, writes_files=false, and network_access=false keep this slice reversible.",
+		},
+	}
+}
+
+func executorStepPlan(step TraceStep) ExecutorStepPlan {
+	action := strings.ToLower(strings.TrimSpace(step.Action))
+	if action == "" {
+		action = "noop"
+	}
+	return ExecutorStepPlan{
+		Index:                  step.Index,
+		Action:                 step.Action,
+		ExecutorAction:         action,
+		Selector:               step.Selector,
+		Value:                  step.Value,
+		Assertion:              step.Assertion,
+		RequiresBrowserIntent:  action != "noop",
+		RequiresActionTracer:   true,
+		ExecutesBrowserAction:  false,
+		WritesBrowserState:     false,
+		ConsumesExternalTarget: false,
+	}
 }
 
 func (h *Handler) normalizeTrace(trace Trace) (Trace, error) {
@@ -489,6 +780,11 @@ func substitute(text string, params map[string]string) string {
 }
 
 func safeSlug(slug string) bool { return safeSlugRe.MatchString(slug) }
+
+func deterministicID(parts ...string) string {
+	hash := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(hash[:])[:24]
+}
 
 func slugify(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))

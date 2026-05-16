@@ -37,7 +37,7 @@ test("RPAReplayClient reads status and trace list with bearer token", async () =
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.rpa-replay", stage: "pack-shell", executor_ready: false, trace_count: 1, active_recordings: 0, capabilities: [] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.rpa-replay", stage: "pack-shell-before-executor", executor_plan_ready: true, executor_ready: false, action_tracer_plan_ready: true, action_tracer_ready: false, browser_intent_gate_plan_ready: true, browser_intent_ready: false, consumes_browser_intent: false, executes_browser_actions: false, writes_browser_state: false, writes_files: false, network_access: false, trace_count: 1, active_recordings: 0, capabilities: ["rpa.executor.plan"] });
       return jsonResponse({ traces: [{ slug: "export-report", name: "Export", recorded_at: "now", step_count: 1 }], count: 1 });
     },
   });
@@ -46,10 +46,52 @@ test("RPAReplayClient reads status and trace list with bearer token", async () =
   const traces = await client.traces();
 
   assertEqual(status.pack_id, "yunque.pack.rpa-replay");
+  assertEqual(status.executor_plan_ready, true);
+  assertEqual(status.executes_browser_actions, false);
   assertEqual(traces.count, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/rpa-replay/status");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/rpa-replay/traces");
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer token-123");
+});
+
+test("RPAReplayClient plans Browser Intent executor handoffs without executing browser actions", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createRPAReplayClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ plan: {
+        status: "rpa_executor_handoff_plan_ready_pending_executor",
+        executor_plan_ready: true,
+        executor_ready: false,
+        action_tracer_plan_ready: true,
+        action_tracer_ready: false,
+        browser_intent_gate_plan_ready: true,
+        browser_intent_ready: false,
+        consumes_browser_intent: false,
+        executes_browser_actions: false,
+        writes_browser_state: false,
+        writes_files: false,
+        network_access: false,
+        action_count: 1,
+        planned_steps: [{ index: 1, action: "navigate", executor_action: "navigate", value: "https://erp.example.com/reports?month=2026-05", requires_browser_intent: true, requires_action_tracer: true, executes_browser_action: false, writes_browser_state: false, consumes_external_target: false }],
+        executor_handoff_plan: { target: "rpa.replay.executor.browser_intent" },
+        browser_intent_gate_plan: { target: "yunque.pack.browser-intent" },
+        action_tracer_handoff_plan: { target: "rpa.action_tracer.trace_sink" },
+        artifacts: ["executor-handoff-plan.json", "browser-intent-gate-plan.json", "action-tracer-plan.json"],
+      } });
+    },
+  });
+
+  const plan = await client.executorPlan({ slug: "export-report", params: { month: "2026-05" }, dry_run: true });
+
+  assertEqual(plan.plan.executor_plan_ready, true);
+  assertEqual(plan.plan.executor_ready, false);
+  assertEqual(plan.plan.executes_browser_actions, false);
+  assertEqual(plan.plan.writes_browser_state, false);
+  assertEqual(plan.plan.network_access, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/rpa-replay/executor/plan");
+  assertEqual(calls[0]?.init?.body, JSON.stringify({ slug: "export-report", params: { month: "2026-05" }, dry_run: true }));
 });
 
 test("RPAReplayClient creates and reads traces", async () => {
@@ -106,14 +148,15 @@ test("RPAReplayClient exports evidence packs", async () => {
     baseUrl: "http://localhost:9090",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      return jsonResponse({ pack_id: "yunque.pack.rpa-replay", exported_at: "now", format: "json-evidence-pack", files: ["trace.json"], trace: { slug: "export-report", name: "Export", type: "rpa-replay", recorded_at: "now", steps: [] } });
+      return jsonResponse({ pack_id: "yunque.pack.rpa-replay", exported_at: "now", format: "json-evidence-pack", files: ["trace.json", "executor-handoff-plan.json"], trace: { slug: "export-report", name: "Export", type: "rpa-replay", recorded_at: "now", steps: [] }, executor_plan: { executor_plan_ready: true, executor_ready: false } });
     },
   });
 
   const evidence = await client.evidence("export-report");
 
   assertEqual(evidence.format, "json-evidence-pack");
-  assertDeepEqual(evidence.files, ["trace.json"]);
+  assertDeepEqual(evidence.files, ["trace.json", "executor-handoff-plan.json"]);
+  assertEqual(evidence.executor_plan?.executor_ready, false);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/rpa-replay/evidence/export-report");
 });
 
