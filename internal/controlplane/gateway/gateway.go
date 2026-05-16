@@ -234,8 +234,9 @@ type Gateway struct {
 	allowedOrigins []string
 
 	// Workflow Engine
-	workflowStore  workflow.Store
-	workflowEngine *workflow.Engine
+	workflowStore      workflow.Store
+	workflowEngine     *workflow.Engine
+	workflowAPIHandler *workflowapi.Handler
 
 	// RBAC
 	rbacEnforcer   *rbac.Enforcer
@@ -669,11 +670,12 @@ func (g *Gateway) routes() {
 		},
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
-	(&workflowapi.Handler{
+	g.workflowAPIHandler = &workflowapi.Handler{
 		Store:   g.workflowStore,
 		Engine:  g.workflowEngine,
 		LLMCall: g.llmCall,
-	}).RegisterRoutes(g.mux, g.requireAuth)
+	}
+	g.workflowAPIHandler.RegisterRoutes(g.mux, g.requireAuth)
 
 	(&schedulerapi.Handler{
 		Scheduler: g.scheduler,

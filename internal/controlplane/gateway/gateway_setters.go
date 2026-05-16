@@ -271,7 +271,12 @@ func (g *Gateway) SetAuditTrail(at *audit.Trail) { g.auditTrail = at }
 func (g *Gateway) SetProviderRegistry(pr *llm.ProviderRegistry) { g.providerReg = pr }
 
 // SetLLMCall attaches the shared LLM caller used by extracted route groups.
-func (g *Gateway) SetLLMCall(fn workflow.LLMCallFunc) { g.llmCall = fn }
+func (g *Gateway) SetLLMCall(fn workflow.LLMCallFunc) {
+	g.llmCall = fn
+	if g.workflowAPIHandler != nil {
+		g.workflowAPIHandler.SetLLMCall(fn)
+	}
+}
 
 // SetSpeechRegistry attaches the TTS/STT speech registry.
 func (g *Gateway) SetSpeechRegistry(sr *speech.Registry) { g.speechReg = sr }
@@ -349,10 +354,20 @@ func (g *Gateway) SetChannelRegistry(cr *channel.Registry) { g.channelReg = cr }
 func (g *Gateway) SetPreAckEmojis(emojis []string) { g.preAckEmojis = emojis }
 
 // SetWorkflowStore attaches the workflow definition/instance store.
-func (g *Gateway) SetWorkflowStore(s workflow.Store) { g.workflowStore = s }
+func (g *Gateway) SetWorkflowStore(s workflow.Store) {
+	g.workflowStore = s
+	if g.workflowAPIHandler != nil {
+		g.workflowAPIHandler.SetStore(s)
+	}
+}
 
 // SetWorkflowEngine attaches the workflow execution engine.
-func (g *Gateway) SetWorkflowEngine(e *workflow.Engine) { g.workflowEngine = e }
+func (g *Gateway) SetWorkflowEngine(e *workflow.Engine) {
+	g.workflowEngine = e
+	if g.workflowAPIHandler != nil {
+		g.workflowAPIHandler.SetEngine(e)
+	}
+}
 
 // SetRBACEnforcer attaches the RBAC permission enforcer.
 func (g *Gateway) SetRBACEnforcer(e *rbac.Enforcer) { g.rbacEnforcer = e }
