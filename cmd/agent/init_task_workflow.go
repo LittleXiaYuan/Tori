@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/knowledge"
 	"yunque-agent/internal/agentcore/planner"
+	agentrt "yunque-agent/internal/agentcore/runtime"
 	"yunque-agent/internal/agentcore/trigger"
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/internal/config"
@@ -29,16 +29,34 @@ func wireWorkflowExecutors(gw *gateway.Gateway, wfEngine *workflow.Engine, knowl
 		if hub == nil || !hub.Connected() {
 			return "", fmt.Errorf("browser extension not connected; install and connect the Yunque Browser Connector extension")
 		}
-		browserAction := map[string]any{"type": "browser_" + action}
+		action = strings.TrimSpace(action)
+		if action == "" {
+			action = "navigate"
+		}
+		if strings.HasPrefix(action, "browser_") || action == "session_status" {
+			// already normalized
+		} else {
+			action = "browser_" + action
+		}
+		browserAction := map[string]any{"type": action}
 		if target, ok := args["target"].(string); ok {
-			if action == "navigate" {
+			if action == "browser_navigate" {
 				browserAction["url"] = target
 			} else {
 				browserAction["target"] = map[string]any{"strategy": "bySelector", "selector": target}
 			}
 		}
+		if sel, ok := args["selector"].(string); ok && sel != "" {
+			browserAction["target"] = map[string]any{"strategy": "bySelector", "selector": sel}
+		}
+		if label, ok := args["text_target"].(string); ok && label != "" {
+			browserAction["target"] = map[string]any{"strategy": "byText", "text": label}
+		}
 		if text, ok := args["text"].(string); ok {
 			browserAction["text"] = text
+		}
+		if pressEnter, ok := args["press_enter"].(bool); ok {
+			browserAction["press_enter"] = pressEnter
 		}
 		actionData, _ := json.Marshal(browserAction)
 		resultData, err := hub.SendActionRaw(ctx, actionData)

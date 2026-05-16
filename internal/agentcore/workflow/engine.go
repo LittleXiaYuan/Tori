@@ -492,6 +492,22 @@ func (e *Engine) execBrowserNode(ctx context.Context, node *Node, inst *Instance
 		}
 		args["target"] = target
 	}
+	if selector, ok := node.Config["selector"].(string); ok {
+		for k, v := range inst.Variables {
+			if s, ok := v.(string); ok {
+				selector = replaceAll(selector, "{"+k+"}", s)
+			}
+		}
+		args["selector"] = selector
+	}
+	if textTarget, ok := node.Config["text_target"].(string); ok {
+		for k, v := range inst.Variables {
+			if s, ok := v.(string); ok {
+				textTarget = replaceAll(textTarget, "{"+k+"}", s)
+			}
+		}
+		args["text_target"] = textTarget
+	}
 	if text, ok := node.Config["text"].(string); ok {
 		for k, v := range inst.Variables {
 			if s, ok := v.(string); ok {
@@ -499,6 +515,9 @@ func (e *Engine) execBrowserNode(ctx context.Context, node *Node, inst *Instance
 			}
 		}
 		args["text"] = text
+	}
+	if pressEnter, ok := node.Config["press_enter"].(bool); ok {
+		args["press_enter"] = pressEnter
 	}
 	return e.execBrowser(ctx, action, args)
 }
