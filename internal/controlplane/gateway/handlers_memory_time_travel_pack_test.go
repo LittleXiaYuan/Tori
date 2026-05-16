@@ -149,6 +149,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_audit_link_writeback_store_ready") || !strings.Contains(w.Body.String(), "audit-link-writeback-store.json") || !strings.Contains(w.Body.String(), "audit-link-writeback-record.json") || !strings.Contains(w.Body.String(), `"writes_audit_link_writeback_store":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) || !strings.Contains(w.Body.String(), `"backfills_audit_seq":false`) {
 		t.Fatalf("audit proof-link writeback store status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback/executor/plan", strings.NewReader(`{"request_key":"approval-link-store-gateway","requested_by":"operator","reason":"gateway executor plan smoke","dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_audit_link_writeback_executor_plan_ready") || !strings.Contains(w.Body.String(), "executor_input_contract_ready") || !strings.Contains(w.Body.String(), "audit-link-writeback-executor-plan.json") || !strings.Contains(w.Body.String(), "audit-link-executor-handoff-plan.json") || !strings.Contains(w.Body.String(), `"consumes_audit_link_writeback_store":true`) || !strings.Contains(w.Body.String(), `"audit_proof_link_executor_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"backfills_audit_seq":false`) {
+		t.Fatalf("audit proof-link executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -183,6 +191,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/audit/links/preview",
 				"/v1/memory-time-travel/audit/links/writeback-plan",
 				"/v1/memory-time-travel/audit/links/writeback/store",
+				"/v1/memory-time-travel/audit/links/writeback/executor/plan",
 				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
 			},
@@ -206,6 +215,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/preview"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback-plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback/store"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback/executor/plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},
 			},

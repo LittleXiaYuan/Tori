@@ -6,7 +6,7 @@ import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -38,6 +38,7 @@ export default function MemoryTimeTravelPackPage() {
   const [auditLinkPreview, setAuditLinkPreview] = useState<MemoryTimeTravelKVAuditProofLinkPreview | null>(null);
   const [auditLinkWritebackPlan, setAuditLinkWritebackPlan] = useState<MemoryTimeTravelKVAuditProofLinkWritebackPlan | null>(null);
   const [auditLinkWritebackStore, setAuditLinkWritebackStore] = useState<MemoryTimeTravelKVAuditProofLinkWritebackStore | null>(null);
+  const [auditLinkWritebackExecutorPlan, setAuditLinkWritebackExecutorPlan] = useState<MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan | null>(null);
   const [nativeKVHistoryPlan, setNativeKVHistoryPlan] = useState<MemoryTimeTravelNativeKVHistoryPlan | null>(null);
   const [nativeKVHistoryPreview, setNativeKVHistoryPreview] = useState<MemoryTimeTravelNativeKVHistoryMigrationPreview | null>(null);
   const [kvHistoryDualReadParity, setKVHistoryDualReadParity] = useState<MemoryTimeTravelKVHistoryDualReadParity | null>(null);
@@ -48,7 +49,7 @@ export default function MemoryTimeTravelPackPage() {
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "audit-link-writeback-executor" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -341,6 +342,29 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const buildAuditLinkWritebackExecutorPlan = async () => {
+    setBusy("audit-link-writeback-executor");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.auditLinksWritebackExecutorPlan({
+        namespace,
+        request_key: `${approvalId}-audit-link`,
+        requested_by: "pack-console",
+        reason: "operator audit proof-link executor handoff review",
+        dry_run: true,
+      });
+      setAuditLinkWritebackExecutorPlan(res.plan);
+      showToast(
+        `已生成 executor handoff plan（动作 ${res.plan.action_count}，仍未写 native/Ledger/Merkle）`,
+        "success",
+      );
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 KV audit proof-link executor handoff plan 失败，请先写入 handoff store"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const buildNativeKVHistoryPlan = async () => {
     setBusy("native-kv-history");
     setError(null);
@@ -452,7 +476,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、retention prune/cron、逐条 KV 审计证明真实写回和真实回滚写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan / pack-local handoff store / executor handoff plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、retention prune/cron、逐条 KV 审计证明真实写回和真实回滚写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -656,7 +680,7 @@ export default function MemoryTimeTravelPackPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><Link2 size={16} />KV audit proof-link schema / preview gate</div>
             <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              先暴露逐条 KV 证明链接的稳定 schema，并用 `audit-link-preview.json` 把 native kv_history row preview 与 Merkle audit record 做只读候选关联；`audit-link-writeback-plan.json` 只把已匹配候选映射为未来 audit_seq/audit_hash 回填动作和 Approval Manager 请求形态；`audit-link-writeback-store.json` / `audit-link-writeback-record.json` 只保存 pack-local durable handoff record，当前不会回填 audit_seq/audit_hash、不会写 native/Ledger，也不会声称已有 per-KV proof。
+              先暴露逐条 KV 证明链接的稳定 schema，并用 `audit-link-preview.json` 把 native kv_history row preview 与 Merkle audit record 做只读候选关联；`audit-link-writeback-plan.json` 只把已匹配候选映射为未来 audit_seq/audit_hash 回填动作和 Approval Manager 请求形态；`audit-link-writeback-store.json` / `audit-link-writeback-record.json` 只保存 pack-local durable handoff record；`audit-link-writeback-executor-plan.json` / `audit-link-executor-handoff-plan.json` / `audit-link-executor-audit-plan.json` 只生成 executor 输入与审计追加计划，当前不会回填 audit_seq/audit_hash、不会写 native/Ledger、不会追加 Merkle，也不会声称已有 per-KV proof。
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -664,6 +688,7 @@ export default function MemoryTimeTravelPackPage() {
             <Button variant="outline" isPending={busy === "audit-link-preview"} onPress={previewAuditLinks}><ShieldCheck size={14} />生成 preview gate</Button>
             <Button variant="outline" isPending={busy === "audit-link-writeback"} onPress={buildAuditLinkWritebackPlan}><UnlockKeyhole size={14} />生成 writeback plan</Button>
             <Button variant="outline" isPending={busy === "audit-link-writeback-store"} onPress={writeAuditLinkWritebackStore}><Save size={14} />写入 handoff store</Button>
+            <Button variant="outline" isPending={busy === "audit-link-writeback-executor"} onPress={buildAuditLinkWritebackExecutorPlan}><DatabaseZap size={14} />生成 executor handoff plan</Button>
           </div>
         </div>
         {auditLinks ? (
@@ -729,6 +754,23 @@ export default function MemoryTimeTravelPackPage() {
             </div>
             <TextField value={JSON.stringify(auditLinkWritebackStore, null, 2)} onChange={() => undefined}>
               <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link writeback store JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        )}
+        {auditLinkWritebackExecutorPlan && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: auditLinkWritebackExecutorPlan.audit_proof_link_executor_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: auditLinkWritebackExecutorPlan.audit_proof_link_executor_ready ? "#22c55e" : "#facc15" }}>
+                {auditLinkWritebackExecutorPlan.status}
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{auditLinkWritebackExecutorPlan.action_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>kv_audit_link_writeback_executor_plan_ready {String(auditLinkWritebackExecutorPlan.kv_audit_link_writeback_executor_plan_ready)} · consumes store {String(auditLinkWritebackExecutorPlan.consumes_audit_link_writeback_store)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>executor ready {String(auditLinkWritebackExecutorPlan.audit_proof_link_executor_ready)} · input contract {String(auditLinkWritebackExecutorPlan.executor_input_contract_ready)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes audit chain {String(auditLinkWritebackExecutorPlan.writes_audit_chain)} · audit append {String(auditLinkWritebackExecutorPlan.audit_append_plan_ready)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact audit-link-writeback-executor-plan.json · audit-link-executor-handoff-plan.json · audit-link-executor-audit-plan.json</div>
+            </div>
+            <TextField value={JSON.stringify(auditLinkWritebackExecutorPlan, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel KV audit proof-link executor handoff plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
         )}

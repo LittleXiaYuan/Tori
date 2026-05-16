@@ -7,7 +7,8 @@
 // audit proof-link schema plus plan-only proof-link preview gates over native
 // kv_history row previews and Merkle records, plan-only proof-link write-back
 // bridges, pack-local proof-link write-back store handoff records,
-// native kv_history table/index/migration planning, read-only migration row previews, dual-read parity
+// executor handoff plans, native kv_history table/index/migration planning,
+// read-only migration row previews, dual-read parity
 // validation against the reserved adapter, cutover readiness gate reporting,
 // and non-destructive dual-read/dual-write cutover planning while native Ledger
 // KV kv_history write-back remains a later slice.
@@ -620,6 +621,103 @@ type KVAuditProofLinkWritebackStoreReport struct {
 	Notes                          []string                              `json:"notes,omitempty"`
 }
 
+type KVAuditProofLinkWritebackExecutorPlanRequest struct {
+	RecordID    string `json:"record_id,omitempty"`
+	RequestID   string `json:"request_id,omitempty"`
+	RequestKey  string `json:"request_key,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	RequestedBy string `json:"requested_by,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	DryRun      bool   `json:"dry_run,omitempty"`
+}
+
+type KVAuditProofLinkExecutorHandoffPlan struct {
+	Target                          string   `json:"target"`
+	SourceStore                     string   `json:"source_store"`
+	SourceRecordArtifact            string   `json:"source_record_artifact"`
+	RecordID                        string   `json:"record_id"`
+	RequestID                       string   `json:"request_id"`
+	RequestKey                      string   `json:"request_key"`
+	Namespace                       string   `json:"namespace"`
+	TemporalNamespace               string   `json:"temporal_namespace"`
+	DedupKey                        string   `json:"dedup_key"`
+	ConsumesAuditLinkWritebackStore bool     `json:"consumes_audit_link_writeback_store"`
+	ExecutorInputContractReady      bool     `json:"executor_input_contract_ready"`
+	AuditProofLinkExecutorReady     bool     `json:"audit_proof_link_executor_ready"`
+	ApprovalRequired                bool     `json:"approval_required"`
+	GlobalApprovalEnqueueReady      bool     `json:"global_approval_enqueue_ready"`
+	WritesNativeKVHistory           bool     `json:"writes_native_kv_history"`
+	WritesLedgerKV                  bool     `json:"writes_ledger_kv"`
+	BackfillsAuditSeq               bool     `json:"backfills_audit_seq"`
+	BackfillsAuditHash              bool     `json:"backfills_audit_hash"`
+	MerkleAppendReady               bool     `json:"merkle_append_ready"`
+	AppendsMerkle                   bool     `json:"appends_merkle"`
+	ActionCount                     int      `json:"action_count"`
+	ActionKeys                      []string `json:"action_keys"`
+	Actions                         []string `json:"actions"`
+	BlockedBy                       []string `json:"blocked_by"`
+	Notes                           []string `json:"notes,omitempty"`
+}
+
+type KVAuditProofLinkExecutorAuditAppendPlan struct {
+	AuditAppendPlanReady bool     `json:"audit_append_plan_ready"`
+	MerkleAppendReady    bool     `json:"merkle_append_ready"`
+	Chain                string   `json:"chain"`
+	EventType            string   `json:"event_type"`
+	Subject              string   `json:"subject"`
+	PayloadDigest        string   `json:"payload_digest"`
+	DedupKey             string   `json:"dedup_key"`
+	WritesAuditChain     bool     `json:"writes_audit_chain"`
+	Actions              []string `json:"actions"`
+	BlockedBy            []string `json:"blocked_by"`
+	Notes                []string `json:"notes,omitempty"`
+}
+
+type KVAuditProofLinkWritebackExecutorPlanReport struct {
+	PackID                                string                                  `json:"pack_id"`
+	GeneratedAt                           time.Time                               `json:"generated_at"`
+	Status                                string                                  `json:"status"`
+	Stage                                 string                                  `json:"stage"`
+	DryRun                                bool                                    `json:"dry_run"`
+	RecordID                              string                                  `json:"record_id"`
+	RequestID                             string                                  `json:"request_id"`
+	RequestKey                            string                                  `json:"request_key"`
+	Namespace                             string                                  `json:"namespace"`
+	TemporalNamespace                     string                                  `json:"temporal_namespace"`
+	RequestedBy                           string                                  `json:"requested_by,omitempty"`
+	Reason                                string                                  `json:"reason,omitempty"`
+	KVAuditLinkWritebackExecutorPlanReady bool                                    `json:"kv_audit_link_writeback_executor_plan_ready"`
+	ExecutorInputContractReady            bool                                    `json:"executor_input_contract_ready"`
+	ConsumesAuditLinkWritebackStore       bool                                    `json:"consumes_audit_link_writeback_store"`
+	KVAuditLinkWritebackStoreReady        bool                                    `json:"kv_audit_link_writeback_store_ready"`
+	KVAuditLinkWritebackReady             bool                                    `json:"kv_audit_link_writeback_ready"`
+	KVAuditLinkageReady                   bool                                    `json:"kv_audit_linkage_ready"`
+	AuditProofLinkExecutorReady           bool                                    `json:"audit_proof_link_executor_ready"`
+	AuditProofLinkReady                   bool                                    `json:"audit_proof_link_ready"`
+	ApprovalRequestPlanReady              bool                                    `json:"approval_request_plan_ready"`
+	ApprovalManagerBridgePlanReady        bool                                    `json:"approval_manager_bridge_plan_ready"`
+	GlobalApprovalEnqueueReady            bool                                    `json:"global_approval_enqueue_ready"`
+	AuditAppendPlanReady                  bool                                    `json:"audit_append_plan_ready"`
+	MerkleAppendReady                     bool                                    `json:"merkle_append_ready"`
+	WritesAuditChain                      bool                                    `json:"writes_audit_chain"`
+	WritesLedgerKV                        bool                                    `json:"writes_ledger_kv"`
+	WritesNativeKVHistory                 bool                                    `json:"writes_native_kv_history"`
+	BackfillsAuditSeq                     bool                                    `json:"backfills_audit_seq"`
+	BackfillsAuditHash                    bool                                    `json:"backfills_audit_hash"`
+	AppendsMerkle                         bool                                    `json:"appends_merkle"`
+	ActionCount                           int                                     `json:"action_count"`
+	AuditLinkWritebackRecord              KVAuditProofLinkWritebackRecord         `json:"audit_link_writeback_record"`
+	AuditLinkWritebackStore               KVAuditProofLinkWritebackStoreSummary   `json:"audit_link_writeback_store"`
+	ExecutorHandoffPlan                   KVAuditProofLinkExecutorHandoffPlan     `json:"executor_handoff_plan"`
+	AuditAppendPlan                       KVAuditProofLinkExecutorAuditAppendPlan `json:"audit_append_plan"`
+	WritebackActions                      []KVAuditProofLinkWritebackActionPlan   `json:"writeback_actions"`
+	Artifacts                             []string                                `json:"artifacts"`
+	Actions                               []string                                `json:"actions"`
+	BlockedBy                             []string                                `json:"blocked_by"`
+	Labels                                []string                                `json:"labels"`
+	Notes                                 []string                                `json:"notes,omitempty"`
+}
+
 type NativeKVHistoryColumnPlan struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
@@ -988,6 +1086,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/preview", Handler: h.AuditLinksPreview},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback-plan", Handler: h.AuditLinksWritebackPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback/store", Handler: h.AuditLinksWritebackStore},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/audit/links/writeback/executor/plan", Handler: h.AuditLinksWritebackExecutorPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
 	}
@@ -1025,112 +1124,119 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.audit.links.preview",
 		"memory.audit.links.writeback_plan",
 		"memory.audit.links.writeback_store",
+		"memory.audit.links.writeback_executor_plan",
 		"memory.evidence.export",
 	}
 	if h.merkleVerifier != nil {
 		capabilities = append(capabilities, "memory.audit.verify")
 	}
 	writeJSON(w, http.StatusOK, statusResponse{
-		PackID:                         PackID,
-		Stage:                          "pack-shell-before-ledger-kv-history",
-		SnapshotStoreReady:             true,
-		TemporalQueryReady:             true,
-		LedgerHistoryReady:             h.temporalKV != nil,
-		TemporalKVAdapterReady:         true,
-		NativeKVHistoryPlanReady:       true,
-		KVHistoryMigrationPlanReady:    true,
-		KVHistoryIndexPlanReady:        true,
-		NativeKVHistoryPreviewReady:    h.nativeKVHistoryPreviewer != nil,
-		KVHistoryCutoverPlanReady:      true,
-		KVHistoryCutoverReadinessReady: true,
-		DualReadPlanReady:              true,
-		DualReadParityCheckReady:       h.temporalKV != nil && h.nativeKVHistoryPreviewer != nil,
-		DualWritePlanReady:             true,
-		NativeKVHistoryReady:           false,
-		WritesNativeKVHistory:          false,
-		MigratesKVHistory:              false,
-		DualReadReady:                  false,
-		DualWriteReady:                 false,
-		CutoverReady:                   false,
-		RollbackReady:                  false,
-		MerkleVerificationReady:        h.merkleVerifier != nil,
-		MemoryPersisterWritebackReady:  h.memoryPersisterWriteback,
-		ApprovedRollbackPlanReady:      true,
-		ApprovalRequestPlanReady:       true,
-		ApprovalManagerBridgePlanReady: true,
-		GlobalApprovalEnqueueReady:     false,
-		RollbackWritebackPlanReady:     true,
-		RollbackWritebackReady:         false,
-		WritesLedgerKV:                 false,
-		WritesTemporalKV:               false,
-		RetentionPlanReady:             true,
-		RetentionPrunePlanReady:        true,
-		RetentionPruneReady:            false,
-		KVAuditLinkSchemaReady:         true,
-		KVAuditLinkPreviewReady:        true,
-		KVAuditLinkWritebackPlanReady:  true,
-		KVAuditLinkWritebackStoreReady: true,
-		KVAuditLinkWritebackReady:      false,
-		KVAuditLinkageReady:            false,
-		SnapshotCount:                  len(snapshots),
-		NamespaceCount:                 len(namespaces),
-		StoreDir:                       h.dataDir,
-		Policy:                         h.policy,
-		LastSnapshot:                   firstSnapshot(snapshots),
-		Capabilities:                   capabilities,
-		Notes:                          h.statusNotes(),
+		PackID:                                PackID,
+		Stage:                                 "pack-shell-before-ledger-kv-history",
+		SnapshotStoreReady:                    true,
+		TemporalQueryReady:                    true,
+		LedgerHistoryReady:                    h.temporalKV != nil,
+		TemporalKVAdapterReady:                true,
+		NativeKVHistoryPlanReady:              true,
+		KVHistoryMigrationPlanReady:           true,
+		KVHistoryIndexPlanReady:               true,
+		NativeKVHistoryPreviewReady:           h.nativeKVHistoryPreviewer != nil,
+		KVHistoryCutoverPlanReady:             true,
+		KVHistoryCutoverReadinessReady:        true,
+		DualReadPlanReady:                     true,
+		DualReadParityCheckReady:              h.temporalKV != nil && h.nativeKVHistoryPreviewer != nil,
+		DualWritePlanReady:                    true,
+		NativeKVHistoryReady:                  false,
+		WritesNativeKVHistory:                 false,
+		MigratesKVHistory:                     false,
+		DualReadReady:                         false,
+		DualWriteReady:                        false,
+		CutoverReady:                          false,
+		RollbackReady:                         false,
+		MerkleVerificationReady:               h.merkleVerifier != nil,
+		MemoryPersisterWritebackReady:         h.memoryPersisterWriteback,
+		ApprovedRollbackPlanReady:             true,
+		ApprovalRequestPlanReady:              true,
+		ApprovalManagerBridgePlanReady:        true,
+		GlobalApprovalEnqueueReady:            false,
+		RollbackWritebackPlanReady:            true,
+		RollbackWritebackReady:                false,
+		WritesLedgerKV:                        false,
+		WritesTemporalKV:                      false,
+		RetentionPlanReady:                    true,
+		RetentionPrunePlanReady:               true,
+		RetentionPruneReady:                   false,
+		KVAuditLinkSchemaReady:                true,
+		KVAuditLinkPreviewReady:               true,
+		KVAuditLinkWritebackPlanReady:         true,
+		KVAuditLinkWritebackStoreReady:        true,
+		KVAuditLinkWritebackExecutorPlanReady: true,
+		ExecutorInputContractReady:            true,
+		AuditProofLinkExecutorReady:           false,
+		KVAuditLinkWritebackReady:             false,
+		KVAuditLinkageReady:                   false,
+		SnapshotCount:                         len(snapshots),
+		NamespaceCount:                        len(namespaces),
+		StoreDir:                              h.dataDir,
+		Policy:                                h.policy,
+		LastSnapshot:                          firstSnapshot(snapshots),
+		Capabilities:                          capabilities,
+		Notes:                                 h.statusNotes(),
 	})
 }
 
 type statusResponse struct {
-	PackID                         string           `json:"pack_id"`
-	Stage                          string           `json:"stage"`
-	SnapshotStoreReady             bool             `json:"snapshot_store_ready"`
-	TemporalQueryReady             bool             `json:"temporal_query_ready"`
-	LedgerHistoryReady             bool             `json:"ledger_history_ready"`
-	TemporalKVAdapterReady         bool             `json:"temporal_kv_adapter_ready"`
-	NativeKVHistoryPlanReady       bool             `json:"native_kv_history_plan_ready"`
-	KVHistoryMigrationPlanReady    bool             `json:"kv_history_migration_plan_ready"`
-	KVHistoryIndexPlanReady        bool             `json:"kv_history_index_plan_ready"`
-	NativeKVHistoryPreviewReady    bool             `json:"native_kv_history_preview_ready"`
-	KVHistoryCutoverPlanReady      bool             `json:"kv_history_cutover_plan_ready"`
-	KVHistoryCutoverReadinessReady bool             `json:"kv_history_cutover_readiness_ready"`
-	DualReadPlanReady              bool             `json:"dual_read_plan_ready"`
-	DualReadParityCheckReady       bool             `json:"dual_read_parity_check_ready"`
-	DualWritePlanReady             bool             `json:"dual_write_plan_ready"`
-	NativeKVHistoryReady           bool             `json:"native_kv_history_ready"`
-	WritesNativeKVHistory          bool             `json:"writes_native_kv_history"`
-	MigratesKVHistory              bool             `json:"migrates_kv_history"`
-	DualReadReady                  bool             `json:"dual_read_ready"`
-	DualWriteReady                 bool             `json:"dual_write_ready"`
-	CutoverReady                   bool             `json:"cutover_ready"`
-	RollbackReady                  bool             `json:"rollback_ready"`
-	MerkleVerificationReady        bool             `json:"merkle_verification_ready"`
-	MemoryPersisterWritebackReady  bool             `json:"memory_persister_writeback_ready"`
-	ApprovedRollbackPlanReady      bool             `json:"approved_rollback_plan_ready"`
-	ApprovalRequestPlanReady       bool             `json:"approval_request_plan_ready"`
-	ApprovalManagerBridgePlanReady bool             `json:"approval_manager_bridge_plan_ready"`
-	GlobalApprovalEnqueueReady     bool             `json:"global_approval_enqueue_ready"`
-	RollbackWritebackPlanReady     bool             `json:"rollback_writeback_plan_ready"`
-	RollbackWritebackReady         bool             `json:"rollback_writeback_ready"`
-	WritesLedgerKV                 bool             `json:"writes_ledger_kv"`
-	WritesTemporalKV               bool             `json:"writes_temporal_kv"`
-	RetentionPlanReady             bool             `json:"retention_plan_ready"`
-	RetentionPrunePlanReady        bool             `json:"retention_prune_plan_ready"`
-	RetentionPruneReady            bool             `json:"retention_prune_ready"`
-	KVAuditLinkSchemaReady         bool             `json:"kv_audit_link_schema_ready"`
-	KVAuditLinkPreviewReady        bool             `json:"kv_audit_link_preview_ready"`
-	KVAuditLinkWritebackPlanReady  bool             `json:"kv_audit_link_writeback_plan_ready"`
-	KVAuditLinkWritebackStoreReady bool             `json:"kv_audit_link_writeback_store_ready"`
-	KVAuditLinkWritebackReady      bool             `json:"kv_audit_link_writeback_ready"`
-	KVAuditLinkageReady            bool             `json:"kv_audit_linkage_ready"`
-	SnapshotCount                  int              `json:"snapshot_count"`
-	NamespaceCount                 int              `json:"namespace_count"`
-	StoreDir                       string           `json:"store_dir"`
-	Policy                         RetentionPolicy  `json:"policy"`
-	LastSnapshot                   *SnapshotSummary `json:"last_snapshot"`
-	Capabilities                   []string         `json:"capabilities"`
-	Notes                          []string         `json:"notes"`
+	PackID                                string           `json:"pack_id"`
+	Stage                                 string           `json:"stage"`
+	SnapshotStoreReady                    bool             `json:"snapshot_store_ready"`
+	TemporalQueryReady                    bool             `json:"temporal_query_ready"`
+	LedgerHistoryReady                    bool             `json:"ledger_history_ready"`
+	TemporalKVAdapterReady                bool             `json:"temporal_kv_adapter_ready"`
+	NativeKVHistoryPlanReady              bool             `json:"native_kv_history_plan_ready"`
+	KVHistoryMigrationPlanReady           bool             `json:"kv_history_migration_plan_ready"`
+	KVHistoryIndexPlanReady               bool             `json:"kv_history_index_plan_ready"`
+	NativeKVHistoryPreviewReady           bool             `json:"native_kv_history_preview_ready"`
+	KVHistoryCutoverPlanReady             bool             `json:"kv_history_cutover_plan_ready"`
+	KVHistoryCutoverReadinessReady        bool             `json:"kv_history_cutover_readiness_ready"`
+	DualReadPlanReady                     bool             `json:"dual_read_plan_ready"`
+	DualReadParityCheckReady              bool             `json:"dual_read_parity_check_ready"`
+	DualWritePlanReady                    bool             `json:"dual_write_plan_ready"`
+	NativeKVHistoryReady                  bool             `json:"native_kv_history_ready"`
+	WritesNativeKVHistory                 bool             `json:"writes_native_kv_history"`
+	MigratesKVHistory                     bool             `json:"migrates_kv_history"`
+	DualReadReady                         bool             `json:"dual_read_ready"`
+	DualWriteReady                        bool             `json:"dual_write_ready"`
+	CutoverReady                          bool             `json:"cutover_ready"`
+	RollbackReady                         bool             `json:"rollback_ready"`
+	MerkleVerificationReady               bool             `json:"merkle_verification_ready"`
+	MemoryPersisterWritebackReady         bool             `json:"memory_persister_writeback_ready"`
+	ApprovedRollbackPlanReady             bool             `json:"approved_rollback_plan_ready"`
+	ApprovalRequestPlanReady              bool             `json:"approval_request_plan_ready"`
+	ApprovalManagerBridgePlanReady        bool             `json:"approval_manager_bridge_plan_ready"`
+	GlobalApprovalEnqueueReady            bool             `json:"global_approval_enqueue_ready"`
+	RollbackWritebackPlanReady            bool             `json:"rollback_writeback_plan_ready"`
+	RollbackWritebackReady                bool             `json:"rollback_writeback_ready"`
+	WritesLedgerKV                        bool             `json:"writes_ledger_kv"`
+	WritesTemporalKV                      bool             `json:"writes_temporal_kv"`
+	RetentionPlanReady                    bool             `json:"retention_plan_ready"`
+	RetentionPrunePlanReady               bool             `json:"retention_prune_plan_ready"`
+	RetentionPruneReady                   bool             `json:"retention_prune_ready"`
+	KVAuditLinkSchemaReady                bool             `json:"kv_audit_link_schema_ready"`
+	KVAuditLinkPreviewReady               bool             `json:"kv_audit_link_preview_ready"`
+	KVAuditLinkWritebackPlanReady         bool             `json:"kv_audit_link_writeback_plan_ready"`
+	KVAuditLinkWritebackStoreReady        bool             `json:"kv_audit_link_writeback_store_ready"`
+	KVAuditLinkWritebackExecutorPlanReady bool             `json:"kv_audit_link_writeback_executor_plan_ready"`
+	ExecutorInputContractReady            bool             `json:"executor_input_contract_ready"`
+	AuditProofLinkExecutorReady           bool             `json:"audit_proof_link_executor_ready"`
+	KVAuditLinkWritebackReady             bool             `json:"kv_audit_link_writeback_ready"`
+	KVAuditLinkageReady                   bool             `json:"kv_audit_linkage_ready"`
+	SnapshotCount                         int              `json:"snapshot_count"`
+	NamespaceCount                        int              `json:"namespace_count"`
+	StoreDir                              string           `json:"store_dir"`
+	Policy                                RetentionPolicy  `json:"policy"`
+	LastSnapshot                          *SnapshotSummary `json:"last_snapshot"`
+	Capabilities                          []string         `json:"capabilities"`
+	Notes                                 []string         `json:"notes"`
 }
 
 func (h *Handler) Snapshots(w http.ResponseWriter, r *http.Request) {
@@ -1999,6 +2105,31 @@ func (h *Handler) AuditLinksWritebackStore(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"writeback": report})
 }
 
+func (h *Handler) AuditLinksWritebackExecutorPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req KVAuditProofLinkWritebackExecutorPlanRequest
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid KV audit proof-link executor plan payload")
+		return
+	}
+	if strings.TrimSpace(string(body)) != "" {
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid KV audit proof-link executor plan payload")
+			return
+		}
+	}
+	plan, err := h.buildKVAuditProofLinkWritebackExecutorPlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) AuditVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -2042,7 +2173,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -2106,6 +2237,18 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	} else {
 		payload["kv_audit_link_writeback_records"] = records
 	}
+	if executorPlan, err := h.buildKVAuditProofLinkWritebackExecutorPlan(r.Context(), KVAuditProofLinkWritebackExecutorPlanRequest{
+		Namespace:   snapshot.Namespace,
+		RequestedBy: "evidence-export",
+		Reason:      "evidence-export-executor-plan",
+		DryRun:      true,
+	}); err != nil {
+		payload["kv_audit_link_writeback_executor_plan_error"] = err.Error()
+	} else {
+		payload["kv_audit_link_writeback_executor_plan"] = executorPlan
+		payload["audit_link_executor_handoff_plan"] = executorPlan.ExecutorHandoffPlan
+		payload["audit_link_executor_audit_plan"] = executorPlan.AuditAppendPlan
+	}
 	nativeKVHistoryPlan := h.buildNativeKVHistoryPlan(snapshot.Namespace)
 	payload["native_kv_history_plan"] = nativeKVHistoryPlan
 	payload["kv_history_migration_plan"] = nativeKVHistoryPlan.KVHistoryMigrationPlan
@@ -2168,7 +2311,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) statusNotes() []string {
-	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, approved rollback write-back planning, retention dry-run planning, pack-local audit proof-link write-back store handoff, and evidence export are available."}
+	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, approved rollback write-back planning, retention dry-run planning, pack-local audit proof-link write-back store handoff, executor input planning, and evidence export are available."}
 	if h.temporalKV != nil {
 		if h.memoryPersisterWriteback {
 			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; approved rollback write-back planning is shaped, while native kv_history tables, retention prune execution, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
@@ -2189,7 +2332,7 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Dual-read parity checks can compare reserved TemporalKV SnapshotRawAt output with native kv_history row previews as a read-only gate; this still does not enable adapter switching.")
 	}
 	notes = append(notes, "Cutover readiness checks aggregate native plan, migration preview, dual-read parity, adapter, write-path, approval, rollback, and audit-proof gates into a read-only report; cutover_ready remains false.")
-	notes = append(notes, "KV audit proof-link schema, read-only preview gates, write-back plan bridge, and pack-local writeback store handoff are exposed; native kv_history rows can be joined to Merkle record candidates and mapped into future audit_seq/audit_hash backfill records, but linkage_ready remains false until real proof write-back is wired.")
+	notes = append(notes, "KV audit proof-link schema, read-only preview gates, write-back plan bridge, pack-local writeback store handoff, and executor input contract planning are exposed; native kv_history rows can be joined to Merkle record candidates and mapped into future audit_seq/audit_hash backfill records, but linkage_ready remains false until real proof write-back is wired.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
 	} else {
@@ -2750,6 +2893,179 @@ func (h *Handler) auditProofLinkWritebackStoreSummary() KVAuditProofLinkWritebac
 			"Native kv_history row updates, Ledger writes, audit_seq/audit_hash backfill, Merkle append, and proof-link executor consumption remain disabled.",
 		},
 	}
+}
+
+func (h *Handler) buildKVAuditProofLinkWritebackExecutorPlan(_ context.Context, req KVAuditProofLinkWritebackExecutorPlanRequest) (KVAuditProofLinkWritebackExecutorPlanReport, error) {
+	record, ok := h.auditProofLinkWritebackRecordForExecutorPlan(req)
+	if !ok {
+		return KVAuditProofLinkWritebackExecutorPlanReport{}, fmt.Errorf("audit proof-link writeback record not found; run /v1/memory-time-travel/audit/links/writeback/store before planning executor handoff")
+	}
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = record.RequestedBy
+	}
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = record.Reason
+	}
+	if reason == "" {
+		reason = "plan audit proof-link executor handoff from pack-local writeback store"
+	}
+	actionKeys := make([]string, 0, len(record.WritebackActions))
+	for _, action := range record.WritebackActions {
+		if strings.TrimSpace(action.Key) != "" {
+			actionKeys = append(actionKeys, action.Key)
+		}
+	}
+	sort.Strings(actionKeys)
+	dedupKey := auditProofLinkExecutorDedupKey(record)
+	payloadDigest := auditProofLinkExecutorPayloadDigest(record, dedupKey)
+	handoff := KVAuditProofLinkExecutorHandoffPlan{
+		Target:                          "ledger.kv_history.audit_proof_link_executor",
+		SourceStore:                     "audit-link-writeback-store.json",
+		SourceRecordArtifact:            "audit-link-writeback-record.json",
+		RecordID:                        record.RecordID,
+		RequestID:                       record.RequestID,
+		RequestKey:                      record.RequestKey,
+		Namespace:                       record.Namespace,
+		TemporalNamespace:               record.TemporalNamespace,
+		DedupKey:                        dedupKey,
+		ConsumesAuditLinkWritebackStore: true,
+		ExecutorInputContractReady:      true,
+		AuditProofLinkExecutorReady:     false,
+		ApprovalRequired:                true,
+		GlobalApprovalEnqueueReady:      false,
+		WritesNativeKVHistory:           false,
+		WritesLedgerKV:                  false,
+		BackfillsAuditSeq:               false,
+		BackfillsAuditHash:              false,
+		MerkleAppendReady:               false,
+		AppendsMerkle:                   false,
+		ActionCount:                     len(record.WritebackActions),
+		ActionKeys:                      actionKeys,
+		Actions: []string{
+			"would validate the pack-local audit proof-link writeback record and map it to a native kv_history executor input contract",
+			"would require explicit approval consumption, native kv_history writer wiring, and Merkle append wiring before any backfill can execute",
+		},
+		BlockedBy: []string{"audit-proof-link-executor-not-wired", "native-kv-history-writer-not-wired", "global-approval-manager-not-consumed", "merkle-append-writer-not-wired"},
+		Notes: []string{
+			"Plan-only executor handoff contract; no native kv_history row is modified.",
+			"Use dedup_key with request_key to make later executor consumption idempotent.",
+		},
+	}
+	audit := KVAuditProofLinkExecutorAuditAppendPlan{
+		AuditAppendPlanReady: true,
+		MerkleAppendReady:    false,
+		Chain:                "ledger.kv_history.audit_proof_link",
+		EventType:            "memory_time_travel.audit_proof_link.executor_handoff",
+		Subject:              record.RecordID,
+		PayloadDigest:        payloadDigest,
+		DedupKey:             dedupKey,
+		WritesAuditChain:     false,
+		Actions: []string{
+			"would append the proof-link executor handoff payload after native row backfill succeeds",
+		},
+		BlockedBy: []string{"merkle-append-writer-not-wired", "audit-proof-link-executor-not-wired"},
+		Notes: []string{
+			"Audit append is deliberately a contract preview only.",
+			"merkle_append_ready=false keeps the current slice from claiming durable proof linkage.",
+		},
+	}
+	return KVAuditProofLinkWritebackExecutorPlanReport{
+		PackID:                                PackID,
+		GeneratedAt:                           h.now().UTC(),
+		Status:                                "audit_proof_link_executor_handoff_plan",
+		Stage:                                 "executor-plan-before-native-kv-history-backfill",
+		DryRun:                                true,
+		RecordID:                              record.RecordID,
+		RequestID:                             record.RequestID,
+		RequestKey:                            record.RequestKey,
+		Namespace:                             record.Namespace,
+		TemporalNamespace:                     record.TemporalNamespace,
+		RequestedBy:                           requestedBy,
+		Reason:                                reason,
+		KVAuditLinkWritebackExecutorPlanReady: true,
+		ExecutorInputContractReady:            true,
+		ConsumesAuditLinkWritebackStore:       true,
+		KVAuditLinkWritebackStoreReady:        true,
+		KVAuditLinkWritebackReady:             false,
+		KVAuditLinkageReady:                   false,
+		AuditProofLinkExecutorReady:           false,
+		AuditProofLinkReady:                   false,
+		ApprovalRequestPlanReady:              record.ApprovalRequestPlanReady,
+		ApprovalManagerBridgePlanReady:        record.ApprovalManagerBridgePlanReady,
+		GlobalApprovalEnqueueReady:            false,
+		AuditAppendPlanReady:                  true,
+		MerkleAppendReady:                     false,
+		WritesAuditChain:                      false,
+		WritesLedgerKV:                        false,
+		WritesNativeKVHistory:                 false,
+		BackfillsAuditSeq:                     false,
+		BackfillsAuditHash:                    false,
+		AppendsMerkle:                         false,
+		ActionCount:                           len(record.WritebackActions),
+		AuditLinkWritebackRecord:              record,
+		AuditLinkWritebackStore:               h.auditProofLinkWritebackStoreSummary(),
+		ExecutorHandoffPlan:                   handoff,
+		AuditAppendPlan:                       audit,
+		WritebackActions:                      record.WritebackActions,
+		Artifacts:                             []string{"audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json"},
+		Actions: []string{
+			"mapped the pack-local audit proof-link writeback record into the future native kv_history executor input contract",
+			"kept audit_seq/audit_hash backfill, Ledger/native writes, Merkle append, and global Approval Manager enqueue blocked until explicit executor wiring consumes this plan",
+		},
+		BlockedBy: appendUnique(record.BlockedBy, "audit-proof-link-executor-not-wired", "native-kv-history-writer-not-wired", "global-approval-manager-not-consumed", "merkle-append-writer-not-wired"),
+		Labels:    []string{"memory-time-travel", "audit-proof-link", "executor-plan", "pack-local-store-consumer", "no-native-write", "no-ledger-write", "no-merkle-append"},
+		Notes: []string{
+			"executor_input_contract_ready=true means the handoff shape is available for a later executor.",
+			"audit_proof_link_executor_ready=false, writes_native_kv_history=false, backfills_audit_seq=false, and merkle_append_ready=false keep this slice plan-only and reversible.",
+		},
+	}, nil
+}
+
+func (h *Handler) auditProofLinkWritebackRecordForExecutorPlan(req KVAuditProofLinkWritebackExecutorPlanRequest) (KVAuditProofLinkWritebackRecord, bool) {
+	recordID := strings.TrimSpace(req.RecordID)
+	requestID := strings.TrimSpace(req.RequestID)
+	requestKey := strings.TrimSpace(req.RequestKey)
+	namespace := normalizeNamespace(req.Namespace)
+	namespaceProvided := strings.TrimSpace(req.Namespace) != ""
+	records, _ := h.loadKVAuditProofLinkWritebackRecords()
+	for _, record := range records {
+		if recordID != "" && record.RecordID == recordID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if requestID != "" && record.RequestID == requestID {
+			return record, true
+		}
+		if requestKey != "" && record.RequestKey == requestKey {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if !namespaceProvided || normalizeNamespace(record.Namespace) == namespace {
+			return record, true
+		}
+	}
+	return KVAuditProofLinkWritebackRecord{}, false
+}
+
+func auditProofLinkExecutorDedupKey(record KVAuditProofLinkWritebackRecord) string {
+	return deterministicID("audit-link-executor-handoff", record.Namespace, record.RecordID, record.RequestKey, fmt.Sprint(record.ActionCount))
+}
+
+func auditProofLinkExecutorPayloadDigest(record KVAuditProofLinkWritebackRecord, dedupKey string) string {
+	keys := make([]string, 0, len(record.WritebackActions))
+	for _, action := range record.WritebackActions {
+		keys = append(keys, fmt.Sprintf("%s:%s:%d:%d:%s", action.Namespace, action.Key, action.NativeRowVersion, action.AuditSeq, action.AuditHash))
+	}
+	sort.Strings(keys)
+	sum := sha256.Sum256([]byte(strings.Join([]string{record.RecordID, record.RequestKey, dedupKey, strings.Join(keys, "|")}, ":")))
+	return hex.EncodeToString(sum[:])
 }
 
 func (h *Handler) buildKVAuditProofLinkCandidates(rows []NativeKVHistoryRowPreview, records []MerkleAuditRecord) ([]KVAuditProofLink, []NativeKVHistoryRowPreview, []MerkleAuditRecord) {

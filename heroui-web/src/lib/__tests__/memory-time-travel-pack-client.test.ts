@@ -277,6 +277,31 @@ describe("memory-time-travel-pack-client", () => {
     expect(spy.mock.calls[0]?.[1]?.method).toBe("POST");
   });
 
+  it("builds KV audit proof-link executor handoff plans without native writes", async () => {
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ plan: { pack_id: "yunque.pack.memory-time-travel", generated_at: "2026-05-15T16:00:00Z", status: "audit_proof_link_executor_handoff_plan", stage: "executor-plan-before-native-kv-history-backfill", dry_run: true, record_id: "audit-link-writeback-record-1", request_id: "approval-link-1", request_key: "approval-link-1", namespace: "memory_snapshot", temporal_namespace: "memory_snapshot", requested_by: "operator", reason: "plan executor handoff", kv_audit_link_writeback_executor_plan_ready: true, executor_input_contract_ready: true, consumes_audit_link_writeback_store: true, kv_audit_link_writeback_store_ready: true, kv_audit_link_writeback_ready: false, kv_audit_linkage_ready: false, audit_proof_link_executor_ready: false, audit_proof_link_ready: false, approval_request_plan_ready: true, approval_manager_bridge_plan_ready: true, global_approval_enqueue_ready: false, audit_append_plan_ready: true, merkle_append_ready: false, writes_audit_chain: false, writes_ledger_kv: false, writes_native_kv_history: false, backfills_audit_seq: false, backfills_audit_hash: false, appends_merkle: false, action_count: 1, executor_handoff_plan: { target: "ledger.kv_history.audit_proof_link_executor", source_store: "audit-link-writeback-store.json", source_record_artifact: "audit-link-writeback-record.json", record_id: "audit-link-writeback-record-1", request_id: "approval-link-1", request_key: "approval-link-1", namespace: "memory_snapshot", temporal_namespace: "memory_snapshot", dedup_key: "audit-link-executor-handoff-1", consumes_audit_link_writeback_store: true, executor_input_contract_ready: true, audit_proof_link_executor_ready: false, approval_required: true, global_approval_enqueue_ready: false, writes_native_kv_history: false, writes_ledger_kv: false, backfills_audit_seq: false, backfills_audit_hash: false, merkle_append_ready: false, appends_merkle: false, action_count: 1, action_keys: ["goal"], actions: [], blocked_by: ["audit-proof-link-executor-not-wired"] }, audit_append_plan: { audit_append_plan_ready: true, merkle_append_ready: false, chain: "ledger.kv_history.audit_proof_link", event_type: "memory_time_travel.audit_proof_link.executor_handoff", subject: "audit-link-writeback-record-1", payload_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", dedup_key: "audit-link-executor-handoff-1", writes_audit_chain: false, actions: [], blocked_by: ["merkle-append-writer-not-wired"] }, artifacts: ["audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json"], writeback_actions: [{ key: "goal", proof_status: "would_backfill_audit_seq_hash" }], actions: [], blocked_by: ["audit-proof-link-executor-not-wired"], labels: ["executor-plan"] } }), { status: 200 }));
+    const client = createMemoryTimeTravelPackClient();
+
+    const result = await client.auditLinksWritebackExecutorPlan({ request_key: "approval-link-1", namespace: "memory_snapshot", requested_by: "operator", reason: "plan executor handoff", dry_run: true });
+
+    expect(result.plan.kv_audit_link_writeback_executor_plan_ready).toBe(true);
+    expect(result.plan.executor_input_contract_ready).toBe(true);
+    expect(result.plan.audit_proof_link_executor_ready).toBe(false);
+    expect(result.plan.consumes_audit_link_writeback_store).toBe(true);
+    expect(result.plan.writes_ledger_kv).toBe(false);
+    expect(result.plan.writes_native_kv_history).toBe(false);
+    expect(result.plan.backfills_audit_seq).toBe(false);
+    expect(result.plan.appends_merkle).toBe(false);
+    expect(result.plan.writes_audit_chain).toBe(false);
+    expect(result.plan.executor_handoff_plan.target).toBe("ledger.kv_history.audit_proof_link_executor");
+    expect(result.plan.audit_append_plan.audit_append_plan_ready).toBe(true);
+    expect(result.plan.audit_append_plan.writes_audit_chain).toBe(false);
+    expect(result.plan.artifacts).toContain("audit-link-executor-handoff-plan.json");
+    expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/audit/links/writeback/executor/plan");
+    expect(spy.mock.calls[0]?.[1]?.method).toBe("POST");
+  });
+
   it("reads the KV audit proof-link schema placeholder through pack-owned route", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
