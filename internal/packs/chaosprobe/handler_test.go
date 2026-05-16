@@ -15,8 +15,8 @@ func TestChaosProbeHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 Chaos Probe routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 Chaos Probe routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -30,14 +30,15 @@ func TestChaosProbeHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/chaos-probe/status":                  {http.MethodGet},
-		"/v1/chaos-probe/probes":                  {http.MethodGet, http.MethodPost},
-		"/v1/chaos-probe/run":                     {http.MethodPost},
-		"/v1/chaos-probe/scheduler/plan":          {http.MethodPost},
-		"/v1/chaos-probe/degrade-state/writeback": {http.MethodPost},
-		"/v1/chaos-probe/reports":                 {http.MethodGet},
-		"/v1/chaos-probe/reports/":                {http.MethodGet},
-		"/v1/chaos-probe/evidence/":               {http.MethodGet},
+		"/v1/chaos-probe/status":                    {http.MethodGet},
+		"/v1/chaos-probe/probes":                    {http.MethodGet, http.MethodPost},
+		"/v1/chaos-probe/run":                       {http.MethodPost},
+		"/v1/chaos-probe/scheduler/plan":            {http.MethodPost},
+		"/v1/chaos-probe/degrade-state/writeback":   {http.MethodPost},
+		"/v1/chaos-probe/degrade-state/engine/plan": {http.MethodPost},
+		"/v1/chaos-probe/reports":                   {http.MethodGet},
+		"/v1/chaos-probe/reports/":                  {http.MethodGet},
+		"/v1/chaos-probe/evidence/":                 {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -144,6 +145,68 @@ func TestChaosProbeDegradeStateWritebackPersistsPackLocalStoreOnly(t *testing.T)
 	h.Evidence(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "degrade-state-store.json") || !strings.Contains(w.Body.String(), "degrade-state-record.json") {
 		t.Fatalf("evidence with degrade state status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestChaosProbeDegradeStateEnginePlanConsumesPackLocalStoreWithoutRuntimeMutation(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, Policy: ProbePolicy{MemoryWarnBytes: ^uint64(0)}})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/probes", strings.NewReader(`{"probes":[{"id":"custom-degraded-probe","name":"Custom degraded probe","category":"storage","description":"stored but no runner","safe":true,"enabled":true,"interval_seconds":30,"weight":1}],"replace":true}`))
+	h.Probes(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save custom probe status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/run", strings.NewReader(`{"probe_ids":["custom-degraded-probe"],"persist":true}`))
+	h.Run(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("run degraded probe status=%d body=%s", w.Code, w.Body.String())
+	}
+	var run struct {
+		Report ChaosReport `json:"report"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&run); err != nil {
+		t.Fatalf("decode degraded run: %v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/degrade-state/engine/plan", strings.NewReader(`{"report_id":"`+run.Report.ID+`","requested_by":"unit"}`))
+	h.DegradeStateEnginePlan(w, req)
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "degrade-state record not found") {
+		t.Fatalf("engine plan without store should be gated, status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/degrade-state/writeback", strings.NewReader(`{"report_id":"`+run.Report.ID+`","requested_by":"unit","reason":"persist for runtime engine plan"}`))
+	h.DegradeStateWriteback(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/degrade-state/engine/plan", strings.NewReader(`{"report_id":"`+run.Report.ID+`","requested_by":"unit","metadata":{"ticket":"chaos-2"}}`))
+	h.DegradeStateEnginePlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"degrade_engine_plan_ready":true`) || !strings.Contains(w.Body.String(), `"consumes_degrade_state_store":true`) || !strings.Contains(w.Body.String(), `"writes_runtime_degrade_state":false`) || !strings.Contains(w.Body.String(), `"merkle_append_ready":false`) {
+		t.Fatalf("engine plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var planned struct {
+		Plan DegradeStateEnginePlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&planned); err != nil {
+		t.Fatalf("decode engine plan: %v", err)
+	}
+	if planned.Plan.ReportID != run.Report.ID || !planned.Plan.RuntimeHandoffPlanReady || planned.Plan.RuntimeDegradeStateReady || planned.Plan.DegradeEngineReady {
+		t.Fatalf("unexpected engine plan: %#v", planned.Plan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/chaos-probe/evidence/"+run.Report.ID, nil)
+	h.Evidence(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "degrade-engine-plan.json") || !strings.Contains(w.Body.String(), "runtime-degrade-handoff-plan.json") || !strings.Contains(w.Body.String(), "audit-append-plan.json") || !strings.Contains(w.Body.String(), `"degrade_engine_plan_ready":true`) {
+		t.Fatalf("evidence with engine plan status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

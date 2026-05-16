@@ -26,6 +26,7 @@ import { formatErrorMessage } from "@/lib/error-utils";
 import {
   createChaosProbePackClient,
   type ChaosProbeDefinition,
+  type ChaosProbeDegradeStateEnginePlan,
   type ChaosProbeDegradeStateWriteback,
   type ChaosProbeReport,
   type ChaosProbeReportSummary,
@@ -89,7 +90,13 @@ export default function ChaosProbePackPage() {
   const [probes, setProbes] = useState<ChaosProbeDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<
-    "probes" | "run" | "scheduler" | "degrade" | "evidence" | null
+    | "probes"
+    | "run"
+    | "scheduler"
+    | "degrade"
+    | "engine"
+    | "evidence"
+    | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [definitionJSON, setDefinitionJSON] = useState(sampleDefinitions);
@@ -101,6 +108,8 @@ export default function ChaosProbePackPage() {
     useState<ChaosProbeSchedulerPlan | null>(null);
   const [degradeWriteback, setDegradeWriteback] =
     useState<ChaosProbeDegradeStateWriteback | null>(null);
+  const [enginePlan, setEnginePlan] =
+    useState<ChaosProbeDegradeStateEnginePlan | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
   const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
@@ -166,6 +175,7 @@ export default function ChaosProbePackPage() {
       setReport(res.report);
       setSchedulerPlan(null);
       setDegradeWriteback(null);
+      setEnginePlan(null);
       showToast(
         res.report.gate_status === "fail"
           ? "Chaos Probe 发现故障风险，已生成报告"
@@ -241,6 +251,7 @@ export default function ChaosProbePackPage() {
         metadata: { source: "web-pack" },
       });
       setDegradeWriteback(res.writeback);
+      setEnginePlan(null);
       showToast(
         "已写入 pack-local degrade-state store（未写 runtime 状态）",
         "success",
@@ -249,6 +260,36 @@ export default function ChaosProbePackPage() {
     } catch (e) {
       setError(
         formatErrorMessage(e, "写入 pack-local degrade-state store 失败"),
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planDegradeEngine = async () => {
+    const id = selectedReport?.id || reports[0]?.id;
+    if (!id) return;
+    setBusy("engine");
+    setError(null);
+    try {
+      const res = await chaosProbePack.degradeEnginePlan({
+        report_id: id,
+        requested_by: "pack-console",
+        reason:
+          "plan runtime degrade engine handoff from pack-local degrade-state store",
+        metadata: { source: "web-pack" },
+      });
+      setEnginePlan(res.plan);
+      showToast(
+        "已生成 runtime degrade engine handoff 计划（未写 runtime 状态）",
+        "success",
+      );
+    } catch (e) {
+      setError(
+        formatErrorMessage(
+          e,
+          "生成 runtime degrade engine handoff 计划失败。请先写本地降级状态。",
+        ),
       );
     } finally {
       setBusy(null);
@@ -487,6 +528,14 @@ export default function ChaosProbePackPage() {
                 </Button>
                 <Button
                   variant="outline"
+                  isPending={busy === "engine"}
+                  onPress={planDegradeEngine}
+                  isDisabled={!selectedReport && reports.length === 0}
+                >
+                  Engine handoff 计划
+                </Button>
+                <Button
+                  variant="outline"
                   isPending={busy === "evidence"}
                   onPress={exportEvidence}
                   isDisabled={!selectedReport && reports.length === 0}
@@ -618,6 +667,50 @@ export default function ChaosProbePackPage() {
                 已持久化到 pack-local `degrade-state-store.json`；不会修改
                 runtime degrade state、不会触发降级状态机、不会发布 Prometheus
                 指标或发送 alert。
+              </div>
+            </Card>
+          )}
+
+          {enginePlan && (
+            <Card className="section-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <ShieldCheck size={16} />
+                Runtime degrade engine handoff plan
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Chip size="sm">{enginePlan.status}</Chip>
+                <Chip size="sm">
+                  consumes_store:{" "}
+                  {String(enginePlan.consumes_degrade_state_store)}
+                </Chip>
+                <Chip size="sm">
+                  writes_runtime:{" "}
+                  {String(enginePlan.writes_runtime_degrade_state)}
+                </Chip>
+                <Chip size="sm">
+                  merkle_append: {String(enginePlan.merkle_append_ready)}
+                </Chip>
+              </div>
+              <TextField
+                value={JSON.stringify(enginePlan, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={12}
+                  aria-label="Chaos Probe Degrade Engine Plan JSON"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+              <div
+                className="mt-2 text-xs"
+                style={{ color: "var(--yunque-text-muted)" }}
+              >
+                `degrade-engine-plan.json` 只把 pack-local
+                degrade-state-record 映射为后续 runtime engine
+                消费契约；`runtime_degrade_state_ready=false`、
+                `writes_runtime_degrade_state=false`、`merkle_append_ready=false`
+                表示本切片不写 runtime 状态，也不追加 Merkle audit chain。
               </div>
             </Card>
           )}

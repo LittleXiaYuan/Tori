@@ -3,7 +3,8 @@
  *
  * This keeps safe probe definitions, one-shot health checks, scheduler /
  * metrics / alert write-back plans, pack-local degrade-state write-back
- * persistence, degrade summaries, remediation hints, and evidence export usable
+ * persistence, runtime degrade engine handoff plans, degrade summaries,
+ * remediation hints, and evidence export usable
  * without importing the full generated OpenAPI SDK:
  *
  *   import { createChaosProbeClient } from "yunque-client/chaos-probe";
@@ -82,6 +83,11 @@ export type ChaosProbeStatusResponse = {
   degrade_writeback_ready?: boolean;
   degrade_state_store_ready?: boolean;
   writes_degrade_state_store?: boolean;
+  degrade_engine_plan_ready?: boolean;
+  audit_append_plan_ready?: boolean;
+  merkle_append_ready?: boolean;
+  consumes_degrade_state_store?: boolean;
+  writes_runtime_degrade_state?: boolean;
   runtime_degrade_state_ready?: boolean;
   degrade_engine_ready: boolean;
   alert_writeback_plan_ready: boolean;
@@ -189,6 +195,14 @@ export type ChaosProbeDegradeStateWritebackRequest = {
   metadata?: Record<string, string>;
 };
 
+export type ChaosProbeDegradeStateEnginePlanRequest = {
+  report_id?: string;
+  record_id?: string;
+  requested_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
 export type ChaosProbeDegradeStateStoreSummary = {
   pack_id: string;
   store: string;
@@ -203,6 +217,41 @@ export type ChaosProbeDegradeStateStoreSummary = {
   prometheus_ready: boolean;
   alert_writeback_ready: boolean;
   latest_record_id?: string;
+  notes?: string[];
+};
+
+export type ChaosProbeRuntimeDegradeHandoffPlan = {
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  reason: string;
+  record_id: string;
+  record_key: string;
+  report_id: string;
+  dedup_key: string;
+  consumes_degrade_state_store: boolean;
+  writes_runtime_degrade_state: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  approval_required: boolean;
+  metadata?: Record<string, string>;
+  actions: string[];
+  blocked_by: string[];
+  notes?: string[];
+};
+
+export type ChaosProbeAuditAppendPlan = {
+  audit_append_plan_ready: boolean;
+  merkle_append_ready: boolean;
+  chain: string;
+  event_type: string;
+  subject: string;
+  payload_digest: string;
+  dedup_key: string;
+  writes_audit_chain: boolean;
+  actions: string[];
+  blocked_by: string[];
   notes?: string[];
 };
 
@@ -236,6 +285,43 @@ export type ChaosProbeDegradeStateRecord = {
   metadata?: Record<string, string>;
   artifacts: string[];
   labels: string[];
+  notes?: string[];
+};
+
+export type ChaosProbeDegradeStateEnginePlanReport = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id: string;
+  record_id: string;
+  record_key: string;
+  target: string;
+  level: number;
+  gate_status: string;
+  health_score: number;
+  requested_by?: string;
+  reason?: string;
+  degrade_engine_plan_ready: boolean;
+  runtime_degrade_handoff_plan_ready: boolean;
+  runtime_degrade_state_ready: boolean;
+  degrade_engine_ready: boolean;
+  audit_append_plan_ready: boolean;
+  merkle_append_ready: boolean;
+  consumes_degrade_state_store: boolean;
+  writes_runtime_degrade_state: boolean;
+  degrade_state_store_ready: boolean;
+  degrade_writeback_ready: boolean;
+  scheduler_ready: boolean;
+  prometheus_ready: boolean;
+  alert_writeback_ready: boolean;
+  degrade_state_record: ChaosProbeDegradeStateRecord;
+  degrade_state_store: ChaosProbeDegradeStateStoreSummary;
+  runtime_handoff_plan: ChaosProbeRuntimeDegradeHandoffPlan;
+  audit_append_plan: ChaosProbeAuditAppendPlan;
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
   notes?: string[];
 };
 
@@ -276,6 +362,10 @@ export type ChaosProbeDegradeStateWritebackResponse = {
   writeback: ChaosProbeDegradeStateWritebackReport;
 };
 
+export type ChaosProbeDegradeStateEnginePlanResponse = {
+  plan: ChaosProbeDegradeStateEnginePlanReport;
+};
+
 export type ChaosProbeReportsResponse = {
   reports: ChaosProbeReportSummary[];
   count: number;
@@ -295,6 +385,8 @@ export type ChaosProbeEvidenceResponse = {
   degrade_state_store?: ChaosProbeDegradeStateStoreSummary;
   degrade_state_record?: ChaosProbeDegradeStateRecord;
   degrade_state_record_persisted?: boolean;
+  degrade_engine_plan?: ChaosProbeDegradeStateEnginePlanReport;
+  degrade_engine_plan_ready?: boolean;
 };
 
 export type ChaosProbeClientOptions = {
@@ -430,6 +522,16 @@ export class ChaosProbeClient {
     return this.request<ChaosProbeDegradeStateWritebackResponse>(
       "POST",
       "/v1/chaos-probe/degrade-state/writeback",
+      input,
+    );
+  }
+
+  degradeEnginePlan(
+    input: ChaosProbeDegradeStateEnginePlanRequest = {},
+  ): Promise<ChaosProbeDegradeStateEnginePlanResponse> {
+    return this.request<ChaosProbeDegradeStateEnginePlanResponse>(
+      "POST",
+      "/v1/chaos-probe/degrade-state/engine/plan",
       input,
     );
   }

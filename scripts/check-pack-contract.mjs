@@ -57,7 +57,9 @@ for (const token of [
   "yunque-client/chaos-probe",
   "Chaos Probe Pack shell 闭环",
   "/v1/chaos-probe/scheduler/plan",
+  "/v1/chaos-probe/degrade-state/engine/plan",
   "scheduler-plan.json",
+  "degrade-engine-plan.json",
   "Prometheus 指标",
   "降级状态机",
 ]) {
@@ -438,19 +440,19 @@ if (chaosProbeManifest) {
 if (chaosProbePage.includes('from "@/lib/api"') || chaosProbePage.includes("api.chaosProbe") || !chaosProbePage.includes("createChaosProbePackClient")) {
   fail("Chaos Probe pack page must use chaos-probe-pack-client instead of monolithic api object");
 }
-for (const token of ["createChaosProbePackClient", "/v1/chaos-probe/status", "/v1/chaos-probe/probes", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/reports", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState", "scheduler_plan_ready", "metrics_plan_ready", "prometheus_ready", "degrade_writeback_plan_ready", "degrade_state_store_ready", "runtime_degrade_state_ready", "alert_writeback_plan_ready", 'method: "POST"']) {
+for (const token of ["createChaosProbePackClient", "/v1/chaos-probe/status", "/v1/chaos-probe/probes", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/degrade-state/engine/plan", "/v1/chaos-probe/reports", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState", "degradeEnginePlan", "scheduler_plan_ready", "metrics_plan_ready", "prometheus_ready", "degrade_writeback_plan_ready", "degrade_state_store_ready", "degrade_engine_plan_ready", "audit_append_plan_ready", "merkle_append_ready", "consumes_degrade_state_store", "writes_runtime_degrade_state", "runtime_degrade_state_ready", "alert_writeback_plan_ready", 'method: "POST"']) {
   if (!chaosProbeClient.includes(token)) fail(`chaos-probe-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("chaos-probe")')) {
   fail("Chaos Probe runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestChaosProbe", "StatusMethodNotAllowed", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback"]) {
+for (const token of ["TestChaosProbe", "StatusMethodNotAllowed", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/degrade-state/engine/plan"]) {
   if (!chaosProbeGateTest.includes(token)) fail(`Chaos Probe gateway gate test missing token: ${token}`);
 }
-for (const token of ["createChaosProbeClient", "ChaosProbeClientError", "/v1/chaos-probe/status", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState"]) {
+for (const token of ["createChaosProbeClient", "ChaosProbeClientError", "/v1/chaos-probe/status", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/degrade-state/engine/plan", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState", "degradeEnginePlan"]) {
   if (!chaosProbeSdk.includes(token)) fail(`Chaos Probe TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/evidence/chaos-1"]) {
+for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/degrade-state/engine/plan", "/v1/chaos-probe/evidence/chaos-1"]) {
   if (!chaosProbeClientTest.includes(token)) fail(`Chaos Probe frontend client test missing token: ${token}`);
 }
 for (const token of [
@@ -464,6 +466,11 @@ for (const token of [
   "degrade_writeback_ready",
   "degrade_state_store_ready",
   "writes_degrade_state_store",
+  "degrade_engine_plan_ready",
+  "audit_append_plan_ready",
+  "merkle_append_ready",
+  "consumes_degrade_state_store",
+  "writes_runtime_degrade_state",
   "runtime_degrade_state_ready",
   "degrade_engine_ready",
   "alert_writeback_plan_ready",
@@ -472,12 +479,17 @@ for (const token of [
   "chaos.metrics.plan",
   "chaos.degrade.plan",
   "chaos.degrade_state.writeback",
+  "chaos.degrade_state.engine.plan",
+  "chaos.audit.append.plan",
   "chaos.alert.writeback.plan",
   "scheduler-plan.json",
   "metrics-plan.json",
   "degrade-writeback-plan.json",
   "degrade-state-store.json",
   "degrade-state-record.json",
+  "degrade-engine-plan.json",
+  "runtime-degrade-handoff-plan.json",
+  "audit-append-plan.json",
 ]) {
   if (!chaosProbeSource.includes(token)) fail(`Chaos Probe handler missing ops resilience shell token: ${token}`);
 }
