@@ -9,6 +9,12 @@ export const SKILL_ANOMALY_APPROVAL_QUEUE_RECORD_ARTIFACT =
 export const SKILL_ANOMALY_APPROVAL_QUEUE_WRITEBACK_CAPABILITY =
   "skill.approval_queue.writeback";
 
+export const SKILL_ANOMALY_APPROVAL_MANAGER_BRIDGE_PLAN_ARTIFACT =
+  "approval-manager-bridge-plan.json";
+
+export const SKILL_ANOMALY_APPROVAL_MANAGER_BRIDGE_PLAN_CAPABILITY =
+  "skill.approval_manager.bridge.plan";
+
 export interface SkillAnomalyPolicy {
   window_size: number;
   min_observations: number;
@@ -60,6 +66,8 @@ export interface SkillAnomalyStatus {
   trust_mutation_ready: boolean;
   approval_writeback_ready: boolean;
   approval_queue_store_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
   approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
   profile_count: number;
   active_profiles: number;
@@ -235,6 +243,59 @@ export interface SkillAnomalyApprovalQueueWriteback {
 export type SkillAnomalyApprovalQueueWritebackInput =
   SkillAnomalyAuditHookPlanInput;
 
+export interface SkillAnomalyGlobalApprovalRequestPlan {
+  request_id: string;
+  request_key: string;
+  task_id?: string;
+  workflow_id?: string;
+  step_index?: number;
+  queue_name: string;
+  category: string;
+  risk_level: string;
+  summary: string;
+  details: Record<string, unknown>;
+  requester: string;
+  tenant_id?: string;
+  reason: string;
+  required_fields: string[];
+  decision_states: string[];
+  approval_manager_enqueue_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  action_release_ready: boolean;
+  source_store: string;
+  source_artifact: string;
+  payload: Record<string, unknown>;
+  notes?: string[];
+}
+
+export interface SkillAnomalyApprovalManagerBridgePlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  merkle_append_ready: boolean;
+  trust_mutation_ready: boolean;
+  action_release_ready: boolean;
+  approval_queue_store_ready: boolean;
+  source_queue_record_persisted: boolean;
+  request_id: string;
+  request_key: string;
+  source_approval_queue_record: SkillAnomalyApprovalQueueRecord;
+  proposed_global_approval_request: SkillAnomalyGlobalApprovalRequestPlan;
+  detection: SkillAnomalyResult;
+  audit_record: SkillAnomalyAuditRecordPlan;
+  trust_mutation: SkillAnomalyTrustMutationPlan;
+  plan_summary: SkillAnomalyAuditHookPlan;
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export type SkillAnomalyApprovalManagerBridgePlanInput =
+  SkillAnomalyAuditHookPlanInput;
+
 export interface SkillAnomalyEvidence {
   pack_id: string;
   exported_at: string;
@@ -248,6 +309,7 @@ export interface SkillAnomalyEvidence {
   approval_queue_plan?: SkillAnomalyApprovalQueuePlan;
   approval_queue_store?: SkillAnomalyApprovalQueueStoreSummary;
   approval_queue_record?: SkillAnomalyApprovalQueueRecord;
+  approval_manager_bridge_plan?: SkillAnomalyApprovalManagerBridgePlan;
 }
 
 export interface SkillAnomalyPackClient {
@@ -259,6 +321,7 @@ export interface SkillAnomalyPackClient {
   detect(input: SkillAnomalyObservationInput): Promise<{ result: SkillAnomalyResult }>;
   auditHookPlan(input: SkillAnomalyAuditHookPlanInput): Promise<{ plan: SkillAnomalyAuditHookPlan }>;
   approvalQueueWriteback(input: SkillAnomalyApprovalQueueWritebackInput): Promise<{ writeback: SkillAnomalyApprovalQueueWriteback }>;
+  approvalManagerBridgePlan(input: SkillAnomalyApprovalManagerBridgePlanInput): Promise<{ plan: SkillAnomalyApprovalManagerBridgePlan }>;
   evidence(skillSlug: string): Promise<SkillAnomalyEvidence>;
 }
 
@@ -297,6 +360,11 @@ export function createSkillAnomalyPackClient(): SkillAnomalyPackClient {
       }),
     approvalQueueWriteback: (input) =>
       fetcher<{ writeback: SkillAnomalyApprovalQueueWriteback }>("/v1/skill-anomaly/approval-queue/writeback", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    approvalManagerBridgePlan: (input) =>
+      fetcher<{ plan: SkillAnomalyApprovalManagerBridgePlan }>("/v1/skill-anomaly/approval-queue/bridge/plan", {
         method: "POST",
         body: JSON.stringify(input),
       }),

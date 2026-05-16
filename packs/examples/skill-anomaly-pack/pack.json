@@ -2,7 +2,7 @@
   "id": "yunque.pack.skill-anomaly",
   "name": "Skill Anomaly Pack",
   "version": "0.1.0",
-  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划、audit-hook / Trust mutation 计划、pack-local Approval queue 写回和证据包导出作为可选治理能力包暴露。",
+  "description": "将 skill 行为基线、异常评分、NeedsApproval 计划、audit-hook / Trust mutation 计划、pack-local Approval queue 写回、Approval Manager bridge plan 和证据包导出作为可选治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -16,6 +16,7 @@
       "skill_anomaly.detect",
       "skill_anomaly.audit_hook.plan",
       "skill_anomaly.approval_queue.writeback",
+      "skill_anomaly.approval_manager.bridge.plan",
       "skill_anomaly.evidence.export"
     ],
     "routes": [
@@ -26,6 +27,7 @@
       "/v1/skill-anomaly/detect",
       "/v1/skill-anomaly/audit-hook/plan",
       "/v1/skill-anomaly/approval-queue/writeback",
+      "/v1/skill-anomaly/approval-queue/bridge/plan",
       "/v1/skill-anomaly/evidence/"
     ],
     "permissions": [
@@ -73,6 +75,11 @@
         "method": "POST",
         "path": "/v1/skill-anomaly/approval-queue/writeback",
         "description": "Persist only a pack-local Approval queue record for one anomalous skill behavior event; no Merkle append, Trust Score mutation, approval release, or runtime action execution is performed."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/skill-anomaly/approval-queue/bridge/plan",
+        "description": "Build a non-destructive Approval Manager bridge plan from a pack-local Approval queue record; no global Approval Manager enqueue, Merkle append, Trust Score mutation, approval release, or runtime action execution is performed."
       },
       {
         "method": "GET",
