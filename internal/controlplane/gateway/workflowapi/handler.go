@@ -14,13 +14,15 @@ import (
 
 // Handler serves workflow engine HTTP endpoints.
 type Handler struct {
-	Store  workflow.Store
-	Engine *workflow.Engine
+	Store   workflow.Store
+	Engine  *workflow.Engine
+	LLMCall workflow.LLMCallFunc
 }
 
 // RegisterRoutes mounts all /v1/workflows/* endpoints.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
 	mux.HandleFunc("/v1/workflows", auth(h.handleRouteSwitch))
+	mux.HandleFunc("/v1/workflows/generate", auth(h.handleGenerate))
 	mux.HandleFunc("/v1/workflows/run", auth(h.handleRun))
 	mux.HandleFunc("/v1/workflows/instances", auth(h.handleInstances))
 	mux.HandleFunc("/v1/workflows/cancel", auth(h.handleCancel))
@@ -37,6 +39,44 @@ func (h *Handler) handleRouteSwitch(w http.ResponseWriter, r *http.Request) {
 	default:
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "GET/POST/DELETE only")
 	}
+}
+
+func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
+		return
+	}
+	if h.Store == nil {
+		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
+		return
+	}
+	var req struct {
+		Requirement string `json:"requirement"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, "invalid JSON")
+		return
+	}
+	result, err := workflow.GenerateDefinition(r.Context(), req.Requirement, workflow.GeneratorOptions{
+		TenantID: gwshared.TenantFromCtx(r.Context()),
+		LLMCall:  h.LLMCall,
+	})
+	if err != nil {
+		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
+		return
+	}
+	if err := h.Store.SaveDefinition(result.Definition); err != nil {
+		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":           true,
+		"workflow":     result.Definition,
+		"generated_by": string(result.Source),
+		"message":      result.Message,
+	})
 }
 
 func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {

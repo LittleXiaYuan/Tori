@@ -183,6 +183,7 @@ type Gateway struct {
 	modelMgr    *modelManager
 	smartRouter *router.Router
 	costTracker *costtrack.Tracker
+	llmCall     workflow.LLMCallFunc
 
 	// ── Tasks & Scheduling ─────────────────────
 	scheduler     *scheduler.Scheduler
@@ -669,8 +670,9 @@ func (g *Gateway) routes() {
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
 	(&workflowapi.Handler{
-		Store:  g.workflowStore,
-		Engine: g.workflowEngine,
+		Store:   g.workflowStore,
+		Engine:  g.workflowEngine,
+		LLMCall: g.llmCall,
 	}).RegisterRoutes(g.mux, g.requireAuth)
 
 	(&schedulerapi.Handler{
