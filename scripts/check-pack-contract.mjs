@@ -438,19 +438,19 @@ if (chaosProbeManifest) {
 if (chaosProbePage.includes('from "@/lib/api"') || chaosProbePage.includes("api.chaosProbe") || !chaosProbePage.includes("createChaosProbePackClient")) {
   fail("Chaos Probe pack page must use chaos-probe-pack-client instead of monolithic api object");
 }
-for (const token of ["createChaosProbePackClient", "/v1/chaos-probe/status", "/v1/chaos-probe/probes", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/reports", "/v1/chaos-probe/evidence/", "schedulerPlan", "scheduler_plan_ready", "metrics_plan_ready", "prometheus_ready", "degrade_writeback_plan_ready", "alert_writeback_plan_ready", 'method: "POST"']) {
+for (const token of ["createChaosProbePackClient", "/v1/chaos-probe/status", "/v1/chaos-probe/probes", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/reports", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState", "scheduler_plan_ready", "metrics_plan_ready", "prometheus_ready", "degrade_writeback_plan_ready", "degrade_state_store_ready", "runtime_degrade_state_ready", "alert_writeback_plan_ready", 'method: "POST"']) {
   if (!chaosProbeClient.includes(token)) fail(`chaos-probe-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("chaos-probe")')) {
   fail("Chaos Probe runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestChaosProbe", "StatusMethodNotAllowed", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan"]) {
+for (const token of ["TestChaosProbe", "StatusMethodNotAllowed", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback"]) {
   if (!chaosProbeGateTest.includes(token)) fail(`Chaos Probe gateway gate test missing token: ${token}`);
 }
-for (const token of ["createChaosProbeClient", "ChaosProbeClientError", "/v1/chaos-probe/status", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/evidence/", "schedulerPlan"]) {
+for (const token of ["createChaosProbeClient", "ChaosProbeClientError", "/v1/chaos-probe/status", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/evidence/", "schedulerPlan", "writeDegradeState"]) {
   if (!chaosProbeSdk.includes(token)) fail(`Chaos Probe TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/evidence/chaos-1"]) {
+for (const token of ["/v1/chaos-probe/status", "/v1/chaos-probe/run", "/v1/chaos-probe/scheduler/plan", "/v1/chaos-probe/degrade-state/writeback", "/v1/chaos-probe/evidence/chaos-1"]) {
   if (!chaosProbeClientTest.includes(token)) fail(`Chaos Probe frontend client test missing token: ${token}`);
 }
 for (const token of [
@@ -461,16 +461,23 @@ for (const token of [
   "metrics_plan_ready",
   "prometheus_ready",
   "degrade_writeback_plan_ready",
+  "degrade_writeback_ready",
+  "degrade_state_store_ready",
+  "writes_degrade_state_store",
+  "runtime_degrade_state_ready",
   "degrade_engine_ready",
   "alert_writeback_plan_ready",
   "alert_writeback_ready",
   "chaos.scheduler.plan",
   "chaos.metrics.plan",
   "chaos.degrade.plan",
+  "chaos.degrade_state.writeback",
   "chaos.alert.writeback.plan",
   "scheduler-plan.json",
   "metrics-plan.json",
   "degrade-writeback-plan.json",
+  "degrade-state-store.json",
+  "degrade-state-record.json",
 ]) {
   if (!chaosProbeSource.includes(token)) fail(`Chaos Probe handler missing ops resilience shell token: ${token}`);
 }
