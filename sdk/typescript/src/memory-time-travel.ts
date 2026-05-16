@@ -2,9 +2,9 @@
  * Lightweight Memory Time Travel Pack SDK slice.
  *
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
- * rollback plan generation, retention dry-run/prune planning, KV audit
- * proof-link schema inspection, and evidence export usable without importing
- * the full generated OpenAPI SDK:
+ * rollback plan generation, approved rollback write-back planning, retention
+ * dry-run/prune planning, KV audit proof-link schema inspection, and evidence
+ * export usable without importing the full generated OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
  */
@@ -51,7 +51,14 @@ export type MemoryTimeTravelStatusResponse = {
   ledger_history_ready: boolean;
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
+  approved_rollback_plan_ready?: boolean;
+  approval_request_plan_ready?: boolean;
+  approval_manager_bridge_plan_ready?: boolean;
+  global_approval_enqueue_ready?: boolean;
+  rollback_writeback_plan_ready?: boolean;
   rollback_writeback_ready: boolean;
+  writes_ledger_kv?: boolean;
+  writes_temporal_kv?: boolean;
   retention_plan_ready?: boolean;
   retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
@@ -216,6 +223,91 @@ export type MemoryTimeTravelRollbackPlanResponse = {
   plan: MemoryTimeTravelRollbackPlan;
 };
 
+export type MemoryTimeTravelApprovedRollbackPlanRequest = {
+  namespace?: string;
+  snapshot_id: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelRollbackWritebackActionPlan = {
+  operation: string;
+  namespace: string;
+  key: string;
+  value_hash?: string;
+  value_bytes?: number;
+  target_snapshot_id: string;
+  temporal_version: number;
+  audit_action: string;
+  requires_approval: boolean;
+  approval_id?: string;
+  generated_at: string;
+};
+
+export type MemoryTimeTravelGlobalApprovalRequestPlan = {
+  request_id: string;
+  request_key: string;
+  task_id?: string;
+  workflow_id?: string;
+  step_index?: number;
+  queue_name: string;
+  category: string;
+  risk_level: string;
+  summary: string;
+  details: Record<string, unknown>;
+  requester: string;
+  tenant_id?: string;
+  reason: string;
+  required_fields: string[];
+  decision_states: string[];
+  approval_manager_enqueue_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  action_release_ready: boolean;
+  source_store: string;
+  source_artifact: string;
+  payload: Record<string, unknown>;
+  notes?: string[];
+};
+
+export type MemoryTimeTravelApprovedRollbackPlan = {
+  pack_id: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  namespace: string;
+  snapshot_id: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  dry_run: boolean;
+  approval_required: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  approved_rollback_plan_ready: boolean;
+  rollback_writeback_plan_ready: boolean;
+  rollback_writeback_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  action_count: number;
+  preview_values?: Record<string, string>;
+  rollback_plan: MemoryTimeTravelRollbackPlan;
+  proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
+  writeback_actions: MemoryTimeTravelRollbackWritebackActionPlan[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelApprovedRollbackPlanResponse = {
+  plan: MemoryTimeTravelApprovedRollbackPlan;
+};
+
 export type MemoryTimeTravelRetentionCandidate = {
   id: string;
   namespace: string;
@@ -291,6 +383,12 @@ export type MemoryTimeTravelEvidenceResponse = {
   files: string[];
   snapshot: MemoryTimeTravelSnapshot;
   history: MemoryTimeTravelSnapshotSummary[];
+  rollback_plan?: MemoryTimeTravelRollbackPlan;
+  rollback_plan_error?: string;
+  approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan;
+  approved_rollback_plan_error?: string;
+  rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[];
+  approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan;
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
   retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
@@ -414,6 +512,10 @@ export class MemoryTimeTravelClient {
 
   rollbackPlan(input: MemoryTimeTravelRollbackPlanRequest): Promise<MemoryTimeTravelRollbackPlanResponse> {
     return this.request<MemoryTimeTravelRollbackPlanResponse>("POST", "/v1/memory-time-travel/rollback-plan", input);
+  }
+
+  approvedRollbackPlan(input: MemoryTimeTravelApprovedRollbackPlanRequest): Promise<MemoryTimeTravelApprovedRollbackPlanResponse> {
+    return this.request<MemoryTimeTravelApprovedRollbackPlanResponse>("POST", "/v1/memory-time-travel/rollback/approved-plan", input);
   }
 
   retentionPlan(namespace?: string): Promise<MemoryTimeTravelRetentionPlanResponse> {

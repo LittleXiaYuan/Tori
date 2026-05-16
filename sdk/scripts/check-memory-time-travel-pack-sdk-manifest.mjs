@@ -41,6 +41,7 @@ for (const token of [
   "/v1/memory-time-travel/snapshot-at",
   "/v1/memory-time-travel/diff",
   "/v1/memory-time-travel/rollback-plan",
+  "/v1/memory-time-travel/rollback/approved-plan",
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/audit/links",
@@ -58,12 +59,15 @@ if (!page.includes("createMemoryTimeTravelPackClient") || page.includes('from "@
 for (const token of ["Memory Time Travel", "保存快照", "生成 diff", "导出证据包", "Retention dry-run plan", "Merkle 审计链验证", "Pack shell"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing product token: ${token}`);
 }
+for (const token of ["Approved rollback write-back plan", "buildApprovedRollbackPlan", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "global_approval_enqueue_ready"]) {
+  if (!page.includes(token)) fail(`Memory Time Travel pack page missing approved rollback token: ${token}`);
+}
 for (const token of ["KV audit proof-link schema", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing KV audit link token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -87,6 +91,19 @@ for (const token of [
   "retention_prune_ready",
   "memory.retention.plan",
   "memory.retention.prune_plan",
+  "approved-rollback-plan.json",
+  "rollback-writeback-plan.json",
+  "approval-request-plan.json",
+  "approved_rollback_plan_ready",
+  "approval_request_plan_ready",
+  "approval_manager_bridge_plan_ready",
+  "global_approval_enqueue_ready",
+  "rollback_writeback_plan_ready",
+  "writes_ledger_kv",
+  "writes_temporal_kv",
+  "memory.rollback.approved_plan",
+  "memory.rollback.writeback.plan",
+  "/v1/memory-time-travel/rollback/approved-plan",
   "retention-prune-plan.json",
   "retention_prune_plan",
   "audit-links.json",
@@ -119,6 +136,7 @@ for (const token of [
   "MemoryTimeTravelClientError",
   "/v1/memory-time-travel/status",
   "/v1/memory-time-travel/diff",
+  "/v1/memory-time-travel/rollback/approved-plan",
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/audit/links",
@@ -126,6 +144,10 @@ for (const token of [
   "/v1/memory-time-travel/evidence/",
   "retentionPlan",
   "retentionPrunePlan",
+  "approvedRollbackPlan",
+  "approved_rollback_plan",
+  "rollback_writeback_plan",
+  "approval_request_plan",
   "auditLinks",
   "auditVerify",
   "kv_audit_link_schema",

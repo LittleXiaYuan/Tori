@@ -34,8 +34,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 11 {
-		t.Fatalf("expected 11 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 12 {
+		t.Fatalf("expected 12 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -52,17 +52,18 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/memory-time-travel/status":               {http.MethodGet},
-		"/v1/memory-time-travel/snapshots":            {http.MethodGet, http.MethodPost},
-		"/v1/memory-time-travel/snapshots/":           {http.MethodGet},
-		"/v1/memory-time-travel/snapshot-at":          {http.MethodPost},
-		"/v1/memory-time-travel/diff":                 {http.MethodPost},
-		"/v1/memory-time-travel/rollback-plan":        {http.MethodPost},
-		"/v1/memory-time-travel/retention/plan":       {http.MethodGet},
-		"/v1/memory-time-travel/retention/prune-plan": {http.MethodPost},
-		"/v1/memory-time-travel/audit/links":          {http.MethodGet},
-		"/v1/memory-time-travel/audit/verify":         {http.MethodGet},
-		"/v1/memory-time-travel/evidence/":            {http.MethodGet},
+		"/v1/memory-time-travel/status":                 {http.MethodGet},
+		"/v1/memory-time-travel/snapshots":              {http.MethodGet, http.MethodPost},
+		"/v1/memory-time-travel/snapshots/":             {http.MethodGet},
+		"/v1/memory-time-travel/snapshot-at":            {http.MethodPost},
+		"/v1/memory-time-travel/diff":                   {http.MethodPost},
+		"/v1/memory-time-travel/rollback-plan":          {http.MethodPost},
+		"/v1/memory-time-travel/rollback/approved-plan": {http.MethodPost},
+		"/v1/memory-time-travel/retention/plan":         {http.MethodGet},
+		"/v1/memory-time-travel/retention/prune-plan":   {http.MethodPost},
+		"/v1/memory-time-travel/audit/links":            {http.MethodGet},
+		"/v1/memory-time-travel/audit/verify":           {http.MethodGet},
+		"/v1/memory-time-travel/evidence/":              {http.MethodGet},
 	}
 	for path, methods := range expected {
 		got := strings.Join(byPath[path], ",")
@@ -126,9 +127,28 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/approved-plan", strings.NewReader(`{"namespace":"memory_snapshot","snapshot_id":"baseline","requested_by":"operator","reason":"restore known-good memory","approval_id":"approval-123","dry_run":true}`))
+	h.ApprovedRollbackPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval_request_plan_ready") {
+		t.Fatalf("approved rollback plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var approved struct {
+		Plan ApprovedRollbackExecutionPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&approved); err != nil {
+		t.Fatalf("decode approved rollback plan: %v", err)
+	}
+	if !approved.Plan.ApprovedRollbackPlanReady || !approved.Plan.RollbackWritebackPlanReady || approved.Plan.RollbackWritebackReady || approved.Plan.WritesLedgerKV || approved.Plan.WritesTemporalKV || approved.Plan.GlobalApprovalEnqueueReady {
+		t.Fatalf("approved rollback plan must stay plan-only and non-destructive: %#v", approved.Plan)
+	}
+	if approved.Plan.ProposedApprovalRequest.RiskLevel != "high" || approved.Plan.ProposedApprovalRequest.Category != "data_mutation" || approved.Plan.ProposedApprovalRequest.Requester != "operator" {
+		t.Fatalf("approval request should align global Approval Manager field shape: %#v", approved.Plan.ProposedApprovalRequest)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -212,7 +232,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -386,12 +406,15 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files              []string                 `json:"files"`
-		RetentionPlan      RetentionPlanReport      `json:"retention_plan"`
-		RetentionPrunePlan RetentionPrunePlanReport `json:"retention_prune_plan"`
-		KVAuditLinkSchema  KVAuditLinksReport       `json:"kv_audit_link_schema"`
-		KVAuditLinks       []KVAuditProofLink       `json:"kv_audit_links"`
-		AuditVerification  MerkleVerification       `json:"audit_verification"`
+		Files                 []string                            `json:"files"`
+		ApprovedRollbackPlan  ApprovedRollbackExecutionPlanReport `json:"approved_rollback_plan"`
+		RollbackWritebackPlan []RollbackWritebackActionPlan       `json:"rollback_writeback_plan"`
+		ApprovalRequestPlan   GlobalApprovalRequestPlan           `json:"approval_request_plan"`
+		RetentionPlan         RetentionPlanReport                 `json:"retention_plan"`
+		RetentionPrunePlan    RetentionPrunePlanReport            `json:"retention_prune_plan"`
+		KVAuditLinkSchema     KVAuditLinksReport                  `json:"kv_audit_link_schema"`
+		KVAuditLinks          []KVAuditProofLink                  `json:"kv_audit_links"`
+		AuditVerification     MerkleVerification                  `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -401,6 +424,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "audit-verification.json") {
 		t.Fatalf("evidence files should include audit-verification.json: %#v", got.Files)
+	}
+	if !containsString(got.Files, "approved-rollback-plan.json") || !containsString(got.Files, "rollback-writeback-plan.json") || !containsString(got.Files, "approval-request-plan.json") || !got.ApprovedRollbackPlan.ApprovedRollbackPlanReady || got.ApprovedRollbackPlan.RollbackWritebackReady || got.ApprovalRequestPlan.GlobalApprovalEnqueueReady || len(got.RollbackWritebackPlan) == 0 {
+		t.Fatalf("evidence should include approved rollback writeback plan preview: files=%#v approved=%#v approval=%#v writebacks=%#v", got.Files, got.ApprovedRollbackPlan, got.ApprovalRequestPlan, got.RollbackWritebackPlan)
 	}
 	if !containsString(got.Files, "audit-links.json") || !got.KVAuditLinkSchema.SchemaReady || got.KVAuditLinkSchema.LinkageReady || len(got.KVAuditLinks) != 0 {
 		t.Fatalf("evidence should include KV audit link schema placeholder: files=%#v schema=%#v links=%#v", got.Files, got.KVAuditLinkSchema, got.KVAuditLinks)

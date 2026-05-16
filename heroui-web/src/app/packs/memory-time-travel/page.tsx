@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, Clock3, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, Clock3, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2, UnlockKeyhole } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -35,17 +35,19 @@ export default function MemoryTimeTravelPackPage() {
   const [status, setStatus] = useState<MemoryTimeTravelStatus | null>(null);
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
   const [auditLinks, setAuditLinks] = useState<MemoryTimeTravelKVAuditLinksReport | null>(null);
+  const [approvedRollbackPlan, setApprovedRollbackPlan] = useState<MemoryTimeTravelApprovedRollbackPlan | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "evidence" | "audit" | "audit-links" | "retention" | "retention-prune" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "retention" | "retention-prune" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
   const [valuesJSON, setValuesJSON] = useState(sampleValues);
   const [baseId, setBaseId] = useState("");
   const [targetId, setTargetId] = useState("");
+  const [approvalId, setApprovalId] = useState("approval-memory-rollback-preview");
   const [at, setAt] = useState("2026-05-15T12:00:00Z");
   const [snapshotAt, setSnapshotAt] = useState<MemoryTimeTravelSnapshotAtResponse | null>(null);
   const [diff, setDiff] = useState<MemoryTimeTravelDiffReport | null>(null);
@@ -135,6 +137,29 @@ export default function MemoryTimeTravelPackPage() {
       showToast("已生成 dry-run 回滚计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成回滚计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const buildApprovedRollbackPlan = async () => {
+    const target = baseId || selectedBase?.id;
+    if (!target) return;
+    setBusy("approved-rollback");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.approvedRollbackPlan({
+        namespace,
+        snapshot_id: target,
+        requested_by: "pack-console",
+        reason: "operator approved rollback write-back preview",
+        approval_id: approvalId,
+        dry_run: true,
+      });
+      setApprovedRollbackPlan(res.plan);
+      showToast("已生成 approved rollback write-back plan（未写 Ledger）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 approved rollback write-back plan 失败"));
     } finally {
       setBusy(null);
     }
@@ -254,7 +279,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、retention dry-run/prune plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -273,6 +298,42 @@ export default function MemoryTimeTravelPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">KV audit links</div><div className="kpi-value text-lg">{status?.kv_audit_link_schema_ready ? "schema" : "pending"}</div></Card>
       </div>
+
+      <Card className="section-card p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><UnlockKeyhole size={16} />Approved rollback write-back plan</div>
+            <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              将选中的 snapshot 映射为未来 Ledger KV versioned put 与全局 Approval Manager 请求形态；当前只输出 approved-rollback-plan.json / rollback-writeback-plan.json / approval-request-plan.json，不写 Ledger、不追加 Merkle、不修改 live memory。
+            </div>
+          </div>
+          <Button variant="outline" isPending={busy === "approved-rollback"} onPress={buildApprovedRollbackPlan} isDisabled={!selectedBase && !baseId}><UnlockKeyhole size={14} />生成写回计划</Button>
+        </div>
+        <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <TextField value={baseId} onChange={setBaseId}><Input placeholder="target snapshot id" /></TextField>
+          <TextField value={approvalId} onChange={setApprovalId}><Input placeholder="approval id / request key" /></TextField>
+          <div className="rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+            writeback ready: {String(status?.rollback_writeback_ready ?? false)} · global enqueue: {String(status?.global_approval_enqueue_ready ?? false)}
+          </div>
+        </div>
+        {approvedRollbackPlan ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[280px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: approvedRollbackPlan.rollback_writeback_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: approvedRollbackPlan.rollback_writeback_ready ? "#22c55e" : "#facc15" }}>{approvedRollbackPlan.status}</Chip>
+              <div className="mt-3 text-2xl font-semibold">{approvedRollbackPlan.action_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>writeback actions · approval {approvedRollbackPlan.approval_required ? "required" : "not required"}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>Ledger writes {approvedRollbackPlan.writes_ledger_kv ? "enabled" : "blocked"} · Merkle {approvedRollbackPlan.merkle_append_ready ? "ready" : "blocked"}</div>
+            </div>
+            <TextField value={JSON.stringify(approvedRollbackPlan, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel approved rollback writeback plan JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+            尚未生成 approved rollback write-back plan。该入口只塑形审批与写回契约，用于后续接入真实 Approval Manager + Ledger KV executor。
+          </div>
+        )}
+      </Card>
 
       <Card className="section-card p-4">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">

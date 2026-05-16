@@ -2,7 +2,7 @@
   "id": "yunque.pack.memory-time-travel",
   "name": "Memory Time Travel Pack",
   "version": "0.1.0",
-  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、retention dry-run/prune plan、KV audit link schema 和证据包导出作为可选记忆治理能力包暴露。",
+  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、retention dry-run/prune plan、KV audit link schema 和证据包导出作为可选记忆治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -15,6 +15,8 @@
       "memory_time_travel.snapshot_at",
       "memory_time_travel.diff",
       "memory_time_travel.rollback_plan",
+      "memory_time_travel.rollback.approved_plan",
+      "memory_time_travel.rollback.writeback_plan",
       "memory_time_travel.retention.plan",
       "memory_time_travel.retention.prune_plan",
       "memory_time_travel.audit.links",
@@ -28,6 +30,7 @@
       "/v1/memory-time-travel/snapshot-at",
       "/v1/memory-time-travel/diff",
       "/v1/memory-time-travel/rollback-plan",
+      "/v1/memory-time-travel/rollback/approved-plan",
       "/v1/memory-time-travel/retention/plan",
       "/v1/memory-time-travel/retention/prune-plan",
       "/v1/memory-time-travel/audit/links",
@@ -74,6 +77,11 @@
         "method": "POST",
         "path": "/v1/memory-time-travel/rollback-plan",
         "description": "Build a dry-run rollback plan for a selected memory snapshot."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/rollback/approved-plan",
+        "description": "Build a non-destructive approved rollback execution and Ledger KV write-back plan without mutating memory or Ledger state."
       },
       {
         "method": "GET",
