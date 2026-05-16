@@ -104,6 +104,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/kv-history/cutover/readiness") {
 		t.Fatal("expected Memory Time Travel cutover readiness gate route to be installed from manifest")
 	}
+	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/audit/links/preview") {
+		t.Fatal("expected Memory Time Travel audit proof-link preview route to be installed from manifest")
+	}
 
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
 	if !ok {
