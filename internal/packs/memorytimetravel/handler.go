@@ -4,8 +4,9 @@
 // point-in-time reconstruction, drift diff summaries, rollback plans, approved
 // rollback write-back planning, retention dry-run planning, JSON evidence
 // export, read-only Merkle audit-chain verification, and a conservative KV
-// audit proof-link schema placeholder while native Ledger KV kv_history
-// write-back remains a later slice.
+// audit proof-link schema placeholder plus native kv_history table/index/
+// migration planning while native Ledger KV kv_history write-back remains a
+// later slice.
 package memorytimetravel
 
 import (
@@ -373,6 +374,62 @@ type KVAuditLinksReport struct {
 	Notes                   []string           `json:"notes,omitempty"`
 }
 
+type NativeKVHistoryColumnPlan struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable bool   `json:"nullable"`
+	Purpose  string `json:"purpose"`
+}
+
+type NativeKVHistoryIndexPlan struct {
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"`
+	Unique  bool     `json:"unique"`
+	Purpose string   `json:"purpose"`
+}
+
+type KVHistoryMigrationStepPlan struct {
+	Step        int    `json:"step"`
+	Name        string `json:"name"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	DryRun      bool   `json:"dry_run"`
+	Writes      bool   `json:"writes"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
+
+type NativeKVHistoryPlanReport struct {
+	PackID                      string                       `json:"pack_id"`
+	Namespace                   string                       `json:"namespace"`
+	GeneratedAt                 time.Time                    `json:"generated_at"`
+	Stage                       string                       `json:"stage"`
+	Status                      string                       `json:"status"`
+	Source                      string                       `json:"source"`
+	CurrentAdapter              string                       `json:"current_adapter"`
+	CurrentHistoryNamespace     string                       `json:"current_history_namespace"`
+	NativeTable                 string                       `json:"native_table"`
+	TemporalKVAdapterReady      bool                         `json:"temporal_kv_adapter_ready"`
+	NativeKVHistoryPlanReady    bool                         `json:"native_kv_history_plan_ready"`
+	KVHistoryMigrationPlanReady bool                         `json:"kv_history_migration_plan_ready"`
+	KVHistoryIndexPlanReady     bool                         `json:"kv_history_index_plan_ready"`
+	NativeKVHistoryReady        bool                         `json:"native_kv_history_ready"`
+	WritesNativeKVHistory       bool                         `json:"writes_native_kv_history"`
+	MigratesKVHistory           bool                         `json:"migrates_kv_history"`
+	UsesReservedKVNamespace     bool                         `json:"uses_reserved_kv_namespace"`
+	SnapshotStoreReady          bool                         `json:"snapshot_store_ready"`
+	RetentionPlanReady          bool                         `json:"retention_plan_ready"`
+	AuditProofLinkSchemaReady   bool                         `json:"audit_proof_link_schema_ready"`
+	SchemaPlan                  []NativeKVHistoryColumnPlan  `json:"schema_plan"`
+	KVHistoryIndexPlan          []NativeKVHistoryIndexPlan   `json:"kv_history_index_plan"`
+	KVHistoryMigrationPlan      []KVHistoryMigrationStepPlan `json:"kv_history_migration_plan"`
+	Artifacts                   []string                     `json:"artifacts"`
+	Actions                     []string                     `json:"actions"`
+	BlockedBy                   []string                     `json:"blocked_by"`
+	Labels                      []string                     `json:"labels"`
+	Notes                       []string                     `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a Memory Time Travel pack handler.
@@ -413,6 +470,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan", Handler: h.ApprovedRollbackPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
+		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan", Handler: h.NativeKVHistoryPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
@@ -442,6 +500,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.rollback.writeback.plan",
 		"memory.retention.plan",
 		"memory.retention.prune_plan",
+		"memory.kv_history.native_plan",
 		"memory.audit.links.schema",
 		"memory.evidence.export",
 	}
@@ -454,6 +513,13 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		SnapshotStoreReady:             true,
 		TemporalQueryReady:             true,
 		LedgerHistoryReady:             h.temporalKV != nil,
+		TemporalKVAdapterReady:         true,
+		NativeKVHistoryPlanReady:       true,
+		KVHistoryMigrationPlanReady:    true,
+		KVHistoryIndexPlanReady:        true,
+		NativeKVHistoryReady:           false,
+		WritesNativeKVHistory:          false,
+		MigratesKVHistory:              false,
 		MerkleVerificationReady:        h.merkleVerifier != nil,
 		MemoryPersisterWritebackReady:  h.memoryPersisterWriteback,
 		ApprovedRollbackPlanReady:      true,
@@ -485,6 +551,13 @@ type statusResponse struct {
 	SnapshotStoreReady             bool             `json:"snapshot_store_ready"`
 	TemporalQueryReady             bool             `json:"temporal_query_ready"`
 	LedgerHistoryReady             bool             `json:"ledger_history_ready"`
+	TemporalKVAdapterReady         bool             `json:"temporal_kv_adapter_ready"`
+	NativeKVHistoryPlanReady       bool             `json:"native_kv_history_plan_ready"`
+	KVHistoryMigrationPlanReady    bool             `json:"kv_history_migration_plan_ready"`
+	KVHistoryIndexPlanReady        bool             `json:"kv_history_index_plan_ready"`
+	NativeKVHistoryReady           bool             `json:"native_kv_history_ready"`
+	WritesNativeKVHistory          bool             `json:"writes_native_kv_history"`
+	MigratesKVHistory              bool             `json:"migrates_kv_history"`
 	MerkleVerificationReady        bool             `json:"merkle_verification_ready"`
 	MemoryPersisterWritebackReady  bool             `json:"memory_persister_writeback_ready"`
 	ApprovedRollbackPlanReady      bool             `json:"approved_rollback_plan_ready"`
@@ -695,6 +768,15 @@ func (h *Handler) RetentionPrunePlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) NativeKVHistoryPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	report := h.buildNativeKVHistoryPlan(r.URL.Query().Get("namespace"))
+	writeJSON(w, http.StatusOK, map[string]any{"plan": report})
+}
+
 func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -747,7 +829,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -782,6 +864,10 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	auditLinks := h.buildKVAuditLinksReport(snapshot.Namespace)
 	payload["kv_audit_link_schema"] = auditLinks
 	payload["kv_audit_links"] = auditLinks.KVAuditLinks
+	nativeKVHistoryPlan := h.buildNativeKVHistoryPlan(snapshot.Namespace)
+	payload["native_kv_history_plan"] = nativeKVHistoryPlan
+	payload["kv_history_migration_plan"] = nativeKVHistoryPlan.KVHistoryMigrationPlan
+	payload["kv_history_index_plan"] = nativeKVHistoryPlan.KVHistoryIndexPlan
 	if h.merkleVerifier != nil {
 		auditVerification, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), 10)
 		if err != nil {
@@ -808,6 +894,7 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots, and approved rollback write-back planning remains a non-destructive contract preview.")
 	}
 	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
+	notes = append(notes, "Native kv_history table, migration, and index plans are available as plan-only artifacts; the current TemporalKV adapter still uses the reserved __kv_history__ Ledger KV namespace and does not migrate or write native rows.")
 	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
@@ -815,6 +902,78 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Merkle audit-chain verification is not attached to this pack instance yet.")
 	}
 	return notes
+}
+
+func (h *Handler) buildNativeKVHistoryPlan(namespace string) NativeKVHistoryPlanReport {
+	normalizedNamespace := "all"
+	if strings.TrimSpace(namespace) != "" {
+		normalizedNamespace = normalizeNamespace(namespace)
+	}
+	columns := []NativeKVHistoryColumnPlan{
+		{Name: "id", Type: "text", Nullable: false, Purpose: "stable row id derived from namespace/key/version for idempotent migration"},
+		{Name: "namespace", Type: "text", Nullable: false, Purpose: "Ledger KV namespace"},
+		{Name: "key", Type: "text", Nullable: false, Purpose: "Ledger KV key"},
+		{Name: "version", Type: "integer", Nullable: false, Purpose: "monotonic version per namespace/key"},
+		{Name: "value", Type: "blob", Nullable: false, Purpose: "raw value bytes as stored by TemporalKV"},
+		{Name: "value_sha256", Type: "text", Nullable: false, Purpose: "content digest used by Merkle/audit proof links"},
+		{Name: "updated_at", Type: "timestamp", Nullable: false, Purpose: "logical value update time"},
+		{Name: "archived_at", Type: "timestamp", Nullable: true, Purpose: "time when this value was superseded"},
+		{Name: "current", Type: "boolean", Nullable: false, Purpose: "marks the latest materialized value for fast snapshot-at reads"},
+		{Name: "audit_seq", Type: "integer", Nullable: true, Purpose: "future Merkle audit-chain sequence link"},
+		{Name: "audit_hash", Type: "text", Nullable: true, Purpose: "future Merkle audit-chain hash link"},
+		{Name: "source_adapter", Type: "text", Nullable: false, Purpose: "migration provenance, for example reserved-ledger-kv-namespace"},
+	}
+	indexes := []NativeKVHistoryIndexPlan{
+		{Name: "kv_history_namespace_key_version_uq", Columns: []string{"namespace", "key", "version"}, Unique: true, Purpose: "idempotent replay and duplicate prevention during migration"},
+		{Name: "kv_history_namespace_key_updated_at_idx", Columns: []string{"namespace", "key", "updated_at"}, Purpose: "point-in-time GetRawAt lookup"},
+		{Name: "kv_history_namespace_updated_at_idx", Columns: []string{"namespace", "updated_at"}, Purpose: "SnapshotRawAt namespace reconstruction"},
+		{Name: "kv_history_retention_idx", Columns: []string{"namespace", "archived_at", "current"}, Purpose: "retention prune candidate selection"},
+		{Name: "kv_history_audit_idx", Columns: []string{"audit_seq", "audit_hash"}, Purpose: "per-KV audit proof linkage once Merkle append is wired"},
+	}
+	migration := []KVHistoryMigrationStepPlan{
+		{Step: 1, Name: "scan-reserved-ledger-kv-history", From: "__kv_history__", To: "migration-buffer", DryRun: true, Writes: false, Status: "planned", Description: "scan TemporalKV history documents without deleting or rewriting the reserved namespace"},
+		{Step: 2, Name: "expand-history-documents", From: "migration-buffer", To: "native kv_history row preview", DryRun: true, Writes: false, Status: "planned", Description: "expand each namespace/key versions array into idempotent kv_history rows"},
+		{Step: 3, Name: "dual-read-adapter-gate", From: "__kv_history__ + kv_history", To: "TemporalKVReader", DryRun: true, Writes: false, Status: "planned", Description: "teach SnapshotRawAt/ListVersions to prefer native rows while falling back to the reserved adapter"},
+		{Step: 4, Name: "dual-write-cutover-gate", From: "TemporalKVStore", To: "kv_history", DryRun: true, Writes: false, Status: "blocked", Description: "blocked until Ledger backend owns native kv_history schema and migration tests"},
+	}
+	return NativeKVHistoryPlanReport{
+		PackID:                      PackID,
+		Namespace:                   normalizedNamespace,
+		GeneratedAt:                 h.now().UTC(),
+		Stage:                       "native-kv-history-plan-before-schema-migration",
+		Status:                      "plan_only",
+		Source:                      "temporal-kv-adapter-readiness",
+		CurrentAdapter:              "reserved-ledger-kv-namespace",
+		CurrentHistoryNamespace:     "__kv_history__",
+		NativeTable:                 "kv_history",
+		TemporalKVAdapterReady:      true,
+		NativeKVHistoryPlanReady:    true,
+		KVHistoryMigrationPlanReady: true,
+		KVHistoryIndexPlanReady:     true,
+		NativeKVHistoryReady:        false,
+		WritesNativeKVHistory:       false,
+		MigratesKVHistory:           false,
+		UsesReservedKVNamespace:     true,
+		SnapshotStoreReady:          true,
+		RetentionPlanReady:          true,
+		AuditProofLinkSchemaReady:   true,
+		SchemaPlan:                  columns,
+		KVHistoryIndexPlan:          indexes,
+		KVHistoryMigrationPlan:      migration,
+		Artifacts:                   []string{"native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json"},
+		Actions: []string{
+			"document the native kv_history row shape required by TemporalKVReader",
+			"map reserved __kv_history__ documents into idempotent future kv_history rows",
+			"keep schema migration, native writes, retention purge, and per-KV audit proof linkage blocked until Ledger owns the native table",
+		},
+		BlockedBy: []string{"ledger-native-kv-history-schema-not-wired", "migration-executor-not-wired", "dual-write-cutover-not-enabled", "per-kv-merkle-proof-link-not-wired"},
+		Labels:    []string{"memory-time-travel", "native-kv-history", "migration-plan", "index-plan", "plan-only", "no-ledger-migration", "no-native-write"},
+		Notes: []string{
+			"This route is non-destructive: it does not create tables, migrate rows, delete reserved __kv_history__ documents, or change TemporalKVStore read/write behavior.",
+			"The current TemporalKV adapter remains the source for snapshot-at reconstruction until a native Ledger kv_history table is implemented and dual-read tests pass.",
+			"KV audit proof links need audit_seq/audit_hash backfill from future Merkle append wiring before linkage_ready can become true.",
+		},
+	}
 }
 
 func (h *Handler) buildKVAuditLinksReport(namespace string) KVAuditLinksReport {

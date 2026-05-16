@@ -3,8 +3,9 @@
  *
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
  * rollback plan generation, approved rollback write-back planning, retention
- * dry-run/prune planning, KV audit proof-link schema inspection, and evidence
- * export usable without importing the full generated OpenAPI SDK:
+ * dry-run/prune planning, native kv_history migration/index planning, KV audit
+ * proof-link schema inspection, and evidence export usable without importing
+ * the full generated OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
  */
@@ -49,6 +50,13 @@ export type MemoryTimeTravelStatusResponse = {
   snapshot_store_ready: boolean;
   temporal_query_ready: boolean;
   ledger_history_ready: boolean;
+  temporal_kv_adapter_ready?: boolean;
+  native_kv_history_plan_ready?: boolean;
+  kv_history_migration_plan_ready?: boolean;
+  kv_history_index_plan_ready?: boolean;
+  native_kv_history_ready?: boolean;
+  writes_native_kv_history?: boolean;
+  migrates_kv_history?: boolean;
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
   approved_rollback_plan_ready?: boolean;
@@ -123,6 +131,66 @@ export type MemoryTimeTravelKVAuditLinksResponse = {
 
 export type MemoryTimeTravelKVAuditLinksEnvelope = {
   links: MemoryTimeTravelKVAuditLinksResponse;
+};
+
+export type MemoryTimeTravelNativeKVHistoryColumnPlan = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  purpose: string;
+};
+
+export type MemoryTimeTravelNativeKVHistoryIndexPlan = {
+  name: string;
+  columns: string[];
+  unique?: boolean;
+  purpose: string;
+};
+
+export type MemoryTimeTravelKVHistoryMigrationStepPlan = {
+  step: number;
+  name: string;
+  from: string;
+  to: string;
+  dry_run: boolean;
+  writes: boolean;
+  status: string;
+  description: string;
+};
+
+export type MemoryTimeTravelNativeKVHistoryPlan = {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  source: string;
+  current_adapter: string;
+  current_history_namespace: string;
+  native_table: string;
+  temporal_kv_adapter_ready: boolean;
+  native_kv_history_plan_ready: boolean;
+  kv_history_migration_plan_ready: boolean;
+  kv_history_index_plan_ready: boolean;
+  native_kv_history_ready: boolean;
+  writes_native_kv_history: boolean;
+  migrates_kv_history: boolean;
+  uses_reserved_kv_namespace: boolean;
+  snapshot_store_ready: boolean;
+  retention_plan_ready: boolean;
+  audit_proof_link_schema_ready: boolean;
+  schema_plan: MemoryTimeTravelNativeKVHistoryColumnPlan[];
+  kv_history_index_plan: MemoryTimeTravelNativeKVHistoryIndexPlan[];
+  kv_history_migration_plan: MemoryTimeTravelKVHistoryMigrationStepPlan[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelNativeKVHistoryPlanResponse = {
+  plan: MemoryTimeTravelNativeKVHistoryPlan;
 };
 
 export type MemoryTimeTravelSnapshotsResponse = {
@@ -392,6 +460,9 @@ export type MemoryTimeTravelEvidenceResponse = {
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
   retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
+  native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
+  kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
+  kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksResponse;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
@@ -524,6 +595,10 @@ export class MemoryTimeTravelClient {
 
   retentionPrunePlan(input: MemoryTimeTravelRetentionPrunePlanRequest = {}): Promise<MemoryTimeTravelRetentionPrunePlanResponse> {
     return this.request<MemoryTimeTravelRetentionPrunePlanResponse>("POST", "/v1/memory-time-travel/retention/prune-plan", input);
+  }
+
+  nativeKVHistoryPlan(namespace?: string): Promise<MemoryTimeTravelNativeKVHistoryPlanResponse> {
+    return this.request<MemoryTimeTravelNativeKVHistoryPlanResponse>("GET", `/v1/memory-time-travel/kv-history/native-plan${query({ namespace })}`);
   }
 
   auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {

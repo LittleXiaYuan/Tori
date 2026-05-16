@@ -85,6 +85,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approved_rollback_plan_ready") || !strings.Contains(w.Body.String(), "rollback_writeback_plan_ready") || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) {
 		t.Fatalf("approved rollback plan status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "native_kv_history_plan_ready") || !strings.Contains(w.Body.String(), "kv-history-migration-plan.json") || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) {
+		t.Fatalf("native kv_history plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -110,6 +118,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/rollback/approved-plan",
 				"/v1/memory-time-travel/retention/plan",
 				"/v1/memory-time-travel/retention/prune-plan",
+				"/v1/memory-time-travel/kv-history/native-plan",
 				"/v1/memory-time-travel/audit/links",
 				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
@@ -125,6 +134,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan"},
+				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},

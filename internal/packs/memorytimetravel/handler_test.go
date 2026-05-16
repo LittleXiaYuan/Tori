@@ -34,8 +34,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 12 {
-		t.Fatalf("expected 12 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 13 {
+		t.Fatalf("expected 13 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -61,6 +61,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/rollback/approved-plan": {http.MethodPost},
 		"/v1/memory-time-travel/retention/plan":         {http.MethodGet},
 		"/v1/memory-time-travel/retention/prune-plan":   {http.MethodPost},
+		"/v1/memory-time-travel/kv-history/native-plan": {http.MethodGet},
 		"/v1/memory-time-travel/audit/links":            {http.MethodGet},
 		"/v1/memory-time-travel/audit/verify":           {http.MethodGet},
 		"/v1/memory-time-travel/evidence/":              {http.MethodGet},
@@ -148,7 +149,7 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/evidence/baseline", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "native-kv-history-plan.json") || !strings.Contains(w.Body.String(), "kv-history-migration-plan.json") || !strings.Contains(w.Body.String(), "kv-history-index-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -232,7 +233,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -332,6 +333,37 @@ func TestMemoryTimeTravelAuditLinksExposeSchemaPlaceholder(t *testing.T) {
 	}
 }
 
+func TestMemoryTimeTravelNativeKVHistoryPlanIsNonDestructive(t *testing.T) {
+	now := time.Date(2026, 5, 15, 16, 0, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", nil)
+	h.NativeKVHistoryPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("native kv_history plan status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var got struct {
+		Plan NativeKVHistoryPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode native kv_history plan: %v", err)
+	}
+	if got.Plan.Stage != "native-kv-history-plan-before-schema-migration" || got.Plan.Namespace != "memory-snapshot" {
+		t.Fatalf("unexpected native kv_history plan identity: %#v", got.Plan)
+	}
+	if !got.Plan.NativeKVHistoryPlanReady || !got.Plan.KVHistoryMigrationPlanReady || !got.Plan.KVHistoryIndexPlanReady || got.Plan.NativeKVHistoryReady || got.Plan.WritesNativeKVHistory || got.Plan.MigratesKVHistory {
+		t.Fatalf("native kv_history plan must stay plan-only and non-destructive: %#v", got.Plan)
+	}
+	if got.Plan.CurrentHistoryNamespace != "__kv_history__" || got.Plan.NativeTable != "kv_history" || !containsString(got.Plan.Artifacts, "native-kv-history-plan.json") || !containsString(got.Plan.Artifacts, "kv-history-migration-plan.json") || !containsString(got.Plan.Artifacts, "kv-history-index-plan.json") {
+		t.Fatalf("native kv_history artifacts or adapter details drifted: %#v", got.Plan)
+	}
+	if len(got.Plan.SchemaPlan) == 0 || len(got.Plan.KVHistoryMigrationPlan) == 0 || len(got.Plan.KVHistoryIndexPlan) == 0 || !containsString(got.Plan.BlockedBy, "ledger-native-kv-history-schema-not-wired") {
+		t.Fatalf("native kv_history plan should include schema/index/migration blockers: %#v", got.Plan)
+	}
+}
+
 func TestMemoryTimeTravelAuditVerifyUsesMerkleVerifier(t *testing.T) {
 	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
 	verifier := &fakeMerkleVerifier{result: MerkleVerification{
@@ -406,15 +438,18 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files                 []string                            `json:"files"`
-		ApprovedRollbackPlan  ApprovedRollbackExecutionPlanReport `json:"approved_rollback_plan"`
-		RollbackWritebackPlan []RollbackWritebackActionPlan       `json:"rollback_writeback_plan"`
-		ApprovalRequestPlan   GlobalApprovalRequestPlan           `json:"approval_request_plan"`
-		RetentionPlan         RetentionPlanReport                 `json:"retention_plan"`
-		RetentionPrunePlan    RetentionPrunePlanReport            `json:"retention_prune_plan"`
-		KVAuditLinkSchema     KVAuditLinksReport                  `json:"kv_audit_link_schema"`
-		KVAuditLinks          []KVAuditProofLink                  `json:"kv_audit_links"`
-		AuditVerification     MerkleVerification                  `json:"audit_verification"`
+		Files                  []string                            `json:"files"`
+		ApprovedRollbackPlan   ApprovedRollbackExecutionPlanReport `json:"approved_rollback_plan"`
+		RollbackWritebackPlan  []RollbackWritebackActionPlan       `json:"rollback_writeback_plan"`
+		ApprovalRequestPlan    GlobalApprovalRequestPlan           `json:"approval_request_plan"`
+		RetentionPlan          RetentionPlanReport                 `json:"retention_plan"`
+		RetentionPrunePlan     RetentionPrunePlanReport            `json:"retention_prune_plan"`
+		NativeKVHistoryPlan    NativeKVHistoryPlanReport           `json:"native_kv_history_plan"`
+		KVHistoryMigrationPlan []KVHistoryMigrationStepPlan        `json:"kv_history_migration_plan"`
+		KVHistoryIndexPlan     []NativeKVHistoryIndexPlan          `json:"kv_history_index_plan"`
+		KVAuditLinkSchema      KVAuditLinksReport                  `json:"kv_audit_link_schema"`
+		KVAuditLinks           []KVAuditProofLink                  `json:"kv_audit_links"`
+		AuditVerification      MerkleVerification                  `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -436,6 +471,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "retention-plan.json") || !got.RetentionPlan.DryRun {
 		t.Fatalf("evidence should include dry-run retention plan: files=%#v plan=%#v", got.Files, got.RetentionPlan)
+	}
+	if !containsString(got.Files, "native-kv-history-plan.json") || !containsString(got.Files, "kv-history-migration-plan.json") || !containsString(got.Files, "kv-history-index-plan.json") || !got.NativeKVHistoryPlan.NativeKVHistoryPlanReady || got.NativeKVHistoryPlan.NativeKVHistoryReady || got.NativeKVHistoryPlan.WritesNativeKVHistory || len(got.KVHistoryMigrationPlan) == 0 || len(got.KVHistoryIndexPlan) == 0 {
+		t.Fatalf("evidence should include native kv_history plan-only artifacts: files=%#v plan=%#v migration=%#v indexes=%#v", got.Files, got.NativeKVHistoryPlan, got.KVHistoryMigrationPlan, got.KVHistoryIndexPlan)
 	}
 }
 
