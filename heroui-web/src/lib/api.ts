@@ -19,7 +19,7 @@ import type {
   SetupEnvironment, SetupHealthResult, SetupTemplate, SetupTemplatesResponse, SetupApplyResponse, SetupTestProviderResult, SessionQueueInfo,
   TrustEntry, RBACRole,
   IterateProposal, IterateStatus, SkillGrowPattern,
-  WorkflowDef, WorkflowInstance,
+  WorkflowDef, WorkflowGenerateResponse, WorkflowInstance,
   ProviderInfo, ProviderTestResult,
   CostSummary, CostHistoryEntry, CostAlert, CostBudget,
   GraphEntity, GraphRelation, GraphStats, MemorySearchResult,
@@ -933,6 +933,11 @@ export const api = {
     fetcher<WorkflowDef>(`/v1/workflows?id=${encodeURIComponent(id)}`),
   workflowSave: (def: Partial<WorkflowDef>) =>
     fetcher<WorkflowDef>("/v1/workflows", { method: "POST", body: JSON.stringify(def) }),
+  workflowGenerate: (requirement: string) =>
+    fetcher<WorkflowGenerateResponse>("/v1/workflows/generate", {
+      method: "POST",
+      body: JSON.stringify({ requirement }),
+    }),
   workflowDelete: (id: string) =>
     fetcher<{ deleted: string }>(`/v1/workflows?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
   workflowRun: (definitionId: string, variables?: Record<string, unknown>) =>

@@ -564,6 +564,13 @@ export interface WorkflowNodeState {
   finished_at?: string;
 }
 
+export interface WorkflowGenerateResponse {
+  ok: boolean;
+  workflow: WorkflowDef;
+  generated_by: "llm" | "template" | string;
+  message?: string;
+}
+
 export interface WorkflowInstance {
   id: string;
   definition_id: string;
