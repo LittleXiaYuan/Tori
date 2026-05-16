@@ -101,6 +101,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_history_migration_preview") || !strings.Contains(w.Body.String(), "kv-history-migration-preview.json") || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) {
 		t.Fatalf("native kv_history migration preview status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/kv-history/cutover/plan", strings.NewReader(`{"namespace":"memory_snapshot","requested_by":"operator","reason":"gateway smoke","limit":50,"dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "kv_history_cutover_plan_ready") || !strings.Contains(w.Body.String(), "dual_read_plan_ready") || !strings.Contains(w.Body.String(), "dual_write_plan_ready") || !strings.Contains(w.Body.String(), "kv-history-cutover-plan.json") || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) {
+		t.Fatalf("native kv_history cutover plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -128,6 +136,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/retention/prune-plan",
 				"/v1/memory-time-travel/kv-history/native-plan",
 				"/v1/memory-time-travel/kv-history/migration-preview",
+				"/v1/memory-time-travel/kv-history/cutover/plan",
 				"/v1/memory-time-travel/audit/links",
 				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
@@ -145,6 +154,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},

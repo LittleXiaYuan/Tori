@@ -45,9 +45,16 @@ export interface MemoryTimeTravelStatus {
   kv_history_migration_plan_ready?: boolean;
   kv_history_index_plan_ready?: boolean;
   native_kv_history_preview_ready?: boolean;
+  kv_history_cutover_plan_ready?: boolean;
+  dual_read_plan_ready?: boolean;
+  dual_write_plan_ready?: boolean;
   native_kv_history_ready?: boolean;
   writes_native_kv_history?: boolean;
   migrates_kv_history?: boolean;
+  dual_read_ready?: boolean;
+  dual_write_ready?: boolean;
+  cutover_ready?: boolean;
+  rollback_ready?: boolean;
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
   approved_rollback_plan_ready?: boolean;
@@ -211,6 +218,110 @@ export interface MemoryTimeTravelNativeKVHistoryMigrationPreview {
   artifacts?: string[];
   actions?: string[];
   labels?: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryCutoverPlanInput {
+  namespace?: string;
+  requested_by?: string;
+  reason?: string;
+  limit?: number;
+  dry_run?: boolean;
+}
+
+export interface MemoryTimeTravelKVHistoryCutoverPhasePlan {
+  step: number;
+  name: string;
+  from: string;
+  to: string;
+  gate: string;
+  ready: boolean;
+  writes: boolean;
+  status: string;
+  description: string;
+  blocked_by?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryDualReadPlan {
+  plan_ready: boolean;
+  ready: boolean;
+  preferred_source: string;
+  fallback_source: string;
+  reads_native_kv_history: boolean;
+  reads_reserved_kv_namespace: boolean;
+  switches_adapter: boolean;
+  validation: string[];
+  blocked_by: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryDualWritePlan {
+  plan_ready: boolean;
+  ready: boolean;
+  primary_target: string;
+  mirror_target: string;
+  writes_native_kv_history: boolean;
+  writes_reserved_kv_namespace: boolean;
+  writes_ledger_kv: boolean;
+  migration_executor_ready: boolean;
+  guardrails: string[];
+  blocked_by: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryCutoverRollbackPlan {
+  plan_ready: boolean;
+  ready: boolean;
+  requires_approval: boolean;
+  restores_reserved_adapter: boolean;
+  drops_native_rows: boolean;
+  deletes_reserved_kv_namespace: boolean;
+  actions: string[];
+  blocked_by: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVHistoryCutoverPlan {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  requested_by?: string;
+  reason?: string;
+  source: string;
+  native_table: string;
+  current_history_namespace: string;
+  consumes_native_kv_history_plan: boolean;
+  consumes_migration_preview: boolean;
+  native_kv_history_plan_ready: boolean;
+  native_kv_history_preview_ready: boolean;
+  kv_history_cutover_plan_ready: boolean;
+  dual_read_plan_ready: boolean;
+  dual_write_plan_ready: boolean;
+  native_kv_history_ready: boolean;
+  writes_native_kv_history: boolean;
+  migrates_kv_history: boolean;
+  dual_read_ready: boolean;
+  dual_write_ready: boolean;
+  cutover_ready: boolean;
+  rollback_ready: boolean;
+  creates_native_table: boolean;
+  deletes_reserved_kv_namespace: boolean;
+  switches_temporal_adapter: boolean;
+  preview_row_count: number;
+  returned_preview_row_count: number;
+  native_kv_history_plan: MemoryTimeTravelNativeKVHistoryPlan;
+  kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview;
+  phases: MemoryTimeTravelKVHistoryCutoverPhasePlan[];
+  dual_read_plan: MemoryTimeTravelKVHistoryDualReadPlan;
+  dual_write_plan: MemoryTimeTravelKVHistoryDualWritePlan;
+  cutover_rollback_plan: MemoryTimeTravelKVHistoryCutoverRollbackPlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
   notes?: string[];
 }
 
@@ -452,6 +563,11 @@ export interface MemoryTimeTravelEvidenceResponse {
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
   kv_history_migration_preview?: MemoryTimeTravelNativeKVHistoryMigrationPreview;
   kv_history_migration_preview_error?: string;
+  kv_history_cutover_plan?: MemoryTimeTravelKVHistoryCutoverPlan;
+  kv_history_cutover_plan_error?: string;
+  kv_history_dual_read_plan?: MemoryTimeTravelKVHistoryDualReadPlan;
+  kv_history_dual_write_plan?: MemoryTimeTravelKVHistoryDualWritePlan;
+  kv_history_cutover_rollback_plan?: MemoryTimeTravelKVHistoryCutoverRollbackPlan;
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerification;
@@ -471,6 +587,7 @@ export interface MemoryTimeTravelPackClient {
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
   nativeKVHistoryPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>;
   nativeKVHistoryMigrationPreview(namespace?: string, limit?: number): Promise<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>;
+  kvHistoryCutoverPlan(input?: MemoryTimeTravelKVHistoryCutoverPlanInput): Promise<{ plan: MemoryTimeTravelKVHistoryCutoverPlan }>;
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse>;
@@ -531,6 +648,11 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       fetcher<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>(
         `/v1/memory-time-travel/kv-history/migration-preview${query({ namespace, limit: limit ? String(limit) : undefined })}`,
       ),
+    kvHistoryCutoverPlan: (input = {}) =>
+      fetcher<{ plan: MemoryTimeTravelKVHistoryCutoverPlan }>("/v1/memory-time-travel/kv-history/cutover/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     auditLinks: (namespace) =>
       fetcher<{ links: MemoryTimeTravelKVAuditLinksReport }>(`/v1/memory-time-travel/audit/links${query({ namespace })}`),
     auditVerify: (limit) =>
