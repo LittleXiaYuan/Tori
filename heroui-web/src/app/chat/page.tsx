@@ -66,6 +66,15 @@ import { ChatStreamTimeoutError, parseAgenticChatStream } from "@/lib/chat-sse";
 import { buildHiddenContextAttachments } from "@/lib/chat-attachments";
 import { PlannerRecoveryShelf } from "@/components/chat/planner-recovery-shelf";
 import { formatErrorMessage } from "@/lib/error-utils";
+import {
+  buildSocialPublishActions,
+  detectSocialPublishIntent,
+  formatSocialPublishConnectorRequired,
+  formatSocialPublishResult,
+  socialPublishStepLabel,
+  stepRecordFromResult,
+  type SocialPublishStepRecord,
+} from "@/lib/social-publish-intent";
 
 const browserIntentClient = createBrowserIntentPackClient();
 
@@ -406,6 +415,138 @@ export default function ChatPage() {
         pushBrowserTrace(makeBrowserTraceEvent(
           browserTraceSummary(slashBrowserCommand.command, "error"),
           { command: slashBrowserCommand.command, args: slashBrowserCommand.args, error: message },
+          "reflect",
+        ));
+      } finally {
+        chatD({ type: "FINISH_SEND" });
+      }
+      return;
+    }
+
+    const socialPublishIntent = detectSocialPublishIntent(displayText);
+    if (socialPublishIntent) {
+      setSuggestedTab("browser");
+      setShowComputer(true);
+      const extStatus = await browserIntentClient.extensionStatus().catch(() => ({ connected: false }));
+      if (!extStatus.connected) {
+        setShowConnectors(true);
+        setResumePromptForBrowser(text);
+        setBridgeNotice({ tone: "warning", text: `${socialPublishIntent.platformName}直发需要先连接浏览器。` });
+        pushBrowserTrace(makeBrowserTraceEvent(
+          "Social publish waiting for browser connector",
+          { platform: socialPublishIntent.platform, scenario: socialPublishIntent.scenarioId },
+          "reflect",
+        ));
+        const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
+        const asstMsg: Message = {
+          role: "assistant",
+          content: formatSocialPublishConnectorRequired(socialPublishIntent),
+          id: newId(),
+          browserRequirement: {
+            required: true,
+            reason: "browser_connector_required",
+            message: `${socialPublishIntent.platformName}直发需要连接 Yunque Browser Connector，才能在你的真实登录会话中打开页面、填写内容并点击发布。`,
+            install_path: "/packs/browser",
+            settings_path: "/packs/browser",
+          },
+          traceEvents: [makeBrowserTraceEvent("Opened browser install guide", { source: "chat-social-publish", platform: socialPublishIntent.platform }, "reflect")],
+        };
+        chatD({ type: "SET_INPUT", value: "" });
+        chatD({ type: "ADD_PAIR", userMsg, asstMsg });
+        setActiveSlashCommand(null);
+        setShowSlashMenu(false);
+        if (typeof window !== "undefined") {
+          window.setTimeout(() => window.open("/packs/browser", "_blank", "noopener,noreferrer"), 80);
+        }
+        return;
+      }
+
+      const actions = buildSocialPublishActions(socialPublishIntent);
+      const userMsg: Message = { role: "user", content: displayText, id: newId(), timestamp: Date.now() };
+      const asstMsg: Message = { role: "assistant", content: "", id: newId(), timestamp: Date.now(), traceEvents: [] };
+      setActiveSlashCommand(null);
+      setShowSlashMenu(false);
+      chatD({ type: "START_SEND" });
+      chatD({ type: "ADD_PAIR", userMsg, asstMsg });
+      const startEvent = makeBrowserTraceEvent(
+        `${socialPublishIntent.platformName}直发计划开始`,
+        {
+          source: "chat-social-publish",
+          platform: socialPublishIntent.platform,
+          scenario: socialPublishIntent.scenarioId,
+          targetUrl: socialPublishIntent.targetUrl,
+          steps: actions.map((action, index) => ({ index, label: socialPublishStepLabel(action, socialPublishIntent), type: action.type })),
+        },
+        "tool_start",
+      );
+      pushBrowserTrace(startEvent);
+      chatD({ type: "APPEND_LAST_TRACE", event: startEvent });
+
+      const stepRecords: SocialPublishStepRecord[] = [];
+      try {
+        for (const [index, action] of actions.entries()) {
+          const label = socialPublishStepLabel(action, socialPublishIntent);
+          const stepStart = makeBrowserTraceEvent(
+            label,
+            { source: "chat-social-publish", platform: socialPublishIntent.platform, action },
+            "tool_start",
+          );
+          pushBrowserTrace(stepStart);
+          chatD({ type: "APPEND_LAST_TRACE", event: stepStart });
+
+          const result = await browserIntentClient.extensionAction(action);
+          const record = stepRecordFromResult(index, label, action, result);
+          stepRecords.push(record);
+          if (!result?.ok) {
+            throw new Error(result?.error || `${label}失败`);
+          }
+
+          const stepDone = makeBrowserTraceEvent(
+            `${label}完成`,
+            { source: "chat-social-publish", platform: socialPublishIntent.platform, result: record },
+            "tool_result",
+          );
+          pushBrowserTrace(stepDone);
+          chatD({ type: "APPEND_LAST_TRACE", event: stepDone });
+        }
+
+        const lastStep = stepRecords[stepRecords.length - 1];
+        const artifact: BrowserActionArtifactSummary = {
+          action: `${socialPublishIntent.platform}_publish_direct`,
+          url: lastStep?.url || socialPublishIntent.targetUrl,
+          title: socialPublishIntent.title || `${socialPublishIntent.platformName}直发`,
+          hasScreenshot: stepRecords.some((step) => step.hasScreenshot),
+          preview: socialPublishIntent.body.slice(0, 240),
+          updatedAt: Date.now(),
+        };
+        const content = formatSocialPublishResult(socialPublishIntent, stepRecords);
+        chatD({ type: "UPDATE_LAST", updates: { content, browserSummary: artifact } });
+        setResumePromptForBrowser(null);
+        setLastArtifact(artifact);
+        setBridgeNotice({ tone: "success", text: `${socialPublishIntent.platformName}直发已完成。` });
+        pushBrowserTrace(makeBrowserTraceEvent(
+          `${socialPublishIntent.platformName}直发完成`,
+          { source: "chat-social-publish", platform: socialPublishIntent.platform, steps: stepRecords },
+          "tool_result",
+        ));
+        syncBridgeState();
+      } catch (e: unknown) {
+        const message = friendlyError((e as Error).message || `${socialPublishIntent.platformName}直发失败。`);
+        const lastStep = stepRecords[stepRecords.length - 1];
+        const artifact: BrowserActionArtifactSummary = {
+          action: `${socialPublishIntent.platform}_publish_direct`,
+          url: lastStep?.url || socialPublishIntent.targetUrl,
+          title: socialPublishIntent.title || `${socialPublishIntent.platformName}直发`,
+          hasScreenshot: stepRecords.some((step) => step.hasScreenshot),
+          preview: socialPublishIntent.body.slice(0, 240),
+          updatedAt: Date.now(),
+        };
+        chatD({ type: "UPDATE_LAST", updates: { content: formatSocialPublishResult(socialPublishIntent, stepRecords, message), browserSummary: artifact } });
+        setLastArtifact(artifact);
+        setBridgeNotice({ tone: "error", text: message });
+        pushBrowserTrace(makeBrowserTraceEvent(
+          `${socialPublishIntent.platformName}直发被中断`,
+          { source: "chat-social-publish", platform: socialPublishIntent.platform, error: message, steps: stepRecords },
           "reflect",
         ));
       } finally {
