@@ -16,6 +16,7 @@
     "POST /v1/chaos-probe/run",
     "POST /v1/chaos-probe/scheduler/plan",
     "POST /v1/chaos-probe/degrade-state/writeback",
+    "POST /v1/chaos-probe/degrade-state/engine/plan",
     "GET /v1/chaos-probe/reports",
     "GET /v1/chaos-probe/reports/",
     "GET /v1/chaos-probe/evidence/"

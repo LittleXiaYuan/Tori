@@ -65,6 +65,11 @@ test("ChaosProbeClient reads status and probes with bearer token", async () => {
           degrade_writeback_ready: true,
           degrade_state_store_ready: true,
           writes_degrade_state_store: true,
+          degrade_engine_plan_ready: true,
+          audit_append_plan_ready: true,
+          merkle_append_ready: false,
+          consumes_degrade_state_store: true,
+          writes_runtime_degrade_state: false,
           runtime_degrade_state_ready: false,
           degrade_engine_ready: false,
           alert_writeback_plan_ready: true,
@@ -177,7 +182,7 @@ test("ChaosProbeClient saves probes, runs checks, and reads report detail", asyn
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 
-test("ChaosProbeClient lists reports, plans scheduler, writes pack-local degrade state, and exports evidence packs", async () => {
+test("ChaosProbeClient lists reports, plans scheduler, writes pack-local degrade state, plans runtime engine handoff, and exports evidence packs", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createChaosProbeClient({
     baseUrl: "http://localhost:9090",
@@ -253,6 +258,41 @@ test("ChaosProbeClient lists reports, plans scheduler, writes pack-local degrade
             labels: [],
           },
         });
+      if (String(url).includes("/degrade-state/engine/plan"))
+        return jsonResponse({
+          plan: {
+            pack_id: "yunque.pack.chaos-probe",
+            generated_at: "now",
+            status: "degrade_engine_handoff_plan",
+            report_id: "chaos-1",
+            record_id: "chaos-degrade-1",
+            record_key: "key",
+            target: "runtime.degrade_state",
+            level: 1,
+            gate_status: "warn",
+            health_score: 80,
+            degrade_engine_plan_ready: true,
+            runtime_degrade_handoff_plan_ready: true,
+            runtime_degrade_state_ready: false,
+            degrade_engine_ready: false,
+            audit_append_plan_ready: true,
+            merkle_append_ready: false,
+            consumes_degrade_state_store: true,
+            writes_runtime_degrade_state: false,
+            degrade_state_store_ready: true,
+            degrade_writeback_ready: true,
+            scheduler_ready: false,
+            prometheus_ready: false,
+            alert_writeback_ready: false,
+            degrade_state_record: { record_id: "chaos-degrade-1" },
+            degrade_state_store: { record_count: 1 },
+            runtime_handoff_plan: { writes_runtime_degrade_state: false },
+            audit_append_plan: { merkle_append_ready: false },
+            artifacts: ["degrade-engine-plan.json"],
+            actions: [],
+            labels: [],
+          },
+        });
       return jsonResponse({
         pack_id: "yunque.pack.chaos-probe",
         exported_at: "now",
@@ -272,11 +312,17 @@ test("ChaosProbeClient lists reports, plans scheduler, writes pack-local degrade
     report_id: "chaos-1",
     requested_by: "unit",
   });
+  const enginePlan = await client.degradeEnginePlan({
+    report_id: "chaos-1",
+    requested_by: "unit",
+  });
   const evidence = await client.evidence("chaos-1");
 
   assertEqual(reports.count, 1);
   assertEqual(plan.plan.scheduler_ready, false);
   assertEqual(writeback.writeback.runtime_degrade_state_ready, false);
+  assertEqual(enginePlan.plan.degrade_engine_plan_ready, true);
+  assertEqual(enginePlan.plan.writes_runtime_degrade_state, false);
   assertEqual(evidence.format, "json-chaos-probe-evidence");
   assertDeepEqual(evidence.files, ["chaos-report.json"]);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/chaos-probe/reports");
@@ -298,6 +344,14 @@ test("ChaosProbeClient lists reports, plans scheduler, writes pack-local degrade
   );
   assertEqual(
     calls[3]?.url,
+    "http://localhost:9090/v1/chaos-probe/degrade-state/engine/plan",
+  );
+  assertEqual(
+    calls[3]?.init?.body,
+    JSON.stringify({ report_id: "chaos-1", requested_by: "unit" }),
+  );
+  assertEqual(
+    calls[4]?.url,
     "http://localhost:9090/v1/chaos-probe/evidence/chaos-1",
   );
 });

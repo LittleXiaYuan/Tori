@@ -2,8 +2,8 @@
 // Chaos Probe capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, safe local probe definitions,
 // one-shot probe runs, health/degrade summaries, remediation hints, and JSON
-// evidence export while background scheduling, Prometheus metrics, and
-// automatic degrade-state write-back are wired later.
+// evidence export while background scheduling, Prometheus metrics, and the
+// runtime degrade-state engine are wired later.
 package chaosprobe
 
 import (
@@ -249,6 +249,86 @@ type DegradeStateWritebackReport struct {
 	Notes                     []string                 `json:"notes,omitempty"`
 }
 
+type DegradeStateEnginePlanRequest struct {
+	ReportID    string            `json:"report_id,omitempty"`
+	RecordID    string            `json:"record_id,omitempty"`
+	RequestedBy string            `json:"requested_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type RuntimeDegradeHandoffPlan struct {
+	Target                    string            `json:"target"`
+	Level                     int               `json:"level"`
+	GateStatus                string            `json:"gate_status"`
+	HealthScore               float64           `json:"health_score"`
+	Reason                    string            `json:"reason"`
+	RecordID                  string            `json:"record_id"`
+	RecordKey                 string            `json:"record_key"`
+	ReportID                  string            `json:"report_id"`
+	DedupKey                  string            `json:"dedup_key"`
+	ConsumesDegradeStateStore bool              `json:"consumes_degrade_state_store"`
+	WritesRuntimeDegradeState bool              `json:"writes_runtime_degrade_state"`
+	RuntimeDegradeStateReady  bool              `json:"runtime_degrade_state_ready"`
+	DegradeEngineReady        bool              `json:"degrade_engine_ready"`
+	ApprovalRequired          bool              `json:"approval_required"`
+	Metadata                  map[string]string `json:"metadata,omitempty"`
+	Actions                   []string          `json:"actions"`
+	BlockedBy                 []string          `json:"blocked_by"`
+	Notes                     []string          `json:"notes,omitempty"`
+}
+
+type AuditAppendPlan struct {
+	AuditAppendPlanReady bool     `json:"audit_append_plan_ready"`
+	MerkleAppendReady    bool     `json:"merkle_append_ready"`
+	Chain                string   `json:"chain"`
+	EventType            string   `json:"event_type"`
+	Subject              string   `json:"subject"`
+	PayloadDigest        string   `json:"payload_digest"`
+	DedupKey             string   `json:"dedup_key"`
+	WritesAuditChain     bool     `json:"writes_audit_chain"`
+	Actions              []string `json:"actions"`
+	BlockedBy            []string `json:"blocked_by"`
+	Notes                []string `json:"notes,omitempty"`
+}
+
+type DegradeStateEnginePlanReport struct {
+	PackID                    string                    `json:"pack_id"`
+	GeneratedAt               time.Time                 `json:"generated_at"`
+	Status                    string                    `json:"status"`
+	ReportID                  string                    `json:"report_id"`
+	RecordID                  string                    `json:"record_id"`
+	RecordKey                 string                    `json:"record_key"`
+	Target                    string                    `json:"target"`
+	Level                     int                       `json:"level"`
+	GateStatus                string                    `json:"gate_status"`
+	HealthScore               float64                   `json:"health_score"`
+	RequestedBy               string                    `json:"requested_by,omitempty"`
+	Reason                    string                    `json:"reason,omitempty"`
+	DegradeEnginePlanReady    bool                      `json:"degrade_engine_plan_ready"`
+	RuntimeHandoffPlanReady   bool                      `json:"runtime_degrade_handoff_plan_ready"`
+	RuntimeDegradeStateReady  bool                      `json:"runtime_degrade_state_ready"`
+	DegradeEngineReady        bool                      `json:"degrade_engine_ready"`
+	AuditAppendPlanReady      bool                      `json:"audit_append_plan_ready"`
+	MerkleAppendReady         bool                      `json:"merkle_append_ready"`
+	ConsumesDegradeStateStore bool                      `json:"consumes_degrade_state_store"`
+	WritesRuntimeDegradeState bool                      `json:"writes_runtime_degrade_state"`
+	DegradeStateStoreReady    bool                      `json:"degrade_state_store_ready"`
+	DegradeWritebackReady     bool                      `json:"degrade_writeback_ready"`
+	SchedulerReady            bool                      `json:"scheduler_ready"`
+	PrometheusReady           bool                      `json:"prometheus_ready"`
+	AlertWritebackReady       bool                      `json:"alert_writeback_ready"`
+	DegradeStateRecord        DegradeStateRecord        `json:"degrade_state_record"`
+	DegradeStateStore         DegradeStateStoreSummary  `json:"degrade_state_store"`
+	RuntimeHandoffPlan        RuntimeDegradeHandoffPlan `json:"runtime_handoff_plan"`
+	AuditAppendPlan           AuditAppendPlan           `json:"audit_append_plan"`
+	Artifacts                 []string                  `json:"artifacts"`
+	Actions                   []string                  `json:"actions"`
+	Labels                    []string                  `json:"labels"`
+	Metadata                  map[string]string         `json:"metadata,omitempty"`
+	Notes                     []string                  `json:"notes,omitempty"`
+}
+
 type ReportSummary struct {
 	ID            string    `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -290,6 +370,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/run", Handler: h.Run},
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/scheduler/plan", Handler: h.SchedulerPlan},
 		{Method: http.MethodPost, Path: "/v1/chaos-probe/degrade-state/writeback", Handler: h.DegradeStateWriteback},
+		{Method: http.MethodPost, Path: "/v1/chaos-probe/degrade-state/engine/plan", Handler: h.DegradeStateEnginePlan},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports", Handler: h.Reports},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/reports/", Handler: h.ReportDetail},
 		{Method: http.MethodGet, Path: "/v1/chaos-probe/evidence/", Handler: h.Evidence},
@@ -324,6 +405,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"degrade_writeback_ready":      true,
 		"degrade_state_store_ready":    true,
 		"writes_degrade_state_store":   true,
+		"degrade_engine_plan_ready":    true,
+		"audit_append_plan_ready":      true,
+		"merkle_append_ready":          false,
+		"consumes_degrade_state_store": true,
+		"writes_runtime_degrade_state": false,
 		"runtime_degrade_state_ready":  false,
 		"degrade_engine_ready":         false,
 		"alert_writeback_plan_ready":   true,
@@ -342,10 +428,12 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"chaos.metrics.plan",
 			"chaos.degrade.plan",
 			"chaos.degrade_state.writeback",
+			"chaos.degrade_state.engine.plan",
+			"chaos.audit.append.plan",
 			"chaos.alert.writeback.plan",
 			"chaos.evidence.export",
 		},
-		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, and automatic runtime degrade-state write-back plans are available as non-destructive contracts; pack-local degrade-state write-back persistence is available, while real scheduler/metrics/alert routing and runtime degrade-state engine remain follow-up wiring."},
+		"notes": []string{"Background scheduler, Prometheus metrics, alert routing, runtime degrade-state engine handoff, and audit append plans are available as non-destructive contracts; pack-local degrade-state write-back persistence is available, while real scheduler/metrics/alert routing, Merkle append, and runtime degrade-state mutation remain follow-up wiring."},
 	})
 }
 
@@ -454,6 +542,24 @@ func (h *Handler) DegradeStateWriteback(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": writeback})
 }
 
+func (h *Handler) DegradeStateEnginePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req DegradeStateEnginePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid chaos degrade-state engine plan payload")
+		return
+	}
+	plan, err := h.buildDegradeStateEnginePlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Reports(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -494,16 +600,19 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	}
 	plan := h.buildSchedulerPlan(report, SchedulerPlanRequest{ReportID: report.ID, Interval: "5m", RequestedBy: "evidence-export", Reason: "report evidence schema snapshot"})
 	record, recordPersisted := h.latestDegradeStateRecordForReport(report.ID)
+	enginePlan, enginePlanReady := h.degradeStateEnginePlanForEvidence(report.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                        PackID,
 		"exported_at":                    h.now().UTC(),
 		"format":                         "json-chaos-probe-evidence",
-		"files":                          []string{"chaos-report.json", "probe-definitions.json", "scheduler-plan.json", "metrics-plan.json", "degrade-writeback-plan.json", "degrade-state-store.json", "degrade-state-record.json"},
+		"files":                          []string{"chaos-report.json", "probe-definitions.json", "scheduler-plan.json", "metrics-plan.json", "degrade-writeback-plan.json", "degrade-state-store.json", "degrade-state-record.json", "degrade-engine-plan.json", "runtime-degrade-handoff-plan.json", "audit-append-plan.json"},
 		"report":                         report,
 		"scheduler_plan":                 plan,
 		"degrade_state_store":            h.degradeStateStoreSummary(),
 		"degrade_state_record":           record,
 		"degrade_state_record_persisted": recordPersisted,
+		"degrade_engine_plan":            enginePlan,
+		"degrade_engine_plan_ready":      enginePlanReady,
 	})
 }
 
@@ -758,6 +867,150 @@ func (h *Handler) reportForDegradeStateWriteback(ctx context.Context, req Degrad
 		return ChaosReport{}, err
 	}
 	return report, nil
+}
+
+func (h *Handler) buildDegradeStateEnginePlan(_ context.Context, req DegradeStateEnginePlanRequest) (DegradeStateEnginePlanReport, error) {
+	record, ok := h.degradeStateRecordForEnginePlan(req)
+	if !ok {
+		return DegradeStateEnginePlanReport{}, fmt.Errorf("degrade-state record not found; run /v1/chaos-probe/degrade-state/writeback before planning runtime engine handoff")
+	}
+
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = record.RequestedBy
+	}
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = record.Reason
+	}
+	metadata := cleanStringMap(req.Metadata)
+	if metadata == nil {
+		metadata = record.Metadata
+	}
+	dedupKey := runtimeHandoffDedupKey(record)
+	handoff := RuntimeDegradeHandoffPlan{
+		Target:                    record.Target,
+		Level:                     record.Level,
+		GateStatus:                record.GateStatus,
+		HealthScore:               record.HealthScore,
+		Reason:                    reason,
+		RecordID:                  record.RecordID,
+		RecordKey:                 record.RecordKey,
+		ReportID:                  record.ReportID,
+		DedupKey:                  dedupKey,
+		ConsumesDegradeStateStore: true,
+		WritesRuntimeDegradeState: false,
+		RuntimeDegradeStateReady:  false,
+		DegradeEngineReady:        false,
+		ApprovalRequired:          record.Level > 0 || record.GateStatus != "pass",
+		Metadata:                  metadata,
+		Actions: []string{
+			"would validate the pack-local degrade-state record and map it to the runtime degrade-state input contract",
+			"would require explicit runtime degrade engine wiring before mutating live runtime state",
+		},
+		BlockedBy: []string{"runtime-degrade-engine-not-wired", "audit-chain-append-not-wired"},
+		Notes: []string{
+			"Plan-only handoff contract; the live runtime degrade state is not mutated.",
+			"Use dedup_key with record_key to make later engine consumption idempotent.",
+		},
+	}
+	audit := AuditAppendPlan{
+		AuditAppendPlanReady: true,
+		MerkleAppendReady:    false,
+		Chain:                "runtime.degrade_state.audit",
+		EventType:            "chaos_probe.degrade_state.engine_handoff",
+		Subject:              record.RecordID,
+		PayloadDigest:        degradeEnginePayloadDigest(record, dedupKey),
+		DedupKey:             dedupKey,
+		WritesAuditChain:     false,
+		Actions: []string{
+			"would append the runtime degrade handoff payload to the Merkle audit-chain after engine consumption",
+		},
+		BlockedBy: []string{"merkle-append-writer-not-wired"},
+		Notes: []string{
+			"Audit append is deliberately a contract preview only.",
+			"merkle_append_ready=false keeps the current slice from claiming durable audit-chain writes.",
+		},
+	}
+	return DegradeStateEnginePlanReport{
+		PackID:                    PackID,
+		GeneratedAt:               h.now().UTC(),
+		Status:                    "degrade_engine_handoff_plan",
+		ReportID:                  record.ReportID,
+		RecordID:                  record.RecordID,
+		RecordKey:                 record.RecordKey,
+		Target:                    record.Target,
+		Level:                     record.Level,
+		GateStatus:                record.GateStatus,
+		HealthScore:               record.HealthScore,
+		RequestedBy:               requestedBy,
+		Reason:                    reason,
+		DegradeEnginePlanReady:    true,
+		RuntimeHandoffPlanReady:   true,
+		RuntimeDegradeStateReady:  false,
+		DegradeEngineReady:        false,
+		AuditAppendPlanReady:      true,
+		MerkleAppendReady:         false,
+		ConsumesDegradeStateStore: true,
+		WritesRuntimeDegradeState: false,
+		DegradeStateStoreReady:    true,
+		DegradeWritebackReady:     true,
+		SchedulerReady:            false,
+		PrometheusReady:           false,
+		AlertWritebackReady:       false,
+		DegradeStateRecord:        record,
+		DegradeStateStore:         h.degradeStateStoreSummary(),
+		RuntimeHandoffPlan:        handoff,
+		AuditAppendPlan:           audit,
+		Artifacts:                 []string{"degrade-engine-plan.json", "runtime-degrade-handoff-plan.json", "audit-append-plan.json", "degrade-state-store.json", "degrade-state-record.json"},
+		Actions: []string{
+			"mapped the pack-local degrade-state record into the future runtime degrade engine handoff contract",
+			"kept runtime degrade-state mutation and Merkle audit append blocked until explicit engine/audit writers are wired",
+		},
+		Labels:   []string{"chaos-probe", "degrade-engine-plan", "pack-local-store-consumer", "no-runtime-degrade-state-write", "no-merkle-append"},
+		Metadata: metadata,
+		Notes: []string{
+			"degrade_engine_plan_ready=true means the handoff shape is available; degrade_engine_ready=false means no live engine consumes it yet.",
+			"runtime_degrade_state_ready=false and writes_runtime_degrade_state=false are intentional safety gates for this reversible slice.",
+		},
+	}, nil
+}
+
+func (h *Handler) degradeStateRecordForEnginePlan(req DegradeStateEnginePlanRequest) (DegradeStateRecord, bool) {
+	recordID := strings.TrimSpace(req.RecordID)
+	reportID := strings.TrimSpace(req.ReportID)
+	records, _ := h.loadDegradeStateRecords()
+	for _, record := range records {
+		if recordID != "" && record.RecordID == recordID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if reportID == "" || record.ReportID == reportID {
+			return record, true
+		}
+	}
+	return DegradeStateRecord{}, false
+}
+
+func (h *Handler) degradeStateEnginePlanForEvidence(reportID string) (DegradeStateEnginePlanReport, bool) {
+	record, ok := h.degradeStateRecordForEnginePlan(DegradeStateEnginePlanRequest{ReportID: reportID})
+	if !ok {
+		return DegradeStateEnginePlanReport{}, false
+	}
+	plan, err := h.buildDegradeStateEnginePlan(context.Background(), DegradeStateEnginePlanRequest{
+		ReportID:    record.ReportID,
+		RecordID:    record.RecordID,
+		RequestedBy: "evidence-export",
+		Reason:      "report evidence runtime degrade handoff snapshot",
+	})
+	if err != nil {
+		return DegradeStateEnginePlanReport{}, false
+	}
+	return plan, true
 }
 
 func (h *Handler) executeProbe(ctx context.Context, def ProbeDefinition) ProbeResult {
@@ -1152,6 +1405,32 @@ func degradeStateRecordKey(report ChaosReport, target, requestedBy, reason, appr
 		"requested_by=" + requestedBy,
 		"reason=" + reason,
 		"approval_id=" + strings.TrimSpace(approvalID),
+	}, "\n")
+	return sha256Hex(payload)
+}
+
+func runtimeHandoffDedupKey(record DegradeStateRecord) string {
+	payload := strings.Join([]string{
+		"pack_id=" + PackID,
+		"record_key=" + record.RecordKey,
+		"target=" + record.Target,
+		fmt.Sprintf("level=%d", record.Level),
+		"gate_status=" + record.GateStatus,
+	}, "\n")
+	return "runtime-handoff-" + sha256Hex(payload)[:24]
+}
+
+func degradeEnginePayloadDigest(record DegradeStateRecord, dedupKey string) string {
+	payload := strings.Join([]string{
+		"pack_id=" + PackID,
+		"record_id=" + record.RecordID,
+		"record_key=" + record.RecordKey,
+		"report_id=" + record.ReportID,
+		"target=" + record.Target,
+		fmt.Sprintf("level=%d", record.Level),
+		"gate_status=" + record.GateStatus,
+		fmt.Sprintf("health_score=%.3f", record.HealthScore),
+		"dedup_key=" + dedupKey,
 	}, "\n")
 	return sha256Hex(payload)
 }

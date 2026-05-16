@@ -120,6 +120,44 @@ func TestChaosProbePackCanWritePackLocalDegradeState(t *testing.T) {
 	}
 }
 
+func TestChaosProbePackCanPlanRuntimeDegradeEngineHandoff(t *testing.T) {
+	gw, tm := newTestGatewayWithChaosProbePack(t, packruntime.PackStatusEnabled)
+	tenant := tm.Register("chaos-probe-engine-plan")
+
+	definitionBody := `{"probes":[{"id":"custom-degraded-probe","name":"Custom degraded probe","category":"storage","description":"stored but no runner","safe":true,"enabled":true,"interval_seconds":30,"weight":1}],"replace":true}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/probes", strings.NewReader(definitionBody))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save probe definition status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/run", strings.NewReader(`{"probe_ids":["custom-degraded-probe"],"persist":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"gate_status":"warn"`) {
+		t.Fatalf("run degraded probe status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/degrade-state/writeback", strings.NewReader(`{"requested_by":"gateway-test","reason":"persist pack-local degrade state"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("degrade state writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/chaos-probe/degrade-state/engine/plan", strings.NewReader(`{"requested_by":"gateway-test","metadata":{"ticket":"chaos-2"}}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"degrade_engine_plan_ready":true`) || !strings.Contains(w.Body.String(), `"consumes_degrade_state_store":true`) || !strings.Contains(w.Body.String(), `"writes_runtime_degrade_state":false`) || !strings.Contains(w.Body.String(), `"merkle_append_ready":false`) {
+		t.Fatalf("engine plan status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
 	t.Helper()
 	registry, err := packruntime.NewRegistry(t.TempDir())
@@ -139,6 +177,7 @@ func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatu
 				"/v1/chaos-probe/run",
 				"/v1/chaos-probe/scheduler/plan",
 				"/v1/chaos-probe/degrade-state/writeback",
+				"/v1/chaos-probe/degrade-state/engine/plan",
 				"/v1/chaos-probe/reports",
 				"/v1/chaos-probe/reports/",
 				"/v1/chaos-probe/evidence/",
@@ -150,6 +189,7 @@ func newTestGatewayWithChaosProbePack(t *testing.T, status packruntime.PackStatu
 				{Method: http.MethodPost, Path: "/v1/chaos-probe/run"},
 				{Method: http.MethodPost, Path: "/v1/chaos-probe/scheduler/plan"},
 				{Method: http.MethodPost, Path: "/v1/chaos-probe/degrade-state/writeback"},
+				{Method: http.MethodPost, Path: "/v1/chaos-probe/degrade-state/engine/plan"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/reports"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/reports/"},
 				{Method: http.MethodGet, Path: "/v1/chaos-probe/evidence/"},
