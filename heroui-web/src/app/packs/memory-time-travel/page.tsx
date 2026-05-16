@@ -6,7 +6,7 @@ import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -36,12 +36,13 @@ export default function MemoryTimeTravelPackPage() {
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
   const [auditLinks, setAuditLinks] = useState<MemoryTimeTravelKVAuditLinksReport | null>(null);
   const [nativeKVHistoryPlan, setNativeKVHistoryPlan] = useState<MemoryTimeTravelNativeKVHistoryPlan | null>(null);
+  const [nativeKVHistoryPreview, setNativeKVHistoryPreview] = useState<MemoryTimeTravelNativeKVHistoryMigrationPreview | null>(null);
   const [approvedRollbackPlan, setApprovedRollbackPlan] = useState<MemoryTimeTravelApprovedRollbackPlan | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "native-kv-history" | "retention" | "retention-prune" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "native-kv-history" | "native-kv-history-preview" | "retention" | "retention-prune" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -276,6 +277,20 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const previewNativeKVHistoryMigration = async () => {
+    setBusy("native-kv-history-preview");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.nativeKVHistoryMigrationPreview(namespace, 50);
+      setNativeKVHistoryPreview(res.kv_history_migration_preview);
+      showToast("已生成 Native kv_history migration preview（未迁移、未写表）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 native kv_history migration preview 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -311,7 +326,7 @@ export default function MemoryTimeTravelPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">命名空间</div><div className="kpi-value">{status?.namespace_count ?? 0}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Native kv_history</div><div className="kpi-value text-lg">{status?.native_kv_history_plan_ready ? "plan" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Native kv_history</div><div className="kpi-value text-lg">{status?.native_kv_history_preview_ready ? "preview" : status?.native_kv_history_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
       <Card className="section-card p-4">
@@ -355,10 +370,13 @@ export default function MemoryTimeTravelPackPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><DatabaseZap size={16} />Native kv_history plan</div>
             <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              从当前 reserved `__kv_history__` TemporalKV adapter 推导未来原生 Ledger `kv_history` 表、索引和 migration plan；只输出 native-kv-history-plan.json / kv-history-migration-plan.json / kv-history-index-plan.json，不建表、不迁移、不写 native rows。
+              从当前 reserved `__kv_history__` TemporalKV adapter 推导未来原生 Ledger `kv_history` 表、索引、migration plan 和 row preview；只输出 native-kv-history-plan.json / kv-history-migration-plan.json / kv-history-index-plan.json / kv-history-migration-preview.json，不建表、不迁移、不写 native rows。
             </div>
           </div>
-          <Button variant="outline" isPending={busy === "native-kv-history"} onPress={buildNativeKVHistoryPlan}><DatabaseZap size={14} />生成 native 计划</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" isPending={busy === "native-kv-history"} onPress={buildNativeKVHistoryPlan}><DatabaseZap size={14} />生成 native 计划</Button>
+            <Button variant="outline" isPending={busy === "native-kv-history-preview"} onPress={previewNativeKVHistoryMigration}><DatabaseZap size={14} />预览迁移行</Button>
+          </div>
         </div>
         {nativeKVHistoryPlan ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
@@ -375,6 +393,21 @@ export default function MemoryTimeTravelPackPage() {
         ) : (
           <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
             尚未生成 Native kv_history plan。该入口用于把当前 `__kv_history__` 适配层升级路径固化成可审计契约，真实 Ledger schema migration 会在后续切片单独接入。
+          </div>
+        )}
+        {nativeKVHistoryPreview && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: nativeKVHistoryPreview.native_kv_history_preview_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: nativeKVHistoryPreview.native_kv_history_preview_ready ? "#38bdf8" : "#facc15" }}>
+                {nativeKVHistoryPreview.status || "preview"}
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{nativeKVHistoryPreview.returned_row_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>returned rows · total {nativeKVHistoryPreview.preview_row_count}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>documents {nativeKVHistoryPreview.scanned_document_count} · writes {String(nativeKVHistoryPreview.writes_native_kv_history)}</div>
+            </div>
+            <TextField value={JSON.stringify(nativeKVHistoryPreview, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel native kv_history migration preview JSON" className="font-mono text-xs" readOnly />
+            </TextField>
           </div>
         )}
       </Card>

@@ -95,6 +95,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if memoryTimeTravel.Manifest.SDK.TypeScript != "yunque-client/memory-time-travel" {
 		t.Fatalf("unexpected Memory Time Travel SDK import: %s", memoryTimeTravel.Manifest.SDK.TypeScript)
 	}
+	if !hasBackendRoute(memoryTimeTravel.Manifest, "/v1/memory-time-travel/kv-history/migration-preview") {
+		t.Fatal("expected Memory Time Travel native kv_history migration preview route to be installed from manifest")
+	}
 
 	rpaReplay, ok := registry.Get("yunque.pack.rpa-replay")
 	if !ok {
@@ -144,4 +147,13 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if got := len(registry.List()); got != 12 {
 		t.Fatalf("expected idempotent builtin install, got %d packs", got)
 	}
+}
+
+func hasBackendRoute(manifest packruntime.Manifest, path string) bool {
+	for _, route := range manifest.Backend.Routes {
+		if route == path {
+			return true
+		}
+	}
+	return false
 }
