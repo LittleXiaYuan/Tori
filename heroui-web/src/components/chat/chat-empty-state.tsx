@@ -67,10 +67,10 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
               displayLabel: "写代码 / 修 Bug",
             },
             {
-              icon: <Search size={14} />,
-              label: "/research 最新的AI Agent技术趋势，并生成可分享的结构化报告",
-              desc: "自动研究、提炼信息、沉淀为报告。",
-              displayLabel: "研究一个主题",
+              icon: <Zap size={14} />,
+              label: "帮我在小红书发布一条效率演示笔记，标题：云雀 Chat-first 自动发布，正文：这条笔记演示云雀从对话识别意图、打开创作中心、填写内容并直接点击发布的完整效率链路。",
+              desc: "从 Chat 触发浏览器直发，不再先去 Pack 页面点按钮。",
+              displayLabel: "小红书直发",
               autoSend: true,
             },
           ];
