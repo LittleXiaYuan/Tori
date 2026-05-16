@@ -10,18 +10,34 @@ describe("packs-client", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ modules: [], count: 0 }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ modules: [], count: 0 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generated_at: "2026-05-16T00:00:00Z",
+        packs: 0,
+        enabled_packs: 0,
+        mounted_modules: 0,
+        declared_routes: 0,
+        mounted_routes: 0,
+        ok_routes: 0,
+        missing_routes: 0,
+        method_mismatches: 0,
+        undeclared_routes: 0,
+        entries: [],
+      }), { status: 200 }));
 
     const client = createPacksClient();
     await client.installed();
     await client.enabled();
     await client.backendModules();
+    const audit = await client.backendRouteAudit();
 
     expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/packs/installed",
       "/v1/packs/enabled",
       "/v1/packs/backend-modules",
+      "/v1/packs/backend-route-audit",
     ]);
+    expect(audit.ok_routes).toBe(0);
   });
 
   it("installs local and remote manifests with optional artifact download", async () => {

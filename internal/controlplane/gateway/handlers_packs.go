@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	backuppack "yunque-agent/internal/packs/backup"
 	"yunque-agent/pkg/packruntime"
@@ -30,6 +31,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs/installed", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/enabled", g.requireAuth(g.handlePacksEnabled))
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
+	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
 	g.mux.HandleFunc("/v1/packs/enable", g.requireAuth(g.handlePackEnable))
 	g.mux.HandleFunc("/v1/packs/disable", g.requireAuth(g.handlePackDisable))
@@ -218,6 +220,231 @@ func (g *Gateway) handlePackBackendModules(w http.ResponseWriter, r *http.Reques
 	}
 	modules := g.backendModuleInfos()
 	writeJSON(w, map[string]any{"modules": modules, "count": len(modules)})
+}
+
+func (g *Gateway) handlePackBackendRouteAudit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	writeJSON(w, g.backendRouteAuditReport())
+}
+
+func (g *Gateway) backendRouteAuditReport() packruntime.BackendRouteAuditReport {
+	registry := g.packRegistry
+	modules := g.backendModuleInfos()
+	report := packruntime.BackendRouteAuditReport{
+		GeneratedAt:    time.Now().UTC(),
+		MountedModules: len(modules),
+		Entries:        []packruntime.BackendRouteAuditEntry{},
+	}
+	mounted := backendRouteAuditMountedIndex(modules)
+	report.MountedRoutes = backendRouteAuditMountedRouteCount(mounted)
+	if registry == nil {
+		for _, mountedRoute := range backendRouteAuditFlattenMounted(mounted) {
+			report.Entries = append(report.Entries, packruntime.BackendRouteAuditEntry{
+				PackID:  mountedRoute.packID,
+				Status:  "registry-unavailable",
+				Mounted: true,
+				Method:  mountedRoute.primaryMethod(),
+				Methods: append([]string(nil), mountedRoute.methods...),
+				Path:    mountedRoute.path,
+				Auth:    mountedRoute.auth,
+				Issues:  []string{"pack registry is not configured"},
+			})
+			report.UndeclaredRoutes++
+		}
+		return report
+	}
+	packs := registry.List()
+	report.Packs = len(packs)
+	installedIDs := map[string]bool{}
+	for _, pack := range packs {
+		installedIDs[pack.Manifest.ID] = true
+		if pack.Status == packruntime.PackStatusEnabled {
+			report.EnabledPacks++
+		}
+		declared := backendRouteAuditDeclaredRoutes(pack)
+		report.DeclaredRoutes += len(declared)
+		seenMountedKeys := map[string]bool{}
+		for _, route := range declared {
+			entry := packruntime.BackendRouteAuditEntry{
+				PackID:      pack.Manifest.ID,
+				PackName:    pack.Manifest.Name,
+				PackStatus:  string(pack.Status),
+				Enabled:     pack.Status == packruntime.PackStatusEnabled,
+				Declared:    true,
+				Method:      route.method,
+				Path:        route.path,
+				Description: route.description,
+			}
+			moduleRoutes := mounted[pack.Manifest.ID+" "+route.path]
+			if len(moduleRoutes) == 0 {
+				entry.Status = "missing"
+				entry.Issues = []string{"manifest route is not mounted by any backend module"}
+				report.MissingRoutes++
+				report.Entries = append(report.Entries, entry)
+				continue
+			}
+			for _, mountedRoute := range moduleRoutes {
+				seenMountedKeys[mountedRoute.key()] = true
+				entry.Mounted = true
+				entry.Methods = append([]string(nil), mountedRoute.methods...)
+				entry.Auth = mountedRoute.auth
+				if backendRouteAuditMethodAllowed(mountedRoute.methods, route.method) {
+					entry.Status = "ok"
+					report.OKRoutes++
+				} else {
+					entry.Status = "method-mismatch"
+					entry.Issues = []string{"manifest routeSpec method is not served by the mounted backend module"}
+					report.MethodMismatches++
+				}
+				report.Entries = append(report.Entries, entry)
+			}
+		}
+		for _, mountedRoute := range backendRouteAuditFlattenMounted(mounted) {
+			if mountedRoute.packID != pack.Manifest.ID || seenMountedKeys[mountedRoute.key()] {
+				continue
+			}
+			report.Entries = append(report.Entries, packruntime.BackendRouteAuditEntry{
+				PackID:     pack.Manifest.ID,
+				PackName:   pack.Manifest.Name,
+				PackStatus: string(pack.Status),
+				Enabled:    pack.Status == packruntime.PackStatusEnabled,
+				Status:     "undeclared",
+				Declared:   false,
+				Mounted:    true,
+				Method:     mountedRoute.primaryMethod(),
+				Methods:    append([]string(nil), mountedRoute.methods...),
+				Path:       mountedRoute.path,
+				Auth:       mountedRoute.auth,
+				Issues:     []string{"mounted backend route is not declared by manifest routeSpecs/routes"},
+			})
+			report.UndeclaredRoutes++
+		}
+	}
+	for _, mountedRoute := range backendRouteAuditFlattenMounted(mounted) {
+		if installedIDs[mountedRoute.packID] {
+			continue
+		}
+		report.Entries = append(report.Entries, packruntime.BackendRouteAuditEntry{
+			PackID:  mountedRoute.packID,
+			Status:  "pack-not-installed",
+			Mounted: true,
+			Method:  mountedRoute.primaryMethod(),
+			Methods: append([]string(nil), mountedRoute.methods...),
+			Path:    mountedRoute.path,
+			Auth:    mountedRoute.auth,
+			Issues:  []string{"backend module is mounted but the pack is not installed in registry"},
+		})
+		report.UndeclaredRoutes++
+	}
+	return report
+}
+
+type backendRouteAuditDeclaredRoute struct {
+	method      string
+	path        string
+	description string
+}
+
+type backendRouteAuditMountedRoute struct {
+	packID  string
+	path    string
+	methods []string
+	auth    string
+}
+
+func (r backendRouteAuditMountedRoute) key() string {
+	return r.packID + " " + r.path + " " + strings.Join(r.methods, ",") + " " + r.auth
+}
+
+func (r backendRouteAuditMountedRoute) primaryMethod() string {
+	if len(r.methods) == 0 {
+		return ""
+	}
+	return r.methods[0]
+}
+
+func backendRouteAuditDeclaredRoutes(pack packruntime.InstalledPack) []backendRouteAuditDeclaredRoute {
+	var out []backendRouteAuditDeclaredRoute
+	seen := map[string]bool{}
+	add := func(method, path, description string) {
+		method = strings.ToUpper(strings.TrimSpace(method))
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		key := method + " " + path
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, backendRouteAuditDeclaredRoute{method: method, path: path, description: strings.TrimSpace(description)})
+	}
+	for _, spec := range pack.Manifest.Backend.RouteSpecs {
+		add(spec.Method, spec.Path, spec.Description)
+	}
+	if len(out) > 0 {
+		return out
+	}
+	for _, path := range pack.Manifest.Backend.Routes {
+		add("*", path, "")
+	}
+	return out
+}
+
+func backendRouteAuditMountedIndex(modules []packruntime.BackendModuleInfo) map[string][]backendRouteAuditMountedRoute {
+	out := map[string][]backendRouteAuditMountedRoute{}
+	for _, module := range modules {
+		for _, route := range module.Routes {
+			methods := append([]string(nil), route.Methods...)
+			if len(methods) == 0 && strings.TrimSpace(route.Method) != "" {
+				methods = []string{strings.ToUpper(strings.TrimSpace(route.Method))}
+			}
+			for i, method := range methods {
+				methods[i] = strings.ToUpper(strings.TrimSpace(method))
+			}
+			path := strings.TrimSpace(route.Path)
+			if path == "" {
+				continue
+			}
+			out[module.PackID+" "+path] = append(out[module.PackID+" "+path], backendRouteAuditMountedRoute{
+				packID:  module.PackID,
+				path:    path,
+				methods: methods,
+				auth:    route.Auth,
+			})
+		}
+	}
+	return out
+}
+
+func backendRouteAuditFlattenMounted(index map[string][]backendRouteAuditMountedRoute) []backendRouteAuditMountedRoute {
+	var out []backendRouteAuditMountedRoute
+	for _, routes := range index {
+		out = append(out, routes...)
+	}
+	slices.SortFunc(out, func(a, b backendRouteAuditMountedRoute) int {
+		return strings.Compare(a.key(), b.key())
+	})
+	return out
+}
+
+func backendRouteAuditMountedRouteCount(index map[string][]backendRouteAuditMountedRoute) int {
+	total := 0
+	for _, routes := range index {
+		total += len(routes)
+	}
+	return total
+}
+
+func backendRouteAuditMethodAllowed(methods []string, declaredMethod string) bool {
+	declaredMethod = strings.ToUpper(strings.TrimSpace(declaredMethod))
+	if declaredMethod == "" || declaredMethod == "*" {
+		return len(methods) > 0
+	}
+	return backendRouteMethodAllowed(methods, declaredMethod)
 }
 
 func (g *Gateway) handlePackInstall(w http.ResponseWriter, r *http.Request) {

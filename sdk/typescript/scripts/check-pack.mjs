@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const baseUnpackedSize = 1_202_000;
+const baseUnpackedSize = 1_203_000;
 const baseExportedFiles = 137;
 const maxUnpackedGrowthPerExport = 2_500;
 const maxNonEntryFiles = 16;

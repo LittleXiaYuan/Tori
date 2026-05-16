@@ -71,6 +71,19 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 export default function PacksPage() {
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
   const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => packsClient.backendModules(), { modules: [], count: 0 });
+  const { data: routeAuditData, loading: routeAuditLoading, refresh: refreshRouteAudit } = useApiData(async () => packsClient.backendRouteAudit(), {
+    generated_at: "",
+    packs: 0,
+    enabled_packs: 0,
+    mounted_modules: 0,
+    declared_routes: 0,
+    mounted_routes: 0,
+    ok_routes: 0,
+    missing_routes: 0,
+    method_mismatches: 0,
+    undeclared_routes: 0,
+    entries: [],
+  });
   const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
   const [manifestUrl, setManifestUrl] = useState("");
   const [downloadArtifact, setDownloadArtifact] = useState(true);
@@ -78,7 +91,17 @@ export default function PacksPage() {
 
   const packs = data?.packs || [];
   const backendModules = backendModulesData?.modules || [];
+  const routeAudit = routeAuditData;
   const backendModuleByPack = useMemo(() => new Map(backendModules.map((module) => [module.pack_id, module])), [backendModules]);
+  const routeAuditByPack = useMemo(() => {
+    const byPack = new Map<string, typeof routeAudit.entries>();
+    for (const entry of routeAudit.entries || []) {
+      const current = byPack.get(entry.pack_id) || [];
+      current.push(entry);
+      byPack.set(entry.pack_id, current);
+    }
+    return byPack;
+  }, [routeAudit.entries]);
   const stats = useMemo(() => ({
     total: packs.length,
     enabled: packs.filter((p) => p.status === "enabled").length,
@@ -86,7 +109,8 @@ export default function PacksPage() {
     frontendMenus: packs.reduce((n, p) => n + (p.manifest.frontend?.menus?.length || 0), 0),
     backendModules: backendModules.length,
     backendRoutes: backendModules.reduce((n, m) => n + (m.routes?.length || 0), 0),
-  }), [packs, backendModules]);
+    routeAuditIssues: (routeAudit.missing_routes || 0) + (routeAudit.method_mismatches || 0) + (routeAudit.undeclared_routes || 0),
+  }), [packs, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);
@@ -95,6 +119,7 @@ export default function PacksPage() {
       showToast("Pack registry 已更新，前端菜单会跟随已启用包同步。", "success");
       await refresh();
       await refreshBackendModules();
+      await refreshRouteAudit();
     } catch (e) {
       showToast(formatErrorMessage(e, "Pack 操作失败"), "error");
     } finally {
@@ -119,10 +144,10 @@ export default function PacksPage() {
         icon={<Boxes size={20} />}
         title="增量包运行时"
         description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。"
-        onRefresh={() => { void refresh(); void refreshBackendModules(); }}
+        onRefresh={() => { void refresh(); void refreshBackendModules(); void refreshRouteAudit(); }}
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="section-card p-4">
           <div className="kpi-label">已安装 Pack</div>
           <div className="kpi-value">{stats.total}</div>
@@ -138,6 +163,10 @@ export default function PacksPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">后端模块 / 路由</div>
           <div className="kpi-value">{stats.backendModules}/{stats.backendRoutes}</div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">路由审计问题</div>
+          <div className="kpi-value">{stats.routeAuditIssues}</div>
         </Card>
       </div>
 
@@ -222,6 +251,54 @@ export default function PacksPage() {
         )}
       </Card>
 
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <ShieldCheck size={15} /> 后端路由审计
+            </div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              对齐 manifest routeSpecs 与 Gateway 实际挂载：missing / method-mismatch / undeclared 都会暴露为可追踪问题，避免 pack 看似启用但 HTTP surface 漂移。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: stats.routeAuditIssues ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)", color: stats.routeAuditIssues ? "var(--yunque-warning)" : "var(--yunque-success)" }}>
+            {routeAuditLoading ? "审计中" : `${routeAudit.ok_routes} ok / ${stats.routeAuditIssues} issues`}
+          </Chip>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {[
+            ["declared", routeAudit.declared_routes],
+            ["mounted", routeAudit.mounted_routes],
+            ["missing", routeAudit.missing_routes],
+            ["method-mismatch", routeAudit.method_mismatches],
+            ["undeclared", routeAudit.undeclared_routes],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+              <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+              <div className="text-lg font-semibold" style={{ color: "var(--yunque-text)" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+        {(routeAudit.entries || []).filter((entry) => entry.status !== "ok").slice(0, 8).length > 0 ? (
+          <div className="space-y-2">
+            {(routeAudit.entries || []).filter((entry) => entry.status !== "ok").slice(0, 8).map((entry) => (
+              <div key={`${entry.pack_id}:${entry.method}:${entry.path}:${entry.status}`} className="rounded-xl p-3 text-xs" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", color: "var(--yunque-text-muted)" }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>{entry.status}</Chip>
+                  <code>{entry.method || "*" } {entry.path}</code>
+                  <span>{entry.pack_name || entry.pack_id}</span>
+                </div>
+                {entry.issues?.length ? <div className="mt-1">{entry.issues.join("；")}</div> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }}>
+            当前 manifest routeSpecs 与已挂载 backend modules 对齐；该审计只读，不修改 Pack registry。
+          </div>
+        )}
+      </Card>
+
       {packs.length === 0 ? (
         <Card className="section-card p-12 text-center">
           <Boxes size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
@@ -243,6 +320,8 @@ export default function PacksPage() {
             const caps = manifest.backend?.capabilities || [];
             const backendModule = backendModuleByPack.get(manifest.id);
             const mountedRoutes = backendModule?.routes || [];
+            const routeAuditEntries = routeAuditByPack.get(manifest.id) || [];
+            const routeAuditIssues = routeAuditEntries.filter((entry) => entry.status !== "ok");
             const sdkEntries = Object.entries(manifest.sdk || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
             const distribution = manifest.distribution;
             const declaredBackendSpecs = declaredBackendRouteSpecs(pack);
@@ -294,6 +373,9 @@ export default function PacksPage() {
                       {caps.length ? caps.map((cap) => <Chip key={cap} size="sm">{cap}</Chip>) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未声明</span>}
                       {mountedRoutes.length > 0 && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>已挂载 {mountedRoutes.length}</Chip>}
                       {declaredBackendSpecs.length > 0 && mountedRoutes.length === 0 && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>未挂载</Chip>}
+                      <Chip size="sm" style={{ background: routeAuditIssues.length ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)", color: routeAuditIssues.length ? "var(--yunque-warning)" : "var(--yunque-success)" }}>
+                        route audit {routeAuditIssues.length ? `${routeAuditIssues.length} issues` : "ok"}
+                      </Chip>
                     </div>
                   </div>
                   <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
@@ -365,6 +447,13 @@ export default function PacksPage() {
                   <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-warning)" }}>
                     <ShieldCheck size={13} className="mt-0.5 shrink-0" />
                     <span>manifest 声明但尚未挂载：{missingMountedRoutes.map((route) => <code key={backendRouteKey(route)} className="mx-1">{formatBackendRouteSpec(route)}</code>)}</span>
+                  </div>
+                )}
+
+                {routeAuditIssues.length > 0 && (
+                  <div className="text-xs flex items-start gap-2" style={{ color: "var(--yunque-warning)" }}>
+                    <ShieldCheck size={13} className="mt-0.5 shrink-0" />
+                    <span>路由审计问题：{routeAuditIssues.slice(0, 4).map((entry) => <code key={`${entry.status}:${entry.method}:${entry.path}`} className="mx-1">{entry.status} {entry.method || "*"} {entry.path}</code>)}</span>
                   </div>
                 )}
               </Card>

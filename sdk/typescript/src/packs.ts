@@ -20,6 +20,8 @@ export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [k
 export type PackBackendRouteInfo = { method?: string; methods?: string[]; path: string };
 export type PackBackendModuleInfo = { pack_id: string; routes: PackBackendRouteInfo[] };
 export type PackBackendModulesResponse = { modules: PackBackendModuleInfo[]; count: number; [key: string]: unknown };
+export type PackBackendRouteAuditEntry = { pack_id: string; pack_name?: string; pack_status?: string; enabled: boolean; status: "ok" | "missing" | "method-mismatch" | "undeclared" | "pack-not-installed" | "registry-unavailable" | string; declared: boolean; mounted: boolean; method?: string; methods?: string[]; path: string; auth?: string; description?: string; issues?: string[]; [key: string]: unknown };
+export type PackBackendRouteAuditReport = { generated_at: string; packs: number; enabled_packs: number; mounted_modules: number; declared_routes: number; mounted_routes: number; ok_routes: number; missing_routes: number; method_mismatches: number; undeclared_routes: number; entries: PackBackendRouteAuditEntry[]; [key: string]: unknown };
 export type PackPruneResponse = { removed: string[]; kept: string[]; errors?: string[]; removed_count: number; kept_count: number; [key: string]: unknown };
 export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string; download?: boolean };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
@@ -43,6 +45,7 @@ export class PacksClient {
   list(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs"); }
   enabled(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/enabled"); }
   backendModules(): Promise<PackBackendModulesResponse> { return this.json<PackBackendModulesResponse>("GET", "/v1/packs/backend-modules"); }
+  backendRouteAudit(): Promise<PackBackendRouteAuditReport> { return this.json<PackBackendRouteAuditReport>("GET", "/v1/packs/backend-route-audit"); }
   install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, source: request.source, download: request.download }); }
   enable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/enable", id); }
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }

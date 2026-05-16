@@ -3,6 +3,8 @@ export type {
   PackBackendManifest,
   PackBackendModuleInfo,
   PackBackendModulesResponse,
+  PackBackendRouteAuditEntry,
+  PackBackendRouteAuditReport,
   PackBackendRouteInfo,
   PackBackendRouteSpec,
   PackDistributionManifest,
@@ -16,4 +18,3 @@ export type {
   PackSDKManifest,
   PackUpdateManifest,
 } from "./api-types/skills";
-
