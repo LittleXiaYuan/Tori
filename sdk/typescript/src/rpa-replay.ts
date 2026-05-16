@@ -1,12 +1,3 @@
-/**
- * Lightweight RPA Replay Pack SDK slice.
- *
- * This keeps RPA trace storage, recording shells, dry-run replay planning, and
- * evidence export usable without importing the full generated OpenAPI SDK:
- *
- *   import { createRPAReplayClient } from "yunque-client/rpa-replay";
- */
-
 export type RPAReplayParamDef = {
   type?: string;
   description?: string;
@@ -48,33 +39,22 @@ export type RPAReplayTrace = Omit<RPAReplayTraceSummary, "step_count"> & {
   steps: RPAReplayTraceStep[];
 };
 
+type JsonObject = Record<string, unknown>;
+
 export type RPAReplayStatusResponse = {
   pack_id: string;
   stage: string;
-  executor_ready: boolean;
   trace_count: number;
   active_recordings: number;
   store_dir?: string;
   capabilities: string[];
-};
-
-export type RPAReplayTracesResponse = {
-  traces: RPAReplayTraceSummary[];
-  count: number;
-};
-
-export type RPAReplayTraceResponse = {
-  trace: RPAReplayTrace;
-};
+  notes?: string[];
+} & Partial<RPAReplayPlanBoundary> & { executor_ready: boolean };
 
 export type RPAReplayCreateTraceRequest = Partial<RPAReplayTrace> & {
   slug: string;
   name: string;
   steps: RPAReplayTraceStep[];
-};
-
-export type RPAReplayCreateTraceResponse = RPAReplayTraceResponse & {
-  status: string;
 };
 
 export type RPAReplayRecordingSession = {
@@ -87,25 +67,11 @@ export type RPAReplayRecordingSession = {
   status: string;
 };
 
-export type RPAReplayStartRecordingRequest = Partial<Omit<RPAReplayRecordingSession, "id" | "started_at" | "status">> & {
-  parameters?: Record<string, RPAReplayParamDef>;
-};
-
-export type RPAReplayStartRecordingResponse = {
-  session: RPAReplayRecordingSession;
-  status: string;
-  note?: string;
-};
-
 export type RPAReplayStopRecordingRequest = {
   session_id: string;
   slug?: string;
   name?: string;
   steps?: RPAReplayTraceStep[];
-};
-
-export type RPAReplayStopRecordingResponse = RPAReplayTraceResponse & {
-  status: string;
 };
 
 export type RPAReplayRequest = {
@@ -125,9 +91,44 @@ export type RPAReplayResult = {
   planned_steps?: RPAReplayTraceStep[];
 };
 
-export type RPAReplayResponse = {
-  result: RPAReplayResult;
-  trace: string;
+export type RPAReplayPlanBoundary = {
+  executor_plan_ready: boolean;
+  executor_ready: boolean;
+  action_tracer_plan_ready: boolean;
+  action_tracer_ready: boolean;
+  browser_intent_gate_plan_ready: boolean;
+  browser_intent_ready: boolean;
+  consumes_browser_intent: boolean;
+  executes_browser_actions: boolean;
+  writes_browser_state: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+};
+
+export type RPAReplayExecutorStepPlan = RPAReplayTraceStep & {
+  executor_action: string;
+  requires_browser_intent: boolean;
+  requires_action_tracer: boolean;
+  executes_browser_action: boolean;
+  writes_browser_state: boolean;
+  consumes_external_target: boolean;
+};
+
+export type RPAReplayExecutorPlan = RPAReplayPlanBoundary & {
+  status: string;
+  action_count: number;
+  planned_steps: RPAReplayExecutorStepPlan[];
+  executor_handoff_plan: JsonObject;
+  browser_intent_gate_plan: JsonObject;
+  action_tracer_handoff_plan: JsonObject;
+  artifacts: string[];
+  [key: string]: unknown;
+};
+
+export type RPAReplayExecutorPlanRequest = RPAReplayRequest & {
+  executor?: string;
+  requested_by?: string;
+  reason?: string;
 };
 
 export type RPAReplayEvidenceResponse = {
@@ -136,6 +137,10 @@ export type RPAReplayEvidenceResponse = {
   format: string;
   files: string[];
   trace: RPAReplayTrace;
+  executor_plan?: RPAReplayExecutorPlan;
+  executor_handoff_plan?: JsonObject;
+  browser_intent_gate_plan?: JsonObject;
+  action_tracer_handoff_plan?: JsonObject;
 };
 
 export type RPAReplayClientOptions = {
@@ -158,17 +163,6 @@ export class RPAReplayClientError extends Error {
   }
 }
 
-function trimBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
-
-function mergeHeaders(base: HeadersInit | undefined, extra?: HeadersInit): Headers {
-  const headers = new Headers(base);
-  if (!extra) return headers;
-  new Headers(extra).forEach((value, key) => headers.set(key, value));
-  return headers;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -176,10 +170,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function messageFromErrorBody(body: unknown): string | undefined {
   if (typeof body === "string" && body.trim()) return body.trim();
   if (!isRecord(body)) return undefined;
-  for (const key of ["message", "detail", "error", "reason"]) {
-    const value = body[key];
+  for (const value of [body.message, body.detail, body.error, body.reason]) {
     if (typeof value === "string" && value.trim()) return value;
-    if (key === "error" && isRecord(value)) {
+    if (isRecord(value)) {
       const nested = messageFromErrorBody(value);
       if (nested) return nested;
     }
@@ -197,10 +190,6 @@ async function parseResponse(response: Response): Promise<unknown> {
   }
 }
 
-function enc(value: string): string {
-  return encodeURIComponent(value);
-}
-
 export class RPAReplayClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -212,7 +201,7 @@ export class RPAReplayClient {
     if (!options.baseUrl) throw new Error("RPAReplayClient requires baseUrl");
     const fetchImpl = options.fetch ?? globalThis.fetch;
     if (!fetchImpl) throw new Error("RPAReplayClient requires a fetch implementation");
-    this.baseUrl = trimBaseUrl(options.baseUrl);
+    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.fetchImpl = fetchImpl.bind(globalThis) as typeof fetch;
     this.headers = options.headers;
     this.token = options.token;
@@ -223,36 +212,40 @@ export class RPAReplayClient {
     return this.request<RPAReplayStatusResponse>("GET", "/v1/rpa-replay/status");
   }
 
-  traces(): Promise<RPAReplayTracesResponse> {
-    return this.request<RPAReplayTracesResponse>("GET", "/v1/rpa-replay/traces");
+  traces(): Promise<{ traces: RPAReplayTraceSummary[]; count: number }> {
+    return this.request<{ traces: RPAReplayTraceSummary[]; count: number }>("GET", "/v1/rpa-replay/traces");
   }
 
-  createTrace(trace: RPAReplayCreateTraceRequest): Promise<RPAReplayCreateTraceResponse> {
-    return this.request<RPAReplayCreateTraceResponse>("POST", "/v1/rpa-replay/traces", trace);
+  createTrace(trace: RPAReplayCreateTraceRequest): Promise<{ trace: RPAReplayTrace; status: string }> {
+    return this.request<{ trace: RPAReplayTrace; status: string }>("POST", "/v1/rpa-replay/traces", trace);
   }
 
-  trace(slug: string): Promise<RPAReplayTraceResponse> {
-    return this.request<RPAReplayTraceResponse>("GET", `/v1/rpa-replay/traces/${enc(slug)}`);
+  trace(slug: string): Promise<{ trace: RPAReplayTrace }> {
+    return this.request<{ trace: RPAReplayTrace }>("GET", `/v1/rpa-replay/traces/${encodeURIComponent(slug)}`);
   }
 
-  startRecording(input: RPAReplayStartRecordingRequest = {}): Promise<RPAReplayStartRecordingResponse> {
-    return this.request<RPAReplayStartRecordingResponse>("POST", "/v1/rpa-replay/recordings/start", input);
+  startRecording(input: Partial<Omit<RPAReplayRecordingSession, "id" | "started_at" | "status">> & { parameters?: Record<string, RPAReplayParamDef> } = {}): Promise<{ session: RPAReplayRecordingSession; status: string; note?: string }> {
+    return this.request<{ session: RPAReplayRecordingSession; status: string; note?: string }>("POST", "/v1/rpa-replay/recordings/start", input);
   }
 
-  stopRecording(input: RPAReplayStopRecordingRequest): Promise<RPAReplayStopRecordingResponse> {
-    return this.request<RPAReplayStopRecordingResponse>("POST", "/v1/rpa-replay/recordings/stop", input);
+  stopRecording(input: RPAReplayStopRecordingRequest): Promise<{ trace: RPAReplayTrace; status: string }> {
+    return this.request<{ trace: RPAReplayTrace; status: string }>("POST", "/v1/rpa-replay/recordings/stop", input);
   }
 
-  replay(input: RPAReplayRequest): Promise<RPAReplayResponse> {
-    return this.request<RPAReplayResponse>("POST", "/v1/rpa-replay/replay", input);
+  replay(input: RPAReplayRequest): Promise<{ result: RPAReplayResult; trace: string }> {
+    return this.request<{ result: RPAReplayResult; trace: string }>("POST", "/v1/rpa-replay/replay", input);
+  }
+
+  executorPlan(input: RPAReplayExecutorPlanRequest): Promise<{ plan: RPAReplayExecutorPlan }> {
+    return this.request<{ plan: RPAReplayExecutorPlan }>("POST", "/v1/rpa-replay/executor/plan", input);
   }
 
   evidence(slug: string): Promise<RPAReplayEvidenceResponse> {
-    return this.request<RPAReplayEvidenceResponse>("GET", `/v1/rpa-replay/evidence/${enc(slug)}`);
+    return this.request<RPAReplayEvidenceResponse>("GET", `/v1/rpa-replay/evidence/${encodeURIComponent(slug)}`);
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-    const headers = mergeHeaders(this.headers);
+    const headers = new Headers(this.headers);
     if (this.token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${this.token}`);
     if (this.apiKey && !headers.has("x-api-key")) headers.set("X-API-Key", this.apiKey);
 

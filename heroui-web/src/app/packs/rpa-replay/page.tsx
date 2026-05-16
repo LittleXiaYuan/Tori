@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, ClipboardList, Download, Play, Plus, Radio, RefreshCw, Route, Workflow } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, Play, Plus, Radio, RefreshCw, Route, ShieldCheck, Workflow } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createRPAReplayPackClient, type RPAReplayResult, type RPAReplayStatus, type RPAReplayTraceSummary } from "@/lib/rpa-replay-pack-client";
+import { createRPAReplayPackClient, type RPAReplayExecutorPlan, type RPAReplayResult, type RPAReplayStatus, type RPAReplayTraceSummary } from "@/lib/rpa-replay-pack-client";
 
 const rpaReplayPack = createRPAReplayPackClient();
 
@@ -38,12 +38,13 @@ export default function RPAReplayPackPage() {
   const [status, setStatus] = useState<RPAReplayStatus | null>(null);
   const [traces, setTraces] = useState<RPAReplayTraceSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"create" | "replay" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"create" | "replay" | "executorPlan" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [slug, setSlug] = useState("export-report");
   const [traceJSON, setTraceJSON] = useState(() => sampleTrace("export-report"));
   const [paramsJSON, setParamsJSON] = useState(() => JSON.stringify({ month: "2026-05", format: "xlsx" }, null, 2));
   const [result, setResult] = useState<RPAReplayResult | null>(null);
+  const [executorPlan, setExecutorPlan] = useState<RPAReplayExecutorPlan | null>(null);
   const tone = statusTone(status);
 
   const selectedTrace = useMemo(() => traces.find((trace) => trace.slug === slug) || traces[0] || null, [slug, traces]);
@@ -99,6 +100,27 @@ export default function RPAReplayPackPage() {
     }
   };
 
+  const planExecutorHandoff = async () => {
+    setBusy("executorPlan");
+    setError(null);
+    try {
+      const params = JSON.parse(paramsJSON || "{}");
+      const res = await rpaReplayPack.executorPlan({
+        slug,
+        params,
+        dry_run: true,
+        requested_by: "pack-console",
+        reason: "operator Browser Intent / ActionTracer handoff review",
+      });
+      setExecutorPlan(res.plan);
+      showToast("已生成 executor handoff plan（plan-only，未执行浏览器动作）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 executor handoff plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportEvidence = async () => {
     setBusy("evidence");
     setError(null);
@@ -143,7 +165,7 @@ export default function RPAReplayPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.rpa-replay"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片先完成 manifest、route gate、trace store、dry-run replay plan 和证据包导出。真正的 browser/computer-use 执行器会在后续切片接入。
+              当前切片完成 manifest、route gate、trace store、dry-run replay plan、executor handoff plan、Browser Intent gate plan、ActionTracer handoff plan 和证据包导出。该入口只生成未来执行器契约，不消费 Browser Intent、不执行浏览器动作、不写浏览器状态/文件、不访问网络。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -210,6 +232,7 @@ export default function RPAReplayPackPage() {
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!slug}><Download size={14} />导出证据包</Button>
+                <Button variant="outline" isPending={busy === "executorPlan"} onPress={planExecutorHandoff} isDisabled={!slug}><ShieldCheck size={14} />Executor handoff</Button>
                 <Button className="btn-accent" isPending={busy === "replay"} onPress={replay} isDisabled={!slug}><Play size={14} />生成回放计划</Button>
               </div>
             </div>
@@ -220,6 +243,23 @@ export default function RPAReplayPackPage() {
               <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
                 <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Radio size={15} />{result.output || "回放计划"}</div>
                 <pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs" style={{ color: "var(--yunque-text-muted)" }}>{JSON.stringify(result, null, 2)}</pre>
+              </Card>
+            )}
+            {executorPlan && (
+              <Card className="mt-3 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <ShieldCheck size={15} />Browser Intent / ActionTracer handoff
+                  <Chip size="sm">executor_plan_ready {String(executorPlan.executor_plan_ready)}</Chip>
+                  <Chip size="sm" color={executorPlan.executor_ready ? "success" : "warning"}>executor_ready {String(executorPlan.executor_ready)}</Chip>
+                  <Chip size="sm">browser_intent_gate_plan_ready {String(executorPlan.browser_intent_gate_plan_ready)}</Chip>
+                  <Chip size="sm">executes_browser_actions {String(executorPlan.executes_browser_actions)}</Chip>
+                  <Chip size="sm">writes_browser_state {String(executorPlan.writes_browser_state)}</Chip>
+                  <Chip size="sm">network_access {String(executorPlan.network_access)}</Chip>
+                </div>
+                <div className="mb-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                  这是 plan-only 的执行器交接预览：只把参数替换后的 RPA steps 映射为未来 Browser Intent + ActionTracer 输入契约；当前 executor_ready=false，不会捕获 runtime trace、不会访问外部目标、不会写入本地文件。
+                </div>
+                <pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs" style={{ color: "var(--yunque-text-muted)" }}>{JSON.stringify(executorPlan, null, 2)}</pre>
               </Card>
             )}
           </Card>

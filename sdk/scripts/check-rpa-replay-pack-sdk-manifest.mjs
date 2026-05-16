@@ -40,7 +40,15 @@ for (const token of [
   "/v1/rpa-replay/recordings/start",
   "/v1/rpa-replay/recordings/stop",
   "/v1/rpa-replay/replay",
+  "/v1/rpa-replay/executor/plan",
   "/v1/rpa-replay/evidence/",
+  "executorPlan",
+  "executor_plan_ready",
+  "browser_intent_gate_plan_ready",
+  "action_tracer_plan_ready",
+  "executes_browser_actions",
+  "writes_browser_state",
+  "network_access",
   "method: \"POST\"",
 ]) {
   if (!client.includes(token)) fail(`rpa-replay-pack-client missing token: ${token}`);
@@ -50,12 +58,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createRPAReplayPackClient") || page.includes('from "@/lib/api"') || page.includes("api.rpa")) {
   fail("RPA Replay pack page must use rpa-replay-pack-client instead of monolithic api.ts");
 }
-for (const token of ["RPA 录制回放", "Dry-run 回放计划", "导出证据包", "Pack shell"]) {
+for (const token of ["RPA 录制回放", "Dry-run 回放计划", "导出证据包", "Executor handoff", "Browser Intent / ActionTracer handoff", "Pack shell"]) {
   if (!page.includes(token)) fail(`RPA Replay pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
-for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/evidence/export-report"]) {
+for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/executor/plan", "/v1/rpa-replay/evidence/export-report", "executes_browser_actions", "writes_browser_state", "network_access"]) {
   if (!frontendTest.includes(token)) fail(`RPA Replay frontend client test missing token: ${token}`);
 }
 
@@ -67,6 +75,20 @@ for (const token of [
   "const PackID = \"yunque.pack.rpa-replay\"",
   "rpa-replay",
   "executor_ready",
+  "/v1/rpa-replay/executor/plan",
+  "executor_plan_ready",
+  "browser_intent_gate_plan_ready",
+  "action_tracer_plan_ready",
+  "consumes_browser_intent",
+  "executes_browser_actions",
+  "writes_browser_state",
+  "network_access",
+  "rpa.executor.plan",
+  "rpa.browser_intent.gate_plan",
+  "rpa.action_tracer.handoff_plan",
+  "executor-handoff-plan.json",
+  "browser-intent-gate-plan.json",
+  "action-tracer-plan.json",
   "cfg.DataPath(\"rpa-replay\")",
   "rpa.replay.dry_run",
   "json-evidence-pack",
@@ -84,7 +106,15 @@ for (const token of [
   "RPAReplayClientError",
   "/v1/rpa-replay/status",
   "/v1/rpa-replay/replay",
+  "/v1/rpa-replay/executor/plan",
   "/v1/rpa-replay/evidence/",
+  "executorPlan",
+  "executor_plan_ready",
+  "executor_ready",
+  "browser_intent_gate_plan_ready",
+  "executes_browser_actions",
+  "writes_browser_state",
+  "network_access",
   "RPA Replay request failed",
 ]) {
   if (!sdk.includes(token)) fail(`TypeScript RPA Replay SDK slice missing token: ${token}`);

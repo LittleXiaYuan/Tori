@@ -73,6 +73,14 @@ func TestRPAReplayPackCanCreateTraceAndDryRunReplay(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "month=2026-05") {
 		t.Fatalf("dry-run replay status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/rpa-replay/executor/plan", strings.NewReader(`{"slug":"export-report","params":{"month":"2026-05"},"dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"executor_plan_ready":true`) || !strings.Contains(w.Body.String(), `"executor_ready":false`) || !strings.Contains(w.Body.String(), `"browser_intent_gate_plan_ready":true`) || !strings.Contains(w.Body.String(), `"executes_browser_actions":false`) || !strings.Contains(w.Body.String(), `"writes_browser_state":false`) || !strings.Contains(w.Body.String(), `"network_access":false`) {
+		t.Fatalf("executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithRPAReplayPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -95,6 +103,7 @@ func newTestGatewayWithRPAReplayPack(t *testing.T, status packruntime.PackStatus
 				"/v1/rpa-replay/recordings/start",
 				"/v1/rpa-replay/recordings/stop",
 				"/v1/rpa-replay/replay",
+				"/v1/rpa-replay/executor/plan",
 				"/v1/rpa-replay/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -105,6 +114,7 @@ func newTestGatewayWithRPAReplayPack(t *testing.T, status packruntime.PackStatus
 				{Method: http.MethodPost, Path: "/v1/rpa-replay/recordings/start"},
 				{Method: http.MethodPost, Path: "/v1/rpa-replay/recordings/stop"},
 				{Method: http.MethodPost, Path: "/v1/rpa-replay/replay"},
+				{Method: http.MethodPost, Path: "/v1/rpa-replay/executor/plan"},
 				{Method: http.MethodGet, Path: "/v1/rpa-replay/evidence/"},
 			},
 		},

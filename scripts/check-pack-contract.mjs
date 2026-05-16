@@ -615,19 +615,19 @@ if (rpaReplayManifest) {
 if (rpaReplayPage.includes('from "@/lib/api"') || rpaReplayPage.includes("api.rpa") || !rpaReplayPage.includes("createRPAReplayPackClient")) {
   fail("RPA Replay pack page must use rpa-replay-pack-client instead of monolithic api object");
 }
-for (const token of ["createRPAReplayPackClient", "/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/evidence/", 'method: "POST"']) {
+for (const token of ["createRPAReplayPackClient", "/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/executor/plan", "/v1/rpa-replay/evidence/", "executorPlan", "executor_plan_ready", "browser_intent_gate_plan_ready", "action_tracer_plan_ready", "executes_browser_actions", "writes_browser_state", "network_access", 'method: "POST"']) {
   if (!rpaReplayClient.includes(token)) fail(`rpa-replay-pack-client missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("rpa-replay")')) {
   fail("RPA Replay runtime store must be wired through the configured data directory");
 }
-for (const token of ["TestRPAReplay", "StatusNotFound", "StatusMethodNotAllowed", "/v1/rpa-replay/replay"]) {
+for (const token of ["TestRPAReplay", "StatusNotFound", "StatusMethodNotAllowed", "/v1/rpa-replay/replay", "/v1/rpa-replay/executor/plan", "executor_plan_ready", "executes_browser_actions", "writes_browser_state", "network_access"]) {
   if (!rpaReplayGateTest.includes(token)) fail(`RPA Replay gateway gate test missing token: ${token}`);
 }
-for (const token of ["createRPAReplayClient", "RPAReplayClientError", "/v1/rpa-replay/status", "/v1/rpa-replay/evidence/"]) {
+for (const token of ["createRPAReplayClient", "RPAReplayClientError", "/v1/rpa-replay/status", "/v1/rpa-replay/executor/plan", "/v1/rpa-replay/evidence/", "executorPlan", "executor_plan_ready", "executor_ready", "browser_intent_gate_plan_ready", "executes_browser_actions", "writes_browser_state", "network_access"]) {
   if (!rpaReplaySdk.includes(token)) fail(`RPA Replay TypeScript SDK missing token: ${token}`);
 }
-for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/evidence/export-report"]) {
+for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/executor/plan", "/v1/rpa-replay/evidence/export-report"]) {
   if (!rpaReplayClientTest.includes(token)) fail(`RPA Replay frontend client test missing token: ${token}`);
 }
 for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", "rpaReplayEvidence:"]) {

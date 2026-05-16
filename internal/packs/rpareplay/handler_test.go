@@ -17,8 +17,8 @@ func TestRPAReplayHandlerRoutesExposePackShellSurface(t *testing.T) {
 	}
 
 	routes := h.Routes()
-	if len(routes) != 7 {
-		t.Fatalf("expected 7 RPA replay routes, got %d", len(routes))
+	if len(routes) != 8 {
+		t.Fatalf("expected 8 RPA replay routes, got %d", len(routes))
 	}
 
 	byPath := map[string][]string{}
@@ -43,6 +43,7 @@ func TestRPAReplayHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/rpa-replay/recordings/start": {http.MethodPost},
 		"/v1/rpa-replay/recordings/stop":  {http.MethodPost},
 		"/v1/rpa-replay/replay":           {http.MethodPost},
+		"/v1/rpa-replay/executor/plan":    {http.MethodPost},
 		"/v1/rpa-replay/evidence/":        {http.MethodGet},
 	}
 	for path, methods := range expected {
@@ -93,9 +94,36 @@ func TestRPAReplayTraceStoreReplayAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/rpa-replay/executor/plan", strings.NewReader(`{"slug":"export-report","params":{"month":"2026-05"},"requested_by":"unit","reason":"executor review","dry_run":true}`))
+	h.ExecutorPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var executorPlan struct {
+		Plan ExecutorPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&executorPlan); err != nil {
+		t.Fatalf("decode executor plan: %v", err)
+	}
+	if !executorPlan.Plan.ExecutorPlanReady || executorPlan.Plan.ExecutorReady || !executorPlan.Plan.BrowserIntentGatePlanReady || executorPlan.Plan.BrowserIntentReady || !executorPlan.Plan.ActionTracerPlanReady || executorPlan.Plan.ActionTracerReady {
+		t.Fatalf("unexpected executor plan readiness: %#v", executorPlan.Plan)
+	}
+	if executorPlan.Plan.ConsumesBrowserIntent || executorPlan.Plan.ExecutesBrowserActions || executorPlan.Plan.WritesBrowserState || executorPlan.Plan.WritesFiles || executorPlan.Plan.NetworkAccess {
+		t.Fatalf("executor plan must remain non-destructive: %#v", executorPlan.Plan)
+	}
+	if executorPlan.Plan.ActionCount != 1 || executorPlan.Plan.PlannedSteps[0].Value != "https://erp.example.com/reports?month=2026-05" {
+		t.Fatalf("executor plan should substitute trace params: %#v", executorPlan.Plan.PlannedSteps)
+	}
+	for _, artifact := range []string{"executor-handoff-plan.json", "browser-intent-gate-plan.json", "action-tracer-plan.json"} {
+		if !containsString(executorPlan.Plan.Artifacts, artifact) {
+			t.Fatalf("executor plan missing artifact %s: %#v", artifact, executorPlan.Plan.Artifacts)
+		}
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/rpa-replay/evidence/export-report", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-evidence-pack") || !strings.Contains(w.Body.String(), "trace.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-evidence-pack") || !strings.Contains(w.Body.String(), "trace.json") || !strings.Contains(w.Body.String(), "executor-handoff-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 }
@@ -130,4 +158,13 @@ func TestRPAReplayRecordingSessionCanStopIntoTrace(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "#submit") {
 		t.Fatalf("trace detail status=%d body=%s", w.Code, w.Body.String())
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
