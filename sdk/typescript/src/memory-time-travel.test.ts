@@ -121,7 +121,7 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
       if (String(url).includes("/snapshots/")) return jsonResponse({ snapshot });
-      return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "audit-links.json", "audit-verification.json"], snapshot, history: [], approved_rollback_plan: { approved_rollback_plan_ready: true, rollback_writeback_ready: false, writes_ledger_kv: false }, rollback_writeback_plan: [{ key: "goal", requires_approval: true }], approval_request_plan: { risk_level: "high", global_approval_enqueue_ready: false }, retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, retention_prune_plan: { dry_run: true, prune_ready: false, approval_required: false, selected_candidate_count: 0, actions: [] }, native_kv_history_plan: { native_kv_history_plan_ready: true, native_kv_history_ready: false, writes_native_kv_history: false }, kv_history_migration_plan: [{ writes: false }], kv_history_index_plan: [{ name: "kv_history_namespace_key_version_uq" }], kv_history_migration_preview: { native_kv_history_preview_ready: true, writes_native_kv_history: false, migrates_kv_history: false, rows: [] }, kv_history_dual_read_parity: { dual_read_parity_check_ready: true, dual_read_parity_ready: true, parity_passed: true, switches_temporal_adapter: false, writes_ledger_kv: false, writes_native_kv_history: false, mismatch_count: 0 }, kv_history_cutover_plan: { kv_history_cutover_plan_ready: true, cutover_ready: false, writes_native_kv_history: false, dual_read_ready: false, dual_write_ready: false }, kv_history_dual_read_plan: { plan_ready: true, ready: false, switches_adapter: false }, kv_history_dual_write_plan: { plan_ready: true, ready: false, writes_ledger_kv: false, writes_native_kv_history: false }, kv_audit_link_schema: { schema_ready: true, linkage_ready: false, kv_audit_links: [] }, kv_audit_links: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } });
+      return jsonResponse({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "audit-links.json", "audit-verification.json"], snapshot, history: [], approved_rollback_plan: { approved_rollback_plan_ready: true, rollback_writeback_ready: false, writes_ledger_kv: false }, rollback_writeback_plan: [{ key: "goal", requires_approval: true }], approval_request_plan: { risk_level: "high", global_approval_enqueue_ready: false }, retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, retention_prune_plan: { dry_run: true, prune_ready: false, approval_required: false, selected_candidate_count: 0, actions: [] }, native_kv_history_plan: { native_kv_history_plan_ready: true, native_kv_history_ready: false, writes_native_kv_history: false }, kv_history_migration_plan: [{ writes: false }], kv_history_index_plan: [{ name: "kv_history_namespace_key_version_uq" }], kv_history_migration_preview: { native_kv_history_preview_ready: true, writes_native_kv_history: false, migrates_kv_history: false, rows: [] }, kv_history_dual_read_parity: { dual_read_parity_check_ready: true, dual_read_parity_ready: true, parity_passed: true, switches_temporal_adapter: false, writes_ledger_kv: false, writes_native_kv_history: false, mismatch_count: 0 }, kv_history_cutover_plan: { kv_history_cutover_plan_ready: true, cutover_ready: false, writes_native_kv_history: false, dual_read_ready: false, dual_write_ready: false }, kv_history_cutover_readiness: { cutover_readiness_check_ready: true, cutover_ready: false, passed_gate_count: 3, blocked_gate_count: 4, switches_temporal_adapter: false, writes_ledger_kv: false, writes_native_kv_history: false, gates: [] }, kv_history_dual_read_plan: { plan_ready: true, ready: false, switches_adapter: false }, kv_history_dual_write_plan: { plan_ready: true, ready: false, writes_ledger_kv: false, writes_native_kv_history: false }, kv_audit_link_schema: { schema_ready: true, linkage_ready: false, kv_audit_links: [] }, kv_audit_links: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } });
     },
   });
 
@@ -130,7 +130,7 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
 
   assertEqual(detail.snapshot.id, "baseline");
   assertEqual(evidence.format, "json-memory-time-travel-evidence");
-  assertDeepEqual(evidence.files, ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "audit-links.json", "audit-verification.json"]);
+  assertDeepEqual(evidence.files, ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "audit-links.json", "audit-verification.json"]);
   assertEqual(evidence.approved_rollback_plan?.rollback_writeback_ready, false);
   assertEqual(evidence.approval_request_plan?.global_approval_enqueue_ready, false);
   assertEqual(evidence.rollback_writeback_plan?.[0]?.requires_approval, true);
@@ -144,6 +144,8 @@ test("MemoryTimeTravelClient reads detail and exports evidence packs", async () 
   assertEqual(evidence.kv_history_dual_read_parity?.switches_temporal_adapter, false);
   assertEqual(evidence.kv_history_cutover_plan?.kv_history_cutover_plan_ready, true);
   assertEqual(evidence.kv_history_cutover_plan?.cutover_ready, false);
+  assertEqual(evidence.kv_history_cutover_readiness?.cutover_readiness_check_ready, true);
+  assertEqual(evidence.kv_history_cutover_readiness?.cutover_ready, false);
   assertEqual(evidence.kv_history_dual_read_plan?.ready, false);
   assertEqual(evidence.kv_history_dual_write_plan?.writes_ledger_kv, false);
   assertEqual(evidence.kv_audit_link_schema?.schema_ready, true);
@@ -269,6 +271,28 @@ test("MemoryTimeTravelClient runs native kv_history dual-read parity without swi
   assertEqual(parity.parity.switches_temporal_adapter, false);
   assertEqual(parity.parity.writes_ledger_kv, false);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/kv-history/dual-read/parity");
+  assertEqual(calls[0]?.init?.method, "POST");
+});
+
+
+test("MemoryTimeTravelClient builds kv_history cutover readiness gates without switching adapters", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createMemoryTimeTravelClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ readiness: { pack_id: "yunque.pack.memory-time-travel", namespace: "memory-snapshot", temporal_namespace: "memory_snapshot", generated_at: "2026-05-15T19:00:00Z", at: "2026-05-15T19:00:00Z", stage: "kv-history-cutover-readiness-before-adapter-switch", status: "blocked", dry_run: true, requested_by: "operator", reason: "readiness review", source: "cutover-plan-plus-dual-read-parity", native_table: "kv_history", current_history_namespace: "__kv_history__", cutover_readiness_check_ready: true, cutover_ready: false, native_kv_history_plan_ready: true, native_kv_history_preview_ready: true, dual_read_parity_check_ready: true, dual_read_parity_ready: true, parity_passed: true, preview_complete: true, migration_executor_ready: false, native_read_adapter_ready: false, native_write_path_ready: false, approval_manager_ready: false, rollback_executor_ready: false, audit_proof_link_ready: false, switches_temporal_adapter: false, writes_ledger_kv: false, writes_native_kv_history: false, consumes_cutover_plan: true, consumes_dual_read_parity: true, required_gate_count: 7, passed_gate_count: 3, blocked_gate_count: 4, gates: [{ name: "dual-read-parity", ready: true, required: true, status: "passed", evidence: ["kv-history-dual-read-parity.json"], description: "parity" }], cutover_plan: { kv_history_cutover_plan_ready: true, cutover_ready: false, writes_native_kv_history: false }, dual_read_parity: { dual_read_parity_ready: true, parity_passed: true, switches_temporal_adapter: false, writes_ledger_kv: false, writes_native_kv_history: false }, artifacts: ["kv-history-cutover-readiness.json"], actions: [], blocked_by: ["native-kv-history-read-adapter-not-wired"], labels: ["read-only"] } });
+    },
+  });
+
+  const readiness = await client.kvHistoryCutoverReadiness({ namespace: "memory_snapshot", at: "2026-05-15T19:00:00Z", requested_by: "operator", reason: "readiness review", limit: 500, dry_run: true });
+
+  assertEqual(readiness.readiness.cutover_readiness_check_ready, true);
+  assertEqual(readiness.readiness.cutover_ready, false);
+  assertEqual(readiness.readiness.parity_passed, true);
+  assertEqual(readiness.readiness.switches_temporal_adapter, false);
+  assertEqual(readiness.readiness.writes_ledger_kv, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/kv-history/cutover/readiness");
   assertEqual(calls[0]?.init?.method, "POST");
 });
 

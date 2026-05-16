@@ -50,8 +50,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 16 {
-		t.Fatalf("expected 16 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 17 {
+		t.Fatalf("expected 17 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -81,6 +81,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/kv-history/migration-preview": {http.MethodGet},
 		"/v1/memory-time-travel/kv-history/dual-read/parity":  {http.MethodPost},
 		"/v1/memory-time-travel/kv-history/cutover/plan":      {http.MethodPost},
+		"/v1/memory-time-travel/kv-history/cutover/readiness": {http.MethodPost},
 		"/v1/memory-time-travel/audit/links":                  {http.MethodGet},
 		"/v1/memory-time-travel/audit/verify":                 {http.MethodGet},
 		"/v1/memory-time-travel/evidence/":                    {http.MethodGet},
@@ -252,7 +253,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -587,6 +588,61 @@ func TestMemoryTimeTravelKVHistoryDualReadParityReportsMismatchAndStaysBlocked(t
 	}
 }
 
+func TestMemoryTimeTravelKVHistoryCutoverReadinessAggregatesPlanAndParityWithoutSwitching(t *testing.T) {
+	now := time.Date(2026, 5, 15, 19, 0, 0, 0, time.UTC)
+	temporal := &fakeTemporalKV{snapshot: map[string][]byte{
+		"goal": []byte(`"ship"`),
+	}}
+	previewer := &fakeNativeKVHistoryPreviewer{preview: NativeKVHistoryMigrationPreview{
+		Namespace:            "memory_snapshot",
+		GeneratedAt:          now,
+		SourceNamespace:      "__kv_history__",
+		NativeTable:          "kv_history",
+		ScannedDocumentCount: 1,
+		PreviewRowCount:      1,
+		ReturnedRowCount:     1,
+		Rows: []NativeKVHistoryRowPreview{
+			{ID: "kvh-goal", Namespace: "memory_snapshot", Key: "goal", Version: 1, Value: []byte(`"ship"`), ValueSHA256: valueHash(`"ship"`), UpdatedAt: now.Add(-time.Hour), Current: true, SourceAdapter: "reserved-ledger-kv-namespace"},
+		},
+	}}
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, TemporalKV: temporal, NativeKVHistoryPreviewer: previewer})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/kv-history/cutover/readiness", strings.NewReader(`{"namespace":"memory_snapshot","at":"2026-05-15T19:00:00Z","requested_by":"operator","reason":"cutover gate review","limit":5,"dry_run":true}`))
+	h.KVHistoryCutoverReadiness(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("cutover readiness status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Readiness KVHistoryCutoverReadinessReport `json:"readiness"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode cutover readiness: %v", err)
+	}
+	if got.Readiness.Stage != "kv-history-cutover-readiness-before-adapter-switch" || got.Readiness.Status != "blocked" || !got.Readiness.CutoverReadinessCheckReady {
+		t.Fatalf("unexpected readiness identity: %#v", got.Readiness)
+	}
+	if !got.Readiness.ConsumesCutoverPlan || !got.Readiness.ConsumesDualReadParity || !got.Readiness.ParityPassed || !got.Readiness.DualReadParityReady {
+		t.Fatalf("readiness should consume plan and parity evidence: %#v", got.Readiness)
+	}
+	if got.Readiness.CutoverReady || got.Readiness.SwitchesTemporalAdapter || got.Readiness.WritesLedgerKV || got.Readiness.WritesNativeKVHistory || got.Readiness.NativeReadAdapterReady || got.Readiness.NativeWritePathReady {
+		t.Fatalf("readiness gate must not enable cutover, adapter switch or writes: %#v", got.Readiness)
+	}
+	if got.Readiness.RequiredGateCount != 7 || got.Readiness.PassedGateCount != 3 || got.Readiness.BlockedGateCount != 4 {
+		t.Fatalf("unexpected readiness gate counts: %#v", got.Readiness)
+	}
+	for _, artifact := range []string{"kv-history-cutover-readiness.json", "kv-history-cutover-plan.json", "kv-history-dual-read-parity.json"} {
+		if !containsString(got.Readiness.Artifacts, artifact) {
+			t.Fatalf("readiness missing artifact %s: %#v", artifact, got.Readiness.Artifacts)
+		}
+	}
+	for _, blocker := range []string{"native-kv-history-read-adapter-not-wired", "dual-write-cutover-not-enabled", "cutover-rollback-executor-not-wired", "per-kv-merkle-proof-link-not-wired"} {
+		if !containsString(got.Readiness.BlockedBy, blocker) {
+			t.Fatalf("readiness missing blocker %s: %#v", blocker, got.Readiness.BlockedBy)
+		}
+	}
+}
+
 func TestMemoryTimeTravelAuditVerifyUsesMerkleVerifier(t *testing.T) {
 	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
 	verifier := &fakeMerkleVerifier{result: MerkleVerification{
@@ -671,6 +727,7 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 		KVHistoryMigrationPlan    []KVHistoryMigrationStepPlan        `json:"kv_history_migration_plan"`
 		KVHistoryIndexPlan        []NativeKVHistoryIndexPlan          `json:"kv_history_index_plan"`
 		KVHistoryCutoverPlan      KVHistoryCutoverPlanReport          `json:"kv_history_cutover_plan"`
+		KVHistoryCutoverReadiness KVHistoryCutoverReadinessReport     `json:"kv_history_cutover_readiness"`
 		KVHistoryDualReadParity   KVHistoryDualReadParityReport       `json:"kv_history_dual_read_parity"`
 		KVHistoryDualReadPlan     KVHistoryDualReadPlan               `json:"kv_history_dual_read_plan"`
 		KVHistoryDualWritePlan    KVHistoryDualWritePlan              `json:"kv_history_dual_write_plan"`
@@ -705,6 +762,9 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if !containsString(got.Files, "kv-history-dual-read-parity.json") || got.KVHistoryDualReadParity.SwitchesTemporalAdapter || got.KVHistoryDualReadParity.WritesLedgerKV || got.KVHistoryDualReadParity.WritesNativeKVHistory {
 		t.Fatalf("evidence should include read-only dual-read parity gate: files=%#v parity=%#v", got.Files, got.KVHistoryDualReadParity)
+	}
+	if !containsString(got.Files, "kv-history-cutover-readiness.json") || !got.KVHistoryCutoverReadiness.CutoverReadinessCheckReady || got.KVHistoryCutoverReadiness.CutoverReady || got.KVHistoryCutoverReadiness.SwitchesTemporalAdapter || got.KVHistoryCutoverReadiness.WritesLedgerKV || got.KVHistoryCutoverReadiness.WritesNativeKVHistory {
+		t.Fatalf("evidence should include read-only cutover readiness gate: files=%#v readiness=%#v", got.Files, got.KVHistoryCutoverReadiness)
 	}
 	if !containsString(got.Files, "kv-history-cutover-plan.json") || !containsString(got.Files, "kv-history-dual-read-plan.json") || !containsString(got.Files, "kv-history-dual-write-plan.json") || !got.KVHistoryCutoverPlan.KVHistoryCutoverPlanReady || got.KVHistoryCutoverPlan.CutoverReady || got.KVHistoryCutoverPlan.WritesNativeKVHistory || got.KVHistoryDualReadPlan.Ready || got.KVHistoryDualWritePlan.Ready || got.KVHistoryDualWritePlan.WritesLedgerKV {
 		t.Fatalf("evidence should include plan-only kv_history cutover artifacts: files=%#v cutover=%#v read=%#v write=%#v", got.Files, got.KVHistoryCutoverPlan, got.KVHistoryDualReadPlan, got.KVHistoryDualWritePlan)

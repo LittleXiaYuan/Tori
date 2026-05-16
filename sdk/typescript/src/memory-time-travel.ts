@@ -4,9 +4,9 @@
  * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
  * rollback plan generation, approved rollback write-back planning, retention
  * dry-run/prune planning, native kv_history migration/index planning, KV audit
- * proof-link schema inspection, dual-read parity validation, dual-read/
- * dual-write cutover planning, and evidence export usable without importing
- * the full generated OpenAPI SDK:
+ * proof-link schema inspection, dual-read parity validation, cutover readiness
+ * gate reporting, dual-read/dual-write cutover planning, and evidence export
+ * usable without importing the full generated OpenAPI SDK:
  *
  *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
  */
@@ -57,6 +57,7 @@ export type MemoryTimeTravelStatusResponse = {
   kv_history_index_plan_ready?: boolean;
   native_kv_history_preview_ready?: boolean;
   kv_history_cutover_plan_ready?: boolean;
+  kv_history_cutover_readiness_ready?: boolean;
   dual_read_plan_ready?: boolean;
   dual_read_parity_check_ready?: boolean;
   dual_write_plan_ready?: boolean;
@@ -253,6 +254,15 @@ export type MemoryTimeTravelKVHistoryCutoverPlanRequest = {
   dry_run?: boolean;
 };
 
+export type MemoryTimeTravelKVHistoryCutoverReadinessRequest = {
+  namespace?: string;
+  at?: string;
+  requested_by?: string;
+  reason?: string;
+  limit?: number;
+  dry_run?: boolean;
+};
+
 export type MemoryTimeTravelKVHistoryDualReadParityRequest = {
   namespace?: string;
   at?: string;
@@ -410,6 +420,66 @@ export type MemoryTimeTravelKVHistoryDualReadParity = {
 
 export type MemoryTimeTravelKVHistoryDualReadParityResponse = {
   parity: MemoryTimeTravelKVHistoryDualReadParity;
+};
+
+export type MemoryTimeTravelKVHistoryCutoverReadinessGate = {
+  name: string;
+  ready: boolean;
+  required: boolean;
+  status: string;
+  evidence: string[];
+  blocked_by?: string[];
+  description: string;
+};
+
+export type MemoryTimeTravelKVHistoryCutoverReadiness = {
+  pack_id: string;
+  namespace: string;
+  temporal_namespace: string;
+  generated_at: string;
+  at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  requested_by?: string;
+  reason?: string;
+  source: string;
+  native_table: string;
+  current_history_namespace: string;
+  cutover_readiness_check_ready: boolean;
+  cutover_ready: boolean;
+  native_kv_history_plan_ready: boolean;
+  native_kv_history_preview_ready: boolean;
+  dual_read_parity_check_ready: boolean;
+  dual_read_parity_ready: boolean;
+  parity_passed: boolean;
+  preview_complete: boolean;
+  migration_executor_ready: boolean;
+  native_read_adapter_ready: boolean;
+  native_write_path_ready: boolean;
+  approval_manager_ready: boolean;
+  rollback_executor_ready: boolean;
+  audit_proof_link_ready: boolean;
+  switches_temporal_adapter: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  consumes_cutover_plan: boolean;
+  consumes_dual_read_parity: boolean;
+  required_gate_count: number;
+  passed_gate_count: number;
+  blocked_gate_count: number;
+  gates: MemoryTimeTravelKVHistoryCutoverReadinessGate[];
+  cutover_plan: MemoryTimeTravelKVHistoryCutoverPlan;
+  dual_read_parity: MemoryTimeTravelKVHistoryDualReadParity;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelKVHistoryCutoverReadinessResponse = {
+  readiness: MemoryTimeTravelKVHistoryCutoverReadiness;
 };
 
 export type MemoryTimeTravelSnapshotsResponse = {
@@ -688,6 +758,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   kv_history_dual_read_parity_error?: string;
   kv_history_cutover_plan?: MemoryTimeTravelKVHistoryCutoverPlan;
   kv_history_cutover_plan_error?: string;
+  kv_history_cutover_readiness?: MemoryTimeTravelKVHistoryCutoverReadiness;
+  kv_history_cutover_readiness_error?: string;
   kv_history_dual_read_plan?: MemoryTimeTravelKVHistoryDualReadPlan;
   kv_history_dual_write_plan?: MemoryTimeTravelKVHistoryDualWritePlan;
   kv_history_cutover_rollback_plan?: MemoryTimeTravelKVHistoryCutoverRollbackPlan;
@@ -839,6 +911,10 @@ export class MemoryTimeTravelClient {
 
   kvHistoryCutoverPlan(input: MemoryTimeTravelKVHistoryCutoverPlanRequest = {}): Promise<MemoryTimeTravelKVHistoryCutoverPlanResponse> {
     return this.request<MemoryTimeTravelKVHistoryCutoverPlanResponse>("POST", "/v1/memory-time-travel/kv-history/cutover/plan", input);
+  }
+
+  kvHistoryCutoverReadiness(input: MemoryTimeTravelKVHistoryCutoverReadinessRequest = {}): Promise<MemoryTimeTravelKVHistoryCutoverReadinessResponse> {
+    return this.request<MemoryTimeTravelKVHistoryCutoverReadinessResponse>("POST", "/v1/memory-time-travel/kv-history/cutover/readiness", input);
   }
 
   auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {
