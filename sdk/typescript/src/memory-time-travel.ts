@@ -5,6 +5,7 @@
  * rollback plan generation, approved rollback write-back planning, retention
  * dry-run/prune planning, native kv_history migration/index planning, KV audit
  * proof-link schema inspection plus read-only proof-link preview gates,
+ * plan-only proof-link write-back bridge contracts,
  * dual-read parity validation, cutover readiness gate reporting,
  * dual-read/dual-write cutover planning, and evidence export
  * usable without importing the full generated OpenAPI SDK:
@@ -84,6 +85,8 @@ export type MemoryTimeTravelStatusResponse = {
   retention_prune_ready?: boolean;
   kv_audit_link_schema_ready?: boolean;
   kv_audit_link_preview_ready?: boolean;
+  kv_audit_link_writeback_plan_ready?: boolean;
+  kv_audit_link_writeback_ready?: boolean;
   kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
   namespace_count: number;
@@ -543,6 +546,81 @@ export type MemoryTimeTravelKVAuditProofLinkPreviewResponse = {
   preview: MemoryTimeTravelKVAuditProofLinkPreview;
 };
 
+export type MemoryTimeTravelKVAuditProofLinkWritebackPlanRequest = {
+  namespace?: string;
+  at?: string;
+  limit?: number;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackActionPlan = {
+  operation: string;
+  namespace: string;
+  key: string;
+  native_row_id: string;
+  native_row_version: number;
+  kv_version_at?: string;
+  value_hash?: string;
+  audit_seq?: number;
+  audit_hash?: string;
+  audit_action?: string;
+  proof_status: string;
+  requires_approval: boolean;
+  approval_id?: string;
+  generated_at: string;
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackPlan = {
+  pack_id: string;
+  namespace: string;
+  temporal_namespace: string;
+  generated_at: string;
+  at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  kv_audit_link_writeback_plan_ready: boolean;
+  kv_audit_link_writeback_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  audit_proof_link_ready: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  consumes_audit_link_preview: boolean;
+  native_kv_history_preview_ready: boolean;
+  merkle_verification_ready: boolean;
+  merkle_append_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  backfills_audit_seq: boolean;
+  backfills_audit_hash: boolean;
+  appends_merkle: boolean;
+  candidate_link_count: number;
+  matched_link_count: number;
+  pending_link_count: number;
+  unmatched_row_count: number;
+  unmatched_audit_record_count: number;
+  action_count: number;
+  audit_link_preview: MemoryTimeTravelKVAuditProofLinkPreview;
+  proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
+  writeback_actions: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackPlanResponse = {
+  plan: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
+};
+
 export type MemoryTimeTravelSnapshotsResponse = {
   snapshots: MemoryTimeTravelSnapshotSummary[];
   count: number;
@@ -828,6 +906,9 @@ export type MemoryTimeTravelEvidenceResponse = {
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   kv_audit_link_preview?: MemoryTimeTravelKVAuditProofLinkPreview;
   kv_audit_link_preview_error?: string;
+  kv_audit_link_writeback_plan?: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
+  kv_audit_link_writeback_plan_error?: string;
+  kv_audit_link_writeback_actions?: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
   audit_verification_error?: string;
 };
@@ -986,6 +1067,10 @@ export class MemoryTimeTravelClient {
 
   auditLinksPreview(input: MemoryTimeTravelKVAuditProofLinkPreviewRequest = {}): Promise<MemoryTimeTravelKVAuditProofLinkPreviewResponse> {
     return this.request<MemoryTimeTravelKVAuditProofLinkPreviewResponse>("POST", "/v1/memory-time-travel/audit/links/preview", input);
+  }
+
+  auditLinksWritebackPlan(input: MemoryTimeTravelKVAuditProofLinkWritebackPlanRequest = {}): Promise<MemoryTimeTravelKVAuditProofLinkWritebackPlanResponse> {
+    return this.request<MemoryTimeTravelKVAuditProofLinkWritebackPlanResponse>("POST", "/v1/memory-time-travel/audit/links/writeback-plan", input);
   }
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {

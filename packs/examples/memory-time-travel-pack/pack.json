@@ -2,7 +2,7 @@
   "id": "yunque.pack.memory-time-travel",
   "name": "Memory Time Travel Pack",
   "version": "0.1.0",
-  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、retention dry-run/prune plan、native kv_history plan/migration preview/dual-read parity/cutover readiness/cutover plan、KV audit link schema/preview gate 和证据包导出作为可选记忆治理能力包暴露。",
+  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、retention dry-run/prune plan、native kv_history plan/migration preview/dual-read parity/cutover readiness/cutover plan、KV audit link schema/preview gate/writeback plan 和证据包导出作为可选记忆治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -26,6 +26,7 @@
       "memory_time_travel.kv_history.cutover_readiness",
       "memory_time_travel.audit.links",
       "memory_time_travel.audit.links_preview",
+      "memory_time_travel.audit.links_writeback_plan",
       "memory_time_travel.audit.verify",
       "memory_time_travel.evidence.export"
     ],
@@ -46,6 +47,7 @@
       "/v1/memory-time-travel/kv-history/cutover/readiness",
       "/v1/memory-time-travel/audit/links",
       "/v1/memory-time-travel/audit/links/preview",
+      "/v1/memory-time-travel/audit/links/writeback-plan",
       "/v1/memory-time-travel/audit/verify",
       "/v1/memory-time-travel/evidence/"
     ],
@@ -139,6 +141,11 @@
         "method": "POST",
         "path": "/v1/memory-time-travel/audit/links/preview",
         "description": "Build a read-only KV audit proof-link preview by joining native kv_history row previews with Merkle audit records without backfilling audit_seq/audit_hash or writing Ledger/native rows."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/audit/links/writeback-plan",
+        "description": "Build a non-destructive KV audit proof-link write-back plan that maps matched preview candidates into future audit_seq/audit_hash backfill actions without writing Ledger/native rows."
       },
       {
         "method": "GET",
