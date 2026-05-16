@@ -37,7 +37,7 @@ test("SBOMDriftClient reads status and snapshots with bearer token", async () =>
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_gate_ready: false, vulnerability_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, snapshot_count: 1, capabilities: ["sbom.govulncheck.plan"] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_workflow_writeback_plan_ready: true, ci_workflow_writeback_ready: false, ci_gate_ready: false, consumes_ci_baseline_store: false, vulnerability_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, snapshot_count: 1, capabilities: ["sbom.govulncheck.plan", "sbom.ci_workflow.writeback_plan"] });
       return jsonResponse({ snapshots: [{ id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 } }], count: 1 });
     },
   });
@@ -47,6 +47,7 @@ test("SBOMDriftClient reads status and snapshots with bearer token", async () =>
 
   assertEqual(status.pack_id, "yunque.pack.sbom-drift");
   assertEqual(status.govulncheck_plan_ready, true);
+  assertEqual(status.ci_workflow_writeback_plan_ready, true);
   assertEqual(status.govulncheck_ready, false);
   assertEqual(snapshots.count, 1);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/status");
@@ -146,6 +147,37 @@ test("SBOMDriftClient writes pack-local CI baseline gate handoff records", async
   assertEqual(writeback.writeback.writes_ci_baseline_store, true);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/baseline/writeback");
   assertEqual(calls[0]?.init?.body, JSON.stringify({ base_id: "baseline", target_current: true, fail_on_risk: "high" }));
+});
+
+test("SBOMDriftClient plans CI workflow writeback handoff from baseline store", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createSBOMDriftClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ plan: {
+        status: "ci_workflow_writeback_plan_ready_pending_ci_writer",
+        ci_workflow_writeback_plan_ready: true,
+        consumes_ci_baseline_store: true,
+        writes_ci_workflow: false,
+        executes_govulncheck: false,
+        blocks_release: false,
+        ci_workflow_handoff_plan: { workflow_path: ".github/workflows/security.yml", job_name: "sbom-drift-gate", steps: [{ writes_files: false }] },
+        release_blocker_plan: { would_block: true, blocks_release: false },
+        artifacts: ["ci-workflow-writeback-plan.json", "ci-workflow-handoff-plan.json", "release-blocker-plan.json"],
+      } });
+    },
+  });
+
+  const plan = await client.ciWorkflowWritebackPlan({ request_key: "sbom-baseline", workflow_path: ".github/workflows/security.yml" });
+
+  assertEqual(plan.plan.ci_workflow_writeback_plan_ready, true);
+  assertEqual(plan.plan.consumes_ci_baseline_store, true);
+  assertEqual(plan.plan.writes_ci_workflow, false);
+  assertEqual(plan.plan.executes_govulncheck, false);
+  assertEqual(plan.plan.release_blocker_plan.blocks_release, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/workflow/writeback/plan");
+  assertEqual(calls[0]?.init?.body, JSON.stringify({ request_key: "sbom-baseline", workflow_path: ".github/workflows/security.yml" }));
 });
 
 test("SBOMDriftClient throws SBOMDriftClientError with nested gateway messages", async () => {

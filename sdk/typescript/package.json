@@ -559,6 +559,10 @@
       "types": "./src/sbom-drift.ts",
       "import": "./src/sbom-drift.ts"
     },
+    "./sbom-drift-ci": {
+      "types": "./src/sbom-drift-ci.ts",
+      "import": "./src/sbom-drift-ci.ts"
+    },
     "./skill-anomaly": {
       "types": "./src/skill-anomaly.ts",
       "import": "./src/skill-anomaly.ts"

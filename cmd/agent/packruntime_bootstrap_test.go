@@ -141,6 +141,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !hasRouteSpec(sbomDrift.Manifest.Backend.RouteSpecs, "POST", "/v1/sbom-drift/ci-gate/baseline/writeback") {
 		t.Fatal("expected SBOM Drift CI baseline writeback routeSpec")
 	}
+	if !hasRouteSpec(sbomDrift.Manifest.Backend.RouteSpecs, "POST", "/v1/sbom-drift/ci-gate/workflow/writeback/plan") {
+		t.Fatal("expected SBOM Drift CI workflow writeback plan routeSpec")
+	}
 
 	skillAnomaly, ok := registry.Get("yunque.pack.skill-anomaly")
 	if !ok {

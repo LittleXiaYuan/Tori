@@ -2,7 +2,7 @@
   "id": "yunque.pack.sbom-drift",
   "name": "SBOM Drift Pack",
   "version": "0.1.0",
-  "description": "将 SBOM 快照、Go/npm 依赖漂移检测、CI baseline gate pack-local write-back、govulncheck 预览和供应链证据包导出作为可选运维能力包暴露。",
+  "description": "将 SBOM 快照、Go/npm 依赖漂移检测、CI baseline gate pack-local write-back、CI workflow write-back handoff plan、govulncheck 预览和供应链证据包导出作为可选运维能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -16,6 +16,7 @@
       "sbom.cyclonedx.export",
       "sbom.ci_gate.plan",
       "sbom.ci_baseline.writeback",
+      "sbom.ci_workflow.writeback_plan",
       "sbom.govulncheck.plan",
       "sbom.evidence.export"
     ],
@@ -27,6 +28,7 @@
       "/v1/sbom-drift/cyclonedx/",
       "/v1/sbom-drift/ci-gate/plan",
       "/v1/sbom-drift/ci-gate/baseline/writeback",
+      "/v1/sbom-drift/ci-gate/workflow/writeback/plan",
       "/v1/sbom-drift/evidence/"
     ],
     "permissions": [
@@ -74,6 +76,11 @@
         "method": "POST",
         "path": "/v1/sbom-drift/ci-gate/baseline/writeback",
         "description": "Persist a CI baseline gate handoff record into the pack-local store without writing CI workflows, executing govulncheck, fetching vulnerability data or blocking releases."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/sbom-drift/ci-gate/workflow/writeback/plan",
+        "description": "Map a pack-local CI baseline gate record into a plan-only CI workflow write-back handoff without modifying workflow files, executing govulncheck, fetching vulnerability data or blocking releases."
       },
       {
         "method": "GET",

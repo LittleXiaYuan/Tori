@@ -6,7 +6,7 @@ import { AlertTriangle, Download, FileJson, GitCompare, PackageSearch, RefreshCw
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createSBOMDriftPackClient, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatus } from "@/lib/sbom-drift-pack-client";
+import { createSBOMDriftPackClient, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCIWorkflowWritebackPlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatus } from "@/lib/sbom-drift-pack-client";
 
 const sbomDriftPack = createSBOMDriftPackClient();
 
@@ -28,7 +28,7 @@ export default function SBOMDriftPackPage() {
   const [status, setStatus] = useState<SBOMDriftStatus | null>(null);
   const [snapshots, setSnapshots] = useState<SBOMDriftSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"snapshot" | "diff" | "cyclonedx" | "ciGate" | "ciBaselineWriteback" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"snapshot" | "diff" | "cyclonedx" | "ciGate" | "ciBaselineWriteback" | "ciWorkflowPlan" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
   const [source, setSource] = useState("manual-baseline");
@@ -37,6 +37,7 @@ export default function SBOMDriftPackPage() {
   const [cycloneDX, setCycloneDX] = useState<SBOMDriftCycloneDXDocument | null>(null);
   const [ciGatePlan, setCIGatePlan] = useState<SBOMDriftCIGatePlan | null>(null);
   const [ciBaselineWriteback, setCIBaselineWriteback] = useState<SBOMDriftCIBaselineWriteback | null>(null);
+  const [ciWorkflowPlan, setCIWorkflowPlan] = useState<SBOMDriftCIWorkflowWritebackPlan | null>(null);
 
   const selectedBase = useMemo(() => snapshots.find((snapshot) => snapshot.id === baseId) || snapshots[0] || null, [baseId, snapshots]);
   const tone = riskTone(diff?.risk_level);
@@ -148,6 +149,25 @@ export default function SBOMDriftPackPage() {
     }
   };
 
+  const planCIWorkflowWriteback = async () => {
+    const key = ciBaselineWriteback?.request_key || (baseId || selectedBase?.id ? `sbom-baseline-${baseId || selectedBase?.id}` : "");
+    if (!key) {
+      setError("请先写入 Baseline Store。CI workflow handoff plan 需要 pack-local baseline 记录。");
+      return;
+    }
+    setBusy("ciWorkflowPlan");
+    setError(null);
+    try {
+      const res = await sbomDriftPack.ciWorkflowWritebackPlan({ request_key: key, workflow_path: ".github/workflows/sbom-drift.yml", job_name: "sbom-drift-gate", requested_by: "pack-console" });
+      setCIWorkflowPlan(res.plan);
+      showToast("已生成 CI workflow write-back handoff plan", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 CI workflow handoff plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportEvidence = async () => {
     const id = baseId || selectedBase?.id;
     if (!id) return;
@@ -193,11 +213,14 @@ export default function SBOMDriftPackPage() {
               <Chip size="sm" style={{ background: status?.ci_baseline_writeback_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.ci_baseline_writeback_ready ? "#38bdf8" : "#facc15" }}>
                 {status?.ci_baseline_writeback_ready ? "baseline store" : "baseline pending"}
               </Chip>
+              <Chip size="sm" style={{ background: status?.ci_workflow_writeback_plan_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.ci_workflow_writeback_plan_ready ? "#38bdf8" : "#facc15" }}>
+                {status?.ci_workflow_writeback_plan_ready ? "workflow handoff" : "workflow pending"}
+              </Chip>
               <Chip size="sm">{status?.stage || "pack-shell"}</Chip>
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.sbom-drift"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan、pack-local CI baseline gate write-back、govulncheck plan preview 和证据包导出。govulncheck 执行、CI workflow 写回和真实 CI 阻断仍保持后续接入。
+              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan、pack-local CI baseline gate write-back、CI workflow write-back handoff plan、govulncheck plan preview 和证据包导出。govulncheck 执行、CI workflow 写回和真实 CI 阻断仍保持后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -272,9 +295,9 @@ export default function SBOMDriftPackPage() {
             )}
           </Card>
 
-          {(cycloneDX || ciGatePlan || ciBaselineWriteback) && (
+          {(cycloneDX || ciGatePlan || ciBaselineWriteback || ciWorkflowPlan) && (
             <Card className="section-card p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><FileJson size={16} />CycloneDX / CI gate / baseline store 预览</div>
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><FileJson size={16} />CycloneDX / CI gate / baseline / workflow handoff 预览</div>
               <div className="mb-3 flex flex-wrap gap-2">
                 {cycloneDX && <Chip size="sm">CycloneDX {cycloneDX.specVersion}</Chip>}
                 {ciGatePlan && <Chip size="sm" style={{ background: ciGatePlan.blocked ? "rgba(239,68,68,0.16)" : "rgba(34,197,94,0.12)", color: ciGatePlan.blocked ? "#ef4444" : "#22c55e" }}>{ciGatePlan.status}</Chip>}
@@ -286,12 +309,20 @@ export default function SBOMDriftPackPage() {
                 {ciBaselineWriteback && <Chip size="sm">baseline_store: {String(ciBaselineWriteback.writes_ci_baseline_store)}</Chip>}
                 {ciBaselineWriteback && <Chip size="sm">ci_workflow: {String(ciBaselineWriteback.writes_ci_workflow)}</Chip>}
                 {ciBaselineWriteback && <Chip size="sm">govulncheck_exec: {String(ciBaselineWriteback.executes_govulncheck)}</Chip>}
+                {ciWorkflowPlan && <Chip size="sm">workflow_plan: {String(ciWorkflowPlan.ci_workflow_writeback_plan_ready)}</Chip>}
+                {ciWorkflowPlan && <Chip size="sm">consumes_store: {String(ciWorkflowPlan.consumes_ci_baseline_store)}</Chip>}
+                {ciWorkflowPlan && <Chip size="sm">release_block: {String(ciWorkflowPlan.blocks_release)}</Chip>}
               </div>
-              <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, ci_baseline_writeback: ciBaselineWriteback }, null, 2)} onChange={() => undefined}>
+              {ciBaselineWriteback && !ciWorkflowPlan && (
+                <div className="mb-3 flex justify-end">
+                  <Button variant="outline" isPending={busy === "ciWorkflowPlan"} onPress={planCIWorkflowWriteback}>生成 Workflow Handoff</Button>
+                </div>
+              )}
+              <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, ci_baseline_writeback: ciBaselineWriteback, ci_workflow_writeback_plan: ciWorkflowPlan }, null, 2)} onChange={() => undefined}>
                 <TextArea rows={12} aria-label="SBOM CycloneDX and CI Gate JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                baseline store 只写 pack-local JSON handoff：会记录 CI gate 决策和 govulncheck -json ./... 预览对象，但不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
+                baseline store 只写 pack-local JSON handoff；workflow handoff plan 只消费该记录并生成 CI writer / release blocker 契约。当前不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
               </div>
             </Card>
           )}

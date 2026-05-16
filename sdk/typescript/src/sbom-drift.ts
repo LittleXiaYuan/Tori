@@ -25,7 +25,10 @@ export type SBOMDriftStatusResponse = {
   scanner_ready: boolean;
   cyclonedx_ready: boolean;
   ci_gate_plan_ready: boolean;
+  ci_workflow_writeback_plan_ready?: boolean;
+  ci_workflow_writeback_ready?: boolean;
   ci_gate_ready: boolean;
+  consumes_ci_baseline_store?: boolean;
   vulnerability_ready: boolean;
   govulncheck_plan_ready: boolean;
   govulncheck_ready: boolean;
@@ -168,6 +171,14 @@ export type SBOMDriftCIBaselineWritebackResponse = {
   writeback: SBOMDriftCIBaselineWriteback;
 };
 
+export type SBOMDriftCIWorkflowWritebackPlan = {
+  status: string; ci_workflow_writeback_plan_ready: boolean; consumes_ci_baseline_store: boolean; writes_ci_workflow: boolean; executes_govulncheck: boolean; blocks_release: boolean;
+  ci_workflow_handoff_plan: { workflow_path: string; job_name: string; steps: Array<Record<string, unknown>> };
+  release_blocker_plan: { would_block: boolean; blocks_release: boolean };
+  artifacts: string[];
+};
+export type SBOMDriftCIWorkflowWritebackPlanResponse = { plan: SBOMDriftCIWorkflowWritebackPlan };
+
 export type SBOMDriftEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -177,6 +188,7 @@ export type SBOMDriftEvidenceResponse = {
   cyclonedx?: SBOMDriftCycloneDXDocument;
   ci_gate_plan?: SBOMDriftCIGatePlan;
   govulncheck_plan?: SBOMDriftGovulncheckPlan;
+  ci_workflow_writeback_plan?: SBOMDriftCIWorkflowWritebackPlan;
 };
 
 export type SBOMDriftClientOptions = {
@@ -290,6 +302,10 @@ export class SBOMDriftClient {
 
   ciBaselineWriteback(input: SBOMDriftCIBaselineWritebackRequest): Promise<SBOMDriftCIBaselineWritebackResponse> {
     return this.request<SBOMDriftCIBaselineWritebackResponse>("POST", "/v1/sbom-drift/ci-gate/baseline/writeback", input);
+  }
+
+  ciWorkflowWritebackPlan(input: Record<string, unknown> = {}): Promise<SBOMDriftCIWorkflowWritebackPlanResponse> {
+    return this.request<SBOMDriftCIWorkflowWritebackPlanResponse>("POST", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", input);
   }
 
   evidence(id: string): Promise<SBOMDriftEvidenceResponse> {

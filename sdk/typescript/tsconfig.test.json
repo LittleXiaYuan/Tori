@@ -90,6 +90,8 @@
     "src/reactions.ts",
     "src/instructions.ts",
     "src/rbac.ts",
+    "src/sbom-drift.ts",
+    "src/sbom-drift-ci.ts",
     "src/roles.ts",
     "src/role-bindings.ts",
     "src/my-roles.ts",
