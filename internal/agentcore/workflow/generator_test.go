@@ -63,3 +63,31 @@ func TestGenerateDefinitionUsesLLMJSON(t *testing.T) {
 		t.Fatalf("node id should be sanitized, got %q", res.Definition.Nodes[1].ID)
 	}
 }
+
+func TestGenerateDefinitionFallsBackToSocialPublishWorkflow(t *testing.T) {
+	res, err := GenerateDefinition(context.Background(), "打开小红书创作中心，生成一条效率演示笔记并直接发布", GeneratorOptions{
+		TenantID: "tenant-social",
+		Now:      fixedWorkflowNow,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Source != GenerationSourceTemplate {
+		t.Fatalf("source=%s, want template", res.Source)
+	}
+	if res.Definition.Name != "小红书直发自动化" {
+		t.Fatalf("unexpected name: %s", res.Definition.Name)
+	}
+	if !hasNodeType(res.Definition.Nodes, NodeBrowser) {
+		t.Fatalf("social publish workflow should include browser nodes: %#v", res.Definition.Nodes)
+	}
+	var hasPublish bool
+	for _, node := range res.Definition.Nodes {
+		if node.ID == "publish" && node.Config["action"] == "click" && node.Config["text_target"] == "发布" {
+			hasPublish = true
+		}
+	}
+	if !hasPublish {
+		t.Fatalf("social publish workflow should click publish: %#v", res.Definition.Nodes)
+	}
+}
