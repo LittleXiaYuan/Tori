@@ -72,8 +72,10 @@ const backend = readRepoFile("internal/packs/cognikernel/handler.go")
   + "\n" + readRepoFile("cmd/agent/init_tasks.go");
 for (const token of [
   "const PackID = \"yunque.pack.cogni-kernel\"",
-  "type CogniGateway interface",
-  "HandleCogniKernelPack",
+  "type API interface",
+  "ServeCogniKernel",
+  "type Router struct",
+  "NewRouter",
   "Methods: []string",
   "http.MethodDelete",
   "SetCogniKernelRuntimeStateHandler",

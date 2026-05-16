@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
-type fakeCogniGateway struct {
+type fakeCogniAPI struct {
 	called int
+	paths  []string
 }
 
-func (g *fakeCogniGateway) HandleCogniKernelPack(w http.ResponseWriter, _ *http.Request) {
-	g.called++
+func (api *fakeCogniAPI) ServeCogniKernel(w http.ResponseWriter, r *http.Request) {
+	api.called++
+	api.paths = append(api.paths, r.URL.Path)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -44,8 +46,8 @@ func (fakeRuntimeReporter) CogniKernelRuntimeState() RuntimeStateReport {
 }
 
 func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
-	gateway := &fakeCogniGateway{}
-	handler := NewHandlerWithRuntimeState(gateway, fakeRuntimeReporter{})
+	api := &fakeCogniAPI{}
+	handler := NewHandlerWithRuntimeState(api, fakeRuntimeReporter{})
 
 	if handler.PackID() != PackID {
 		t.Fatalf("PackID = %q, want %q", handler.PackID(), PackID)
@@ -55,33 +57,66 @@ func TestCogniKernelHandlerRoutesExposeSurface(t *testing.T) {
 	if len(routes) != 3 {
 		t.Fatalf("expected 3 Cogni Kernel routes, got %d", len(routes))
 	}
-	if routes[0].Path != "/v1/cognis" {
+	if routes[0].Path != CollectionRoute {
 		t.Fatalf("collection route path = %q", routes[0].Path)
 	}
-	if routes[1].Path != "/v1/cognis/" {
+	if routes[1].Path != SubResourceRoute {
 		t.Fatalf("sub-resource route path = %q", routes[1].Path)
 	}
-	if routes[2].Path != "/v1/cognis/runtime/pack-state" {
+	if routes[2].Path != RuntimePackStateRoute {
 		t.Fatalf("runtime state route path = %q", routes[2].Path)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/cognis", nil)
+	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
 	w := httptest.NewRecorder()
 	routes[0].Handler(w, req)
-	if w.Code != http.StatusNoContent || gateway.called != 1 {
-		t.Fatalf("expected route to delegate to gateway, status=%d called=%d", w.Code, gateway.called)
+	if w.Code != http.StatusNoContent || api.called != 1 || api.paths[0] != CollectionRoute {
+		t.Fatalf("expected route to delegate to API, status=%d called=%d paths=%v", w.Code, api.called, api.paths)
 	}
 
 	runtimeRoutes := handler.RuntimeRoutes()
-	if len(runtimeRoutes) != 1 || runtimeRoutes[0].Path != "/v1/cognis/runtime/pack-state" {
+	if len(runtimeRoutes) != 1 || runtimeRoutes[0].Path != RuntimePackStateRoute {
 		t.Fatalf("unexpected runtime routes: %#v", runtimeRoutes)
 	}
 }
 
-func TestCogniKernelRuntimePackStateRoute(t *testing.T) {
-	handler := NewHandlerWithRuntimeState(&fakeCogniGateway{}, fakeRuntimeReporter{})
+func TestCogniKernelRouterOwnsRuntimeStateBeforeAPIDelegation(t *testing.T) {
+	api := &fakeCogniAPI{}
+	router := NewRouter(api, fakeRuntimeReporter{})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/cognis/runtime/pack-state", nil)
+	req := httptest.NewRequest(http.MethodGet, RuntimePackStateRoute, nil)
+	w := httptest.NewRecorder()
+	router.HandleRuntimePackState(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("runtime route status=%d body=%s", w.Code, w.Body.String())
+	}
+	if api.called != 0 {
+		t.Fatalf("runtime pack-state should not delegate to API adapter, called=%d", api.called)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, SubResourceRoute+"reviewer", nil)
+	w = httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusNoContent || api.called != 1 {
+		t.Fatalf("sub-resource route should delegate to API adapter, status=%d called=%d", w.Code, api.called)
+	}
+}
+
+func TestCogniKernelRouterReportsMissingAPIAdapter(t *testing.T) {
+	router := NewRouter(nil, fakeRuntimeReporter{})
+
+	req := httptest.NewRequest(http.MethodGet, CollectionRoute, nil)
+	w := httptest.NewRecorder()
+	router.ServeCogniKernel(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("missing API adapter status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestCogniKernelRuntimePackStateRoute(t *testing.T) {
+	handler := NewHandlerWithRuntimeState(&fakeCogniAPI{}, fakeRuntimeReporter{})
+
+	req := httptest.NewRequest(http.MethodGet, RuntimePackStateRoute, nil)
 	w := httptest.NewRecorder()
 	handler.HandleRuntimePackState(w, req)
 

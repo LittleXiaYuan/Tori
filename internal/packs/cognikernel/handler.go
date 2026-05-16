@@ -10,12 +10,18 @@ import (
 
 const PackID = "yunque.pack.cogni-kernel"
 
-// CogniGateway is the narrow Gateway surface required by the Cogni Kernel
-// pack. Keeping the pack behind this interface avoids importing Gateway from
-// the pack package and makes the bridge easy to replace with a standalone API
-// handler later.
-type CogniGateway interface {
-	HandleCogniKernelPack(w http.ResponseWriter, r *http.Request)
+const (
+	CollectionRoute       = "/v1/cognis"
+	SubResourceRoute      = "/v1/cognis/"
+	RuntimePackStateRoute = "/v1/cognis/runtime/pack-state"
+)
+
+// API is the pack-owned Cogni Kernel HTTP surface. The current Gateway still
+// implements it as an adapter during the migration, but the pack no longer
+// depends on a Gateway-named bridge method. A standalone Cogni API service can
+// replace the adapter without changing Pack Runtime route ownership.
+type API interface {
+	ServeCogniKernel(w http.ResponseWriter, r *http.Request)
 }
 
 type RuntimeStateReporter interface {
@@ -46,60 +52,96 @@ type RuntimeStateReport struct {
 }
 
 // Handler exposes CogniKernel/Cognis management as a Pack Runtime backend
-// module. The business logic still lives in Gateway during this bridge phase;
-// route ownership, enablement and method gates now belong to Pack Runtime.
+// module. Business operations may still be served by a Gateway adapter during
+// this migration phase, but route dispatch, runtime-state handling, enablement
+// and method gates are owned by this package.
 type Handler struct {
-	gateway  CogniGateway
+	router *Router
+}
+
+func NewHandler(api API) *Handler {
+	return NewHandlerWithRuntimeState(api, nil)
+}
+
+func NewHandlerWithRuntimeState(api API, reporter RuntimeStateReporter) *Handler {
+	if reporter == nil {
+		if inferred, ok := api.(RuntimeStateReporter); ok {
+			reporter = inferred
+		}
+	}
+	return &Handler{router: NewRouter(api, reporter)}
+}
+
+// Router is the pack-owned route dispatcher for Cogni Kernel. It keeps runtime
+// pack-state as a first-class pack route and delegates declaration operations to
+// the supplied API adapter.
+type Router struct {
+	api      API
 	reporter RuntimeStateReporter
 }
 
-func NewHandler(gateway CogniGateway) *Handler {
-	h := &Handler{gateway: gateway}
-	if reporter, ok := gateway.(RuntimeStateReporter); ok {
-		h.reporter = reporter
-	}
-	return h
+func NewRouter(api API, reporter RuntimeStateReporter) *Router {
+	return &Router{api: api, reporter: reporter}
 }
 
-func NewHandlerWithRuntimeState(gateway CogniGateway, reporter RuntimeStateReporter) *Handler {
-	return &Handler{gateway: gateway, reporter: reporter}
-}
-
-func RuntimeRouteSpecs() []packruntime.BackendRouteSpec {
-	return []packruntime.BackendRouteSpec{
-		{Method: http.MethodGet, Path: "/v1/cognis/runtime/pack-state", Description: "Read live Cogni runtime-loop and pack-state gate status."},
-	}
-}
-
-func (h *Handler) PackID() string { return PackID }
-
-func (h *Handler) Routes() []packruntime.BackendRoute {
+func (r *Router) Routes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{
-		{Methods: []string{http.MethodGet, http.MethodPost}, Path: "/v1/cognis", Handler: h.gateway.HandleCogniKernelPack},
-		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: "/v1/cognis/", Handler: h.gateway.HandleCogniKernelPack},
-		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/runtime/pack-state", Handler: h.HandleRuntimePackState},
+		{Methods: []string{http.MethodGet, http.MethodPost}, Path: CollectionRoute, Handler: r.ServeCogniKernel},
+		{Methods: []string{http.MethodGet, http.MethodPost, http.MethodDelete}, Path: SubResourceRoute, Handler: r.ServeCogniKernel},
+		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
 }
 
-func (h *Handler) RuntimeRoutes() []packruntime.BackendRoute {
+func (r *Router) RuntimeRoutes() []packruntime.BackendRoute {
 	return []packruntime.BackendRoute{
-		{Methods: []string{http.MethodGet}, Path: "/v1/cognis/runtime/pack-state", Handler: h.HandleRuntimePackState},
+		{Methods: []string{http.MethodGet}, Path: RuntimePackStateRoute, Handler: r.HandleRuntimePackState},
 	}
 }
 
-func (h *Handler) HandleRuntimePackState(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+func (r *Router) ServeCogniKernel(w http.ResponseWriter, req *http.Request) {
+	if r == nil || r.api == nil {
+		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
+			"error":   "cogni api handler not configured",
+			"pack_id": PackID,
+		})
+		return
+	}
+	r.api.ServeCogniKernel(w, req)
+}
+
+func (r *Router) HandleRuntimePackState(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
 		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "GET only"})
 		return
 	}
-	if h.reporter == nil {
+	if r == nil || r.reporter == nil {
 		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
 			"error":   "cogni runtime state reporter not configured",
 			"pack_id": PackID,
 		})
 		return
 	}
-	writeJSON(w, h.reporter.CogniKernelRuntimeState())
+	writeJSON(w, r.reporter.CogniKernelRuntimeState())
+}
+
+func RuntimeRouteSpecs() []packruntime.BackendRouteSpec {
+	return []packruntime.BackendRouteSpec{
+		{Method: http.MethodGet, Path: RuntimePackStateRoute, Description: "Read live Cogni runtime-loop and pack-state gate status."},
+	}
+}
+
+func (h *Handler) PackID() string { return PackID }
+
+func (h *Handler) Routes() []packruntime.BackendRoute {
+	return h.router.Routes()
+}
+
+func (h *Handler) RuntimeRoutes() []packruntime.BackendRoute {
+	return h.router.RuntimeRoutes()
+}
+
+func (h *Handler) HandleRuntimePackState(w http.ResponseWriter, r *http.Request) {
+	h.router.HandleRuntimePackState(w, r)
 }
 
 func writeJSON(w http.ResponseWriter, value any) {
