@@ -44,6 +44,7 @@ export interface MemoryTimeTravelStatus {
   native_kv_history_plan_ready?: boolean;
   kv_history_migration_plan_ready?: boolean;
   kv_history_index_plan_ready?: boolean;
+  native_kv_history_preview_ready?: boolean;
   native_kv_history_ready?: boolean;
   writes_native_kv_history?: boolean;
   migrates_kv_history?: boolean;
@@ -172,6 +173,44 @@ export interface MemoryTimeTravelNativeKVHistoryPlan {
   actions: string[];
   blocked_by: string[];
   labels: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelNativeKVHistoryRowPreview {
+  id: string;
+  namespace: string;
+  key: string;
+  version: number;
+  value_base64: string;
+  value_sha256: string;
+  updated_at: string;
+  archived_at?: string;
+  current: boolean;
+  audit_seq?: number;
+  audit_hash?: string;
+  source_adapter: string;
+}
+
+export interface MemoryTimeTravelNativeKVHistoryMigrationPreview {
+  pack_id?: string;
+  namespace: string;
+  generated_at: string;
+  stage?: string;
+  status?: string;
+  source_namespace: string;
+  native_table: string;
+  scanned_document_count: number;
+  preview_row_count: number;
+  returned_row_count: number;
+  limit?: number;
+  native_kv_history_preview_ready: boolean;
+  writes_native_kv_history: boolean;
+  migrates_kv_history: boolean;
+  uses_reserved_kv_namespace: boolean;
+  rows: MemoryTimeTravelNativeKVHistoryRowPreview[];
+  artifacts?: string[];
+  actions?: string[];
+  labels?: string[];
   notes?: string[];
 }
 
@@ -411,6 +450,8 @@ export interface MemoryTimeTravelEvidenceResponse {
   native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
   kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
+  kv_history_migration_preview?: MemoryTimeTravelNativeKVHistoryMigrationPreview;
+  kv_history_migration_preview_error?: string;
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerification;
@@ -429,6 +470,7 @@ export interface MemoryTimeTravelPackClient {
   retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
   nativeKVHistoryPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>;
+  nativeKVHistoryMigrationPreview(namespace?: string, limit?: number): Promise<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>;
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse>;
@@ -485,6 +527,10 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       }),
     nativeKVHistoryPlan: (namespace) =>
       fetcher<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>(`/v1/memory-time-travel/kv-history/native-plan${query({ namespace })}`),
+    nativeKVHistoryMigrationPreview: (namespace, limit) =>
+      fetcher<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>(
+        `/v1/memory-time-travel/kv-history/migration-preview${query({ namespace, limit: limit ? String(limit) : undefined })}`,
+      ),
     auditLinks: (namespace) =>
       fetcher<{ links: MemoryTimeTravelKVAuditLinksReport }>(`/v1/memory-time-travel/audit/links${query({ namespace })}`),
     auditVerify: (limit) =>

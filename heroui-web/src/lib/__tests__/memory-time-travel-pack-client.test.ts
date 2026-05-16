@@ -65,7 +65,7 @@ describe("memory-time-travel-pack-client", () => {
   it("exports JSON evidence packs by snapshot id", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "audit-links.json", "audit-verification.json"], snapshot: { id: "baseline", values: {} }, history: [], approved_rollback_plan: { approved_rollback_plan_ready: true, rollback_writeback_ready: false, writes_ledger_kv: false }, rollback_writeback_plan: [{ key: "goal", requires_approval: true }], approval_request_plan: { risk_level: "high", global_approval_enqueue_ready: false }, retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, retention_prune_plan: { dry_run: true, prune_ready: false, approval_required: false, selected_candidate_count: 0, actions: [] }, native_kv_history_plan: { native_kv_history_plan_ready: true, native_kv_history_ready: false, writes_native_kv_history: false }, kv_history_migration_plan: [{ writes: false }], kv_history_index_plan: [{ name: "kv_history_namespace_key_version_uq" }], kv_audit_link_schema: { schema_ready: true, linkage_ready: false, kv_audit_links: [] }, kv_audit_links: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ pack_id: "yunque.pack.memory-time-travel", exported_at: "now", format: "json-memory-time-travel-evidence", files: ["snapshot.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "audit-links.json", "audit-verification.json"], snapshot: { id: "baseline", values: {} }, history: [], approved_rollback_plan: { approved_rollback_plan_ready: true, rollback_writeback_ready: false, writes_ledger_kv: false }, rollback_writeback_plan: [{ key: "goal", requires_approval: true }], approval_request_plan: { risk_level: "high", global_approval_enqueue_ready: false }, retention_plan: { dry_run: true, candidate_count: 0, actions: [] }, retention_prune_plan: { dry_run: true, prune_ready: false, approval_required: false, selected_candidate_count: 0, actions: [] }, native_kv_history_plan: { native_kv_history_plan_ready: true, native_kv_history_ready: false, writes_native_kv_history: false }, kv_history_migration_plan: [{ writes: false }], kv_history_index_plan: [{ name: "kv_history_namespace_key_version_uq" }], kv_history_migration_preview: { native_kv_history_preview_ready: true, writes_native_kv_history: false, migrates_kv_history: false, rows: [] }, kv_audit_link_schema: { schema_ready: true, linkage_ready: false, kv_audit_links: [] }, kv_audit_links: [], audit_verification: { ready: true, valid: true, invalid_index: -1, record_count: 1, checked_at: "now" } }), { status: 200 }));
 
     const client = createMemoryTimeTravelPackClient();
     const evidence = await client.evidence("baseline");
@@ -78,6 +78,8 @@ describe("memory-time-travel-pack-client", () => {
     expect(evidence.retention_prune_plan?.prune_ready).toBe(false);
     expect(evidence.native_kv_history_plan?.native_kv_history_ready).toBe(false);
     expect(evidence.native_kv_history_plan?.writes_native_kv_history).toBe(false);
+    expect(evidence.kv_history_migration_preview?.native_kv_history_preview_ready).toBe(true);
+    expect(evidence.kv_history_migration_preview?.writes_native_kv_history).toBe(false);
     expect(evidence.kv_audit_link_schema?.schema_ready).toBe(true);
     expect(evidence.kv_audit_links).toEqual([]);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/evidence/baseline");
@@ -124,6 +126,20 @@ describe("memory-time-travel-pack-client", () => {
     expect(result.plan.writes_native_kv_history).toBe(false);
     expect(result.plan.artifacts).toContain("kv-history-migration-plan.json");
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot");
+  });
+
+  it("previews native kv_history migration rows through pack-owned route", async () => {
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ kv_history_migration_preview: { pack_id: "yunque.pack.memory-time-travel", namespace: "memory_snapshot", generated_at: "2026-05-15T16:30:00Z", stage: "native-kv-history-migration-preview-before-native-write", status: "preview_only", source_namespace: "__kv_history__", native_table: "kv_history", scanned_document_count: 1, preview_row_count: 2, returned_row_count: 2, limit: 50, native_kv_history_preview_ready: true, writes_native_kv_history: false, migrates_kv_history: false, uses_reserved_kv_namespace: true, rows: [{ id: "kvh-1", namespace: "memory_snapshot", key: "goal", version: 1, value_base64: "InNoaXAi", value_sha256: "h", updated_at: "2026-05-15T15:30:00Z", current: false, source_adapter: "reserved-ledger-kv-namespace" }], artifacts: ["kv-history-migration-preview.json"], labels: ["preview-only"] } }), { status: 200 }));
+
+    const client = createMemoryTimeTravelPackClient();
+    const result = await client.nativeKVHistoryMigrationPreview("memory_snapshot", 50);
+
+    expect(result.kv_history_migration_preview.native_kv_history_preview_ready).toBe(true);
+    expect(result.kv_history_migration_preview.writes_native_kv_history).toBe(false);
+    expect(result.kv_history_migration_preview.rows[0]?.source_adapter).toBe("reserved-ledger-kv-namespace");
+    expect(spy.mock.calls[0]?.[0]).toBe("/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50");
   });
 
   it("runs read-only Merkle audit-chain verification through pack-owned route", async () => {

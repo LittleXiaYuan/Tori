@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -96,6 +97,7 @@ func initTasks(app *agentrt.App) error {
 			memorytimetravelpack.New(memorytimetravelpack.Config{
 				DataDir:                  cfg.DataPath("memory-time-travel"),
 				TemporalKV:               memoryTimeTravelTemporalKV(app),
+				NativeKVHistoryPreviewer: memoryTimeTravelNativeKVHistoryPreviewer(app),
 				MemoryPersisterWriteback: memoryPersisterTemporalWritebackReady(app),
 				MerkleVerifier:           memoryTimeTravelMerkleVerifier(app),
 			}),
@@ -405,6 +407,60 @@ func memoryTimeTravelTemporalKV(app *agentrt.App) *iledger.TemporalKVStore {
 		return nil
 	}
 	return iledger.NewTemporalKVStore(app.Ledger)
+}
+
+type memoryTimeTravelKVHistoryPreviewAdapter struct {
+	store *iledger.TemporalKVStore
+}
+
+func memoryTimeTravelNativeKVHistoryPreviewer(app *agentrt.App) memorytimetravelpack.NativeKVHistoryPreviewer {
+	store := memoryTimeTravelTemporalKV(app)
+	if store == nil {
+		return nil
+	}
+	return memoryTimeTravelKVHistoryPreviewAdapter{store: store}
+}
+
+func (a memoryTimeTravelKVHistoryPreviewAdapter) PreviewNativeKVHistoryRows(ctx context.Context, namespace string, limit int) (memorytimetravelpack.NativeKVHistoryMigrationPreview, error) {
+	if a.store == nil {
+		return memorytimetravelpack.NativeKVHistoryMigrationPreview{}, errors.New("memory time travel native kv_history preview adapter is not attached")
+	}
+	preview, err := a.store.PreviewNativeKVHistoryRows(ctx, namespace, limit)
+	if err != nil {
+		return memorytimetravelpack.NativeKVHistoryMigrationPreview{}, err
+	}
+	rows := make([]memorytimetravelpack.NativeKVHistoryRowPreview, 0, len(preview.Rows))
+	for _, row := range preview.Rows {
+		rows = append(rows, memorytimetravelpack.NativeKVHistoryRowPreview{
+			ID:            row.ID,
+			Namespace:     row.Namespace,
+			Key:           row.Key,
+			Version:       row.Version,
+			Value:         append([]byte(nil), row.Value...),
+			ValueSHA256:   row.ValueSHA256,
+			UpdatedAt:     row.UpdatedAt,
+			ArchivedAt:    row.ArchivedAt,
+			Current:       row.Current,
+			AuditSeq:      row.AuditSeq,
+			AuditHash:     row.AuditHash,
+			SourceAdapter: row.SourceAdapter,
+		})
+	}
+	return memorytimetravelpack.NativeKVHistoryMigrationPreview{
+		Namespace:               preview.Namespace,
+		GeneratedAt:             preview.GeneratedAt,
+		SourceNamespace:         preview.SourceNamespace,
+		NativeTable:             preview.NativeTable,
+		ScannedDocumentCount:    preview.ScannedDocumentCount,
+		PreviewRowCount:         preview.PreviewRowCount,
+		ReturnedRowCount:        preview.ReturnedRowCount,
+		Limit:                   preview.Limit,
+		WritesNativeKVHistory:   preview.WritesNativeKVHistory,
+		MigratesKVHistory:       preview.MigratesKVHistory,
+		UsesReservedKVNamespace: preview.UsesReservedKVNamespace,
+		Rows:                    rows,
+		Notes:                   append([]string{}, preview.Notes...),
+	}, nil
 }
 
 func memoryTimeTravelMerkleVerifier(app *agentrt.App) memorytimetravelpack.MerkleVerifier {

@@ -54,6 +54,7 @@ export type MemoryTimeTravelStatusResponse = {
   native_kv_history_plan_ready?: boolean;
   kv_history_migration_plan_ready?: boolean;
   kv_history_index_plan_ready?: boolean;
+  native_kv_history_preview_ready?: boolean;
   native_kv_history_ready?: boolean;
   writes_native_kv_history?: boolean;
   migrates_kv_history?: boolean;
@@ -191,6 +192,48 @@ export type MemoryTimeTravelNativeKVHistoryPlan = {
 
 export type MemoryTimeTravelNativeKVHistoryPlanResponse = {
   plan: MemoryTimeTravelNativeKVHistoryPlan;
+};
+
+export type MemoryTimeTravelNativeKVHistoryRowPreview = {
+  id: string;
+  namespace: string;
+  key: string;
+  version: number;
+  value_base64: string;
+  value_sha256: string;
+  updated_at: string;
+  archived_at?: string;
+  current: boolean;
+  audit_seq?: number;
+  audit_hash?: string;
+  source_adapter: string;
+};
+
+export type MemoryTimeTravelNativeKVHistoryMigrationPreview = {
+  pack_id?: string;
+  namespace: string;
+  generated_at: string;
+  stage?: string;
+  status?: string;
+  source_namespace: string;
+  native_table: string;
+  scanned_document_count: number;
+  preview_row_count: number;
+  returned_row_count: number;
+  limit?: number;
+  native_kv_history_preview_ready: boolean;
+  writes_native_kv_history: boolean;
+  migrates_kv_history: boolean;
+  uses_reserved_kv_namespace: boolean;
+  rows: MemoryTimeTravelNativeKVHistoryRowPreview[];
+  artifacts?: string[];
+  actions?: string[];
+  labels?: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelNativeKVHistoryMigrationPreviewResponse = {
+  kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview;
 };
 
 export type MemoryTimeTravelSnapshotsResponse = {
@@ -463,6 +506,8 @@ export type MemoryTimeTravelEvidenceResponse = {
   native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
   kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
+  kv_history_migration_preview?: MemoryTimeTravelNativeKVHistoryMigrationPreview;
+  kv_history_migration_preview_error?: string;
   kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksResponse;
   kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
@@ -599,6 +644,10 @@ export class MemoryTimeTravelClient {
 
   nativeKVHistoryPlan(namespace?: string): Promise<MemoryTimeTravelNativeKVHistoryPlanResponse> {
     return this.request<MemoryTimeTravelNativeKVHistoryPlanResponse>("GET", `/v1/memory-time-travel/kv-history/native-plan${query({ namespace })}`);
+  }
+
+  nativeKVHistoryMigrationPreview(namespace?: string, limit?: number): Promise<MemoryTimeTravelNativeKVHistoryMigrationPreviewResponse> {
+    return this.request<MemoryTimeTravelNativeKVHistoryMigrationPreviewResponse>("GET", `/v1/memory-time-travel/kv-history/migration-preview${query({ namespace, limit: limit ? String(limit) : undefined })}`);
   }
 
   auditLinks(namespace?: string): Promise<MemoryTimeTravelKVAuditLinksEnvelope> {

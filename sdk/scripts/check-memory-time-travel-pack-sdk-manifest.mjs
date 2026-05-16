@@ -45,6 +45,7 @@ for (const token of [
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/kv-history/native-plan",
+  "/v1/memory-time-travel/kv-history/migration-preview",
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
@@ -66,12 +67,12 @@ for (const token of ["Approved rollback write-back plan", "buildApprovedRollback
 for (const token of ["KV audit proof-link schema", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing KV audit link token: ${token}`);
 }
-for (const token of ["Native kv_history plan", "buildNativeKVHistoryPlan", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "writes_native_kv_history"]) {
+for (const token of ["Native kv_history plan", "buildNativeKVHistoryPlan", "previewNativeKVHistoryMigration", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "writes_native_kv_history"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing native kv_history plan token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -99,12 +100,16 @@ for (const token of [
   "native-kv-history-plan.json",
   "kv-history-migration-plan.json",
   "kv-history-index-plan.json",
+  "kv-history-migration-preview.json",
+  "kv_history_migration_preview",
   "native_kv_history_plan_ready",
   "kv_history_migration_plan_ready",
   "kv_history_index_plan_ready",
+  "native_kv_history_preview_ready",
   "writes_native_kv_history",
   "migrates_kv_history",
   "/v1/memory-time-travel/kv-history/native-plan",
+  "/v1/memory-time-travel/kv-history/migration-preview",
   "approved-rollback-plan.json",
   "rollback-writeback-plan.json",
   "approval-request-plan.json",
@@ -131,6 +136,7 @@ for (const token of [
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/kv-history/native-plan",
+  "/v1/memory-time-travel/kv-history/migration-preview",
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "rollback_writeback_ready",
@@ -155,15 +161,19 @@ for (const token of [
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/kv-history/native-plan",
+  "/v1/memory-time-travel/kv-history/migration-preview",
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "retentionPlan",
   "retentionPrunePlan",
   "nativeKVHistoryPlan",
+  "nativeKVHistoryMigrationPreview",
   "native_kv_history_plan",
   "kv_history_migration_plan",
   "kv_history_index_plan",
+  "kv_history_migration_preview",
+  "native_kv_history_preview_ready",
   "approvedRollbackPlan",
   "approved_rollback_plan",
   "rollback_writeback_plan",

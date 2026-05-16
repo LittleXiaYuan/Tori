@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	baseledger "github.com/LittleXiaYuan/ledger"
 )
 
 func TestTemporalKVStorePutVersionedAndGetRawAt(t *testing.T) {
@@ -71,6 +73,78 @@ func TestTemporalKVStoreListVersionsAndSnapshotRawAt(t *testing.T) {
 	}
 }
 
+func TestTemporalKVStorePreviewNativeKVHistoryRowsIsReadOnly(t *testing.T) {
+	ldg := newTestLedger(t)
+	ctx := context.Background()
+	t0 := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	store := NewTemporalKVStore(ldg, WithTemporalKVNow(func() time.Time { return t0 }))
+
+	if err := store.PutRawVersionedAt(ctx, "memory_snapshot", "goal", []byte(`"ship"`), t0); err != nil {
+		t.Fatalf("put goal v1: %v", err)
+	}
+	if err := store.PutRawVersionedAt(ctx, "memory_snapshot", "goal", []byte(`"ship runtime"`), t0.Add(time.Hour)); err != nil {
+		t.Fatalf("put goal v2: %v", err)
+	}
+	if err := store.PutRawVersionedAt(ctx, "memory_snapshot", "persona", []byte(`"careful"`), t0.Add(10*time.Minute)); err != nil {
+		t.Fatalf("put persona: %v", err)
+	}
+	if err := store.PutRawVersionedAt(ctx, "other_namespace", "goal", []byte(`"ignore-v1"`), t0); err != nil {
+		t.Fatalf("put other v1: %v", err)
+	}
+	if err := store.PutRawVersionedAt(ctx, "other_namespace", "goal", []byte(`"ignore-v2"`), t0.Add(time.Hour)); err != nil {
+		t.Fatalf("put other v2: %v", err)
+	}
+
+	beforeHistory := rawKVByKey(t, ctx, ldg, temporalKVHistoryNamespace)
+	preview, err := store.PreviewNativeKVHistoryRows(ctx, "memory_snapshot", 0)
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	afterHistory := rawKVByKey(t, ctx, ldg, temporalKVHistoryNamespace)
+
+	if preview.Namespace != "memory_snapshot" || preview.SourceNamespace != temporalKVHistoryNamespace || preview.NativeTable != "kv_history" {
+		t.Fatalf("unexpected preview identity: %#v", preview)
+	}
+	if preview.WritesNativeKVHistory || preview.MigratesKVHistory || !preview.UsesReservedKVNamespace {
+		t.Fatalf("preview must stay non-destructive: %#v", preview)
+	}
+	if preview.ScannedDocumentCount != 1 || preview.PreviewRowCount != 3 || preview.ReturnedRowCount != 3 {
+		t.Fatalf("unexpected preview counts: %#v", preview)
+	}
+	if len(preview.Rows) != 3 {
+		t.Fatalf("expected 3 preview rows, got %#v", preview.Rows)
+	}
+	if preview.Rows[0].Key != "goal" || preview.Rows[0].Version != 1 || preview.Rows[0].Current || string(preview.Rows[0].Value) != `"ship"` {
+		t.Fatalf("unexpected historical row: %#v", preview.Rows[0])
+	}
+	if preview.Rows[0].ValueSHA256 != sha256Hex([]byte(`"ship"`)) || preview.Rows[0].SourceAdapter != "reserved-ledger-kv-namespace" {
+		t.Fatalf("unexpected historical row metadata: %#v", preview.Rows[0])
+	}
+	if preview.Rows[1].Key != "goal" || preview.Rows[1].Version != 2 || !preview.Rows[1].Current || string(preview.Rows[1].Value) != `"ship runtime"` {
+		t.Fatalf("unexpected current goal row: %#v", preview.Rows[1])
+	}
+	if preview.Rows[2].Key != "persona" || preview.Rows[2].Version != 1 || !preview.Rows[2].Current || string(preview.Rows[2].Value) != `"careful"` {
+		t.Fatalf("unexpected current persona row: %#v", preview.Rows[2])
+	}
+	if preview.Rows[0].AuditSeq != 0 || preview.Rows[0].AuditHash != "" {
+		t.Fatalf("audit linkage should remain placeholder-only: %#v", preview.Rows[0])
+	}
+	if !sameRawKV(beforeHistory, afterHistory) {
+		t.Fatalf("preview changed reserved history namespace: before=%#v after=%#v", beforeHistory, afterHistory)
+	}
+
+	again, err := store.PreviewNativeKVHistoryRows(ctx, "memory_snapshot", 2)
+	if err != nil {
+		t.Fatalf("preview with limit: %v", err)
+	}
+	if again.PreviewRowCount != 3 || again.ReturnedRowCount != 2 || len(again.Rows) != 2 || again.Limit != 2 {
+		t.Fatalf("limit should cap returned rows only: %#v", again)
+	}
+	if again.Rows[0].ID != preview.Rows[0].ID || again.Rows[1].ID != preview.Rows[1].ID {
+		t.Fatalf("preview row IDs should be deterministic: first=%#v again=%#v", preview.Rows[:2], again.Rows)
+	}
+}
+
 func TestTemporalKVStorePutVersionedJSON(t *testing.T) {
 	ldg := newTestLedger(t)
 	ctx := context.Background()
@@ -94,4 +168,29 @@ func TestTemporalKVStorePutVersionedJSON(t *testing.T) {
 	if got["default"] != "local" {
 		t.Fatalf("unexpected json value: %#v", got)
 	}
+}
+
+func rawKVByKey(t *testing.T, ctx context.Context, ldg *baseledger.Ledger, namespace string) map[string]string {
+	t.Helper()
+	entries, err := ldg.KV.List(ctx, namespace)
+	if err != nil {
+		t.Fatalf("list raw kv %s: %v", namespace, err)
+	}
+	out := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		out[entry.Key] = string(entry.Value)
+	}
+	return out
+}
+
+func sameRawKV(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, value := range a {
+		if b[key] != value {
+			return false
+		}
+	}
+	return true
 }

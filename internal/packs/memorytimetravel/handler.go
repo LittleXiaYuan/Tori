@@ -5,8 +5,8 @@
 // rollback write-back planning, retention dry-run planning, JSON evidence
 // export, read-only Merkle audit-chain verification, and a conservative KV
 // audit proof-link schema placeholder plus native kv_history table/index/
-// migration planning while native Ledger KV kv_history write-back remains a
-// later slice.
+// migration planning plus read-only migration row previews while native Ledger
+// KV kv_history write-back remains a later slice.
 package memorytimetravel
 
 import (
@@ -36,6 +36,7 @@ type Config struct {
 	Now                      func() time.Time
 	Policy                   RetentionPolicy
 	TemporalKV               TemporalKVReader
+	NativeKVHistoryPreviewer NativeKVHistoryPreviewer
 	MemoryPersisterWriteback bool
 	MerkleVerifier           MerkleVerifier
 }
@@ -46,6 +47,7 @@ type Handler struct {
 	now                      func() time.Time
 	policy                   RetentionPolicy
 	temporalKV               TemporalKVReader
+	nativeKVHistoryPreviewer NativeKVHistoryPreviewer
 	memoryPersisterWriteback bool
 	merkleVerifier           MerkleVerifier
 }
@@ -55,6 +57,13 @@ type Handler struct {
 // the concrete Ledger implementation into the pack shell.
 type TemporalKVReader interface {
 	SnapshotRawAt(ctx context.Context, namespace string, at time.Time) (map[string][]byte, error)
+}
+
+// NativeKVHistoryPreviewer is the narrow pack-local dependency for expanding
+// reserved TemporalKV history documents into future native kv_history row
+// previews without importing the concrete Ledger implementation here.
+type NativeKVHistoryPreviewer interface {
+	PreviewNativeKVHistoryRows(ctx context.Context, namespace string, limit int) (NativeKVHistoryMigrationPreview, error)
 }
 
 // MerkleVerifier is the pack-local adapter boundary for the global audit chain.
@@ -399,6 +408,44 @@ type KVHistoryMigrationStepPlan struct {
 	Description string `json:"description"`
 }
 
+type NativeKVHistoryRowPreview struct {
+	ID            string    `json:"id"`
+	Namespace     string    `json:"namespace"`
+	Key           string    `json:"key"`
+	Version       int       `json:"version"`
+	Value         []byte    `json:"value_base64"`
+	ValueSHA256   string    `json:"value_sha256"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	ArchivedAt    time.Time `json:"archived_at,omitempty"`
+	Current       bool      `json:"current"`
+	AuditSeq      uint64    `json:"audit_seq,omitempty"`
+	AuditHash     string    `json:"audit_hash,omitempty"`
+	SourceAdapter string    `json:"source_adapter"`
+}
+
+type NativeKVHistoryMigrationPreview struct {
+	PackID                      string                      `json:"pack_id,omitempty"`
+	Namespace                   string                      `json:"namespace"`
+	GeneratedAt                 time.Time                   `json:"generated_at"`
+	Stage                       string                      `json:"stage,omitempty"`
+	Status                      string                      `json:"status,omitempty"`
+	SourceNamespace             string                      `json:"source_namespace"`
+	NativeTable                 string                      `json:"native_table"`
+	ScannedDocumentCount        int                         `json:"scanned_document_count"`
+	PreviewRowCount             int                         `json:"preview_row_count"`
+	ReturnedRowCount            int                         `json:"returned_row_count"`
+	Limit                       int                         `json:"limit,omitempty"`
+	NativeKVHistoryPreviewReady bool                        `json:"native_kv_history_preview_ready"`
+	WritesNativeKVHistory       bool                        `json:"writes_native_kv_history"`
+	MigratesKVHistory           bool                        `json:"migrates_kv_history"`
+	UsesReservedKVNamespace     bool                        `json:"uses_reserved_kv_namespace"`
+	Rows                        []NativeKVHistoryRowPreview `json:"rows"`
+	Artifacts                   []string                    `json:"artifacts,omitempty"`
+	Actions                     []string                    `json:"actions,omitempty"`
+	Labels                      []string                    `json:"labels,omitempty"`
+	Notes                       []string                    `json:"notes,omitempty"`
+}
+
 type NativeKVHistoryPlanReport struct {
 	PackID                      string                       `json:"pack_id"`
 	Namespace                   string                       `json:"namespace"`
@@ -447,6 +494,7 @@ func New(cfg Config) *Handler {
 		now:                      now,
 		policy:                   normalizePolicy(cfg.Policy),
 		temporalKV:               cfg.TemporalKV,
+		nativeKVHistoryPreviewer: cfg.NativeKVHistoryPreviewer,
 		memoryPersisterWriteback: cfg.MemoryPersisterWriteback,
 		merkleVerifier:           cfg.MerkleVerifier,
 	}
@@ -471,6 +519,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan", Handler: h.NativeKVHistoryPlan},
+		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview", Handler: h.NativeKVHistoryMigrationPreview},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
@@ -501,6 +550,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.retention.plan",
 		"memory.retention.prune_plan",
 		"memory.kv_history.native_plan",
+		"memory.kv_history.migration_preview",
 		"memory.audit.links.schema",
 		"memory.evidence.export",
 	}
@@ -517,6 +567,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		NativeKVHistoryPlanReady:       true,
 		KVHistoryMigrationPlanReady:    true,
 		KVHistoryIndexPlanReady:        true,
+		NativeKVHistoryPreviewReady:    h.nativeKVHistoryPreviewer != nil,
 		NativeKVHistoryReady:           false,
 		WritesNativeKVHistory:          false,
 		MigratesKVHistory:              false,
@@ -555,6 +606,7 @@ type statusResponse struct {
 	NativeKVHistoryPlanReady       bool             `json:"native_kv_history_plan_ready"`
 	KVHistoryMigrationPlanReady    bool             `json:"kv_history_migration_plan_ready"`
 	KVHistoryIndexPlanReady        bool             `json:"kv_history_index_plan_ready"`
+	NativeKVHistoryPreviewReady    bool             `json:"native_kv_history_preview_ready"`
 	NativeKVHistoryReady           bool             `json:"native_kv_history_ready"`
 	WritesNativeKVHistory          bool             `json:"writes_native_kv_history"`
 	MigratesKVHistory              bool             `json:"migrates_kv_history"`
@@ -777,6 +829,63 @@ func (h *Handler) NativeKVHistoryPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": report})
 }
 
+func (h *Handler) NativeKVHistoryMigrationPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	namespace := normalizeNamespace(r.URL.Query().Get("namespace"))
+	limit := parsePreviewLimit(r.URL.Query().Get("limit"))
+	if h.nativeKVHistoryPreviewer == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": NativeKVHistoryMigrationPreview{
+			PackID:                      PackID,
+			Namespace:                   namespace,
+			GeneratedAt:                 h.now().UTC(),
+			Stage:                       "native-kv-history-migration-preview-before-native-write",
+			Status:                      "not_attached",
+			SourceNamespace:             "__kv_history__",
+			NativeTable:                 "kv_history",
+			Limit:                       limit,
+			NativeKVHistoryPreviewReady: false,
+			WritesNativeKVHistory:       false,
+			MigratesKVHistory:           false,
+			UsesReservedKVNamespace:     true,
+			Rows:                        []NativeKVHistoryRowPreview{},
+			Artifacts:                   []string{"kv-history-migration-preview.json"},
+			Actions:                     []string{"attach TemporalKVStore preview adapter before scanning reserved __kv_history__ documents"},
+			Labels:                      []string{"memory-time-travel", "native-kv-history", "migration-preview", "not-attached", "no-native-write"},
+			Notes:                       []string{"Native kv_history migration previewer is not attached to this pack instance; no scan was executed."},
+		}})
+		return
+	}
+	preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(r.Context(), namespace, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	preview.PackID = PackID
+	preview.Stage = "native-kv-history-migration-preview-before-native-write"
+	preview.Status = "preview_only"
+	preview.NativeKVHistoryPreviewReady = true
+	preview.WritesNativeKVHistory = false
+	preview.MigratesKVHistory = false
+	preview.UsesReservedKVNamespace = true
+	preview.Artifacts = []string{"kv-history-migration-preview.json"}
+	preview.Actions = []string{
+		"review deterministic future kv_history rows expanded from reserved TemporalKV history documents",
+		"keep native table creation, native row writes, migration execution, and reserved namespace cleanup blocked",
+	}
+	preview.Labels = []string{"memory-time-travel", "native-kv-history", "migration-preview", "preview-only", "no-native-write"}
+	if len(preview.Rows) == 0 {
+		preview.Rows = []NativeKVHistoryRowPreview{}
+	}
+	preview.Notes = append(preview.Notes,
+		"This route is non-destructive: it scans the current reserved adapter and returns row previews only.",
+		"native_kv_history_preview_ready=true does not mean native_kv_history_ready; writes_native_kv_history and migrates_kv_history remain false.",
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": preview})
+}
+
 func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -829,7 +938,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -868,6 +977,26 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	payload["native_kv_history_plan"] = nativeKVHistoryPlan
 	payload["kv_history_migration_plan"] = nativeKVHistoryPlan.KVHistoryMigrationPlan
 	payload["kv_history_index_plan"] = nativeKVHistoryPlan.KVHistoryIndexPlan
+	if h.nativeKVHistoryPreviewer != nil {
+		preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(r.Context(), snapshot.Namespace, 50)
+		if err != nil {
+			payload["kv_history_migration_preview_error"] = err.Error()
+		} else {
+			preview.PackID = PackID
+			preview.Stage = "native-kv-history-migration-preview-before-native-write"
+			preview.Status = "preview_only"
+			preview.NativeKVHistoryPreviewReady = true
+			preview.WritesNativeKVHistory = false
+			preview.MigratesKVHistory = false
+			preview.UsesReservedKVNamespace = true
+			preview.Artifacts = []string{"kv-history-migration-preview.json"}
+			preview.Labels = []string{"memory-time-travel", "native-kv-history", "migration-preview", "preview-only", "no-native-write"}
+			if len(preview.Rows) == 0 {
+				preview.Rows = []NativeKVHistoryRowPreview{}
+			}
+			payload["kv_history_migration_preview"] = preview
+		}
+	}
 	if h.merkleVerifier != nil {
 		auditVerification, err := h.merkleVerifier.VerifyMerkleAuditChain(r.Context(), 10)
 		if err != nil {
@@ -895,6 +1024,11 @@ func (h *Handler) statusNotes() []string {
 	}
 	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
 	notes = append(notes, "Native kv_history table, migration, and index plans are available as plan-only artifacts; the current TemporalKV adapter still uses the reserved __kv_history__ Ledger KV namespace and does not migrate or write native rows.")
+	if h.nativeKVHistoryPreviewer != nil {
+		notes = append(notes, "Native kv_history migration preview can scan reserved __kv_history__ documents into deterministic future row previews, but it remains read-only and does not create tables, migrate rows, or change TemporalKVStore behavior.")
+	} else {
+		notes = append(notes, "Native kv_history migration preview route is shaped, but the TemporalKVStore preview adapter is not attached to this pack instance.")
+	}
 	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
 	if h.merkleVerifier != nil {
 		notes = append(notes, "Read-only Merkle audit-chain verification is attached through Pack Runtime; individual KV-history entries are not yet linked to audit proofs.")
@@ -1045,6 +1179,22 @@ func parseAuditLimit(raw string) int {
 	}
 	if limit > 50 {
 		return 50
+	}
+	return limit
+}
+
+func parsePreviewLimit(raw string) int {
+	limit := 50
+	if strings.TrimSpace(raw) != "" {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(raw)); err == nil {
+			limit = parsed
+		}
+	}
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 500 {
+		return 500
 	}
 	return limit
 }
