@@ -5,8 +5,9 @@
 // rollback write-back planning, retention dry-run planning, JSON evidence
 // export, read-only Merkle audit-chain verification, and a conservative KV
 // audit proof-link schema placeholder plus native kv_history table/index/
-// migration planning plus read-only migration row previews while native Ledger
-// KV kv_history write-back remains a later slice.
+// migration planning, read-only migration row previews, and non-destructive
+// dual-read/dual-write cutover planning while native Ledger KV kv_history
+// write-back remains a later slice.
 package memorytimetravel
 
 import (
@@ -16,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -477,6 +479,110 @@ type NativeKVHistoryPlanReport struct {
 	Notes                       []string                     `json:"notes,omitempty"`
 }
 
+type KVHistoryCutoverPlanRequest struct {
+	Namespace   string `json:"namespace,omitempty"`
+	RequestedBy string `json:"requested_by,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Limit       int    `json:"limit,omitempty"`
+	DryRun      bool   `json:"dry_run,omitempty"`
+}
+
+type KVHistoryCutoverPhasePlan struct {
+	Step        int      `json:"step"`
+	Name        string   `json:"name"`
+	From        string   `json:"from"`
+	To          string   `json:"to"`
+	Gate        string   `json:"gate"`
+	Ready       bool     `json:"ready"`
+	Writes      bool     `json:"writes"`
+	Status      string   `json:"status"`
+	Description string   `json:"description"`
+	BlockedBy   []string `json:"blocked_by,omitempty"`
+}
+
+type KVHistoryDualReadPlan struct {
+	PlanReady                bool     `json:"plan_ready"`
+	Ready                    bool     `json:"ready"`
+	PreferredSource          string   `json:"preferred_source"`
+	FallbackSource           string   `json:"fallback_source"`
+	ReadsNativeKVHistory     bool     `json:"reads_native_kv_history"`
+	ReadsReservedKVNamespace bool     `json:"reads_reserved_kv_namespace"`
+	SwitchesAdapter          bool     `json:"switches_adapter"`
+	Validation               []string `json:"validation"`
+	BlockedBy                []string `json:"blocked_by"`
+	Notes                    []string `json:"notes,omitempty"`
+}
+
+type KVHistoryDualWritePlan struct {
+	PlanReady                 bool     `json:"plan_ready"`
+	Ready                     bool     `json:"ready"`
+	PrimaryTarget             string   `json:"primary_target"`
+	MirrorTarget              string   `json:"mirror_target"`
+	WritesNativeKVHistory     bool     `json:"writes_native_kv_history"`
+	WritesReservedKVNamespace bool     `json:"writes_reserved_kv_namespace"`
+	WritesLedgerKV            bool     `json:"writes_ledger_kv"`
+	MigrationExecutorReady    bool     `json:"migration_executor_ready"`
+	Guardrails                []string `json:"guardrails"`
+	BlockedBy                 []string `json:"blocked_by"`
+	Notes                     []string `json:"notes,omitempty"`
+}
+
+type KVHistoryCutoverRollbackPlan struct {
+	PlanReady                  bool     `json:"plan_ready"`
+	Ready                      bool     `json:"ready"`
+	RequiresApproval           bool     `json:"requires_approval"`
+	RestoresReservedAdapter    bool     `json:"restores_reserved_adapter"`
+	DropsNativeRows            bool     `json:"drops_native_rows"`
+	DeletesReservedKVNamespace bool     `json:"deletes_reserved_kv_namespace"`
+	Actions                    []string `json:"actions"`
+	BlockedBy                  []string `json:"blocked_by"`
+	Notes                      []string `json:"notes,omitempty"`
+}
+
+type KVHistoryCutoverPlanReport struct {
+	PackID                      string                          `json:"pack_id"`
+	Namespace                   string                          `json:"namespace"`
+	GeneratedAt                 time.Time                       `json:"generated_at"`
+	Stage                       string                          `json:"stage"`
+	Status                      string                          `json:"status"`
+	DryRun                      bool                            `json:"dry_run"`
+	RequestedBy                 string                          `json:"requested_by,omitempty"`
+	Reason                      string                          `json:"reason,omitempty"`
+	Source                      string                          `json:"source"`
+	NativeTable                 string                          `json:"native_table"`
+	CurrentHistoryNamespace     string                          `json:"current_history_namespace"`
+	ConsumesNativeKVHistoryPlan bool                            `json:"consumes_native_kv_history_plan"`
+	ConsumesMigrationPreview    bool                            `json:"consumes_migration_preview"`
+	NativeKVHistoryPlanReady    bool                            `json:"native_kv_history_plan_ready"`
+	NativeKVHistoryPreviewReady bool                            `json:"native_kv_history_preview_ready"`
+	KVHistoryCutoverPlanReady   bool                            `json:"kv_history_cutover_plan_ready"`
+	DualReadPlanReady           bool                            `json:"dual_read_plan_ready"`
+	DualWritePlanReady          bool                            `json:"dual_write_plan_ready"`
+	NativeKVHistoryReady        bool                            `json:"native_kv_history_ready"`
+	WritesNativeKVHistory       bool                            `json:"writes_native_kv_history"`
+	MigratesKVHistory           bool                            `json:"migrates_kv_history"`
+	DualReadReady               bool                            `json:"dual_read_ready"`
+	DualWriteReady              bool                            `json:"dual_write_ready"`
+	CutoverReady                bool                            `json:"cutover_ready"`
+	RollbackReady               bool                            `json:"rollback_ready"`
+	CreatesNativeTable          bool                            `json:"creates_native_table"`
+	DeletesReservedKVNamespace  bool                            `json:"deletes_reserved_kv_namespace"`
+	SwitchesTemporalAdapter     bool                            `json:"switches_temporal_adapter"`
+	PreviewRowCount             int                             `json:"preview_row_count"`
+	ReturnedPreviewRowCount     int                             `json:"returned_preview_row_count"`
+	NativeKVHistoryPlan         NativeKVHistoryPlanReport       `json:"native_kv_history_plan"`
+	KVHistoryMigrationPreview   NativeKVHistoryMigrationPreview `json:"kv_history_migration_preview"`
+	Phases                      []KVHistoryCutoverPhasePlan     `json:"phases"`
+	DualReadPlan                KVHistoryDualReadPlan           `json:"dual_read_plan"`
+	DualWritePlan               KVHistoryDualWritePlan          `json:"dual_write_plan"`
+	CutoverRollbackPlan         KVHistoryCutoverRollbackPlan    `json:"cutover_rollback_plan"`
+	Artifacts                   []string                        `json:"artifacts"`
+	Actions                     []string                        `json:"actions"`
+	BlockedBy                   []string                        `json:"blocked_by"`
+	Labels                      []string                        `json:"labels"`
+	Notes                       []string                        `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,79}$`)
 
 // New creates a Memory Time Travel pack handler.
@@ -520,6 +626,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan", Handler: h.NativeKVHistoryPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview", Handler: h.NativeKVHistoryMigrationPreview},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/plan", Handler: h.KVHistoryCutoverPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify", Handler: h.AuditVerify},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/", Handler: h.Evidence},
@@ -551,6 +658,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.retention.prune_plan",
 		"memory.kv_history.native_plan",
 		"memory.kv_history.migration_preview",
+		"memory.kv_history.cutover.plan",
 		"memory.audit.links.schema",
 		"memory.evidence.export",
 	}
@@ -568,9 +676,16 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		KVHistoryMigrationPlanReady:    true,
 		KVHistoryIndexPlanReady:        true,
 		NativeKVHistoryPreviewReady:    h.nativeKVHistoryPreviewer != nil,
+		KVHistoryCutoverPlanReady:      true,
+		DualReadPlanReady:              true,
+		DualWritePlanReady:             true,
 		NativeKVHistoryReady:           false,
 		WritesNativeKVHistory:          false,
 		MigratesKVHistory:              false,
+		DualReadReady:                  false,
+		DualWriteReady:                 false,
+		CutoverReady:                   false,
+		RollbackReady:                  false,
 		MerkleVerificationReady:        h.merkleVerifier != nil,
 		MemoryPersisterWritebackReady:  h.memoryPersisterWriteback,
 		ApprovedRollbackPlanReady:      true,
@@ -607,9 +722,16 @@ type statusResponse struct {
 	KVHistoryMigrationPlanReady    bool             `json:"kv_history_migration_plan_ready"`
 	KVHistoryIndexPlanReady        bool             `json:"kv_history_index_plan_ready"`
 	NativeKVHistoryPreviewReady    bool             `json:"native_kv_history_preview_ready"`
+	KVHistoryCutoverPlanReady      bool             `json:"kv_history_cutover_plan_ready"`
+	DualReadPlanReady              bool             `json:"dual_read_plan_ready"`
+	DualWritePlanReady             bool             `json:"dual_write_plan_ready"`
 	NativeKVHistoryReady           bool             `json:"native_kv_history_ready"`
 	WritesNativeKVHistory          bool             `json:"writes_native_kv_history"`
 	MigratesKVHistory              bool             `json:"migrates_kv_history"`
+	DualReadReady                  bool             `json:"dual_read_ready"`
+	DualWriteReady                 bool             `json:"dual_write_ready"`
+	CutoverReady                   bool             `json:"cutover_ready"`
+	RollbackReady                  bool             `json:"rollback_ready"`
 	MerkleVerificationReady        bool             `json:"merkle_verification_ready"`
 	MemoryPersisterWritebackReady  bool             `json:"memory_persister_writeback_ready"`
 	ApprovedRollbackPlanReady      bool             `json:"approved_rollback_plan_ready"`
@@ -836,8 +958,21 @@ func (h *Handler) NativeKVHistoryMigrationPreview(w http.ResponseWriter, r *http
 	}
 	namespace := normalizeNamespace(r.URL.Query().Get("namespace"))
 	limit := parsePreviewLimit(r.URL.Query().Get("limit"))
+	preview, err := h.buildNativeKVHistoryMigrationPreview(r.Context(), namespace, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": preview})
+}
+
+func (h *Handler) buildNativeKVHistoryMigrationPreview(ctx context.Context, namespace string, limit int) (NativeKVHistoryMigrationPreview, error) {
+	namespace = normalizeNamespace(namespace)
+	if limit <= 0 {
+		limit = 50
+	}
 	if h.nativeKVHistoryPreviewer == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": NativeKVHistoryMigrationPreview{
+		return NativeKVHistoryMigrationPreview{
 			PackID:                      PackID,
 			Namespace:                   namespace,
 			GeneratedAt:                 h.now().UTC(),
@@ -855,13 +990,11 @@ func (h *Handler) NativeKVHistoryMigrationPreview(w http.ResponseWriter, r *http
 			Actions:                     []string{"attach TemporalKVStore preview adapter before scanning reserved __kv_history__ documents"},
 			Labels:                      []string{"memory-time-travel", "native-kv-history", "migration-preview", "not-attached", "no-native-write"},
 			Notes:                       []string{"Native kv_history migration previewer is not attached to this pack instance; no scan was executed."},
-		}})
-		return
+		}, nil
 	}
-	preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(r.Context(), namespace, limit)
+	preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(ctx, namespace, limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return NativeKVHistoryMigrationPreview{}, err
 	}
 	preview.PackID = PackID
 	preview.Stage = "native-kv-history-migration-preview-before-native-write"
@@ -883,7 +1016,185 @@ func (h *Handler) NativeKVHistoryMigrationPreview(w http.ResponseWriter, r *http
 		"This route is non-destructive: it scans the current reserved adapter and returns row previews only.",
 		"native_kv_history_preview_ready=true does not mean native_kv_history_ready; writes_native_kv_history and migrates_kv_history remain false.",
 	)
-	writeJSON(w, http.StatusOK, map[string]any{"kv_history_migration_preview": preview})
+	return preview, nil
+}
+
+func (h *Handler) KVHistoryCutoverPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req KVHistoryCutoverPlanRequest
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid kv_history cutover plan payload")
+		return
+	}
+	if strings.TrimSpace(string(body)) != "" {
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid kv_history cutover plan payload")
+			return
+		}
+	}
+	plan, err := h.buildKVHistoryCutoverPlan(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
+func (h *Handler) buildKVHistoryCutoverPlan(ctx context.Context, req KVHistoryCutoverPlanRequest) (KVHistoryCutoverPlanReport, error) {
+	namespace := normalizeNamespace(req.Namespace)
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	nativePlan := h.buildNativeKVHistoryPlan(namespace)
+	preview, err := h.buildNativeKVHistoryMigrationPreview(ctx, namespace, limit)
+	if err != nil {
+		return KVHistoryCutoverPlanReport{}, err
+	}
+	previewRows := preview.PreviewRowCount
+	if previewRows == 0 {
+		previewRows = len(preview.Rows)
+	}
+	returnedRows := preview.ReturnedRowCount
+	if returnedRows == 0 {
+		returnedRows = len(preview.Rows)
+	}
+	blockedBy := []string{
+		"ledger-native-kv-history-schema-not-wired",
+		"migration-executor-not-wired",
+		"dual-read-adapter-not-wired",
+		"dual-write-cutover-not-enabled",
+		"per-kv-merkle-proof-link-not-wired",
+		"cutover-rollback-executor-not-wired",
+	}
+	phases := []KVHistoryCutoverPhasePlan{
+		{Step: 1, Name: "schema-readiness-gate", From: "native-kv-history-plan.json", To: "Ledger kv_history DDL", Gate: "manual_schema_review", Ready: false, Writes: false, Status: "blocked", Description: "review table and index contract before Ledger owns the native kv_history schema", BlockedBy: []string{"ledger-native-kv-history-schema-not-wired"}},
+		{Step: 2, Name: "migration-preview-gate", From: "__kv_history__", To: "kv_history row preview", Gate: "row_digest_review", Ready: preview.NativeKVHistoryPreviewReady, Writes: false, Status: "plan_only", Description: "compare deterministic row previews and value hashes before any migration executor exists"},
+		{Step: 3, Name: "dual-read-adapter-gate", From: "__kv_history__ fallback", To: "native kv_history preferred read", Gate: "shadow_read_parity", Ready: false, Writes: false, Status: "blocked", Description: "future adapter must prove SnapshotRawAt/ListVersions parity before native reads are preferred", BlockedBy: []string{"dual-read-adapter-not-wired"}},
+		{Step: 4, Name: "dual-write-cutover-gate", From: "TemporalKVStore reserved adapter", To: "reserved adapter + native kv_history mirror", Gate: "approval_required", Ready: false, Writes: false, Status: "blocked", Description: "future writer must mirror versioned puts only after schema, migration and read parity gates pass", BlockedBy: []string{"dual-write-cutover-not-enabled"}},
+		{Step: 5, Name: "rollback-and-proof-link-gate", From: "cutover plan", To: "audited rollback executor", Gate: "approval_and_merkle_proof", Ready: false, Writes: false, Status: "blocked", Description: "cutover rollback and per-KV audit proof linkage remain separate executor work", BlockedBy: []string{"cutover-rollback-executor-not-wired", "per-kv-merkle-proof-link-not-wired"}},
+	}
+	dualRead := KVHistoryDualReadPlan{
+		PlanReady:                true,
+		Ready:                    false,
+		PreferredSource:          "native kv_history rows",
+		FallbackSource:           "reserved __kv_history__ Ledger KV namespace",
+		ReadsNativeKVHistory:     false,
+		ReadsReservedKVNamespace: true,
+		SwitchesAdapter:          false,
+		Validation: []string{
+			"compare GetRawAt for namespace/key/time across reserved adapter and native kv_history row preview",
+			"compare SnapshotRawAt namespace reconstruction against current TemporalKVReader output",
+			"require row digest and version ordering parity before preferring native reads",
+		},
+		BlockedBy: []string{"dual-read-adapter-not-wired", "shadow-read-parity-tests-not-wired"},
+		Notes: []string{
+			"dual_read_plan_ready=true only means the adapter cutover contract is shaped.",
+			"dual_read_ready remains false; this plan does not switch TemporalKVReader to native rows.",
+		},
+	}
+	dualWrite := KVHistoryDualWritePlan{
+		PlanReady:                 true,
+		Ready:                     false,
+		PrimaryTarget:             "reserved __kv_history__ Ledger KV namespace",
+		MirrorTarget:              "native kv_history table",
+		WritesNativeKVHistory:     false,
+		WritesReservedKVNamespace: false,
+		WritesLedgerKV:            false,
+		MigrationExecutorReady:    false,
+		Guardrails: []string{
+			"require explicit operator approval before enabling mirror writes",
+			"require native schema migration and rollback executor before dual-write can become ready",
+			"preserve reserved __kv_history__ documents until native read parity and proof linkage pass",
+		},
+		BlockedBy: []string{"migration-executor-not-wired", "dual-write-cutover-not-enabled", "global-approval-manager-not-consumed"},
+		Notes: []string{
+			"dual_write_plan_ready=true is a non-destructive contract; writes_native_kv_history and writes_ledger_kv stay false.",
+			"reserved adapter writes are also not performed by this route.",
+		},
+	}
+	rollback := KVHistoryCutoverRollbackPlan{
+		PlanReady:                  true,
+		Ready:                      false,
+		RequiresApproval:           true,
+		RestoresReservedAdapter:    true,
+		DropsNativeRows:            false,
+		DeletesReservedKVNamespace: false,
+		Actions: []string{
+			"keep TemporalKVReader pinned to reserved adapter until cutover_ready=true",
+			"if a future cutover fails, restore reserved adapter as primary read source",
+			"preserve native rows for forensic comparison instead of deleting them automatically",
+		},
+		BlockedBy: []string{"cutover-rollback-executor-not-wired", "approval-manager-not-wired"},
+		Notes: []string{
+			"rollback_ready=false because no executor mutates adapters, tables, rows, or reserved documents in this slice.",
+		},
+	}
+	return KVHistoryCutoverPlanReport{
+		PackID:                      PackID,
+		Namespace:                   namespace,
+		GeneratedAt:                 h.now().UTC(),
+		Stage:                       "kv-history-cutover-plan-before-dual-read-write",
+		Status:                      "plan_only",
+		DryRun:                      true,
+		RequestedBy:                 strings.TrimSpace(req.RequestedBy),
+		Reason:                      strings.TrimSpace(req.Reason),
+		Source:                      "native-plan-plus-migration-preview",
+		NativeTable:                 "kv_history",
+		CurrentHistoryNamespace:     "__kv_history__",
+		ConsumesNativeKVHistoryPlan: true,
+		ConsumesMigrationPreview:    true,
+		NativeKVHistoryPlanReady:    nativePlan.NativeKVHistoryPlanReady,
+		NativeKVHistoryPreviewReady: preview.NativeKVHistoryPreviewReady,
+		KVHistoryCutoverPlanReady:   true,
+		DualReadPlanReady:           true,
+		DualWritePlanReady:          true,
+		NativeKVHistoryReady:        false,
+		WritesNativeKVHistory:       false,
+		MigratesKVHistory:           false,
+		DualReadReady:               false,
+		DualWriteReady:              false,
+		CutoverReady:                false,
+		RollbackReady:               false,
+		CreatesNativeTable:          false,
+		DeletesReservedKVNamespace:  false,
+		SwitchesTemporalAdapter:     false,
+		PreviewRowCount:             previewRows,
+		ReturnedPreviewRowCount:     returnedRows,
+		NativeKVHistoryPlan:         nativePlan,
+		KVHistoryMigrationPreview:   preview,
+		Phases:                      phases,
+		DualReadPlan:                dualRead,
+		DualWritePlan:               dualWrite,
+		CutoverRollbackPlan:         rollback,
+		Artifacts: []string{
+			"kv-history-cutover-plan.json",
+			"kv-history-dual-read-plan.json",
+			"kv-history-dual-write-plan.json",
+			"kv-history-cutover-rollback-plan.json",
+			"native-kv-history-plan.json",
+			"kv-history-migration-preview.json",
+		},
+		Actions: []string{
+			"review native kv_history schema/index/migration plan before any DDL work",
+			"review migration preview row digests before any migration executor writes native rows",
+			"keep native reads, native writes, adapter switching, reserved namespace cleanup, and rollback execution blocked",
+		},
+		BlockedBy: blockedBy,
+		Labels:    []string{"memory-time-travel", "kv-history-cutover", "dual-read-plan", "dual-write-plan", "plan-only", "no-native-write", "no-adapter-switch"},
+		Notes: []string{
+			"This route is non-destructive: it does not create tables, migrate rows, switch adapters, delete reserved __kv_history__ documents, write Ledger KV, or append Merkle proofs.",
+			"Use kv-history-cutover-plan.json with the dual-read/dual-write artifacts as the contract for a later native Ledger kv_history cutover executor.",
+			"cutover_ready, dual_read_ready, dual_write_ready, native_kv_history_ready, rollback_ready, writes_native_kv_history, and migrates_kv_history intentionally remain false.",
+		},
+	}, nil
 }
 
 func (h *Handler) AuditLinks(w http.ResponseWriter, r *http.Request) {
@@ -938,7 +1249,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-cutover-plan.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -977,6 +1288,20 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	payload["native_kv_history_plan"] = nativeKVHistoryPlan
 	payload["kv_history_migration_plan"] = nativeKVHistoryPlan.KVHistoryMigrationPlan
 	payload["kv_history_index_plan"] = nativeKVHistoryPlan.KVHistoryIndexPlan
+	if cutoverPlan, err := h.buildKVHistoryCutoverPlan(r.Context(), KVHistoryCutoverPlanRequest{
+		Namespace:   snapshot.Namespace,
+		RequestedBy: "evidence-export",
+		Reason:      "evidence-export-preview",
+		Limit:       50,
+		DryRun:      true,
+	}); err != nil {
+		payload["kv_history_cutover_plan_error"] = err.Error()
+	} else {
+		payload["kv_history_cutover_plan"] = cutoverPlan
+		payload["kv_history_dual_read_plan"] = cutoverPlan.DualReadPlan
+		payload["kv_history_dual_write_plan"] = cutoverPlan.DualWritePlan
+		payload["kv_history_cutover_rollback_plan"] = cutoverPlan.CutoverRollbackPlan
+	}
 	if h.nativeKVHistoryPreviewer != nil {
 		preview, err := h.nativeKVHistoryPreviewer.PreviewNativeKVHistoryRows(r.Context(), snapshot.Namespace, 50)
 		if err != nil {
@@ -1023,7 +1348,7 @@ func (h *Handler) statusNotes() []string {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots, and approved rollback write-back planning remains a non-destructive contract preview.")
 	}
 	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
-	notes = append(notes, "Native kv_history table, migration, and index plans are available as plan-only artifacts; the current TemporalKV adapter still uses the reserved __kv_history__ Ledger KV namespace and does not migrate or write native rows.")
+	notes = append(notes, "Native kv_history table, migration, index, and dual-read/dual-write cutover plans are available as plan-only artifacts; the current TemporalKV adapter still uses the reserved __kv_history__ Ledger KV namespace and does not migrate rows, write native rows, or switch adapters.")
 	if h.nativeKVHistoryPreviewer != nil {
 		notes = append(notes, "Native kv_history migration preview can scan reserved __kv_history__ documents into deterministic future row previews, but it remains read-only and does not create tables, migrate rows, or change TemporalKVStore behavior.")
 	} else {
