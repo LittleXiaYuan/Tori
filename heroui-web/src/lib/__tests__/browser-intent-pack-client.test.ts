@@ -35,12 +35,14 @@ describe("browser-intent-pack-client", () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ text: "page text" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ plan: { browser_act_plan_ready: true, browser_act_ready: false, permission_gate_ready: true, runtime_skill_gate_ready: true, opp_gate_ready: true, consumes_browser_session: false, executes_browser_actions: false, writes_browser_state: false, writes_files: false, network_access: false, artifacts: ["browser-act-plan.json"] } }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ws_url: "ws://localhost:9090/ws/browser", ticket: "t1", nonce: "n1", expires_at: "now", ttl_sec: 120 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "resolved" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, scenario: "open-page", results: [] }), { status: 200 }));
 
     const client = createBrowserIntentPackClient();
     await client.ocr("dom");
+    await client.browserActPlan({ intent: "click", selector: "button.export", requested_by: "unit", dry_run: true });
     await client.extensionSession();
     await client.oppDecide("opp-1", "allow");
     await client.runScenario("open-page");
@@ -48,12 +50,15 @@ describe("browser-intent-pack-client", () => {
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/browser/ocr");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(JSON.parse(String((spy.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ mode: "dom" });
-    expect(spy.mock.calls[1]?.[0]).toBe("/api/browser/ext/session");
+    expect(spy.mock.calls[1]?.[0]).toBe("/v1/browser/intent/plan");
     expect((spy.mock.calls[1]?.[1] as RequestInit).method).toBe("POST");
-    expect(spy.mock.calls[2]?.[0]).toBe("/v1/browser/opp/decide");
-    expect(JSON.parse(String((spy.mock.calls[2]?.[1] as RequestInit).body))).toEqual({ id: "opp-1", decision: "allow" });
-    expect(spy.mock.calls[3]?.[0]).toBe("/api/browser/ext/scenarios/run");
-    expect(JSON.parse(String((spy.mock.calls[3]?.[1] as RequestInit).body))).toEqual({ scenario_id: "open-page" });
+    expect(JSON.parse(String((spy.mock.calls[1]?.[1] as RequestInit).body))).toEqual({ intent: "click", selector: "button.export", requested_by: "unit", dry_run: true });
+    expect(spy.mock.calls[2]?.[0]).toBe("/api/browser/ext/session");
+    expect((spy.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
+    expect(spy.mock.calls[3]?.[0]).toBe("/v1/browser/opp/decide");
+    expect(JSON.parse(String((spy.mock.calls[3]?.[1] as RequestInit).body))).toEqual({ id: "opp-1", decision: "allow" });
+    expect(spy.mock.calls[4]?.[0]).toBe("/api/browser/ext/scenarios/run");
+    expect(JSON.parse(String((spy.mock.calls[4]?.[1] as RequestInit).body))).toEqual({ scenario_id: "open-page" });
   });
 
   it("keeps desktop helpers colocated with the browser pack workspace", async () => {

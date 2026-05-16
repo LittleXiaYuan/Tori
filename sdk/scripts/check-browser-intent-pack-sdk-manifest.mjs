@@ -35,6 +35,12 @@ const client = readRepoFile(manifest.frontend.client);
 for (const token of [
   "createBrowserIntentPackClient",
   "/v1/browser/status",
+  "/v1/browser/intent/plan",
+  "browserActPlan",
+  "browser_act_plan_ready",
+  "permission_gate_ready",
+  "runtime_skill_gate_ready",
+  "opp_gate_ready",
   "/v1/browser/ocr",
   "/v1/browser/opp/decide",
   "/api/browser/ext/session",
@@ -70,6 +76,9 @@ const backend = readRepoFile("internal/packs/browserintent/handler.go")
 for (const token of [
   "const PackID = \"yunque.pack.browser-intent\"",
   "type BrowserGateway interface",
+  "BrowserActPlan",
+  "browser-act-plan-before-runtime",
+  "browser-act-plan.json",
   "HandleBrowserIntentPack",
   "HandleBrowserIntentSession",
   "BackendRouteAuthPassthrough",

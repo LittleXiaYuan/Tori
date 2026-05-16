@@ -90,6 +90,21 @@ export type BrowserActionResult = {
   [key: string]: unknown;
 };
 
+export type BrowserActPlanRequest = {
+  intent?: string;
+  selector?: string;
+  requested_by?: string;
+  dry_run?: boolean;
+};
+
+export type BrowserActPlan = {
+  browser_act_plan_ready: boolean;
+  browser_act_ready: boolean;
+  executes_browser_actions: boolean;
+  planned_actions: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
+
 export type BrowserScenario = {
   id?: string;
   name?: string;
@@ -228,6 +243,10 @@ export class BrowserClient {
 
   extensionAction(action: BrowserAction): Promise<BrowserActionResult> {
     return this.request<BrowserActionResult>("POST", "/api/browser/ext/action", action);
+  }
+
+  browserActPlan(input: BrowserActPlanRequest): Promise<{ plan: BrowserActPlan }> {
+    return this.request("POST", "/v1/browser/intent/plan", input) as Promise<{ plan: BrowserActPlan }>;
   }
 
   scenarios(): Promise<BrowserScenariosResponse> {

@@ -125,6 +125,50 @@ test("BrowserClient supports extension session, action and scenarios", async () 
   assertEqual(calls[4]?.init?.body, JSON.stringify({ scenario_id: "open-page" }));
 });
 
+test("BrowserClient builds non-destructive browser_act plan gate", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createBrowserClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({
+        plan: {
+          status: "browser_act_intent_plan_ready_pending_policy_runtime",
+          stage: "browser-act-plan-before-runtime",
+          intent: "click",
+          browser_act_plan_ready: true,
+          browser_act_ready: false,
+          permission_gate_ready: true,
+          runtime_skill_gate_ready: true,
+          opp_gate_ready: true,
+          consumes_browser_session: false,
+          executes_browser_actions: false,
+          writes_browser_state: false,
+          writes_files: false,
+          network_access: false,
+          requires_human_approval: true,
+          action_count: 1,
+          planned_actions: [{ index: 1, intent: "click", executor_action: "browser.click", requires_permission: "browser:write", requires_runtime_skill: "browser_act", requires_opp_gate: true, consumes_browser_session: false, executes_browser_action: false, writes_browser_state: false, network_access: false }],
+          permission_gate: { permission_gate_ready: true, permission_policy_enforced: false },
+          runtime_skill_gate: { runtime_skill_gate_ready: true, runtime_skill_ready: false },
+          opp_gate: { opp_gate_ready: true, opp_decision_ready: false },
+          artifacts: ["browser-act-plan.json"],
+          blocked_by: ["browser-act-runtime-not-wired"],
+        },
+      });
+    },
+  });
+
+  const res = await client.browserActPlan({ intent: "click", selector: "button.export", requested_by: "sdk-test", dry_run: true });
+
+  assertEqual(res.plan.browser_act_plan_ready, true);
+  assertEqual(res.plan.browser_act_ready, false);
+  assertEqual(res.plan.executes_browser_actions, false);
+  assertEqual(res.plan.planned_actions[0]?.executor_action, "browser.click");
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/browser/intent/plan");
+  assertEqual(calls[0]?.init?.body, JSON.stringify({ intent: "click", selector: "button.export", requested_by: "sdk-test", dry_run: true }));
+});
+
 test("BrowserClient throws BrowserClientError with parsed body", async () => {
   const client = createBrowserClient({
     baseUrl: "http://localhost:9090",
