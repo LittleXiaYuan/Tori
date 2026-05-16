@@ -1,10 +1,11 @@
 // Package memorytimetravel contains the backend implementation for the built-in
 // Memory Time Travel capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
-// point-in-time reconstruction, drift diff summaries, rollback plans, retention
-// dry-run planning, JSON evidence export, read-only Merkle audit-chain
-// verification, and a conservative KV audit proof-link schema placeholder while
-// native Ledger KV kv_history write-back remains a later slice.
+// point-in-time reconstruction, drift diff summaries, rollback plans, approved
+// rollback write-back planning, retention dry-run planning, JSON evidence
+// export, read-only Merkle audit-chain verification, and a conservative KV
+// audit proof-link schema placeholder while native Ledger KV kv_history
+// write-back remains a later slice.
 package memorytimetravel
 
 import (
@@ -182,6 +183,87 @@ type RollbackPlan struct {
 	Notes         []string          `json:"notes,omitempty"`
 }
 
+type RollbackExecutionPlanRequest struct {
+	Namespace   string `json:"namespace,omitempty"`
+	SnapshotID  string `json:"snapshot_id"`
+	RequestedBy string `json:"requested_by,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	ApprovalID  string `json:"approval_id,omitempty"`
+	DryRun      bool   `json:"dry_run,omitempty"`
+}
+
+type RollbackWritebackActionPlan struct {
+	Operation        string    `json:"operation"`
+	Namespace        string    `json:"namespace"`
+	Key              string    `json:"key"`
+	ValueHash        string    `json:"value_hash,omitempty"`
+	ValueBytes       int       `json:"value_bytes,omitempty"`
+	TargetSnapshotID string    `json:"target_snapshot_id"`
+	TemporalVersion  int       `json:"temporal_version"`
+	AuditAction      string    `json:"audit_action"`
+	RequiresApproval bool      `json:"requires_approval"`
+	ApprovalID       string    `json:"approval_id,omitempty"`
+	GeneratedAt      time.Time `json:"generated_at"`
+}
+
+type GlobalApprovalRequestPlan struct {
+	RequestID                   string         `json:"request_id"`
+	RequestKey                  string         `json:"request_key"`
+	TaskID                      string         `json:"task_id,omitempty"`
+	WorkflowID                  string         `json:"workflow_id,omitempty"`
+	StepIndex                   int            `json:"step_index,omitempty"`
+	QueueName                   string         `json:"queue_name"`
+	Category                    string         `json:"category"`
+	RiskLevel                   string         `json:"risk_level"`
+	Summary                     string         `json:"summary"`
+	Details                     map[string]any `json:"details"`
+	Requester                   string         `json:"requester"`
+	TenantID                    string         `json:"tenant_id,omitempty"`
+	Reason                      string         `json:"reason"`
+	RequiredFields              []string       `json:"required_fields"`
+	DecisionStates              []string       `json:"decision_states"`
+	ApprovalManagerEnqueueReady bool           `json:"approval_manager_enqueue_ready"`
+	GlobalApprovalEnqueueReady  bool           `json:"global_approval_enqueue_ready"`
+	ActionReleaseReady          bool           `json:"action_release_ready"`
+	SourceStore                 string         `json:"source_store"`
+	SourceArtifact              string         `json:"source_artifact"`
+	Payload                     map[string]any `json:"payload"`
+	Notes                       []string       `json:"notes,omitempty"`
+}
+
+type ApprovedRollbackExecutionPlanReport struct {
+	PackID                         string                        `json:"pack_id"`
+	GeneratedAt                    time.Time                     `json:"generated_at"`
+	Stage                          string                        `json:"stage"`
+	Status                         string                        `json:"status"`
+	Namespace                      string                        `json:"namespace"`
+	SnapshotID                     string                        `json:"snapshot_id"`
+	RequestedBy                    string                        `json:"requested_by,omitempty"`
+	Reason                         string                        `json:"reason,omitempty"`
+	ApprovalID                     string                        `json:"approval_id,omitempty"`
+	DryRun                         bool                          `json:"dry_run"`
+	ApprovalRequired               bool                          `json:"approval_required"`
+	ApprovalRequestPlanReady       bool                          `json:"approval_request_plan_ready"`
+	ApprovalManagerBridgePlanReady bool                          `json:"approval_manager_bridge_plan_ready"`
+	GlobalApprovalEnqueueReady     bool                          `json:"global_approval_enqueue_ready"`
+	ApprovedRollbackPlanReady      bool                          `json:"approved_rollback_plan_ready"`
+	RollbackWritebackPlanReady     bool                          `json:"rollback_writeback_plan_ready"`
+	RollbackWritebackReady         bool                          `json:"rollback_writeback_ready"`
+	WritesLedgerKV                 bool                          `json:"writes_ledger_kv"`
+	WritesTemporalKV               bool                          `json:"writes_temporal_kv"`
+	MerkleAppendReady              bool                          `json:"merkle_append_ready"`
+	AuditProofLinkReady            bool                          `json:"audit_proof_link_ready"`
+	ActionCount                    int                           `json:"action_count"`
+	PreviewValues                  map[string]string             `json:"preview_values,omitempty"`
+	RollbackPlan                   RollbackPlan                  `json:"rollback_plan"`
+	ProposedApprovalRequest        GlobalApprovalRequestPlan     `json:"proposed_approval_request"`
+	WritebackActions               []RollbackWritebackActionPlan `json:"writeback_actions"`
+	Artifacts                      []string                      `json:"artifacts"`
+	Actions                        []string                      `json:"actions"`
+	Labels                         []string                      `json:"labels"`
+	Notes                          []string                      `json:"notes,omitempty"`
+}
+
 type RetentionCandidate struct {
 	ID        string    `json:"id"`
 	Namespace string    `json:"namespace"`
@@ -328,6 +410,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/snapshot-at", Handler: h.SnapshotAt},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff", Handler: h.Diff},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan", Handler: h.RollbackPlan},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan", Handler: h.ApprovedRollbackPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links", Handler: h.AuditLinks},
@@ -355,6 +438,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.snapshot_at.reconstruct",
 		"memory.drift.diff",
 		"memory.rollback.plan",
+		"memory.rollback.approved_plan",
+		"memory.rollback.writeback.plan",
 		"memory.retention.plan",
 		"memory.retention.prune_plan",
 		"memory.audit.links.schema",
@@ -364,50 +449,64 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		capabilities = append(capabilities, "memory.audit.verify")
 	}
 	writeJSON(w, http.StatusOK, statusResponse{
-		PackID:                        PackID,
-		Stage:                         "pack-shell-before-ledger-kv-history",
-		SnapshotStoreReady:            true,
-		TemporalQueryReady:            true,
-		LedgerHistoryReady:            h.temporalKV != nil,
-		MerkleVerificationReady:       h.merkleVerifier != nil,
-		MemoryPersisterWritebackReady: h.memoryPersisterWriteback,
-		RollbackWritebackReady:        false,
-		RetentionPlanReady:            true,
-		RetentionPrunePlanReady:       true,
-		RetentionPruneReady:           false,
-		KVAuditLinkSchemaReady:        true,
-		KVAuditLinkageReady:           false,
-		SnapshotCount:                 len(snapshots),
-		NamespaceCount:                len(namespaces),
-		StoreDir:                      h.dataDir,
-		Policy:                        h.policy,
-		LastSnapshot:                  firstSnapshot(snapshots),
-		Capabilities:                  capabilities,
-		Notes:                         h.statusNotes(),
+		PackID:                         PackID,
+		Stage:                          "pack-shell-before-ledger-kv-history",
+		SnapshotStoreReady:             true,
+		TemporalQueryReady:             true,
+		LedgerHistoryReady:             h.temporalKV != nil,
+		MerkleVerificationReady:        h.merkleVerifier != nil,
+		MemoryPersisterWritebackReady:  h.memoryPersisterWriteback,
+		ApprovedRollbackPlanReady:      true,
+		ApprovalRequestPlanReady:       true,
+		ApprovalManagerBridgePlanReady: true,
+		GlobalApprovalEnqueueReady:     false,
+		RollbackWritebackPlanReady:     true,
+		RollbackWritebackReady:         false,
+		WritesLedgerKV:                 false,
+		WritesTemporalKV:               false,
+		RetentionPlanReady:             true,
+		RetentionPrunePlanReady:        true,
+		RetentionPruneReady:            false,
+		KVAuditLinkSchemaReady:         true,
+		KVAuditLinkageReady:            false,
+		SnapshotCount:                  len(snapshots),
+		NamespaceCount:                 len(namespaces),
+		StoreDir:                       h.dataDir,
+		Policy:                         h.policy,
+		LastSnapshot:                   firstSnapshot(snapshots),
+		Capabilities:                   capabilities,
+		Notes:                          h.statusNotes(),
 	})
 }
 
 type statusResponse struct {
-	PackID                        string           `json:"pack_id"`
-	Stage                         string           `json:"stage"`
-	SnapshotStoreReady            bool             `json:"snapshot_store_ready"`
-	TemporalQueryReady            bool             `json:"temporal_query_ready"`
-	LedgerHistoryReady            bool             `json:"ledger_history_ready"`
-	MerkleVerificationReady       bool             `json:"merkle_verification_ready"`
-	MemoryPersisterWritebackReady bool             `json:"memory_persister_writeback_ready"`
-	RollbackWritebackReady        bool             `json:"rollback_writeback_ready"`
-	RetentionPlanReady            bool             `json:"retention_plan_ready"`
-	RetentionPrunePlanReady       bool             `json:"retention_prune_plan_ready"`
-	RetentionPruneReady           bool             `json:"retention_prune_ready"`
-	KVAuditLinkSchemaReady        bool             `json:"kv_audit_link_schema_ready"`
-	KVAuditLinkageReady           bool             `json:"kv_audit_linkage_ready"`
-	SnapshotCount                 int              `json:"snapshot_count"`
-	NamespaceCount                int              `json:"namespace_count"`
-	StoreDir                      string           `json:"store_dir"`
-	Policy                        RetentionPolicy  `json:"policy"`
-	LastSnapshot                  *SnapshotSummary `json:"last_snapshot"`
-	Capabilities                  []string         `json:"capabilities"`
-	Notes                         []string         `json:"notes"`
+	PackID                         string           `json:"pack_id"`
+	Stage                          string           `json:"stage"`
+	SnapshotStoreReady             bool             `json:"snapshot_store_ready"`
+	TemporalQueryReady             bool             `json:"temporal_query_ready"`
+	LedgerHistoryReady             bool             `json:"ledger_history_ready"`
+	MerkleVerificationReady        bool             `json:"merkle_verification_ready"`
+	MemoryPersisterWritebackReady  bool             `json:"memory_persister_writeback_ready"`
+	ApprovedRollbackPlanReady      bool             `json:"approved_rollback_plan_ready"`
+	ApprovalRequestPlanReady       bool             `json:"approval_request_plan_ready"`
+	ApprovalManagerBridgePlanReady bool             `json:"approval_manager_bridge_plan_ready"`
+	GlobalApprovalEnqueueReady     bool             `json:"global_approval_enqueue_ready"`
+	RollbackWritebackPlanReady     bool             `json:"rollback_writeback_plan_ready"`
+	RollbackWritebackReady         bool             `json:"rollback_writeback_ready"`
+	WritesLedgerKV                 bool             `json:"writes_ledger_kv"`
+	WritesTemporalKV               bool             `json:"writes_temporal_kv"`
+	RetentionPlanReady             bool             `json:"retention_plan_ready"`
+	RetentionPrunePlanReady        bool             `json:"retention_prune_plan_ready"`
+	RetentionPruneReady            bool             `json:"retention_prune_ready"`
+	KVAuditLinkSchemaReady         bool             `json:"kv_audit_link_schema_ready"`
+	KVAuditLinkageReady            bool             `json:"kv_audit_linkage_ready"`
+	SnapshotCount                  int              `json:"snapshot_count"`
+	NamespaceCount                 int              `json:"namespace_count"`
+	StoreDir                       string           `json:"store_dir"`
+	Policy                         RetentionPolicy  `json:"policy"`
+	LastSnapshot                   *SnapshotSummary `json:"last_snapshot"`
+	Capabilities                   []string         `json:"capabilities"`
+	Notes                          []string         `json:"notes"`
 }
 
 func (h *Handler) Snapshots(w http.ResponseWriter, r *http.Request) {
@@ -547,6 +646,24 @@ func (h *Handler) RollbackPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) ApprovedRollbackPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RollbackExecutionPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid approved rollback plan payload")
+		return
+	}
+	plan, err := h.buildApprovedRollbackPlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) RetentionPlan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -630,9 +747,27 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "retention-plan.json", "retention-prune-plan.json", "audit-links.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "audit-links.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
+	}
+	if rollbackPlan, err := h.buildRollbackPlan(RollbackPlanRequest{Namespace: snapshot.Namespace, SnapshotID: snapshot.ID, DryRun: true}); err != nil {
+		payload["rollback_plan_error"] = err.Error()
+	} else {
+		payload["rollback_plan"] = rollbackPlan
+	}
+	if approvedRollbackPlan, err := h.buildApprovedRollbackPlan(RollbackExecutionPlanRequest{
+		Namespace:   snapshot.Namespace,
+		SnapshotID:  snapshot.ID,
+		RequestedBy: "evidence-export",
+		Reason:      "evidence-export-preview",
+		DryRun:      true,
+	}); err != nil {
+		payload["approved_rollback_plan_error"] = err.Error()
+	} else {
+		payload["approved_rollback_plan"] = approvedRollbackPlan
+		payload["rollback_writeback_plan"] = approvedRollbackPlan.WritebackActions
+		payload["approval_request_plan"] = approvedRollbackPlan.ProposedApprovalRequest
 	}
 	if retentionPlan, err := h.buildRetentionPlan(snapshot.Namespace); err != nil {
 		payload["retention_plan_error"] = err.Error()
@@ -662,15 +797,15 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) statusNotes() []string {
-	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, retention dry-run planning, and evidence export are available."}
+	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, approved rollback write-back planning, retention dry-run planning, and evidence export are available."}
 	if h.temporalKV != nil {
 		if h.memoryPersisterWriteback {
-			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; native kv_history tables, retention prune execution, cron scheduling, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; approved rollback write-back planning is shaped, while native kv_history tables, retention prune execution, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
 		} else {
-			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; Memory Persister write-back, native kv_history tables, retention prune execution, cron scheduling, and approved rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; approved rollback write-back planning is shaped, while Memory Persister write-back, native kv_history tables, retention prune execution, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
 		}
 	} else {
-		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots.")
+		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots, and approved rollback write-back planning remains a non-destructive contract preview.")
 	}
 	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
 	notes = append(notes, "KV audit proof-link schema is exposed as a placeholder; native kv_history rows are not yet joined to per-KV Merkle proofs.")
@@ -883,6 +1018,146 @@ func (h *Handler) buildRollbackPlan(req RollbackPlanRequest) (RollbackPlan, erro
 		Status:        status,
 		Notes:         []string{"Rollback write-back is intentionally not connected in this pack shell; execute through Ledger KV after approval in a later slice."},
 	}, nil
+}
+
+func (h *Handler) buildApprovedRollbackPlan(req RollbackExecutionPlanRequest) (ApprovedRollbackExecutionPlanReport, error) {
+	rollbackPlan, err := h.buildRollbackPlan(RollbackPlanRequest{
+		Namespace:  req.Namespace,
+		SnapshotID: req.SnapshotID,
+		DryRun:     true,
+	})
+	if err != nil {
+		return ApprovedRollbackExecutionPlanReport{}, err
+	}
+	generatedAt := h.now().UTC()
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "approved rollback execution requires operator review"
+	}
+	approvalID := strings.TrimSpace(req.ApprovalID)
+	values := make(map[string]string, len(rollbackPlan.PreviewValues))
+	keys := make([]string, 0, len(rollbackPlan.PreviewValues))
+	for key, value := range rollbackPlan.PreviewValues {
+		values[key] = value
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	writebacks := make([]RollbackWritebackActionPlan, 0, len(keys))
+	for idx, key := range keys {
+		value := values[key]
+		writebacks = append(writebacks, RollbackWritebackActionPlan{
+			Operation:        "ledger_kv_put_versioned_preview",
+			Namespace:        rollbackPlan.Namespace,
+			Key:              key,
+			ValueHash:        valueHash(value),
+			ValueBytes:       len([]byte(value)),
+			TargetSnapshotID: rollbackPlan.SnapshotID,
+			TemporalVersion:  idx + 1,
+			AuditAction:      "memory_time_travel.rollback_writeback.plan",
+			RequiresApproval: true,
+			ApprovalID:       approvalID,
+			GeneratedAt:      generatedAt,
+		})
+	}
+	status := "approved_rollback_writeback_plan"
+	if approvalID == "" {
+		status = "approval_required_before_writeback"
+	}
+	approvalRequest := h.rollbackApprovalRequestPlan(rollbackPlan, requestedBy, reason, approvalID, generatedAt, keys)
+	return ApprovedRollbackExecutionPlanReport{
+		PackID:                         PackID,
+		GeneratedAt:                    generatedAt,
+		Stage:                          "pack-shell-before-approved-rollback-writeback",
+		Status:                         status,
+		Namespace:                      rollbackPlan.Namespace,
+		SnapshotID:                     rollbackPlan.SnapshotID,
+		RequestedBy:                    requestedBy,
+		Reason:                         reason,
+		ApprovalID:                     approvalID,
+		DryRun:                         true,
+		ApprovalRequired:               true,
+		ApprovalRequestPlanReady:       true,
+		ApprovalManagerBridgePlanReady: true,
+		GlobalApprovalEnqueueReady:     false,
+		ApprovedRollbackPlanReady:      true,
+		RollbackWritebackPlanReady:     true,
+		RollbackWritebackReady:         false,
+		WritesLedgerKV:                 false,
+		WritesTemporalKV:               false,
+		MerkleAppendReady:              false,
+		AuditProofLinkReady:            false,
+		ActionCount:                    len(writebacks),
+		PreviewValues:                  values,
+		RollbackPlan:                   rollbackPlan,
+		ProposedApprovalRequest:        approvalRequest,
+		WritebackActions:               writebacks,
+		Artifacts:                      []string{"approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "rollback-plan.json", "snapshot.json"},
+		Actions: []string{
+			"map the selected snapshot into versioned Ledger KV put previews",
+			"shape a future global Approval Manager request for the rollback execution",
+			"keep Ledger KV writes, temporal KV writes, Merkle append, and runtime memory mutation blocked until explicit execution wiring consumes an approved request",
+		},
+		Labels: []string{"memory-time-travel", "approved-rollback", "writeback-plan", "plan-only", "no-ledger-write", "no-merkle-append"},
+		Notes: []string{
+			"This route is a non-destructive approved rollback execution plan; it does not write Ledger KV, Temporal KV, pack-local snapshots, or live memory.",
+			"The proposed approval request follows the global Approval Manager field shape (risk_level/requester/details), but global_approval_enqueue_ready remains false.",
+			"Use approved-rollback-plan.json and rollback-writeback-plan.json as the contract for a later audited rollback executor.",
+		},
+	}, nil
+}
+
+func (h *Handler) rollbackApprovalRequestPlan(plan RollbackPlan, requestedBy, reason, approvalID string, generatedAt time.Time, keys []string) GlobalApprovalRequestPlan {
+	requestKey := strings.TrimSpace(approvalID)
+	if requestKey == "" {
+		requestKey = deterministicID("memory-rollback-request", plan.Namespace, plan.SnapshotID, strings.Join(keys, ","), requestedBy, reason)
+	}
+	requestID := requestKey
+	if len(requestID) > 48 {
+		requestID = requestID[:48]
+	}
+	details := map[string]any{
+		"pack_id":             PackID,
+		"namespace":           plan.Namespace,
+		"snapshot_id":         plan.SnapshotID,
+		"key_count":           len(keys),
+		"keys":                keys,
+		"dry_run":             true,
+		"writes_ledger_kv":    false,
+		"writes_temporal_kv":  false,
+		"merkle_append_ready": false,
+		"generated_at":        generatedAt,
+	}
+	return GlobalApprovalRequestPlan{
+		RequestID:                   requestID,
+		RequestKey:                  requestKey,
+		QueueName:                   "memory_time_travel_rollback",
+		Category:                    "data_mutation",
+		RiskLevel:                   "high",
+		Summary:                     fmt.Sprintf("Approve Memory Time Travel rollback to snapshot %s", plan.SnapshotID),
+		Details:                     details,
+		Requester:                   requestedBy,
+		Reason:                      reason,
+		RequiredFields:              []string{"id", "category", "risk_level", "summary", "details", "requester", "tenant_id"},
+		DecisionStates:              []string{"pending", "approved", "denied", "expired"},
+		ApprovalManagerEnqueueReady: false,
+		GlobalApprovalEnqueueReady:  false,
+		ActionReleaseReady:          false,
+		SourceStore:                 "pack-local-memory-snapshot",
+		SourceArtifact:              "approved-rollback-plan.json",
+		Payload: map[string]any{
+			"rollback_plan":           plan,
+			"rollback_writeback_plan": "rollback-writeback-plan.json",
+		},
+		Notes: []string{
+			"Approval request is plan-only and is not enqueued into the global Approval Manager.",
+			"Ledger KV write-back, Merkle audit append, and runtime memory mutation remain blocked until a later executor consumes an approved request.",
+		},
+	}
 }
 
 func (h *Handler) buildRetentionPlan(namespace string) (RetentionPlanReport, error) {
@@ -1163,6 +1438,12 @@ func (h *Handler) diffID(baseID, targetID string, entries []DiffEntry) string {
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(seed))
 	return fmt.Sprintf("memory-diff-%08x", hash.Sum32())
+}
+
+func deterministicID(prefix string, parts ...string) string {
+	seed := strings.Join(parts, ":")
+	sum := sha256.Sum256([]byte(seed))
+	return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(sum[:])[:16])
 }
 
 func normalizeNamespace(namespace string) string {

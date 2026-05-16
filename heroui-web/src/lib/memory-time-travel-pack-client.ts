@@ -42,7 +42,14 @@ export interface MemoryTimeTravelStatus {
   ledger_history_ready: boolean;
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
+  approved_rollback_plan_ready?: boolean;
+  approval_request_plan_ready?: boolean;
+  approval_manager_bridge_plan_ready?: boolean;
+  global_approval_enqueue_ready?: boolean;
+  rollback_writeback_plan_ready?: boolean;
   rollback_writeback_ready: boolean;
+  writes_ledger_kv?: boolean;
+  writes_temporal_kv?: boolean;
   retention_plan_ready?: boolean;
   retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
@@ -181,6 +188,87 @@ export interface MemoryTimeTravelRollbackPlan {
   notes?: string[];
 }
 
+export interface MemoryTimeTravelApprovedRollbackPlanInput {
+  namespace?: string;
+  snapshot_id: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  dry_run?: boolean;
+}
+
+export interface MemoryTimeTravelRollbackWritebackActionPlan {
+  operation: string;
+  namespace: string;
+  key: string;
+  value_hash?: string;
+  value_bytes?: number;
+  target_snapshot_id: string;
+  temporal_version: number;
+  audit_action: string;
+  requires_approval: boolean;
+  approval_id?: string;
+  generated_at: string;
+}
+
+export interface MemoryTimeTravelGlobalApprovalRequestPlan {
+  request_id: string;
+  request_key: string;
+  task_id?: string;
+  workflow_id?: string;
+  step_index?: number;
+  queue_name: string;
+  category: string;
+  risk_level: string;
+  summary: string;
+  details: Record<string, unknown>;
+  requester: string;
+  tenant_id?: string;
+  reason: string;
+  required_fields: string[];
+  decision_states: string[];
+  approval_manager_enqueue_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  action_release_ready: boolean;
+  source_store: string;
+  source_artifact: string;
+  payload: Record<string, unknown>;
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelApprovedRollbackPlan {
+  pack_id: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  namespace: string;
+  snapshot_id: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  dry_run: boolean;
+  approval_required: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  approved_rollback_plan_ready: boolean;
+  rollback_writeback_plan_ready: boolean;
+  rollback_writeback_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  action_count: number;
+  preview_values?: Record<string, string>;
+  rollback_plan: MemoryTimeTravelRollbackPlan;
+  proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
+  writeback_actions: MemoryTimeTravelRollbackWritebackActionPlan[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface MemoryTimeTravelRetentionCandidate {
   id: string;
   namespace: string;
@@ -249,11 +337,12 @@ export interface MemoryTimeTravelPackClient {
   snapshotAt(input: MemoryTimeTravelSnapshotAtInput): Promise<MemoryTimeTravelSnapshotAtResponse>;
   diff(input: MemoryTimeTravelDiffInput): Promise<{ diff: MemoryTimeTravelDiffReport }>;
   rollbackPlan(input: MemoryTimeTravelRollbackPlanInput): Promise<{ plan: MemoryTimeTravelRollbackPlan }>;
+  approvedRollbackPlan(input: MemoryTimeTravelApprovedRollbackPlanInput): Promise<{ plan: MemoryTimeTravelApprovedRollbackPlan }>;
   retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
+  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; rollback_plan?: MemoryTimeTravelRollbackPlan; rollback_plan_error?: string; approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan; approved_rollback_plan_error?: string; rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[]; approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
 }
 
 function enc(value: string): string {
@@ -293,6 +382,11 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    approvedRollbackPlan: (input) =>
+      fetcher<{ plan: MemoryTimeTravelApprovedRollbackPlan }>("/v1/memory-time-travel/rollback/approved-plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     retentionPlan: (namespace) =>
       fetcher<{ plan: MemoryTimeTravelRetentionPlan }>(`/v1/memory-time-travel/retention/plan${query({ namespace })}`),
     retentionPrunePlan: (input = {}) =>
@@ -305,7 +399,7 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
     auditVerify: (limit) =>
       fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
+      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; rollback_plan?: MemoryTimeTravelRollbackPlan; rollback_plan_error?: string; approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan; approved_rollback_plan_error?: string; rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[]; approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
         `/v1/memory-time-travel/evidence/${enc(id)}`,
       ),
   };
