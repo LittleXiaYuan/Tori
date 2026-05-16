@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Input, Spinner, TextArea, TextField } from "@heroui/react";
-import { AlertTriangle, Clock3, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2, UnlockKeyhole } from "lucide-react";
+import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link2, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2, UnlockKeyhole } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -35,12 +35,13 @@ export default function MemoryTimeTravelPackPage() {
   const [status, setStatus] = useState<MemoryTimeTravelStatus | null>(null);
   const [auditVerification, setAuditVerification] = useState<MemoryTimeTravelAuditVerification | null>(null);
   const [auditLinks, setAuditLinks] = useState<MemoryTimeTravelKVAuditLinksReport | null>(null);
+  const [nativeKVHistoryPlan, setNativeKVHistoryPlan] = useState<MemoryTimeTravelNativeKVHistoryPlan | null>(null);
   const [approvedRollbackPlan, setApprovedRollbackPlan] = useState<MemoryTimeTravelApprovedRollbackPlan | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "retention" | "retention-prune" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "native-kv-history" | "retention" | "retention-prune" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -261,6 +262,20 @@ export default function MemoryTimeTravelPackPage() {
     }
   };
 
+  const buildNativeKVHistoryPlan = async () => {
+    setBusy("native-kv-history");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.nativeKVHistoryPlan(namespace);
+      setNativeKVHistoryPlan(res.plan);
+      showToast("已生成 Native kv_history plan（未迁移、未写表）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 native kv_history plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -279,7 +294,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、Native kv_history plan、KV audit proof-link schema 占位、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、retention prune/cron、逐条 KV 审计证明和真实写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -296,7 +311,7 @@ export default function MemoryTimeTravelPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">命名空间</div><div className="kpi-value">{status?.namespace_count ?? 0}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">KV audit links</div><div className="kpi-value text-lg">{status?.kv_audit_link_schema_ready ? "schema" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Native kv_history</div><div className="kpi-value text-lg">{status?.native_kv_history_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
       <Card className="section-card p-4">
@@ -331,6 +346,35 @@ export default function MemoryTimeTravelPackPage() {
         ) : (
           <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
             尚未生成 approved rollback write-back plan。该入口只塑形审批与写回契约，用于后续接入真实 Approval Manager + Ledger KV executor。
+          </div>
+        )}
+      </Card>
+
+      <Card className="section-card p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><DatabaseZap size={16} />Native kv_history plan</div>
+            <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              从当前 reserved `__kv_history__` TemporalKV adapter 推导未来原生 Ledger `kv_history` 表、索引和 migration plan；只输出 native-kv-history-plan.json / kv-history-migration-plan.json / kv-history-index-plan.json，不建表、不迁移、不写 native rows。
+            </div>
+          </div>
+          <Button variant="outline" isPending={busy === "native-kv-history"} onPress={buildNativeKVHistoryPlan}><DatabaseZap size={14} />生成 native 计划</Button>
+        </div>
+        {nativeKVHistoryPlan ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: nativeKVHistoryPlan.native_kv_history_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: nativeKVHistoryPlan.native_kv_history_ready ? "#22c55e" : "#facc15" }}>{nativeKVHistoryPlan.status}</Chip>
+              <div className="mt-3 text-2xl font-semibold">{nativeKVHistoryPlan.schema_plan.length}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>columns · indexes {nativeKVHistoryPlan.kv_history_index_plan.length}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes_native_kv_history {String(nativeKVHistoryPlan.writes_native_kv_history)} · migrates {String(nativeKVHistoryPlan.migrates_kv_history)}</div>
+            </div>
+            <TextField value={JSON.stringify(nativeKVHistoryPlan, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel native kv_history plan JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+            尚未生成 Native kv_history plan。该入口用于把当前 `__kv_history__` 适配层升级路径固化成可审计契约，真实 Ledger schema migration 会在后续切片单独接入。
           </div>
         )}
       </Card>

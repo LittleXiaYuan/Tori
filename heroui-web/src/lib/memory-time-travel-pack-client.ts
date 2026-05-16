@@ -40,6 +40,13 @@ export interface MemoryTimeTravelStatus {
   snapshot_store_ready: boolean;
   temporal_query_ready: boolean;
   ledger_history_ready: boolean;
+  temporal_kv_adapter_ready?: boolean;
+  native_kv_history_plan_ready?: boolean;
+  kv_history_migration_plan_ready?: boolean;
+  kv_history_index_plan_ready?: boolean;
+  native_kv_history_ready?: boolean;
+  writes_native_kv_history?: boolean;
+  migrates_kv_history?: boolean;
   merkle_verification_ready: boolean;
   memory_persister_writeback_ready?: boolean;
   approved_rollback_plan_ready?: boolean;
@@ -109,6 +116,62 @@ export interface MemoryTimeTravelKVAuditLinksReport {
   source: string;
   kv_audit_links: MemoryTimeTravelKVAuditProofLink[];
   required_fields: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelNativeKVHistoryColumnPlan {
+  name: string;
+  type: string;
+  nullable: boolean;
+  purpose: string;
+}
+
+export interface MemoryTimeTravelNativeKVHistoryIndexPlan {
+  name: string;
+  columns: string[];
+  unique?: boolean;
+  purpose: string;
+}
+
+export interface MemoryTimeTravelKVHistoryMigrationStepPlan {
+  step: number;
+  name: string;
+  from: string;
+  to: string;
+  dry_run: boolean;
+  writes: boolean;
+  status: string;
+  description: string;
+}
+
+export interface MemoryTimeTravelNativeKVHistoryPlan {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  source: string;
+  current_adapter: string;
+  current_history_namespace: string;
+  native_table: string;
+  temporal_kv_adapter_ready: boolean;
+  native_kv_history_plan_ready: boolean;
+  kv_history_migration_plan_ready: boolean;
+  kv_history_index_plan_ready: boolean;
+  native_kv_history_ready: boolean;
+  writes_native_kv_history: boolean;
+  migrates_kv_history: boolean;
+  uses_reserved_kv_namespace: boolean;
+  snapshot_store_ready: boolean;
+  retention_plan_ready: boolean;
+  audit_proof_link_schema_ready: boolean;
+  schema_plan: MemoryTimeTravelNativeKVHistoryColumnPlan[];
+  kv_history_index_plan: MemoryTimeTravelNativeKVHistoryIndexPlan[];
+  kv_history_migration_plan: MemoryTimeTravelKVHistoryMigrationStepPlan[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
   notes?: string[];
 }
 
@@ -329,6 +392,31 @@ export interface MemoryTimeTravelRetentionPrunePlan {
   notes?: string[];
 }
 
+export interface MemoryTimeTravelEvidenceResponse {
+  pack_id: string;
+  exported_at: string;
+  format: string;
+  files: string[];
+  snapshot: MemoryTimeTravelSnapshot;
+  history: MemoryTimeTravelSnapshotSummary[];
+  rollback_plan?: MemoryTimeTravelRollbackPlan;
+  rollback_plan_error?: string;
+  approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan;
+  approved_rollback_plan_error?: string;
+  rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[];
+  approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan;
+  retention_plan?: MemoryTimeTravelRetentionPlan;
+  retention_plan_error?: string;
+  retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
+  native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
+  kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
+  kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
+  kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport;
+  kv_audit_links?: MemoryTimeTravelKVAuditProofLink[];
+  audit_verification?: MemoryTimeTravelAuditVerification;
+  audit_verification_error?: string;
+}
+
 export interface MemoryTimeTravelPackClient {
   status(): Promise<MemoryTimeTravelStatus>;
   snapshots(namespace?: string): Promise<{ snapshots: MemoryTimeTravelSnapshotSummary[]; count: number }>;
@@ -340,9 +428,10 @@ export interface MemoryTimeTravelPackClient {
   approvedRollbackPlan(input: MemoryTimeTravelApprovedRollbackPlanInput): Promise<{ plan: MemoryTimeTravelApprovedRollbackPlan }>;
   retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
+  nativeKVHistoryPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>;
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
-  evidence(id: string): Promise<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; rollback_plan?: MemoryTimeTravelRollbackPlan; rollback_plan_error?: string; approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan; approved_rollback_plan_error?: string; rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[]; approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>;
+  evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse>;
 }
 
 function enc(value: string): string {
@@ -394,13 +483,13 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    nativeKVHistoryPlan: (namespace) =>
+      fetcher<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>(`/v1/memory-time-travel/kv-history/native-plan${query({ namespace })}`),
     auditLinks: (namespace) =>
       fetcher<{ links: MemoryTimeTravelKVAuditLinksReport }>(`/v1/memory-time-travel/audit/links${query({ namespace })}`),
     auditVerify: (limit) =>
       fetcher<MemoryTimeTravelAuditVerification>(`/v1/memory-time-travel/audit/verify${query({ limit: limit ? String(limit) : undefined })}`),
     evidence: (id) =>
-      fetcher<{ pack_id: string; exported_at: string; format: string; files: string[]; snapshot: MemoryTimeTravelSnapshot; history: MemoryTimeTravelSnapshotSummary[]; rollback_plan?: MemoryTimeTravelRollbackPlan; rollback_plan_error?: string; approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan; approved_rollback_plan_error?: string; rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[]; approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan; retention_plan?: MemoryTimeTravelRetentionPlan; retention_plan_error?: string; retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan; kv_audit_link_schema?: MemoryTimeTravelKVAuditLinksReport; kv_audit_links?: MemoryTimeTravelKVAuditProofLink[]; audit_verification?: MemoryTimeTravelAuditVerification; audit_verification_error?: string }>(
-        `/v1/memory-time-travel/evidence/${enc(id)}`,
-      ),
+      fetcher<MemoryTimeTravelEvidenceResponse>(`/v1/memory-time-travel/evidence/${enc(id)}`),
   };
 }

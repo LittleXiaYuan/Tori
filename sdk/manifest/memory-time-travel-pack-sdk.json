@@ -14,6 +14,7 @@
     "POST /v1/memory-time-travel/rollback/approved-plan",
     "GET /v1/memory-time-travel/retention/plan",
     "POST /v1/memory-time-travel/retention/prune-plan",
+    "GET /v1/memory-time-travel/kv-history/native-plan",
     "GET /v1/memory-time-travel/audit/links",
     "GET /v1/memory-time-travel/audit/verify",
     "GET /v1/memory-time-travel/evidence/"
@@ -33,6 +34,7 @@
     "rollbackWritebackPlan",
     "retentionPlan",
     "retentionPrunePlan",
+    "nativeKVHistoryPlan",
     "auditLinks",
     "auditVerify",
     "evidenceExport"
