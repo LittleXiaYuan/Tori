@@ -28,6 +28,7 @@ if (pack.defaultState !== "disabled") fail("Cognitive Canary pack should stay de
 if (pack.metadata?.stage !== "pack-shell-before-shadow-traffic") fail("Cognitive Canary pack should declare pack-shell-before-shadow-traffic stage");
 if (pack.metadata?.blueprint !== "doc/COGNITIVE-CANARY.md") fail("Cognitive Canary pack should point to doc/COGNITIVE-CANARY.md");
 if (!(pack.backend?.capabilities ?? []).includes("cognitive_canary.response_collector.plan")) fail("Cognitive Canary pack should expose response collector plan capability");
+if (!(pack.backend?.capabilities ?? []).includes("cognitive_canary.response_collector.writeback")) fail("Cognitive Canary pack should expose response collector writeback capability");
 
 const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
 for (const route of manifest.routes ?? []) {
@@ -41,13 +42,20 @@ for (const token of [
   "/v1/cognitive-canary/scenarios",
   "/v1/cognitive-canary/evaluate",
   "/v1/cognitive-canary/shadow/plan",
+  "/v1/cognitive-canary/response-collector/writeback",
   "/v1/cognitive-canary/reports",
   "/v1/cognitive-canary/evidence/",
   "shadowPlan",
+  "responseCollectorWriteback",
   "shadow_plan_ready",
   "response_collector_plan_ready",
+  "response_collector_store_ready",
+  "response_collector_writeback_ready",
+  "writes_response_collector_store",
+  "response_collector_store",
   "response_collector_summary",
   "response_collectors",
+  "response_collector_records",
   "artifact_sha256",
   "writes_files",
   "judge_plan_ready",
@@ -66,9 +74,12 @@ if (!page.includes("createCognitiveCanaryPackClient") || page.includes('from "@/
 for (const token of ["Cognitive Canary", "保存 Scenarios", "运行评估", "导出证据包", "Plan shell", "Shadow 计划", "response collector", "writes_files"]) {
   if (!page.includes(token)) fail(`Cognitive Canary pack page missing product token: ${token}`);
 }
+for (const token of ["写入 Collector Store", "responseCollectorWriteback", "collectorWriteback", "response_collector_store", "response-collector-store.json", "response-collector-record.json"]) {
+  if (!page.includes(token)) fail(`Cognitive Canary pack page missing response collector writeback token: ${token}`);
+}
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
-for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/evidence/canary-1", "response_collector_summary", "artifact_sha256", "response-collector-plan.json"]) {
+for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/response-collector/writeback", "/v1/cognitive-canary/evidence/canary-1", "response_collector_summary", "artifact_sha256", "response-collector-plan.json", "response-collector-store.json", "writes_response_collector_store"]) {
   if (!frontendTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
 }
 
@@ -79,15 +90,22 @@ const backend = readRepoFile("internal/packs/cognitivecanary/handler.go")
 for (const token of [
   "const PackID = \"yunque.pack.cognitive-canary\"",
   "/v1/cognitive-canary/shadow/plan",
+  "/v1/cognitive-canary/response-collector/writeback",
   "shadow_plan_ready",
   "shadow_traffic_ready",
   "judge_plan_ready",
   "judge_pipeline_ready",
   "response_collector_plan_ready",
+  "response_collector_store_ready",
+  "response_collector_writeback_ready",
+  "writes_response_collector_store",
   "response_collector_ready",
+  "canary.response_collector.writeback",
   "canary.response_collector.plan",
   "response_collectors",
   "response_collector_summary",
+  "response_collector_store",
+  "response_collector_records",
   "artifact_sha256",
   "writes_files",
   "metrics_plan_ready",
@@ -102,6 +120,8 @@ for (const token of [
   "json-cognitive-canary-evidence",
   "shadow-plan.json",
   "response-collector-plan.json",
+  "response-collector-store.json",
+  "response-collector-record.json",
   "judge-plan.json",
   "metrics-plan.json",
   "rollback-plan.json",
@@ -122,12 +142,18 @@ for (const token of [
   "/v1/cognitive-canary/status",
   "/v1/cognitive-canary/evaluate",
   "/v1/cognitive-canary/shadow/plan",
+  "/v1/cognitive-canary/response-collector/writeback",
   "/v1/cognitive-canary/evidence/",
   "shadowPlan",
+  "responseCollectorWriteback",
   "CognitiveCanaryShadowPlan",
   "CognitiveCanaryResponseCollectorPlan",
+  "CognitiveCanaryResponseCollectorWritebackReport",
   "response_collector_plan_ready",
+  "response_collector_writeback_ready",
+  "writes_response_collector_store",
   "response_collectors",
+  "response_collector_store",
   "artifact_sha256",
   "writes_files",
   "Cognitive Canary request failed",

@@ -6,7 +6,7 @@ import { Activity, AlertTriangle, CalendarClock, Download, GitCompareArrows, Ref
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryScenario, type CognitiveCanaryShadowPlan, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
+import { createCognitiveCanaryPackClient, type CognitiveCanaryReport, type CognitiveCanaryReportSummary, type CognitiveCanaryResponseCollectorWritebackReport, type CognitiveCanaryScenario, type CognitiveCanaryShadowPlan, type CognitiveCanaryStatus } from "@/lib/cognitive-canary-pack-client";
 
 const cognitiveCanaryPack = createCognitiveCanaryPackClient();
 
@@ -60,7 +60,7 @@ export default function CognitiveCanaryPackPage() {
   const [reports, setReports] = useState<CognitiveCanaryReportSummary[]>([]);
   const [scenarios, setScenarios] = useState<CognitiveCanaryScenario[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"scenarios" | "evaluate" | "shadow" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"scenarios" | "evaluate" | "shadow" | "collector" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scenarioJSON, setScenarioJSON] = useState(sampleScenarios);
   const [scenarioIDs, setScenarioIDs] = useState("troubleshooting-summary,tool-safety-decision");
@@ -68,6 +68,7 @@ export default function CognitiveCanaryPackPage() {
   const [stableVersion, setStableVersion] = useState("1.0.0");
   const [report, setReport] = useState<CognitiveCanaryReport | null>(null);
   const [shadowPlan, setShadowPlan] = useState<CognitiveCanaryShadowPlan | null>(null);
+  const [collectorWriteback, setCollectorWriteback] = useState<CognitiveCanaryResponseCollectorWritebackReport | null>(null);
 
   const selectedReport = useMemo(() => report || null, [report]);
   const tone = gateTone(selectedReport?.gate_status || reports[0]?.gate_status);
@@ -172,6 +173,30 @@ export default function CognitiveCanaryPackPage() {
     }
   };
 
+  const writeCollectorStore = async () => {
+    setBusy("collector");
+    setError(null);
+    try {
+      const res = await cognitiveCanaryPack.responseCollectorWriteback({
+        report_id: selectedReport?.id || reports[0]?.id,
+        candidate_version: candidateVersion,
+        stable_version: stableVersion,
+        sample_percent: 5,
+        requested_by: "pack-console",
+        reason: "operator persisted response collector plan metadata",
+        metadata: { source: "web-pack" },
+      });
+      setCollectorWriteback(res.writeback);
+      setShadowPlan(res.writeback.shadow_plan);
+      showToast("已写入 pack-local response collector store", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入 Cognitive Canary response collector store 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><Spinner size="lg" /></div>;
   }
@@ -190,7 +215,7 @@ export default function CognitiveCanaryPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.cognitive-canary"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow response collector / judge / metrics / rollback 计划和证据包放进可选 Pack。真实 shadow traffic、response collector 持久化、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
+              当前切片已把 canary scenario set、deterministic local judge、认知质量 SLI、promotion/block 决策、shadow response collector / judge / metrics / rollback 计划、pack-local response collector store 写回和证据包放进可选 Pack。真实 shadow traffic、live collector、LLM-as-Judge batch、Prometheus 指标和自动回滚写回后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -203,11 +228,12 @@ export default function CognitiveCanaryPackPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <Card className="section-card p-4"><div className="kpi-label">Scenarios</div><div className="kpi-value">{status?.scenario_count ?? scenarios.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Reports</div><div className="kpi-value">{status?.report_count ?? reports.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Quality</div><div className="kpi-value">{(selectedReport?.quality_score ?? reports[0]?.quality_score ?? status?.last_report?.quality_score ?? 0).toFixed(2)}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Shadow Plan</div><div className="kpi-value text-lg" style={{ color: tone.fg }}>{status?.shadow_plan_ready ? "plan" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Collector Store</div><div className="kpi-value text-lg">{status?.response_collector_store?.record_count ?? 0}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr]">
@@ -248,6 +274,7 @@ export default function CognitiveCanaryPackPage() {
                 <TextField className="min-w-40" value={candidateVersion} onChange={setCandidateVersion}><Input placeholder="candidate version" /></TextField>
                 <TextField className="min-w-64" value={scenarioIDs} onChange={setScenarioIDs}><Input placeholder="scenario ids" /></TextField>
                 <Button variant="outline" isPending={busy === "shadow"} onPress={planShadow}><CalendarClock size={14} />Shadow 计划</Button>
+                <Button variant="outline" isPending={busy === "collector"} onPress={writeCollectorStore}><ShieldCheck size={14} />写入 Collector Store</Button>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedReport && reports.length === 0}><Download size={14} />导出证据包</Button>
                 <Button className="btn-accent" isPending={busy === "evaluate"} onPress={evaluate}>运行评估</Button>
               </div>
@@ -285,7 +312,28 @@ export default function CognitiveCanaryPackPage() {
                 <TextArea rows={12} aria-label="Cognitive Canary Shadow Plan JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                非破坏性计划：只预览 response collector artifact 名称、SHA-256 内容哈希、labels 和 writes_files=false；不会 mirror live traffic、不会持久化 collector artifacts、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
+                非破坏性计划：只预览 response collector artifact 名称、SHA-256 内容哈希、labels 和 writes_files=false；“写入 Collector Store” 只持久化 pack-local JSON bridge，不会 mirror live traffic、不会写 collector artifact 文件、不会调用 LLM-as-Judge batch、不会发布 Prometheus 指标、不会执行 rollback，也不会写 release state。
+              </div>
+            </Card>
+          )}
+
+          {collectorWriteback && (
+            <Card className="section-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><ShieldCheck size={16} />Response Collector Store 写回</div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Chip size="sm">{collectorWriteback.status}</Chip>
+                <Chip size="sm">records: {collectorWriteback.record_count}</Chip>
+                <Chip size="sm">store_ready: {String(collectorWriteback.response_collector_store_ready)}</Chip>
+                <Chip size="sm">writeback_ready: {String(collectorWriteback.response_collector_writeback_ready)}</Chip>
+                <Chip size="sm">writes_store: {String(collectorWriteback.writes_response_collector_store)}</Chip>
+                <Chip size="sm">collector_ready: {String(collectorWriteback.response_collector_ready)}</Chip>
+                <Chip size="sm">shadow_ready: {String(collectorWriteback.shadow_traffic_ready)}</Chip>
+              </div>
+              <TextField value={JSON.stringify(collectorWriteback, null, 2)} onChange={() => undefined}>
+                <TextArea rows={12} aria-label="Cognitive Canary Response Collector Writeback JSON" className="font-mono text-xs" readOnly />
+              </TextField>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+                当前仅写入 `response-collector-store.json` / `response-collector-record.json` 的 pack-local 元数据桥；真实 collector pipeline、Prometheus 和 release rollback 仍保持 false。
               </div>
             </Card>
           )}
