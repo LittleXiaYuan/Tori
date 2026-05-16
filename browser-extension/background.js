@@ -944,6 +944,9 @@ async function doNavigate(action) {
 async function doClick(action) {
   const { tabId, session } = await getOrCreateSession(action.tabId);
   const { target } = action;
+  const selectorNotFoundError = target.strategy === "bySelector"
+    ? `selector not found: ${target.selector || ""}`
+    : "";
 
   try {
     if (target.strategy === "byIndex") {
@@ -961,10 +964,42 @@ async function doClick(action) {
     await dispatchMouseEvent(session.target, "mousePressed", x, y);
     await dispatchMouseEvent(session.target, "mouseReleased", x, y);
   } else if (target.strategy === "bySelector") {
-    await cdpSend(session.target, "Runtime.evaluate", {
-      expression: `document.querySelector(${JSON.stringify(target.selector)})?.click()`,
+    const clickResult = await cdpSend(session.target, "Runtime.evaluate", {
+      expression: `(() => {
+        const el = document.querySelector(${JSON.stringify(target.selector)});
+        if (!el) return { ok: false, error: ${JSON.stringify(selectorNotFoundError)} };
+        el.click();
+        return { ok: true };
+      })()`,
+      returnByValue: true,
       awaitPromise: true,
     });
+    const value = clickResult?.result?.value;
+    if (value && value.ok === false) return value;
+  } else if (target.strategy === "byText") {
+    const wanted = String(target.text || target.selector || "").trim();
+    const clickResult = await cdpSend(session.target, "Runtime.evaluate", {
+      expression: `(() => {
+        const wanted = ${JSON.stringify(target.text || target.selector || "")}.trim();
+        const norm = (s) => String(s || "").replace(/\\s+/g, " ").trim();
+        const visible = (el) => {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+        };
+        const labelOf = (el) => norm(el.innerText || el.textContent || el.value || el.getAttribute("aria-label") || el.title);
+        const candidates = Array.from(document.querySelectorAll('button,[role="button"],a,input[type="button"],input[type="submit"],div,span'));
+        const exact = candidates.find((el) => visible(el) && labelOf(el) === wanted);
+        const partial = exact || candidates.find((el) => visible(el) && labelOf(el).includes(wanted));
+        if (!partial) return { ok: false, error: "text target not found: " + wanted };
+        partial.click();
+        return { ok: true, label: labelOf(partial) };
+      })()`,
+      returnByValue: true,
+      awaitPromise: true,
+    });
+    const value = clickResult?.result?.value;
+    if (value && value.ok === false) return value;
   } else if (target.strategy === "byIndex") {
     await sendTabMessage(tabId, {
       type: "yunque_click_index",
@@ -979,7 +1014,11 @@ async function doClick(action) {
 
 async function doInput(action) {
   const { tabId, session } = await getOrCreateSession(action.tabId);
-  const { target, text, pressEnter } = action;
+  const { target, text } = action;
+  const pressEnter = Boolean(action.pressEnter ?? action.press_enter);
+  const selectorNotFoundError = target?.strategy === "bySelector"
+    ? `selector not found: ${target.selector || ""}`
+    : "";
 
   try {
     if (target?.strategy === "bySelector") {
@@ -991,12 +1030,40 @@ async function doInput(action) {
   } catch (_) {}
 
   if (target?.strategy === "bySelector" && target.selector) {
-    await cdpSend(session.target, "Runtime.evaluate", {
+    const inputResult = await cdpSend(session.target, "Runtime.evaluate", {
       expression: `(() => {
         const el = document.querySelector(${JSON.stringify(target.selector)});
-        if (el) { el.focus(); el.value = ${JSON.stringify(text)}; el.dispatchEvent(new Event('input', {bubbles:true})); }
+        if (!el) return { ok: false, error: ${JSON.stringify(selectorNotFoundError)} };
+        const text = ${JSON.stringify(text)};
+        el.focus();
+        if ("value" in el) {
+          el.value = text;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        } else {
+          const editable = el.isContentEditable || el.getAttribute("contenteditable") === "true" || el.getAttribute("role") === "textbox";
+          if (editable) {
+            try {
+              document.execCommand("selectAll", false, null);
+              document.execCommand("insertText", false, text);
+            } catch (_) {
+              el.textContent = text;
+            }
+            if (!String(el.textContent || "").includes(text)) el.textContent = text;
+            el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+          } else {
+            el.textContent = text;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        }
+        return { ok: true };
       })()`,
+      returnByValue: true,
+      awaitPromise: true,
     });
+    const value = inputResult?.result?.value;
+    if (value && value.ok === false) return value;
   } else if (target?.strategy === "byCoordinates") {
     await dispatchMouseEvent(session.target, "mousePressed", target.coordinateX, target.coordinateY);
     await dispatchMouseEvent(session.target, "mouseReleased", target.coordinateX, target.coordinateY);

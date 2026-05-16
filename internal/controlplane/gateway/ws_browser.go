@@ -43,6 +43,7 @@ type BrowserAction struct {
 type ActionTarget struct {
 	Strategy    string  `json:"strategy"`
 	Selector    string  `json:"selector,omitempty"`
+	Text        string  `json:"text,omitempty"`
 	Index       int     `json:"index,omitempty"`
 	CoordinateX float64 `json:"coordinateX,omitempty"`
 	CoordinateY float64 `json:"coordinateY,omitempty"`

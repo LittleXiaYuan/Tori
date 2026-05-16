@@ -77,6 +77,32 @@ func PresetScenarios() []Scenario {
 			},
 		},
 		{
+			ID: "x-post-direct", Name: "X/Twitter 直发", Icon: "x",
+			Description: "打开 X/Twitter，输入内容并点击发布，用于演示已登录账号的一键直发效率。",
+			Steps: []map[string]any{
+				{"type": "browser_navigate", "url": "https://x.com/home"},
+				{"type": "browser_screenshot"},
+				{"type": "browser_click", "target": map[string]any{"strategy": "bySelector", "selector": `[data-testid="tweetTextarea_0"]`}},
+				{"type": "browser_input", "text": "云雀 Agent 正在演示浏览器自动化：从打开页面、填写内容到直接发布，全链路减少重复操作。"},
+				{"type": "browser_screenshot"},
+				{"type": "browser_click", "target": map[string]any{"strategy": "bySelector", "selector": `[data-testid="tweetButtonInline"], [data-testid="tweetButton"]`}},
+				{"type": "browser_screenshot"},
+			},
+		},
+		{
+			ID: "xiaohongshu-post-direct", Name: "小红书直发笔记", Icon: "rednote",
+			Description: "打开小红书创作中心，填写标题和正文，并点击发布；需要浏览器已登录且满足平台素材/发布条件。",
+			Steps: []map[string]any{
+				{"type": "browser_navigate", "url": "https://creator.xiaohongshu.com/publish/publish"},
+				{"type": "browser_screenshot"},
+				{"type": "browser_input", "target": map[string]any{"strategy": "bySelector", "selector": `input[placeholder*="标题"], textarea[placeholder*="标题"]`}, "text": "云雀自动化效率演示"},
+				{"type": "browser_input", "target": map[string]any{"strategy": "bySelector", "selector": `[contenteditable="true"], textarea[placeholder*="正文"], .ql-editor, .ProseMirror`}, "text": "今天用云雀 Agent 演示内容运营自动化：自动打开创作中心、填写标题和正文、截图确认，并在满足平台条件后直接点击发布。"},
+				{"type": "browser_screenshot"},
+				{"type": "browser_click", "target": map[string]any{"strategy": "byText", "text": "发布"}},
+				{"type": "browser_screenshot"},
+			},
+		},
+		{
 			ID: "gmail-scroll", Name: "Gmail 收件箱", Icon: "📧",
 			Description: "打开 Gmail 收件箱并滚动浏览邮件",
 			Steps: []map[string]any{
