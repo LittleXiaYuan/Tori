@@ -157,6 +157,18 @@ type CIWorkflowWritebackPlanRequest struct {
 	JobName      string `json:"job_name,omitempty"`
 }
 
+type BaselineArtifactSourcePlanRequest struct {
+	SourceName     string `json:"source_name,omitempty"`
+	Provider       string `json:"provider,omitempty"`
+	ArtifactURL    string `json:"artifact_url,omitempty"`
+	ArtifactName   string `json:"artifact_name,omitempty"`
+	BaselineID     string `json:"baseline_id,omitempty"`
+	ExpectedSHA256 string `json:"expected_sha256,omitempty"`
+	AuthRef        string `json:"auth_ref,omitempty"`
+	RequestedBy    string `json:"requested_by,omitempty"`
+	Reason         string `json:"reason,omitempty"`
+}
+
 type CIGatePlanReport struct {
 	PackID               string          `json:"pack_id"`
 	GeneratedAt          time.Time       `json:"generated_at"`
@@ -271,6 +283,77 @@ type ReleaseBlockerPlan struct {
 	SourceRecordArtifact string   `json:"source_record_artifact"`
 	BlockedBy            []string `json:"blocked_by"`
 	Notes                []string `json:"notes,omitempty"`
+}
+
+type BaselineArtifactSourceSpec struct {
+	SourceName      string   `json:"source_name"`
+	Provider        string   `json:"provider"`
+	ArtifactURL     string   `json:"artifact_url"`
+	ArtifactName    string   `json:"artifact_name"`
+	BaselineID      string   `json:"baseline_id"`
+	ExpectedSHA256  string   `json:"expected_sha256,omitempty"`
+	AuthRef         string   `json:"auth_ref,omitempty"`
+	FetchesNetwork  bool     `json:"fetches_network"`
+	UsesCredentials bool     `json:"uses_credentials"`
+	WritesBaseline  bool     `json:"writes_baseline"`
+	Notes           []string `json:"notes,omitempty"`
+}
+
+type BaselineFetchHandoffPlan struct {
+	Target                     string                     `json:"target"`
+	DedupKey                   string                     `json:"dedup_key"`
+	Source                     BaselineArtifactSourceSpec `json:"source"`
+	ArtifactSourcePlanReady    bool                       `json:"artifact_source_plan_ready"`
+	BaselineFetchPlanReady     bool                       `json:"baseline_fetch_plan_ready"`
+	BaselineFetchReady         bool                       `json:"baseline_fetch_ready"`
+	ArtifactBaselineReady      bool                       `json:"artifact_baseline_ready"`
+	CIBaselineStoreReady       bool                       `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady   bool                       `json:"ci_baseline_writeback_ready"`
+	ConsumesArtifactRepository bool                       `json:"consumes_artifact_repository"`
+	FetchesArtifactBaseline    bool                       `json:"fetches_artifact_baseline"`
+	WritesCIBaselineStore      bool                       `json:"writes_ci_baseline_store"`
+	WritesBaselineSnapshot     bool                       `json:"writes_baseline_snapshot"`
+	WritesCIWorkflow           bool                       `json:"writes_ci_workflow"`
+	ExecutesGovulncheck        bool                       `json:"executes_govulncheck"`
+	BlocksRelease              bool                       `json:"blocks_release"`
+	ExpectedArtifacts          []string                   `json:"expected_artifacts"`
+	BlockedBy                  []string                   `json:"blocked_by"`
+	Notes                      []string                   `json:"notes,omitempty"`
+}
+
+type BaselineArtifactSourcePlanReport struct {
+	PackID                     string                     `json:"pack_id"`
+	GeneratedAt                time.Time                  `json:"generated_at"`
+	Status                     string                     `json:"status"`
+	Stage                      string                     `json:"stage"`
+	RequestedBy                string                     `json:"requested_by,omitempty"`
+	Reason                     string                     `json:"reason,omitempty"`
+	ArtifactSourcePlanReady    bool                       `json:"artifact_source_plan_ready"`
+	BaselineFetchPlanReady     bool                       `json:"baseline_fetch_plan_ready"`
+	BaselineFetchReady         bool                       `json:"baseline_fetch_ready"`
+	ArtifactBaselineReady      bool                       `json:"artifact_baseline_ready"`
+	CIBaselineStoreReady       bool                       `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady   bool                       `json:"ci_baseline_writeback_ready"`
+	CIGatePlanReady            bool                       `json:"ci_gate_plan_ready"`
+	CIGateReady                bool                       `json:"ci_gate_ready"`
+	GovulncheckPlanReady       bool                       `json:"govulncheck_plan_ready"`
+	GovulncheckReady           bool                       `json:"govulncheck_ready"`
+	VulnerabilityReady         bool                       `json:"vulnerability_ready"`
+	ConsumesArtifactRepository bool                       `json:"consumes_artifact_repository"`
+	FetchesArtifactBaseline    bool                       `json:"fetches_artifact_baseline"`
+	WritesCIBaselineStore      bool                       `json:"writes_ci_baseline_store"`
+	WritesBaselineSnapshot     bool                       `json:"writes_baseline_snapshot"`
+	WritesCIWorkflow           bool                       `json:"writes_ci_workflow"`
+	ExecutesGovulncheck        bool                       `json:"executes_govulncheck"`
+	BlocksRelease              bool                       `json:"blocks_release"`
+	Source                     BaselineArtifactSourceSpec `json:"source"`
+	BaselineFetchHandoffPlan   BaselineFetchHandoffPlan   `json:"baseline_fetch_handoff_plan"`
+	CIBaselineStore            CIBaselineStoreSummary     `json:"ci_baseline_store"`
+	Artifacts                  []string                   `json:"artifacts"`
+	Actions                    []string                   `json:"actions"`
+	BlockedBy                  []string                   `json:"blocked_by"`
+	Labels                     []string                   `json:"labels"`
+	Notes                      []string                   `json:"notes,omitempty"`
 }
 
 type CIWorkflowWritebackPlanReport struct {
@@ -393,6 +476,7 @@ type CIBaselineWritebackReport struct {
 }
 
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
+var sha256HexRe = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
 func New(cfg Config) *Handler {
 	repoRoot := strings.TrimSpace(cfg.RepoRoot)
@@ -422,6 +506,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/diff", Handler: h.Diff},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/", Handler: h.CycloneDX},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan", Handler: h.CIGatePlan},
+		{Method: http.MethodPost, Path: "/v1/sbom-drift/baseline/artifact-source/plan", Handler: h.BaselineArtifactSourcePlan},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/baseline/writeback", Handler: h.CIBaselineWriteback},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/workflow/writeback/plan", Handler: h.CIWorkflowWritebackPlan},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/", Handler: h.Evidence},
@@ -444,16 +529,23 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"scanner_ready":                    true,
 		"cyclonedx_ready":                  true,
 		"ci_gate_plan_ready":               true,
+		"artifact_source_plan_ready":       true,
+		"baseline_fetch_plan_ready":        true,
+		"baseline_fetch_ready":             false,
+		"artifact_baseline_ready":          false,
 		"ci_baseline_store_ready":          true,
 		"ci_baseline_writeback_ready":      true,
 		"ci_workflow_writeback_plan_ready": true,
 		"ci_workflow_writeback_ready":      false,
+		"consumes_artifact_repository":     false,
+		"fetches_artifact_baseline":        false,
 		"consumes_ci_baseline_store":       false,
 		"ci_gate_ready":                    false,
 		"vulnerability_ready":              false,
 		"govulncheck_plan_ready":           true,
 		"govulncheck_ready":                false,
 		"writes_ci_baseline_store":         false,
+		"writes_baseline_snapshot":         false,
 		"writes_ci_workflow":               false,
 		"executes_govulncheck":             false,
 		"blocks_release":                   false,
@@ -467,12 +559,14 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"sbom.drift.diff",
 			"sbom.cyclonedx.export",
 			"sbom.ci_gate.plan",
+			"sbom.baseline.artifact_source.plan",
+			"sbom.baseline.fetch.plan",
 			"sbom.ci_baseline.writeback",
 			"sbom.ci_workflow.writeback_plan",
 			"sbom.govulncheck.plan",
 			"sbom.evidence.export",
 		},
-		"notes": []string{"CycloneDX JSON export, CI gate plan, pack-local CI baseline gate write-back, CI workflow write-back handoff plan, and govulncheck command preview are available as pack contracts; govulncheck execution, CI workflow write-back, and real release blocking remain follow-up wiring."},
+		"notes": []string{"CycloneDX JSON export, CI gate plan, artifact baseline source plan, pack-local CI baseline gate write-back, CI workflow write-back handoff plan, and govulncheck command preview are available as pack contracts; artifact repository fetch, govulncheck execution, CI workflow write-back, and real release blocking remain follow-up wiring."},
 	})
 }
 
@@ -608,6 +702,24 @@ func (h *Handler) CIBaselineWriteback(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"writeback": report})
 }
 
+func (h *Handler) BaselineArtifactSourcePlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req BaselineArtifactSourcePlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "invalid baseline artifact source plan payload")
+		return
+	}
+	report, err := h.buildBaselineArtifactSourcePlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": report})
+}
+
 func (h *Handler) CIWorkflowWritebackPlan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -650,6 +762,11 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"govulncheck_plan":    ciGatePlan.GovulncheckPlan,
 		"ci_baseline_store":   h.ciBaselineStoreSummary(),
 		"ci_baseline_records": records,
+	}
+	if baselineSourcePlan, err := h.buildBaselineArtifactSourcePlan(BaselineArtifactSourcePlanRequest{BaselineID: id, RequestedBy: "evidence-export", Reason: "snapshot artifact baseline source handoff evidence"}); err == nil {
+		files = append(files, "baseline-artifact-source-plan.json", "baseline-fetch-handoff-plan.json")
+		payload["baseline_artifact_source_plan"] = baselineSourcePlan
+		payload["baseline_fetch_handoff_plan"] = baselineSourcePlan.BaselineFetchHandoffPlan
 	}
 	if workflowPlan, err := h.buildCIWorkflowWritebackPlan(CIWorkflowWritebackPlanRequest{BaseID: id, RequestedBy: "evidence-export", Reason: "snapshot CI workflow handoff evidence"}); err == nil {
 		files = append(files, "ci-workflow-writeback-plan.json", "ci-workflow-handoff-plan.json", "release-blocker-plan.json")
@@ -940,10 +1057,162 @@ func (h *Handler) ciBaselineStoreSummary() CIBaselineStoreSummary {
 		Artifact:                 "ci-baseline-store.json",
 		RecordArtifact:           "ci-baseline-record.json",
 		Notes: []string{
-			"Store readiness covers only pack-local CI baseline gate handoff records.",
-			"CI workflow write-back plan readiness means the future handoff shape is available; CI workflow mutation, govulncheck execution, vulnerability DB fetch, and real release blocking remain disabled.",
+			"Store readiness covers only pack-local CI baseline gate handoff records; artifact baseline source planning remains plan-only until a fetch executor is wired.",
+			"CI workflow write-back plan readiness means the future handoff shape is available; artifact repository fetch, CI workflow mutation, govulncheck execution, vulnerability DB fetch, and real release blocking remain disabled.",
 		},
 	}
+}
+
+func (h *Handler) buildBaselineArtifactSourcePlan(req BaselineArtifactSourcePlanRequest) (BaselineArtifactSourcePlanReport, error) {
+	source, err := normalizeBaselineArtifactSource(req)
+	if err != nil {
+		return BaselineArtifactSourcePlanReport{}, err
+	}
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "plan external artifact repository baseline fetch for later CI baseline consumption"
+	}
+	blockedBy := []string{"artifact-fetcher-not-wired", "artifact-credential-resolver-not-wired", "baseline-snapshot-writeback-not-wired", "ci-baseline-store-consumer-not-wired"}
+	if source.ExpectedSHA256 == "" {
+		blockedBy = append(blockedBy, "artifact-sha256-not-pinned")
+	}
+	if source.AuthRef == "" {
+		blockedBy = append(blockedBy, "artifact-auth-ref-not-configured")
+	}
+	blockedBy = appendUnique(blockedBy)
+	handoff := BaselineFetchHandoffPlan{
+		Target:                     "artifact.baseline.fetcher.sbom_drift",
+		DedupKey:                   deterministicID("sbom-baseline-artifact-source", source.Provider, source.ArtifactURL, source.ArtifactName, source.BaselineID),
+		Source:                     source,
+		ArtifactSourcePlanReady:    true,
+		BaselineFetchPlanReady:     true,
+		BaselineFetchReady:         false,
+		ArtifactBaselineReady:      false,
+		CIBaselineStoreReady:       true,
+		CIBaselineWritebackReady:   true,
+		ConsumesArtifactRepository: false,
+		FetchesArtifactBaseline:    false,
+		WritesCIBaselineStore:      false,
+		WritesBaselineSnapshot:     false,
+		WritesCIWorkflow:           false,
+		ExecutesGovulncheck:        false,
+		BlocksRelease:              false,
+		ExpectedArtifacts:          []string{source.ArtifactName, "snapshot.json", "meta.json", "sbom.cdx.json"},
+		BlockedBy:                  blockedBy,
+		Notes: []string{
+			"Plan-only artifact baseline source handoff; this route does not contact artifact repositories or read credentials.",
+			"A later fetch executor can consume source, expected_sha256, and baseline_id to hydrate pack-local snapshots before CI baseline write-back.",
+		},
+	}
+	return BaselineArtifactSourcePlanReport{
+		PackID:                     PackID,
+		GeneratedAt:                h.now().UTC(),
+		Status:                     "baseline_artifact_source_plan_ready_pending_fetcher",
+		Stage:                      "artifact-source-plan-before-fetch",
+		RequestedBy:                requestedBy,
+		Reason:                     reason,
+		ArtifactSourcePlanReady:    true,
+		BaselineFetchPlanReady:     true,
+		BaselineFetchReady:         false,
+		ArtifactBaselineReady:      false,
+		CIBaselineStoreReady:       true,
+		CIBaselineWritebackReady:   true,
+		CIGatePlanReady:            true,
+		CIGateReady:                false,
+		GovulncheckPlanReady:       true,
+		GovulncheckReady:           false,
+		VulnerabilityReady:         false,
+		ConsumesArtifactRepository: false,
+		FetchesArtifactBaseline:    false,
+		WritesCIBaselineStore:      false,
+		WritesBaselineSnapshot:     false,
+		WritesCIWorkflow:           false,
+		ExecutesGovulncheck:        false,
+		BlocksRelease:              false,
+		Source:                     source,
+		BaselineFetchHandoffPlan:   handoff,
+		CIBaselineStore:            h.ciBaselineStoreSummary(),
+		Artifacts:                  []string{"baseline-artifact-source-plan.json", "baseline-fetch-handoff-plan.json", "ci-baseline-store.json", "snapshot.json", "meta.json", "sbom.cdx.json"},
+		Actions: []string{
+			"mapped an external artifact repository baseline source into a deterministic fetch handoff contract",
+			"kept network fetch, credential access, baseline snapshot overwrite, CI workflow write-back, govulncheck execution, and release blocking disabled",
+		},
+		BlockedBy: blockedBy,
+		Labels:    []string{"sbom-drift", "baseline-artifact-source", "baseline-fetch-plan", "no-network-fetch", "no-credential-read", "no-baseline-write"},
+		Notes: []string{
+			"artifact_source_plan_ready=true and baseline_fetch_plan_ready=true mean only the fetch contract shape is available.",
+			"fetches_artifact_baseline=false, writes_baseline_snapshot=false, writes_ci_baseline_store=false, executes_govulncheck=false, and blocks_release=false keep this slice plan-only and reversible.",
+		},
+	}, nil
+}
+
+func normalizeBaselineArtifactSource(req BaselineArtifactSourcePlanRequest) (BaselineArtifactSourceSpec, error) {
+	sourceName := strings.TrimSpace(req.SourceName)
+	if sourceName == "" {
+		sourceName = "release-artifact-baseline"
+	}
+	provider := strings.ToLower(strings.TrimSpace(req.Provider))
+	if provider == "" {
+		provider = "artifact-repository"
+	}
+	artifactURL := strings.TrimSpace(req.ArtifactURL)
+	if artifactURL == "" {
+		artifactURL = "artifact://sbom-drift/baselines/latest"
+	}
+	if strings.Contains(artifactURL, "\x00") || strings.ContainsAny(artifactURL, "\r\n") {
+		return BaselineArtifactSourceSpec{}, fmt.Errorf("artifact_url must be a single-line artifact reference")
+	}
+	artifactName, err := normalizeArtifactName(req.ArtifactName)
+	if err != nil {
+		return BaselineArtifactSourceSpec{}, err
+	}
+	baselineID := strings.TrimSpace(req.BaselineID)
+	if baselineID == "" {
+		baselineID = "artifact-baseline"
+	}
+	baselineID = strings.Trim(strings.ToLower(baselineID), "/")
+	if !safeIDRe.MatchString(baselineID) {
+		return BaselineArtifactSourceSpec{}, fmt.Errorf("baseline_id must match %s", safeIDRe.String())
+	}
+	expectedSHA256 := strings.ToLower(strings.TrimSpace(req.ExpectedSHA256))
+	if expectedSHA256 != "" && !sha256HexRe.MatchString(expectedSHA256) {
+		return BaselineArtifactSourceSpec{}, fmt.Errorf("expected_sha256 must be a 64-character hex digest")
+	}
+	authRef := strings.TrimSpace(req.AuthRef)
+	if strings.Contains(authRef, "\x00") || strings.ContainsAny(authRef, "\r\n") {
+		return BaselineArtifactSourceSpec{}, fmt.Errorf("auth_ref must be a single-line secret reference")
+	}
+	return BaselineArtifactSourceSpec{
+		SourceName:      sourceName,
+		Provider:        provider,
+		ArtifactURL:     artifactURL,
+		ArtifactName:    artifactName,
+		BaselineID:      baselineID,
+		ExpectedSHA256:  expectedSHA256,
+		AuthRef:         authRef,
+		FetchesNetwork:  false,
+		UsesCredentials: false,
+		WritesBaseline:  false,
+		Notes: []string{
+			"Source is normalized for a future fetch executor only; this route does not open network connections.",
+			"auth_ref is a secret reference label, not a credential value, and is never resolved by this route.",
+		},
+	}, nil
+}
+
+func normalizeArtifactName(value string) (string, error) {
+	name := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	if name == "" {
+		return "sbom-baseline-evidence.json", nil
+	}
+	if strings.HasPrefix(name, "/") || strings.Contains(name, "..") || strings.ContainsAny(name, "\x00\r\n") {
+		return "", fmt.Errorf("artifact_name must be a safe relative artifact filename")
+	}
+	return name, nil
 }
 
 func (h *Handler) buildCIWorkflowWritebackPlan(req CIWorkflowWritebackPlanRequest) (CIWorkflowWritebackPlanReport, error) {

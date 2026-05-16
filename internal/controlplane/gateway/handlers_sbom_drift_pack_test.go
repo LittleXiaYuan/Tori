@@ -102,6 +102,14 @@ func TestSBOMDriftPackCanExportCycloneDXAndPlanCIGate(t *testing.T) {
 		t.Fatalf("ci gate plan status=%d body=%s", w.Code, w.Body.String())
 	}
 
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/baseline/artifact-source/plan", strings.NewReader(`{"provider":"github-actions","artifact_url":"artifact://repo/actions/runs/42/sbom-baseline-evidence.json","baseline_id":"gateway-baseline"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"artifact_source_plan_ready":true`) || !strings.Contains(w.Body.String(), `"baseline_fetch_plan_ready":true`) || !strings.Contains(w.Body.String(), `"fetches_artifact_baseline":false`) || !strings.Contains(w.Body.String(), `"writes_baseline_snapshot":false`) {
+		t.Fatalf("baseline artifact source plan status=%d body=%s", w.Code, w.Body.String())
+	}
+
 	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/baseline/writeback", strings.NewReader(`{"base_id":"baseline","target_current":true,"fail_on_risk":"high","request_key":"gateway-sbom"}`))
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
@@ -139,6 +147,7 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				"/v1/sbom-drift/diff",
 				"/v1/sbom-drift/cyclonedx/",
 				"/v1/sbom-drift/ci-gate/plan",
+				"/v1/sbom-drift/baseline/artifact-source/plan",
 				"/v1/sbom-drift/ci-gate/baseline/writeback",
 				"/v1/sbom-drift/ci-gate/workflow/writeback/plan",
 				"/v1/sbom-drift/evidence/",
@@ -151,6 +160,7 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/diff"},
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan"},
+				{Method: http.MethodPost, Path: "/v1/sbom-drift/baseline/artifact-source/plan"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/baseline/writeback"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/workflow/writeback/plan"},
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/"},

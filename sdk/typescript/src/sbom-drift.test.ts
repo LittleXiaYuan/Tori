@@ -37,7 +37,7 @@ test("SBOMDriftClient reads status and snapshots with bearer token", async () =>
     token: "token-123",
     fetch: async (url, init) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, ci_workflow_writeback_plan_ready: true, ci_workflow_writeback_ready: false, ci_gate_ready: false, consumes_ci_baseline_store: false, vulnerability_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, snapshot_count: 1, capabilities: ["sbom.govulncheck.plan", "sbom.ci_workflow.writeback_plan"] });
+      if (String(url).endsWith("/status")) return jsonResponse({ pack_id: "yunque.pack.sbom-drift", stage: "pack-shell-before-ci", scanner_ready: true, cyclonedx_ready: true, ci_gate_plan_ready: true, artifact_source_plan_ready: true, baseline_fetch_plan_ready: true, baseline_fetch_ready: false, ci_workflow_writeback_plan_ready: true, ci_workflow_writeback_ready: false, ci_gate_ready: false, consumes_artifact_repository: false, fetches_artifact_baseline: false, consumes_ci_baseline_store: false, vulnerability_ready: false, govulncheck_plan_ready: true, govulncheck_ready: false, snapshot_count: 1, capabilities: ["sbom.govulncheck.plan", "sbom.baseline.artifact_source.plan", "sbom.ci_workflow.writeback_plan"] });
       return jsonResponse({ snapshots: [{ id: "baseline", source: "unit", created_at: "now", component_count: 1, ecosystems: { gomod: 1 } }], count: 1 });
     },
   });
@@ -47,6 +47,8 @@ test("SBOMDriftClient reads status and snapshots with bearer token", async () =>
 
   assertEqual(status.pack_id, "yunque.pack.sbom-drift");
   assertEqual(status.govulncheck_plan_ready, true);
+  assertEqual(status.artifact_source_plan_ready, true);
+  assertEqual(status.fetches_artifact_baseline, false);
   assertEqual(status.ci_workflow_writeback_plan_ready, true);
   assertEqual(status.govulncheck_ready, false);
   assertEqual(snapshots.count, 1);
@@ -147,6 +149,56 @@ test("SBOMDriftClient writes pack-local CI baseline gate handoff records", async
   assertEqual(writeback.writeback.writes_ci_baseline_store, true);
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/ci-gate/baseline/writeback");
   assertEqual(calls[0]?.init?.body, JSON.stringify({ base_id: "baseline", target_current: true, fail_on_risk: "high" }));
+});
+
+test("SBOMDriftClient plans artifact baseline source handoffs without fetching artifacts", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createSBOMDriftClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ plan: {
+        pack_id: "yunque.pack.sbom-drift",
+        generated_at: "now",
+        status: "baseline_artifact_source_plan_ready_pending_fetcher",
+        stage: "artifact-source-plan-before-fetch",
+        artifact_source_plan_ready: true,
+        baseline_fetch_plan_ready: true,
+        baseline_fetch_ready: false,
+        artifact_baseline_ready: false,
+        ci_baseline_store_ready: true,
+        ci_baseline_writeback_ready: true,
+        ci_gate_plan_ready: true,
+        ci_gate_ready: false,
+        govulncheck_plan_ready: true,
+        govulncheck_ready: false,
+        vulnerability_ready: false,
+        consumes_artifact_repository: false,
+        fetches_artifact_baseline: false,
+        writes_ci_baseline_store: false,
+        writes_baseline_snapshot: false,
+        writes_ci_workflow: false,
+        executes_govulncheck: false,
+        blocks_release: false,
+        source: { source_name: "release-ci", provider: "github-actions", artifact_url: "artifact://repo/run/42", artifact_name: "sbom-baseline-evidence.json", baseline_id: "baseline", fetches_network: false, uses_credentials: false, writes_baseline: false },
+        baseline_fetch_handoff_plan: { target: "artifact.baseline.fetcher.sbom_drift", dedup_key: "dedup", source: { source_name: "release-ci", provider: "github-actions", artifact_url: "artifact://repo/run/42", artifact_name: "sbom-baseline-evidence.json", baseline_id: "baseline", fetches_network: false, uses_credentials: false, writes_baseline: false }, artifact_source_plan_ready: true, baseline_fetch_plan_ready: true, baseline_fetch_ready: false, artifact_baseline_ready: false, ci_baseline_store_ready: true, ci_baseline_writeback_ready: true, consumes_artifact_repository: false, fetches_artifact_baseline: false, writes_ci_baseline_store: false, writes_baseline_snapshot: false, writes_ci_workflow: false, executes_govulncheck: false, blocks_release: false, expected_artifacts: ["sbom-baseline-evidence.json"], blocked_by: ["artifact-fetcher-not-wired"] },
+        artifacts: ["baseline-artifact-source-plan.json", "baseline-fetch-handoff-plan.json"],
+        actions: [],
+        blocked_by: ["artifact-fetcher-not-wired"],
+        labels: ["sbom-drift"],
+      } });
+    },
+  });
+
+  const plan = await client.baselineArtifactSourcePlan({ provider: "github-actions", baseline_id: "baseline" });
+
+  assertEqual(plan.plan.artifact_source_plan_ready, true);
+  assertEqual(plan.plan.baseline_fetch_plan_ready, true);
+  assertEqual(plan.plan.fetches_artifact_baseline, false);
+  assertEqual(plan.plan.writes_baseline_snapshot, false);
+  assertEqual(plan.plan.source.uses_credentials, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/sbom-drift/baseline/artifact-source/plan");
+  assertEqual(calls[0]?.init?.body, JSON.stringify({ provider: "github-actions", baseline_id: "baseline" }));
 });
 
 test("SBOMDriftClient plans CI workflow writeback handoff from baseline store", async () => {
