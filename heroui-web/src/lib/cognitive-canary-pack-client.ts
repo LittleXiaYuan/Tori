@@ -111,6 +111,10 @@ export interface CognitiveCanaryStatus {
   store_dir?: string;
   policy: CognitiveCanaryPolicy;
   last_report?: CognitiveCanaryReportSummary | null;
+  response_collector_store_ready?: boolean;
+  response_collector_writeback_ready?: boolean;
+  writes_response_collector_store?: boolean;
+  response_collector_store?: CognitiveCanaryResponseCollectorStoreSummary;
   capabilities: string[];
   notes?: string[];
 }
@@ -169,6 +173,94 @@ export interface CognitiveCanaryResponseCollectorSummary {
   deterministic: boolean;
   hash_algorithm: string;
   ready: boolean;
+}
+
+export interface CognitiveCanaryResponseCollectorStoreSummary {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  response_collector_store_ready: boolean;
+  response_collector_writeback_ready: boolean;
+  writes_response_collector_store: boolean;
+  response_collector_ready: boolean;
+  shadow_traffic_ready: boolean;
+  judge_pipeline_ready: boolean;
+  prometheus_ready: boolean;
+  auto_rollback_ready: boolean;
+  latest_record_id?: string;
+  notes?: string[];
+}
+
+export interface CognitiveCanaryResponseCollectorRecord {
+  pack_id: string;
+  record_id: string;
+  record_key: string;
+  report_id: string;
+  pair_id: string;
+  scenario_id: string;
+  category: string;
+  stable_version: string;
+  candidate_version: string;
+  sample_percent: number;
+  collector_route: string;
+  artifact: string;
+  artifact_sha256: string;
+  artifact_bytes: number;
+  source: string;
+  status: string;
+  requested_by?: string;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+  report_summary: CognitiveCanaryReportSummary;
+  collector_plan: CognitiveCanaryResponseCollectorPlan;
+  response_collector_store_ready: boolean;
+  response_collector_writeback_ready: boolean;
+  writes_response_collector_store: boolean;
+  response_collector_ready: boolean;
+  shadow_traffic_ready: boolean;
+  judge_pipeline_ready: boolean;
+  prometheus_ready: boolean;
+  auto_rollback_ready: boolean;
+  writes_files: boolean;
+  metadata?: Record<string, string>;
+  artifacts: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface CognitiveCanaryResponseCollectorWritebackInput extends CognitiveCanaryShadowPlanInput {}
+
+export interface CognitiveCanaryResponseCollectorWritebackReport {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  report_id: string;
+  candidate_version?: string;
+  stable_version?: string;
+  sample_percent: number;
+  requested_by?: string;
+  reason?: string;
+  response_collector_store_ready: boolean;
+  response_collector_writeback_ready: boolean;
+  writes_response_collector_store: boolean;
+  response_collector_ready: boolean;
+  shadow_traffic_ready: boolean;
+  judge_pipeline_ready: boolean;
+  prometheus_ready: boolean;
+  auto_rollback_ready: boolean;
+  writes_files: boolean;
+  record_count: number;
+  records: CognitiveCanaryResponseCollectorRecord[];
+  response_collector_store: CognitiveCanaryResponseCollectorStoreSummary;
+  shadow_plan: CognitiveCanaryShadowPlan;
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
 }
 
 export interface CognitiveCanaryJudgeBatchPlan {
@@ -242,6 +334,8 @@ export interface CognitiveCanaryEvidence {
   files: string[];
   report: CognitiveCanaryReport;
   shadow_plan?: CognitiveCanaryShadowPlan;
+  response_collector_store?: CognitiveCanaryResponseCollectorStoreSummary;
+  response_collector_records?: CognitiveCanaryResponseCollectorRecord[];
 }
 
 export interface CognitiveCanaryPackClient {
@@ -250,6 +344,7 @@ export interface CognitiveCanaryPackClient {
   saveScenarios(input: { scenarios: CognitiveCanaryScenario[]; replace?: boolean }): Promise<{ scenarios: CognitiveCanaryScenario[]; count: number; status: string }>;
   evaluate(input?: CognitiveCanaryEvaluateInput): Promise<{ report: CognitiveCanaryReport; status: string }>;
   shadowPlan(input?: CognitiveCanaryShadowPlanInput): Promise<{ plan: CognitiveCanaryShadowPlan }>;
+  responseCollectorWriteback(input?: CognitiveCanaryResponseCollectorWritebackInput): Promise<{ writeback: CognitiveCanaryResponseCollectorWritebackReport }>;
   reports(): Promise<{ reports: CognitiveCanaryReportSummary[]; count: number }>;
   report(id: string): Promise<{ report: CognitiveCanaryReport }>;
   evidence(id: string): Promise<CognitiveCanaryEvidence>;
@@ -275,6 +370,11 @@ export function createCognitiveCanaryPackClient(): CognitiveCanaryPackClient {
       }),
     shadowPlan: (input = {}) =>
       fetcher<{ plan: CognitiveCanaryShadowPlan }>("/v1/cognitive-canary/shadow/plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    responseCollectorWriteback: (input = {}) =>
+      fetcher<{ writeback: CognitiveCanaryResponseCollectorWritebackReport }>("/v1/cognitive-canary/response-collector/writeback", {
         method: "POST",
         body: JSON.stringify(input),
       }),
