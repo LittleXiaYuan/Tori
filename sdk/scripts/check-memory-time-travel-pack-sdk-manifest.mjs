@@ -32,17 +32,21 @@ const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${ro
 for (const route of manifest.routes ?? []) {
   if (!routeSpecs.has(route)) fail(`Memory Time Travel pack manifest missing routeSpec: ${route}`);
 }
-for (const capability of ["auditLinksWritebackPlan"]) {
+for (const capability of ["auditLinksWritebackPlan", "auditLinksWritebackStore"]) {
   if (!(manifest.capabilities ?? []).includes(capability)) fail(`memory-time-travel-pack-sdk.json missing capability: ${capability}`);
 }
 if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.audit.links_writeback_plan")) {
   fail("Memory Time Travel pack manifest missing audit proof-link writeback plan backend capability");
+}
+if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.audit.links_writeback_store")) {
+  fail("Memory Time Travel pack manifest missing audit proof-link writeback store backend capability");
 }
 
 const client = readRepoFile(manifest.frontend.client);
 for (const token of [
   "createMemoryTimeTravelPackClient",
   "auditLinksWritebackPlan",
+  "auditLinksWritebackStore",
   "/v1/memory-time-travel/status",
   "/v1/memory-time-travel/snapshots",
   "/v1/memory-time-travel/snapshot-at",
@@ -59,6 +63,7 @@ for (const token of [
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/links/writeback-plan",
+  "/v1/memory-time-travel/audit/links/writeback/store",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "method: \"POST\"",
@@ -76,7 +81,7 @@ for (const token of ["Memory Time Travel", "保存快照", "生成 diff", "导�
 for (const token of ["Approved rollback write-back plan", "buildApprovedRollbackPlan", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "global_approval_enqueue_ready"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing approved rollback token: ${token}`);
 }
-for (const token of ["KV audit proof-link schema", "previewAuditLinks", "buildAuditLinkWritebackPlan", "audit-link-preview.json", "audit-link-writeback-plan.json", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划", "kv_audit_link_writeback_ready", "backfills_audit_seq", "global_approval_enqueue_ready"]) {
+for (const token of ["KV audit proof-link schema", "previewAuditLinks", "buildAuditLinkWritebackPlan", "writeAuditLinkWritebackStore", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "生成审批计划", "kv_audit_link_writeback_store_ready", "writes_audit_link_writeback_store", "kv_audit_link_writeback_ready", "backfills_audit_seq", "global_approval_enqueue_ready"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing KV audit link token: ${token}`);
 }
 for (const token of ["Native kv_history plan", "buildNativeKVHistoryPlan", "previewNativeKVHistoryMigration", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "writes_native_kv_history"]) {
@@ -93,7 +98,7 @@ for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -183,15 +188,22 @@ for (const token of [
   "memory.audit.links.preview",
   "audit-link-preview.json",
   "audit-link-writeback-plan.json",
+  "audit-link-writeback-store.json",
+  "audit-link-writeback-record.json",
   "kv_audit_link_preview",
   "kv_audit_link_writeback_plan",
   "kv_audit_link_writeback_actions",
+  "kv_audit_link_writeback_store",
+  "kv_audit_link_writeback_records",
   "kv_audit_link_writeback_plan_ready",
+  "kv_audit_link_writeback_store_ready",
   "kv_audit_link_writeback_ready",
+  "writes_audit_link_writeback_store",
   "backfills_audit_seq",
   "backfills_audit_hash",
   "consumes_audit_link_preview",
   "memory.audit.links.writeback_plan",
+  "memory.audit.links.writeback_store",
   "MerkleVerifier",
   "VerifyMerkleAuditChain",
   "/v1/memory-time-travel/retention/plan",
@@ -203,6 +215,7 @@ for (const token of [
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/links/writeback-plan",
+  "/v1/memory-time-travel/audit/links/writeback/store",
   "/v1/memory-time-travel/audit/verify",
   "rollback_writeback_ready",
   "json-memory-time-travel-evidence",
@@ -233,6 +246,7 @@ for (const token of [
   "/v1/memory-time-travel/audit/links",
   "/v1/memory-time-travel/audit/links/preview",
   "/v1/memory-time-travel/audit/links/writeback-plan",
+  "/v1/memory-time-travel/audit/links/writeback/store",
   "/v1/memory-time-travel/audit/verify",
   "/v1/memory-time-travel/evidence/",
   "retentionPlan",
@@ -269,14 +283,19 @@ for (const token of [
   "auditLinks",
   "auditLinksPreview",
   "auditLinksWritebackPlan",
+  "auditLinksWritebackStore",
   "auditVerify",
   "kv_audit_link_schema",
   "kv_audit_link_preview",
   "kv_audit_link_writeback_plan",
   "kv_audit_link_writeback_actions",
+  "kv_audit_link_writeback_store",
+  "kv_audit_link_writeback_records",
   "kv_audit_link_preview_ready",
   "kv_audit_link_writeback_plan_ready",
+  "kv_audit_link_writeback_store_ready",
   "kv_audit_link_writeback_ready",
+  "writes_audit_link_writeback_store",
   "backfills_audit_seq",
   "backfills_audit_hash",
   "consumes_audit_link_preview",

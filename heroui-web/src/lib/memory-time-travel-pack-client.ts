@@ -73,6 +73,7 @@ export interface MemoryTimeTravelStatus {
   kv_audit_link_schema_ready?: boolean;
   kv_audit_link_preview_ready?: boolean;
   kv_audit_link_writeback_plan_ready?: boolean;
+  kv_audit_link_writeback_store_ready?: boolean;
   kv_audit_link_writeback_ready?: boolean;
   kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
@@ -576,6 +577,112 @@ export interface MemoryTimeTravelKVAuditProofLinkWritebackPlan {
   notes?: string[];
 }
 
+export interface MemoryTimeTravelKVAuditProofLinkWritebackStoreInput extends MemoryTimeTravelKVAuditProofLinkWritebackPlanInput {}
+
+export interface MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  kv_audit_link_writeback_store_ready: boolean;
+  kv_audit_link_writeback_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  writes_audit_link_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  backfills_audit_seq: boolean;
+  backfills_audit_hash: boolean;
+  merkle_append_ready: boolean;
+  record_count: number;
+  artifact: string;
+  record_artifact: string;
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVAuditProofLinkWritebackRecord {
+  pack_id: string;
+  store_name: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  temporal_namespace: string;
+  status: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  created_at: string;
+  updated_at: string;
+  kv_audit_link_writeback_store_ready: boolean;
+  kv_audit_link_writeback_plan_ready: boolean;
+  kv_audit_link_writeback_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  audit_proof_link_ready: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  writes_audit_link_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  backfills_audit_seq: boolean;
+  backfills_audit_hash: boolean;
+  merkle_append_ready: boolean;
+  appends_merkle: boolean;
+  candidate_link_count: number;
+  matched_link_count: number;
+  pending_link_count: number;
+  action_count: number;
+  proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
+  writeback_actions: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
+  plan_summary: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
+  store_artifact: string;
+  record_artifact: string;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
+export interface MemoryTimeTravelKVAuditProofLinkWritebackStore {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  kv_audit_link_writeback_store_ready: boolean;
+  kv_audit_link_writeback_plan_ready: boolean;
+  kv_audit_link_writeback_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  audit_proof_link_ready: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  writes_audit_link_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  backfills_audit_seq: boolean;
+  backfills_audit_hash: boolean;
+  merkle_append_ready: boolean;
+  appends_merkle: boolean;
+  request_id: string;
+  request_key: string;
+  approval_id?: string;
+  record_id: string;
+  namespace: string;
+  temporal_namespace: string;
+  candidate_link_count: number;
+  matched_link_count: number;
+  pending_link_count: number;
+  action_count: number;
+  writeback_actions: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
+  approval_queue_record: MemoryTimeTravelKVAuditProofLinkWritebackRecord;
+  audit_link_writeback_store: MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary;
+  plan_summary: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface MemoryTimeTravelSaveSnapshotInput {
   id?: string;
   namespace?: string;
@@ -830,6 +937,9 @@ export interface MemoryTimeTravelEvidenceResponse {
   kv_audit_link_writeback_plan?: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
   kv_audit_link_writeback_plan_error?: string;
   kv_audit_link_writeback_actions?: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
+  kv_audit_link_writeback_store?: MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary;
+  kv_audit_link_writeback_store_error?: string;
+  kv_audit_link_writeback_records?: MemoryTimeTravelKVAuditProofLinkWritebackRecord[];
   audit_verification?: MemoryTimeTravelAuditVerification;
   audit_verification_error?: string;
 }
@@ -853,6 +963,7 @@ export interface MemoryTimeTravelPackClient {
   auditLinks(namespace?: string): Promise<{ links: MemoryTimeTravelKVAuditLinksReport }>;
   auditLinksPreview(input?: MemoryTimeTravelKVAuditProofLinkPreviewInput): Promise<{ preview: MemoryTimeTravelKVAuditProofLinkPreview }>;
   auditLinksWritebackPlan(input?: MemoryTimeTravelKVAuditProofLinkWritebackPlanInput): Promise<{ plan: MemoryTimeTravelKVAuditProofLinkWritebackPlan }>;
+  auditLinksWritebackStore(input?: MemoryTimeTravelKVAuditProofLinkWritebackStoreInput): Promise<{ writeback: MemoryTimeTravelKVAuditProofLinkWritebackStore }>;
   auditVerify(limit?: number): Promise<MemoryTimeTravelAuditVerification>;
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse>;
 }
@@ -936,6 +1047,11 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       }),
     auditLinksWritebackPlan: (input = {}) =>
       fetcher<{ plan: MemoryTimeTravelKVAuditProofLinkWritebackPlan }>("/v1/memory-time-travel/audit/links/writeback-plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    auditLinksWritebackStore: (input = {}) =>
+      fetcher<{ writeback: MemoryTimeTravelKVAuditProofLinkWritebackStore }>("/v1/memory-time-travel/audit/links/writeback/store", {
         method: "POST",
         body: JSON.stringify(input),
       }),
