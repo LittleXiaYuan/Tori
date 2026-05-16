@@ -877,9 +877,28 @@ export const api = {
   // 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
 
   memoryAdd: (content: string, metadata?: Record<string, string>) =>
-    fetcher<{ id: string; status: string }>("/v1/memory/add", { method: "POST", body: JSON.stringify({ content, metadata }) }),
-  memorySearch: (query: string, limit = 10) =>
-    fetcher<{ results: MemorySearchResult[]; total: number }>(`/v1/memory/search?q=${encodeURIComponent(query)}&limit=${limit}`),
+    fetcher<{ id?: string; status: string }>("/v1/memory/add", {
+      method: "POST",
+      body: JSON.stringify({
+        key: metadata?.key,
+        value: content,
+        layer: metadata?.layer || "mid",
+        source: metadata?.source || "manual",
+      }),
+    }),
+  memorySearch: async (query: string, limit = 10) => {
+    const res = await fetcher<{ results: Array<MemorySearchResult & { value?: string }>; count?: number; total?: number }>("/v1/memory/search", {
+      method: "POST",
+      body: JSON.stringify({ query, limit }),
+    });
+    return {
+      results: (res.results || []).map((item) => ({
+        ...item,
+        content: item.content || item.value || "",
+      })),
+      total: res.total ?? res.count ?? (res.results || []).length,
+    };
+  },
   memoryCompact: () =>
     fetcher<{ status: string; before: number; after: number }>("/v1/memory/compact", { method: "POST" }),
 
