@@ -6,7 +6,7 @@ import { AlertTriangle, Download, FileJson, GitCompare, PackageSearch, RefreshCw
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createSBOMDriftPackClient, type SBOMDriftCIGatePlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatus } from "@/lib/sbom-drift-pack-client";
+import { createSBOMDriftPackClient, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatus } from "@/lib/sbom-drift-pack-client";
 
 const sbomDriftPack = createSBOMDriftPackClient();
 
@@ -28,7 +28,7 @@ export default function SBOMDriftPackPage() {
   const [status, setStatus] = useState<SBOMDriftStatus | null>(null);
   const [snapshots, setSnapshots] = useState<SBOMDriftSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"snapshot" | "diff" | "cyclonedx" | "ciGate" | "evidence" | null>(null);
+  const [busy, setBusy] = useState<"snapshot" | "diff" | "cyclonedx" | "ciGate" | "ciBaselineWriteback" | "evidence" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
   const [source, setSource] = useState("manual-baseline");
@@ -36,6 +36,7 @@ export default function SBOMDriftPackPage() {
   const [diff, setDiff] = useState<SBOMDriftDiff | null>(null);
   const [cycloneDX, setCycloneDX] = useState<SBOMDriftCycloneDXDocument | null>(null);
   const [ciGatePlan, setCIGatePlan] = useState<SBOMDriftCIGatePlan | null>(null);
+  const [ciBaselineWriteback, setCIBaselineWriteback] = useState<SBOMDriftCIBaselineWriteback | null>(null);
 
   const selectedBase = useMemo(() => snapshots.find((snapshot) => snapshot.id === baseId) || snapshots[0] || null, [baseId, snapshots]);
   const tone = riskTone(diff?.risk_level);
@@ -126,6 +127,27 @@ export default function SBOMDriftPackPage() {
     }
   };
 
+  const writeCIBaseline = async () => {
+    const id = baseId || selectedBase?.id;
+    if (!id) {
+      setError("请先创建或选择一个基线快照。CI baseline write-back 需要 baseline。");
+      return;
+    }
+    setBusy("ciBaselineWriteback");
+    setError(null);
+    try {
+      const res = await sbomDriftPack.ciBaselineWriteback({ base_id: id, target_current: true, fail_on_risk: "high", requested_by: "pack-console", request_key: `sbom-baseline-${id}` });
+      setCIBaselineWriteback(res.writeback);
+      setCIGatePlan(res.writeback.ci_gate_plan);
+      setDiff(res.writeback.ci_gate_plan.diff);
+      showToast("已写入 pack-local CI baseline gate 记录", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入 CI baseline gate 记录失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportEvidence = async () => {
     const id = baseId || selectedBase?.id;
     if (!id) return;
@@ -168,10 +190,14 @@ export default function SBOMDriftPackPage() {
               <Chip size="sm" style={{ background: status?.govulncheck_plan_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.govulncheck_plan_ready ? "#38bdf8" : "#facc15" }}>
                 {status?.govulncheck_plan_ready ? "govulncheck plan" : "vuln plan pending"}
               </Chip>
+              <Chip size="sm" style={{ background: status?.ci_baseline_writeback_ready ? "rgba(56,189,248,0.12)" : "rgba(250,204,21,0.12)", color: status?.ci_baseline_writeback_ready ? "#38bdf8" : "#facc15" }}>
+                {status?.ci_baseline_writeback_ready ? "baseline store" : "baseline pending"}
+              </Chip>
+              <Chip size="sm">{status?.stage || "pack-shell"}</Chip>
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.sbom-drift"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan、govulncheck plan preview 和证据包导出。govulncheck 执行和真实 CI 阻断仍保持后续写回。
+              当前切片已完成 Go/npm 依赖快照、漂移 diff、CycloneDX JSON 导出、CI gate plan、pack-local CI baseline gate write-back、govulncheck plan preview 和证据包导出。govulncheck 执行、CI workflow 写回和真实 CI 阻断仍保持后续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -188,7 +214,7 @@ export default function SBOMDriftPackPage() {
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">扫描器</div><div className="kpi-value text-lg">{status?.scanner_ready ? "ready" : "shell"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">CycloneDX / CI / Vuln</div><div className="kpi-value text-lg">{status?.cyclonedx_ready && status?.ci_gate_plan_ready && status?.govulncheck_plan_ready ? "plan" : "pending"}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">阶段</div><div className="kpi-value text-lg">{status?.stage || "pack-shell"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Baseline Store</div><div className="kpi-value text-lg">{status?.ci_baseline_store?.record_count ?? 0}</div></Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
@@ -226,6 +252,7 @@ export default function SBOMDriftPackPage() {
               <div className="flex gap-2">
                 <Button variant="outline" isPending={busy === "cyclonedx"} onPress={exportCycloneDX} isDisabled={!selectedBase && !baseId}><FileJson size={14} />CycloneDX</Button>
                 <Button variant="outline" isPending={busy === "ciGate"} onPress={planCIGate} isDisabled={!selectedBase && !baseId}>CI Gate Plan</Button>
+                <Button variant="outline" isPending={busy === "ciBaselineWriteback"} onPress={writeCIBaseline} isDisabled={!selectedBase && !baseId}>写 Baseline Store</Button>
                 <Button variant="outline" isPending={busy === "evidence"} onPress={exportEvidence} isDisabled={!selectedBase && !baseId}><Download size={14} />导出证据包</Button>
                 <Button className="btn-accent" isPending={busy === "diff"} onPress={runDiff} isDisabled={!selectedBase && !baseId}>生成漂移报告</Button>
               </div>
@@ -245,9 +272,9 @@ export default function SBOMDriftPackPage() {
             )}
           </Card>
 
-          {(cycloneDX || ciGatePlan) && (
+          {(cycloneDX || ciGatePlan || ciBaselineWriteback) && (
             <Card className="section-card p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><FileJson size={16} />CycloneDX / CI gate plan 预览</div>
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><FileJson size={16} />CycloneDX / CI gate / baseline store 预览</div>
               <div className="mb-3 flex flex-wrap gap-2">
                 {cycloneDX && <Chip size="sm">CycloneDX {cycloneDX.specVersion}</Chip>}
                 {ciGatePlan && <Chip size="sm" style={{ background: ciGatePlan.blocked ? "rgba(239,68,68,0.16)" : "rgba(34,197,94,0.12)", color: ciGatePlan.blocked ? "#ef4444" : "#22c55e" }}>{ciGatePlan.status}</Chip>}
@@ -256,12 +283,15 @@ export default function SBOMDriftPackPage() {
                 {ciGatePlan && <Chip size="sm">govulncheck_ready: {String(ciGatePlan.govulncheck_ready)}</Chip>}
                 {ciGatePlan?.govulncheck_plan && <Chip size="sm">writes_files: {String(ciGatePlan.govulncheck_plan.writes_files)}</Chip>}
                 {ciGatePlan?.govulncheck_plan && <Chip size="sm">{ciGatePlan.govulncheck_plan.report_artifact}</Chip>}
+                {ciBaselineWriteback && <Chip size="sm">baseline_store: {String(ciBaselineWriteback.writes_ci_baseline_store)}</Chip>}
+                {ciBaselineWriteback && <Chip size="sm">ci_workflow: {String(ciBaselineWriteback.writes_ci_workflow)}</Chip>}
+                {ciBaselineWriteback && <Chip size="sm">govulncheck_exec: {String(ciBaselineWriteback.executes_govulncheck)}</Chip>}
               </div>
-              <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan }, null, 2)} onChange={() => undefined}>
+              <TextField value={JSON.stringify({ cyclonedx: cycloneDX, ci_gate_plan: ciGatePlan, ci_baseline_writeback: ciBaselineWriteback }, null, 2)} onChange={() => undefined}>
                 <TextArea rows={12} aria-label="SBOM CycloneDX and CI Gate JSON" className="font-mono text-xs" readOnly />
               </TextField>
               <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-                这里仍是非破坏性计划：会预览 govulncheck -json ./... 的执行对象和 govulncheck-report.json 制品，但不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
+                baseline store 只写 pack-local JSON handoff：会记录 CI gate 决策和 govulncheck -json ./... 预览对象，但不会修改 GitHub Actions、不会执行 govulncheck、不会拉取漏洞库，也不会真实阻断 release。
               </div>
             </Card>
           )}

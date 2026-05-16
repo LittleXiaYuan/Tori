@@ -2,6 +2,8 @@ package sbomdrift
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -131,6 +133,18 @@ type CIGatePlanRequest struct {
 	Reason        string `json:"reason,omitempty"`
 }
 
+type CIBaselineWritebackRequest struct {
+	BaseID        string `json:"base_id"`
+	TargetID      string `json:"target_id,omitempty"`
+	TargetCurrent bool   `json:"target_current,omitempty"`
+	FailOnRisk    string `json:"fail_on_risk,omitempty"`
+	RequestedBy   string `json:"requested_by,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	ApprovalID    string `json:"approval_id,omitempty"`
+	RequestID     string `json:"request_id,omitempty"`
+	RequestKey    string `json:"request_key,omitempty"`
+}
+
 type CIGatePlanReport struct {
 	PackID               string          `json:"pack_id"`
 	GeneratedAt          time.Time       `json:"generated_at"`
@@ -179,6 +193,108 @@ type GovulncheckPackagePlan struct {
 	Labels    []string `json:"labels,omitempty"`
 }
 
+type CIBaselineStoreSummary struct {
+	PackID                   string   `json:"pack_id"`
+	Store                    string   `json:"store"`
+	StoreReady               bool     `json:"store_ready"`
+	CIBaselineStoreReady     bool     `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady bool     `json:"ci_baseline_writeback_ready"`
+	CIGatePlanReady          bool     `json:"ci_gate_plan_ready"`
+	CIGateReady              bool     `json:"ci_gate_ready"`
+	GovulncheckPlanReady     bool     `json:"govulncheck_plan_ready"`
+	GovulncheckReady         bool     `json:"govulncheck_ready"`
+	VulnerabilityReady       bool     `json:"vulnerability_ready"`
+	WritesCIBaselineStore    bool     `json:"writes_ci_baseline_store"`
+	WritesCIWorkflow         bool     `json:"writes_ci_workflow"`
+	ExecutesGovulncheck      bool     `json:"executes_govulncheck"`
+	BlocksRelease            bool     `json:"blocks_release"`
+	RecordCount              int      `json:"record_count"`
+	Artifact                 string   `json:"artifact"`
+	RecordArtifact           string   `json:"record_artifact"`
+	Notes                    []string `json:"notes,omitempty"`
+}
+
+type CIBaselineGateStore struct {
+	PackID      string                 `json:"pack_id"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	RecordCount int                    `json:"record_count"`
+	Records     []CIBaselineGateRecord `json:"records"`
+}
+
+type CIBaselineGateRecord struct {
+	PackID                   string           `json:"pack_id"`
+	CreatedAt                time.Time        `json:"created_at"`
+	Status                   string           `json:"status"`
+	RecordID                 string           `json:"record_id"`
+	RequestID                string           `json:"request_id"`
+	RequestKey               string           `json:"request_key"`
+	ApprovalID               string           `json:"approval_id,omitempty"`
+	BaseID                   string           `json:"base_id"`
+	TargetID                 string           `json:"target_id"`
+	TargetCurrent            bool             `json:"target_current"`
+	FailOnRisk               string           `json:"fail_on_risk"`
+	RequestedBy              string           `json:"requested_by,omitempty"`
+	Reason                   string           `json:"reason,omitempty"`
+	Blocked                  bool             `json:"blocked"`
+	RiskLevel                string           `json:"risk_level"`
+	CIBaselineStoreReady     bool             `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady bool             `json:"ci_baseline_writeback_ready"`
+	WritesCIBaselineStore    bool             `json:"writes_ci_baseline_store"`
+	CIGatePlanReady          bool             `json:"ci_gate_plan_ready"`
+	CIGateReady              bool             `json:"ci_gate_ready"`
+	GovulncheckPlanReady     bool             `json:"govulncheck_plan_ready"`
+	GovulncheckReady         bool             `json:"govulncheck_ready"`
+	VulnerabilityReady       bool             `json:"vulnerability_ready"`
+	WritesCIWorkflow         bool             `json:"writes_ci_workflow"`
+	ExecutesGovulncheck      bool             `json:"executes_govulncheck"`
+	BlocksRelease            bool             `json:"blocks_release"`
+	Base                     SnapshotSummary  `json:"base"`
+	Target                   SnapshotSummary  `json:"target"`
+	CIGatePlan               CIGatePlanReport `json:"ci_gate_plan"`
+	Artifacts                []string         `json:"artifacts"`
+	Actions                  []string         `json:"actions"`
+	BlockedBy                []string         `json:"blocked_by"`
+	Labels                   []string         `json:"labels"`
+	Notes                    []string         `json:"notes,omitempty"`
+}
+
+type CIBaselineWritebackReport struct {
+	PackID                   string                 `json:"pack_id"`
+	GeneratedAt              time.Time              `json:"generated_at"`
+	Status                   string                 `json:"status"`
+	RecordID                 string                 `json:"record_id"`
+	RequestID                string                 `json:"request_id"`
+	RequestKey               string                 `json:"request_key"`
+	ApprovalID               string                 `json:"approval_id,omitempty"`
+	BaseID                   string                 `json:"base_id"`
+	TargetID                 string                 `json:"target_id"`
+	TargetCurrent            bool                   `json:"target_current"`
+	FailOnRisk               string                 `json:"fail_on_risk"`
+	RequestedBy              string                 `json:"requested_by,omitempty"`
+	Reason                   string                 `json:"reason,omitempty"`
+	Blocked                  bool                   `json:"blocked"`
+	RiskLevel                string                 `json:"risk_level"`
+	CIBaselineStoreReady     bool                   `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady bool                   `json:"ci_baseline_writeback_ready"`
+	WritesCIBaselineStore    bool                   `json:"writes_ci_baseline_store"`
+	CIGatePlanReady          bool                   `json:"ci_gate_plan_ready"`
+	CIGateReady              bool                   `json:"ci_gate_ready"`
+	GovulncheckPlanReady     bool                   `json:"govulncheck_plan_ready"`
+	GovulncheckReady         bool                   `json:"govulncheck_ready"`
+	VulnerabilityReady       bool                   `json:"vulnerability_ready"`
+	WritesCIWorkflow         bool                   `json:"writes_ci_workflow"`
+	ExecutesGovulncheck      bool                   `json:"executes_govulncheck"`
+	BlocksRelease            bool                   `json:"blocks_release"`
+	CIGatePlan               CIGatePlanReport       `json:"ci_gate_plan"`
+	CIBaselineStore          CIBaselineStoreSummary `json:"ci_baseline_store"`
+	CIBaselineRecord         CIBaselineGateRecord   `json:"ci_baseline_record"`
+	Artifacts                []string               `json:"artifacts"`
+	Actions                  []string               `json:"actions"`
+	BlockedBy                []string               `json:"blocked_by"`
+	Labels                   []string               `json:"labels"`
+	Notes                    []string               `json:"notes,omitempty"`
+}
+
 var safeIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,79}$`)
 
 func New(cfg Config) *Handler {
@@ -209,6 +325,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/diff", Handler: h.Diff},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/", Handler: h.CycloneDX},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan", Handler: h.CIGatePlan},
+		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/baseline/writeback", Handler: h.CIBaselineWriteback},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/", Handler: h.Evidence},
 	}
 }
@@ -224,28 +341,36 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                PackID,
-		"stage":                  "pack-shell-before-ci",
-		"scanner_ready":          true,
-		"cyclonedx_ready":        true,
-		"ci_gate_plan_ready":     true,
-		"ci_gate_ready":          false,
-		"vulnerability_ready":    false,
-		"govulncheck_plan_ready": true,
-		"govulncheck_ready":      false,
-		"snapshot_count":         len(snapshots),
-		"repo_root":              h.repoRoot,
-		"store_dir":              h.dataDir,
+		"pack_id":                     PackID,
+		"stage":                       "pack-shell-before-ci",
+		"scanner_ready":               true,
+		"cyclonedx_ready":             true,
+		"ci_gate_plan_ready":          true,
+		"ci_baseline_store_ready":     true,
+		"ci_baseline_writeback_ready": true,
+		"ci_gate_ready":               false,
+		"vulnerability_ready":         false,
+		"govulncheck_plan_ready":      true,
+		"govulncheck_ready":           false,
+		"writes_ci_baseline_store":    false,
+		"writes_ci_workflow":          false,
+		"executes_govulncheck":        false,
+		"blocks_release":              false,
+		"ci_baseline_store":           h.ciBaselineStoreSummary(),
+		"snapshot_count":              len(snapshots),
+		"repo_root":                   h.repoRoot,
+		"store_dir":                   h.dataDir,
 		"capabilities": []string{
 			"sbom.snapshot.go_mod",
 			"sbom.snapshot.npm_package_json",
 			"sbom.drift.diff",
 			"sbom.cyclonedx.export",
 			"sbom.ci_gate.plan",
+			"sbom.ci_baseline.writeback",
 			"sbom.govulncheck.plan",
 			"sbom.evidence.export",
 		},
-		"notes": []string{"CycloneDX JSON export, CI gate plan, and govulncheck command preview are available as non-destructive pack contracts; govulncheck execution and CI write-back remain follow-up wiring."},
+		"notes": []string{"CycloneDX JSON export, CI gate plan, pack-local CI baseline gate write-back, and govulncheck command preview are available as pack contracts; govulncheck execution, CI workflow write-back, and real release blocking remain follow-up wiring."},
 	})
 }
 
@@ -363,6 +488,24 @@ func (h *Handler) CIGatePlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
+func (h *Handler) CIBaselineWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req CIBaselineWritebackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.BaseID) == "" {
+		writeError(w, http.StatusBadRequest, "base_id is required")
+		return
+	}
+	report, err := h.writeCIBaselineRecord(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"writeback": report})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -375,15 +518,18 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ciGatePlan := h.buildCIGatePlan(diffSnapshots(snapshot, snapshot), snapshot, "high", "evidence-export", "snapshot evidence schema snapshot")
+	records, _ := h.loadCIBaselineRecords()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":          PackID,
-		"exported_at":      h.now().UTC(),
-		"format":           "json-sbom-drift-evidence",
-		"files":            []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json"},
-		"snapshot":         snapshot,
-		"cyclonedx":        h.buildCycloneDX(snapshot),
-		"ci_gate_plan":     ciGatePlan,
-		"govulncheck_plan": ciGatePlan.GovulncheckPlan,
+		"pack_id":             PackID,
+		"exported_at":         h.now().UTC(),
+		"format":              "json-sbom-drift-evidence",
+		"files":               []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json", "ci-baseline-store.json", "ci-baseline-record.json"},
+		"snapshot":            snapshot,
+		"cyclonedx":           h.buildCycloneDX(snapshot),
+		"ci_gate_plan":        ciGatePlan,
+		"govulncheck_plan":    ciGatePlan.GovulncheckPlan,
+		"ci_baseline_store":   h.ciBaselineStoreSummary(),
+		"ci_baseline_records": records,
 	})
 }
 
@@ -516,6 +662,156 @@ func (h *Handler) buildCIGatePlan(diff DiffResult, target Snapshot, failOnRisk, 
 		Notes: []string{
 			"This route is non-destructive: it does not write CI workflow files, invoke govulncheck, fetch the vulnerability database, or block a release by itself.",
 			"Use the plan shape as the contract for the later CI baseline gate and govulncheck runtime write-back slice.",
+		},
+	}
+}
+
+func (h *Handler) writeCIBaselineRecord(req CIBaselineWritebackRequest) (CIBaselineWritebackReport, error) {
+	base, err := h.loadSnapshot(req.BaseID)
+	if err != nil {
+		return CIBaselineWritebackReport{}, fmt.Errorf("base snapshot not found: %s", req.BaseID)
+	}
+	target, err := h.resolveTargetSnapshot(req.TargetID, req.TargetCurrent)
+	if err != nil {
+		return CIBaselineWritebackReport{}, err
+	}
+	plan := h.buildCIGatePlan(diffSnapshots(base, target), target, req.FailOnRisk, req.RequestedBy, req.Reason)
+	record := h.ciBaselineRecordFromPlan(req, plan)
+	if err := h.saveCIBaselineRecord(record); err != nil {
+		return CIBaselineWritebackReport{}, err
+	}
+	store := h.ciBaselineStoreSummary()
+	return CIBaselineWritebackReport{
+		PackID:                   PackID,
+		GeneratedAt:              h.now().UTC(),
+		Status:                   record.Status,
+		RecordID:                 record.RecordID,
+		RequestID:                record.RequestID,
+		RequestKey:               record.RequestKey,
+		ApprovalID:               record.ApprovalID,
+		BaseID:                   record.BaseID,
+		TargetID:                 record.TargetID,
+		TargetCurrent:            record.TargetCurrent,
+		FailOnRisk:               record.FailOnRisk,
+		RequestedBy:              record.RequestedBy,
+		Reason:                   record.Reason,
+		Blocked:                  record.Blocked,
+		RiskLevel:                record.RiskLevel,
+		CIBaselineStoreReady:     true,
+		CIBaselineWritebackReady: true,
+		WritesCIBaselineStore:    true,
+		CIGatePlanReady:          true,
+		CIGateReady:              false,
+		GovulncheckPlanReady:     plan.GovulncheckPlanReady,
+		GovulncheckReady:         false,
+		VulnerabilityReady:       false,
+		WritesCIWorkflow:         false,
+		ExecutesGovulncheck:      false,
+		BlocksRelease:            false,
+		CIGatePlan:               plan,
+		CIBaselineStore:          store,
+		CIBaselineRecord:         record,
+		Artifacts:                record.Artifacts,
+		Actions:                  record.Actions,
+		BlockedBy:                record.BlockedBy,
+		Labels:                   record.Labels,
+		Notes: []string{
+			"Pack-local CI baseline gate write-back record persisted for later CI baseline gate wiring.",
+			"This is not a CI workflow write-back, govulncheck execution, vulnerability DB fetch, or real release blocker.",
+		},
+	}, nil
+}
+
+func (h *Handler) ciBaselineRecordFromPlan(req CIBaselineWritebackRequest, plan CIGatePlanReport) CIBaselineGateRecord {
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "persist SBOM CI baseline gate handoff for later release pipeline consumption"
+	}
+	requestID := strings.TrimSpace(req.RequestID)
+	if requestID == "" {
+		requestID = deterministicID("sbom-ci-baseline-request", req.BaseID, plan.Diff.Target.ID, requestedBy, reason)
+	}
+	requestKey := strings.TrimSpace(req.RequestKey)
+	if requestKey == "" {
+		requestKey = deterministicID("sbom-ci-baseline", req.BaseID, plan.Diff.Target.ID, plan.FailOnRisk)
+	}
+	status := "ci_baseline_gate_record_stored_pending_ci_wiring"
+	blockedBy := []string{"ci-workflow-writer-not-wired", "govulncheck-runtime-not-wired", "release-blocker-not-wired"}
+	if plan.Blocked {
+		blockedBy = append(blockedBy, "ci-baseline-drift-block-plan")
+	}
+	actions := []string{
+		"persisted CI baseline gate decision into pack-local JSON store for later release pipeline consumption",
+		"kept CI workflow write-back, govulncheck execution, vulnerability DB fetch, and real release blocking disabled",
+	}
+	return CIBaselineGateRecord{
+		PackID:                   PackID,
+		CreatedAt:                h.now().UTC(),
+		Status:                   status,
+		RecordID:                 deterministicID("sbom-ci-baseline-record", requestKey, requestID),
+		RequestID:                requestID,
+		RequestKey:               requestKey,
+		ApprovalID:               strings.TrimSpace(req.ApprovalID),
+		BaseID:                   req.BaseID,
+		TargetID:                 plan.Diff.Target.ID,
+		TargetCurrent:            req.TargetCurrent || strings.TrimSpace(req.TargetID) == "",
+		FailOnRisk:               plan.FailOnRisk,
+		RequestedBy:              requestedBy,
+		Reason:                   reason,
+		Blocked:                  plan.Blocked,
+		RiskLevel:                plan.Diff.RiskLevel,
+		CIBaselineStoreReady:     true,
+		CIBaselineWritebackReady: true,
+		WritesCIBaselineStore:    true,
+		CIGatePlanReady:          true,
+		CIGateReady:              false,
+		GovulncheckPlanReady:     plan.GovulncheckPlanReady,
+		GovulncheckReady:         false,
+		VulnerabilityReady:       false,
+		WritesCIWorkflow:         false,
+		ExecutesGovulncheck:      false,
+		BlocksRelease:            false,
+		Base:                     plan.Diff.Base,
+		Target:                   plan.Diff.Target,
+		CIGatePlan:               plan,
+		Artifacts:                []string{"ci-baseline-store.json", "ci-baseline-record.json", "ci-gate-plan.json", "govulncheck-plan.json"},
+		Actions:                  actions,
+		BlockedBy:                blockedBy,
+		Labels:                   []string{"sbom-drift", "ci-baseline", "pack-local-store", "no-ci-workflow-write", "no-govulncheck-exec"},
+		Notes: []string{
+			"Store readiness covers only the pack-local CI baseline gate handoff record.",
+			"Release blocking remains plan-only until a CI workflow or release gate consumes this record explicitly.",
+		},
+	}
+}
+
+func (h *Handler) ciBaselineStoreSummary() CIBaselineStoreSummary {
+	records, _ := h.loadCIBaselineRecords()
+	return CIBaselineStoreSummary{
+		PackID:                   PackID,
+		Store:                    "pack-local-json",
+		StoreReady:               true,
+		CIBaselineStoreReady:     true,
+		CIBaselineWritebackReady: true,
+		CIGatePlanReady:          true,
+		CIGateReady:              false,
+		GovulncheckPlanReady:     true,
+		GovulncheckReady:         false,
+		VulnerabilityReady:       false,
+		WritesCIBaselineStore:    false,
+		WritesCIWorkflow:         false,
+		ExecutesGovulncheck:      false,
+		BlocksRelease:            false,
+		RecordCount:              len(records),
+		Artifact:                 "ci-baseline-store.json",
+		RecordArtifact:           "ci-baseline-record.json",
+		Notes: []string{
+			"Store readiness covers only pack-local CI baseline gate handoff records.",
+			"CI workflow write-back, govulncheck execution, vulnerability DB fetch, and real release blocking remain disabled.",
 		},
 	}
 }
@@ -765,6 +1061,70 @@ func (h *Handler) listSnapshots() ([]SnapshotSummary, error) {
 	return out, nil
 }
 
+func (h *Handler) ciBaselineStorePath() string {
+	return filepath.Join(h.dataDir, "ci-baseline-store.json")
+}
+
+func (h *Handler) loadCIBaselineRecords() ([]CIBaselineGateRecord, error) {
+	data, err := os.ReadFile(h.ciBaselineStorePath())
+	if os.IsNotExist(err) {
+		return []CIBaselineGateRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var store CIBaselineGateStore
+	if err := json.Unmarshal(data, &store); err != nil {
+		return nil, err
+	}
+	if store.Records == nil {
+		return []CIBaselineGateRecord{}, nil
+	}
+	return store.Records, nil
+}
+
+func (h *Handler) saveCIBaselineRecord(record CIBaselineGateRecord) error {
+	records, err := h.loadCIBaselineRecords()
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i, existing := range records {
+		if existing.RequestKey == record.RequestKey || existing.RecordID == record.RecordID {
+			records[i] = record
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		records = append(records, record)
+	}
+	sort.SliceStable(records, func(i, j int) bool {
+		return records[i].CreatedAt.After(records[j].CreatedAt)
+	})
+	store := CIBaselineGateStore{
+		PackID:      PackID,
+		UpdatedAt:   h.now().UTC(),
+		RecordCount: len(records),
+		Records:     records,
+	}
+	if err := os.MkdirAll(h.dataDir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(store, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(h.ciBaselineStorePath(), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	recordData, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(h.dataDir, "ci-baseline-record.json"), append(recordData, '\n'), 0o644)
+}
+
 func diffSnapshots(base Snapshot, target Snapshot) DiffResult {
 	baseMap := componentMap(base.Components)
 	targetMap := componentMap(target.Components)
@@ -795,6 +1155,18 @@ func diffSnapshots(base Snapshot, target Snapshot) DiffResult {
 	sortChanges(removed)
 	sortChanges(changed)
 	return DiffResult{Base: toSummary(base), Target: toSummary(target), Added: added, Removed: removed, Changed: changed, RiskLevel: risk, Notes: []string{"Known-CVE blocking is not connected yet; this pack shell reports dependency drift only."}}
+}
+
+func deterministicID(parts ...string) string {
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value != "" {
+			normalized = append(normalized, value)
+		}
+	}
+	sum := sha256.Sum256([]byte(strings.Join(normalized, "\x00")))
+	return hex.EncodeToString(sum[:])[:24]
 }
 
 func componentMap(components []Component) map[string]Component {
