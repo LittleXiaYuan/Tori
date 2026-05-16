@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -145,6 +146,17 @@ type CIBaselineWritebackRequest struct {
 	RequestKey    string `json:"request_key,omitempty"`
 }
 
+type CIWorkflowWritebackPlanRequest struct {
+	RecordID     string `json:"record_id,omitempty"`
+	RequestID    string `json:"request_id,omitempty"`
+	RequestKey   string `json:"request_key,omitempty"`
+	BaseID       string `json:"base_id,omitempty"`
+	RequestedBy  string `json:"requested_by,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	WorkflowPath string `json:"workflow_path,omitempty"`
+	JobName      string `json:"job_name,omitempty"`
+}
+
 type CIGatePlanReport struct {
 	PackID               string          `json:"pack_id"`
 	GeneratedAt          time.Time       `json:"generated_at"`
@@ -199,6 +211,8 @@ type CIBaselineStoreSummary struct {
 	StoreReady               bool     `json:"store_ready"`
 	CIBaselineStoreReady     bool     `json:"ci_baseline_store_ready"`
 	CIBaselineWritebackReady bool     `json:"ci_baseline_writeback_ready"`
+	CIWorkflowPlanReady      bool     `json:"ci_workflow_writeback_plan_ready"`
+	CIWorkflowWritebackReady bool     `json:"ci_workflow_writeback_ready"`
 	CIGatePlanReady          bool     `json:"ci_gate_plan_ready"`
 	CIGateReady              bool     `json:"ci_gate_ready"`
 	GovulncheckPlanReady     bool     `json:"govulncheck_plan_ready"`
@@ -212,6 +226,89 @@ type CIBaselineStoreSummary struct {
 	Artifact                 string   `json:"artifact"`
 	RecordArtifact           string   `json:"record_artifact"`
 	Notes                    []string `json:"notes,omitempty"`
+}
+
+type CIWorkflowStepPlan struct {
+	Step                int    `json:"step"`
+	Name                string `json:"name"`
+	Run                 string `json:"run,omitempty"`
+	Artifact            string `json:"artifact,omitempty"`
+	Required            bool   `json:"required"`
+	WritesFiles         bool   `json:"writes_files"`
+	ExecutesGovulncheck bool   `json:"executes_govulncheck"`
+	BlocksRelease       bool   `json:"blocks_release"`
+	Description         string `json:"description,omitempty"`
+}
+
+type CIWorkflowHandoffPlan struct {
+	Target                   string               `json:"target"`
+	SourceStore              string               `json:"source_store"`
+	SourceRecordArtifact     string               `json:"source_record_artifact"`
+	WorkflowPath             string               `json:"workflow_path"`
+	JobName                  string               `json:"job_name"`
+	DedupKey                 string               `json:"dedup_key"`
+	ConsumesCIBaselineStore  bool                 `json:"consumes_ci_baseline_store"`
+	CIWorkflowPlanReady      bool                 `json:"ci_workflow_writeback_plan_ready"`
+	CIWorkflowWritebackReady bool                 `json:"ci_workflow_writeback_ready"`
+	CIGatePlanReady          bool                 `json:"ci_gate_plan_ready"`
+	GovulncheckPlanReady     bool                 `json:"govulncheck_plan_ready"`
+	GovulncheckReady         bool                 `json:"govulncheck_ready"`
+	WritesCIWorkflow         bool                 `json:"writes_ci_workflow"`
+	ExecutesGovulncheck      bool                 `json:"executes_govulncheck"`
+	BlocksRelease            bool                 `json:"blocks_release"`
+	Steps                    []CIWorkflowStepPlan `json:"steps"`
+	BlockedBy                []string             `json:"blocked_by"`
+	Notes                    []string             `json:"notes,omitempty"`
+}
+
+type ReleaseBlockerPlan struct {
+	GateName             string   `json:"gate_name"`
+	Threshold            string   `json:"threshold"`
+	RiskLevel            string   `json:"risk_level"`
+	WouldBlock           bool     `json:"would_block"`
+	BlocksRelease        bool     `json:"blocks_release"`
+	SourceRecordID       string   `json:"source_record_id"`
+	SourceRecordArtifact string   `json:"source_record_artifact"`
+	BlockedBy            []string `json:"blocked_by"`
+	Notes                []string `json:"notes,omitempty"`
+}
+
+type CIWorkflowWritebackPlanReport struct {
+	PackID                   string                 `json:"pack_id"`
+	GeneratedAt              time.Time              `json:"generated_at"`
+	Status                   string                 `json:"status"`
+	Stage                    string                 `json:"stage"`
+	RecordID                 string                 `json:"record_id"`
+	RequestID                string                 `json:"request_id"`
+	RequestKey               string                 `json:"request_key"`
+	RequestedBy              string                 `json:"requested_by,omitempty"`
+	Reason                   string                 `json:"reason,omitempty"`
+	Blocked                  bool                   `json:"blocked"`
+	RiskLevel                string                 `json:"risk_level"`
+	FailOnRisk               string                 `json:"fail_on_risk"`
+	CIBaselineStoreReady     bool                   `json:"ci_baseline_store_ready"`
+	CIBaselineWritebackReady bool                   `json:"ci_baseline_writeback_ready"`
+	CIWorkflowPlanReady      bool                   `json:"ci_workflow_writeback_plan_ready"`
+	CIWorkflowWritebackReady bool                   `json:"ci_workflow_writeback_ready"`
+	ConsumesCIBaselineStore  bool                   `json:"consumes_ci_baseline_store"`
+	CIGatePlanReady          bool                   `json:"ci_gate_plan_ready"`
+	CIGateReady              bool                   `json:"ci_gate_ready"`
+	GovulncheckPlanReady     bool                   `json:"govulncheck_plan_ready"`
+	GovulncheckReady         bool                   `json:"govulncheck_ready"`
+	VulnerabilityReady       bool                   `json:"vulnerability_ready"`
+	WritesCIBaselineStore    bool                   `json:"writes_ci_baseline_store"`
+	WritesCIWorkflow         bool                   `json:"writes_ci_workflow"`
+	ExecutesGovulncheck      bool                   `json:"executes_govulncheck"`
+	BlocksRelease            bool                   `json:"blocks_release"`
+	CIBaselineStore          CIBaselineStoreSummary `json:"ci_baseline_store"`
+	CIBaselineRecord         CIBaselineGateRecord   `json:"ci_baseline_record"`
+	CIWorkflowHandoffPlan    CIWorkflowHandoffPlan  `json:"ci_workflow_handoff_plan"`
+	ReleaseBlockerPlan       ReleaseBlockerPlan     `json:"release_blocker_plan"`
+	Artifacts                []string               `json:"artifacts"`
+	Actions                  []string               `json:"actions"`
+	BlockedBy                []string               `json:"blocked_by"`
+	Labels                   []string               `json:"labels"`
+	Notes                    []string               `json:"notes,omitempty"`
 }
 
 type CIBaselineGateStore struct {
@@ -326,6 +423,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/", Handler: h.CycloneDX},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan", Handler: h.CIGatePlan},
 		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/baseline/writeback", Handler: h.CIBaselineWriteback},
+		{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/workflow/writeback/plan", Handler: h.CIWorkflowWritebackPlan},
 		{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/", Handler: h.Evidence},
 	}
 }
@@ -341,25 +439,28 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                     PackID,
-		"stage":                       "pack-shell-before-ci",
-		"scanner_ready":               true,
-		"cyclonedx_ready":             true,
-		"ci_gate_plan_ready":          true,
-		"ci_baseline_store_ready":     true,
-		"ci_baseline_writeback_ready": true,
-		"ci_gate_ready":               false,
-		"vulnerability_ready":         false,
-		"govulncheck_plan_ready":      true,
-		"govulncheck_ready":           false,
-		"writes_ci_baseline_store":    false,
-		"writes_ci_workflow":          false,
-		"executes_govulncheck":        false,
-		"blocks_release":              false,
-		"ci_baseline_store":           h.ciBaselineStoreSummary(),
-		"snapshot_count":              len(snapshots),
-		"repo_root":                   h.repoRoot,
-		"store_dir":                   h.dataDir,
+		"pack_id":                          PackID,
+		"stage":                            "pack-shell-before-ci",
+		"scanner_ready":                    true,
+		"cyclonedx_ready":                  true,
+		"ci_gate_plan_ready":               true,
+		"ci_baseline_store_ready":          true,
+		"ci_baseline_writeback_ready":      true,
+		"ci_workflow_writeback_plan_ready": true,
+		"ci_workflow_writeback_ready":      false,
+		"consumes_ci_baseline_store":       false,
+		"ci_gate_ready":                    false,
+		"vulnerability_ready":              false,
+		"govulncheck_plan_ready":           true,
+		"govulncheck_ready":                false,
+		"writes_ci_baseline_store":         false,
+		"writes_ci_workflow":               false,
+		"executes_govulncheck":             false,
+		"blocks_release":                   false,
+		"ci_baseline_store":                h.ciBaselineStoreSummary(),
+		"snapshot_count":                   len(snapshots),
+		"repo_root":                        h.repoRoot,
+		"store_dir":                        h.dataDir,
 		"capabilities": []string{
 			"sbom.snapshot.go_mod",
 			"sbom.snapshot.npm_package_json",
@@ -367,10 +468,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"sbom.cyclonedx.export",
 			"sbom.ci_gate.plan",
 			"sbom.ci_baseline.writeback",
+			"sbom.ci_workflow.writeback_plan",
 			"sbom.govulncheck.plan",
 			"sbom.evidence.export",
 		},
-		"notes": []string{"CycloneDX JSON export, CI gate plan, pack-local CI baseline gate write-back, and govulncheck command preview are available as pack contracts; govulncheck execution, CI workflow write-back, and real release blocking remain follow-up wiring."},
+		"notes": []string{"CycloneDX JSON export, CI gate plan, pack-local CI baseline gate write-back, CI workflow write-back handoff plan, and govulncheck command preview are available as pack contracts; govulncheck execution, CI workflow write-back, and real release blocking remain follow-up wiring."},
 	})
 }
 
@@ -506,6 +608,24 @@ func (h *Handler) CIBaselineWriteback(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"writeback": report})
 }
 
+func (h *Handler) CIWorkflowWritebackPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req CIWorkflowWritebackPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "invalid CI workflow writeback plan payload")
+		return
+	}
+	report, err := h.buildCIWorkflowWritebackPlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": report})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -519,18 +639,26 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	}
 	ciGatePlan := h.buildCIGatePlan(diffSnapshots(snapshot, snapshot), snapshot, "high", "evidence-export", "snapshot evidence schema snapshot")
 	records, _ := h.loadCIBaselineRecords()
-	writeJSON(w, http.StatusOK, map[string]any{
+	files := []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json", "ci-baseline-store.json", "ci-baseline-record.json"}
+	payload := map[string]any{
 		"pack_id":             PackID,
 		"exported_at":         h.now().UTC(),
 		"format":              "json-sbom-drift-evidence",
-		"files":               []string{"snapshot.json", "meta.json", "sbom.cdx.json", "ci-gate-plan.json", "govulncheck-plan.json", "ci-baseline-store.json", "ci-baseline-record.json"},
 		"snapshot":            snapshot,
 		"cyclonedx":           h.buildCycloneDX(snapshot),
 		"ci_gate_plan":        ciGatePlan,
 		"govulncheck_plan":    ciGatePlan.GovulncheckPlan,
 		"ci_baseline_store":   h.ciBaselineStoreSummary(),
 		"ci_baseline_records": records,
-	})
+	}
+	if workflowPlan, err := h.buildCIWorkflowWritebackPlan(CIWorkflowWritebackPlanRequest{BaseID: id, RequestedBy: "evidence-export", Reason: "snapshot CI workflow handoff evidence"}); err == nil {
+		files = append(files, "ci-workflow-writeback-plan.json", "ci-workflow-handoff-plan.json", "release-blocker-plan.json")
+		payload["ci_workflow_writeback_plan"] = workflowPlan
+		payload["ci_workflow_handoff_plan"] = workflowPlan.CIWorkflowHandoffPlan
+		payload["release_blocker_plan"] = workflowPlan.ReleaseBlockerPlan
+	}
+	payload["files"] = files
+	writeJSON(w, http.StatusOK, payload)
 }
 
 func (h *Handler) createSnapshot(id string, source string) (Snapshot, error) {
@@ -797,6 +925,8 @@ func (h *Handler) ciBaselineStoreSummary() CIBaselineStoreSummary {
 		StoreReady:               true,
 		CIBaselineStoreReady:     true,
 		CIBaselineWritebackReady: true,
+		CIWorkflowPlanReady:      true,
+		CIWorkflowWritebackReady: false,
 		CIGatePlanReady:          true,
 		CIGateReady:              false,
 		GovulncheckPlanReady:     true,
@@ -811,9 +941,168 @@ func (h *Handler) ciBaselineStoreSummary() CIBaselineStoreSummary {
 		RecordArtifact:           "ci-baseline-record.json",
 		Notes: []string{
 			"Store readiness covers only pack-local CI baseline gate handoff records.",
-			"CI workflow write-back, govulncheck execution, vulnerability DB fetch, and real release blocking remain disabled.",
+			"CI workflow write-back plan readiness means the future handoff shape is available; CI workflow mutation, govulncheck execution, vulnerability DB fetch, and real release blocking remain disabled.",
 		},
 	}
+}
+
+func (h *Handler) buildCIWorkflowWritebackPlan(req CIWorkflowWritebackPlanRequest) (CIWorkflowWritebackPlanReport, error) {
+	record, ok := h.ciBaselineRecordForWorkflowPlan(req)
+	if !ok {
+		return CIWorkflowWritebackPlanReport{}, fmt.Errorf("CI baseline record not found; run /v1/sbom-drift/ci-gate/baseline/writeback before planning CI workflow write-back")
+	}
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	if requestedBy == "" {
+		requestedBy = record.RequestedBy
+	}
+	if requestedBy == "" {
+		requestedBy = "operator"
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "plan CI workflow write-back from pack-local SBOM baseline store"
+	}
+	workflowPath, err := normalizeWorkflowPath(req.WorkflowPath)
+	if err != nil {
+		return CIWorkflowWritebackPlanReport{}, err
+	}
+	jobName := strings.TrimSpace(req.JobName)
+	if jobName == "" {
+		jobName = "sbom-drift-gate"
+	}
+	dedupKey := deterministicID("sbom-ci-workflow-handoff", record.RecordID, record.RequestKey, workflowPath, jobName)
+	steps := []CIWorkflowStepPlan{
+		{Step: 1, Name: "checkout", Run: "actions/checkout@v4", Required: true, Description: "future workflow step placeholder; this route does not write workflow YAML"},
+		{Step: 2, Name: "restore-pack-local-baseline", Artifact: "ci-baseline-store.json", Required: true, Description: "future workflow should consume the pack-local baseline handoff record"},
+		{Step: 3, Name: "export-cyclonedx", Run: "make sbom", Artifact: "dist/sbom.cdx.json", Required: true, Description: "future workflow should export CycloneDX evidence before release"},
+		{Step: 4, Name: "govulncheck-plan", Run: record.CIGatePlan.GovulncheckPlan.Command + " > " + record.CIGatePlan.GovulncheckPlan.ReportArtifact, Artifact: record.CIGatePlan.GovulncheckPlan.ReportArtifact, Required: true, Description: "planned scanner command only; execution remains unwired in this route"},
+		{Step: 5, Name: "release-blocker-plan", Artifact: "release-blocker-plan.json", Required: true, Description: "future release gate should use this decision; this route does not block release"},
+	}
+	blockedBy := appendUnique(record.BlockedBy, "ci-workflow-writer-not-wired", "govulncheck-runtime-not-wired", "release-blocker-not-wired")
+	handoff := CIWorkflowHandoffPlan{
+		Target:                   "ci.workflow.sbom_drift_release_gate",
+		SourceStore:              "ci-baseline-store.json",
+		SourceRecordArtifact:     "ci-baseline-record.json",
+		WorkflowPath:             workflowPath,
+		JobName:                  jobName,
+		DedupKey:                 dedupKey,
+		ConsumesCIBaselineStore:  true,
+		CIWorkflowPlanReady:      true,
+		CIWorkflowWritebackReady: false,
+		CIGatePlanReady:          true,
+		GovulncheckPlanReady:     record.GovulncheckPlanReady,
+		GovulncheckReady:         false,
+		WritesCIWorkflow:         false,
+		ExecutesGovulncheck:      false,
+		BlocksRelease:            false,
+		Steps:                    steps,
+		BlockedBy:                blockedBy,
+		Notes: []string{
+			"Plan-only CI workflow handoff contract; no workflow YAML is created or modified.",
+			"Use dedup_key with request_key so a later workflow writer can consume the pack-local record idempotently.",
+		},
+	}
+	releaseBlocker := ReleaseBlockerPlan{
+		GateName:             jobName,
+		Threshold:            record.FailOnRisk,
+		RiskLevel:            record.RiskLevel,
+		WouldBlock:           record.Blocked,
+		BlocksRelease:        false,
+		SourceRecordID:       record.RecordID,
+		SourceRecordArtifact: "ci-baseline-record.json",
+		BlockedBy:            appendUnique([]string{"release-blocker-not-wired"}, "ci-workflow-writer-not-wired", "govulncheck-runtime-not-wired"),
+		Notes: []string{
+			"would_block previews the later release decision only.",
+			"blocks_release=false because no CI workflow or release gate consumes this plan yet.",
+		},
+	}
+	return CIWorkflowWritebackPlanReport{
+		PackID:                   PackID,
+		GeneratedAt:              h.now().UTC(),
+		Status:                   "ci_workflow_writeback_plan_ready_pending_ci_writer",
+		Stage:                    "workflow-plan-before-ci-write",
+		RecordID:                 record.RecordID,
+		RequestID:                record.RequestID,
+		RequestKey:               record.RequestKey,
+		RequestedBy:              requestedBy,
+		Reason:                   reason,
+		Blocked:                  record.Blocked,
+		RiskLevel:                record.RiskLevel,
+		FailOnRisk:               record.FailOnRisk,
+		CIBaselineStoreReady:     true,
+		CIBaselineWritebackReady: true,
+		CIWorkflowPlanReady:      true,
+		CIWorkflowWritebackReady: false,
+		ConsumesCIBaselineStore:  true,
+		CIGatePlanReady:          true,
+		CIGateReady:              false,
+		GovulncheckPlanReady:     record.GovulncheckPlanReady,
+		GovulncheckReady:         false,
+		VulnerabilityReady:       false,
+		WritesCIBaselineStore:    false,
+		WritesCIWorkflow:         false,
+		ExecutesGovulncheck:      false,
+		BlocksRelease:            false,
+		CIBaselineStore:          h.ciBaselineStoreSummary(),
+		CIBaselineRecord:         record,
+		CIWorkflowHandoffPlan:    handoff,
+		ReleaseBlockerPlan:       releaseBlocker,
+		Artifacts:                []string{"ci-workflow-writeback-plan.json", "ci-workflow-handoff-plan.json", "release-blocker-plan.json", "ci-baseline-store.json", "ci-baseline-record.json", "ci-gate-plan.json", "govulncheck-plan.json"},
+		Actions: []string{
+			"mapped the pack-local CI baseline gate record into a future CI workflow writer contract",
+			"kept workflow YAML mutation, govulncheck execution, vulnerability DB fetch, and release blocking disabled",
+		},
+		BlockedBy: blockedBy,
+		Labels:    []string{"sbom-drift", "ci-workflow", "writeback-plan", "pack-local-store-consumer", "no-ci-workflow-write", "no-govulncheck-exec"},
+		Notes: []string{
+			"ci_workflow_writeback_plan_ready=true means the handoff shape is available for a later CI writer.",
+			"writes_ci_workflow=false, executes_govulncheck=false, and blocks_release=false keep this slice plan-only and reversible.",
+		},
+	}, nil
+}
+
+func (h *Handler) ciBaselineRecordForWorkflowPlan(req CIWorkflowWritebackPlanRequest) (CIBaselineGateRecord, bool) {
+	records, _ := h.loadCIBaselineRecords()
+	recordID := strings.TrimSpace(req.RecordID)
+	requestID := strings.TrimSpace(req.RequestID)
+	requestKey := strings.TrimSpace(req.RequestKey)
+	baseID := strings.TrimSpace(req.BaseID)
+	for _, record := range records {
+		if recordID != "" && record.RecordID == recordID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if requestID != "" && record.RequestID == requestID {
+			return record, true
+		}
+		if requestKey != "" && record.RequestKey == requestKey {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if baseID != "" && record.BaseID == baseID {
+			return record, true
+		}
+	}
+	if len(records) > 0 {
+		return records[0], true
+	}
+	return CIBaselineGateRecord{}, false
+}
+
+func normalizeWorkflowPath(value string) (string, error) {
+	path := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	if path == "" {
+		return ".github/workflows/sbom-drift.yml", nil
+	}
+	if strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
+		return "", fmt.Errorf("workflow_path must be a repository-relative CI workflow path")
+	}
+	if !strings.HasSuffix(path, ".yml") && !strings.HasSuffix(path, ".yaml") {
+		return "", fmt.Errorf("workflow_path must end with .yml or .yaml")
+	}
+	return path, nil
 }
 
 func buildGovulncheckPlan(snapshot Snapshot) GovulncheckPlan {
@@ -1167,6 +1456,21 @@ func deterministicID(parts ...string) string {
 	}
 	sum := sha256.Sum256([]byte(strings.Join(normalized, "\x00")))
 	return hex.EncodeToString(sum[:])[:24]
+}
+
+func appendUnique(values []string, extra ...string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values)+len(extra))
+	for _, value := range append(append([]string{}, values...), extra...) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func componentMap(components []Component) map[string]Component {

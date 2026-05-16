@@ -1,9 +1,9 @@
 {
   "version": 1,
   "domain": "sbom-drift-pack",
-  "description": "SBOM Drift capability pack manifest binding for Pack Runtime route gates, frontend sync, dependency snapshot drift reports, CycloneDX export, CI gate planning, pack-local CI baseline gate write-back, govulncheck command previews, evidence export, and lightweight SDK import discovery.",
+  "description": "SBOM Drift capability pack manifest binding for Pack Runtime route gates, frontend sync, dependency snapshot drift reports, CycloneDX export, CI gate planning, pack-local CI baseline gate write-back, CI workflow write-back handoff planning, govulncheck command previews, evidence export, and lightweight SDK import discovery.",
   "principles": [
-    "Expose dependency snapshot collection, drift diffing, CycloneDX JSON export, CI gate planning, pack-local CI baseline gate write-back, govulncheck plan previews, risk summaries, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
+    "Expose dependency snapshot collection, drift diffing, CycloneDX JSON export, CI gate planning, pack-local CI baseline gate write-back, CI workflow write-back handoff planning, govulncheck plan previews, risk summaries, and JSON evidence export as an optional Pack Runtime capability instead of a hard-coded main-shell feature.",
     "Keep SBOM Drift method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/sbom-drift only when the SBOM Drift pack is installed and enabled."
   ],
@@ -18,6 +18,7 @@
     "GET /v1/sbom-drift/cyclonedx/",
     "POST /v1/sbom-drift/ci-gate/plan",
     "POST /v1/sbom-drift/ci-gate/baseline/writeback",
+    "POST /v1/sbom-drift/ci-gate/workflow/writeback/plan",
     "GET /v1/sbom-drift/evidence/"
   ],
   "frontend": {

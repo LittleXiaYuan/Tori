@@ -26,7 +26,7 @@ if (pack.frontend?.routes?.[0]?.component !== manifest.frontend.component) fail(
 if (pack.update?.rollback !== true) fail("SBOM Drift pack must be rollbackable");
 if (pack.defaultState !== "disabled") fail("SBOM Drift pack should stay default disabled until CI scanner wiring is complete");
 if (pack.metadata?.stage !== "pack-shell-before-ci") fail("SBOM Drift pack should declare pack-shell-before-ci stage");
-for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.ci_baseline.writeback", "sbom.govulncheck.plan"]) {
+for (const capability of ["sbom.cyclonedx.export", "sbom.ci_gate.plan", "sbom.ci_baseline.writeback", "sbom.ci_workflow.writeback_plan", "sbom.govulncheck.plan"]) {
   if (!pack.backend?.capabilities?.includes(capability)) fail(`SBOM Drift pack capability missing: ${capability}`);
 }
 
@@ -44,6 +44,7 @@ for (const token of [
   "/v1/sbom-drift/cyclonedx/",
   "/v1/sbom-drift/ci-gate/plan",
   "/v1/sbom-drift/ci-gate/baseline/writeback",
+  "/v1/sbom-drift/ci-gate/workflow/writeback/plan",
   "/v1/sbom-drift/evidence/",
   "method: \"POST\"",
 ]) {
@@ -59,7 +60,7 @@ for (const token of ["SBOM 依赖漂移", "生成漂移报告", "CycloneDX", "CI
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
-for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/evidence/baseline"]) {
+for (const token of ["/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/baseline", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`SBOM Drift frontend client test missing token: ${token}`);
 }
 
@@ -73,6 +74,8 @@ for (const token of [
   "cyclonedx_ready",
   "ci_gate_plan_ready",
   "ci_baseline_writeback_ready",
+  "ci_workflow_writeback_plan_ready",
+  "consumes_ci_baseline_store",
   "writes_ci_baseline_store",
   "ci_gate_ready",
   "govulncheck_plan_ready",
@@ -82,6 +85,9 @@ for (const token of [
   "govulncheck-plan.json",
   "ci-baseline-store.json",
   "ci-baseline-record.json",
+  "ci-workflow-writeback-plan.json",
+  "ci-workflow-handoff-plan.json",
+  "release-blocker-plan.json",
   "writes_files",
   "CycloneDX",
   "CIGatePlan",
@@ -105,14 +111,19 @@ for (const token of [
   "/v1/sbom-drift/cyclonedx/",
   "/v1/sbom-drift/ci-gate/plan",
   "/v1/sbom-drift/ci-gate/baseline/writeback",
+  "/v1/sbom-drift/ci-gate/workflow/writeback/plan",
   "/v1/sbom-drift/evidence/",
   "SBOMDriftCycloneDXDocument",
   "SBOMDriftCIGatePlan",
   "SBOMDriftCIBaselineWriteback",
+  "SBOMDriftCIWorkflowWritebackPlan",
   "SBOMDriftGovulncheckPlan",
   "govulncheck_plan_ready",
   "govulncheck_plan",
   "ciBaselineWriteback",
+  "ciWorkflowWritebackPlan",
+  "consumes_ci_baseline_store",
+  "ci_workflow_handoff_plan",
   "writes_ci_baseline_store",
   "govulncheck-report.json",
   "writes_files",
@@ -123,6 +134,7 @@ for (const token of [
 
 const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
 if (pkg.exports?.["./sbom-drift"]?.import !== "./src/sbom-drift.ts") fail("yunque-client/sbom-drift subpath export is missing or drifted");
+if (pkg.exports?.["./sbom-drift-ci"]?.import !== "./src/sbom-drift-ci.ts") fail("yunque-client/sbom-drift-ci subpath export is missing or drifted");
 
 const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
 for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftDiff:", "sbomDriftEvidence:"]) {

@@ -17,8 +17,8 @@ func TestSBOMDriftHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 8 {
-		t.Fatalf("expected 8 SBOM drift routes, got %d", len(routes))
+	if len(routes) != 9 {
+		t.Fatalf("expected 9 SBOM drift routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -32,14 +32,15 @@ func TestSBOMDriftHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/sbom-drift/status":                     {http.MethodGet},
-		"/v1/sbom-drift/snapshots":                  {http.MethodGet, http.MethodPost},
-		"/v1/sbom-drift/snapshots/":                 {http.MethodGet},
-		"/v1/sbom-drift/diff":                       {http.MethodPost},
-		"/v1/sbom-drift/cyclonedx/":                 {http.MethodGet},
-		"/v1/sbom-drift/ci-gate/plan":               {http.MethodPost},
-		"/v1/sbom-drift/ci-gate/baseline/writeback": {http.MethodPost},
-		"/v1/sbom-drift/evidence/":                  {http.MethodGet},
+		"/v1/sbom-drift/status":                          {http.MethodGet},
+		"/v1/sbom-drift/snapshots":                       {http.MethodGet, http.MethodPost},
+		"/v1/sbom-drift/snapshots/":                      {http.MethodGet},
+		"/v1/sbom-drift/diff":                            {http.MethodPost},
+		"/v1/sbom-drift/cyclonedx/":                      {http.MethodGet},
+		"/v1/sbom-drift/ci-gate/plan":                    {http.MethodPost},
+		"/v1/sbom-drift/ci-gate/baseline/writeback":      {http.MethodPost},
+		"/v1/sbom-drift/ci-gate/workflow/writeback/plan": {http.MethodPost},
+		"/v1/sbom-drift/evidence/":                       {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -228,6 +229,81 @@ require github.com/example/direct v2.0.0
 	}
 	if len(records) != 1 || records[0].RequestKey != "sbom-baseline" {
 		t.Fatalf("CI baseline store should replace by request key, records=%#v", records)
+	}
+}
+
+func TestSBOMDriftCIWorkflowWritebackPlanConsumesPackLocalBaselineStore(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "go.mod"), `module example.com/demo
+
+go 1.22
+
+require github.com/example/direct v1.2.3
+`)
+	now := time.Date(2026, 5, 15, 14, 0, 0, 0, time.UTC)
+	h := New(Config{RepoRoot: repo, DataDir: t.TempDir(), Now: func() time.Time { return now }})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/snapshots", strings.NewReader(`{"id":"baseline","source":"unit-test"}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create baseline status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	writeFile(t, filepath.Join(repo, "go.mod"), `module example.com/demo
+
+go 1.22
+
+require github.com/example/direct v2.0.0
+`)
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/baseline/writeback", strings.NewReader(`{"base_id":"baseline","target_current":true,"fail_on_risk":"high","requested_by":"unit","request_key":"sbom-baseline"}`))
+	h.CIBaselineWriteback(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("ci baseline writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/workflow/writeback/plan", strings.NewReader(`{"request_key":"sbom-baseline","workflow_path":".github/workflows/security.yml","job_name":"sbom-drift-gate","requested_by":"unit"}`))
+	h.CIWorkflowWritebackPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("ci workflow writeback plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan CIWorkflowWritebackPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode CI workflow writeback plan: %v", err)
+	}
+	if got.Plan.Status != "ci_workflow_writeback_plan_ready_pending_ci_writer" || !got.Plan.CIWorkflowPlanReady || !got.Plan.ConsumesCIBaselineStore {
+		t.Fatalf("unexpected workflow writeback plan identity: %#v", got.Plan)
+	}
+	if got.Plan.CIWorkflowWritebackReady || got.Plan.WritesCIWorkflow || got.Plan.ExecutesGovulncheck || got.Plan.BlocksRelease || got.Plan.GovulncheckReady {
+		t.Fatalf("workflow writeback plan must stay plan-only: %#v", got.Plan)
+	}
+	if got.Plan.CIWorkflowHandoffPlan.WorkflowPath != ".github/workflows/security.yml" || got.Plan.CIWorkflowHandoffPlan.JobName != "sbom-drift-gate" {
+		t.Fatalf("unexpected workflow handoff target: %#v", got.Plan.CIWorkflowHandoffPlan)
+	}
+	if !got.Plan.ReleaseBlockerPlan.WouldBlock || got.Plan.ReleaseBlockerPlan.BlocksRelease {
+		t.Fatalf("release blocker must preview decision without blocking release: %#v", got.Plan.ReleaseBlockerPlan)
+	}
+	for _, artifact := range []string{"ci-workflow-writeback-plan.json", "ci-workflow-handoff-plan.json", "release-blocker-plan.json", "ci-baseline-store.json"} {
+		if !containsString(got.Plan.Artifacts, artifact) {
+			t.Fatalf("workflow writeback plan missing artifact %s: %#v", artifact, got.Plan.Artifacts)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(h.dataDir, "ci-baseline-store.json")); err != nil {
+		t.Fatalf("baseline store should exist: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".github", "workflows", "security.yml")); !os.IsNotExist(err) {
+		t.Fatalf("workflow writeback plan must not create workflow files, stat err=%v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/workflow/writeback/plan", strings.NewReader(`{"request_key":"sbom-baseline","workflow_path":"../security.yml"}`))
+	h.CIWorkflowWritebackPlan(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("invalid workflow path should be rejected, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

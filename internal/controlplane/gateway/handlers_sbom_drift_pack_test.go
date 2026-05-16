@@ -109,6 +109,14 @@ func TestSBOMDriftPackCanExportCycloneDXAndPlanCIGate(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_baseline_writeback_ready":true`) || !strings.Contains(w.Body.String(), `"writes_ci_baseline_store":true`) || !strings.Contains(w.Body.String(), `"writes_ci_workflow":false`) || !strings.Contains(w.Body.String(), `"executes_govulncheck":false`) {
 		t.Fatalf("ci baseline writeback status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/sbom-drift/ci-gate/workflow/writeback/plan", strings.NewReader(`{"request_key":"gateway-sbom","workflow_path":".github/workflows/security.yml"}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"ci_workflow_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"consumes_ci_baseline_store":true`) || !strings.Contains(w.Body.String(), `"writes_ci_workflow":false`) || !strings.Contains(w.Body.String(), `"blocks_release":false`) {
+		t.Fatalf("ci workflow writeback plan status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -132,6 +140,7 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				"/v1/sbom-drift/cyclonedx/",
 				"/v1/sbom-drift/ci-gate/plan",
 				"/v1/sbom-drift/ci-gate/baseline/writeback",
+				"/v1/sbom-drift/ci-gate/workflow/writeback/plan",
 				"/v1/sbom-drift/evidence/",
 			},
 			RouteSpecs: []packruntime.BackendRouteSpec{
@@ -143,6 +152,7 @@ func newTestGatewayWithSBOMDriftPack(t *testing.T, status packruntime.PackStatus
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/cyclonedx/"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/plan"},
 				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/baseline/writeback"},
+				{Method: http.MethodPost, Path: "/v1/sbom-drift/ci-gate/workflow/writeback/plan"},
 				{Method: http.MethodGet, Path: "/v1/sbom-drift/evidence/"},
 			},
 		},

@@ -177,7 +177,7 @@ const checks = [
   {
     name: "TypeScript packs SDK incremental tests",
     command: process.execPath,
-    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "cognitive-canary", "guardrail-fuzzer", "memory-time-travel", "rpa-replay", "sbom-drift", "skill-anomaly", "wasm-plugin"],
+    args: ["scripts/run-incremental-tests.mjs", "packs", "chaos-probe", "cognitive-canary", "guardrail-fuzzer", "memory-time-travel", "rpa-replay", "sbom-drift", "sbom-drift-ci", "skill-anomaly", "wasm-plugin"],
     cwd: "sdk/typescript",
   },
   {
