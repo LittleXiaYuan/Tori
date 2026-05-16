@@ -38,6 +38,7 @@ import { useI18n } from "@/lib/i18n";
 import { formatErrorMessage } from "@/lib/error-utils";
 
 const browserIntentClient = createBrowserIntentPackClient();
+const directPublishScenarioIds = new Set(["xiaohongshu-post-direct", "x-post-direct"]);
 
 export default function BrowserIntentPackPage() {
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function BrowserIntentPackPage() {
   const [screenshotTs, setScreenshotTs] = useState<string>("");
   const [scenarios, setScenarios] = useState<BrowserScenario[]>([]);
   const [runningScenario, setRunningScenario] = useState<string | null>(null);
+  const [publishMode, setPublishMode] = useState<"direct" | "review">("direct");
   const [extConnected, setExtConnected] = useState(false);
   const [desktopSandbox, setDesktopSandbox] = useState<{ id: string; stream_url: string; created_at: string; vnc_log?: string[] } | null>(null);
   const [desktopLoading, setDesktopLoading] = useState(false);
@@ -164,6 +166,10 @@ export default function BrowserIntentPackPage() {
   };
 
   const runScenario = async (scenarioId: string) => {
+    if (publishMode === "review" && directPublishScenarioIds.has(scenarioId)) {
+      showToast("已切换为审核模式：请在工作流页生成可编辑流程，删除/禁用发布节点后再运行。", "warning");
+      return;
+    }
     setRunningScenario(scenarioId);
     const ts = new Date().toLocaleTimeString();
     const scenario = scenarios.find((item) => item.id === scenarioId);
@@ -309,6 +315,54 @@ export default function BrowserIntentPackPage() {
         artifact={lastArtifact}
         onAction={(type, extra) => sendBridgeAction(type, type === "bridge/takeover" ? { reason: "User takeover from Yunque browser page", ...extra } : extra || {})}
       />
+
+      <Card className="section-card overflow-hidden p-0">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>📕</span>
+                  <div>
+                    <h2 className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>内容平台直发自动化</h2>
+                    <p className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>面向小红书 / X 等运营场景：打开平台、填写内容、截图留痕、点击发布，减少重复操作。</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["打开创作页", "填写标题/正文", "发布前截图", "点击发布", "发布后留痕"].map((item, idx) => (
+                    <Chip key={item} size="sm" style={{ background: idx === 3 ? "rgba(239,68,68,0.10)" : "rgba(59,130,246,0.09)", color: idx === 3 ? "#ef4444" : "#60a5fa", fontSize: "var(--text-2xs)" }}>
+                      {idx + 1}. {item}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onPress={() => setTab("scenarios")}>
+                  查看场景
+                </Button>
+                <Button size="sm" className="btn-accent" isDisabled={!extConnected || !!runningScenario} isPending={runningScenario === "xiaohongshu-post-direct"} onPress={() => runScenario("xiaohongshu-post-direct")}>
+                  <Play size={14} className="mr-1" /> 小红书直发
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="p-5" style={{ background: "linear-gradient(180deg, rgba(239,68,68,0.08), rgba(245,158,11,0.04))", borderLeft: "1px solid var(--yunque-border)" }}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>发布策略</div>
+                <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>演示默认走完整直发链路。</div>
+              </div>
+              <Switch isSelected={publishMode === "direct"} onChange={(v) => setPublishMode(v ? "direct" : "review")} size="sm" aria-label="Direct publish mode">
+                <Switch.Control><Switch.Thumb /></Switch.Control>
+              </Switch>
+            </div>
+            <div className="rounded-lg p-3 text-xs leading-5" style={{ background: "rgba(0,0,0,0.12)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text-secondary)" }}>
+              当前：<strong style={{ color: publishMode === "direct" ? "#ef4444" : "#f59e0b" }}>{publishMode === "direct" ? "直发模式" : "审核模式"}</strong>
+              <br />直发要求浏览器扩展已连接、目标账号已登录，并且页面满足平台发布条件（例如素材、验证码、合规提示）。
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as string)}>
         <Tabs.ListContainer>
@@ -529,16 +583,19 @@ export default function BrowserIntentPackPage() {
             )}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {scenarios.map((scenario) => (
-                <Card key={scenario.id} className="section-card cursor-pointer p-4 hover-lift" style={{ transition: "all 0.2s" }}>
+                <Card key={scenario.id} className="section-card cursor-pointer p-4 hover-lift" style={{ transition: "all 0.2s", borderColor: directPublishScenarioIds.has(scenario.id) ? "rgba(239,68,68,0.35)" : undefined }}>
                   <div className="mb-2 flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <ScenarioIcon icon={scenario.icon} />
                       <div>
-                        <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{scenario.name}</div>
+                        <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                          {scenario.name}
+                          {directPublishScenarioIds.has(scenario.id) && <Chip size="sm" style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444", fontSize: "var(--text-2xs)" }}>直发</Chip>}
+                        </div>
                         <div className="mt-0.5 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{scenario.steps.length} {t("browserPage.steps")}</div>
                       </div>
                     </div>
-                    <Button size="sm" isIconOnly isPending={runningScenario === scenario.id} isDisabled={!extConnected || !!runningScenario} onPress={() => runScenario(scenario.id)} className="btn-accent">
+                    <Button size="sm" isIconOnly isPending={runningScenario === scenario.id} isDisabled={!extConnected || !!runningScenario || (publishMode === "review" && directPublishScenarioIds.has(scenario.id))} onPress={() => runScenario(scenario.id)} className="btn-accent">
                       <Play size={14} />
                     </Button>
                   </div>
