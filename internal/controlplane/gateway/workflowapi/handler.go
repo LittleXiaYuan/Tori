@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"yunque-agent/internal/agentcore/workflow"
 	"yunque-agent/internal/apperror"
@@ -17,6 +18,8 @@ type Handler struct {
 	Store   workflow.Store
 	Engine  *workflow.Engine
 	LLMCall workflow.LLMCallFunc
+
+	mu sync.RWMutex
 }
 
 // RegisterRoutes mounts all /v1/workflows/* endpoints.
@@ -26,6 +29,35 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth gwshared.AuthFunc) {
 	mux.HandleFunc("/v1/workflows/run", auth(h.handleRun))
 	mux.HandleFunc("/v1/workflows/instances", auth(h.handleInstances))
 	mux.HandleFunc("/v1/workflows/cancel", auth(h.handleCancel))
+}
+
+// SetStore updates the backing workflow store after the handler has already
+// been mounted. The gateway constructs routes before every runtime subsystem is
+// available, so this keeps /v1/workflows live once init_task_engine finishes.
+func (h *Handler) SetStore(store workflow.Store) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.Store = store
+}
+
+// SetEngine updates the execution engine after route registration.
+func (h *Handler) SetEngine(engine *workflow.Engine) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.Engine = engine
+}
+
+// SetLLMCall updates the optional LLM generator hook after route registration.
+func (h *Handler) SetLLMCall(fn workflow.LLMCallFunc) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.LLMCall = fn
+}
+
+func (h *Handler) snapshot() (workflow.Store, *workflow.Engine, workflow.LLMCallFunc) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.Store, h.Engine, h.LLMCall
 }
 
 func (h *Handler) handleRouteSwitch(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +78,8 @@ func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeMethodNotAllow, "POST only")
 		return
 	}
-	if h.Store == nil {
+	store, _, llmCall := h.snapshot()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
@@ -59,13 +92,13 @@ func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := workflow.GenerateDefinition(r.Context(), req.Requirement, workflow.GeneratorOptions{
 		TenantID: gwshared.TenantFromCtx(r.Context()),
-		LLMCall:  h.LLMCall,
+		LLMCall:  llmCall,
 	})
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
-	if err := h.Store.SaveDefinition(result.Definition); err != nil {
+	if err := store.SaveDefinition(result.Definition); err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
 	}
@@ -80,14 +113,15 @@ func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
-	if h.Store == nil {
+	store, _, _ := h.snapshot()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	id := r.URL.Query().Get("id")
 	if id != "" {
-		def, err := h.Store.GetDefinition(id)
+		def, err := store.GetDefinition(id)
 		if err != nil {
 			apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
 			return
@@ -95,7 +129,7 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(def)
 		return
 	}
-	defs, err := h.Store.ListDefinitions("")
+	defs, err := store.ListDefinitions("")
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
@@ -107,7 +141,8 @@ func (h *Handler) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleSave(w http.ResponseWriter, r *http.Request) {
-	if h.Store == nil {
+	store, _, _ := h.snapshot()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
@@ -121,7 +156,7 @@ func (h *Handler) handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	def.TenantID = gwshared.TenantFromCtx(r.Context())
-	if err := h.Store.SaveDefinition(&def); err != nil {
+	if err := store.SaveDefinition(&def); err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
 	}
@@ -131,7 +166,8 @@ func (h *Handler) handleSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
-	if h.Store == nil {
+	store, _, _ := h.snapshot()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
@@ -140,7 +176,7 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "id query param required")
 		return
 	}
-	if err := h.Store.DeleteDefinition(id); err != nil {
+	if err := store.DeleteDefinition(id); err != nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
 		return
 	}
@@ -149,7 +185,8 @@ func (h *Handler) handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleRun(w http.ResponseWriter, r *http.Request) {
-	if h.Store == nil || h.Engine == nil {
+	store, engine, _ := h.snapshot()
+	if store == nil || engine == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
@@ -166,12 +203,11 @@ func (h *Handler) handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenantID := gwshared.TenantFromCtx(r.Context())
-	inst, err := h.Store.CreateInstance(req.DefinitionID, tenantID, req.Variables)
+	inst, err := store.CreateInstance(req.DefinitionID, tenantID, req.Variables)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeBadRequest, err.Error())
 		return
 	}
-	engine := h.Engine
 	safego.Go("workflow-run-"+inst.ID, func() {
 		if err := engine.Run(context.Background(), inst.ID); err != nil {
 			slog.Warn("workflow execution failed", "instance", inst.ID, "err", err)
@@ -187,14 +223,15 @@ func (h *Handler) handleRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleInstances(w http.ResponseWriter, r *http.Request) {
-	if h.Store == nil {
+	store, _, _ := h.snapshot()
+	if store == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	id := r.URL.Query().Get("id")
 	if id != "" {
-		inst, err := h.Store.GetInstance(id)
+		inst, err := store.GetInstance(id)
 		if err != nil {
 			apperror.WriteCode(w, apperror.CodeNotFound, err.Error())
 			return
@@ -203,7 +240,7 @@ func (h *Handler) handleInstances(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenantID := gwshared.TenantFromCtx(r.Context())
-	insts, err := h.Store.ListInstances(tenantID, 50)
+	insts, err := store.ListInstances(tenantID, 50)
 	if err != nil {
 		apperror.WriteCode(w, apperror.CodeInternal, err.Error())
 		return
@@ -215,7 +252,8 @@ func (h *Handler) handleInstances(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleCancel(w http.ResponseWriter, r *http.Request) {
-	if h.Engine == nil {
+	_, engine, _ := h.snapshot()
+	if engine == nil {
 		apperror.WriteCode(w, apperror.CodeNotFound, "workflow engine not available")
 		return
 	}
@@ -230,7 +268,7 @@ func (h *Handler) handleCancel(w http.ResponseWriter, r *http.Request) {
 		apperror.WriteCode(w, apperror.CodeBadRequest, "instance_id is required")
 		return
 	}
-	if !h.Engine.Cancel(req.InstanceID) {
+	if !engine.Cancel(req.InstanceID) {
 		apperror.WriteCode(w, apperror.CodeNotFound, "instance not running")
 		return
 	}
