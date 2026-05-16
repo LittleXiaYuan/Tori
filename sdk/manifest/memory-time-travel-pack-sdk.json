@@ -22,6 +22,7 @@
     "GET /v1/memory-time-travel/audit/links",
     "POST /v1/memory-time-travel/audit/links/preview",
     "POST /v1/memory-time-travel/audit/links/writeback-plan",
+    "POST /v1/memory-time-travel/audit/links/writeback/store",
     "GET /v1/memory-time-travel/audit/verify",
     "GET /v1/memory-time-travel/evidence/"
   ],
@@ -48,6 +49,7 @@
     "auditLinks",
     "auditLinksPreview",
     "auditLinksWritebackPlan",
+    "auditLinksWritebackStore",
     "auditVerify",
     "evidenceExport"
   ]
