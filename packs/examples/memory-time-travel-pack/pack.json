@@ -2,7 +2,7 @@
   "id": "yunque.pack.memory-time-travel",
   "name": "Memory Time Travel Pack",
   "version": "0.1.0",
-  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、retention dry-run/prune plan、native kv_history plan/migration preview/dual-read parity/cutover plan、KV audit link schema 和证据包导出作为可选记忆治理能力包暴露。",
+  "description": "将记忆快照、时间点回溯、漂移 diff、回滚计划、approved rollback write-back plan、retention dry-run/prune plan、native kv_history plan/migration preview/dual-read parity/cutover readiness/cutover plan、KV audit link schema 和证据包导出作为可选记忆治理能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -23,6 +23,7 @@
       "memory_time_travel.kv_history.migration_preview",
       "memory_time_travel.kv_history.dual_read_parity",
       "memory_time_travel.kv_history.cutover_plan",
+      "memory_time_travel.kv_history.cutover_readiness",
       "memory_time_travel.audit.links",
       "memory_time_travel.audit.verify",
       "memory_time_travel.evidence.export"
@@ -41,6 +42,7 @@
       "/v1/memory-time-travel/kv-history/migration-preview",
       "/v1/memory-time-travel/kv-history/dual-read/parity",
       "/v1/memory-time-travel/kv-history/cutover/plan",
+      "/v1/memory-time-travel/kv-history/cutover/readiness",
       "/v1/memory-time-travel/audit/links",
       "/v1/memory-time-travel/audit/verify",
       "/v1/memory-time-travel/evidence/"
@@ -120,6 +122,11 @@
         "method": "POST",
         "path": "/v1/memory-time-travel/kv-history/cutover/plan",
         "description": "Build a non-destructive dual-read/dual-write cutover and rollback plan that consumes the native kv_history plan and migration preview without switching adapters or writing Ledger rows."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/memory-time-travel/kv-history/cutover/readiness",
+        "description": "Aggregate native plan, migration preview, dual-read parity, adapter, write-path, approval, rollback and audit-proof gates into a read-only cutover readiness report without switching adapters or writing Ledger rows."
       },
       {
         "method": "GET",

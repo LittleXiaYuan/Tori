@@ -18,6 +18,7 @@
     "GET /v1/memory-time-travel/kv-history/migration-preview",
     "POST /v1/memory-time-travel/kv-history/dual-read/parity",
     "POST /v1/memory-time-travel/kv-history/cutover/plan",
+    "POST /v1/memory-time-travel/kv-history/cutover/readiness",
     "GET /v1/memory-time-travel/audit/links",
     "GET /v1/memory-time-travel/audit/verify",
     "GET /v1/memory-time-travel/evidence/"
@@ -41,6 +42,7 @@
     "nativeKVHistoryMigrationPreview",
     "kvHistoryDualReadParity",
     "kvHistoryCutoverPlan",
+    "kvHistoryCutoverReadiness",
     "auditLinks",
     "auditVerify",
     "evidenceExport"

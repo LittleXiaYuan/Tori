@@ -117,6 +117,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "dual_read_parity_check_ready") || !strings.Contains(w.Body.String(), "kv-history-dual-read-parity.json") || !strings.Contains(w.Body.String(), `"switches_temporal_adapter":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) {
 		t.Fatalf("dual-read parity gate status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/kv-history/cutover/readiness", strings.NewReader(`{"namespace":"memory_snapshot","at":"2026-05-15T12:00:00Z","requested_by":"operator","reason":"gateway readiness smoke","limit":50,"dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "cutover_readiness_check_ready") || !strings.Contains(w.Body.String(), "kv-history-cutover-readiness.json") || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"switches_temporal_adapter":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) {
+		t.Fatalf("cutover readiness gate status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.PackStatus) (*Gateway, *tenant.Manager) {
@@ -146,6 +154,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/kv-history/migration-preview",
 				"/v1/memory-time-travel/kv-history/dual-read/parity",
 				"/v1/memory-time-travel/kv-history/cutover/plan",
+				"/v1/memory-time-travel/kv-history/cutover/readiness",
 				"/v1/memory-time-travel/audit/links",
 				"/v1/memory-time-travel/audit/verify",
 				"/v1/memory-time-travel/evidence/",
@@ -165,6 +174,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/dual-read/parity"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/plan"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/cutover/readiness"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/links"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/audit/verify"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/evidence/"},
