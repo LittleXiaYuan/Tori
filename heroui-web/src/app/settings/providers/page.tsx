@@ -1,60 +1,44 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Spinner, Chip, Tooltip, TextField, Input, Label, Switch, Tabs } from "@heroui/react";
 import {
   Cpu, Cloud, Zap, Link2, Unlink, RefreshCw, Plus,
-  CheckCircle2, AlertCircle, Globe, Server, Wifi, WifiOff,
-  Key, ChevronRight, ExternalLink, CloudOff, ArrowDownToLine, Activity, Database, Hash,
-  Brain, Wrench,
+  CheckCircle2, AlertCircle, Globe, WifiOff,
+  Key, ChevronRight, ExternalLink, CloudOff, ArrowDownToLine, Activity, Database,
+  Brain, Wrench, Search, ShieldCheck, ImageIcon, FileText, Sparkles, Eye,
 } from "lucide-react";
-import PageHeader from "@/components/page-header";
 import { useApiData } from "@/lib/use-api-data";
 import { openExternal } from "@/lib/safe-url";
-import { api, type ProviderInfo, type ProviderPreset, type ToriBindingStatus, type ToriHealthStatus, type ToriUsageSummary } from "@/lib/api";
+import { api, type ProviderInfo, type ProviderPreset, type ProviderTestResult, type SkillInfo, type ToriBindingStatus, type ToriHealthStatus, type ToriUsageSummary } from "@/lib/api";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-
-type ProviderModeType = "local" | "tori" | "hybrid";
+import {
+  capMeta,
+  capabilityOverflow,
+  normalizeProviderTestResult,
+  orderedCapabilities,
+  presetColors,
+  providerColor,
+  providerInitial,
+  providerTitle,
+  searchMatch,
+  statusTone,
+  type NormalizedProviderTestResult,
+  type ProviderModeType,
+} from "@/lib/provider-ui";
 
 const modeConfig: Record<ProviderModeType, { icon: React.ElementType; label: string; desc: string; color: string }> = {
-  local:  { icon: Key,   label: "自带 Key",     desc: "使用你自己的 API 密钥直连各大模型提供商", color: "#3b82f6" },
-  tori:   { icon: Cloud, label: "Tori 中转",    desc: "通过 Tori 平台统一代理，免配置即用", color: "#8b5cf6" },
-  hybrid: { icon: Zap,   label: "智能混合",     desc: "优先直连，故障自动回退 Tori 中转", color: "#22c55e" },
+  local:  { icon: Key,   label: "自带 Key",   desc: "直连你自己的模型服务", color: "#3b82f6" },
+  tori:   { icon: Cloud, label: "Tori 中转",  desc: "统一代理与账号绑定", color: "#8b5cf6" },
+  hybrid: { icon: Zap,   label: "智能混合",   desc: "直连优先，失败回退", color: "#22c55e" },
 };
-
-const presetColors: Record<string, string> = {
-  deepseek: "#4d6bfe", openai: "#10a37f", anthropic: "#d4a574", google: "#4285f4",
-  doubao: "#3370ff", qwen: "#6236ff", zhipu: "#2563eb", moonshot: "#1a1a2e",
-  minimax: "#ff6600", ollama: "#ffffff", openrouter: "#6366f1", custom: "#6b7280",
-  siliconflow: "#00b4d8", gitcode: "#fc5531",
-};
-
-const capMeta: Record<string, { label: string; color: string; icon: string }> = {
-  vision:           { label: "视觉",   color: "#a855f7", icon: "👁" },
-  reasoning:        { label: "推理",   color: "#f59e0b", icon: "🧠" },
-  function_calling: { label: "工具",   color: "#3b82f6", icon: "🔧" },
-  structured_output:{ label: "结构化", color: "#06b6d4", icon: "📋" },
-  long_context:     { label: "长文本", color: "#10b981", icon: "📜" },
-  web_search:       { label: "搜索",   color: "#ef4444", icon: "🔍" },
-  code_interpreter: { label: "代码",   color: "#8b5cf6", icon: "💻" },
-  computer_use:     { label: "操控",   color: "#ec4899", icon: "🖥" },
-  audio_in:         { label: "语音",   color: "#14b8a6", icon: "🎙" },
-  video_in:         { label: "视频",   color: "#f97316", icon: "🎬" },
-  image_gen:        { label: "生图",   color: "#d946ef", icon: "🎨" },
-  streaming:        { label: "流式",   color: "#64748b", icon: "⚡" },
-  prompt_caching:   { label: "缓存",   color: "#84cc16", icon: "💾" },
-  mcp:              { label: "MCP",    color: "#6366f1", icon: "🔌" },
-};
-
-const keyCapabilities = ["vision", "reasoning", "web_search", "code_interpreter", "computer_use", "audio_in", "video_in", "image_gen", "mcp"];
 
 function CapBadges({ caps, max = 5 }: { caps?: string[]; max?: number }) {
   if (!caps?.length) return null;
-  const important = caps.filter(c => keyCapabilities.includes(c));
-  const shown = important.slice(0, max);
-  const extra = important.length - shown.length;
+  const shown = orderedCapabilities(caps, max);
+  const extra = capabilityOverflow(caps, max);
   return (
     <>
       {shown.map(c => {
@@ -77,16 +61,102 @@ function CapBadges({ caps, max = 5 }: { caps?: string[]; max?: number }) {
   );
 }
 
+function ProviderAvatar({ name, color, size = 38 }: { name: string; color: string; size?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `${color}22`,
+        color,
+        border: `1px solid ${color}44`,
+        fontWeight: 800,
+        fontSize: size >= 42 ? "var(--text-lg)" : "var(--text-sm)",
+        flexShrink: 0,
+      }}
+    >
+      {providerInitial(name)}
+    </span>
+  );
+}
+
+function FieldBlock({ label, value, hint, icon }: { label: string; value?: React.ReactNode; hint?: string; icon?: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: "var(--sp-3)",
+        borderRadius: "var(--radius-md)",
+        background: "var(--yunque-surface-2)",
+        border: "1px solid var(--yunque-border)",
+      }}
+    >
+      <div className="mb-2 flex items-center gap-2" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)", fontWeight: 600 }}>
+        {icon}
+        {label}
+      </div>
+      <div style={{ color: "var(--yunque-text)", fontSize: "var(--text-sm)", minHeight: 22 }}>{value || "—"}</div>
+      {hint && <div className="mt-1" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{hint}</div>}
+    </div>
+  );
+}
+
+function DemoGate({ ok, title, desc, icon, action }: { ok: boolean; title: string; desc: string; icon: React.ReactNode; action?: React.ReactNode }) {
+  const color = ok ? "#22c55e" : "#f59e0b";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--sp-3)",
+        padding: "var(--sp-3)",
+        borderRadius: "var(--radius-lg)",
+        background: ok ? "rgba(34,197,94,0.07)" : "rgba(245,158,11,0.08)",
+        border: `1px solid ${color}28`,
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: "var(--radius-md)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: `${color}16`,
+            color,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div style={{ color: "var(--yunque-text)", fontSize: "var(--text-sm)", fontWeight: 700 }}>{title}</div>
+          <div className="truncate" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>{desc}</div>
+        </div>
+      </div>
+      {action || <CheckCircle2 size={16} style={{ color }} />}
+    </div>
+  );
+}
+
 export default function ProvidersPage() {
   const router = useRouter();
   const { data, loading, refresh } = useApiData(
     async () => {
-      const [providersRes, modeRes, presetsRes, toriRes, execRes] = await Promise.all([
+      const [providersRes, modeRes, presetsRes, toriRes, execRes, skillsRes] = await Promise.all([
         api.providerList().catch(() => ({ providers: [] as ProviderInfo[], count: 0 })),
         api.providerMode().catch(() => ({ mode: "local" })),
         api.providerPresets().catch(() => ({ presets: [] as ProviderPreset[] })),
         api.toriStatus().catch(() => ({ bound: false } as ToriBindingStatus)),
         api.execProvider().catch(() => ({ exec_provider: "", available_providers: [] as string[] })),
+        api.skills().catch(() => ({ skills: [] as SkillInfo[], count: 0 })),
       ]);
       let toriHealth: ToriHealthStatus = { status: "unknown" };
       let toriUsage: ToriUsageSummary = {};
@@ -105,12 +175,13 @@ export default function ProvidersPage() {
         toriUsage,
         execProvider: execRes.exec_provider || "",
         availableProviders: execRes.available_providers || [],
+        skills: skillsRes.skills || [],
       };
     },
-    { providers: [] as ProviderInfo[], mode: "local" as ProviderModeType, presets: [] as ProviderPreset[], tori: { bound: false } as ToriBindingStatus, toriHealth: { status: "unknown" } as ToriHealthStatus, toriUsage: {} as ToriUsageSummary, execProvider: "", availableProviders: [] as string[] },
+    { providers: [] as ProviderInfo[], mode: "local" as ProviderModeType, presets: [] as ProviderPreset[], tori: { bound: false } as ToriBindingStatus, toriHealth: { status: "unknown" } as ToriHealthStatus, toriUsage: {} as ToriUsageSummary, execProvider: "", availableProviders: [] as string[], skills: [] as SkillInfo[] },
   );
 
-  const { providers, mode: serverMode, presets, tori, toriHealth, toriUsage, execProvider: serverExecProvider, availableProviders } = data;
+  const { providers, mode: serverMode, presets, tori, toriHealth, toriUsage, execProvider: serverExecProvider, availableProviders, skills } = data;
   const [localMode, setLocalMode] = useState<ProviderModeType | null>(null);
   const mode = localMode ?? serverMode;
   const [expandedPreset, setExpandedPreset] = useState<string | null>(null);
@@ -118,11 +189,16 @@ export default function ProvidersPage() {
   const [binding, setBinding] = useState(false);
   const [unbinding, setUnbinding] = useState(false);
   const [discovering, setDiscovering] = useState(false);
-  const [registerForm, setRegisterForm] = useState({ apiKey: "", model: "", baseUrl: "" });
+  const [registerForm, setRegisterForm] = useState({ apiKey: "", model: "", baseUrl: "", name: "" });
   const [registering, setRegistering] = useState(false);
-  const [tab, setTab] = useState("mode");
+  const [tab, setTab] = useState("providers");
   const [modeError, setModeError] = useState<string | null>(null);
   const [savingExec, setSavingExec] = useState(false);
+  const [providerSearch, setProviderSearch] = useState("");
+  const [presetSearch, setPresetSearch] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<NormalizedProviderTestResult | null>(null);
 
   const setMode = useCallback(async (m: ProviderModeType) => {
     setLocalMode(m);
@@ -179,13 +255,14 @@ export default function ProvidersPage() {
     try {
       await api.providerRegister({
         preset_id: presetId,
+        name: registerForm.name || undefined,
         api_key: registerForm.apiKey || undefined,
         base_url: registerForm.baseUrl || undefined,
         model: modelId || registerForm.model || undefined,
         tier: tier || undefined,
       });
-      setRegResult({ ok: true, msg: `已添加 ${modelId || registerForm.model}` });
-      setRegisterForm({ apiKey: "", model: "", baseUrl: "" });
+      setRegResult({ ok: true, msg: `已添加 ${modelId || registerForm.model || registerForm.name || presetId}` });
+      setRegisterForm({ apiKey: "", model: "", baseUrl: "", name: "" });
       refresh();
     } catch (e: unknown) {
       setRegResult({ ok: false, msg: formatErrorMessage(e, "添加失败") });
@@ -204,7 +281,72 @@ export default function ProvidersPage() {
     setSavingExec(false);
   }, [refresh]);
 
-  const activeProviders = providers.filter(p => p.enabled);
+  const handleTestProvider = useCallback(async (provider: ProviderInfo) => {
+    setTestingId(provider.id);
+    setTestResult(null);
+    try {
+      const res = await api.providerTest(provider.id);
+      const normalized = normalizeProviderTestResult(res as ProviderTestResult & { success?: boolean });
+      setTestResult(normalized);
+      showToast(normalized.status === "ok" ? "模型连接正常" : "模型检测未通过", normalized.status === "ok" ? "success" : "warning");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "检测失败";
+      setTestResult({ status: "error", latency_ms: 0, error: message });
+      showToast(message, "error");
+    }
+    setTestingId(null);
+  }, []);
+
+  const handleToggleProvider = useCallback(async (provider: ProviderInfo) => {
+    try {
+      if (provider.enabled) {
+        await api.providerDisable(provider.id);
+      } else {
+        await api.providerEnable(provider.id);
+      }
+      refresh();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "切换失败", "error");
+    }
+  }, [refresh]);
+
+  const handleDeleteProvider = useCallback(async (provider: ProviderInfo) => {
+    try {
+      await api.providerDelete(provider.id);
+      showToast("已删除提供商", "success");
+      setSelectedProviderId(null);
+      refresh();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "删除失败", "error");
+    }
+  }, [refresh]);
+
+  const activeProviders = useMemo(() => providers.filter(p => p.enabled), [providers]);
+  const filteredProviders = useMemo(() => {
+    const q = providerSearch.trim().toLowerCase();
+    if (!q) return providers;
+    return providers.filter((p) => searchMatch([p.id, p.display_name, p.model, p.base_url, p.type, p.tier, p.capabilities], q));
+  }, [providerSearch, providers]);
+  const selectedProvider = useMemo(
+    () => providers.find((p) => p.id === selectedProviderId) || providers[0],
+    [providers, selectedProviderId],
+  );
+  const filteredPresets = useMemo(() => {
+    const q = presetSearch.trim().toLowerCase();
+    if (!q) return presets;
+    return presets.filter((p) => searchMatch([p.id, p.name, p.base_url, p.description, p.models?.map((m) => [m.id, m.name, m.tier, m.capabilities])], q));
+  }, [presetSearch, presets]);
+  const skillNames = useMemo(() => new Set(skills.map((s) => s.name)), [skills]);
+  const chatConfigured = activeProviders.some((p) => p.type === "chat" || p.capabilities?.includes("chat"));
+  const imageProviderConfigured = activeProviders.some((p) => p.capabilities?.includes("image_gen"));
+  const imageSkillRegistered = skillNames.has("image_gen") || skillNames.has("image_generate");
+  const pptReady = skillNames.has("pptx_create");
+
+  useEffect(() => {
+    if (providers.length > 0 && (!selectedProviderId || !providers.some((p) => p.id === selectedProviderId))) {
+      setSelectedProviderId(providers[0].id);
+    }
+  }, [providers, selectedProviderId]);
 
   const [firstTime, setFirstTime] = useState(false);
   useEffect(() => {
@@ -216,17 +358,17 @@ export default function ProvidersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {firstTime && (
         <Card className="section-card p-5 border-l-4" style={{ borderLeftColor: "var(--yunque-accent)" }}>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 font-semibold" style={{ color: "var(--yunque-text)" }}>
-                <Zap size={16} style={{ color: "var(--yunque-accent)" }} /> 欢迎使用云雀 Agent！
+                <Zap size={16} style={{ color: "var(--yunque-accent)" }} /> 先把模型服务接通，云雀才算真正闭环
               </div>
               <p className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
-                首次使用请先配置模型提供商。推荐使用 <strong>Tori 中转</strong>（免 Key 即用）或填入你自己的 API Key。
+                Chat、PPT、文档和生图都依赖这里的供应商配置。推荐先配置一个聊天模型，再补一个带 image_gen 能力的图片模型。
               </p>
             </div>
             <Button
@@ -240,34 +382,41 @@ export default function ProvidersPage() {
         </Card>
       )}
 
-      {/* KPI Strip */}
-      <div className="kpi-grid stagger-children">
-        <Card className="section-card p-4 hover-lift">
-          <div className="kpi-label stat-card-header"><Wifi size={13} style={{ color: "#22c55e" }} />活跃提供商</div>
-          <div className="kpi-value">{activeProviders.length}</div>
-        </Card>
-        <Card className="section-card p-4 hover-lift">
-          <div className="kpi-label stat-card-header"><Cpu size={13} style={{ color: "var(--yunque-accent)" }} />提供商总数</div>
-          <div className="kpi-value">{providers.length}</div>
-        </Card>
-        <Card className="section-card p-4 hover-lift">
-          <div className="kpi-label stat-card-header"><Globe size={13} style={{ color: "#8b5cf6" }} />可用预置</div>
-          <div className="kpi-value">{presets.length}</div>
-        </Card>
-        <Card className="section-card p-4 hover-lift">
-          <div className="kpi-label stat-card-header"><Cloud size={13} style={{ color: tori.bound ? "#22c55e" : "var(--yunque-text-muted)" }} />Tori</div>
-          <div className="kpi-value" style={{ fontSize: "var(--text-lg)" }}>{tori.bound ? "已绑定" : "未绑定"}</div>
-        </Card>
-      </div>
+      <Card className="section-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2" style={{ color: "var(--yunque-text)", fontSize: "var(--text-md)", fontWeight: 800 }}>
+              <ShieldCheck size={17} style={{ color: "var(--yunque-accent)" }} /> 演示闭环检查
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
+              先看 Chat / PPT / 生图三件事有没有闭环，再进入详细配置。
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" onPress={refresh}>
+            <RefreshCw size={13} /> 刷新
+          </Button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--sp-3)" }}>
+          <DemoGate ok={chatConfigured} title="聊天模型" desc={chatConfigured ? `${activeProviders.length} 个启用供应商` : "未检测到启用聊天模型"} icon={<Sparkles size={16} />} />
+          <DemoGate ok={pptReady} title="PPT / 文档" desc={pptReady ? "pptx_create 已注册" : "缺少 pptx_create 技能"} icon={<FileText size={16} />} />
+          <DemoGate
+            ok={imageSkillRegistered && imageProviderConfigured}
+            title="图片生成"
+            desc={imageProviderConfigured ? "已接入 image_gen provider" : imageSkillRegistered ? "技能存在，但缺图片模型" : "未检测到生图技能"}
+            icon={<ImageIcon size={16} />}
+            action={!imageProviderConfigured ? <Button size="sm" variant="ghost" onPress={() => { setTab("presets"); setPresetSearch("image gpt-image imagen wanx cogview flux"); }}>去配置</Button> : undefined}
+          />
+        </div>
+      </Card>
 
       <Tabs selectedKey={tab} onSelectionChange={k => setTab(k as string)}>
         <Tabs.ListContainer>
           <Tabs.List aria-label="提供商设置">
-            <Tabs.Tab id="mode">接入模式<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="providers">模型服务 <Chip style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)", fontSize: "var(--text-2xs)" }}>{providers.length}</Chip><Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="presets"><Tabs.Separator />添加提供商<Tabs.Indicator /></Tabs.Tab>
+            <Tabs.Tab id="mode"><Tabs.Separator />接入模式<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="routing"><Tabs.Separator />模型分配<Tabs.Indicator /></Tabs.Tab>
             <Tabs.Tab id="tori"><Tabs.Separator />Tori 平台<Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="providers"><Tabs.Separator />提供商列表 <Chip style={{ background: "rgba(0,111,238,0.1)", color: "var(--yunque-accent)", fontSize: "var(--text-2xs)" }}>{providers.length}</Chip><Tabs.Indicator /></Tabs.Tab>
-            <Tabs.Tab id="presets"><Tabs.Separator />添加提供商<Tabs.Indicator /></Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
 
@@ -601,76 +750,180 @@ export default function ProvidersPage() {
         {/* ── Provider List ─── */}
         <Tabs.Panel id="providers">
           <div className="flex items-center justify-between mb-3">
-            <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>已配置的模型提供商</span>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>已配置的模型提供商 · {providers.length} 个，启用 {activeProviders.length} 个</span>
             <Button size="sm" variant="ghost" onPress={async () => {
               try { const r = await api.breakerReset(); showToast(`已重置 ${r.reset_count} 个熔断器`, "success"); refresh(); } catch (e: unknown) { showToast(e instanceof Error ? e.message : String(e), "error"); }
             }} style={{ fontSize: "var(--text-xs)" }}>
               重置熔断器
             </Button>
           </div>
-          <div className="space-y-3 stagger-children">
-            {providers.length === 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 340px) minmax(0, 1fr)", gap: "var(--sp-4)", alignItems: "start" }}>
+            <Card className="section-card p-3">
+              <div style={{ position: "relative", marginBottom: "var(--sp-3)" }}>
+                <Search size={14} style={{ position: "absolute", left: 12, top: 11, color: "var(--yunque-text-muted)" }} />
+                <input
+                  value={providerSearch}
+                  onChange={(e) => setProviderSearch(e.target.value)}
+                  placeholder="搜索模型平台..."
+                  style={{
+                    width: "100%",
+                    height: 36,
+                    padding: "0 12px 0 34px",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--yunque-border)",
+                    background: "var(--yunque-surface-2)",
+                    color: "var(--yunque-text)",
+                    outline: "none",
+                    fontSize: "var(--text-sm)",
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5" style={{ maxHeight: 520, overflow: "auto", paddingRight: 2 }}>
+                {filteredProviders.length === 0 ? (
+                  <div className="py-8 text-center" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-sm)" }}>
+                    <WifiOff size={28} className="mx-auto mb-2" /> 暂无匹配提供商
+                  </div>
+                ) : filteredProviders.map((p) => {
+                  const selected = selectedProvider?.id === p.id;
+                  const tone = statusTone(p);
+                  const title = providerTitle(p);
+                  const color = providerColor(`${p.id} ${title}`);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => { setSelectedProviderId(p.id); setTestResult(null); }}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--sp-3)",
+                        padding: "10px 12px",
+                        borderRadius: "var(--radius-lg)",
+                        background: selected ? "var(--yunque-surface-2)" : "transparent",
+                        border: `1px solid ${selected ? "var(--yunque-border-strong)" : "transparent"}`,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <ProviderAvatar name={title} color={color} size={34} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate" style={{ color: "var(--yunque-text)", fontSize: "var(--text-sm)", fontWeight: 800 }}>{title}</span>
+                          {p.enabled && <span style={{ color: "#68e36f", border: "1px solid rgba(104,227,111,.25)", background: "rgba(104,227,111,.08)", borderRadius: 999, padding: "0 7px", fontSize: "10px", fontWeight: 700 }}>ON</span>}
+                        </span>
+                        <span className="mt-0.5 block truncate" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{p.model || p.type || p.id}</span>
+                      </span>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: tone.color, flexShrink: 0 }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {providers.length === 0 || !selectedProvider ? (
               <Card className="section-card p-12 text-center">
                 <WifiOff size={40} className="mx-auto mb-3" style={{ color: "var(--yunque-text-muted)" }} />
                 <div style={{ fontSize: "var(--text-sm)", color: "var(--yunque-text-muted)" }}>暂无提供商，前往「添加提供商」标签页配置</div>
               </Card>
-            ) : providers.map(p => {
-              const healthy = p.breaker_state === "closed";
-              const statusColor = healthy ? "#22c55e" : p.breaker_state === "half-open" ? "#f59e0b" : "#ef4444";
+            ) : (() => {
+              const title = providerTitle(selectedProvider);
+              const color = providerColor(`${selectedProvider.id} ${title}`);
+              const tone = statusTone(selectedProvider);
               return (
-                <Card key={p.id} className="section-card p-5 hover-lift transition-all duration-200">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: "var(--radius-md)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        background: "var(--yunque-surface-2)", border: "1px solid var(--yunque-border)",
-                        position: "relative",
-                      }}>
-                        <Server size={16} style={{ color: p.enabled ? statusColor : "var(--yunque-text-muted)" }} />
-                        <span style={{
-                          position: "absolute", bottom: -2, right: -2,
-                          width: 8, height: 8, borderRadius: "50%",
-                          background: p.enabled ? statusColor : "#4b5563",
-                          border: "2px solid var(--yunque-card)",
-                        }} />
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)" }}>
-                          {p.display_name || p.id}
-                          <Chip size="sm" style={{ background: `${statusColor}15`, color: statusColor, fontSize: "var(--text-2xs)" }}>
-                            {healthy ? "正常" : p.breaker_state === "open" ? "熔断" : p.breaker_state === "half-open" ? "半开" : "未知"}
-                          </Chip>
-                          {p.tier && <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)", fontSize: "var(--text-2xs)" }}>{p.tier}</Chip>}
+                <Card className="section-card p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <ProviderAvatar name={title} color={color} size={52} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2" style={{ color: "var(--yunque-text)", fontSize: "var(--text-lg)", fontWeight: 900 }}>
+                          <span className="truncate">{title}</span>
+                          <Chip size="sm" style={{ background: `${tone.color}16`, color: tone.color }}>{tone.label}</Chip>
                         </div>
-                        <div style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-                          <span>{p.type}</span>
-                          {p.base_url && <><span>·</span><span className="font-mono" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.base_url}</span></>}
-                          {p.model && <><span>·</span><span>{p.model}</span></>}
+                        <div className="mt-1 flex flex-wrap items-center gap-2" style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>
+                          <span>{selectedProvider.type}</span>
+                          {selectedProvider.tier && <><span>·</span><span>{selectedProvider.tier}</span></>}
+                          <span>·</span><span className="font-mono">{selectedProvider.id}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch isSelected={p.enabled} onChange={() => p.enabled ? api.providerDisable(p.id).then(refresh) : api.providerEnable(p.id).then(refresh)} size="sm">
+                      <Switch isSelected={selectedProvider.enabled} onChange={() => handleToggleProvider(selectedProvider)} size="sm">
                         <Switch.Control><Switch.Thumb /></Switch.Control>
                       </Switch>
                       <Tooltip delay={0}>
-                        <Button isIconOnly variant="ghost" size="sm" onPress={async () => {
-                          try {
-                            await api.providerDelete(p.id);
-                            showToast("已删除", "success");
-                            refresh();
-                          } catch (e) { showToast(e instanceof Error ? e.message : "删除失败", "error"); }
-                        }} style={{ color: "#ef4444" }}>
-                          <Unlink size={14} />
+                        <Button isIconOnly variant="ghost" size="sm" onPress={() => handleTestProvider(selectedProvider)} isPending={testingId === selectedProvider.id}>
+                          <RefreshCw size={14} />
                         </Button>
-                        <Tooltip.Content>删除模型</Tooltip.Content>
+                        <Tooltip.Content>检测连接</Tooltip.Content>
                       </Tooltip>
                     </div>
                   </div>
+
+                  {testResult && (
+                    <div
+                      className="mt-4"
+                      style={{
+                        padding: "var(--sp-3)",
+                        borderRadius: "var(--radius-md)",
+                        background: testResult.status === "ok" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+                        border: `1px solid ${testResult.status === "ok" ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
+                        color: testResult.status === "ok" ? "#22c55e" : "#ef4444",
+                        fontSize: "var(--text-sm)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {testResult.status === "ok" ? `连接正常 · ${testResult.latency_ms}ms` : `检测失败：${testResult.error || testResult.status}`}
+                    </div>
+                  )}
+
+                  <div className="mt-4" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-3)" }}>
+                    <FieldBlock label="API 密钥" icon={<Key size={12} />} value={selectedProvider.key_count > 0 ? `已保存 ${selectedProvider.key_count} 个密钥` : "未保存密钥"} hint="密钥不会在前端明文展示。" />
+                    <FieldBlock label="API 地址" icon={<Globe size={12} />} value={<span className="font-mono break-all">{selectedProvider.base_url || "—"}</span>} hint="OpenAI 兼容接口通常以 /v1 结尾。" />
+                    <FieldBlock label="当前模型" icon={<Cpu size={12} />} value={selectedProvider.model || "—"} hint="Chat 失败时优先确认模型名。" />
+                    <FieldBlock label="熔断状态" icon={<Activity size={12} />} value={selectedProvider.breaker_state || "unknown"} hint="可点击右上检测连接。" />
+                  </div>
+
+                  <div
+                    className="mt-4"
+                    style={{
+                      padding: "var(--sp-4)",
+                      borderRadius: "var(--radius-lg)",
+                      background: "var(--yunque-surface-2)",
+                      border: "1px solid var(--yunque-border)",
+                    }}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2" style={{ color: "var(--yunque-text)", fontSize: "var(--text-sm)", fontWeight: 800 }}>
+                        <Eye size={15} style={{ color }} /> 能力标签
+                      </div>
+                      {!selectedProvider.capabilities?.includes("image_gen") && (
+                        <Chip size="sm" style={{ background: "rgba(245,158,11,.12)", color: "#f59e0b", fontSize: "var(--text-2xs)" }}>非生图模型</Chip>
+                      )}
+                    </div>
+                    {selectedProvider.capabilities?.length ? (
+                      <CapBadges caps={selectedProvider.capabilities} max={12} />
+                    ) : (
+                      <div style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-sm)" }}>此提供商未声明能力标签。</div>
+                    )}
+                    {!selectedProvider.capabilities?.includes("image_gen") && (
+                      <div className="mt-3 flex items-start gap-2" style={{ color: "#f59e0b", fontSize: "var(--text-xs)" }}>
+                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                        图片生成演示需要带 image_gen 能力的图片模型，或在 .env 中显式配置 IMAGEGEN_API_URL / IMAGEGEN_API_KEY / IMAGEGEN_MODEL。
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: "var(--yunque-border)" }}>
+                    <div style={{ color: "var(--yunque-text-muted)", fontSize: "var(--text-xs)" }}>
+                      若演示前出现 401/502，优先点击“检测连接”，再确认 API Key 与模型名。
+                    </div>
+                    <Button variant="ghost" size="sm" onPress={() => handleDeleteProvider(selectedProvider)} style={{ color: "#ef4444" }}>
+                      <Unlink size={14} /> 删除提供商
+                    </Button>
+                  </div>
                 </Card>
               );
-            })}
+            })()}
           </div>
         </Tabs.Panel>
 
@@ -695,8 +948,27 @@ export default function ProvidersPage() {
               </p>
             </Card>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "var(--sp-3)" }} className="stagger-children">
-            {presets.map(preset => {
+          <div style={{ position: "relative", marginBottom: "var(--sp-3)", maxWidth: 420 }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: 11, color: "var(--yunque-text-muted)" }} />
+            <input
+              value={presetSearch}
+              onChange={(e) => setPresetSearch(e.target.value)}
+              placeholder="搜索 OpenAI / Qwen / Moonshot..."
+              style={{
+                width: "100%",
+                height: 36,
+                padding: "0 12px 0 34px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--yunque-border)",
+                background: "var(--yunque-surface-2)",
+                color: "var(--yunque-text)",
+                outline: "none",
+                fontSize: "var(--text-sm)",
+              }}
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "var(--sp-3)" }} className="stagger-children">
+            {filteredPresets.map(preset => {
               const expanded = expandedPreset === preset.id;
               const color = presetColors[preset.id] || "#6b7280";
               return (
@@ -706,7 +978,7 @@ export default function ProvidersPage() {
                     style={{
                       width: "100%", textAlign: "left",
                       display: "flex", alignItems: "center", gap: "var(--sp-3)",
-                      padding: "var(--card-pad-sm)",
+                      padding: "12px 14px",
                       borderRadius: expanded ? "var(--radius-lg) var(--radius-lg) 0 0" : "var(--radius-lg)",
                       background: expanded ? "var(--yunque-accent-soft)" : "var(--yunque-card)",
                       border: `1px solid ${expanded ? "var(--yunque-accent)" : "var(--yunque-border)"}`,
@@ -715,12 +987,7 @@ export default function ProvidersPage() {
                       transition: "all var(--duration-fast) ease",
                     }}
                   >
-                    <span style={{
-                      width: 32, height: 32, borderRadius: "var(--radius-md)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: `${color}18`, color, fontSize: "var(--text-sm)", fontWeight: 700,
-                      flexShrink: 0,
-                    }}>{preset.name.charAt(0)}</span>
+                    <ProviderAvatar name={preset.name} color={color} size={34} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--yunque-text)", display: "flex", alignItems: "center", gap: 6 }}>
                         {preset.name}
@@ -754,6 +1021,10 @@ export default function ProvidersPage() {
                     >
                       <div className="space-y-3">
                         {/* API Key — always shown */}
+                        <TextField value={registerForm.name} onChange={v => setRegisterForm(f => ({ ...f, name: v }))}>
+                          <Label>显示名称</Label>
+                          <Input placeholder={`例如 ${preset.name}`} />
+                        </TextField>
                         <TextField value={registerForm.apiKey} onChange={v => setRegisterForm(f => ({ ...f, apiKey: v }))}>
                           <Label>API Key</Label>
                           <Input placeholder="sk-..." type="password" />
