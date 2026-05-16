@@ -332,6 +332,66 @@ func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
 	}
 }
 
+func TestPackBackendRouteAuditComparesManifestAndMountedRoutes(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.audit",
+		Name:         "Audit Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Routes: []string{"/v1/audit/ok", "/v1/audit/missing", "/v1/audit/mismatch"},
+			RouteSpecs: []packruntime.BackendRouteSpec{
+				{Method: http.MethodGet, Path: "/v1/audit/ok", Description: "ok route"},
+				{Method: http.MethodPost, Path: "/v1/audit/missing", Description: "missing route"},
+				{Method: http.MethodPost, Path: "/v1/audit/mismatch", Description: "mismatch route"},
+			},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.audit",
+		routes: []packruntime.BackendRoute{
+			{Method: http.MethodGet, Path: "/v1/audit/ok", Handler: func(w http.ResponseWriter, r *http.Request) {}},
+			{Method: http.MethodGet, Path: "/v1/audit/mismatch", Handler: func(w http.ResponseWriter, r *http.Request) {}},
+			{Method: http.MethodGet, Path: "/v1/audit/extra", Handler: func(w http.ResponseWriter, r *http.Request) {}},
+		},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	tenant := tenants.Register("backend-route-audit")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/backend-route-audit", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.BackendRouteAuditReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if report.Packs != 1 || report.EnabledPacks != 1 || report.MountedModules != 1 {
+		t.Fatalf("unexpected report summary: %#v", report)
+	}
+	if report.OKRoutes != 1 || report.MissingRoutes != 1 || report.MethodMismatches != 1 || report.UndeclaredRoutes != 1 {
+		t.Fatalf("expected ok/missing/mismatch/undeclared counts, got %#v", report)
+	}
+	statusByPath := map[string]string{}
+	for _, entry := range report.Entries {
+		statusByPath[entry.Path] = entry.Status
+	}
+	if statusByPath["/v1/audit/ok"] != "ok" || statusByPath["/v1/audit/missing"] != "missing" || statusByPath["/v1/audit/mismatch"] != "method-mismatch" || statusByPath["/v1/audit/extra"] != "undeclared" {
+		t.Fatalf("unexpected audit entries: %#v", report.Entries)
+	}
+}
+
 func TestBackendPackMultiMethodRouteInfoAndGate(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {

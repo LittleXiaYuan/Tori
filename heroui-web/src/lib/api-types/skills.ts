@@ -172,6 +172,7 @@ export interface PackBackendRouteInfo {
   method?: string;
   methods?: string[];
   path: string;
+  auth?: string;
 }
 
 export interface PackBackendModuleInfo {
@@ -182,6 +183,36 @@ export interface PackBackendModuleInfo {
 export interface PackBackendModulesResponse {
   modules: PackBackendModuleInfo[];
   count: number;
+}
+
+export interface PackBackendRouteAuditEntry {
+  pack_id: string;
+  pack_name?: string;
+  pack_status?: string;
+  enabled: boolean;
+  status: "ok" | "missing" | "method-mismatch" | "undeclared" | "pack-not-installed" | "registry-unavailable" | string;
+  declared: boolean;
+  mounted: boolean;
+  method?: string;
+  methods?: string[];
+  path: string;
+  auth?: string;
+  description?: string;
+  issues?: string[];
+}
+
+export interface PackBackendRouteAuditReport {
+  generated_at: string;
+  packs: number;
+  enabled_packs: number;
+  mounted_modules: number;
+  declared_routes: number;
+  mounted_routes: number;
+  ok_routes: number;
+  missing_routes: number;
+  method_mismatches: number;
+  undeclared_routes: number;
+  entries: PackBackendRouteAuditEntry[];
 }
 
 // --- SkillHub ---
