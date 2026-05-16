@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -467,6 +468,15 @@ func (g *Gateway) SetModuleRegistry(r *agentrt.ModuleRegistry, profile string) {
 func (g *Gateway) SetCogniRegistry(r *cogni.Registry, dir string) {
 	g.cogniRegistry = r
 	g.cogniDir = dir
+}
+
+// SetCogniKernelRuntimeStateHandler attaches a read-only Pack Runtime state
+// reporter owned by the Cogni Kernel module. It is intentionally separate from
+// the broad /v1/cognis/ bridge route so Pack Runtime can keep a method-aware
+// gate for /v1/cognis/runtime/pack-state while the legacy sub-resource bridge
+// continues to cover declaration operations.
+func (g *Gateway) SetCogniKernelRuntimeStateHandler(handler http.HandlerFunc) {
+	g.cogniKernelRuntimeState = handler
 }
 
 // SetCogniTraceStore attaches the trace store for /v1/cognis/traces and

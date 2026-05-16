@@ -395,8 +395,14 @@ if (cogniKernelPage.includes('from "@/lib/api"') || cogniKernelPage.includes("ap
 if (!legacyCogniPage.includes('redirect("/packs/cognis")')) {
   fail("legacy /cognis page should redirect to /packs/cognis");
 }
-for (const token of ["createCogniKernelPackClient", "/v1/cognis", "/v1/cognis/reload", "/v1/cognis/alerts", "/v1/cognis/export", 'method: "DELETE"']) {
+for (const token of ["createCogniKernelPackClient", "/v1/cognis", "/v1/cognis/reload", "/v1/cognis/alerts", "/v1/cognis/export", "/v1/cognis/runtime/pack-state", "runtimePackState", "runtime_loop_pack_state_ready", "cogni-runtime-pack-state.json", 'method: "DELETE"']) {
   if (!cogniKernelClient.includes(token)) fail(`cogni-kernel-pack-client missing token: ${token}`);
+}
+for (const token of ["RuntimeRouteSpecs", "SetCogniKernelRuntimeStateHandler", "CogniKernelRuntimeState", "runtime_loop_pack_state_ready", "cogni-runtime-pack-state.json"]) {
+  if (!cogniKernelSource.includes(token) && !cogniGatewayBridge.includes(token) && !gatewaySource.includes(token)) fail(`Cogni Kernel runtime pack-state gate missing token: ${token}`);
+}
+for (const token of ["运行态 Gate", "starts_runtime_loops", "stops_runtime_loops"]) {
+  if (!cogniKernelPage.includes(token)) fail(`Cogni Kernel page missing runtime gate token: ${token}`);
 }
 const hardcodedCogniShell = [
   "heroui-web/src/components/sidebar.tsx",

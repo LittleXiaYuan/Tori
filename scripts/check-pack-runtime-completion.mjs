@@ -159,6 +159,8 @@ const frontendShell = [
 const sdk = [
   "sdk/typescript/src/packs.ts",
   "sdk/typescript/src/packs.test.ts",
+  "sdk/typescript/src/cognis.ts",
+  "sdk/typescript/src/cognis.test.ts",
   "sdk/manifest/packs-sdk.json",
   "sdk/manifest/lora-pack-sdk.json",
   "sdk/manifest/cogni-kernel-pack-sdk.json",
@@ -312,12 +314,20 @@ requireTokens("cogni-kernel 蓝图能力包", cogniKernelPack + cogniKernelManif
   "func (h *Handler) Routes() []packruntime.BackendRoute",
   "/v1/cognis",
   "/v1/cognis/",
+  "/v1/cognis/runtime/pack-state",
   "http.MethodDelete",
   "yunque-client/cognis",
   "Cogni Kernel Pack",
   "createCogniKernelPackClient",
+  "runtimePackState",
+  "runtime_loop_pack_state_ready",
+  "cogni-runtime-pack-state.json",
+  "SetCogniKernelRuntimeStateHandler",
+  "NewHandlerWithRuntimeState",
+  "CogniKernelRuntimeState",
   "cogni-kernel-pack-client",
   "TestCogniKernelPackGateReturnsNotFoundWhenDisabled",
+  "TestCogniKernelRuntimePackStateRouteIsExactPackGated",
   "/packs/cognis",
   "distribution",
   "rollback",
@@ -1074,6 +1084,11 @@ if (cogniPackPage.includes("api.listCognis") || cogniPackPage.includes("api.relo
   fail("前端同步菜单/路由/资源/控制台", "Cogni Kernel pack page must use cogni-kernel-pack-client instead of the monolithic api object");
 } else {
   ok("前端 Cogni Kernel pack 客户端拆分", "Cogni Kernel page uses cogni-kernel-pack-client instead of monolithic api Cogni methods");
+}
+if (!cogniPackPage.includes("运行态 Gate") || !cogniPackPage.includes("runtime_loop_pack_state_ready") || !cogniPackPage.includes("cogni-runtime-pack-state.json")) {
+  fail("前端同步菜单/路由/资源/控制台", "Cogni Kernel pack page must surface the runtime loop pack-state gate");
+} else {
+  ok("前端 Cogni Kernel runtime gate", "Cogni Kernel page surfaces runtime_loop_pack_state_ready and cogni-runtime-pack-state.json");
 }
 
 if (!legacyBrowserPage.includes('redirect("/packs/browser")')) {

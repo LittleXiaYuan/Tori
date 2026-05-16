@@ -24,7 +24,8 @@ if (pack.sdk?.typescript !== manifest.sdkImport) fail("Cogni Kernel pack sdk.typ
 if (pack.frontend?.menus?.[0]?.path !== manifest.frontend.menuPath) fail("Cogni Kernel pack frontend menu path must remain /packs/cognis");
 if (pack.frontend?.routes?.[0]?.component !== manifest.frontend.component) fail("Cogni Kernel pack frontend route component drifted");
 if (pack.update?.rollback !== true) fail("Cogni Kernel pack must be rollbackable");
-if (pack.defaultState !== "enabled") fail("Cogni Kernel bridge pack should stay default enabled until runtime-loop gating lands");
+if (pack.defaultState !== "enabled") fail("Cogni Kernel bridge pack should stay default enabled with runtime-loop pack-state gate coverage");
+if (pack.metadata?.stage !== "runtime-loop-pack-state-gate") fail("Cogni Kernel pack stage should advertise runtime-loop pack-state gate coverage");
 
 const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${route.method} ${route.path}`));
 for (const route of manifest.routes ?? []) {
@@ -39,7 +40,11 @@ for (const token of [
   "/v1/cognis/alerts",
   "/v1/cognis/export",
   "/v1/cognis/import",
+  "/v1/cognis/runtime/pack-state",
   "/v1/cognis/${enc(id)}/experience",
+  "runtimePackState",
+  "runtime_loop_pack_state_ready",
+  "cogni-runtime-pack-state.json",
   "method: \"DELETE\"",
 ]) {
   if (!client.includes(token)) fail(`cogni-kernel-pack-client missing token: ${token}`);
@@ -48,6 +53,9 @@ for (const token of [
 const page = readRepoFile("heroui-web/src/app/packs/cognis/page.tsx");
 if (!page.includes("createCogniKernelPackClient") || page.includes('from "@/lib/api"') || page.includes("api.listCognis") || page.includes("api.reloadCognis")) {
   fail("Cogni Kernel pack page must use cogni-kernel-pack-client instead of monolithic api.ts");
+}
+for (const token of ["运行态 Gate", "runtime_loop_pack_state_ready", "starts_runtime_loops", "stops_runtime_loops", "cogni-runtime-pack-state.json"]) {
+  if (!page.includes(token)) fail(`Cogni Kernel pack page missing runtime gate token: ${token}`);
 }
 
 const legacy = readRepoFile(manifest.frontend.legacyPath);
@@ -68,6 +76,12 @@ for (const token of [
   "HandleCogniKernelPack",
   "Methods: []string",
   "http.MethodDelete",
+  "SetCogniKernelRuntimeStateHandler",
+  "NewHandlerWithRuntimeState",
+  "CogniKernelRuntimeState",
+  "RuntimeRouteSpecs",
+  "runtime_loop_pack_state_ready",
+  "cogni-runtime-pack-state.json",
   "BackendRouteInfo{Method",
   "Methods: methods",
   "cognikernelpack.NewHandler",

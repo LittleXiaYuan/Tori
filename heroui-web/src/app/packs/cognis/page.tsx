@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createCogniKernelPackClient } from "@/lib/cogni-kernel-pack-client";
+import {
+  createCogniKernelPackClient,
+  type CogniRuntimePackStateReport,
+} from "@/lib/cogni-kernel-pack-client";
 import type {
   CogniAlert,
   CogniCheckResult,
@@ -67,6 +70,12 @@ function severityColor(sev: string): { bg: string; fg: string } {
   }
 }
 
+function runtimeGateColor(ready?: boolean): { bg: string; fg: string } {
+  return ready
+    ? { bg: "rgba(23,201,100,0.12)", fg: "#17c964" }
+    : { bg: "rgba(255,170,0,0.12)", fg: "#ffaa00" };
+}
+
 const DEMO_COGNI_ID = "code-reviewer";
 
 const cogniPack = createCogniKernelPackClient();
@@ -94,18 +103,21 @@ export default function CognisPage() {
   const [refreshingTrace, setRefreshingTrace] = useState(false);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [confirmingPatternID, setConfirmingPatternID] = useState<string | null>(null);
+  const [runtimePackState, setRuntimePackState] = useState<CogniRuntimePackStateReport | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [list, alertsRes, demoTracesRes] = await Promise.all([
+      const [list, alertsRes, demoTracesRes, runtimeStateRes] = await Promise.all([
         cogniPack.list(),
         cogniPack.alerts().catch(() => ({ alerts: [] as CogniAlert[], count: 0 })),
         cogniPack.tracesByID(DEMO_COGNI_ID, 5).catch(() => ({ traces: [] as CogniTrace[] })),
+        cogniPack.runtimePackState().catch(() => null),
       ]);
       setCognis(list.cognis || []);
       setHealth(list.health || {});
       setAlerts(alertsRes.alerts || []);
       setDemoTraces(demoTracesRes.traces || []);
+      setRuntimePackState(runtimeStateRes);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "加载失败", "error");
     } finally {
@@ -339,6 +351,65 @@ export default function CognisPage() {
           </div>
         }
       />
+
+      {runtimePackState && (
+        <Card className="section-card p-4 border-l-4" style={{ borderLeftColor: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00" }}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ShieldCheck size={14} style={{ color: runtimeGateColor(runtimePackState.runtime_loop_pack_state_ready).fg }} />
+                <span className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>
+                  运行态 Gate
+                </span>
+                <Chip size="sm" style={{ background: runtimeGateColor(runtimePackState.runtime_loop_pack_state_ready).bg, color: runtimeGateColor(runtimePackState.runtime_loop_pack_state_ready).fg }}>
+                  runtime_loop_pack_state_ready: {String(runtimePackState.runtime_loop_pack_state_ready)}
+                </Chip>
+                <Chip
+                  size="sm"
+                  style={{
+                    background: runtimePackState.runtime_loop_running ? "rgba(23,201,100,0.12)" : "rgba(255,170,0,0.12)",
+                    color: runtimePackState.runtime_loop_running ? "#17c964" : "#ffaa00",
+                  }}
+                >
+                  loop {runtimePackState.runtime_loop_running ? "running" : "stopped"}
+                </Chip>
+                <Chip size="sm">{runtimePackState.pack_status || "unknown"}</Chip>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                {[
+                  ["pack_enabled", runtimePackState.pack_enabled],
+                  ["starts_runtime_loops", runtimePackState.starts_runtime_loops],
+                  ["stops_runtime_loops", runtimePackState.stops_runtime_loops],
+                  ["clears_runtime_state", runtimePackState.clears_runtime_state],
+                  ["sentinel_ready", runtimePackState.sentinel_ready],
+                  ["scheduler_ready", runtimePackState.scheduler_ready],
+                  ["bus_ready", runtimePackState.bus_ready],
+                  ["experience_store_ready", runtimePackState.experience_store_ready],
+                ].map(([label, value]) => (
+                  <Chip
+                    key={String(label)}
+                    size="sm"
+                    style={{
+                      background: value ? "rgba(23,201,100,0.1)" : "rgba(255,255,255,0.04)",
+                      color: value ? "#17c964" : "var(--yunque-text-muted)",
+                    }}
+                  >
+                    {label}: {String(value)}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                <span>active_bus_cognis {runtimePackState.active_bus_cognis}</span>
+                <span>experience_store_count {runtimePackState.experience_store_count}</span>
+                <span>artifact {runtimePackState.artifacts?.[0] || "cogni-runtime-pack-state.json"}</span>
+              </div>
+            </div>
+            <div className="text-[11px] text-right max-w-md" style={{ color: "var(--yunque-text-muted)" }}>
+              该只读报告证明 Cogni runtime loop 已跟随 yunque.pack.cogni-kernel 启停状态；真正切换仍走 /v1/packs/enable 与 /v1/packs/disable。
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Demo Evidence Panel */}
       {!loading && (

@@ -13,6 +13,8 @@ import type {
   CogniWorkflowResult,
 } from "./api-types/cogni";
 
+export const COGNI_RUNTIME_PACK_STATE_ARTIFACT = "cogni-runtime-pack-state.json";
+
 export interface CogniImportSummary {
   added?: string[];
   updated?: string[];
@@ -21,7 +23,31 @@ export interface CogniImportSummary {
   [key: string]: unknown;
 }
 
+export interface CogniRuntimePackStateReport {
+  pack_id: string;
+  stage: string;
+  pack_installed: boolean;
+  pack_enabled: boolean;
+  pack_status: string;
+  runtime_loop_pack_state_ready: boolean;
+  runtime_loop_running: boolean;
+  stops_runtime_loops: boolean;
+  starts_runtime_loops: boolean;
+  clears_runtime_state: boolean;
+  sentinel_ready: boolean;
+  scheduler_ready: boolean;
+  bus_ready: boolean;
+  experience_store_ready: boolean;
+  active_bus_cognis: number;
+  experience_store_count: number;
+  generated_at: string;
+  capabilities: string[];
+  artifacts: string[];
+  notes?: string[];
+}
+
 export interface CogniKernelPackClient {
+  runtimePackState(): Promise<CogniRuntimePackStateReport>;
   list(): Promise<CogniListResponse>;
   get(id: string): Promise<{ id: string; declaration: CogniDeclaration; enabled: boolean }>;
   add(declaration: CogniDeclaration): Promise<{ status: string; id: string }>;
@@ -47,6 +73,7 @@ export interface CogniKernelPackClient {
 
 export function createCogniKernelPackClient(): CogniKernelPackClient {
   return {
+    runtimePackState: () => fetcher<CogniRuntimePackStateReport>("/v1/cognis/runtime/pack-state"),
     list: () => fetcher<CogniListResponse>("/v1/cognis"),
     get: (id) => fetcher<{ id: string; declaration: CogniDeclaration; enabled: boolean }>(`/v1/cognis/${enc(id)}`),
     add: (declaration) =>

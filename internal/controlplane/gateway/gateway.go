@@ -316,16 +316,17 @@ type Gateway struct {
 
 	// Cogni hot-pluggable registry (declarative AI-cognition shells).
 	// Populated by the cogni runtime module after Gateway construction.
-	cogniRegistry       *cogni.Registry
-	cogniDir            string
-	cogniTraces         cogni.TraceStore
-	cogniSentinel       *cogni.Sentinel
-	cogniWorkflowEngine *cogni.WorkflowEngine
-	cogniExperiences    map[string]*cogni.ExperienceStore
-	cogniGenesis        *cogni.Genesis
-	cogniEvolution      *cogni.EvolutionEngine
-	cogniFederation     *cogni.CogniFederation
-	cogniCostTracker    *cogni.CostTracker
+	cogniKernelRuntimeState http.HandlerFunc
+	cogniRegistry           *cogni.Registry
+	cogniDir                string
+	cogniTraces             cogni.TraceStore
+	cogniSentinel           *cogni.Sentinel
+	cogniWorkflowEngine     *cogni.WorkflowEngine
+	cogniExperiences        map[string]*cogni.ExperienceStore
+	cogniGenesis            *cogni.Genesis
+	cogniEvolution          *cogni.EvolutionEngine
+	cogniFederation         *cogni.CogniFederation
+	cogniCostTracker        *cogni.CostTracker
 
 	// NL Config — natural-language → structured-config translator
 	nlConfigTranslator *cogni.NLConfigTranslator

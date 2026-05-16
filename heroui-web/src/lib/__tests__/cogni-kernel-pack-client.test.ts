@@ -6,6 +6,42 @@ afterEach(() => {
 });
 
 describe("cogni-kernel-pack-client", () => {
+  it("reads runtime loop pack-state through the pack-owned gate", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          pack_id: "yunque.pack.cogni-kernel",
+          stage: "runtime-loop-pack-state-gate",
+          pack_installed: true,
+          pack_enabled: true,
+          pack_status: "enabled",
+          runtime_loop_pack_state_ready: true,
+          runtime_loop_running: true,
+          stops_runtime_loops: false,
+          starts_runtime_loops: true,
+          clears_runtime_state: false,
+          sentinel_ready: true,
+          scheduler_ready: true,
+          bus_ready: true,
+          experience_store_ready: true,
+          active_bus_cognis: 2,
+          experience_store_count: 1,
+          generated_at: "2026-05-16T12:00:00Z",
+          capabilities: ["cognis.runtime.pack_state", "cognis.runtime.loop_gate"],
+          artifacts: ["cogni-runtime-pack-state.json"],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const client = createCogniKernelPackClient();
+    const report = await client.runtimePackState();
+
+    expect(spy.mock.calls[0]?.[0]).toBe("/v1/cognis/runtime/pack-state");
+    expect(report.runtime_loop_pack_state_ready).toBe(true);
+    expect(report.artifacts).toContain("cogni-runtime-pack-state.json");
+  });
+
   it("reads registry, alerts and traces through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")

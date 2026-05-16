@@ -14,7 +14,11 @@
     "POST /v1/cognis",
     "GET /v1/cognis/",
     "POST /v1/cognis/",
-    "DELETE /v1/cognis/"
+    "DELETE /v1/cognis/",
+    "GET /v1/cognis/runtime/pack-state"
+  ],
+  "artifacts": [
+    "cogni-runtime-pack-state.json"
   ],
   "frontend": {
     "menuPath": "/packs/cognis",

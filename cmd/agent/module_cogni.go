@@ -294,7 +294,9 @@ func (m *cogniModule) Init(ctx context.Context, app *agentrt.App) error {
 			gw.SetCogniFederation(federation)
 			gw.SetCogniCostTracker(m.costTracker)
 			gw.SetNLConfigTranslator(nlTranslator)
-			gw.RegisterBackendPack(cognikernelpack.NewHandler(gw))
+			cogniPackHandler := cognikernelpack.NewHandlerWithRuntimeState(gw, m)
+			gw.SetCogniKernelRuntimeStateHandler(cogniPackHandler.HandleRuntimePackState)
+			gw.RegisterBackendPack(cogniPackHandler)
 		}
 	}
 
@@ -534,6 +536,64 @@ func (m *cogniModule) cogniRuntimeActive() bool {
 	m.runtimeMu.Lock()
 	defer m.runtimeMu.Unlock()
 	return m.runtimeActive
+}
+
+func (m *cogniModule) CogniKernelRuntimeState() cognikernelpack.RuntimeStateReport {
+	installed := false
+	enabled := m.cogniKernelPackEnabled()
+	status := "registry-unavailable"
+	if m.packRegistry != nil {
+		if pack, ok := m.packRegistry.Get(cognikernelpack.PackID); ok {
+			installed = true
+			status = string(pack.Status)
+		} else {
+			status = "not-installed"
+		}
+	}
+	m.runtimeMu.Lock()
+	runtimeRunning := m.runtimeActive
+	experienceStoreCount := len(m.experiences)
+	schedulerReady := m.scheduler != nil && runtimeRunning
+	sentinelReady := m.sentinel != nil && runtimeRunning
+	m.runtimeMu.Unlock()
+
+	activeBusCognis := 0
+	if m.bus != nil {
+		activeBusCognis = m.bus.ActiveCognis()
+	}
+	report := cognikernelpack.RuntimeStateReport{
+		PackID:                    cognikernelpack.PackID,
+		Stage:                     "runtime-loop-pack-state-gate",
+		PackInstalled:             installed,
+		PackEnabled:               enabled,
+		PackStatus:                status,
+		RuntimeLoopPackStateReady: installed,
+		RuntimeLoopRunning:        runtimeRunning,
+		StopsRuntimeLoops:         installed && !enabled && !runtimeRunning,
+		StartsRuntimeLoops:        installed && enabled && runtimeRunning,
+		ClearsRuntimeState:        installed && !enabled && activeBusCognis == 0 && experienceStoreCount == 0,
+		SentinelReady:             sentinelReady,
+		SchedulerReady:            schedulerReady,
+		BusReady:                  m.bus != nil && runtimeRunning,
+		ExperienceStoreReady:      runtimeRunning,
+		ActiveBusCognis:           activeBusCognis,
+		ExperienceStoreCount:      experienceStoreCount,
+		GeneratedAt:               time.Now().UTC(),
+		Capabilities:              []string{"cognis.runtime.pack_state", "cognis.runtime.loop_gate"},
+		Artifacts:                 []string{"cogni-runtime-pack-state.json"},
+		Notes: []string{
+			"runtime_loop_pack_state_ready=true means the live Cogni runtime loops are bound to yunque.pack.cogni-kernel enabled/disabled state.",
+			"When the pack is disabled, planner Cogni context injection is suppressed and bus/experience runtime projections are cleared.",
+			"This report is read-only; state changes still go through /v1/packs/enable and /v1/packs/disable.",
+		},
+	}
+	if m.scheduler == nil && runtimeRunning {
+		report.Notes = append(report.Notes, "perception scheduler is created lazily after the Cogni hook is wired.")
+	}
+	if m.sentinel != nil && runtimeRunning && !report.SentinelReady {
+		report.Notes = append(report.Notes, "sentinel has no background interval configured; manual alert scans remain available.")
+	}
+	return report
 }
 
 // initExperienceStores creates/updates per-cogni ExperienceStore instances
