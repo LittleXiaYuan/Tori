@@ -412,6 +412,34 @@ test("MemoryTimeTravelClient stores KV audit proof-link writeback handoff withou
   assertEqual(calls[0]?.init?.method, "POST");
 });
 
+test("MemoryTimeTravelClient builds KV audit proof-link executor handoff plans without native writes", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const client = createMemoryTimeTravelClient({
+    baseUrl: "http://localhost:9090",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({ plan: { pack_id: "yunque.pack.memory-time-travel", generated_at: "2026-05-15T16:00:00Z", status: "audit_proof_link_executor_handoff_plan", stage: "executor-plan-before-native-kv-history-backfill", dry_run: true, record_id: "audit-link-writeback-record-1", request_id: "approval-link-1", request_key: "approval-link-1", namespace: "memory_snapshot", temporal_namespace: "memory_snapshot", requested_by: "operator", reason: "plan executor handoff", kv_audit_link_writeback_executor_plan_ready: true, executor_input_contract_ready: true, consumes_audit_link_writeback_store: true, kv_audit_link_writeback_store_ready: true, kv_audit_link_writeback_ready: false, kv_audit_linkage_ready: false, audit_proof_link_executor_ready: false, audit_proof_link_ready: false, approval_request_plan_ready: true, approval_manager_bridge_plan_ready: true, global_approval_enqueue_ready: false, audit_append_plan_ready: true, merkle_append_ready: false, writes_audit_chain: false, writes_ledger_kv: false, writes_native_kv_history: false, backfills_audit_seq: false, backfills_audit_hash: false, appends_merkle: false, action_count: 1, executor_handoff_plan: { target: "ledger.kv_history.audit_proof_link_executor", source_store: "audit-link-writeback-store.json", source_record_artifact: "audit-link-writeback-record.json", record_id: "audit-link-writeback-record-1", request_id: "approval-link-1", request_key: "approval-link-1", namespace: "memory_snapshot", temporal_namespace: "memory_snapshot", dedup_key: "audit-link-executor-handoff-1", consumes_audit_link_writeback_store: true, executor_input_contract_ready: true, audit_proof_link_executor_ready: false, approval_required: true, global_approval_enqueue_ready: false, writes_native_kv_history: false, writes_ledger_kv: false, backfills_audit_seq: false, backfills_audit_hash: false, merkle_append_ready: false, appends_merkle: false, action_count: 1, action_keys: ["goal"], actions: [], blocked_by: ["audit-proof-link-executor-not-wired"] }, audit_append_plan: { audit_append_plan_ready: true, merkle_append_ready: false, chain: "ledger.kv_history.audit_proof_link", event_type: "memory_time_travel.audit_proof_link.executor_handoff", subject: "audit-link-writeback-record-1", payload_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", dedup_key: "audit-link-executor-handoff-1", writes_audit_chain: false, actions: [], blocked_by: ["merkle-append-writer-not-wired"] }, artifacts: ["audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json"], writeback_actions: [{ key: "goal", proof_status: "would_backfill_audit_seq_hash" }], actions: [], blocked_by: ["audit-proof-link-executor-not-wired"], labels: ["executor-plan"] } });
+    },
+  });
+
+  const result = await client.auditLinksWritebackExecutorPlan({ request_key: "approval-link-1", namespace: "memory_snapshot", requested_by: "operator", reason: "plan executor handoff", dry_run: true });
+
+  assertEqual(result.plan.kv_audit_link_writeback_executor_plan_ready, true);
+  assertEqual(result.plan.executor_input_contract_ready, true);
+  assertEqual(result.plan.audit_proof_link_executor_ready, false);
+  assertEqual(result.plan.consumes_audit_link_writeback_store, true);
+  assertEqual(result.plan.writes_ledger_kv, false);
+  assertEqual(result.plan.writes_native_kv_history, false);
+  assertEqual(result.plan.backfills_audit_seq, false);
+  assertEqual(result.plan.appends_merkle, false);
+  assertEqual(result.plan.writes_audit_chain, false);
+  assertEqual(result.plan.executor_handoff_plan.target, "ledger.kv_history.audit_proof_link_executor");
+  assertEqual(result.plan.audit_append_plan.audit_append_plan_ready, true);
+  assertEqual(result.plan.audit_append_plan.writes_audit_chain, false);
+  assertEqual(calls[0]?.url, "http://localhost:9090/v1/memory-time-travel/audit/links/writeback/executor/plan");
+  assertEqual(calls[0]?.init?.method, "POST");
+});
+
 test("MemoryTimeTravelClient throws MemoryTimeTravelClientError with nested gateway messages", async () => {
   const client = createMemoryTimeTravelClient({
     baseUrl: "http://localhost:9090",

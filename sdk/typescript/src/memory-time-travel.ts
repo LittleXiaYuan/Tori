@@ -1,17 +1,8 @@
 /**
  * Lightweight Memory Time Travel Pack SDK slice.
- *
- * This keeps memory snapshot storage, point-in-time reconstruction, drift diff,
- * rollback plan generation, approved rollback write-back planning, retention
- * dry-run/prune planning, native kv_history migration/index planning, KV audit
- * proof-link schema inspection plus read-only proof-link preview gates,
- * plan-only proof-link write-back bridge contracts, pack-local proof-link
- * write-back store handoff records,
- * dual-read parity validation, cutover readiness gate reporting,
- * dual-read/dual-write cutover planning, and evidence export
- * usable without importing the full generated OpenAPI SDK:
- *
- *   import { createMemoryTimeTravelClient } from "yunque-client/memory-time-travel";
+ * Covers snapshots, rollback/retention plans, native kv_history previews,
+ * proof-link writeback handoffs, cutover gates, audit verification, and evidence
+ * without importing the full generated OpenAPI SDK.
  */
 
 export type MemoryTimeTravelPolicy = {
@@ -88,6 +79,9 @@ export type MemoryTimeTravelStatusResponse = {
   kv_audit_link_preview_ready?: boolean;
   kv_audit_link_writeback_plan_ready?: boolean;
   kv_audit_link_writeback_store_ready?: boolean;
+  kv_audit_link_writeback_executor_plan_ready?: boolean;
+  executor_input_contract_ready?: boolean;
+  audit_proof_link_executor_ready?: boolean;
   kv_audit_link_writeback_ready?: boolean;
   kv_audit_linkage_ready?: boolean;
   snapshot_count: number;
@@ -575,7 +569,31 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackActionPlan = {
   generated_at: string;
 };
 
-export type MemoryTimeTravelKVAuditProofLinkWritebackPlan = {
+type MTTWB = {
+  kv_audit_link_writeback_ready: boolean;
+  kv_audit_linkage_ready: boolean;
+  audit_proof_link_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_native_kv_history: boolean;
+  backfills_audit_seq: boolean;
+  backfills_audit_hash: boolean;
+  merkle_append_ready: boolean;
+};
+
+type MTTAB = {
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+};
+
+type MTTAF = {
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackPlan = MTTWB & MTTAB & MTTAF & {
   pack_id: string;
   namespace: string;
   temporal_namespace: string;
@@ -588,20 +606,9 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackPlan = {
   reason?: string;
   approval_id?: string;
   kv_audit_link_writeback_plan_ready: boolean;
-  kv_audit_link_writeback_ready: boolean;
-  kv_audit_linkage_ready: boolean;
-  audit_proof_link_ready: boolean;
-  approval_request_plan_ready: boolean;
-  approval_manager_bridge_plan_ready: boolean;
-  global_approval_enqueue_ready: boolean;
   consumes_audit_link_preview: boolean;
   native_kv_history_preview_ready: boolean;
   merkle_verification_ready: boolean;
-  merkle_append_ready: boolean;
-  writes_ledger_kv: boolean;
-  writes_native_kv_history: boolean;
-  backfills_audit_seq: boolean;
-  backfills_audit_hash: boolean;
   appends_merkle: boolean;
   candidate_link_count: number;
   matched_link_count: number;
@@ -612,11 +619,6 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackPlan = {
   audit_link_preview: MemoryTimeTravelKVAuditProofLinkPreview;
   proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
   writeback_actions: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
-  artifacts: string[];
-  actions: string[];
-  blocked_by: string[];
-  labels: string[];
-  notes?: string[];
 };
 
 export type MemoryTimeTravelKVAuditProofLinkWritebackPlanResponse = {
@@ -625,26 +627,18 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackPlanResponse = {
 
 export type MemoryTimeTravelKVAuditProofLinkWritebackStoreRequest = MemoryTimeTravelKVAuditProofLinkWritebackPlanRequest;
 
-export type MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary = {
+export type MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary = Pick<MTTWB, "kv_audit_link_writeback_ready" | "kv_audit_linkage_ready" | "writes_ledger_kv" | "writes_native_kv_history" | "backfills_audit_seq" | "backfills_audit_hash" | "merkle_append_ready"> & {
   pack_id: string;
   store: string;
   store_ready: boolean;
   kv_audit_link_writeback_store_ready: boolean;
-  kv_audit_link_writeback_ready: boolean;
-  kv_audit_linkage_ready: boolean;
   writes_audit_link_writeback_store: boolean;
-  writes_ledger_kv: boolean;
-  writes_native_kv_history: boolean;
-  backfills_audit_seq: boolean;
-  backfills_audit_hash: boolean;
-  merkle_append_ready: boolean;
   record_count: number;
   artifact: string;
   record_artifact: string;
-  notes?: string[];
 };
 
-export type MemoryTimeTravelKVAuditProofLinkWritebackRecord = {
+export type MemoryTimeTravelKVAuditProofLinkWritebackRecord = MTTWB & MTTAB & MTTAF & {
   pack_id: string;
   store_name: string;
   record_id: string;
@@ -660,18 +654,7 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackRecord = {
   updated_at: string;
   kv_audit_link_writeback_store_ready: boolean;
   kv_audit_link_writeback_plan_ready: boolean;
-  kv_audit_link_writeback_ready: boolean;
-  kv_audit_linkage_ready: boolean;
-  audit_proof_link_ready: boolean;
-  approval_request_plan_ready: boolean;
-  approval_manager_bridge_plan_ready: boolean;
-  global_approval_enqueue_ready: boolean;
   writes_audit_link_writeback_store: boolean;
-  writes_ledger_kv: boolean;
-  writes_native_kv_history: boolean;
-  backfills_audit_seq: boolean;
-  backfills_audit_hash: boolean;
-  merkle_append_ready: boolean;
   appends_merkle: boolean;
   candidate_link_count: number;
   matched_link_count: number;
@@ -682,31 +665,15 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackRecord = {
   plan_summary: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
   store_artifact: string;
   record_artifact: string;
-  artifacts: string[];
-  actions: string[];
-  blocked_by: string[];
-  labels: string[];
-  notes?: string[];
 };
 
-export type MemoryTimeTravelKVAuditProofLinkWritebackStore = {
+export type MemoryTimeTravelKVAuditProofLinkWritebackStore = MTTWB & MTTAB & MTTAF & {
   pack_id: string;
   generated_at: string;
   status: string;
   kv_audit_link_writeback_store_ready: boolean;
   kv_audit_link_writeback_plan_ready: boolean;
-  kv_audit_link_writeback_ready: boolean;
-  kv_audit_linkage_ready: boolean;
-  audit_proof_link_ready: boolean;
-  approval_request_plan_ready: boolean;
-  approval_manager_bridge_plan_ready: boolean;
-  global_approval_enqueue_ready: boolean;
   writes_audit_link_writeback_store: boolean;
-  writes_ledger_kv: boolean;
-  writes_native_kv_history: boolean;
-  backfills_audit_seq: boolean;
-  backfills_audit_hash: boolean;
-  merkle_append_ready: boolean;
   appends_merkle: boolean;
   request_id: string;
   request_key: string;
@@ -722,15 +689,79 @@ export type MemoryTimeTravelKVAuditProofLinkWritebackStore = {
   approval_queue_record: MemoryTimeTravelKVAuditProofLinkWritebackRecord;
   audit_link_writeback_store: MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary;
   plan_summary: MemoryTimeTravelKVAuditProofLinkWritebackPlan;
-  artifacts: string[];
-  actions: string[];
-  blocked_by: string[];
-  labels: string[];
-  notes?: string[];
 };
 
 export type MemoryTimeTravelKVAuditProofLinkWritebackStoreResponse = {
   writeback: MemoryTimeTravelKVAuditProofLinkWritebackStore;
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlanRequest = Partial<Record<"record_id" | "request_id" | "request_key" | "namespace" | "requested_by" | "reason", string>> & {
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelKVAuditProofLinkExecutorHandoffPlan = {
+  target: string;
+  source_store: string;
+  source_record_artifact: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  temporal_namespace: string;
+  dedup_key: string;
+  consumes_audit_link_writeback_store: boolean;
+  executor_input_contract_ready: boolean;
+  audit_proof_link_executor_ready: boolean;
+  action_count: number;
+  action_keys: string[];
+  actions: string[];
+  blocked_by: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkExecutorAuditAppendPlan = {
+  audit_append_plan_ready: boolean;
+  merkle_append_ready: boolean;
+  chain: string;
+  event_type: string;
+  subject: string;
+  payload_digest: string;
+  dedup_key: string;
+  writes_audit_chain: boolean;
+  actions: string[];
+  blocked_by: string[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan = MTTWB & MTTAB & MTTAF & {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  stage: string;
+  dry_run: boolean;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  temporal_namespace: string;
+  requested_by?: string;
+  reason?: string;
+  kv_audit_link_writeback_executor_plan_ready: boolean;
+  executor_input_contract_ready: boolean;
+  consumes_audit_link_writeback_store: boolean;
+  kv_audit_link_writeback_store_ready: boolean;
+  audit_proof_link_executor_ready: boolean;
+  audit_append_plan_ready: boolean;
+  writes_audit_chain: boolean;
+  appends_merkle: boolean;
+  action_count: number;
+  audit_link_writeback_record: MemoryTimeTravelKVAuditProofLinkWritebackRecord;
+  audit_link_writeback_store: MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary;
+  executor_handoff_plan: MemoryTimeTravelKVAuditProofLinkExecutorHandoffPlan;
+  audit_append_plan: MemoryTimeTravelKVAuditProofLinkExecutorAuditAppendPlan;
+  writeback_actions: MemoryTimeTravelKVAuditProofLinkWritebackActionPlan[];
+};
+
+export type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlanResponse = {
+  plan: MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan;
 };
 
 export type MemoryTimeTravelSnapshotsResponse = {
@@ -1024,6 +1055,10 @@ export type MemoryTimeTravelEvidenceResponse = {
   kv_audit_link_writeback_store?: MemoryTimeTravelKVAuditProofLinkWritebackStoreSummary;
   kv_audit_link_writeback_store_error?: string;
   kv_audit_link_writeback_records?: MemoryTimeTravelKVAuditProofLinkWritebackRecord[];
+  kv_audit_link_writeback_executor_plan?: MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan;
+  kv_audit_link_writeback_executor_plan_error?: string;
+  audit_link_executor_handoff_plan?: MemoryTimeTravelKVAuditProofLinkExecutorHandoffPlan;
+  audit_link_executor_audit_plan?: MemoryTimeTravelKVAuditProofLinkExecutorAuditAppendPlan;
   audit_verification?: MemoryTimeTravelAuditVerificationResponse;
   audit_verification_error?: string;
 };
@@ -1190,6 +1225,10 @@ export class MemoryTimeTravelClient {
 
   auditLinksWritebackStore(input: MemoryTimeTravelKVAuditProofLinkWritebackStoreRequest = {}): Promise<MemoryTimeTravelKVAuditProofLinkWritebackStoreResponse> {
     return this.request<MemoryTimeTravelKVAuditProofLinkWritebackStoreResponse>("POST", "/v1/memory-time-travel/audit/links/writeback/store", input);
+  }
+
+  auditLinksWritebackExecutorPlan(input: MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlanRequest = {}): Promise<MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlanResponse> {
+    return this.request<MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlanResponse>("POST", "/v1/memory-time-travel/audit/links/writeback/executor/plan", input);
   }
 
   evidence(id: string): Promise<MemoryTimeTravelEvidenceResponse> {

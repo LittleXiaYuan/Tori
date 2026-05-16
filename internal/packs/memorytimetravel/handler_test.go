@@ -52,8 +52,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 20 {
-		t.Fatalf("expected 20 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 21 {
+		t.Fatalf("expected 21 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -70,26 +70,27 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/memory-time-travel/status":                       {http.MethodGet},
-		"/v1/memory-time-travel/snapshots":                    {http.MethodGet, http.MethodPost},
-		"/v1/memory-time-travel/snapshots/":                   {http.MethodGet},
-		"/v1/memory-time-travel/snapshot-at":                  {http.MethodPost},
-		"/v1/memory-time-travel/diff":                         {http.MethodPost},
-		"/v1/memory-time-travel/rollback-plan":                {http.MethodPost},
-		"/v1/memory-time-travel/rollback/approved-plan":       {http.MethodPost},
-		"/v1/memory-time-travel/retention/plan":               {http.MethodGet},
-		"/v1/memory-time-travel/retention/prune-plan":         {http.MethodPost},
-		"/v1/memory-time-travel/kv-history/native-plan":       {http.MethodGet},
-		"/v1/memory-time-travel/kv-history/migration-preview": {http.MethodGet},
-		"/v1/memory-time-travel/kv-history/dual-read/parity":  {http.MethodPost},
-		"/v1/memory-time-travel/kv-history/cutover/plan":      {http.MethodPost},
-		"/v1/memory-time-travel/kv-history/cutover/readiness": {http.MethodPost},
-		"/v1/memory-time-travel/audit/links":                  {http.MethodGet},
-		"/v1/memory-time-travel/audit/links/preview":          {http.MethodPost},
-		"/v1/memory-time-travel/audit/links/writeback-plan":   {http.MethodPost},
-		"/v1/memory-time-travel/audit/links/writeback/store":  {http.MethodPost},
-		"/v1/memory-time-travel/audit/verify":                 {http.MethodGet},
-		"/v1/memory-time-travel/evidence/":                    {http.MethodGet},
+		"/v1/memory-time-travel/status":                              {http.MethodGet},
+		"/v1/memory-time-travel/snapshots":                           {http.MethodGet, http.MethodPost},
+		"/v1/memory-time-travel/snapshots/":                          {http.MethodGet},
+		"/v1/memory-time-travel/snapshot-at":                         {http.MethodPost},
+		"/v1/memory-time-travel/diff":                                {http.MethodPost},
+		"/v1/memory-time-travel/rollback-plan":                       {http.MethodPost},
+		"/v1/memory-time-travel/rollback/approved-plan":              {http.MethodPost},
+		"/v1/memory-time-travel/retention/plan":                      {http.MethodGet},
+		"/v1/memory-time-travel/retention/prune-plan":                {http.MethodPost},
+		"/v1/memory-time-travel/kv-history/native-plan":              {http.MethodGet},
+		"/v1/memory-time-travel/kv-history/migration-preview":        {http.MethodGet},
+		"/v1/memory-time-travel/kv-history/dual-read/parity":         {http.MethodPost},
+		"/v1/memory-time-travel/kv-history/cutover/plan":             {http.MethodPost},
+		"/v1/memory-time-travel/kv-history/cutover/readiness":        {http.MethodPost},
+		"/v1/memory-time-travel/audit/links":                         {http.MethodGet},
+		"/v1/memory-time-travel/audit/links/preview":                 {http.MethodPost},
+		"/v1/memory-time-travel/audit/links/writeback-plan":          {http.MethodPost},
+		"/v1/memory-time-travel/audit/links/writeback/store":         {http.MethodPost},
+		"/v1/memory-time-travel/audit/links/writeback/executor/plan": {http.MethodPost},
+		"/v1/memory-time-travel/audit/verify":                        {http.MethodGet},
+		"/v1/memory-time-travel/evidence/":                           {http.MethodGet},
 	}
 	for path, methods := range expected {
 		got := strings.Join(byPath[path], ",")
@@ -258,7 +259,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_store_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_store") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_store_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_executor_plan_ready":true`) || !strings.Contains(w.Body.String(), `"executor_input_contract_ready":true`) || !strings.Contains(w.Body.String(), `"audit_proof_link_executor_ready":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_store") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_executor_plan") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -573,6 +574,89 @@ func TestMemoryTimeTravelAuditProofLinkWritebackStorePersistsPackLocalHandoffOnl
 	}
 	if len(records) != 1 || records[0].RequestKey != "approval-link-store" {
 		t.Fatalf("writeback store should replace by request key, records=%#v", records)
+	}
+}
+
+func TestMemoryTimeTravelAuditProofLinkExecutorPlanConsumesStoreWithoutWrites(t *testing.T) {
+	now := time.Date(2026, 5, 15, 15, 55, 0, 0, time.UTC)
+	previewer := &fakeNativeKVHistoryPreviewer{preview: NativeKVHistoryMigrationPreview{
+		Namespace:                   "memory_snapshot",
+		GeneratedAt:                 now,
+		SourceNamespace:             "__kv_history__",
+		NativeTable:                 "kv_history",
+		ScannedDocumentCount:        1,
+		PreviewRowCount:             1,
+		ReturnedRowCount:            1,
+		NativeKVHistoryPreviewReady: true,
+		WritesNativeKVHistory:       false,
+		MigratesKVHistory:           false,
+		Rows: []NativeKVHistoryRowPreview{{
+			ID:          "kvh-memory_snapshot-goal-v1",
+			Namespace:   "memory_snapshot",
+			Key:         "goal",
+			Version:     1,
+			ValueSHA256: "goal-sha",
+			UpdatedAt:   now.Add(-time.Hour),
+			Current:     true,
+			AuditSeq:    7,
+			AuditHash:   "audit-hash-7",
+		}},
+	}}
+	verifier := &fakeMerkleVerifier{result: MerkleVerification{
+		Ready:       true,
+		Valid:       true,
+		RecordCount: 1,
+		LastSeq:     7,
+		LastHash:    "audit-hash-7",
+		RecentRecords: []MerkleAuditRecord{
+			{Seq: 7, Timestamp: now.Add(-time.Hour), Type: "memory", Actor: "tenant", Action: "memory.flush", Hash: "audit-hash-7"},
+		},
+	}}
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }, NativeKVHistoryPreviewer: previewer, MerkleVerifier: verifier})
+
+	body := `{"namespace":"memory_snapshot","at":"2026-05-15T15:55:00Z","requested_by":"operator","reason":"proof link queue","approval_id":"approval-link-executor","dry_run":true}`
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback/store", strings.NewReader(body))
+	h.AuditLinksWritebackStore(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("seed writeback store status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback/executor/plan", strings.NewReader(`{"request_key":"approval-link-executor","requested_by":"operator","reason":"plan executor handoff","dry_run":true}`))
+	h.AuditLinksWritebackExecutorPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit proof-link executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Plan KVAuditProofLinkWritebackExecutorPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode audit proof-link executor plan: %v", err)
+	}
+	if got.Plan.Status != "audit_proof_link_executor_handoff_plan" || !got.Plan.KVAuditLinkWritebackExecutorPlanReady || !got.Plan.ExecutorInputContractReady || !got.Plan.ConsumesAuditLinkWritebackStore {
+		t.Fatalf("unexpected executor plan identity: %#v", got.Plan)
+	}
+	if got.Plan.AuditProofLinkExecutorReady || got.Plan.KVAuditLinkWritebackReady || got.Plan.KVAuditLinkageReady || got.Plan.AuditProofLinkReady || got.Plan.WritesLedgerKV || got.Plan.WritesNativeKVHistory || got.Plan.BackfillsAuditSeq || got.Plan.BackfillsAuditHash || got.Plan.MerkleAppendReady || got.Plan.AppendsMerkle || got.Plan.GlobalApprovalEnqueueReady || got.Plan.WritesAuditChain {
+		t.Fatalf("executor plan must consume store without live writes: %#v", got.Plan)
+	}
+	if got.Plan.ActionCount != 1 || got.Plan.ExecutorHandoffPlan.Target != "ledger.kv_history.audit_proof_link_executor" || !got.Plan.ExecutorHandoffPlan.ConsumesAuditLinkWritebackStore || got.Plan.ExecutorHandoffPlan.AuditProofLinkExecutorReady {
+		t.Fatalf("executor handoff plan should map one stored record to future executor input only: %#v", got.Plan.ExecutorHandoffPlan)
+	}
+	if len(got.Plan.ExecutorHandoffPlan.DedupKey) == 0 || len(got.Plan.AuditAppendPlan.PayloadDigest) != 64 || got.Plan.AuditAppendPlan.WritesAuditChain {
+		t.Fatalf("executor audit plan should expose deterministic non-writing metadata: %#v", got.Plan.AuditAppendPlan)
+	}
+	for _, artifact := range []string{"audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json"} {
+		if !containsString(got.Plan.Artifacts, artifact) {
+			t.Fatalf("executor plan missing artifact %s: %#v", artifact, got.Plan.Artifacts)
+		}
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/audit/links/writeback/executor/plan", strings.NewReader(`{"record_id":"missing","request_id":"missing","request_key":"missing","namespace":"missing"}`))
+	h.AuditLinksWritebackExecutorPlan(w, req)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "writeback record not found") {
+		t.Fatalf("missing executor record should be a clear 400, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -955,29 +1039,33 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 
 	var got struct {
-		Files                     []string                              `json:"files"`
-		ApprovedRollbackPlan      ApprovedRollbackExecutionPlanReport   `json:"approved_rollback_plan"`
-		RollbackWritebackPlan     []RollbackWritebackActionPlan         `json:"rollback_writeback_plan"`
-		ApprovalRequestPlan       GlobalApprovalRequestPlan             `json:"approval_request_plan"`
-		RetentionPlan             RetentionPlanReport                   `json:"retention_plan"`
-		RetentionPrunePlan        RetentionPrunePlanReport              `json:"retention_prune_plan"`
-		NativeKVHistoryPlan       NativeKVHistoryPlanReport             `json:"native_kv_history_plan"`
-		KVHistoryMigrationPlan    []KVHistoryMigrationStepPlan          `json:"kv_history_migration_plan"`
-		KVHistoryIndexPlan        []NativeKVHistoryIndexPlan            `json:"kv_history_index_plan"`
-		KVHistoryCutoverPlan      KVHistoryCutoverPlanReport            `json:"kv_history_cutover_plan"`
-		KVHistoryCutoverReadiness KVHistoryCutoverReadinessReport       `json:"kv_history_cutover_readiness"`
-		KVHistoryDualReadParity   KVHistoryDualReadParityReport         `json:"kv_history_dual_read_parity"`
-		KVHistoryDualReadPlan     KVHistoryDualReadPlan                 `json:"kv_history_dual_read_plan"`
-		KVHistoryDualWritePlan    KVHistoryDualWritePlan                `json:"kv_history_dual_write_plan"`
-		KVHistoryMigrationPreview NativeKVHistoryMigrationPreview       `json:"kv_history_migration_preview"`
-		KVAuditLinkSchema         KVAuditLinksReport                    `json:"kv_audit_link_schema"`
-		KVAuditLinks              []KVAuditProofLink                    `json:"kv_audit_links"`
-		KVAuditLinkPreview        KVAuditProofLinkPreviewReport         `json:"kv_audit_link_preview"`
-		KVAuditLinkWritebackPlan  KVAuditProofLinkWritebackPlanReport   `json:"kv_audit_link_writeback_plan"`
-		KVAuditLinkWritebacks     []KVAuditProofLinkWritebackActionPlan `json:"kv_audit_link_writeback_actions"`
-		KVAuditLinkWritebackStore KVAuditProofLinkWritebackStoreSummary `json:"kv_audit_link_writeback_store"`
-		KVAuditLinkWritebackRecs  []KVAuditProofLinkWritebackRecord     `json:"kv_audit_link_writeback_records"`
-		AuditVerification         MerkleVerification                    `json:"audit_verification"`
+		Files                     []string                                    `json:"files"`
+		ApprovedRollbackPlan      ApprovedRollbackExecutionPlanReport         `json:"approved_rollback_plan"`
+		RollbackWritebackPlan     []RollbackWritebackActionPlan               `json:"rollback_writeback_plan"`
+		ApprovalRequestPlan       GlobalApprovalRequestPlan                   `json:"approval_request_plan"`
+		RetentionPlan             RetentionPlanReport                         `json:"retention_plan"`
+		RetentionPrunePlan        RetentionPrunePlanReport                    `json:"retention_prune_plan"`
+		NativeKVHistoryPlan       NativeKVHistoryPlanReport                   `json:"native_kv_history_plan"`
+		KVHistoryMigrationPlan    []KVHistoryMigrationStepPlan                `json:"kv_history_migration_plan"`
+		KVHistoryIndexPlan        []NativeKVHistoryIndexPlan                  `json:"kv_history_index_plan"`
+		KVHistoryCutoverPlan      KVHistoryCutoverPlanReport                  `json:"kv_history_cutover_plan"`
+		KVHistoryCutoverReadiness KVHistoryCutoverReadinessReport             `json:"kv_history_cutover_readiness"`
+		KVHistoryDualReadParity   KVHistoryDualReadParityReport               `json:"kv_history_dual_read_parity"`
+		KVHistoryDualReadPlan     KVHistoryDualReadPlan                       `json:"kv_history_dual_read_plan"`
+		KVHistoryDualWritePlan    KVHistoryDualWritePlan                      `json:"kv_history_dual_write_plan"`
+		KVHistoryMigrationPreview NativeKVHistoryMigrationPreview             `json:"kv_history_migration_preview"`
+		KVAuditLinkSchema         KVAuditLinksReport                          `json:"kv_audit_link_schema"`
+		KVAuditLinks              []KVAuditProofLink                          `json:"kv_audit_links"`
+		KVAuditLinkPreview        KVAuditProofLinkPreviewReport               `json:"kv_audit_link_preview"`
+		KVAuditLinkWritebackPlan  KVAuditProofLinkWritebackPlanReport         `json:"kv_audit_link_writeback_plan"`
+		KVAuditLinkWritebacks     []KVAuditProofLinkWritebackActionPlan       `json:"kv_audit_link_writeback_actions"`
+		KVAuditLinkWritebackStore KVAuditProofLinkWritebackStoreSummary       `json:"kv_audit_link_writeback_store"`
+		KVAuditLinkWritebackRecs  []KVAuditProofLinkWritebackRecord           `json:"kv_audit_link_writeback_records"`
+		KVAuditLinkExecutorPlan   KVAuditProofLinkWritebackExecutorPlanReport `json:"kv_audit_link_writeback_executor_plan"`
+		AuditLinkExecutorHandoff  KVAuditProofLinkExecutorHandoffPlan         `json:"audit_link_executor_handoff_plan"`
+		AuditLinkExecutorAudit    KVAuditProofLinkExecutorAuditAppendPlan     `json:"audit_link_executor_audit_plan"`
+		KVAuditLinkExecutorErr    string                                      `json:"kv_audit_link_writeback_executor_plan_error"`
+		AuditVerification         MerkleVerification                          `json:"audit_verification"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -1005,6 +1093,12 @@ func TestMemoryTimeTravelEvidenceIncludesMerkleAuditVerificationWhenAttached(t *
 	}
 	if len(got.KVAuditLinkWritebackRecs) != 0 {
 		t.Fatalf("evidence should not synthesize writeback store records unless the store route has persisted them: %#v", got.KVAuditLinkWritebackRecs)
+	}
+	if !containsString(got.Files, "audit-link-writeback-executor-plan.json") || !containsString(got.Files, "audit-link-executor-handoff-plan.json") || !containsString(got.Files, "audit-link-executor-audit-plan.json") {
+		t.Fatalf("evidence files should declare proof-link executor handoff artifacts: %#v", got.Files)
+	}
+	if got.KVAuditLinkExecutorErr == "" || got.KVAuditLinkExecutorPlan.KVAuditLinkWritebackExecutorPlanReady || got.AuditLinkExecutorHandoff.ExecutorInputContractReady || got.AuditLinkExecutorAudit.AuditAppendPlanReady {
+		t.Fatalf("evidence should not synthesize executor handoff without a persisted writeback record: err=%q plan=%#v handoff=%#v audit=%#v", got.KVAuditLinkExecutorErr, got.KVAuditLinkExecutorPlan, got.AuditLinkExecutorHandoff, got.AuditLinkExecutorAudit)
 	}
 	if !containsString(got.Files, "approved-rollback-plan.json") || !containsString(got.Files, "rollback-writeback-plan.json") || !containsString(got.Files, "approval-request-plan.json") || !got.ApprovedRollbackPlan.ApprovedRollbackPlanReady || got.ApprovedRollbackPlan.RollbackWritebackReady || got.ApprovalRequestPlan.GlobalApprovalEnqueueReady || len(got.RollbackWritebackPlan) == 0 {
 		t.Fatalf("evidence should include approved rollback writeback plan preview: files=%#v approved=%#v approval=%#v writebacks=%#v", got.Files, got.ApprovedRollbackPlan, got.ApprovalRequestPlan, got.RollbackWritebackPlan)

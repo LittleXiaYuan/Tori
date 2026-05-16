@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"yunque-agent/pkg/packruntime"
 )
 
 func TestBrowserWSRequiresAuth(t *testing.T) {
@@ -277,7 +279,7 @@ func TestBrowserHubConnectedForTenant(t *testing.T) {
 }
 
 func TestBrowserStatusIsTenantScoped(t *testing.T) {
-	gw, tm := newTestGateway()
+	gw, tm := newTestGatewayWithBrowserIntentPack(t, packruntime.PackStatusEnabled)
 	hub := NewBrowserHub()
 	gw.SetBrowserHub(hub)
 	owner := tm.Register("owner")
