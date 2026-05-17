@@ -117,6 +117,7 @@ export default function PacksPage() {
   const catalog = catalogData;
   const catalogSourceReports = catalog.source_reports || [];
   const catalogSourceIssueCount = catalogSourceReports.filter((report) => !report.ok || (report.errors?.length || 0) > 0).length + (catalog.errors?.length || 0);
+  const capabilityCatalogSourceReports = capabilityPrepare?.catalog_source_reports || capabilityPlan?.catalog_source_reports || [];
   const capabilityIndex = capabilityData;
   const backendModules = backendModulesData?.modules || [];
   const routeAudit = routeAuditData;
@@ -653,6 +654,39 @@ export default function PacksPage() {
                 </div>
               </div>
             </div>
+            {capabilityCatalogSourceReports.length > 0 && (
+              <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>能力预检 Catalog 源诊断</div>
+                    <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                      来自 plan/prepare 的 catalog_source_reports：即使没有匹配到推荐包，也能看到每个 source 是否可读。
+                    </div>
+                  </div>
+                  <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+                    {capabilityCatalogSourceReports.length} sources
+                  </Chip>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                  {capabilityCatalogSourceReports.map((report) => (
+                    <div key={report.source} className="rounded-lg p-3 space-y-1" style={{ background: report.ok ? "rgba(34,197,94,0.05)" : "rgba(245,158,11,0.08)", border: "1px solid var(--yunque-border)" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>{report.source}</div>
+                        <Chip size="sm" style={{ background: report.ok ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: report.ok ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                          {report.ok ? "ok" : "error"}
+                        </Chip>
+                      </div>
+                      <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>
+                        manifests {report.manifest_count} · matched {report.matched_entries}
+                      </div>
+                      {(report.errors || []).map((error) => (
+                        <div key={error} className="text-[11px] font-mono break-all" style={{ color: "var(--yunque-warning)" }}>{error}</div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {(capabilityPlan.catalog_install_hints || []).length > 0 && (
               <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(0,111,238,0.05)", border: "1px solid rgba(0,111,238,0.18)" }}>
                 <div className="flex items-center justify-between gap-2">

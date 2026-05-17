@@ -538,6 +538,7 @@ func (g *Gateway) packCapabilityPlanReport(capabilities []string) packruntime.Ca
 		InstallCapabilities:   []string{},
 		CatalogInstallHints:   []packruntime.PackCatalogEntry{},
 		CatalogDownloadHints:  []packruntime.PackCatalogEntry{},
+		CatalogSourceReports:  []packruntime.PackCatalogSourceReport{},
 		RouteAuditIssues:      []packruntime.BackendRouteAuditEntry{},
 		UnavailableReasons:    []string{},
 		DownloadablePackHints: []packruntime.CapabilityIndexEntry{},
@@ -547,6 +548,7 @@ func (g *Gateway) packCapabilityPlanReport(capabilities []string) packruntime.Ca
 	seenHints := map[string]bool{}
 	seenCatalogInstall := map[string]bool{}
 	seenCatalogDownload := map[string]bool{}
+	seenCatalogSources := map[string]int{}
 	seenInstall := map[string]bool{}
 	seenReasons := map[string]bool{}
 	for _, capability := range report.Capabilities {
@@ -580,6 +582,7 @@ func (g *Gateway) packCapabilityPlanReport(capabilities []string) packruntime.Ca
 				seenInstall[gate.Capability] = true
 			}
 			catalog := g.packCatalogReport(gate.Capability, "")
+			addCapabilityPlanCatalogSourceReports(&report.CatalogSourceReports, seenCatalogSources, catalog.SourceReports)
 			for _, hint := range catalog.InstallHints {
 				addCapabilityPlanCatalogEntry(&report.CatalogInstallHints, seenCatalogInstall, hint)
 				if hint.Downloadable {
@@ -636,6 +639,7 @@ func (g *Gateway) packCapabilityPrepareReport(capabilities []string) packruntime
 		Action:               plan.Action,
 		Plan:                 plan,
 		Steps:                []packruntime.CapabilityPrepareStep{},
+		CatalogSourceReports: append([]packruntime.PackCatalogSourceReport(nil), plan.CatalogSourceReports...),
 		UnavailableReasons:   append([]string(nil), plan.UnavailableReasons...),
 		RouteAuditIssues:     append([]packruntime.BackendRouteAuditEntry(nil), plan.RouteAuditIssues...),
 		RouteAuditIssueCount: plan.RouteAuditIssueCount,
@@ -903,6 +907,31 @@ func addCapabilityPlanCatalogEntry(entries *[]packruntime.PackCatalogEntry, seen
 	}
 	seen[key] = true
 	*entries = append(*entries, entry)
+}
+
+func addCapabilityPlanCatalogSourceReports(reports *[]packruntime.PackCatalogSourceReport, seen map[string]int, incoming []packruntime.PackCatalogSourceReport) {
+	for _, sourceReport := range incoming {
+		if sourceReport.Source == "" {
+			continue
+		}
+		if index, ok := seen[sourceReport.Source]; ok {
+			existing := &(*reports)[index]
+			existing.ManifestCount = max(existing.ManifestCount, sourceReport.ManifestCount)
+			existing.MatchedEntries += sourceReport.MatchedEntries
+			existing.OK = existing.OK && sourceReport.OK
+			for _, message := range sourceReport.Errors {
+				if message == "" || slices.Contains(existing.Errors, message) {
+					continue
+				}
+				existing.Errors = append(existing.Errors, message)
+			}
+			continue
+		}
+		copyReport := sourceReport
+		copyReport.Errors = append([]string(nil), sourceReport.Errors...)
+		seen[sourceReport.Source] = len(*reports)
+		*reports = append(*reports, copyReport)
+	}
 }
 
 func packCapabilityFrontendPaths(manifest packruntime.Manifest) []string {
