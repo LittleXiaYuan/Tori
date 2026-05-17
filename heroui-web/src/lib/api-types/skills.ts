@@ -65,6 +65,7 @@ export interface PluginUITab {
 // The backend pack registry is the source of truth for optional capability
 // packs. Frontend shells should render menus/routes from enabled packs instead
 // of hardcoding every new feature into the main app.
+export type PackStatus = "installed" | "enabled" | "disabled" | string;
 
 export interface PackBackendRouteSpec {
   method: string;
@@ -205,6 +206,118 @@ export interface PackCapabilityIndexReport {
   capabilities: number;
   enabled_capabilities: number;
   entries: PackCapabilityIndexEntry[];
+}
+
+export interface PackCapabilityResolveReport {
+  generated_at: string;
+  capability: string;
+  found: boolean;
+  enabled: boolean;
+  action: "use" | "enable" | "install" | string;
+  preferred?: PackCapabilityIndexEntry;
+  entries: PackCapabilityIndexEntry[];
+  enabled_entries: PackCapabilityIndexEntry[];
+}
+
+export interface PackCapabilityGateReport {
+  generated_at: string;
+  capability: string;
+  allowed: boolean;
+  action: "use" | "enable" | "install" | string;
+  reason?: string;
+  resolution: PackCapabilityResolveReport;
+  route_audit?: PackBackendRouteAuditEntry[];
+}
+
+export interface PackCapabilityPlanReport {
+  generated_at: string;
+  capabilities: string[];
+  allowed: boolean;
+  action: "use" | "enable" | "install" | "fix-route-audit" | string;
+  allowed_count: number;
+  blocked_count: number;
+  use_count: number;
+  enable_count: number;
+  install_count: number;
+  route_audit_issue_count: number;
+  gates: PackCapabilityGateReport[];
+  required_packs?: PackCapabilityIndexEntry[];
+  enable_packs?: PackCapabilityIndexEntry[];
+  install_capabilities?: string[];
+  catalog_install_hints?: PackCatalogEntry[];
+  catalog_download_hints?: PackCatalogEntry[];
+  route_audit_issues?: PackBackendRouteAuditEntry[];
+  unavailable_reasons?: string[];
+  downloadable_pack_hints?: PackCapabilityIndexEntry[];
+}
+
+export interface PackCapabilityPrepareStep {
+  action: "use" | "enable" | "install" | "download" | "fix-route-audit" | string;
+  pack_id?: string;
+  pack_name?: string;
+  capability?: string;
+  manifest_path?: string;
+  manifest_url?: string;
+  package_url?: string;
+  frontend_url?: string;
+  sha256?: string;
+  size_bytes?: number;
+  installed: boolean;
+  enabled: boolean;
+  downloadable: boolean;
+  reason?: string;
+  catalog_entry?: PackCatalogEntry;
+  capability_info?: PackCapabilityIndexEntry;
+}
+
+export interface PackCapabilityPrepareReport {
+  generated_at: string;
+  capabilities: string[];
+  allowed: boolean;
+  action: "use" | "enable" | "install" | "fix-route-audit" | string;
+  plan: PackCapabilityPlanReport;
+  use_steps?: PackCapabilityPrepareStep[];
+  enable_steps?: PackCapabilityPrepareStep[];
+  install_steps?: PackCapabilityPrepareStep[];
+  download_steps?: PackCapabilityPrepareStep[];
+  route_audit_fix_steps?: PackCapabilityPrepareStep[];
+  steps: PackCapabilityPrepareStep[];
+  step_count: number;
+  download_count: number;
+  enable_count: number;
+  install_count: number;
+  route_audit_issue_count: number;
+  ready_count: number;
+  unavailable_reasons?: string[];
+  route_audit_issues?: PackBackendRouteAuditEntry[];
+}
+
+export interface PackCatalogEntry {
+  manifest_path?: string;
+  source?: string;
+  manifest: PackManifest;
+  installed: boolean;
+  enabled: boolean;
+  status?: PackStatus;
+  update_action: "use" | "enable" | "install" | "update" | string;
+  downloadable: boolean;
+}
+
+export interface PackCatalogReport {
+  generated_at: string;
+  sources: string[];
+  count: number;
+  installed: number;
+  enabled: number;
+  downloadable: number;
+  capabilities: number;
+  capability?: string;
+  query?: string;
+  entries: PackCatalogEntry[];
+  install_hints?: PackCatalogEntry[];
+  enable_hints?: PackCatalogEntry[];
+  download_hints?: PackCatalogEntry[];
+  errors?: string[];
 }
 
 export interface PackBackendRouteAuditEntry {

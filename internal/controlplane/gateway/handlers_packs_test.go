@@ -26,6 +26,16 @@ func (m testBackendPackModule) PackID() string { return m.id }
 
 func (m testBackendPackModule) Routes() []packruntime.BackendRoute { return m.routes }
 
+func writeTestPackManifest(t *testing.T, manifestPath string, manifest packruntime.Manifest) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll manifest dir: %v", err)
+	}
+	if err := packruntime.SaveManifest(manifestPath, manifest); err != nil {
+		t.Fatalf("SaveManifest: %v", err)
+	}
+}
+
 func TestPackRoutesExposeInstalledAndEnabledPacks(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
@@ -63,6 +73,213 @@ func TestPackRoutesExposeInstalledAndEnabledPacks(t *testing.T) {
 	}
 	if body.Count != 1 || len(body.Enabled) != 1 || body.Enabled[0].Manifest.SDK.TypeScript != "yunque-client/backup" {
 		t.Fatalf("unexpected body: %#v", body)
+	}
+}
+
+func TestPackCatalogListsInstallableManifestsAndCapabilityHints(t *testing.T) {
+	sourceDir := t.TempDir()
+	writeTestPackManifest(t, filepath.Join(sourceDir, "ready-pack", packruntime.ManifestFileName), packruntime.Manifest{
+		ID:           "yunque.pack.catalog-ready",
+		Name:         "Catalog Ready Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"catalog.ready", "catalog.shared"},
+			Routes:       []string{"/v1/catalog/ready"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/catalog/ready"}},
+		},
+		Frontend: packruntime.FrontendManifest{Menus: []packruntime.FrontendMenu{{Key: "catalog-ready", Label: "Catalog Ready", Path: "/packs/catalog-ready"}}},
+		SDK:      packruntime.SDKManifest{TypeScript: "yunque-client/catalog-ready"},
+		Distribution: packruntime.DistributionManifest{
+			ManifestURL: "https://packs.yunque.local/catalog-ready/pack.json",
+			PackageURL:  "https://packs.yunque.local/catalog-ready/catalog-ready-0.1.0.tgz",
+			SHA256:      strings.Repeat("a", 64),
+			SizeBytes:   1024,
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	})
+	writeTestPackManifest(t, filepath.Join(sourceDir, "missing-pack", packruntime.ManifestFileName), packruntime.Manifest{
+		ID:           "yunque.pack.catalog-missing",
+		Name:         "Catalog Missing Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"catalog.missing"},
+			Routes:       []string{"/v1/catalog/missing"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/catalog/missing"}},
+		},
+		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/catalog-missing"},
+		Distribution: packruntime.DistributionManifest{PackageURL: "https://packs.yunque.local/catalog-missing/catalog-missing-0.1.0.tgz", SHA256: strings.Repeat("b", 64)},
+		Update:       packruntime.UpdateManifest{Rollback: true},
+	})
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.catalog-ready",
+		Name:         "Catalog Ready Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"catalog.ready"}, Routes: []string{"/v1/catalog/ready"}},
+		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/catalog-ready"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	gw.SetPackCatalogSources([]string{sourceDir})
+	tenant := tenants.Register("pack-catalog")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/catalog?capability=catalog.missing", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var catalog packruntime.PackCatalogReport
+	if err := json.NewDecoder(w.Body).Decode(&catalog); err != nil {
+		t.Fatalf("decode catalog: %v", err)
+	}
+	if catalog.Count != 1 || catalog.Downloadable != 1 || len(catalog.InstallHints) != 1 {
+		t.Fatalf("expected missing capability to return one downloadable install hint: %#v", catalog)
+	}
+	if catalog.InstallHints[0].Manifest.ID != "yunque.pack.catalog-missing" || catalog.InstallHints[0].UpdateAction != "install" {
+		t.Fatalf("unexpected install hint: %#v", catalog.InstallHints[0])
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/catalog?capability=catalog.ready", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	catalog = packruntime.PackCatalogReport{}
+	if err := json.NewDecoder(w.Body).Decode(&catalog); err != nil {
+		t.Fatalf("decode ready catalog: %v", err)
+	}
+	if catalog.Count != 1 || catalog.Installed != 1 || len(catalog.EnableHints) != 1 || catalog.EnableHints[0].UpdateAction != "enable" {
+		t.Fatalf("expected installed disabled pack to become enable hint: %#v", catalog)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/catalog?q=missing", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	catalog = packruntime.PackCatalogReport{}
+	if err := json.NewDecoder(w.Body).Decode(&catalog); err != nil {
+		t.Fatalf("decode query catalog: %v", err)
+	}
+	if catalog.Count != 1 || catalog.Entries[0].Manifest.ID != "yunque.pack.catalog-missing" {
+		t.Fatalf("expected query to filter catalog entries: %#v", catalog)
+	}
+}
+
+func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
+	sourceDir := t.TempDir()
+	writeTestPackManifest(t, filepath.Join(sourceDir, "install-pack", packruntime.ManifestFileName), packruntime.Manifest{
+		ID:           "yunque.pack.install-me",
+		Name:         "Install Me Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"prepare.install"},
+			Routes:       []string{"/v1/prepare/install"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/prepare/install"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/install-me"},
+		Distribution: packruntime.DistributionManifest{
+			ManifestURL: "https://packs.yunque.local/install-me/pack.json",
+			PackageURL:  "https://packs.yunque.local/install-me/install-me-0.1.0.tgz",
+			FrontendURL: "https://packs.yunque.local/install-me/remoteEntry.js",
+			SHA256:      strings.Repeat("c", 64),
+			SizeBytes:   2048,
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	})
+
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.ready",
+		Name:         "Ready Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"prepare.ready"},
+			Routes:       []string{"/v1/prepare/ready"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/prepare/ready"}},
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install ready: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.disabled",
+		Name:         "Disabled Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"prepare.enable"},
+			Routes:       []string{"/v1/prepare/enable"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/prepare/enable"}},
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install disabled: %v", err)
+	}
+
+	module := testBackendPackModule{
+		id: "yunque.pack.ready",
+		routes: []packruntime.BackendRoute{{
+			Method: http.MethodGet,
+			Path:   "/v1/prepare/ready",
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, map[string]any{"ok": true})
+			},
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
+	gw.SetPackCatalogSources([]string{sourceDir})
+	tenant := tenants.Register("pack-prepare")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/prepare?capability=prepare.ready&capability=prepare.enable&capability=prepare.install", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var prepare packruntime.CapabilityPrepareReport
+	if err := json.NewDecoder(w.Body).Decode(&prepare); err != nil {
+		t.Fatalf("decode prepare: %v", err)
+	}
+	if prepare.Action != "install" || prepare.Allowed {
+		t.Fatalf("expected install action with blocked workflow: %#v", prepare)
+	}
+	if prepare.ReadyCount != 1 || prepare.EnableCount != 1 || prepare.InstallCount != 1 || prepare.DownloadCount != 1 {
+		t.Fatalf("unexpected prepare counters: %#v", prepare)
+	}
+	if len(prepare.UseSteps) != 1 || prepare.UseSteps[0].PackID != "yunque.pack.ready" {
+		t.Fatalf("unexpected use steps: %#v", prepare.UseSteps)
+	}
+	if len(prepare.EnableSteps) != 1 || prepare.EnableSteps[0].PackID != "yunque.pack.disabled" {
+		t.Fatalf("unexpected enable steps: %#v", prepare.EnableSteps)
+	}
+	if len(prepare.InstallSteps) != 1 || prepare.InstallSteps[0].PackID != "yunque.pack.install-me" {
+		t.Fatalf("unexpected install steps: %#v", prepare.InstallSteps)
+	}
+	if len(prepare.DownloadSteps) != 1 || prepare.DownloadSteps[0].SHA256 != strings.Repeat("c", 64) {
+		t.Fatalf("expected downloadable package with sha256: %#v", prepare.DownloadSteps)
 	}
 }
 
@@ -406,6 +623,352 @@ func TestPackCapabilitiesExposeManifestCapabilityIndex(t *testing.T) {
 	}
 	if disabled.PackID != "yunque.pack.disabled-capability" || disabled.Enabled {
 		t.Fatalf("disabled capability should stay visible but disabled: %#v", disabled)
+	}
+}
+
+func TestPackCapabilityResolveReturnsPreferredAction(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.disabled-resolver",
+		Name:         "Disabled Resolver Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"resolver.demo"}, Routes: []string{"/v1/resolver/disabled"}},
+		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/resolver-disabled"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install disabled: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.enabled-resolver",
+		Name:         "Enabled Resolver Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"resolver.demo"}, Routes: []string{"/v1/resolver/enabled"}},
+		SDK:          packruntime.SDKManifest{TypeScript: "yunque-client/resolver-enabled"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install enabled: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-capability-resolve")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/resolve?capability=resolver.demo", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.CapabilityResolveReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !report.Found || !report.Enabled || report.Action != "use" || report.Preferred == nil {
+		t.Fatalf("expected enabled resolver action, got %#v", report)
+	}
+	if report.Preferred.PackID != "yunque.pack.enabled-resolver" || len(report.Entries) != 2 || len(report.EnabledEntries) != 1 {
+		t.Fatalf("expected enabled pack to be preferred while keeping all providers visible: %#v", report)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/resolve?capability=capability.not-installed", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing status=%d body=%s", w.Code, w.Body.String())
+	}
+	report = packruntime.CapabilityResolveReport{}
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode missing: %v", err)
+	}
+	if report.Found || report.Enabled || report.Action != "install" || report.Preferred != nil {
+		t.Fatalf("expected missing capability to suggest install: %#v", report)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/resolve", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected missing capability query to be 400, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestPackCapabilityGateChecksEnabledStateAndRouteAudit(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.gated",
+		Name:         "Gated Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"gated.ready"},
+			Routes:       []string{"/v1/gated/ready"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/gated/ready"}},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install gated: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.gated-disabled",
+		Name:         "Gated Disabled Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"gated.disabled"}, Routes: []string{"/v1/gated/disabled"}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install disabled: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.gated-mismatch",
+		Name:         "Gated Mismatch Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"gated.mismatch"},
+			Routes:       []string{"/v1/gated/mismatch"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/gated/mismatch"}},
+		},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install mismatch: %v", err)
+	}
+	module := testBackendPackModule{
+		id: "yunque.pack.gated",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/gated/ready",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	mismatchModule := testBackendPackModule{
+		id: "yunque.pack.gated-mismatch",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/gated/mismatch",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module, mismatchModule}})
+	tenant := tenants.Register("pack-capability-gate")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/gate?capability=gated.ready", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("ready status=%d body=%s", w.Code, w.Body.String())
+	}
+	var gate packruntime.CapabilityGateReport
+	if err := json.NewDecoder(w.Body).Decode(&gate); err != nil {
+		t.Fatalf("decode ready: %v", err)
+	}
+	if !gate.Allowed || gate.Action != "use" || gate.Reason != "capability is available through an enabled pack" || len(gate.RouteAudit) != 1 {
+		t.Fatalf("expected ready capability to be allowed with route audit evidence: %#v", gate)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/gate?capability=gated.disabled", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if err := json.NewDecoder(w.Body).Decode(&gate); err != nil {
+		t.Fatalf("decode disabled: %v", err)
+	}
+	if gate.Allowed || gate.Action != "enable" || gate.Reason != "capability is provided only by disabled packs" {
+		t.Fatalf("expected disabled capability to be blocked with enable action: %#v", gate)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/gate?capability=gated.mismatch", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	gate = packruntime.CapabilityGateReport{}
+	if err := json.NewDecoder(w.Body).Decode(&gate); err != nil {
+		t.Fatalf("decode mismatch: %v", err)
+	}
+	if gate.Allowed || gate.Action != "use" || gate.Reason != "capability pack has backend route audit issues" || len(gate.RouteAudit) != 1 || gate.RouteAudit[0].Status != "method-mismatch" {
+		t.Fatalf("expected route audit mismatch to block capability: %#v", gate)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/gate?capability=gated.missing", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	gate = packruntime.CapabilityGateReport{}
+	if err := json.NewDecoder(w.Body).Decode(&gate); err != nil {
+		t.Fatalf("decode missing: %v", err)
+	}
+	if gate.Allowed || gate.Action != "install" || gate.Reason != "capability is not provided by any installed pack" {
+		t.Fatalf("expected missing capability to be blocked with install action: %#v", gate)
+	}
+}
+
+func TestPackCapabilityPlanAggregatesWorkflowPreflight(t *testing.T) {
+	sourceDir := t.TempDir()
+	writeTestPackManifest(t, filepath.Join(sourceDir, "plan-missing-pack", packruntime.ManifestFileName), packruntime.Manifest{
+		ID:           "yunque.pack.plan-missing",
+		Name:         "Plan Missing Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"plan.missing"},
+			Routes:       []string{"/v1/plan/missing"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/plan/missing"}},
+		},
+		Frontend: packruntime.FrontendManifest{
+			Menus:  []packruntime.FrontendMenu{{Key: "plan-missing", Label: "Plan Missing", Path: "/packs/plan-missing"}},
+			Routes: []packruntime.FrontendRoute{{Path: "/packs/plan-missing", Component: "PlanMissingPackPage"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/plan-missing"},
+		Distribution: packruntime.DistributionManifest{
+			ManifestURL: "https://packs.yunque.local/plan-missing/pack.json",
+			PackageURL:  "https://packs.yunque.local/plan-missing/plan-missing-0.1.0.tgz",
+			FrontendURL: "https://packs.yunque.local/plan-missing/frontend/remoteEntry.js",
+			SHA256:      strings.Repeat("c", 64),
+			SizeBytes:   2048,
+		},
+		Update: packruntime.UpdateManifest{Rollback: true},
+	})
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.plan-ready",
+		Name:         "Plan Ready Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"plan.ready"},
+			Routes:       []string{"/v1/plan/ready"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/plan/ready"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/plan-ready"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install ready: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.plan-disabled",
+		Name:         "Plan Disabled Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"plan.disabled"},
+			Routes:       []string{"/v1/plan/disabled"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodGet, Path: "/v1/plan/disabled"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/plan-disabled"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install disabled: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.plan-audit",
+		Name:         "Plan Audit Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"plan.audit"},
+			Routes:       []string{"/v1/plan/audit"},
+			RouteSpecs:   []packruntime.BackendRouteSpec{{Method: http.MethodPost, Path: "/v1/plan/audit"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/plan-audit"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install audit: %v", err)
+	}
+	readyModule := testBackendPackModule{
+		id: "yunque.pack.plan-ready",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/plan/ready",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	auditModule := testBackendPackModule{
+		id: "yunque.pack.plan-audit",
+		routes: []packruntime.BackendRoute{{
+			Method:  http.MethodGet,
+			Path:    "/v1/plan/audit",
+			Handler: func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) },
+		}},
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{readyModule, auditModule}})
+	gw.SetPackCatalogSources([]string{sourceDir})
+	tenant := tenants.Register("pack-capability-plan")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/plan?capability=plan.ready&capability=plan.disabled&capability=plan.audit&capability=plan.missing", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var plan packruntime.CapabilityPlanReport
+	if err := json.NewDecoder(w.Body).Decode(&plan); err != nil {
+		t.Fatalf("decode plan: %v", err)
+	}
+	if plan.Allowed || plan.Action != "install" || plan.AllowedCount != 1 || plan.BlockedCount != 3 {
+		t.Fatalf("expected mixed plan to require install with three blockers: %#v", plan)
+	}
+	if plan.UseCount != 2 || plan.EnableCount != 1 || plan.InstallCount != 1 || plan.RouteAuditIssueCount != 1 {
+		t.Fatalf("unexpected plan counts: %#v", plan)
+	}
+	if len(plan.RequiredPacks) != 1 || plan.RequiredPacks[0].PackID != "yunque.pack.plan-ready" {
+		t.Fatalf("expected ready pack in required packs: %#v", plan.RequiredPacks)
+	}
+	if len(plan.EnablePacks) != 1 || plan.EnablePacks[0].PackID != "yunque.pack.plan-disabled" {
+		t.Fatalf("expected disabled pack in enable packs: %#v", plan.EnablePacks)
+	}
+	if len(plan.InstallCapabilities) != 1 || plan.InstallCapabilities[0] != "plan.missing" {
+		t.Fatalf("expected missing capability to require install: %#v", plan.InstallCapabilities)
+	}
+	if len(plan.CatalogInstallHints) != 1 || plan.CatalogInstallHints[0].Manifest.ID != "yunque.pack.plan-missing" {
+		t.Fatalf("expected missing capability to include installable catalog hint: %#v", plan.CatalogInstallHints)
+	}
+	if len(plan.CatalogDownloadHints) != 1 || !plan.CatalogDownloadHints[0].Downloadable {
+		t.Fatalf("expected missing capability to include downloadable catalog hint: %#v", plan.CatalogDownloadHints)
+	}
+	if len(plan.RouteAuditIssues) != 1 || plan.RouteAuditIssues[0].Status != "method-mismatch" {
+		t.Fatalf("expected route audit issue to be surfaced: %#v", plan.RouteAuditIssues)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/plan?capabilities=plan.ready,plan.ready", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	plan = packruntime.CapabilityPlanReport{}
+	if err := json.NewDecoder(w.Body).Decode(&plan); err != nil {
+		t.Fatalf("decode deduped plan: %v", err)
+	}
+	if !plan.Allowed || plan.Action != "use" || len(plan.Capabilities) != 1 || len(plan.Gates) != 1 {
+		t.Fatalf("expected deduped ready plan to be allowed: %#v", plan)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/plan", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected empty plan query to be 400, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 

@@ -75,6 +75,143 @@ type CapabilityIndexReport struct {
 	Entries             []CapabilityIndexEntry `json:"entries"`
 }
 
+// CapabilityResolveReport is returned by /v1/packs/capabilities/resolve.
+// It keeps capability lookup side-effect free while giving external shells,
+// operators, and runtime gates a concrete next action: use an enabled pack,
+// enable an installed pack, or install a pack that provides the capability.
+type CapabilityResolveReport struct {
+	GeneratedAt    time.Time              `json:"generated_at"`
+	Capability     string                 `json:"capability"`
+	Found          bool                   `json:"found"`
+	Enabled        bool                   `json:"enabled"`
+	Action         string                 `json:"action"`
+	Preferred      *CapabilityIndexEntry  `json:"preferred,omitempty"`
+	Entries        []CapabilityIndexEntry `json:"entries"`
+	EnabledEntries []CapabilityIndexEntry `json:"enabled_entries"`
+}
+
+// CapabilityGateReport is returned by /v1/packs/capabilities/gate.
+// Unlike the resolver, it is shaped for runtime preflight checks: a caller can
+// ask whether a capability is currently usable, and receive the concrete block
+// reason without mutating installed pack state.
+type CapabilityGateReport struct {
+	GeneratedAt time.Time                `json:"generated_at"`
+	Capability  string                   `json:"capability"`
+	Allowed     bool                     `json:"allowed"`
+	Action      string                   `json:"action"`
+	Reason      string                   `json:"reason,omitempty"`
+	Resolution  CapabilityResolveReport  `json:"resolution"`
+	RouteAudit  []BackendRouteAuditEntry `json:"route_audit,omitempty"`
+}
+
+// CapabilityPlanReport is returned by /v1/packs/capabilities/plan. It rolls up
+// several capability gates into a single enterprise workflow preflight so
+// callers can prepare the minimal set of enabled or installable packs before
+// executing a task.
+type CapabilityPlanReport struct {
+	GeneratedAt           time.Time                `json:"generated_at"`
+	Capabilities          []string                 `json:"capabilities"`
+	Allowed               bool                     `json:"allowed"`
+	Action                string                   `json:"action"`
+	AllowedCount          int                      `json:"allowed_count"`
+	BlockedCount          int                      `json:"blocked_count"`
+	UseCount              int                      `json:"use_count"`
+	EnableCount           int                      `json:"enable_count"`
+	InstallCount          int                      `json:"install_count"`
+	RouteAuditIssueCount  int                      `json:"route_audit_issue_count"`
+	Gates                 []CapabilityGateReport   `json:"gates"`
+	RequiredPacks         []CapabilityIndexEntry   `json:"required_packs,omitempty"`
+	EnablePacks           []CapabilityIndexEntry   `json:"enable_packs,omitempty"`
+	InstallCapabilities   []string                 `json:"install_capabilities,omitempty"`
+	CatalogInstallHints   []PackCatalogEntry       `json:"catalog_install_hints,omitempty"`
+	CatalogDownloadHints  []PackCatalogEntry       `json:"catalog_download_hints,omitempty"`
+	RouteAuditIssues      []BackendRouteAuditEntry `json:"route_audit_issues,omitempty"`
+	UnavailableReasons    []string                 `json:"unavailable_reasons,omitempty"`
+	DownloadablePackHints []CapabilityIndexEntry   `json:"downloadable_pack_hints,omitempty"`
+}
+
+// CapabilityPrepareStep is one operator-facing action inside a read-only
+// capability preparation plan. It is intentionally descriptive: callers still
+// use explicit install/enable endpoints for every mutation.
+type CapabilityPrepareStep struct {
+	Action         string                `json:"action"`
+	PackID         string                `json:"pack_id,omitempty"`
+	PackName       string                `json:"pack_name,omitempty"`
+	Capability     string                `json:"capability,omitempty"`
+	ManifestPath   string                `json:"manifest_path,omitempty"`
+	ManifestURL    string                `json:"manifest_url,omitempty"`
+	PackageURL     string                `json:"package_url,omitempty"`
+	FrontendURL    string                `json:"frontend_url,omitempty"`
+	SHA256         string                `json:"sha256,omitempty"`
+	SizeBytes      int64                 `json:"size_bytes,omitempty"`
+	Installed      bool                  `json:"installed"`
+	Enabled        bool                  `json:"enabled"`
+	Downloadable   bool                  `json:"downloadable"`
+	Reason         string                `json:"reason,omitempty"`
+	CatalogEntry   *PackCatalogEntry     `json:"catalog_entry,omitempty"`
+	CapabilityInfo *CapabilityIndexEntry `json:"capability_info,omitempty"`
+}
+
+// CapabilityPrepareReport is returned by /v1/packs/capabilities/prepare. It
+// turns workflow preflight into a minimal package preparation checklist for
+// enterprise consoles and SDK callers: use, enable, install/download, or fix
+// route drift.
+type CapabilityPrepareReport struct {
+	GeneratedAt          time.Time                `json:"generated_at"`
+	Capabilities         []string                 `json:"capabilities"`
+	Allowed              bool                     `json:"allowed"`
+	Action               string                   `json:"action"`
+	Plan                 CapabilityPlanReport     `json:"plan"`
+	UseSteps             []CapabilityPrepareStep  `json:"use_steps,omitempty"`
+	EnableSteps          []CapabilityPrepareStep  `json:"enable_steps,omitempty"`
+	InstallSteps         []CapabilityPrepareStep  `json:"install_steps,omitempty"`
+	DownloadSteps        []CapabilityPrepareStep  `json:"download_steps,omitempty"`
+	RouteAuditFixSteps   []CapabilityPrepareStep  `json:"route_audit_fix_steps,omitempty"`
+	Steps                []CapabilityPrepareStep  `json:"steps"`
+	StepCount            int                      `json:"step_count"`
+	DownloadCount        int                      `json:"download_count"`
+	EnableCount          int                      `json:"enable_count"`
+	InstallCount         int                      `json:"install_count"`
+	RouteAuditIssueCount int                      `json:"route_audit_issue_count"`
+	ReadyCount           int                      `json:"ready_count"`
+	UnavailableReasons   []string                 `json:"unavailable_reasons,omitempty"`
+	RouteAuditIssues     []BackendRouteAuditEntry `json:"route_audit_issues,omitempty"`
+}
+
+// PackCatalogEntry describes one installable pack manifest discovered from a
+// local or remote catalog source. It is read-only metadata: installing or
+// downloading still goes through the explicit Pack Runtime mutation endpoints.
+type PackCatalogEntry struct {
+	ManifestPath string     `json:"manifest_path,omitempty"`
+	Source       string     `json:"source,omitempty"`
+	Manifest     Manifest   `json:"manifest"`
+	Installed    bool       `json:"installed"`
+	Enabled      bool       `json:"enabled"`
+	Status       PackStatus `json:"status,omitempty"`
+	UpdateAction string     `json:"update_action"`
+	Downloadable bool       `json:"downloadable"`
+}
+
+// PackCatalogReport is returned by /v1/packs/catalog. It lets enterprise
+// consoles and SDK callers map missing capabilities to concrete incremental
+// packages without mutating the registry.
+type PackCatalogReport struct {
+	GeneratedAt   time.Time          `json:"generated_at"`
+	Sources       []string           `json:"sources"`
+	Count         int                `json:"count"`
+	Installed     int                `json:"installed"`
+	Enabled       int                `json:"enabled"`
+	Downloadable  int                `json:"downloadable"`
+	Capabilities  int                `json:"capabilities"`
+	Capability    string             `json:"capability,omitempty"`
+	Query         string             `json:"query,omitempty"`
+	Entries       []PackCatalogEntry `json:"entries"`
+	InstallHints  []PackCatalogEntry `json:"install_hints,omitempty"`
+	EnableHints   []PackCatalogEntry `json:"enable_hints,omitempty"`
+	DownloadHints []PackCatalogEntry `json:"download_hints,omitempty"`
+	Errors        []string           `json:"errors,omitempty"`
+}
+
 // BackendRouteAuditEntry compares one manifest-declared backend route or one
 // mounted Gateway backend route against the other side of the Pack Runtime
 // contract. It is intentionally data-only so SDKs and consoles can audit the

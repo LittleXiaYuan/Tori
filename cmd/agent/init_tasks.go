@@ -114,6 +114,7 @@ func initTasks(app *agentrt.App) error {
 	} else {
 		ensureBuiltinPacks(packRegistry)
 		gw.SetPackRegistry(packRegistry)
+		gw.SetPackCatalogSources([]string{filepath.Join("packs", "examples"), filepath.Join("packs", "templates")})
 		app.Set(agentrt.CompPackRuntimeRegistry, packRegistry)
 		slog.Info("pack runtime registry initialized", "dir", cfg.DataPath("packs"), "installed", len(packRegistry.List()))
 	}
