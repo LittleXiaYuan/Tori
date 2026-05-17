@@ -7,9 +7,11 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardCopy,
+  ClipboardList,
   DatabaseZap,
   Download,
   ExternalLink,
+  ListChecks,
   PackageCheck,
   PackageX,
   Power,
@@ -21,7 +23,7 @@ import {
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import type { InstalledPack, PackBackendRouteSpec } from "@/lib/pack-types";
+import type { InstalledPack, PackBackendRouteSpec, PackCapabilityPlanReport, PackCapabilityPrepareReport } from "@/lib/pack-types";
 import { createPacksClient } from "@/lib/packs-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
@@ -70,6 +72,16 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 
 export default function PacksPage() {
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
+  const { data: catalogData, loading: catalogLoading, refresh: refreshCatalog } = useApiData(async () => packsClient.catalog(), {
+    generated_at: "",
+    sources: [],
+    count: 0,
+    installed: 0,
+    enabled: 0,
+    downloadable: 0,
+    capabilities: 0,
+    entries: [],
+  });
   const { data: capabilityData, loading: capabilityLoading, refresh: refreshCapabilities } = useApiData(async () => packsClient.capabilities(), {
     generated_at: "",
     packs: 0,
@@ -96,8 +108,13 @@ export default function PacksPage() {
   const [manifestUrl, setManifestUrl] = useState("");
   const [downloadArtifact, setDownloadArtifact] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [capabilityPlanInput, setCapabilityPlanInput] = useState("browser.intent.plan, rpa.replay.plan");
+  const [capabilityPlan, setCapabilityPlan] = useState<PackCapabilityPlanReport | null>(null);
+  const [capabilityPrepare, setCapabilityPrepare] = useState<PackCapabilityPrepareReport | null>(null);
+  const [capabilityPlanBusy, setCapabilityPlanBusy] = useState(false);
 
   const packs = data?.packs || [];
+  const catalog = catalogData;
   const capabilityIndex = capabilityData;
   const backendModules = backendModulesData?.modules || [];
   const routeAudit = routeAuditData;
@@ -127,10 +144,12 @@ export default function PacksPage() {
     frontendMenus: packs.reduce((n, p) => n + (p.manifest.frontend?.menus?.length || 0), 0),
     capabilities: capabilityIndex.capabilities || 0,
     enabledCapabilities: capabilityIndex.enabled_capabilities || 0,
+    catalog: catalog.count || 0,
+    catalogDownloadable: catalog.downloadable || 0,
     backendModules: backendModules.length,
     backendRoutes: backendModules.reduce((n, m) => n + (m.routes?.length || 0), 0),
     routeAuditIssues: (routeAudit.missing_routes || 0) + (routeAudit.method_mismatches || 0) + (routeAudit.undeclared_routes || 0),
-  }), [packs, capabilityIndex.capabilities, capabilityIndex.enabled_capabilities, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
+  }), [packs, capabilityIndex.capabilities, capabilityIndex.enabled_capabilities, catalog.count, catalog.downloadable, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);
@@ -138,6 +157,7 @@ export default function PacksPage() {
       await op();
       showToast("Pack registry 已更新，前端菜单会跟随已启用包同步。", "success");
       await refresh();
+      await refreshCatalog();
       await refreshCapabilities();
       await refreshBackendModules();
       await refreshRouteAudit();
@@ -154,6 +174,42 @@ export default function PacksPage() {
   const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id));
   const prune = () => run("prune", () => packsClient.prune());
+  const runCapabilityPlan = async () => {
+    const capabilities = capabilityPlanInput.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+    if (capabilities.length === 0) {
+      showToast("请输入至少一个 capability", "error");
+      return;
+    }
+    setCapabilityPlanBusy(true);
+    try {
+      const plan = await packsClient.planCapabilities(capabilities);
+      setCapabilityPlan(plan);
+      setCapabilityPrepare(null);
+      showToast(plan.allowed ? "能力预检通过" : "能力预检已生成准备清单", plan.allowed ? "success" : "info");
+    } catch (e) {
+      showToast(formatErrorMessage(e, "能力预检失败"), "error");
+    } finally {
+      setCapabilityPlanBusy(false);
+    }
+  };
+  const runCapabilityPrepare = async () => {
+    const capabilities = capabilityPlanInput.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+    if (capabilities.length === 0) {
+      showToast("请输入至少一个 capability", "error");
+      return;
+    }
+    setCapabilityPlanBusy(true);
+    try {
+      const prepare = await packsClient.prepareCapabilities(capabilities);
+      setCapabilityPlan(prepare.plan);
+      setCapabilityPrepare(prepare);
+      showToast(prepare.allowed ? "增量包准备完成" : "增量包准备清单已生成", prepare.allowed ? "success" : "info");
+    } catch (e) {
+      showToast(formatErrorMessage(e, "准备清单生成失败"), "error");
+    } finally {
+      setCapabilityPlanBusy(false);
+    }
+  };
 
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
@@ -165,10 +221,10 @@ export default function PacksPage() {
         icon={<Boxes size={20} />}
         title="增量包运行时"
         description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。"
-        onRefresh={() => { void refresh(); void refreshCapabilities(); void refreshBackendModules(); void refreshRouteAudit(); }}
+        onRefresh={() => { void refresh(); void refreshCatalog(); void refreshCapabilities(); void refreshBackendModules(); void refreshRouteAudit(); }}
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card className="section-card p-4">
           <div className="kpi-label">已安装 Pack</div>
           <div className="kpi-value">{stats.total}</div>
@@ -184,6 +240,10 @@ export default function PacksPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">能力索引</div>
           <div className="kpi-value">{stats.enabledCapabilities}/{stats.capabilities}</div>
+        </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">可选目录</div>
+          <div className="kpi-value">{stats.catalogDownloadable}/{stats.catalog}</div>
         </Card>
         <Card className="section-card p-4">
           <div className="kpi-label">路由审计问题</div>
@@ -234,6 +294,71 @@ export default function PacksPage() {
             </div>
           </div>
         </div>
+      </Card>
+
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <PackageCheck size={15} /> 可选增量包目录
+            </div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              从 Pack catalog 读取可安装 manifest，和已安装 registry 对齐；用户可以按 capability 选择需要下载或启用的增量包。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+            {catalogLoading ? "扫描中" : `${catalog.downloadable}/${catalog.count} downloadable`}
+          </Chip>
+        </div>
+        {catalog.entries.length === 0 ? (
+          <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+            暂无 catalog manifest。请确认 `packs/examples` 或企业私有 pack 源已配置。
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+            {catalog.entries.slice(0, 9).map((entry) => (
+              <div key={entry.manifest.id} className="rounded-xl p-3 space-y-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate" style={{ color: "var(--yunque-text)" }}>{entry.manifest.name}</div>
+                    <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>{entry.manifest.id}</div>
+                  </div>
+                  <Chip size="sm" style={{ background: entry.installed ? "rgba(34,197,94,0.10)" : "rgba(0,111,238,0.10)", color: entry.installed ? "var(--yunque-success)" : "var(--yunque-accent)" }}>
+                    {entry.update_action}
+                  </Chip>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(entry.manifest.backend?.capabilities || []).slice(0, 4).map((capability) => <Chip key={capability} size="sm">{capability}</Chip>)}
+                  {entry.downloadable && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>downloadable</Chip>}
+                </div>
+                <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                  {entry.manifest.distribution?.packageUrl || entry.manifest_path || "-"}
+                </div>
+                <div className="flex gap-2">
+                  {entry.update_action === "enable" ? (
+                    <Button size="sm" className="btn-accent" isDisabled={busy === `enable:${entry.manifest.id}`} onPress={() => enable(entry.manifest.id)}>
+                      <Power size={13} /> 启用
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      isDisabled={!entry.manifest_path || entry.update_action === "use" || busy === `catalog-install:${entry.manifest.id}`}
+                      onPress={() => run(`catalog-install:${entry.manifest.id}`, () => packsClient.installLocal(entry.manifest_path || "", entry.source, false))}
+                    >
+                      <Download size={13} /> 安装
+                    </Button>
+                  )}
+                  {entry.manifest_path && (
+                    <Button size="sm" variant="ghost" onPress={() => { setManifestPath(entry.manifest_path || ""); showToast("manifest_path 已填入安装栏", "success"); }}>
+                      <ClipboardCopy size={13} /> 填入
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card className="section-card p-5 space-y-4">
@@ -307,6 +432,225 @@ export default function PacksPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <ListChecks size={15} /> 工作流能力预检
+            </div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              多能力任务执行前先生成 Pack 准备清单，保持只读，不自动启用、不安装、不下载。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: capabilityPlan?.allowed ? "rgba(34,197,94,0.10)" : "rgba(0,111,238,0.10)", color: capabilityPlan?.allowed ? "var(--yunque-success)" : "var(--yunque-accent)" }}>
+            {capabilityPlan ? capabilityPlan.action : "planCapabilities()"}
+          </Chip>
+        </div>
+        <div className="flex flex-col lg:flex-row gap-3">
+          <TextField value={capabilityPlanInput} onChange={(v: string) => setCapabilityPlanInput(v)} className="flex-1">
+            <Label>capabilities</Label>
+            <Input placeholder="browser.intent.plan, rpa.replay.plan, wasm.remote_install.plan" />
+          </TextField>
+          <div className="flex gap-2 lg:self-end">
+            <Button
+              variant="ghost"
+              isDisabled={capabilityIndex.entries.length === 0}
+              onPress={() => setCapabilityPlanInput(capabilityIndex.entries.slice(0, 5).map((entry) => entry.capability).join(", "))}
+            >
+              <TerminalSquare size={14} /> 使用索引
+            </Button>
+            <Button className="btn-accent" isDisabled={capabilityPlanBusy} onPress={() => void runCapabilityPlan()}>
+              <ListChecks size={14} /> 预检
+            </Button>
+            <Button className="btn-accent" isDisabled={capabilityPlanBusy} onPress={() => void runCapabilityPrepare()}>
+              <ClipboardList size={14} /> 准备清单
+            </Button>
+          </div>
+        </div>
+        {capabilityPrepare && (
+          <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(0,111,238,0.05)", border: "1px solid rgba(0,111,238,0.18)" }}>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "var(--yunque-accent)" }}>增量包准备清单</div>
+                <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                  只读计划，不自动下载、不自动启用；用户按需选择下载、安装或启用。
+                </div>
+              </div>
+              <Chip size="sm" style={{ background: capabilityPrepare.allowed ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: capabilityPrepare.allowed ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                {capabilityPrepare.action} · {capabilityPrepare.step_count} steps
+              </Chip>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {[
+                ["ready", capabilityPrepare.ready_count],
+                ["enable", capabilityPrepare.enable_count],
+                ["install", capabilityPrepare.install_count],
+                ["download", capabilityPrepare.download_count],
+                ["audit", capabilityPrepare.route_audit_issue_count],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+                  <div className="text-base font-semibold" style={{ color: "var(--yunque-text)" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              {capabilityPrepare.steps.map((step, index) => (
+                <div key={`${step.action}:${step.pack_id || step.capability || index}:${step.package_url || step.manifest_path || ""}`} className="rounded-lg p-3 space-y-2" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold truncate" style={{ color: "var(--yunque-text)" }}>{step.pack_name || step.capability || step.action}</div>
+                      <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>{step.pack_id || step.capability || "-"}</div>
+                    </div>
+                    <Chip size="sm" style={{ background: step.action === "use" ? "rgba(34,197,94,0.10)" : "rgba(0,111,238,0.10)", color: step.action === "use" ? "var(--yunque-success)" : "var(--yunque-accent)" }}>
+                      {step.action}
+                    </Chip>
+                  </div>
+                  {step.reason && <div className="text-[11px]" style={{ color: "var(--yunque-text-muted)" }}>{step.reason}</div>}
+                  {(step.package_url || step.manifest_path || step.sha256) && (
+                    <div className="space-y-1 text-[11px] font-mono" style={{ color: "var(--yunque-text-muted)" }}>
+                      {step.package_url && <div className="truncate">pkg {step.package_url}</div>}
+                      {step.manifest_path && <div className="truncate">manifest {step.manifest_path}</div>}
+                      {step.sha256 && <div className="truncate">sha256 {step.sha256}</div>}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {step.action === "enable" && step.pack_id && (
+                      <Button size="sm" className="btn-accent" isDisabled={busy === `enable:${step.pack_id}`} onPress={() => enable(step.pack_id || "")}>
+                        <Power size={13} /> 启用
+                      </Button>
+                    )}
+                    {step.action === "install" && step.manifest_path && (
+                      <Button size="sm" className="btn-accent" isDisabled={busy === `prepare-install:${step.pack_id}`} onPress={() => run(`prepare-install:${step.pack_id}`, () => packsClient.installLocal(step.manifest_path || "", "prepare", false))}>
+                        <Download size={13} /> 安装
+                      </Button>
+                    )}
+                    {step.action === "download" && step.manifest_path && (
+                      <Button size="sm" variant="outline" isDisabled={busy === `prepare-download:${step.pack_id}`} onPress={() => run(`prepare-download:${step.pack_id}`, () => packsClient.installLocal(step.manifest_path || "", "prepare", true))}>
+                        <Download size={13} /> 下载并安装
+                      </Button>
+                    )}
+                    {step.manifest_path && (
+                      <Button size="sm" variant="ghost" onPress={() => { setManifestPath(step.manifest_path || ""); showToast("准备清单 manifest_path 已填入安装栏", "success"); }}>
+                        <ClipboardCopy size={13} /> 填入
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {capabilityPlan && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {[
+                ["allowed", capabilityPlan.allowed_count],
+                ["blocked", capabilityPlan.blocked_count],
+                ["enable", capabilityPlan.enable_count],
+                ["install", capabilityPlan.install_count],
+                ["audit", capabilityPlan.route_audit_issue_count],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+                  <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--yunque-text-muted)" }}>{label}</div>
+                  <div className="text-lg font-semibold" style={{ color: "var(--yunque-text)" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="rounded-xl p-3" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.16)" }}>
+                <div className="text-xs font-semibold mb-2" style={{ color: "var(--yunque-success)" }}>可直接使用</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(capabilityPlan.required_packs || []).length > 0 ? capabilityPlan.required_packs?.map((entry) => (
+                    <Chip key={`${entry.pack_id}:${entry.capability}`} size="sm">{entry.capability}</Chip>
+                  )) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>暂无</span>}
+                </div>
+              </div>
+              <div className="rounded-xl p-3" style={{ background: "rgba(0,111,238,0.06)", border: "1px solid rgba(0,111,238,0.16)" }}>
+                <div className="text-xs font-semibold mb-2" style={{ color: "var(--yunque-accent)" }}>需要启用</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(capabilityPlan.enable_packs || []).length > 0 ? capabilityPlan.enable_packs?.map((entry) => (
+                    <Chip key={`${entry.pack_id}:${entry.capability}`} size="sm">{entry.pack_name || entry.pack_id}</Chip>
+                  )) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>暂无</span>}
+                </div>
+              </div>
+              <div className="rounded-xl p-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)" }}>
+                <div className="text-xs font-semibold mb-2" style={{ color: "var(--yunque-warning)" }}>需要安装或修复</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(capabilityPlan.install_capabilities || []).map((capability) => <Chip key={capability} size="sm">{capability}</Chip>)}
+                  {(capabilityPlan.route_audit_issues || []).map((entry) => <Chip key={`${entry.pack_id}:${entry.path}:${entry.status}`} size="sm">{entry.status} {entry.path}</Chip>)}
+                  {(capabilityPlan.catalog_download_hints || []).map((entry) => <Chip key={`download:${entry.manifest.id}`} size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>可下载 {entry.manifest.name}</Chip>)}
+                  {!(capabilityPlan.install_capabilities?.length || capabilityPlan.route_audit_issues?.length || capabilityPlan.catalog_download_hints?.length) && <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>暂无</span>}
+                </div>
+              </div>
+            </div>
+            {(capabilityPlan.catalog_install_hints || []).length > 0 && (
+              <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(0,111,238,0.05)", border: "1px solid rgba(0,111,238,0.18)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold" style={{ color: "var(--yunque-accent)" }}>推荐增量包</div>
+                    <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                      根据缺失 capability 从 catalog 匹配到可安装包，安装后再启用即可补齐工作流能力。
+                    </div>
+                  </div>
+                  <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+                    {capabilityPlan.catalog_install_hints?.length || 0} hints
+                  </Chip>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                  {(capabilityPlan.catalog_install_hints || []).map((entry) => (
+                    <div key={entry.manifest.id} className="rounded-lg p-3 space-y-2" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid var(--yunque-border)" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold truncate" style={{ color: "var(--yunque-text)" }}>{entry.manifest.name}</div>
+                          <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>{entry.manifest.id}</div>
+                        </div>
+                        {entry.downloadable && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>downloadable</Chip>}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(entry.manifest.backend?.capabilities || []).slice(0, 5).map((capability) => <Chip key={capability} size="sm">{capability}</Chip>)}
+                      </div>
+                      <div className="text-[11px] font-mono truncate" style={{ color: "var(--yunque-text-muted)" }}>
+                        {entry.manifest.distribution?.packageUrl || entry.manifest_path || "-"}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="btn-accent"
+                          isDisabled={!entry.manifest_path || busy === `plan-install:${entry.manifest.id}`}
+                          onPress={() => run(`plan-install:${entry.manifest.id}`, () => packsClient.installLocal(entry.manifest_path || "", entry.source, Boolean(entry.downloadable)))}
+                        >
+                          <Download size={13} /> 安装推荐包
+                        </Button>
+                        {entry.manifest_path && (
+                          <Button size="sm" variant="ghost" onPress={() => { setManifestPath(entry.manifest_path || ""); showToast("推荐包 manifest_path 已填入安装栏", "success"); }}>
+                            <ClipboardCopy size={13} /> 填入
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {capabilityPlan.gates.map((gate) => (
+                <div key={gate.capability} className="rounded-xl p-3 text-xs" style={{ background: gate.allowed ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Chip size="sm" style={{ background: gate.allowed ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: gate.allowed ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                      {gate.allowed ? "allowed" : gate.action}
+                    </Chip>
+                    <code>{gate.capability}</code>
+                    {gate.resolution.preferred?.pack_id && <span className="font-mono">{gate.resolution.preferred.pack_id}</span>}
+                  </div>
+                  {gate.reason && <div className="mt-1">{gate.reason}</div>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </Card>

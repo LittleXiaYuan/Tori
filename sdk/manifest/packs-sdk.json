@@ -11,9 +11,14 @@
   ],
   "routes": [
     "GET /v1/packs",
+    "GET /v1/packs/catalog",
     "GET /v1/packs/installed",
     "GET /v1/packs/enabled",
     "GET /v1/packs/capabilities",
+    "GET /v1/packs/capabilities/resolve",
+    "GET /v1/packs/capabilities/gate",
+    "GET /v1/packs/capabilities/plan",
+    "GET /v1/packs/capabilities/prepare",
     "GET /v1/packs/backend-modules",
     "GET /v1/packs/backend-route-audit",
     "POST /v1/packs/install",
@@ -28,6 +33,12 @@
       "route": "GET /v1/packs",
       "readOnly": true,
       "description": "Read installed packs with enabled-pack summary for operator consoles."
+    },
+    {
+      "name": "catalog",
+      "route": "GET /v1/packs/catalog",
+      "readOnly": true,
+      "description": "Read installable Pack catalog entries from configured manifest sources, aligned with installed/enabled state and distribution metadata."
     },
     {
       "name": "installed",
@@ -46,6 +57,30 @@
       "route": "GET /v1/packs/capabilities",
       "readOnly": true,
       "description": "Read the manifest-derived capability index across installed packs, including pack status, routes, permissions, frontend paths, and TypeScript SDK imports."
+    },
+    {
+      "name": "resolveCapability",
+      "route": "GET /v1/packs/capabilities/resolve",
+      "readOnly": true,
+      "description": "Resolve one capability to installed provider packs, the preferred enabled pack when available, and the next operator action: use, enable, or install."
+    },
+    {
+      "name": "gateCapability",
+      "route": "GET /v1/packs/capabilities/gate",
+      "readOnly": true,
+      "description": "Preflight one capability before runtime use by combining capability resolution with enabled-pack backend route audit evidence."
+    },
+    {
+      "name": "planCapabilities",
+      "route": "GET /v1/packs/capabilities/plan",
+      "readOnly": true,
+      "description": "Plan a workflow's required capabilities in one read-only preflight, grouping usable packs, packs to enable, missing capabilities to install, and backend route audit blockers."
+    },
+    {
+      "name": "prepareCapabilities",
+      "route": "GET /v1/packs/capabilities/prepare",
+      "readOnly": true,
+      "description": "Convert workflow capability preflight into a user-selectable incremental package checklist with use, enable, install, download, checksum, and route-audit repair steps."
     },
     {
       "name": "backendModules",
@@ -114,9 +149,14 @@
       ],
       "entrypoints": {
         "list": "createPacksClient().list",
+        "catalog": "createPacksClient().catalog",
         "installed": "createPacksClient().installed",
         "enabled": "createPacksClient().enabled",
         "capabilities": "createPacksClient().capabilities",
+        "resolveCapability": "createPacksClient().resolveCapability",
+        "gateCapability": "createPacksClient().gateCapability",
+        "planCapabilities": "createPacksClient().planCapabilities",
+        "prepareCapabilities": "createPacksClient().prepareCapabilities",
         "backendModules": "createPacksClient().backendModules",
         "backendRouteAudit": "createPacksClient().backendRouteAudit",
         "install": "createPacksClient().install",

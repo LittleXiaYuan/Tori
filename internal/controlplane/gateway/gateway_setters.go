@@ -69,6 +69,13 @@ import (
 // SetPackRegistry attaches the Pack Runtime registry used by /v1/packs and frontend sync.
 func (g *Gateway) SetPackRegistry(r *packruntime.Registry) { g.packRegistry = r }
 
+// SetPackCatalogSources attaches local pack manifest directories used by the
+// read-only Pack Runtime catalog. Sources can point at directories containing
+// pack.json files directly or nested pack folders.
+func (g *Gateway) SetPackCatalogSources(sources []string) {
+	g.packCatalogSources = append([]string(nil), sources...)
+}
+
 // RegisterBackendPack mounts a backend capability pack module through the
 // Pack Runtime route gate. It can be called after Gateway construction, which
 // lets optional packages be installed or wired without adding fixed Gateway

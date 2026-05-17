@@ -131,6 +131,7 @@ type Gateway struct {
 
 	// ── Pack Runtime / Plugins / Skills ────────
 	packRegistry          *packruntime.Registry
+	packCatalogSources    []string
 	backendPacks          []packruntime.BackendModule
 	backendPackRoutes     map[string]string
 	backendPackRouteInfos map[string]packruntime.BackendRouteInfo

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -28,8 +29,13 @@ type packInstallRequest struct {
 
 func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs", g.requireAuth(g.handlePacksList))
+	g.mux.HandleFunc("/v1/packs/catalog", g.requireAuth(g.handlePackCatalog))
 	g.mux.HandleFunc("/v1/packs/installed", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/enabled", g.requireAuth(g.handlePacksEnabled))
+	g.mux.HandleFunc("/v1/packs/capabilities/plan", g.requireAuth(g.handlePackCapabilityPlan))
+	g.mux.HandleFunc("/v1/packs/capabilities/prepare", g.requireAuth(g.handlePackCapabilityPrepare))
+	g.mux.HandleFunc("/v1/packs/capabilities/gate", g.requireAuth(g.handlePackCapabilityGate))
+	g.mux.HandleFunc("/v1/packs/capabilities/resolve", g.requireAuth(g.handlePackCapabilityResolve))
 	g.mux.HandleFunc("/v1/packs/capabilities", g.requireAuth(g.handlePackCapabilities))
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
@@ -214,6 +220,178 @@ func (g *Gateway) handlePacksEnabled(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"packs": packs, "count": len(packs)})
 }
 
+func (g *Gateway) handlePackCatalog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	writeJSON(w, g.packCatalogReport(r.URL.Query().Get("capability"), r.URL.Query().Get("q")))
+}
+
+func (g *Gateway) packCatalogReport(capability string, query string) packruntime.PackCatalogReport {
+	capability = strings.TrimSpace(capability)
+	query = strings.ToLower(strings.TrimSpace(query))
+	sources := g.packCatalogSourceDirs()
+	report := packruntime.PackCatalogReport{
+		GeneratedAt: time.Now().UTC(),
+		Sources:     append([]string(nil), sources...),
+		Capability:  capability,
+		Query:       query,
+		Entries:     []packruntime.PackCatalogEntry{},
+	}
+	installed := map[string]packruntime.InstalledPack{}
+	if g.packRegistry != nil {
+		for _, pack := range g.packRegistry.List() {
+			installed[pack.Manifest.ID] = pack
+		}
+	}
+	seen := map[string]bool{}
+	for _, source := range sources {
+		manifestPaths, err := packCatalogManifestPaths(source)
+		if err != nil {
+			report.Errors = append(report.Errors, err.Error())
+			continue
+		}
+		for _, manifestPath := range manifestPaths {
+			manifest, err := packruntime.LoadManifest(manifestPath)
+			if err != nil {
+				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", manifestPath, err))
+				continue
+			}
+			if seen[manifest.ID] {
+				continue
+			}
+			seen[manifest.ID] = true
+			entry := packCatalogEntry(manifestPath, source, manifest, installed[manifest.ID])
+			if capability != "" && !manifestProvidesCapability(manifest, capability) {
+				continue
+			}
+			if query != "" && !packCatalogEntryMatches(entry, query) {
+				continue
+			}
+			report.Entries = append(report.Entries, entry)
+		}
+	}
+	slices.SortFunc(report.Entries, func(a, b packruntime.PackCatalogEntry) int {
+		return strings.Compare(a.Manifest.ID, b.Manifest.ID)
+	})
+	capabilitySet := map[string]bool{}
+	for _, entry := range report.Entries {
+		report.Count++
+		if entry.Installed {
+			report.Installed++
+		}
+		if entry.Enabled {
+			report.Enabled++
+		}
+		if entry.Downloadable {
+			report.Downloadable++
+			report.DownloadHints = append(report.DownloadHints, entry)
+		}
+		for _, cap := range entry.Manifest.Backend.Capabilities {
+			if strings.TrimSpace(cap) != "" {
+				capabilitySet[cap] = true
+			}
+		}
+		switch entry.UpdateAction {
+		case "install":
+			report.InstallHints = append(report.InstallHints, entry)
+		case "enable":
+			report.EnableHints = append(report.EnableHints, entry)
+		}
+	}
+	report.Capabilities = len(capabilitySet)
+	return report
+}
+
+func (g *Gateway) packCatalogSourceDirs() []string {
+	if len(g.packCatalogSources) > 0 {
+		return append([]string(nil), g.packCatalogSources...)
+	}
+	return []string{filepath.Join("packs", "examples"), filepath.Join("packs", "templates")}
+}
+
+func packCatalogManifestPaths(source string) ([]string, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return nil, nil
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return nil, fmt.Errorf("pack catalog source %s: %w", source, err)
+	}
+	if !info.IsDir() {
+		if filepath.Base(source) == packruntime.ManifestFileName {
+			return []string{source}, nil
+		}
+		return nil, fmt.Errorf("pack catalog source %s is not a directory or %s", source, packruntime.ManifestFileName)
+	}
+	var paths []string
+	err = filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if filepath.Base(path) == packruntime.ManifestFileName {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk pack catalog source %s: %w", source, err)
+	}
+	slices.Sort(paths)
+	return paths, nil
+}
+
+func packCatalogEntry(manifestPath string, source string, manifest packruntime.Manifest, installed packruntime.InstalledPack) packruntime.PackCatalogEntry {
+	entry := packruntime.PackCatalogEntry{
+		ManifestPath: manifestPath,
+		Source:       source,
+		Manifest:     manifest,
+		UpdateAction: "install",
+		Downloadable: strings.TrimSpace(manifest.Distribution.PackageURL) != "" && strings.TrimSpace(manifest.Distribution.SHA256) != "",
+	}
+	if installed.Manifest.ID == manifest.ID {
+		entry.Installed = true
+		entry.Status = installed.Status
+		entry.Enabled = installed.Status == packruntime.PackStatusEnabled
+		if installed.Manifest.Version != manifest.Version {
+			entry.UpdateAction = "update"
+		} else if installed.Status == packruntime.PackStatusDisabled {
+			entry.UpdateAction = "enable"
+		} else {
+			entry.UpdateAction = "use"
+		}
+	}
+	return entry
+}
+
+func manifestProvidesCapability(manifest packruntime.Manifest, capability string) bool {
+	for _, candidate := range manifest.Backend.Capabilities {
+		if strings.TrimSpace(candidate) == capability {
+			return true
+		}
+	}
+	return false
+}
+
+func packCatalogEntryMatches(entry packruntime.PackCatalogEntry, query string) bool {
+	haystack := strings.ToLower(strings.Join([]string{
+		entry.Manifest.ID,
+		entry.Manifest.Name,
+		entry.Manifest.Description,
+		entry.Manifest.SDK.TypeScript,
+		strings.Join(entry.Manifest.Backend.Capabilities, " "),
+		strings.Join(entry.Manifest.Backend.Permissions, " "),
+		entry.Manifest.Metadata["blueprint"],
+		entry.Manifest.Metadata["stage"],
+	}, " "))
+	return strings.Contains(haystack, query)
+}
+
 func (g *Gateway) handlePackBackendModules(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
@@ -229,6 +407,64 @@ func (g *Gateway) handlePackCapabilities(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, g.packCapabilityIndexReport())
+}
+
+func (g *Gateway) handlePackCapabilityResolve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	capability := strings.TrimSpace(r.URL.Query().Get("capability"))
+	if capability == "" {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "capability is required"})
+		return
+	}
+	writeJSON(w, g.packCapabilityResolveReport(capability))
+}
+
+func (g *Gateway) handlePackCapabilityGate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	capability := strings.TrimSpace(r.URL.Query().Get("capability"))
+	if capability == "" {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "capability is required"})
+		return
+	}
+	writeJSON(w, g.packCapabilityGateReport(capability))
+}
+
+func (g *Gateway) handlePackCapabilityPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	capabilities := parseCapabilityPlanQuery(r.URL.Query()["capability"])
+	if len(capabilities) == 0 {
+		capabilities = parseCapabilityPlanQuery([]string{r.URL.Query().Get("capabilities")})
+	}
+	if len(capabilities) == 0 {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "capability or capabilities is required"})
+		return
+	}
+	writeJSON(w, g.packCapabilityPlanReport(capabilities))
+}
+
+func (g *Gateway) handlePackCapabilityPrepare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	capabilities := parseCapabilityPlanQuery(r.URL.Query()["capability"])
+	if len(capabilities) == 0 {
+		capabilities = parseCapabilityPlanQuery([]string{r.URL.Query().Get("capabilities")})
+	}
+	if len(capabilities) == 0 {
+		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "capability or capabilities is required"})
+		return
+	}
+	writeJSON(w, g.packCapabilityPrepareReport(capabilities))
 }
 
 func (g *Gateway) packCapabilityIndexReport() packruntime.CapabilityIndexReport {
@@ -277,6 +513,384 @@ func (g *Gateway) packCapabilityIndexReport() packruntime.CapabilityIndexReport 
 		return strings.Compare(a.PackID, b.PackID)
 	})
 	return report
+}
+
+func (g *Gateway) packCapabilityPlanReport(capabilities []string) packruntime.CapabilityPlanReport {
+	report := packruntime.CapabilityPlanReport{
+		GeneratedAt:           time.Now().UTC(),
+		Capabilities:          normalizeCapabilityPlanInputs(capabilities),
+		Action:                "use",
+		Gates:                 []packruntime.CapabilityGateReport{},
+		RequiredPacks:         []packruntime.CapabilityIndexEntry{},
+		EnablePacks:           []packruntime.CapabilityIndexEntry{},
+		InstallCapabilities:   []string{},
+		CatalogInstallHints:   []packruntime.PackCatalogEntry{},
+		CatalogDownloadHints:  []packruntime.PackCatalogEntry{},
+		RouteAuditIssues:      []packruntime.BackendRouteAuditEntry{},
+		UnavailableReasons:    []string{},
+		DownloadablePackHints: []packruntime.CapabilityIndexEntry{},
+	}
+	seenRequired := map[string]bool{}
+	seenEnable := map[string]bool{}
+	seenHints := map[string]bool{}
+	seenCatalogInstall := map[string]bool{}
+	seenCatalogDownload := map[string]bool{}
+	seenInstall := map[string]bool{}
+	seenReasons := map[string]bool{}
+	for _, capability := range report.Capabilities {
+		gate := g.packCapabilityGateReport(capability)
+		report.Gates = append(report.Gates, gate)
+		if gate.Allowed {
+			report.AllowedCount++
+		} else {
+			report.BlockedCount++
+			if gate.Reason != "" && !seenReasons[gate.Capability+" "+gate.Reason] {
+				report.UnavailableReasons = append(report.UnavailableReasons, gate.Reason)
+				seenReasons[gate.Capability+" "+gate.Reason] = true
+			}
+		}
+		switch gate.Action {
+		case "use":
+			report.UseCount++
+			if gate.Allowed && gate.Resolution.Preferred != nil {
+				addCapabilityPlanEntry(&report.RequiredPacks, seenRequired, *gate.Resolution.Preferred)
+			}
+		case "enable":
+			report.EnableCount++
+			if gate.Resolution.Preferred != nil {
+				addCapabilityPlanEntry(&report.EnablePacks, seenEnable, *gate.Resolution.Preferred)
+				addCapabilityPlanEntry(&report.DownloadablePackHints, seenHints, *gate.Resolution.Preferred)
+			}
+		default:
+			report.InstallCount++
+			if !seenInstall[gate.Capability] {
+				report.InstallCapabilities = append(report.InstallCapabilities, gate.Capability)
+				seenInstall[gate.Capability] = true
+			}
+			catalog := g.packCatalogReport(gate.Capability, "")
+			for _, hint := range catalog.InstallHints {
+				addCapabilityPlanCatalogEntry(&report.CatalogInstallHints, seenCatalogInstall, hint)
+				if hint.Downloadable {
+					addCapabilityPlanCatalogEntry(&report.CatalogDownloadHints, seenCatalogDownload, hint)
+				}
+			}
+			for _, hint := range catalog.DownloadHints {
+				addCapabilityPlanCatalogEntry(&report.CatalogDownloadHints, seenCatalogDownload, hint)
+			}
+		}
+		for _, audit := range gate.RouteAudit {
+			if audit.Status != "ok" {
+				report.RouteAuditIssues = append(report.RouteAuditIssues, audit)
+				report.RouteAuditIssueCount++
+			}
+		}
+	}
+	report.Allowed = report.BlockedCount == 0 && len(report.Capabilities) > 0
+	switch {
+	case report.InstallCount > 0:
+		report.Action = "install"
+	case report.EnableCount > 0:
+		report.Action = "enable"
+	case report.RouteAuditIssueCount > 0:
+		report.Action = "fix-route-audit"
+	default:
+		report.Action = "use"
+	}
+	slices.Sort(report.InstallCapabilities)
+	slices.SortFunc(report.CatalogInstallHints, func(a, b packruntime.PackCatalogEntry) int {
+		return strings.Compare(a.Manifest.ID, b.Manifest.ID)
+	})
+	slices.SortFunc(report.CatalogDownloadHints, func(a, b packruntime.PackCatalogEntry) int {
+		return strings.Compare(a.Manifest.ID, b.Manifest.ID)
+	})
+	slices.SortFunc(report.RequiredPacks, func(a, b packruntime.CapabilityIndexEntry) int {
+		return strings.Compare(a.PackID+" "+a.Capability, b.PackID+" "+b.Capability)
+	})
+	slices.SortFunc(report.EnablePacks, func(a, b packruntime.CapabilityIndexEntry) int {
+		return strings.Compare(a.PackID+" "+a.Capability, b.PackID+" "+b.Capability)
+	})
+	slices.SortFunc(report.DownloadablePackHints, func(a, b packruntime.CapabilityIndexEntry) int {
+		return strings.Compare(a.PackID+" "+a.Capability, b.PackID+" "+b.Capability)
+	})
+	return report
+}
+
+func (g *Gateway) packCapabilityPrepareReport(capabilities []string) packruntime.CapabilityPrepareReport {
+	plan := g.packCapabilityPlanReport(capabilities)
+	report := packruntime.CapabilityPrepareReport{
+		GeneratedAt:          time.Now().UTC(),
+		Capabilities:         append([]string(nil), plan.Capabilities...),
+		Allowed:              plan.Allowed,
+		Action:               plan.Action,
+		Plan:                 plan,
+		Steps:                []packruntime.CapabilityPrepareStep{},
+		UnavailableReasons:   append([]string(nil), plan.UnavailableReasons...),
+		RouteAuditIssues:     append([]packruntime.BackendRouteAuditEntry(nil), plan.RouteAuditIssues...),
+		RouteAuditIssueCount: plan.RouteAuditIssueCount,
+	}
+	seen := map[string]bool{}
+	for _, entry := range plan.RequiredPacks {
+		addCapabilityPrepareStep(&report, seen, packCapabilityPrepareUseStep(entry))
+	}
+	for _, entry := range plan.EnablePacks {
+		addCapabilityPrepareStep(&report, seen, packCapabilityPrepareEnableStep(entry))
+	}
+	for _, entry := range plan.CatalogInstallHints {
+		step := packCapabilityPrepareInstallStep(entry)
+		addCapabilityPrepareStep(&report, seen, step)
+		if entry.Downloadable {
+			downloadStep := step
+			downloadStep.Action = "download"
+			downloadStep.Reason = "download and verify this package before installing the pack manifest"
+			addCapabilityPrepareStep(&report, seen, downloadStep)
+		}
+	}
+	for _, issue := range plan.RouteAuditIssues {
+		step := packruntime.CapabilityPrepareStep{
+			Action:       "fix-route-audit",
+			PackID:       issue.PackID,
+			PackName:     issue.PackName,
+			Enabled:      issue.Enabled,
+			Downloadable: false,
+			Reason:       strings.Join(issue.Issues, "; "),
+		}
+		if step.Reason == "" {
+			step.Reason = fmt.Sprintf("backend route %s %s is %s", issue.Method, issue.Path, issue.Status)
+		}
+		addCapabilityPrepareStep(&report, seen, step)
+	}
+	for _, capability := range plan.InstallCapabilities {
+		if hasPrepareInstallStepForCapability(report.InstallSteps, capability) {
+			continue
+		}
+		addCapabilityPrepareStep(&report, seen, packruntime.CapabilityPrepareStep{
+			Action:     "install",
+			Capability: capability,
+			Reason:     "no installed or catalog pack currently provides this capability",
+		})
+	}
+	report.StepCount = len(report.Steps)
+	report.Allowed = plan.Allowed && report.InstallCount == 0 && report.EnableCount == 0 && report.RouteAuditIssueCount == 0
+	switch {
+	case report.RouteAuditIssueCount > 0:
+		report.Action = "fix-route-audit"
+	case report.InstallCount > 0:
+		report.Action = "install"
+	case report.EnableCount > 0:
+		report.Action = "enable"
+	default:
+		report.Action = "use"
+	}
+	return report
+}
+
+func packCapabilityPrepareUseStep(entry packruntime.CapabilityIndexEntry) packruntime.CapabilityPrepareStep {
+	entryCopy := entry
+	return packruntime.CapabilityPrepareStep{
+		Action:         "use",
+		PackID:         entry.PackID,
+		PackName:       entry.PackName,
+		Capability:     entry.Capability,
+		Installed:      true,
+		Enabled:        entry.Enabled,
+		Reason:         "capability is already available through an enabled pack",
+		CapabilityInfo: &entryCopy,
+	}
+}
+
+func packCapabilityPrepareEnableStep(entry packruntime.CapabilityIndexEntry) packruntime.CapabilityPrepareStep {
+	entryCopy := entry
+	return packruntime.CapabilityPrepareStep{
+		Action:         "enable",
+		PackID:         entry.PackID,
+		PackName:       entry.PackName,
+		Capability:     entry.Capability,
+		Installed:      true,
+		Enabled:        entry.Enabled,
+		Reason:         "capability is installed but the pack is disabled",
+		CapabilityInfo: &entryCopy,
+	}
+}
+
+func packCapabilityPrepareInstallStep(entry packruntime.PackCatalogEntry) packruntime.CapabilityPrepareStep {
+	entryCopy := entry
+	capability := ""
+	if len(entry.Manifest.Backend.Capabilities) > 0 {
+		capability = entry.Manifest.Backend.Capabilities[0]
+	}
+	return packruntime.CapabilityPrepareStep{
+		Action:       "install",
+		PackID:       entry.Manifest.ID,
+		PackName:     entry.Manifest.Name,
+		Capability:   capability,
+		ManifestPath: entry.ManifestPath,
+		ManifestURL:  entry.Manifest.Distribution.ManifestURL,
+		PackageURL:   entry.Manifest.Distribution.PackageURL,
+		FrontendURL:  entry.Manifest.Distribution.FrontendURL,
+		SHA256:       entry.Manifest.Distribution.SHA256,
+		SizeBytes:    entry.Manifest.Distribution.SizeBytes,
+		Installed:    entry.Installed,
+		Enabled:      entry.Enabled,
+		Downloadable: entry.Downloadable,
+		Reason:       "install this catalog pack to provide one or more missing capabilities",
+		CatalogEntry: &entryCopy,
+	}
+}
+
+func addCapabilityPrepareStep(report *packruntime.CapabilityPrepareReport, seen map[string]bool, step packruntime.CapabilityPrepareStep) {
+	key := strings.Join([]string{step.Action, step.PackID, step.Capability, step.ManifestPath, step.PackageURL}, "\x00")
+	if seen[key] {
+		return
+	}
+	seen[key] = true
+	report.Steps = append(report.Steps, step)
+	switch step.Action {
+	case "use":
+		report.ReadyCount++
+		report.UseSteps = append(report.UseSteps, step)
+	case "enable":
+		report.EnableCount++
+		report.EnableSteps = append(report.EnableSteps, step)
+	case "download":
+		report.DownloadCount++
+		report.DownloadSteps = append(report.DownloadSteps, step)
+	case "fix-route-audit":
+		report.RouteAuditFixSteps = append(report.RouteAuditFixSteps, step)
+	default:
+		report.InstallCount++
+		report.InstallSteps = append(report.InstallSteps, step)
+	}
+}
+
+func hasPrepareInstallStepForCapability(steps []packruntime.CapabilityPrepareStep, capability string) bool {
+	for _, step := range steps {
+		if step.Capability == capability || (step.CatalogEntry != nil && manifestProvidesCapability(step.CatalogEntry.Manifest, capability)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Gateway) packCapabilityGateReport(capability string) packruntime.CapabilityGateReport {
+	resolution := g.packCapabilityResolveReport(capability)
+	report := packruntime.CapabilityGateReport{
+		GeneratedAt: time.Now().UTC(),
+		Capability:  resolution.Capability,
+		Action:      resolution.Action,
+		Resolution:  resolution,
+	}
+	if !resolution.Found {
+		report.Reason = "capability is not provided by any installed pack"
+		return report
+	}
+	if !resolution.Enabled {
+		report.Reason = "capability is provided only by disabled packs"
+		return report
+	}
+	auditEntries := g.backendRouteAuditReport().Entries
+	for _, entry := range auditEntries {
+		if resolution.Preferred == nil || entry.PackID != resolution.Preferred.PackID {
+			continue
+		}
+		for _, route := range resolution.Preferred.Routes {
+			if entry.Path == route {
+				report.RouteAudit = append(report.RouteAudit, entry)
+			}
+		}
+	}
+	for _, entry := range report.RouteAudit {
+		if entry.Status != "ok" {
+			report.Reason = "capability pack has backend route audit issues"
+			return report
+		}
+	}
+	report.Allowed = true
+	report.Reason = "capability is available through an enabled pack"
+	return report
+}
+
+func (g *Gateway) packCapabilityResolveReport(capability string) packruntime.CapabilityResolveReport {
+	capability = strings.TrimSpace(capability)
+	report := packruntime.CapabilityResolveReport{
+		GeneratedAt:    time.Now().UTC(),
+		Capability:     capability,
+		Action:         "install",
+		Entries:        []packruntime.CapabilityIndexEntry{},
+		EnabledEntries: []packruntime.CapabilityIndexEntry{},
+	}
+	if capability == "" {
+		return report
+	}
+	index := g.packCapabilityIndexReport()
+	for _, entry := range index.Entries {
+		if entry.Capability != capability {
+			continue
+		}
+		report.Found = true
+		report.Entries = append(report.Entries, entry)
+		if entry.Enabled {
+			report.Enabled = true
+			report.EnabledEntries = append(report.EnabledEntries, entry)
+		}
+	}
+	if len(report.EnabledEntries) > 0 {
+		preferred := report.EnabledEntries[0]
+		report.Preferred = &preferred
+		report.Action = "use"
+		return report
+	}
+	if len(report.Entries) > 0 {
+		preferred := report.Entries[0]
+		report.Preferred = &preferred
+		report.Action = "enable"
+	}
+	return report
+}
+
+func parseCapabilityPlanQuery(values []string) []string {
+	var out []string
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				out = append(out, part)
+			}
+		}
+	}
+	return out
+}
+
+func normalizeCapabilityPlanInputs(capabilities []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, capability := range capabilities {
+		capability = strings.TrimSpace(capability)
+		if capability == "" || seen[capability] {
+			continue
+		}
+		seen[capability] = true
+		out = append(out, capability)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func addCapabilityPlanEntry(entries *[]packruntime.CapabilityIndexEntry, seen map[string]bool, entry packruntime.CapabilityIndexEntry) {
+	key := entry.PackID + " " + entry.Capability
+	if seen[key] {
+		return
+	}
+	seen[key] = true
+	*entries = append(*entries, entry)
+}
+
+func addCapabilityPlanCatalogEntry(entries *[]packruntime.PackCatalogEntry, seen map[string]bool, entry packruntime.PackCatalogEntry) {
+	key := entry.Manifest.ID + " " + entry.Manifest.Version
+	if seen[key] {
+		return
+	}
+	seen[key] = true
+	*entries = append(*entries, entry)
 }
 
 func packCapabilityFrontendPaths(manifest packruntime.Manifest) []string {
