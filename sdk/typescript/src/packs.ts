@@ -20,6 +20,9 @@ export type PackMutationResponse = { pack: InstalledPack; status: PackStatus; [k
 export type PackBackendRouteInfo = { method?: string; methods?: string[]; path: string };
 export type PackBackendModuleInfo = { pack_id: string; routes: PackBackendRouteInfo[] };
 export type PackBackendModulesResponse = { modules: PackBackendModuleInfo[]; count: number; [key: string]: unknown };
+export type PackCapabilityIndexEntry = { capability: string; pack_id: string; pack_name: string; pack_status: string; enabled: boolean; optional: boolean; routes?: string[]; permissions?: string[]; sdk_typescript?: string; frontend_paths?: string[]; [key: string]: unknown };
+export type PackCapabilityIndexReport = { generated_at: string; packs: number; enabled_packs: number; capabilities: number; enabled_capabilities: number; entries: PackCapabilityIndexEntry[]; [key: string]: unknown };
+export type PackCapabilityBinding = { capability: string; packId: string; packName: string; routes: string[]; permissions: string[]; frontendPaths: string[]; sdk: PackSdkEntrypoint[] };
 export type PackBackendRouteAuditEntry = { pack_id: string; pack_name?: string; pack_status?: string; enabled: boolean; status: "ok" | "missing" | "method-mismatch" | "undeclared" | "pack-not-installed" | "registry-unavailable" | string; declared: boolean; mounted: boolean; method?: string; methods?: string[]; path: string; auth?: string; description?: string; issues?: string[]; [key: string]: unknown };
 export type PackBackendRouteAuditReport = { generated_at: string; packs: number; enabled_packs: number; mounted_modules: number; declared_routes: number; mounted_routes: number; ok_routes: number; missing_routes: number; method_mismatches: number; undeclared_routes: number; entries: PackBackendRouteAuditEntry[]; [key: string]: unknown };
 export type PackPruneResponse = { removed: string[]; kept: string[]; errors?: string[]; removed_count: number; kept_count: number; [key: string]: unknown };
@@ -37,6 +40,8 @@ function packSdkEntrypoints(pack: InstalledPack): PackSdkEntrypoint[] { return O
 function normalizeRoutePath(path: string): string { const trimmed = path.trim().replace(/\/+$/, ""); return trimmed || "/"; }
 function packRouteBindings(pack: InstalledPack): PackRouteBinding[] { const routeSdk = packSdkEntrypoints(pack); return (pack.manifest.frontend?.routes ?? []).map((route) => ({ packId: pack.manifest.id, packName: pack.manifest.name, path: route.path, component: route.component, title: route.title, assets: pack.manifest.frontend?.assets, distribution: pack.manifest.distribution, sdk: routeSdk })); }
 function packBackendRouteBindings(pack: InstalledPack): PackBackendRouteBinding[] { return (pack.manifest.backend?.routeSpecs ?? []).map((route) => ({ packId: pack.manifest.id, packName: pack.manifest.name, method: route.method, path: route.path, description: route.description })); }
+function packFrontendPaths(pack: InstalledPack): string[] { return Array.from(new Set([...(pack.manifest.frontend?.menus ?? []).map((menu) => menu.path), ...(pack.manifest.frontend?.routes ?? []).map((route) => route.path)].filter((path): path is string => typeof path === "string" && path.trim().length > 0))).sort(); }
+function packCapabilityBindings(pack: InstalledPack): PackCapabilityBinding[] { const sdk = packSdkEntrypoints(pack); const frontendPaths = packFrontendPaths(pack); return (pack.manifest.backend?.capabilities ?? []).filter((capability) => capability.trim().length > 0).map((capability) => ({ capability, packId: pack.manifest.id, packName: pack.manifest.name, routes: [...(pack.manifest.backend?.routes ?? [])], permissions: [...(pack.manifest.backend?.permissions ?? [])], frontendPaths, sdk })); }
 
 export class PacksClient {
   private readonly baseUrl: string; private readonly fetchImpl: typeof fetch; private readonly headers: HeadersInit | undefined; private readonly token: string | undefined; private readonly apiKey: string | undefined;
@@ -44,6 +49,7 @@ export class PacksClient {
   installed(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/installed"); }
   list(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs"); }
   enabled(): Promise<PacksListResponse> { return this.json<PacksListResponse>("GET", "/v1/packs/enabled"); }
+  capabilities(): Promise<PackCapabilityIndexReport> { return this.json<PackCapabilityIndexReport>("GET", "/v1/packs/capabilities"); }
   backendModules(): Promise<PackBackendModulesResponse> { return this.json<PackBackendModulesResponse>("GET", "/v1/packs/backend-modules"); }
   backendRouteAudit(): Promise<PackBackendRouteAuditReport> { return this.json<PackBackendRouteAuditReport>("GET", "/v1/packs/backend-route-audit"); }
   install(request: PackInstallRequest): Promise<PackMutationResponse> { return this.json<PackMutationResponse>("POST", "/v1/packs/install", { manifest_path: request.manifestPath, manifest_url: request.manifestUrl, source: request.source, download: request.download }); }
@@ -51,7 +57,7 @@ export class PacksClient {
   disable(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/disable", id); }
   rollback(id: string): Promise<PackMutationResponse> { return this.mutate("/v1/packs/rollback", id); }
   prune(): Promise<PackPruneResponse> { return this.json<PackPruneResponse>("POST", "/v1/packs/prune", {}); }
-  async frontendSync(): Promise<{ menus: PackFrontendMenu[]; routes: PackFrontendRoute[]; sdk: PackSdkEntrypoint[]; distributions: PackDistributionManifest[]; routeBindings: PackRouteBinding[]; backendRouteBindings: PackBackendRouteBinding[]; packs: InstalledPack[] }> {
+  async frontendSync(): Promise<{ menus: PackFrontendMenu[]; routes: PackFrontendRoute[]; sdk: PackSdkEntrypoint[]; distributions: PackDistributionManifest[]; routeBindings: PackRouteBinding[]; backendRouteBindings: PackBackendRouteBinding[]; capabilityBindings: PackCapabilityBinding[]; packs: InstalledPack[] }> {
     const response = await this.enabled();
     const packs = response.packs ?? [];
     const sdk = packs.flatMap((pack) => packSdkEntrypoints(pack));
@@ -63,6 +69,7 @@ export class PacksClient {
       distributions: packs.map((pack) => pack.manifest.distribution).filter((distribution): distribution is PackDistributionManifest => Boolean(distribution?.packageUrl || distribution?.frontendUrl)),
       routeBindings: packs.flatMap((pack) => packRouteBindings(pack)),
       backendRouteBindings: packs.flatMap((pack) => packBackendRouteBindings(pack)),
+      capabilityBindings: packs.flatMap((pack) => packCapabilityBindings(pack)),
     };
   }
   async routeBinding(path: string): Promise<PackRouteBinding | undefined> { const sync = await this.frontendSync(); const normalized = normalizeRoutePath(path); return sync.routeBindings.find((route) => normalizeRoutePath(route.path) === normalized); }

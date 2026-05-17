@@ -70,6 +70,14 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 
 export default function PacksPage() {
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
+  const { data: capabilityData, loading: capabilityLoading, refresh: refreshCapabilities } = useApiData(async () => packsClient.capabilities(), {
+    generated_at: "",
+    packs: 0,
+    enabled_packs: 0,
+    capabilities: 0,
+    enabled_capabilities: 0,
+    entries: [],
+  });
   const { data: backendModulesData, loading: backendModulesLoading, refresh: refreshBackendModules } = useApiData(async () => packsClient.backendModules(), { modules: [], count: 0 });
   const { data: routeAuditData, loading: routeAuditLoading, refresh: refreshRouteAudit } = useApiData(async () => packsClient.backendRouteAudit(), {
     generated_at: "",
@@ -90,8 +98,18 @@ export default function PacksPage() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const packs = data?.packs || [];
+  const capabilityIndex = capabilityData;
   const backendModules = backendModulesData?.modules || [];
   const routeAudit = routeAuditData;
+  const capabilityEntriesByPack = useMemo(() => {
+    const byPack = new Map<string, typeof capabilityIndex.entries>();
+    for (const entry of capabilityIndex.entries || []) {
+      const current = byPack.get(entry.pack_id) || [];
+      current.push(entry);
+      byPack.set(entry.pack_id, current);
+    }
+    return byPack;
+  }, [capabilityIndex.entries]);
   const backendModuleByPack = useMemo(() => new Map(backendModules.map((module) => [module.pack_id, module])), [backendModules]);
   const routeAuditByPack = useMemo(() => {
     const byPack = new Map<string, typeof routeAudit.entries>();
@@ -107,10 +125,12 @@ export default function PacksPage() {
     enabled: packs.filter((p) => p.status === "enabled").length,
     rollbackable: packs.filter((p) => p.manifest.update?.rollback).length,
     frontendMenus: packs.reduce((n, p) => n + (p.manifest.frontend?.menus?.length || 0), 0),
+    capabilities: capabilityIndex.capabilities || 0,
+    enabledCapabilities: capabilityIndex.enabled_capabilities || 0,
     backendModules: backendModules.length,
     backendRoutes: backendModules.reduce((n, m) => n + (m.routes?.length || 0), 0),
     routeAuditIssues: (routeAudit.missing_routes || 0) + (routeAudit.method_mismatches || 0) + (routeAudit.undeclared_routes || 0),
-  }), [packs, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
+  }), [packs, capabilityIndex.capabilities, capabilityIndex.enabled_capabilities, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);
@@ -118,6 +138,7 @@ export default function PacksPage() {
       await op();
       showToast("Pack registry 已更新，前端菜单会跟随已启用包同步。", "success");
       await refresh();
+      await refreshCapabilities();
       await refreshBackendModules();
       await refreshRouteAudit();
     } catch (e) {
@@ -144,7 +165,7 @@ export default function PacksPage() {
         icon={<Boxes size={20} />}
         title="增量包运行时"
         description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。"
-        onRefresh={() => { void refresh(); void refreshBackendModules(); void refreshRouteAudit(); }}
+        onRefresh={() => { void refresh(); void refreshCapabilities(); void refreshBackendModules(); void refreshRouteAudit(); }}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -161,8 +182,8 @@ export default function PacksPage() {
           <div className="kpi-value">{stats.rollbackable}</div>
         </Card>
         <Card className="section-card p-4">
-          <div className="kpi-label">后端模块 / 路由</div>
-          <div className="kpi-value">{stats.backendModules}/{stats.backendRoutes}</div>
+          <div className="kpi-label">能力索引</div>
+          <div className="kpi-value">{stats.enabledCapabilities}/{stats.capabilities}</div>
         </Card>
         <Card className="section-card p-4">
           <div className="kpi-label">路由审计问题</div>
@@ -255,6 +276,45 @@ export default function PacksPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
+              <TerminalSquare size={15} /> Pack 能力索引
+            </div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              从 manifest 的 backend.capabilities 生成只读索引，后续 runtime skill gate、插件市场和自动化脚本都可以按 capability 查到所属 pack、启停状态、路由、权限与 SDK 入口。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+            {capabilityLoading ? "索引中" : `${stats.enabledCapabilities}/${stats.capabilities} enabled`}
+          </Chip>
+        </div>
+        {capabilityIndex.entries.length === 0 ? (
+          <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+            暂无 backend.capabilities 声明；能力包需要先在 manifest 中声明 capability，才会进入运行时索引。
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {capabilityIndex.entries.slice(0, 12).map((entry) => (
+              <div key={`${entry.pack_id}:${entry.capability}`} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="text-xs" style={{ color: "var(--yunque-text)" }}>{entry.capability}</code>
+                  <Chip size="sm" style={{ background: entry.enabled ? "rgba(34,197,94,0.10)" : "rgba(255,255,255,0.05)", color: entry.enabled ? "var(--yunque-success)" : "var(--yunque-text-muted)" }}>
+                    {entry.enabled ? "enabled" : entry.pack_status}
+                  </Chip>
+                </div>
+                <div className="text-[11px] mt-2 font-mono" style={{ color: "var(--yunque-text-muted)" }}>{entry.pack_id}</div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {(entry.routes || []).slice(0, 3).map((route) => <Chip key={route} size="sm">{route}</Chip>)}
+                  {entry.sdk_typescript && <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>{entry.sdk_typescript}</Chip>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>
               <ShieldCheck size={15} /> 后端路由审计
             </div>
             <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
@@ -318,6 +378,7 @@ export default function PacksPage() {
             const menus = manifest.frontend?.menus || [];
             const routes = manifest.frontend?.routes || [];
             const caps = manifest.backend?.capabilities || [];
+            const capabilityEntries = capabilityEntriesByPack.get(manifest.id) || [];
             const backendModule = backendModuleByPack.get(manifest.id);
             const mountedRoutes = backendModule?.routes || [];
             const routeAuditEntries = routeAuditByPack.get(manifest.id) || [];
@@ -371,6 +432,7 @@ export default function PacksPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {caps.length ? caps.map((cap) => <Chip key={cap} size="sm">{cap}</Chip>) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未声明</span>}
+                      {capabilityEntries.length > 0 && <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>indexed {capabilityEntries.length}</Chip>}
                       {mountedRoutes.length > 0 && <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>已挂载 {mountedRoutes.length}</Chip>}
                       {declaredBackendSpecs.length > 0 && mountedRoutes.length === 0 && <Chip size="sm" style={{ background: "rgba(245,158,11,0.12)", color: "var(--yunque-warning)" }}>未挂载</Chip>}
                       <Chip size="sm" style={{ background: routeAuditIssues.length ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.10)", color: routeAuditIssues.length ? "var(--yunque-warning)" : "var(--yunque-success)" }}>

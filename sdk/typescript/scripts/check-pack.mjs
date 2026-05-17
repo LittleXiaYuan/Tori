@@ -1,11 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const baseUnpackedSize = 1_203_000;
 const baseExportedFiles = 137;
+const baseManifestCapabilities = 12;
 const maxUnpackedGrowthPerExport = 2_500;
+const maxUnpackedGrowthPerManifestCapability = 1_000;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+const packManifestPath = "../manifest/packs-sdk.json";
+const packManifest = existsSync(packManifestPath)
+  ? JSON.parse(readFileSync(packManifestPath, "utf8"))
+  : { capabilities: [] };
 
 if (pkg.sideEffects !== false) {
   console.error("package.json must declare sideEffects=false so bundlers can tree-shake unused SDK slices");
@@ -80,7 +86,15 @@ if (forbiddenFiles.length > 0) {
   process.exit(1);
 }
 
-const maxUnpackedSize = baseUnpackedSize + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport;
+// A few SDK surfaces intentionally grow an existing subpath instead of adding a
+// new export. Tie that budget to the checked manifest so real feature growth is
+// explicit and reviewable instead of hiding behind a broad global size bump.
+const manifestCapabilityCount = Array.isArray(packManifest.capabilities)
+  ? packManifest.capabilities.length
+  : 0;
+const maxUnpackedSize = baseUnpackedSize
+  + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
+  + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability;
 if (pack.unpackedSize > maxUnpackedSize) {
   console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);
   process.exit(1);

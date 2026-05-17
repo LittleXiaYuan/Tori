@@ -332,6 +332,83 @@ func TestPackBackendModulesExposeMountedRoutes(t *testing.T) {
 	}
 }
 
+func TestPackCapabilitiesExposeManifestCapabilityIndex(t *testing.T) {
+	registry, err := packruntime.NewRegistry(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.capability-index",
+		Name:         "Capability Index Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "enabled",
+		Backend: packruntime.BackendManifest{
+			Capabilities: []string{"capability.alpha", "capability.beta"},
+			Routes:       []string{"/v1/capability-index/ping"},
+			Permissions:  []string{"capability:read"},
+		},
+		Frontend: packruntime.FrontendManifest{
+			Menus:  []packruntime.FrontendMenu{{Key: "capability-index", Label: "能力索引", Path: "/packs/capability-index"}},
+			Routes: []packruntime.FrontendRoute{{Path: "/packs/capability-index/detail", Component: "CapabilityIndexPage"}},
+		},
+		SDK: packruntime.SDKManifest{TypeScript: "yunque-client/capability-index"},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	_, err = registry.Install(packruntime.Manifest{
+		ID:           "yunque.pack.disabled-capability",
+		Name:         "Disabled Capability Pack",
+		Version:      "0.1.0",
+		Optional:     true,
+		DefaultState: "disabled",
+		Backend:      packruntime.BackendManifest{Capabilities: []string{"capability.disabled"}, Routes: []string{"/v1/disabled-capability/ping"}},
+	}, "test")
+	if err != nil {
+		t.Fatalf("Install disabled: %v", err)
+	}
+	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
+	tenant := tenants.Register("pack-capabilities")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities", nil)
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var report packruntime.CapabilityIndexReport
+	if err := json.NewDecoder(w.Body).Decode(&report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if report.Packs != 2 || report.EnabledPacks != 1 || report.Capabilities != 3 || report.EnabledCapabilities != 2 {
+		t.Fatalf("unexpected capability index summary: %#v", report)
+	}
+	var alpha packruntime.CapabilityIndexEntry
+	var disabled packruntime.CapabilityIndexEntry
+	for _, entry := range report.Entries {
+		switch entry.Capability {
+		case "capability.alpha":
+			alpha = entry
+		case "capability.disabled":
+			disabled = entry
+		}
+	}
+	if alpha.PackID != "yunque.pack.capability-index" || !alpha.Enabled || alpha.SDKTypeScript != "yunque-client/capability-index" {
+		t.Fatalf("unexpected alpha capability entry: %#v", alpha)
+	}
+	if len(alpha.Routes) != 1 || alpha.Routes[0] != "/v1/capability-index/ping" || len(alpha.Permissions) != 1 || alpha.Permissions[0] != "capability:read" {
+		t.Fatalf("capability entry should include routes and permissions: %#v", alpha)
+	}
+	if len(alpha.FrontendPaths) != 2 || alpha.FrontendPaths[0] != "/packs/capability-index" || alpha.FrontendPaths[1] != "/packs/capability-index/detail" {
+		t.Fatalf("capability entry should include sorted frontend paths: %#v", alpha.FrontendPaths)
+	}
+	if disabled.PackID != "yunque.pack.disabled-capability" || disabled.Enabled {
+		t.Fatalf("disabled capability should stay visible but disabled: %#v", disabled)
+	}
+}
+
 func TestPackBackendRouteAuditComparesManifestAndMountedRoutes(t *testing.T) {
 	registry, err := packruntime.NewRegistry(t.TempDir())
 	if err != nil {
