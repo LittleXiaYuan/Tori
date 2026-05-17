@@ -270,11 +270,15 @@ for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
   fail("RegisterBackendPack must remain usable after Gateway construction");
 }
+for (const token of ["CatalogSourceReports", "addCapabilityPlanCatalogSourceReports"]) {
+  if (!gatewaySource.includes(token)) fail(`catalog source diagnostics missing token: ${token}`);
+}
 
 const backendContract = readText("pkg/packruntime/backend.go") + "\n" + readText("pkg/packruntime/registry.go");
 for (const token of ["type BackendRoute", "Method  string", "Methods []string", "Path    string", "Auth    BackendRouteAuthMode", "type BackendRouteAuthMode", "BackendRouteAuthPassthrough", "type BackendRouteInfo", "Method  string", "Methods []string", "json:\"methods,omitempty\"", "json:\"auth,omitempty\"", "type BackendModuleInfo", "type PackCatalogEntry", "type PackCatalogSourceReport", "type PackCatalogReport", "json:\"source_reports", "json:\"manifest_count", "json:\"matched_entries", "json:\"install_hints", "json:\"download_hints", "type CapabilityIndexEntry", "type CapabilityIndexReport", "type CapabilityResolveReport", "type CapabilityGateReport", "type CapabilityPlanReport", "json:\"enabled_capabilities", "json:\"enabled_entries", "json:\"route_audit", "json:\"enable_packs", "json:\"install_capabilities", "json:\"sdk_typescript", "type BackendRouteAuditEntry", "type BackendRouteAuditReport", "json:\"missing_routes", "json:\"method_mismatches", "type BackendModule", "PackID() string", "Routes() []BackendRoute"]) {
   if (!backendContract.includes(token)) fail(`packruntime backend contract missing token: ${token}`);
 }
+if (!backendContract.includes("json:\"catalog_source_reports")) fail("packruntime backend contract missing token: json:\"catalog_source_reports");
 
 const packFiles = [
   ...walk("packs/examples").filter((path) => path.endsWith("/pack.json")),

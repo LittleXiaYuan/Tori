@@ -74,13 +74,13 @@
       "name": "planCapabilities",
       "route": "GET /v1/packs/capabilities/plan",
       "readOnly": true,
-      "description": "Plan a workflow's required capabilities in one read-only preflight, grouping usable packs, packs to enable, missing capabilities to install, and backend route audit blockers."
+      "description": "Plan a workflow's required capabilities in one read-only preflight, grouping usable packs, packs to enable, missing capabilities to install, backend route audit blockers, and catalog_source_reports source diagnostics for the catalog scan."
     },
     {
       "name": "prepareCapabilities",
       "route": "GET /v1/packs/capabilities/prepare",
       "readOnly": true,
-      "description": "Convert workflow capability preflight into a user-selectable incremental package checklist with use, enable, install, download, checksum, and route-audit repair steps."
+      "description": "Convert workflow capability preflight into a user-selectable incremental package checklist with use, enable, install, download, checksum, route-audit repair steps, and catalog_source_reports copied from the plan."
     },
     {
       "name": "backendModules",

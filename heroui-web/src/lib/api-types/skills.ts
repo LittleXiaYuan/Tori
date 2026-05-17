@@ -243,12 +243,13 @@ export interface PackCapabilityPlanReport {
   gates: PackCapabilityGateReport[];
   required_packs?: PackCapabilityIndexEntry[];
   enable_packs?: PackCapabilityIndexEntry[];
-  install_capabilities?: string[];
-  catalog_install_hints?: PackCatalogEntry[];
-  catalog_download_hints?: PackCatalogEntry[];
-  route_audit_issues?: PackBackendRouteAuditEntry[];
-  unavailable_reasons?: string[];
-  downloadable_pack_hints?: PackCapabilityIndexEntry[];
+    install_capabilities?: string[];
+    catalog_install_hints?: PackCatalogEntry[];
+    catalog_download_hints?: PackCatalogEntry[];
+    catalog_source_reports?: PackCatalogSourceReport[];
+    route_audit_issues?: PackBackendRouteAuditEntry[];
+    unavailable_reasons?: string[];
+    downloadable_pack_hints?: PackCapabilityIndexEntry[];
 }
 
 export interface PackCapabilityPrepareStep {
@@ -278,10 +279,11 @@ export interface PackCapabilityPrepareReport {
   plan: PackCapabilityPlanReport;
   use_steps?: PackCapabilityPrepareStep[];
   enable_steps?: PackCapabilityPrepareStep[];
-  install_steps?: PackCapabilityPrepareStep[];
-  download_steps?: PackCapabilityPrepareStep[];
-  route_audit_fix_steps?: PackCapabilityPrepareStep[];
-  steps: PackCapabilityPrepareStep[];
+    install_steps?: PackCapabilityPrepareStep[];
+    download_steps?: PackCapabilityPrepareStep[];
+    route_audit_fix_steps?: PackCapabilityPrepareStep[];
+    catalog_source_reports?: PackCatalogSourceReport[];
+    steps: PackCapabilityPrepareStep[];
   step_count: number;
   download_count: number;
   enable_count: number;

@@ -109,25 +109,26 @@ type CapabilityGateReport struct {
 // callers can prepare the minimal set of enabled or installable packs before
 // executing a task.
 type CapabilityPlanReport struct {
-	GeneratedAt           time.Time                `json:"generated_at"`
-	Capabilities          []string                 `json:"capabilities"`
-	Allowed               bool                     `json:"allowed"`
-	Action                string                   `json:"action"`
-	AllowedCount          int                      `json:"allowed_count"`
-	BlockedCount          int                      `json:"blocked_count"`
-	UseCount              int                      `json:"use_count"`
-	EnableCount           int                      `json:"enable_count"`
-	InstallCount          int                      `json:"install_count"`
-	RouteAuditIssueCount  int                      `json:"route_audit_issue_count"`
-	Gates                 []CapabilityGateReport   `json:"gates"`
-	RequiredPacks         []CapabilityIndexEntry   `json:"required_packs,omitempty"`
-	EnablePacks           []CapabilityIndexEntry   `json:"enable_packs,omitempty"`
-	InstallCapabilities   []string                 `json:"install_capabilities,omitempty"`
-	CatalogInstallHints   []PackCatalogEntry       `json:"catalog_install_hints,omitempty"`
-	CatalogDownloadHints  []PackCatalogEntry       `json:"catalog_download_hints,omitempty"`
-	RouteAuditIssues      []BackendRouteAuditEntry `json:"route_audit_issues,omitempty"`
-	UnavailableReasons    []string                 `json:"unavailable_reasons,omitempty"`
-	DownloadablePackHints []CapabilityIndexEntry   `json:"downloadable_pack_hints,omitempty"`
+	GeneratedAt           time.Time                 `json:"generated_at"`
+	Capabilities          []string                  `json:"capabilities"`
+	Allowed               bool                      `json:"allowed"`
+	Action                string                    `json:"action"`
+	AllowedCount          int                       `json:"allowed_count"`
+	BlockedCount          int                       `json:"blocked_count"`
+	UseCount              int                       `json:"use_count"`
+	EnableCount           int                       `json:"enable_count"`
+	InstallCount          int                       `json:"install_count"`
+	RouteAuditIssueCount  int                       `json:"route_audit_issue_count"`
+	Gates                 []CapabilityGateReport    `json:"gates"`
+	RequiredPacks         []CapabilityIndexEntry    `json:"required_packs,omitempty"`
+	EnablePacks           []CapabilityIndexEntry    `json:"enable_packs,omitempty"`
+	InstallCapabilities   []string                  `json:"install_capabilities,omitempty"`
+	CatalogInstallHints   []PackCatalogEntry        `json:"catalog_install_hints,omitempty"`
+	CatalogDownloadHints  []PackCatalogEntry        `json:"catalog_download_hints,omitempty"`
+	CatalogSourceReports  []PackCatalogSourceReport `json:"catalog_source_reports,omitempty"`
+	RouteAuditIssues      []BackendRouteAuditEntry  `json:"route_audit_issues,omitempty"`
+	UnavailableReasons    []string                  `json:"unavailable_reasons,omitempty"`
+	DownloadablePackHints []CapabilityIndexEntry    `json:"downloadable_pack_hints,omitempty"`
 }
 
 // CapabilityPrepareStep is one operator-facing action inside a read-only
@@ -157,25 +158,26 @@ type CapabilityPrepareStep struct {
 // enterprise consoles and SDK callers: use, enable, install/download, or fix
 // route drift.
 type CapabilityPrepareReport struct {
-	GeneratedAt          time.Time                `json:"generated_at"`
-	Capabilities         []string                 `json:"capabilities"`
-	Allowed              bool                     `json:"allowed"`
-	Action               string                   `json:"action"`
-	Plan                 CapabilityPlanReport     `json:"plan"`
-	UseSteps             []CapabilityPrepareStep  `json:"use_steps,omitempty"`
-	EnableSteps          []CapabilityPrepareStep  `json:"enable_steps,omitempty"`
-	InstallSteps         []CapabilityPrepareStep  `json:"install_steps,omitempty"`
-	DownloadSteps        []CapabilityPrepareStep  `json:"download_steps,omitempty"`
-	RouteAuditFixSteps   []CapabilityPrepareStep  `json:"route_audit_fix_steps,omitempty"`
-	Steps                []CapabilityPrepareStep  `json:"steps"`
-	StepCount            int                      `json:"step_count"`
-	DownloadCount        int                      `json:"download_count"`
-	EnableCount          int                      `json:"enable_count"`
-	InstallCount         int                      `json:"install_count"`
-	RouteAuditIssueCount int                      `json:"route_audit_issue_count"`
-	ReadyCount           int                      `json:"ready_count"`
-	UnavailableReasons   []string                 `json:"unavailable_reasons,omitempty"`
-	RouteAuditIssues     []BackendRouteAuditEntry `json:"route_audit_issues,omitempty"`
+	GeneratedAt          time.Time                 `json:"generated_at"`
+	Capabilities         []string                  `json:"capabilities"`
+	Allowed              bool                      `json:"allowed"`
+	Action               string                    `json:"action"`
+	Plan                 CapabilityPlanReport      `json:"plan"`
+	UseSteps             []CapabilityPrepareStep   `json:"use_steps,omitempty"`
+	EnableSteps          []CapabilityPrepareStep   `json:"enable_steps,omitempty"`
+	InstallSteps         []CapabilityPrepareStep   `json:"install_steps,omitempty"`
+	DownloadSteps        []CapabilityPrepareStep   `json:"download_steps,omitempty"`
+	RouteAuditFixSteps   []CapabilityPrepareStep   `json:"route_audit_fix_steps,omitempty"`
+	CatalogSourceReports []PackCatalogSourceReport `json:"catalog_source_reports,omitempty"`
+	Steps                []CapabilityPrepareStep   `json:"steps"`
+	StepCount            int                       `json:"step_count"`
+	DownloadCount        int                       `json:"download_count"`
+	EnableCount          int                       `json:"enable_count"`
+	InstallCount         int                       `json:"install_count"`
+	RouteAuditIssueCount int                       `json:"route_audit_issue_count"`
+	ReadyCount           int                       `json:"ready_count"`
+	UnavailableReasons   []string                  `json:"unavailable_reasons,omitempty"`
+	RouteAuditIssues     []BackendRouteAuditEntry  `json:"route_audit_issues,omitempty"`
 }
 
 // PackCatalogEntry describes one installable pack manifest discovered from a

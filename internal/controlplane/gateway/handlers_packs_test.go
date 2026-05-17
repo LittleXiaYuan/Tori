@@ -259,7 +259,8 @@ func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
 		}},
 	}
 	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{module}})
-	gw.SetPackCatalogSources([]string{sourceDir})
+	missingSource := filepath.Join(t.TempDir(), "missing-catalog")
+	gw.SetPackCatalogSources([]string{sourceDir, missingSource})
 	tenant := tenants.Register("pack-prepare")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/prepare?capability=prepare.ready&capability=prepare.enable&capability=prepare.install", nil)
@@ -290,6 +291,15 @@ func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
 	}
 	if len(prepare.DownloadSteps) != 1 || prepare.DownloadSteps[0].SHA256 != strings.Repeat("c", 64) {
 		t.Fatalf("expected downloadable package with sha256: %#v", prepare.DownloadSteps)
+	}
+	if len(prepare.CatalogSourceReports) != 2 || prepare.CatalogSourceReports[0].ManifestCount != 1 || prepare.CatalogSourceReports[0].MatchedEntries != 1 {
+		t.Fatalf("expected prepare report to expose successful catalog source diagnostics: %#v", prepare.CatalogSourceReports)
+	}
+	if prepare.CatalogSourceReports[1].OK || len(prepare.CatalogSourceReports[1].Errors) != 1 {
+		t.Fatalf("expected prepare report to expose missing catalog source diagnostics: %#v", prepare.CatalogSourceReports)
+	}
+	if len(prepare.Plan.CatalogSourceReports) != len(prepare.CatalogSourceReports) {
+		t.Fatalf("expected nested plan to carry the same catalog source diagnostics: plan=%#v prepare=%#v", prepare.Plan.CatalogSourceReports, prepare.CatalogSourceReports)
 	}
 }
 
@@ -922,7 +932,8 @@ func TestPackCapabilityPlanAggregatesWorkflowPreflight(t *testing.T) {
 		}},
 	}
 	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry, BackendPacks: []packruntime.BackendModule{readyModule, auditModule}})
-	gw.SetPackCatalogSources([]string{sourceDir})
+	missingSource := filepath.Join(t.TempDir(), "missing-plan-catalog")
+	gw.SetPackCatalogSources([]string{sourceDir, missingSource})
 	tenant := tenants.Register("pack-capability-plan")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/plan?capability=plan.ready&capability=plan.disabled&capability=plan.audit&capability=plan.missing", nil)
@@ -956,6 +967,12 @@ func TestPackCapabilityPlanAggregatesWorkflowPreflight(t *testing.T) {
 	}
 	if len(plan.CatalogDownloadHints) != 1 || !plan.CatalogDownloadHints[0].Downloadable {
 		t.Fatalf("expected missing capability to include downloadable catalog hint: %#v", plan.CatalogDownloadHints)
+	}
+	if len(plan.CatalogSourceReports) != 2 || plan.CatalogSourceReports[0].Source != sourceDir || !plan.CatalogSourceReports[0].OK || plan.CatalogSourceReports[0].ManifestCount != 1 || plan.CatalogSourceReports[0].MatchedEntries != 1 {
+		t.Fatalf("expected capability plan to expose successful catalog source diagnostics: %#v", plan.CatalogSourceReports)
+	}
+	if plan.CatalogSourceReports[1].Source != missingSource || plan.CatalogSourceReports[1].OK || len(plan.CatalogSourceReports[1].Errors) != 1 {
+		t.Fatalf("expected capability plan to expose missing catalog source diagnostics: %#v", plan.CatalogSourceReports)
 	}
 	if len(plan.RouteAuditIssues) != 1 || plan.RouteAuditIssues[0].Status != "method-mismatch" {
 		t.Fatalf("expected route audit issue to be surfaced: %#v", plan.RouteAuditIssues)

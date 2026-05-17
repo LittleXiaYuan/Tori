@@ -279,6 +279,8 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "json:\"source_reports",
   "json:\"manifest_count",
   "json:\"matched_entries",
+  "json:\"catalog_source_reports",
+  "CatalogSourceReports",
   "backendPackRoutes",
   "backendPackRouteInfos",
   "backendPackAuth",
@@ -306,6 +308,8 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "CapabilityPrepareStep",
   "handlePackCapabilityPrepare",
   "packCapabilityPrepareReport",
+  "addCapabilityPlanCatalogSourceReports",
+  "catalog_source_reports",
   "/v1/packs/capabilities/prepare",
   "json:\"download_steps",
   "json:\"package_url",
@@ -334,10 +338,12 @@ requireTokens("Pack catalog source 配置化", config + gateway + backend + fron
   "packs/examples,packs/templates",
   "PackCatalogSourceReport",
   "source_reports",
+  "catalog_source_reports",
   "manifest_count",
   "matched_entries",
   "当前目录源",
   "源扫描结果",
+  "能力预检 Catalog 源诊断",
 ]);
 
 requireTokens("backup-pack 示例包", backup + backupManifest, [
@@ -1354,6 +1360,7 @@ requireTokens("TypeScript packs SDK", sdk, [
   "PackCatalogEntry",
   "PackCatalogSourceReport",
   "source_reports",
+  "catalog_source_reports",
   "capabilities()",
   "resolveCapability(",
   "gateCapability(",

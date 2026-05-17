@@ -123,13 +123,21 @@ describe("packs-client", () => {
           update_action: "install",
           downloadable: true,
         }],
+        catalog_source_reports: [
+          { source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 },
+          { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
+        ],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         generated_at: "2026-05-17T00:00:03Z",
         capabilities: ["backup.info", "browser.intent"],
         allowed: false,
         action: "install",
-        plan: { generated_at: "2026-05-17T00:00:02Z", capabilities: ["backup.info", "browser.intent"], allowed: false, action: "install", allowed_count: 1, blocked_count: 1, use_count: 1, enable_count: 0, install_count: 1, route_audit_issue_count: 0, gates: [] },
+        catalog_source_reports: [
+          { source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 },
+          { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
+        ],
+        plan: { generated_at: "2026-05-17T00:00:02Z", capabilities: ["backup.info", "browser.intent"], allowed: false, action: "install", allowed_count: 1, blocked_count: 1, use_count: 1, enable_count: 0, install_count: 1, route_audit_issue_count: 0, gates: [], catalog_source_reports: [{ source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 }, { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] }] },
         steps: [{
           action: "download",
           pack_id: "yunque.pack.rpa-replay",
@@ -213,7 +221,11 @@ describe("packs-client", () => {
     expect(plan.enable_packs?.[0]?.pack_id).toBe("yunque.pack.browser-intent");
     expect(plan.catalog_install_hints?.[0]?.manifest.id).toBe("yunque.pack.rpa-replay");
     expect(plan.catalog_download_hints?.[0]?.downloadable).toBe(true);
+    expect(plan.catalog_source_reports?.[0]?.matched_entries).toBe(1);
+    expect(plan.catalog_source_reports?.[1]?.ok).toBe(false);
     expect(prepare.action).toBe("install");
+    expect(prepare.catalog_source_reports?.[1]?.errors?.[0]).toContain("packs/private");
+    expect(prepare.plan.catalog_source_reports?.[0]?.source).toBe("packs/examples");
     expect(prepare.download_steps?.[0]?.sha256).toBe("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     expect(audit.ok_routes).toBe(0);
   });
