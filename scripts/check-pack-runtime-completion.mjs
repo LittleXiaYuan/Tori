@@ -42,6 +42,7 @@ function runCheck(item, command, args, expected = 0) {
 const manifest = read("pkg/packruntime/manifest.go");
 const registry = read("pkg/packruntime/registry.go");
 const backend = read("pkg/packruntime/backend.go");
+const config = read("internal/config/config.go") + "\n" + read("internal/config/config_test.go");
 const gateway = [
   "internal/controlplane/gateway/handlers_packs.go",
   "internal/controlplane/gateway/gateway.go",
@@ -273,6 +274,7 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "packCatalogReport",
   "/v1/packs/catalog",
   "SetPackCatalogSources",
+  "cfg.PackCatalogSourceDirs()",
   "backendPackRoutes",
   "backendPackRouteInfos",
   "backendPackAuth",
@@ -314,6 +316,18 @@ requireTokens("后端 backend pack module registry / route gates", backend + gat
   "route conflict",
   "handlePackBackendModules",
   "backuppack.DefaultHandler()",
+]);
+
+requireTokens("Pack catalog source 配置化", config + gateway + docs, [
+  "PackCatalogSources",
+  "PACK_CATALOG_SOURCES",
+  "PackCatalogSourceDirs",
+  "DefaultPackCatalogSources",
+  "ParsePaths(c.PackCatalogSources)",
+  "cfg.PackCatalogSourceDirs()",
+  "TestPackCatalogSourceDirsDefaults",
+  "TestPackCatalogSourceDirsFromEnv",
+  "packs/examples,packs/templates",
 ]);
 
 requireTokens("backup-pack 示例包", backup + backupManifest, [
