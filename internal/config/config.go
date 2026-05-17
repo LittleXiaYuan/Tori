@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -51,6 +52,7 @@ type Config struct {
 	ReflectModel           string // LLM pool key for reflect evaluator (empty = primary)
 	Profile                string // "lite", "standard", "full" (default: "standard")
 	DisabledModules        string // comma-separated module names to disable
+	PackCatalogSources     string // comma-separated local manifest directories/files for /v1/packs/catalog
 
 	// BuildFlavor selects industry-specific capabilities.
 	// "standard" (default) — general-purpose agent
@@ -123,6 +125,7 @@ func Load() Config {
 		ReflectModel:           getenv("REFLECT_MODEL", ""),
 		Profile:                getenv("AGENT_PROFILE", "standard"),
 		DisabledModules:        getenv("DISABLED_MODULES", ""),
+		PackCatalogSources:     getenv("PACK_CATALOG_SOURCES", ""),
 		BuildFlavor:            getenv("BUILD_FLAVOR", "standard"),
 	}
 }
@@ -210,6 +213,29 @@ func (c Config) IsModuleDisabled(name string) bool {
 		}
 	}
 	return false
+}
+
+var defaultPackCatalogSources = []string{
+	filepath.Join("packs", "examples"),
+	filepath.Join("packs", "templates"),
+}
+
+// DefaultPackCatalogSources returns the built-in local pack catalog sources.
+// The returned slice is a copy so callers can mutate it safely.
+func DefaultPackCatalogSources() []string {
+	return append([]string(nil), defaultPackCatalogSources...)
+}
+
+// PackCatalogSourceDirs returns the local pack manifest sources used by the
+// read-only Pack Runtime catalog. PACK_CATALOG_SOURCES accepts a comma-separated
+// list of directories or explicit pack.json files. Empty/whitespace-only values
+// fall back to the built-in examples/templates catalog.
+func (c Config) PackCatalogSourceDirs() []string {
+	sources := ParsePaths(c.PackCatalogSources)
+	if len(sources) == 0 {
+		return DefaultPackCatalogSources()
+	}
+	return sources
 }
 
 func getenv(key, fallback string) string {

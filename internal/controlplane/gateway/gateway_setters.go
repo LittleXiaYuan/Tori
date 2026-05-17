@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +74,13 @@ func (g *Gateway) SetPackRegistry(r *packruntime.Registry) { g.packRegistry = r 
 // read-only Pack Runtime catalog. Sources can point at directories containing
 // pack.json files directly or nested pack folders.
 func (g *Gateway) SetPackCatalogSources(sources []string) {
-	g.packCatalogSources = append([]string(nil), sources...)
+	g.packCatalogSources = g.packCatalogSources[:0]
+	for _, source := range sources {
+		source = strings.TrimSpace(source)
+		if source != "" {
+			g.packCatalogSources = append(g.packCatalogSources, source)
+		}
+	}
 }
 
 // RegisterBackendPack mounts a backend capability pack module through the

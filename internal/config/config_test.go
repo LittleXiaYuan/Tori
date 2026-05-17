@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -21,6 +23,24 @@ func TestLoadFromEnv(t *testing.T) {
 	cfg := Load()
 	if cfg.Addr != ":8080" {
 		t.Fatalf("expected :8080, got %s", cfg.Addr)
+	}
+}
+
+func TestPackCatalogSourceDirsDefaults(t *testing.T) {
+	t.Setenv("PACK_CATALOG_SOURCES", "")
+	cfg := Load()
+	want := []string{filepath.Join("packs", "examples"), filepath.Join("packs", "templates")}
+	if got := cfg.PackCatalogSourceDirs(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected default pack catalog sources %v, got %v", want, got)
+	}
+}
+
+func TestPackCatalogSourceDirsFromEnv(t *testing.T) {
+	t.Setenv("PACK_CATALOG_SOURCES", " packs/internal , C:\\packs\\private\\pack.json, ,packs/vendor ")
+	cfg := Load()
+	want := []string{"packs/internal", "C:\\packs\\private\\pack.json", "packs/vendor"}
+	if got := cfg.PackCatalogSourceDirs(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected env pack catalog sources %v, got %v", want, got)
 	}
 }
 
