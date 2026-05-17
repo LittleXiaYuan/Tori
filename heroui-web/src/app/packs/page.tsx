@@ -115,6 +115,8 @@ export default function PacksPage() {
 
   const packs = data?.packs || [];
   const catalog = catalogData;
+  const catalogSourceReports = catalog.source_reports || [];
+  const catalogSourceIssueCount = catalogSourceReports.filter((report) => !report.ok || (report.errors?.length || 0) > 0).length + (catalog.errors?.length || 0);
   const capabilityIndex = capabilityData;
   const backendModules = backendModulesData?.modules || [];
   const routeAudit = routeAuditData;
@@ -306,9 +308,72 @@ export default function PacksPage() {
               从 Pack catalog 读取可安装 manifest，和已安装 registry 对齐；用户可以按 capability 选择需要下载或启用的增量包。
             </div>
           </div>
-          <Chip size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
-            {catalogLoading ? "扫描中" : `${catalog.downloadable}/${catalog.count} downloadable`}
+          <Chip
+            size="sm"
+            style={{
+              background: catalogSourceIssueCount ? "rgba(245,158,11,0.12)" : "rgba(0,111,238,0.10)",
+              color: catalogSourceIssueCount ? "var(--yunque-warning)" : "var(--yunque-accent)",
+            }}
+          >
+            {catalogLoading ? "扫描中" : catalogSourceIssueCount ? `${catalogSourceIssueCount} source issues` : `${catalog.downloadable}/${catalog.count} downloadable`}
           </Chip>
+        </div>
+        <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>当前目录源</div>
+              <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                源扫描结果来自 `/v1/packs/catalog` 的 source_reports，便于定位私有 pack 源、嵌套目录或单个 pack.json 的读取问题。
+              </div>
+            </div>
+            <Chip size="sm" style={{ background: "rgba(255,255,255,0.05)", color: "var(--yunque-text-muted)" }}>
+              {catalog.sources.length} sources
+            </Chip>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {catalog.sources.length ? catalog.sources.map((source) => (
+              <Chip key={source} size="sm" style={{ background: "rgba(0,111,238,0.10)", color: "var(--yunque-accent)" }}>
+                {source}
+              </Chip>
+            )) : <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>未配置 catalog source，运行时会回退默认源。</span>}
+          </div>
+          {catalogSourceReports.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              {catalogSourceReports.map((report) => (
+                <div key={report.source} className="rounded-lg p-3 space-y-2" style={{ background: report.ok ? "rgba(34,197,94,0.05)" : "rgba(245,158,11,0.08)", border: `1px solid ${report.ok ? "rgba(34,197,94,0.18)" : "rgba(245,158,11,0.25)"}` }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-[11px] truncate" style={{ color: "var(--yunque-text)" }}>{report.source}</code>
+                    <Chip size="sm" style={{ background: report.ok ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: report.ok ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
+                      {report.ok ? "ok" : "error"}
+                    </Chip>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Chip size="sm">manifest_count {report.manifest_count}</Chip>
+                    <Chip size="sm">matched_entries {report.matched_entries}</Chip>
+                  </div>
+                  {(report.errors || []).length > 0 && (
+                    <div className="space-y-1">
+                      {report.errors?.map((error) => (
+                        <div key={error} className="text-[11px] font-mono break-all" style={{ color: "var(--yunque-warning)" }}>
+                          {error}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {(catalog.errors || []).length > 0 && (
+            <div className="rounded-lg p-3 space-y-1" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <div className="text-xs font-semibold" style={{ color: "var(--yunque-warning)" }}>Catalog 顶层错误</div>
+              {catalog.errors?.map((error) => (
+                <div key={error} className="text-[11px] font-mono break-all" style={{ color: "var(--yunque-text-muted)" }}>
+                  {error}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {catalog.entries.length === 0 ? (
           <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>

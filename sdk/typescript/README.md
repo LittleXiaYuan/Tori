@@ -2353,14 +2353,17 @@ The lightweight Tori SDK exposes Tori account bind/status/unbind, bound-instance
 
 ### Pack Runtime SDK
 
-The lightweight Packs SDK reads `/v1/packs/installed`, `/v1/packs/enabled`, and `/v1/packs/backend-modules` so the frontend shell can synchronize menus, frontend route bindings, backend route method/path bindings, UI assets, and SDK entrypoints from the backend pack registry instead of hard-coding every capability in the main app.
+The lightweight Packs SDK reads `/v1/packs/installed`, `/v1/packs/enabled`, `/v1/packs/catalog`, and `/v1/packs/backend-modules` so the frontend shell can synchronize menus, frontend route bindings, backend route method/path bindings, UI assets, SDK entrypoints, and catalog `source_reports` from the backend pack registry instead of hard-coding every capability in the main app.
 
 ```ts
 import { createPacksClient } from "yunque-client/packs";
 
 const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<api-key>" });
 await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
-const modules = await packs.backendModules();\nconst sync = await packs.frontendSync();
+const catalog = await packs.catalog();
+const modules = await packs.backendModules();
+const sync = await packs.frontendSync();
+console.log(catalog.source_reports?.map((source) => [source.source, source.ok, source.manifest_count, source.matched_entries]));
 console.log(sync.menus, sync.routes, sync.routeBindings, sync.backendRouteBindings, sync.sdk);
 // TypeScript pack SDK import example:
 // import * as packSdk from sync.sdk.find((entry) => entry.language === "typescript")!.importPath;

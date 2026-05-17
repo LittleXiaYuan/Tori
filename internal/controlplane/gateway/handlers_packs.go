@@ -233,11 +233,12 @@ func (g *Gateway) packCatalogReport(capability string, query string) packruntime
 	query = strings.ToLower(strings.TrimSpace(query))
 	sources := g.packCatalogSourceDirs()
 	report := packruntime.PackCatalogReport{
-		GeneratedAt: time.Now().UTC(),
-		Sources:     append([]string(nil), sources...),
-		Capability:  capability,
-		Query:       query,
-		Entries:     []packruntime.PackCatalogEntry{},
+		GeneratedAt:   time.Now().UTC(),
+		Sources:       append([]string(nil), sources...),
+		Capability:    capability,
+		Query:         query,
+		Entries:       []packruntime.PackCatalogEntry{},
+		SourceReports: []packruntime.PackCatalogSourceReport{},
 	}
 	installed := map[string]packruntime.InstalledPack{}
 	if g.packRegistry != nil {
@@ -247,15 +248,24 @@ func (g *Gateway) packCatalogReport(capability string, query string) packruntime
 	}
 	seen := map[string]bool{}
 	for _, source := range sources {
+		sourceReport := packruntime.PackCatalogSourceReport{Source: source, OK: true}
 		manifestPaths, err := packCatalogManifestPaths(source)
 		if err != nil {
-			report.Errors = append(report.Errors, err.Error())
+			message := err.Error()
+			sourceReport.OK = false
+			sourceReport.Errors = append(sourceReport.Errors, message)
+			report.Errors = append(report.Errors, message)
+			report.SourceReports = append(report.SourceReports, sourceReport)
 			continue
 		}
+		sourceReport.ManifestCount = len(manifestPaths)
 		for _, manifestPath := range manifestPaths {
 			manifest, err := packruntime.LoadManifest(manifestPath)
 			if err != nil {
-				report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", manifestPath, err))
+				message := fmt.Sprintf("%s: %v", manifestPath, err)
+				sourceReport.OK = false
+				sourceReport.Errors = append(sourceReport.Errors, message)
+				report.Errors = append(report.Errors, message)
 				continue
 			}
 			if seen[manifest.ID] {
@@ -270,7 +280,9 @@ func (g *Gateway) packCatalogReport(capability string, query string) packruntime
 				continue
 			}
 			report.Entries = append(report.Entries, entry)
+			sourceReport.MatchedEntries++
 		}
+		report.SourceReports = append(report.SourceReports, sourceReport)
 	}
 	slices.SortFunc(report.Entries, func(a, b packruntime.PackCatalogEntry) int {
 		return strings.Compare(a.Manifest.ID, b.Manifest.ID)

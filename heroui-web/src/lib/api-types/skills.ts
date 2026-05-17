@@ -303,9 +303,18 @@ export interface PackCatalogEntry {
   downloadable: boolean;
 }
 
+export interface PackCatalogSourceReport {
+  source: string;
+  ok: boolean;
+  manifest_count: number;
+  matched_entries: number;
+  errors?: string[];
+}
+
 export interface PackCatalogReport {
   generated_at: string;
   sources: string[];
+  source_reports?: PackCatalogSourceReport[];
   count: number;
   installed: number;
   enabled: number;
