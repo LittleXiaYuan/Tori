@@ -1,5 +1,5 @@
 import { fetcher } from "./api-core";
-import type { PackBackendModulesResponse, PackBackendRouteAuditReport, PackListResponse, PackMutationResponse } from "./pack-types";
+import type { PackBackendModulesResponse, PackBackendRouteAuditReport, PackCapabilityIndexReport, PackListResponse, PackMutationResponse } from "./pack-types";
 
 export interface PacksPruneResponse {
   removed: string[];
@@ -12,6 +12,7 @@ export interface PacksPruneResponse {
 export interface PacksClient {
   installed(): Promise<PackListResponse>;
   enabled(): Promise<PackListResponse>;
+  capabilities(): Promise<PackCapabilityIndexReport>;
   backendModules(): Promise<PackBackendModulesResponse>;
   backendRouteAudit(): Promise<PackBackendRouteAuditReport>;
   installLocal(manifestPath: string, source?: string, download?: boolean): Promise<PackMutationResponse>;
@@ -26,6 +27,7 @@ export function createPacksClient(): PacksClient {
   return {
     installed: () => fetcher<PackListResponse>("/v1/packs/installed"),
     enabled: () => fetcher<PackListResponse>("/v1/packs/enabled"),
+    capabilities: () => fetcher<PackCapabilityIndexReport>("/v1/packs/capabilities"),
     backendModules: () => fetcher<PackBackendModulesResponse>("/v1/packs/backend-modules"),
     backendRouteAudit: () => fetcher<PackBackendRouteAuditReport>("/v1/packs/backend-route-audit"),
     installLocal: (manifestPath, source, download) =>

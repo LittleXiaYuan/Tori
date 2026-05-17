@@ -10,6 +10,25 @@ describe("packs-client", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generated_at: "2026-05-16T00:00:00Z",
+        packs: 1,
+        enabled_packs: 1,
+        capabilities: 1,
+        enabled_capabilities: 1,
+        entries: [{
+          capability: "backup.info",
+          pack_id: "yunque.pack.backup",
+          pack_name: "Backup Pack",
+          pack_status: "enabled",
+          enabled: true,
+          optional: true,
+          routes: ["/v1/backup/info"],
+          permissions: ["backup:read"],
+          sdk_typescript: "yunque-client/backup",
+          frontend_paths: ["/packs/backup"],
+        }],
+      }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ modules: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         generated_at: "2026-05-16T00:00:00Z",
@@ -28,15 +47,19 @@ describe("packs-client", () => {
     const client = createPacksClient();
     await client.installed();
     await client.enabled();
+    const capabilities = await client.capabilities();
     await client.backendModules();
     const audit = await client.backendRouteAudit();
 
     expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/packs/installed",
       "/v1/packs/enabled",
+      "/v1/packs/capabilities",
       "/v1/packs/backend-modules",
       "/v1/packs/backend-route-audit",
     ]);
+    expect(capabilities.enabled_capabilities).toBe(1);
+    expect(capabilities.entries[0]?.capability).toBe("backup.info");
     expect(audit.ok_routes).toBe(0);
   });
 

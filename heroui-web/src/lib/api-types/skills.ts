@@ -185,6 +185,28 @@ export interface PackBackendModulesResponse {
   count: number;
 }
 
+export interface PackCapabilityIndexEntry {
+  capability: string;
+  pack_id: string;
+  pack_name: string;
+  pack_status: string;
+  enabled: boolean;
+  optional: boolean;
+  routes?: string[];
+  permissions?: string[];
+  sdk_typescript?: string;
+  frontend_paths?: string[];
+}
+
+export interface PackCapabilityIndexReport {
+  generated_at: string;
+  packs: number;
+  enabled_packs: number;
+  capabilities: number;
+  enabled_capabilities: number;
+  entries: PackCapabilityIndexEntry[];
+}
+
 export interface PackBackendRouteAuditEntry {
   pack_id: string;
   pack_name?: string;

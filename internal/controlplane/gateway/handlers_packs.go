@@ -30,6 +30,7 @@ func (g *Gateway) registerPackRoutes() {
 	g.mux.HandleFunc("/v1/packs", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/installed", g.requireAuth(g.handlePacksList))
 	g.mux.HandleFunc("/v1/packs/enabled", g.requireAuth(g.handlePacksEnabled))
+	g.mux.HandleFunc("/v1/packs/capabilities", g.requireAuth(g.handlePackCapabilities))
 	g.mux.HandleFunc("/v1/packs/backend-modules", g.requireAuth(g.handlePackBackendModules))
 	g.mux.HandleFunc("/v1/packs/backend-route-audit", g.requireAuth(g.handlePackBackendRouteAudit))
 	g.mux.HandleFunc("/v1/packs/install", g.requireAuth(g.handlePackInstall))
@@ -220,6 +221,83 @@ func (g *Gateway) handlePackBackendModules(w http.ResponseWriter, r *http.Reques
 	}
 	modules := g.backendModuleInfos()
 	writeJSON(w, map[string]any{"modules": modules, "count": len(modules)})
+}
+
+func (g *Gateway) handlePackCapabilities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONStatus(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	writeJSON(w, g.packCapabilityIndexReport())
+}
+
+func (g *Gateway) packCapabilityIndexReport() packruntime.CapabilityIndexReport {
+	report := packruntime.CapabilityIndexReport{
+		GeneratedAt: time.Now().UTC(),
+		Entries:     []packruntime.CapabilityIndexEntry{},
+	}
+	if g.packRegistry == nil {
+		return report
+	}
+	packs := g.packRegistry.List()
+	report.Packs = len(packs)
+	for _, pack := range packs {
+		enabled := pack.Status == packruntime.PackStatusEnabled
+		if enabled {
+			report.EnabledPacks++
+		}
+		for _, capability := range pack.Manifest.Backend.Capabilities {
+			capability = strings.TrimSpace(capability)
+			if capability == "" {
+				continue
+			}
+			entry := packruntime.CapabilityIndexEntry{
+				Capability:    capability,
+				PackID:        pack.Manifest.ID,
+				PackName:      pack.Manifest.Name,
+				PackStatus:    string(pack.Status),
+				Enabled:       enabled,
+				Optional:      pack.Manifest.Optional,
+				Routes:        append([]string(nil), pack.Manifest.Backend.Routes...),
+				Permissions:   append([]string(nil), pack.Manifest.Backend.Permissions...),
+				SDKTypeScript: pack.Manifest.SDK.TypeScript,
+				FrontendPaths: packCapabilityFrontendPaths(pack.Manifest),
+			}
+			report.Entries = append(report.Entries, entry)
+			report.Capabilities++
+			if enabled {
+				report.EnabledCapabilities++
+			}
+		}
+	}
+	slices.SortFunc(report.Entries, func(a, b packruntime.CapabilityIndexEntry) int {
+		if cmp := strings.Compare(a.Capability, b.Capability); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.PackID, b.PackID)
+	})
+	return report
+}
+
+func packCapabilityFrontendPaths(manifest packruntime.Manifest) []string {
+	seen := map[string]bool{}
+	var paths []string
+	add := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" || seen[path] {
+			return
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	for _, menu := range manifest.Frontend.Menus {
+		add(menu.Path)
+	}
+	for _, route := range manifest.Frontend.Routes {
+		add(route.Path)
+	}
+	slices.Sort(paths)
+	return paths
 }
 
 func (g *Gateway) handlePackBackendRouteAudit(w http.ResponseWriter, r *http.Request) {

@@ -6,12 +6,14 @@
     "Expose Pack Runtime as the stable integration surface for external frontends, plugins, CLIs, sidecars, and automation scripts.",
     "Keep optional capabilities discoverable through the backend pack registry instead of hard-coding every feature into the main system.",
     "Let frontend shells synchronize menus, routes, UI resources, and SDK entrypoints from enabled packs while preserving enable, disable, and rollback controls.",
-    "Expose a read-only backend route audit so release gates can compare manifest routeSpecs with mounted Gateway modules before shipping a pack."
+    "Expose a read-only backend route audit so release gates can compare manifest routeSpecs with mounted Gateway modules before shipping a pack.",
+    "Expose a manifest-derived capability index so runtime skill gates and external shells can resolve capabilities to pack ids, status, routes, permissions, frontend paths, and SDK imports."
   ],
   "routes": [
     "GET /v1/packs",
     "GET /v1/packs/installed",
     "GET /v1/packs/enabled",
+    "GET /v1/packs/capabilities",
     "GET /v1/packs/backend-modules",
     "GET /v1/packs/backend-route-audit",
     "POST /v1/packs/install",
@@ -38,6 +40,12 @@
       "route": "GET /v1/packs/enabled",
       "readOnly": true,
       "description": "Read enabled packs that should contribute frontend menus, routes, UI assets, and SDK entrypoints."
+    },
+    {
+      "name": "capabilities",
+      "route": "GET /v1/packs/capabilities",
+      "readOnly": true,
+      "description": "Read the manifest-derived capability index across installed packs, including pack status, routes, permissions, frontend paths, and TypeScript SDK imports."
     },
     {
       "name": "backendModules",
@@ -108,6 +116,7 @@
         "list": "createPacksClient().list",
         "installed": "createPacksClient().installed",
         "enabled": "createPacksClient().enabled",
+        "capabilities": "createPacksClient().capabilities",
         "backendModules": "createPacksClient().backendModules",
         "backendRouteAudit": "createPacksClient().backendRouteAudit",
         "install": "createPacksClient().install",

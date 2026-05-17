@@ -46,6 +46,35 @@ type BackendModuleInfo struct {
 	Routes []BackendRouteInfo `json:"routes"`
 }
 
+// CapabilityIndexEntry is a read-only projection of one capability declared by
+// an installed pack manifest. It gives frontends, SDKs, runtime skill gates and
+// release checks a stable way to answer "which pack owns this capability?" from
+// registry state instead of hard-coded feature lists.
+type CapabilityIndexEntry struct {
+	Capability    string   `json:"capability"`
+	PackID        string   `json:"pack_id"`
+	PackName      string   `json:"pack_name"`
+	PackStatus    string   `json:"pack_status"`
+	Enabled       bool     `json:"enabled"`
+	Optional      bool     `json:"optional"`
+	Routes        []string `json:"routes,omitempty"`
+	Permissions   []string `json:"permissions,omitempty"`
+	SDKTypeScript string   `json:"sdk_typescript,omitempty"`
+	FrontendPaths []string `json:"frontend_paths,omitempty"`
+}
+
+// CapabilityIndexReport is returned by /v1/packs/capabilities. It is intentionally
+// manifest-derived and side-effect free, so it can be used before wiring a real
+// runtime skill gate or operator policy engine.
+type CapabilityIndexReport struct {
+	GeneratedAt         time.Time              `json:"generated_at"`
+	Packs               int                    `json:"packs"`
+	EnabledPacks        int                    `json:"enabled_packs"`
+	Capabilities        int                    `json:"capabilities"`
+	EnabledCapabilities int                    `json:"enabled_capabilities"`
+	Entries             []CapabilityIndexEntry `json:"entries"`
+}
+
 // BackendRouteAuditEntry compares one manifest-declared backend route or one
 // mounted Gateway backend route against the other side of the Pack Runtime
 // contract. It is intentionally data-only so SDKs and consoles can audit the

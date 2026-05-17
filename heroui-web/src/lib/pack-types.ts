@@ -7,6 +7,8 @@ export type {
   PackBackendRouteAuditReport,
   PackBackendRouteInfo,
   PackBackendRouteSpec,
+  PackCapabilityIndexEntry,
+  PackCapabilityIndexReport,
   PackDistributionManifest,
   PackFrontendAssets,
   PackFrontendManifest,
