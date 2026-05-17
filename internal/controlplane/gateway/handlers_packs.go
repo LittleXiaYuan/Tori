@@ -682,7 +682,7 @@ func (g *Gateway) packCapabilityPrepareReport(capabilities []string) packruntime
 		addCapabilityPrepareStep(&report, seen, packruntime.CapabilityPrepareStep{
 			Action:     "install",
 			Capability: capability,
-			Reason:     "no installed or catalog pack currently provides this capability",
+			Reason:     packCapabilityCatalogSourceReason("no installed or catalog pack currently provides this capability", report.CatalogSourceReports),
 		})
 	}
 	report.StepCount = len(report.Steps)
@@ -785,6 +785,29 @@ func hasPrepareInstallStepForCapability(steps []packruntime.CapabilityPrepareSte
 		}
 	}
 	return false
+}
+
+func packCapabilityCatalogSourceReason(base string, reports []packruntime.PackCatalogSourceReport) string {
+	parts := []string{}
+	for _, report := range reports {
+		source := strings.TrimSpace(report.Source)
+		if source == "" {
+			continue
+		}
+		status := "ok"
+		if !report.OK {
+			status = "error"
+		}
+		part := fmt.Sprintf("%s %s manifests=%d matched=%d", source, status, report.ManifestCount, report.MatchedEntries)
+		if len(report.Errors) > 0 {
+			part += " errors=" + strings.Join(report.Errors, " | ")
+		}
+		parts = append(parts, part)
+	}
+	if len(parts) == 0 {
+		return base
+	}
+	return base + "; catalog sources scanned: " + strings.Join(parts, "; ")
 }
 
 func (g *Gateway) packCapabilityGateReport(capability string) packruntime.CapabilityGateReport {

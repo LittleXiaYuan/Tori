@@ -4,14 +4,17 @@ import { existsSync, readFileSync } from "node:fs";
 const baseUnpackedSize = 1_203_000;
 const baseExportedFiles = 137;
 const baseManifestCapabilities = 12;
+const basePackSdkHelperExports = 0;
 const maxUnpackedGrowthPerExport = 2_500;
 const maxUnpackedGrowthPerManifestCapability = 1_000;
+const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const packManifestPath = "../manifest/packs-sdk.json";
 const packManifest = existsSync(packManifestPath)
   ? JSON.parse(readFileSync(packManifestPath, "utf8"))
   : { capabilities: [] };
+const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
 
 if (pkg.sideEffects !== false) {
   console.error("package.json must declare sideEffects=false so bundlers can tree-shake unused SDK slices");
@@ -92,9 +95,11 @@ if (forbiddenFiles.length > 0) {
 const manifestCapabilityCount = Array.isArray(packManifest.capabilities)
   ? packManifest.capabilities.length
   : 0;
+const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
-  + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability;
+  + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability
+  + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport;
 if (pack.unpackedSize > maxUnpackedSize) {
   console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);
   process.exit(1);
