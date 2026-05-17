@@ -124,7 +124,7 @@ import { createAgentKit } from "yunque-client/agent-kit";
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
 import { createBackupClient } from "yunque-client/backup";
-import { createPacksClient } from "yunque-client/packs";
+import { createPacksClient, hasCatalogSourceIssues, summarizeCatalogSourceReports } from "yunque-client/packs";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createPlannerClient } from "yunque-client/planner";
 import { createPlannerReadClient } from "yunque-client/planner-read";
@@ -2365,6 +2365,7 @@ const modules = await packs.backendModules();
 const sync = await packs.frontendSync();
 console.log(catalog.source_reports?.map((source) => [source.source, source.ok, source.manifest_count, source.matched_entries]));
 // planCapabilities() / prepareCapabilities() also return catalog_source_reports.
+console.log(summarizeCatalogSourceReports(catalog.source_reports), hasCatalogSourceIssues(catalog));
 console.log(sync.menus, sync.routes, sync.routeBindings, sync.backendRouteBindings, sync.sdk);
 // TypeScript pack SDK import example:
 // import * as packSdk from sync.sdk.find((entry) => entry.language === "typescript")!.importPath;

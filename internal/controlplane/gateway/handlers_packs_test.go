@@ -263,7 +263,7 @@ func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
 	gw.SetPackCatalogSources([]string{sourceDir, missingSource})
 	tenant := tenants.Register("pack-prepare")
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/prepare?capability=prepare.ready&capability=prepare.enable&capability=prepare.install", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/packs/capabilities/prepare?capability=prepare.ready&capability=prepare.enable&capability=prepare.install&capability=prepare.unknown", nil)
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w := httptest.NewRecorder()
 	gw.ServeHTTP(w, req)
@@ -277,7 +277,7 @@ func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
 	if prepare.Action != "install" || prepare.Allowed {
 		t.Fatalf("expected install action with blocked workflow: %#v", prepare)
 	}
-	if prepare.ReadyCount != 1 || prepare.EnableCount != 1 || prepare.InstallCount != 1 || prepare.DownloadCount != 1 {
+	if prepare.ReadyCount != 1 || prepare.EnableCount != 1 || prepare.InstallCount != 2 || prepare.DownloadCount != 1 {
 		t.Fatalf("unexpected prepare counters: %#v", prepare)
 	}
 	if len(prepare.UseSteps) != 1 || prepare.UseSteps[0].PackID != "yunque.pack.ready" {
@@ -286,8 +286,11 @@ func TestPackCapabilityPrepareBuildsOperatorChecklist(t *testing.T) {
 	if len(prepare.EnableSteps) != 1 || prepare.EnableSteps[0].PackID != "yunque.pack.disabled" {
 		t.Fatalf("unexpected enable steps: %#v", prepare.EnableSteps)
 	}
-	if len(prepare.InstallSteps) != 1 || prepare.InstallSteps[0].PackID != "yunque.pack.install-me" {
+	if len(prepare.InstallSteps) != 2 || prepare.InstallSteps[0].PackID != "yunque.pack.install-me" {
 		t.Fatalf("unexpected install steps: %#v", prepare.InstallSteps)
+	}
+	if prepare.InstallSteps[1].Capability != "prepare.unknown" || !strings.Contains(prepare.InstallSteps[1].Reason, "catalog sources scanned:") || !strings.Contains(prepare.InstallSteps[1].Reason, "matched=1") || !strings.Contains(prepare.InstallSteps[1].Reason, "missing-catalog") {
+		t.Fatalf("expected unmatched install step to summarize catalog source diagnostics: %#v", prepare.InstallSteps[1])
 	}
 	if len(prepare.DownloadSteps) != 1 || prepare.DownloadSteps[0].SHA256 != strings.Repeat("c", 64) {
 		t.Fatalf("expected downloadable package with sha256: %#v", prepare.DownloadSteps)

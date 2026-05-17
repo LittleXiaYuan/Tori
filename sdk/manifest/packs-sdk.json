@@ -7,7 +7,8 @@
     "Keep optional capabilities discoverable through the backend pack registry instead of hard-coding every feature into the main system.",
     "Let frontend shells synchronize menus, routes, UI resources, and SDK entrypoints from enabled packs while preserving enable, disable, and rollback controls.",
     "Expose a read-only backend route audit so release gates can compare manifest routeSpecs with mounted Gateway modules before shipping a pack.",
-    "Expose a manifest-derived capability index so runtime skill gates and external shells can resolve capabilities to pack ids, status, routes, permissions, frontend paths, and SDK imports."
+    "Expose a manifest-derived capability index so runtime skill gates and external shells can resolve capabilities to pack ids, status, routes, permissions, frontend paths, and SDK imports.",
+    "Provide lightweight catalog source diagnostic helpers so CI sidecars and plugin pages can summarize source_reports/catalog_source_reports without importing the full platform client."
   ],
   "routes": [
     "GET /v1/packs",
@@ -38,7 +39,7 @@
       "name": "catalog",
       "route": "GET /v1/packs/catalog",
       "readOnly": true,
-      "description": "Read installable Pack catalog entries from configured manifest sources, aligned with installed/enabled state, distribution metadata, and per-source source_reports scan observability."
+      "description": "Read installable Pack catalog entries from configured manifest sources, aligned with installed/enabled state, distribution metadata, per-source source_reports scan observability, and summarizeCatalogSourceReports()/hasCatalogSourceIssues() helper support."
     },
     {
       "name": "installed",
@@ -80,7 +81,7 @@
       "name": "prepareCapabilities",
       "route": "GET /v1/packs/capabilities/prepare",
       "readOnly": true,
-      "description": "Convert workflow capability preflight into a user-selectable incremental package checklist with use, enable, install, download, checksum, route-audit repair steps, and catalog_source_reports copied from the plan."
+      "description": "Convert workflow capability preflight into a user-selectable incremental package checklist with use, enable, install, download, checksum, route-audit repair steps, unmatched install-step catalog source reason summaries, and catalog_source_reports copied from the plan."
     },
     {
       "name": "backendModules",
