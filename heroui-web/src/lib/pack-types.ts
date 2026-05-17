@@ -9,6 +9,7 @@ export type {
   PackBackendRouteSpec,
   PackCatalogEntry,
   PackCatalogReport,
+  PackCatalogSourceReport,
   PackCapabilityGateReport,
   PackCapabilityIndexEntry,
   PackCapabilityIndexReport,

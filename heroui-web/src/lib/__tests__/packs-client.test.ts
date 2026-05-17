@@ -12,7 +12,11 @@ describe("packs-client", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         generated_at: "2026-05-17T00:00:00Z",
-        sources: ["packs/examples"],
+        sources: ["packs/examples", "packs/private"],
+        source_reports: [
+          { source: "packs/examples", ok: true, manifest_count: 2, matched_entries: 1 },
+          { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
+        ],
         count: 1,
         installed: 0,
         enabled: 0,
@@ -193,6 +197,10 @@ describe("packs-client", () => {
       "/v1/packs/backend-modules",
       "/v1/packs/backend-route-audit",
     ]);
+    expect(catalog.sources).toEqual(["packs/examples", "packs/private"]);
+    expect(catalog.source_reports?.[0]?.matched_entries).toBe(1);
+    expect(catalog.source_reports?.[1]?.ok).toBe(false);
+    expect(catalog.source_reports?.[1]?.errors?.[0]).toContain("packs/private");
     expect(catalog.entries[0]?.manifest.id).toBe("yunque.pack.browser-intent");
     expect(catalog.entries[0]?.downloadable).toBe(true);
     expect(capabilities.enabled_capabilities).toBe(1);

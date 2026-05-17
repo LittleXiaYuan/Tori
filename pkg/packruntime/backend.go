@@ -192,24 +192,36 @@ type PackCatalogEntry struct {
 	Downloadable bool       `json:"downloadable"`
 }
 
+// PackCatalogSourceReport describes how one configured catalog source was
+// scanned. It keeps the read-only catalog observable for operator consoles and
+// SDK callers without requiring them to parse free-form error strings.
+type PackCatalogSourceReport struct {
+	Source         string   `json:"source"`
+	OK             bool     `json:"ok"`
+	ManifestCount  int      `json:"manifest_count"`
+	MatchedEntries int      `json:"matched_entries"`
+	Errors         []string `json:"errors,omitempty"`
+}
+
 // PackCatalogReport is returned by /v1/packs/catalog. It lets enterprise
 // consoles and SDK callers map missing capabilities to concrete incremental
 // packages without mutating the registry.
 type PackCatalogReport struct {
-	GeneratedAt   time.Time          `json:"generated_at"`
-	Sources       []string           `json:"sources"`
-	Count         int                `json:"count"`
-	Installed     int                `json:"installed"`
-	Enabled       int                `json:"enabled"`
-	Downloadable  int                `json:"downloadable"`
-	Capabilities  int                `json:"capabilities"`
-	Capability    string             `json:"capability,omitempty"`
-	Query         string             `json:"query,omitempty"`
-	Entries       []PackCatalogEntry `json:"entries"`
-	InstallHints  []PackCatalogEntry `json:"install_hints,omitempty"`
-	EnableHints   []PackCatalogEntry `json:"enable_hints,omitempty"`
-	DownloadHints []PackCatalogEntry `json:"download_hints,omitempty"`
-	Errors        []string           `json:"errors,omitempty"`
+	GeneratedAt   time.Time                 `json:"generated_at"`
+	Sources       []string                  `json:"sources"`
+	SourceReports []PackCatalogSourceReport `json:"source_reports,omitempty"`
+	Count         int                       `json:"count"`
+	Installed     int                       `json:"installed"`
+	Enabled       int                       `json:"enabled"`
+	Downloadable  int                       `json:"downloadable"`
+	Capabilities  int                       `json:"capabilities"`
+	Capability    string                    `json:"capability,omitempty"`
+	Query         string                    `json:"query,omitempty"`
+	Entries       []PackCatalogEntry        `json:"entries"`
+	InstallHints  []PackCatalogEntry        `json:"install_hints,omitempty"`
+	EnableHints   []PackCatalogEntry        `json:"enable_hints,omitempty"`
+	DownloadHints []PackCatalogEntry        `json:"download_hints,omitempty"`
+	Errors        []string                  `json:"errors,omitempty"`
 }
 
 // BackendRouteAuditEntry compares one manifest-declared backend route or one

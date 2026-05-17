@@ -130,8 +130,9 @@ func TestPackCatalogListsInstallableManifestsAndCapabilityHints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Install: %v", err)
 	}
+	missingSource := filepath.Join(sourceDir, "missing-source")
 	gw, tenants := newTestGatewayWithConfig(GatewayConfig{Packs: registry})
-	gw.SetPackCatalogSources([]string{sourceDir})
+	gw.SetPackCatalogSources([]string{sourceDir, " ", missingSource})
 	tenant := tenants.Register("pack-catalog")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/packs/catalog?capability=catalog.missing", nil)
@@ -150,6 +151,15 @@ func TestPackCatalogListsInstallableManifestsAndCapabilityHints(t *testing.T) {
 	}
 	if catalog.InstallHints[0].Manifest.ID != "yunque.pack.catalog-missing" || catalog.InstallHints[0].UpdateAction != "install" {
 		t.Fatalf("unexpected install hint: %#v", catalog.InstallHints[0])
+	}
+	if len(catalog.Sources) != 2 || catalog.Sources[0] != sourceDir || catalog.Sources[1] != missingSource {
+		t.Fatalf("expected trimmed catalog sources to be reported: %#v", catalog.Sources)
+	}
+	if len(catalog.SourceReports) != 2 || !catalog.SourceReports[0].OK || catalog.SourceReports[0].ManifestCount != 2 || catalog.SourceReports[0].MatchedEntries != 1 {
+		t.Fatalf("expected successful source report with manifest and matched counts: %#v", catalog.SourceReports)
+	}
+	if catalog.SourceReports[1].OK || len(catalog.SourceReports[1].Errors) != 1 || len(catalog.Errors) != 1 {
+		t.Fatalf("expected missing source to be observable through source reports and errors: %#v errors=%#v", catalog.SourceReports, catalog.Errors)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/v1/packs/catalog?capability=catalog.ready", nil)
