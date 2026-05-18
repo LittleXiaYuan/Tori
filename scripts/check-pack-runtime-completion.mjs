@@ -1111,6 +1111,10 @@ requireTokens("前端同步菜单/路由/资源/控制台", frontend + fullVerif
   "prune()",
   "previousArtifacts",
   "SDK 调用入口",
+  "formatCapabilityPrepareSummary",
+  "pack_capability_prepare_summary",
+  "复制准备清单摘要",
+  "复制预检摘要",
 ]);
 
 
