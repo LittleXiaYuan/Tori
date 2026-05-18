@@ -174,7 +174,7 @@ for (const token of [
 }
 
 for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs/zh/guide/pack-runtime.md", chineseGuide]]) {
-  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs", "scaffold-pack.mjs"]) {
+  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs", "scaffold-pack.mjs", "pack_capability_prepare_summary", "catalog_source_reports", "route_audit_issues"]) {
     if (!text.includes(token)) fail(`${name} missing token: ${token}`);
   }
 }
