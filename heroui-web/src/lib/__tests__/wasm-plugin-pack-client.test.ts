@@ -542,6 +542,90 @@ describe("wasm-plugin-pack-client", () => {
     labels: ["remote-install", "installer-continuation", "plan-only"],
   };
 
+  const installerDownloadRecord = {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    status: "download_written_pending_signature_verify",
+    installer_download_writeback_ready: true,
+    approval_queue_store_ready: true,
+    approval_queue_record_found: true,
+    approval_approved: true,
+    download_ready: true,
+    downloads: true,
+    network_access: true,
+    writes_files: false,
+    writes_package_cache: true,
+    signature_verify_ready: false,
+    remote_install_ready: false,
+    installs_plugin: false,
+    installer_ready: false,
+    installer_blocked_until_signature_verify: true,
+    installer_blocked_until_registration: true,
+    queue_name: "wasm_remote_install",
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision_key: "decision-key",
+    package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
+    artifact: "installer-download-record.json",
+    cache_artifact: "installer-package-cache-calculator-remote.tgz",
+    cache_path: "/pack-data/installer-cache/installer-package-cache-calculator-remote.tgz",
+    expected_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    actual_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    sha256_match: true,
+    size_bytes: 42,
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    checks: [],
+    labels: ["remote-install", "installer-download", "pack-local-cache"],
+  };
+
+  const installerDownloadWriteback = {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    status: "download_written_pending_signature_verify",
+    installer_download_writeback_ready: true,
+    consumes_approval_queue_store: true,
+    consumes_installer_continuation_plan: true,
+    approval_queue_store_ready: true,
+    approval_queue_record_found: true,
+    approval_approved: true,
+    would_allow_installer_continue: true,
+    approval_required: true,
+    download_ready: true,
+    downloads: true,
+    network_access: true,
+    writes_files: false,
+    writes_package_cache: true,
+    signature_verify_ready: false,
+    remote_install_ready: false,
+    installs_plugin: false,
+    installer_ready: false,
+    installer_blocked_until_signature_verify: true,
+    installer_blocked_until_registration: true,
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision_key: "decision-key",
+    decision: "approved",
+    approved_by: "security",
+    reason: "download cache",
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    approval_queue_record: approvalQueueRecord,
+    approval_queue_store: approvalQueueStore,
+    installer_continuation_plan: installerContinuationPlan.installer_plan,
+    download_record: installerDownloadRecord,
+    checks: [],
+    artifacts: [
+      "installer-download-record.json",
+      "installer-package-cache-calculator-remote.tgz",
+      "installer-continuation-plan.json",
+    ],
+    actions: [],
+    labels: ["remote-install", "installer-download-writeback"],
+  };
+
   it("reads WASM Plugin pack status and plugin metadata through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
@@ -571,7 +655,9 @@ describe("wasm-plugin-pack-client", () => {
             approval_writeback_plan_ready: true,
             approval_writeback_ready: true,
             installer_continuation_plan_ready: true,
+            installer_download_writeback_ready: true,
             installer_ready: false,
+            installer_blocked_until_signature_verify: true,
             installer_blocked_until_installer_wiring: true,
             plugin_count: 1,
             loaded_count: 0,
@@ -587,6 +673,7 @@ describe("wasm-plugin-pack-client", () => {
               "wasm.remote_install.approval_writeback_plan",
               "wasm.remote_install.approval_queue_writeback",
               "wasm.remote_install.installer_continuation_plan",
+              "wasm.remote_install.installer_download_writeback",
             ],
           }),
           { status: 200 },
@@ -671,7 +758,9 @@ describe("wasm-plugin-pack-client", () => {
     expect(status.approval_writeback_plan_ready).toBe(true);
     expect(status.approval_writeback_ready).toBe(true);
     expect(status.installer_continuation_plan_ready).toBe(true);
+    expect(status.installer_download_writeback_ready).toBe(true);
     expect(status.installer_ready).toBe(false);
+    expect(status.installer_blocked_until_signature_verify).toBe(true);
     expect(status.installer_blocked_until_installer_wiring).toBe(true);
     expect(status.capabilities).toContain("wasm.host_abi.plan");
     expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
@@ -695,6 +784,9 @@ describe("wasm-plugin-pack-client", () => {
     );
     expect(status.capabilities).toContain(
       "wasm.remote_install.installer_continuation_plan",
+    );
+    expect(status.capabilities).toContain(
+      "wasm.remote_install.installer_download_writeback",
     );
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/wasm-plugin/status",
@@ -771,6 +863,14 @@ describe("wasm-plugin-pack-client", () => {
         new Response(JSON.stringify({ plan: installerContinuationPlan }), {
           status: 200,
         }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ writeback: installerDownloadWriteback }),
+          {
+            status: 202,
+          },
+        ),
       )
       .mockResolvedValueOnce(
         new Response(
@@ -869,6 +969,12 @@ describe("wasm-plugin-pack-client", () => {
     const installerPlan = await client.remoteInstallInstallerContinuationPlan({
       request_key: "request-key",
     });
+    const installerDownload = await client.remoteInstallInstallerDownloadWriteback({
+      request_key: "request-key",
+      approved: true,
+      approved_by: "security",
+      reason: "download cache",
+    });
     await client.unload("calculator");
 
     expect(executed.result.host_abi_plan.plan_ready).toBe(true);
@@ -946,6 +1052,24 @@ describe("wasm-plugin-pack-client", () => {
     expect(installerPlan.plan.installer_plan.artifact).toBe(
       "installer-continuation-plan.json",
     );
+    expect(
+      installerDownload.writeback.installer_download_writeback_ready,
+    ).toBe(true);
+    expect(installerDownload.writeback.download_ready).toBe(true);
+    expect(installerDownload.writeback.downloads).toBe(true);
+    expect(installerDownload.writeback.network_access).toBe(true);
+    expect(installerDownload.writeback.writes_package_cache).toBe(true);
+    expect(installerDownload.writeback.writes_files).toBe(false);
+    expect(installerDownload.writeback.signature_verify_ready).toBe(false);
+    expect(installerDownload.writeback.remote_install_ready).toBe(false);
+    expect(installerDownload.writeback.installs_plugin).toBe(false);
+    expect(
+      installerDownload.writeback.installer_blocked_until_signature_verify,
+    ).toBe(true);
+    expect(installerDownload.writeback.download_record.artifact).toBe(
+      "installer-download-record.json",
+    );
+    expect(installerDownload.writeback.download_record.sha256_match).toBe(true);
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/plugins");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(
@@ -1070,7 +1194,19 @@ describe("wasm-plugin-pack-client", () => {
     expect(
       JSON.parse(String((spy.mock.calls[8]?.[1] as RequestInit).body)),
     ).toEqual({ request_key: "request-key" });
-    expect(spy.mock.calls[9]?.[0]).toBe("/v1/wasm-plugin/plugins/unload");
+    expect(spy.mock.calls[9]?.[0]).toBe(
+      "/v1/wasm-plugin/remote-install/installer/download/writeback",
+    );
+    expect((spy.mock.calls[9]?.[1] as RequestInit).method).toBe("POST");
+    expect(
+      JSON.parse(String((spy.mock.calls[9]?.[1] as RequestInit).body)),
+    ).toEqual({
+      request_key: "request-key",
+      approved: true,
+      approved_by: "security",
+      reason: "download cache",
+    });
+    expect(spy.mock.calls[10]?.[0]).toBe("/v1/wasm-plugin/plugins/unload");
   });
 
   it("exports JSON evidence packs by plugin slug", async () => {
@@ -1094,6 +1230,8 @@ describe("wasm-plugin-pack-client", () => {
             "approval-queue-record.json",
             "installer-continuation-plan.json",
             "installer-download-handoff-plan.json",
+            "installer-download-record.json",
+            "installer-package-cache.tgz",
             "installer-registration-handoff-plan.json",
             "installer-audit-handoff-plan.json",
           ],
@@ -1110,6 +1248,7 @@ describe("wasm-plugin-pack-client", () => {
           approval_queue_store: approvalQueueStore,
           approval_queue_record: approvalQueueRecord,
           installer_continuation_plan: installerContinuationPlan.installer_plan,
+          installer_download_record: installerDownloadRecord,
         }),
         { status: 200 },
       ),
@@ -1129,6 +1268,8 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.files).toContain("approval-queue-record.json");
     expect(evidence.files).toContain("installer-continuation-plan.json");
     expect(evidence.files).toContain("installer-download-handoff-plan.json");
+    expect(evidence.files).toContain("installer-download-record.json");
+    expect(evidence.files).toContain("installer-package-cache.tgz");
     expect(evidence.files).toContain("installer-registration-handoff-plan.json");
     expect(evidence.files).toContain("installer-audit-handoff-plan.json");
     expect(evidence.host_abi_plan.status).toBe("plan_only");
@@ -1162,6 +1303,12 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.installer_continuation_plan.installer_ready).toBe(false);
     expect(evidence.installer_continuation_plan.artifact).toBe(
       "installer-continuation-plan.json",
+    );
+    expect(evidence.installer_download_record.artifact).toBe(
+      "installer-download-record.json",
+    );
+    expect(evidence.installer_download_record.signature_verify_ready).toBe(
+      false,
     );
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");
   });

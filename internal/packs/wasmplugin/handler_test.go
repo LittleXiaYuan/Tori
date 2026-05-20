@@ -38,8 +38,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 13 {
-		t.Fatalf("expected 13 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 14 {
+		t.Fatalf("expected 14 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,19 +53,20 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":                                     {http.MethodGet},
-		"/v1/wasm-plugin/plugins":                                    {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":                                   {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":                               {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload":                             {http.MethodPost},
-		"/v1/wasm-plugin/execute":                                    {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/plan":                        {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/plan":               {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/decision/plan":      {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/writeback/plan":     {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/queue/writeback":    {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/installer/continuation/plan": {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":                                  {http.MethodGet},
+		"/v1/wasm-plugin/status":                                      {http.MethodGet},
+		"/v1/wasm-plugin/plugins":                                     {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":                                    {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":                                {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":                              {http.MethodPost},
+		"/v1/wasm-plugin/execute":                                     {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan":                         {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/plan":                {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/decision/plan":       {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/writeback/plan":      {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/queue/writeback":     {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/continuation/plan":  {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/download/writeback": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":                                   {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -82,7 +83,22 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
 	fake := &fakeWasmExecutor{}
-	h := New(Config{PluginDir: pluginDir, DataDir: t.TempDir(), Sandbox: fake, Now: func() time.Time { return now }})
+	remotePackageBytes := []byte("approved wasm plugin package cache bytes")
+	remotePackageSHA256 := sha256Bytes(remotePackageBytes)
+	packageFetches := 0
+	h := New(Config{
+		PluginDir: pluginDir,
+		DataDir:   t.TempDir(),
+		Sandbox:   fake,
+		PackageFetcher: func(ctx context.Context, packageURL string) ([]byte, error) {
+			packageFetches++
+			if packageURL != "https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz" {
+				t.Fatalf("unexpected package URL: %s", packageURL)
+			}
+			return remotePackageBytes, nil
+		},
+		Now: func() time.Time { return now },
+	})
 
 	body := `{"slug":"calculator","name":"Calculator","module_path":"calculator.wasm","entrypoint":"plugin_exec","permissions":{"ledger_kv":true,"http_fetch":false,"max_memory_mb":32,"timeout_seconds":5},"capabilities":["math.add"]}`
 	w := httptest.NewRecorder()
@@ -226,7 +242,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"persist approval writeback","metadata":{"ticket":"WASM-1"}}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"`+remotePackageSHA256+`","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"persist approval writeback","metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalQueueWriteback(w, req)
 	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "approval-queue-store.json") {
 		t.Fatalf("remote install approval queue writeback status=%d body=%s", w.Code, w.Body.String())
@@ -278,6 +294,64 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if installerPlan.RequestKey != "custom-request-key" || installerPlan.InstallerPlan.Artifact != "installer-continuation-plan.json" || installerPlan.InstallerPlan.DownloadHandoffArtifact != "installer-download-handoff-plan.json" || installerPlan.InstallerPlan.RegistrationHandoffArtifact != "installer-registration-handoff-plan.json" {
 		t.Fatalf("installer continuation should expose deterministic handoff artifacts: %#v", installerPlan.InstallerPlan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/download/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":false,"approved_by":"security","reason":"missing explicit download approval"}`))
+	h.RemoteInstallInstallerDownloadWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "blocked_missing_explicit_download_approval") || !strings.Contains(w.Body.String(), "installer-download-record.json") {
+		t.Fatalf("missing explicit installer download approval should return blocked writeback report status=%d body=%s", w.Code, w.Body.String())
+	}
+	var installerDownloadResp struct {
+		Writeback RemoteInstallInstallerDownloadWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&installerDownloadResp); err != nil {
+		t.Fatalf("decode blocked installer download writeback: %v", err)
+	}
+	blockedDownload := installerDownloadResp.Writeback
+	if !blockedDownload.InstallerDownloadWritebackReady || blockedDownload.Downloads || blockedDownload.NetworkAccess || blockedDownload.WritesPackageCache || blockedDownload.DownloadReady || blockedDownload.WritesFiles || blockedDownload.RemoteInstallReady || blockedDownload.InstallsPlugin {
+		t.Fatalf("blocked installer download writeback must not download or write cache: %#v", blockedDownload)
+	}
+	if packageFetches != 0 {
+		t.Fatalf("blocked installer download writeback should not call package fetcher, got %d calls", packageFetches)
+	}
+	if _, err := os.Stat(h.installerDownloadStorePath()); !os.IsNotExist(err) {
+		t.Fatalf("blocked installer download writeback should not write download store, err=%v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/download/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":true,"approved_by":"security","reason":"download cache","metadata":{"ticket":"WASM-DOWNLOAD-1"}}`))
+	h.RemoteInstallInstallerDownloadWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "installer_download_writeback_ready") || !strings.Contains(w.Body.String(), "installer-download-record.json") || !strings.Contains(w.Body.String(), "installer-package-cache-") {
+		t.Fatalf("remote install installer download writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&installerDownloadResp); err != nil {
+		t.Fatalf("decode installer download writeback: %v", err)
+	}
+	installerDownload := installerDownloadResp.Writeback
+	if installerDownload.Status != "download_written_pending_signature_verify" || !installerDownload.InstallerDownloadWritebackReady || !installerDownload.DownloadReady || !installerDownload.Downloads || !installerDownload.NetworkAccess || !installerDownload.WritesPackageCache || installerDownload.WritesFiles || installerDownload.SignatureVerifyReady || installerDownload.RemoteInstallReady || installerDownload.InstallsPlugin || installerDownload.InstallerReady {
+		t.Fatalf("installer download writeback should only write pack-local cache and keep installer blocked: %#v", installerDownload)
+	}
+	if !installerDownload.InstallerBlockedUntilSignatureVerify || !installerDownload.InstallerBlockedUntilRegistration || !installerDownload.ApprovalApproved || !installerDownload.WouldAllowInstallerContinue {
+		t.Fatalf("installer download writeback should preserve conservative installer gates: %#v", installerDownload)
+	}
+	if installerDownload.RequestKey != "custom-request-key" || installerDownload.ApprovedBy != "security" || installerDownload.DownloadRecord.RequestKey != "custom-request-key" || installerDownload.DownloadRecord.ExpectedSHA256 != remotePackageSHA256 || installerDownload.DownloadRecord.ActualSHA256 != remotePackageSHA256 || !installerDownload.DownloadRecord.SHA256Match {
+		t.Fatalf("installer download writeback should expose matching SHA-256 and request metadata: %#v", installerDownload.DownloadRecord)
+	}
+	if installerDownload.DownloadRecord.SizeBytes != int64(len(remotePackageBytes)) || !strings.HasPrefix(installerDownload.DownloadRecord.CacheArtifact, "installer-package-cache-") || installerDownload.DownloadRecord.CachePath == "" {
+		t.Fatalf("installer download record should expose cache artifact and size: %#v", installerDownload.DownloadRecord)
+	}
+	if !containsString(installerDownload.Artifacts, "installer-download-record.json") || !containsString(installerDownload.Artifacts, installerDownload.DownloadRecord.CacheArtifact) {
+		t.Fatalf("installer download writeback should declare record and cache artifacts: %#v", installerDownload.Artifacts)
+	}
+	if data, err := os.ReadFile(installerDownload.DownloadRecord.CachePath); err != nil || string(data) != string(remotePackageBytes) {
+		t.Fatalf("installer package cache should be written with fetched bytes: err=%v data=%q", err, string(data))
+	}
+	if data, err := os.ReadFile(h.installerDownloadStorePath()); err != nil || !strings.Contains(string(data), "custom-request-key") || !strings.Contains(string(data), "installer-download-record.json") || !strings.Contains(string(data), remotePackageSHA256) {
+		t.Fatalf("installer download store should include record and SHA-256: err=%v data=%s", err, string(data))
+	}
+	if packageFetches != 1 {
+		t.Fatalf("installer download writeback should call package fetcher once, got %d", packageFetches)
 	}
 
 	w = httptest.NewRecorder()
@@ -363,7 +437,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") || !strings.Contains(w.Body.String(), "installer-download-record.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
@@ -379,6 +453,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		ApprovalQueueStore        ApprovalQueueStoreSummary                `json:"approval_queue_store"`
 		ApprovalQueueRecord       ApprovalQueueRecord                      `json:"approval_queue_record"`
 		InstallerContinuationPlan InstallerContinuationPlan                `json:"installer_continuation_plan"`
+		InstallerDownloadRecord   InstallerDownloadRecord                  `json:"installer_download_record"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -415,11 +490,15 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !containsString(evidenceResp.Files, "installer-continuation-plan.json") ||
 		!containsString(evidenceResp.Files, "installer-download-handoff-plan.json") ||
+		!containsString(evidenceResp.Files, "installer-download-record.json") ||
 		!evidenceResp.InstallerContinuationPlan.InstallerContinuationPlanReady ||
 		!evidenceResp.InstallerContinuationPlan.ConsumesApprovalQueueStore ||
 		evidenceResp.InstallerContinuationPlan.InstallerReady ||
 		!evidenceResp.InstallerContinuationPlan.BlocksInstaller {
 		t.Fatalf("evidence should include a conservative installer continuation handoff plan: files=%#v plan=%#v", evidenceResp.Files, evidenceResp.InstallerContinuationPlan)
+	}
+	if !evidenceResp.InstallerDownloadRecord.InstallerDownloadWritebackReady || evidenceResp.InstallerDownloadRecord.Downloads || evidenceResp.InstallerDownloadRecord.WritesPackageCache || evidenceResp.InstallerDownloadRecord.SignatureVerifyReady || evidenceResp.InstallerDownloadRecord.RemoteInstallReady || evidenceResp.InstallerDownloadRecord.InstallsPlugin {
+		t.Fatalf("evidence should include a conservative installer download record preview: %#v", evidenceResp.InstallerDownloadRecord)
 	}
 }
 

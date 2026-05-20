@@ -11,11 +11,12 @@ const maxUnpackedGrowthPerManifestCapability = 1_000;
 // shapes in a single published slice; keep this scoped to its manifest instead
 // of widening the global per-export budget.
 const maxUnpackedGrowthPerMemoryTimeTravelCapability = 3_600;
-// WASM Plugin installer continuation grows the existing yunque-client/wasm-plugin
-// slice with nested approval-store consumer and installer handoff response types.
+// WASM Plugin installer continuation/download writeback grows the existing
+// yunque-client/wasm-plugin slice with nested approval-store consumer,
+// installer handoff, and pack-local download cache response types.
 // Tie that reviewable growth to the checked pack SDK manifest route count instead
 // of broadening the global per-export budget.
-const maxUnpackedGrowthPerWASMPluginRoute = 3_000;
+const maxUnpackedGrowthPerWASMPluginRoute = 3_200;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;

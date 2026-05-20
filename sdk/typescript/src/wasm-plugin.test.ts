@@ -39,7 +39,7 @@ function test(name: string, fn: () => Promise<void> | void): void {
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
-  status: 200,
+    status: 200,
     headers: { "Content-Type": "application/json" },
     ...init,
   });
@@ -489,22 +489,79 @@ const approvalQueueWriteback = {
 };
 
 const installerContinuationPlan = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "plan_only_blocked_until_installer_wiring",
+  installer_continuation_plan_ready: true,
+  consumes_approval_queue_store: true,
+  approval_queue_store_ready: true,
+  approval_queue_record_found: true,
+  approval_queue_ready: true,
+  approval_decision_ready: true,
+  approval_writeback_ready: true,
+  applies_approval_decision: true,
+  approval_approved: true,
+  would_allow_installer_continue: true,
+  blocks_installer: true,
+  installer_ready: false,
+  installer_blocked_until_installer_wiring: true,
+  remote_install_ready: false,
+  download_ready: false,
+  signature_verify_ready: false,
+  downloads: false,
+  writes_files: false,
+  network_access: false,
+  installs_plugin: false,
+  decision: "approved",
+  decision_by: "security",
+  decision_reason: "preview decision",
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  signature_gate_status: "blocked_until_signature_verifier",
+  canonical_payload_sha256: "payload-digest",
+  approval_queue_record: approvalQueueRecord,
+  approval_queue_store: approvalQueueStore,
+  installer_plan: {
     pack_id: "yunque.pack.wasm-plugin",
     generated_at: "now",
-    status: "plan_only_blocked_until_installer_wiring",
     installer_continuation_plan_ready: true,
     consumes_approval_queue_store: true,
     approval_queue_store_ready: true,
     approval_queue_record_found: true,
     approval_queue_ready: true,
     approval_decision_ready: true,
-    approval_writeback_ready: true,
-    applies_approval_decision: true,
     approval_approved: true,
     would_allow_installer_continue: true,
     blocks_installer: true,
     installer_ready: false,
     installer_blocked_until_installer_wiring: true,
+    status: "plan_only_blocked_until_installer_wiring",
+    queue_name: "wasm_remote_install",
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision_key: "decision-key",
+    decision: "approved",
+    required_fields: [
+      "approval-queue-store.json",
+      "approval-queue-record.json",
+      "decision=approved",
+      "signature_verify_ready=true",
+      "download_ready=true",
+      "installer_registration_ready=true",
+    ],
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    signature_gate_status: "blocked_until_signature_verifier",
+    canonical_payload_sha256: "payload-digest",
+    queue_store_artifact: "approval-queue-store.json",
+    queue_record_artifact: "approval-queue-record.json",
+    download_handoff_artifact: "installer-download-handoff-plan.json",
+    registration_handoff_artifact: "installer-registration-handoff-plan.json",
+    audit_handoff_artifact: "installer-audit-handoff-plan.json",
+    artifact: "installer-continuation-plan.json",
     remote_install_ready: false,
     download_ready: false,
     signature_verify_ready: false,
@@ -512,81 +569,108 @@ const installerContinuationPlan = {
     writes_files: false,
     network_access: false,
     installs_plugin: false,
-    decision: "approved",
-    decision_by: "security",
-    decision_reason: "preview decision",
-    request_id: "wasm-remote-install-preview",
-    request_key: "request-key",
-    decision_key: "decision-key",
-    plugin: remoteInstallPlan.plugin,
-    package: remoteInstallPlan.package,
-    signature_gate_status: "blocked_until_signature_verifier",
-    canonical_payload_sha256: "payload-digest",
-    approval_queue_record: approvalQueueRecord,
-    approval_queue_store: approvalQueueStore,
-    installer_plan: {
-      pack_id: "yunque.pack.wasm-plugin",
-      generated_at: "now",
-      installer_continuation_plan_ready: true,
-      consumes_approval_queue_store: true,
-      approval_queue_store_ready: true,
-      approval_queue_record_found: true,
-      approval_queue_ready: true,
-      approval_decision_ready: true,
-      approval_approved: true,
-      would_allow_installer_continue: true,
-      blocks_installer: true,
-      installer_ready: false,
-      installer_blocked_until_installer_wiring: true,
-      status: "plan_only_blocked_until_installer_wiring",
-      queue_name: "wasm_remote_install",
-      request_id: "wasm-remote-install-preview",
-      request_key: "request-key",
-      decision_key: "decision-key",
-      decision: "approved",
-      required_fields: [
-        "approval-queue-store.json",
-        "approval-queue-record.json",
-        "decision=approved",
-        "signature_verify_ready=true",
-        "download_ready=true",
-        "installer_registration_ready=true",
-      ],
-      plugin: remoteInstallPlan.plugin,
-      package: remoteInstallPlan.package,
-      signature_gate_status: "blocked_until_signature_verifier",
-      canonical_payload_sha256: "payload-digest",
-      queue_store_artifact: "approval-queue-store.json",
-      queue_record_artifact: "approval-queue-record.json",
-      download_handoff_artifact: "installer-download-handoff-plan.json",
-      registration_handoff_artifact: "installer-registration-handoff-plan.json",
-      audit_handoff_artifact: "installer-audit-handoff-plan.json",
-      artifact: "installer-continuation-plan.json",
-      remote_install_ready: false,
-      download_ready: false,
-      signature_verify_ready: false,
-      downloads: false,
-      writes_files: false,
-      network_access: false,
-      installs_plugin: false,
-      checks: [],
-      actions: [],
-      labels: ["remote-install", "installer-continuation", "plan-only"],
-    },
     checks: [],
-    artifacts: [
-      "installer-continuation-plan.json",
-      "installer-download-handoff-plan.json",
-      "installer-registration-handoff-plan.json",
-      "installer-audit-handoff-plan.json",
-      "approval-queue-store.json",
-      "approval-queue-record.json",
-      "signature-verification.json",
-      "remote-install-plan.json",
-    ],
     actions: [],
     labels: ["remote-install", "installer-continuation", "plan-only"],
-  };
+  },
+  checks: [],
+  artifacts: [
+  "installer-continuation-plan.json",
+  "installer-download-handoff-plan.json",
+  "installer-registration-handoff-plan.json",
+  "installer-audit-handoff-plan.json",
+  "approval-queue-store.json",
+  "approval-queue-record.json",
+  "signature-verification.json",
+  "remote-install-plan.json",
+  ],
+  actions: [],
+  labels: ["remote-install", "installer-continuation", "plan-only"],
+};
+
+const installerDownloadRecord = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "download_written_pending_signature_verify",
+  installer_download_writeback_ready: true,
+  approval_queue_store_ready: true,
+  approval_queue_record_found: true,
+  approval_approved: true,
+  download_ready: true,
+  downloads: true,
+  network_access: true,
+  writes_files: false,
+  writes_package_cache: true,
+  signature_verify_ready: false,
+  remote_install_ready: false,
+  installs_plugin: false,
+  installer_ready: false,
+  installer_blocked_until_signature_verify: true,
+  installer_blocked_until_registration: true,
+  queue_name: "wasm_remote_install",
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  package_url: "https://packs.yunque.local/wasm/calculator-remote.tgz",
+  artifact: "installer-download-record.json",
+  cache_artifact: "installer-package-cache-calculator-remote.tgz",
+  cache_path: "/pack-data/installer-cache/installer-package-cache-calculator-remote.tgz",
+  expected_sha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  actual_sha256:
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  sha256_match: true,
+  size_bytes: 42,
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  checks: [],
+  labels: ["remote-install", "installer-download", "pack-local-cache"],
+};
+
+const installerDownloadWriteback = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "download_written_pending_signature_verify",
+  installer_download_writeback_ready: true,
+  consumes_approval_queue_store: true,
+  consumes_installer_continuation_plan: true,
+  approval_queue_store_ready: true,
+  approval_queue_record_found: true,
+  approval_approved: true,
+  would_allow_installer_continue: true,
+  approval_required: true,
+  download_ready: true,
+  downloads: true,
+  network_access: true,
+  writes_files: false,
+  writes_package_cache: true,
+  signature_verify_ready: false,
+  remote_install_ready: false,
+  installs_plugin: false,
+  installer_ready: false,
+  installer_blocked_until_signature_verify: true,
+  installer_blocked_until_registration: true,
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  decision: "approved",
+  approved_by: "security",
+  reason: "download cache",
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  approval_queue_record: approvalQueueRecord,
+  approval_queue_store: approvalQueueStore,
+  installer_continuation_plan: installerContinuationPlan.installer_plan,
+  download_record: installerDownloadRecord,
+  checks: [],
+  artifacts: [
+    "installer-download-record.json",
+    "installer-package-cache-calculator-remote.tgz",
+    "installer-continuation-plan.json",
+  ],
+  actions: [],
+  labels: ["remote-install", "installer-download-writeback"],
+};
 
 test("WASMPluginClient reads status and plugin list with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
@@ -620,7 +704,9 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           approval_writeback_plan_ready: true,
           approval_writeback_ready: true,
           installer_continuation_plan_ready: true,
+          installer_download_writeback_ready: true,
           installer_ready: false,
+          installer_blocked_until_signature_verify: true,
           installer_blocked_until_installer_wiring: true,
           plugin_count: 1,
           loaded_count: 0,
@@ -636,6 +722,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
             "wasm.remote_install.approval_writeback_plan",
             "wasm.remote_install.approval_queue_writeback",
             "wasm.remote_install.installer_continuation_plan",
+            "wasm.remote_install.installer_download_writeback",
           ],
         });
       return jsonResponse({
@@ -687,7 +774,9 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.approval_writeback_plan_ready, true);
   assertEqual(status.approval_writeback_ready, true);
   assertEqual(status.installer_continuation_plan_ready, true);
+  assertEqual(status.installer_download_writeback_ready, true);
   assertEqual(status.installer_ready, false);
+  assertEqual(status.installer_blocked_until_signature_verify, true);
   assertEqual(status.installer_blocked_until_installer_wiring, true);
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
@@ -716,6 +805,11 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assert(
     status.capabilities.includes(
       "wasm.remote_install.installer_continuation_plan",
+    ),
+  );
+  assert(
+    status.capabilities.includes(
+      "wasm.remote_install.installer_download_writeback",
     ),
   );
   assertEqual(plugins.count, 1);
@@ -774,6 +868,11 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
         return jsonResponse({ writeback: approvalQueueWriteback }, { status: 202 });
       if (String(url).endsWith("/remote-install/installer/continuation/plan"))
         return jsonResponse({ plan: installerContinuationPlan });
+      if (String(url).endsWith("/remote-install/installer/download/writeback"))
+        return jsonResponse(
+          { writeback: installerDownloadWriteback },
+          { status: 202 },
+        );
       if (String(url).endsWith("/remote-install/plan"))
         return jsonResponse({ plan: remoteInstallPlan });
       if (String(url).includes("/plugins/calculator"))
@@ -876,6 +975,14 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   const installerPlanned = await client.remoteInstallInstallerContinuationPlan({
     request_key: "request-key",
   });
+  const installerDownload = await client.remoteInstallInstallerDownloadWriteback(
+    {
+      request_key: "request-key",
+      approved: true,
+      approved_by: "security",
+      reason: "download cache",
+    },
+  );
   const detail = await client.plugin("calculator");
   const unloaded = await client.unload("calculator");
 
@@ -966,6 +1073,27 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
     installerPlanned.plan.installer_plan.artifact,
     "installer-continuation-plan.json",
   );
+  assertEqual(
+    installerDownload.writeback.installer_download_writeback_ready,
+    true,
+  );
+  assertEqual(installerDownload.writeback.download_ready, true);
+  assertEqual(installerDownload.writeback.downloads, true);
+  assertEqual(installerDownload.writeback.network_access, true);
+  assertEqual(installerDownload.writeback.writes_package_cache, true);
+  assertEqual(installerDownload.writeback.writes_files, false);
+  assertEqual(installerDownload.writeback.signature_verify_ready, false);
+  assertEqual(installerDownload.writeback.remote_install_ready, false);
+  assertEqual(installerDownload.writeback.installs_plugin, false);
+  assertEqual(
+    installerDownload.writeback.installer_blocked_until_signature_verify,
+    true,
+  );
+  assertEqual(
+    installerDownload.writeback.download_record.artifact,
+    "installer-download-record.json",
+  );
+  assertEqual(installerDownload.writeback.download_record.sha256_match, true);
   assertEqual(detail.plugin.slug, "calculator");
   assertEqual(unloaded.status, "unloaded");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/wasm-plugin/plugins");
@@ -1111,10 +1239,24 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   );
   assertEqual(
     calls[9]?.url,
-    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+    "http://localhost:9090/v1/wasm-plugin/remote-install/installer/download/writeback",
+  );
+  assertEqual(calls[9]?.init?.method, "POST");
+  assertEqual(
+    calls[9]?.init?.body,
+    JSON.stringify({
+      request_key: "request-key",
+      approved: true,
+      approved_by: "security",
+      reason: "download cache",
+    }),
   );
   assertEqual(
     calls[10]?.url,
+    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+  );
+  assertEqual(
+    calls[11]?.url,
     "http://localhost:9090/v1/wasm-plugin/plugins/unload",
   );
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
@@ -1144,6 +1286,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
           "approval-queue-record.json",
           "installer-continuation-plan.json",
           "installer-download-handoff-plan.json",
+          "installer-download-record.json",
+          "installer-package-cache.tgz",
           "installer-registration-handoff-plan.json",
           "installer-audit-handoff-plan.json",
         ],
@@ -1160,6 +1304,7 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         approval_queue_store: approvalQueueStore,
         approval_queue_record: approvalQueueRecord,
         installer_continuation_plan: installerContinuationPlan.installer_plan,
+        installer_download_record: installerDownloadRecord,
       });
     },
   });
@@ -1181,6 +1326,8 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     "approval-queue-record.json",
     "installer-continuation-plan.json",
     "installer-download-handoff-plan.json",
+    "installer-download-record.json",
+    "installer-package-cache.tgz",
     "installer-registration-handoff-plan.json",
     "installer-audit-handoff-plan.json",
   ]);
@@ -1217,6 +1364,11 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     evidence.installer_continuation_plan.artifact,
     "installer-continuation-plan.json",
   );
+  assertEqual(
+    evidence.installer_download_record.artifact,
+    "installer-download-record.json",
+  );
+  assertEqual(evidence.installer_download_record.signature_verify_ready, false);
   assertEqual(
     calls[0]?.url,
     "http://localhost:9090/v1/wasm-plugin/evidence/calculator",
