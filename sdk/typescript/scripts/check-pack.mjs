@@ -7,7 +7,10 @@ const baseManifestCapabilities = 12;
 const basePackSdkHelperExports = 0;
 const maxUnpackedGrowthPerExport = 2_500;
 const maxUnpackedGrowthPerManifestCapability = 1_000;
-const maxUnpackedGrowthPerMemoryTimeTravelCapability = 2_000;
+// Memory Time Travel capabilities expose nested planner/store/executor contract
+// shapes in a single published slice; keep this scoped to its manifest instead
+// of widening the global per-export budget.
+const maxUnpackedGrowthPerMemoryTimeTravelCapability = 3_600;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;

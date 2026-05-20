@@ -6,7 +6,7 @@ import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPruneExecute, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPruneExecute, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelRollbackWritebackExecutorPlan, type MemoryTimeTravelRollbackWritebackStore, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -45,12 +45,14 @@ export default function MemoryTimeTravelPackPage() {
   const [kvHistoryCutoverPlan, setKVHistoryCutoverPlan] = useState<MemoryTimeTravelKVHistoryCutoverPlan | null>(null);
   const [kvHistoryCutoverReadiness, setKVHistoryCutoverReadiness] = useState<MemoryTimeTravelKVHistoryCutoverReadiness | null>(null);
   const [approvedRollbackPlan, setApprovedRollbackPlan] = useState<MemoryTimeTravelApprovedRollbackPlan | null>(null);
+  const [rollbackWritebackStore, setRollbackWritebackStore] = useState<MemoryTimeTravelRollbackWritebackStore | null>(null);
+  const [rollbackWritebackExecutorPlan, setRollbackWritebackExecutorPlan] = useState<MemoryTimeTravelRollbackWritebackExecutorPlan | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
   const [retentionPruneExecute, setRetentionPruneExecute] = useState<MemoryTimeTravelRetentionPruneExecute | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "audit-link-writeback-executor" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | "retention-prune-execute" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "rollback-writeback-store" | "rollback-writeback-executor" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "audit-link-writeback-executor" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | "retention-prune-execute" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -170,6 +172,51 @@ export default function MemoryTimeTravelPackPage() {
       showToast("已生成 approved rollback write-back plan（未写 Ledger）", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成 approved rollback write-back plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeRollbackWritebackStore = async () => {
+    const target = baseId || selectedBase?.id;
+    if (!target) return;
+    setBusy("rollback-writeback-store");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.rollbackWritebackStore({
+        namespace,
+        snapshot_id: target,
+        requested_by: "pack-console",
+        reason: "persist approved rollback write-back handoff",
+        approval_id: approvalId,
+        dry_run: true,
+      });
+      setRollbackWritebackStore(res.writeback);
+      showToast("已写入 rollback-writeback-store.json（仅 pack-local handoff）", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入 rollback write-back handoff store 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const buildRollbackWritebackExecutorPlan = async () => {
+    setBusy("rollback-writeback-executor");
+    setError(null);
+    try {
+      const res = await memoryTimeTravelPack.rollbackWritebackExecutorPlan({
+        request_key: approvalId,
+        namespace,
+        snapshot_id: baseId || selectedBase?.id,
+        requested_by: "pack-console",
+        reason: "plan rollback executor handoff from pack-local store",
+        dry_run: true,
+      });
+      setRollbackWritebackExecutorPlan(res.plan);
+      showToast("已生成 rollback executor handoff plan（未写 Ledger）", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 rollback executor handoff plan 失败"));
     } finally {
       setBusy(null);
     }
@@ -503,7 +550,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、pack-local retention prune executor、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan / pack-local handoff store / executor handoff plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、Ledger temporal prune/cron、逐条 KV 审计证明真实写回和真实回滚写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、pack-local rollback writeback store / executor handoff plan、retention dry-run/prune plan、pack-local retention prune executor、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan / pack-local handoff store / executor handoff plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、Ledger temporal prune/cron、逐条 KV 审计证明真实写回和真实回滚执行仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -528,16 +575,20 @@ export default function MemoryTimeTravelPackPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><UnlockKeyhole size={16} />Approved rollback write-back plan</div>
             <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              将选中的 snapshot 映射为未来 Ledger KV versioned put 与全局 Approval Manager 请求形态；当前只输出 approved-rollback-plan.json / rollback-writeback-plan.json / approval-request-plan.json，不写 Ledger、不追加 Merkle、不修改 live memory。
+              将选中的 snapshot 映射为未来 Ledger KV versioned put 与全局 Approval Manager 请求形态；当前先输出 approved-rollback-plan.json / rollback-writeback-plan.json / approval-request-plan.json，现在也可显式写入 pack-local rollback-writeback-store.json / rollback-writeback-record.json，并生成 rollback-writeback-executor-plan.json / rollback-executor-handoff-plan.json / rollback-executor-audit-plan.json。仍不写 Ledger、不追加 Merkle、不修改 live memory。
             </div>
           </div>
-          <Button variant="outline" isPending={busy === "approved-rollback"} onPress={buildApprovedRollbackPlan} isDisabled={!selectedBase && !baseId}><UnlockKeyhole size={14} />生成写回计划</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" isPending={busy === "approved-rollback"} onPress={buildApprovedRollbackPlan} isDisabled={!selectedBase && !baseId}><UnlockKeyhole size={14} />生成写回计划</Button>
+            <Button variant="outline" isPending={busy === "rollback-writeback-store"} onPress={writeRollbackWritebackStore} isDisabled={!selectedBase && !baseId}><Save size={14} />写入 handoff store</Button>
+            <Button variant="outline" isPending={busy === "rollback-writeback-executor"} onPress={buildRollbackWritebackExecutorPlan}><DatabaseZap size={14} />生成 executor handoff plan</Button>
+          </div>
         </div>
         <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           <TextField value={baseId} onChange={setBaseId}><Input placeholder="target snapshot id" /></TextField>
           <TextField value={approvalId} onChange={setApprovalId}><Input placeholder="approval id / request key" /></TextField>
           <div className="rounded-xl border p-3 text-xs" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
-            writeback ready: {String(status?.rollback_writeback_ready ?? false)} · global enqueue: {String(status?.global_approval_enqueue_ready ?? false)}
+            store ready: {String(status?.rollback_writeback_store_ready ?? false)} · executor plan: {String(status?.rollback_writeback_executor_plan_ready ?? false)} · writeback ready: {String(status?.rollback_writeback_ready ?? false)}
           </div>
         </div>
         {approvedRollbackPlan ? (
@@ -714,6 +765,40 @@ export default function MemoryTimeTravelPackPage() {
             </div>
             <TextField value={JSON.stringify(retentionPruneExecute, null, 2)} onChange={() => undefined}>
               <TextArea rows={8} aria-label="Memory Time Travel retention prune execute JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        )}
+        {rollbackWritebackStore && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8" }}>
+                pack-local rollback store
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{rollbackWritebackStore.rollback_writeback_store.record_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>records · status {rollbackWritebackStore.status}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>rollback_writeback_store_ready {String(rollbackWritebackStore.rollback_writeback_store_ready)} · store writes {String(rollbackWritebackStore.writes_rollback_writeback_store)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>Ledger {String(rollbackWritebackStore.writes_ledger_kv)} · Temporal {String(rollbackWritebackStore.writes_temporal_kv)} · Merkle {String(rollbackWritebackStore.merkle_append_ready)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact rollback-writeback-store.json · rollback-writeback-record.json</div>
+            </div>
+            <TextField value={JSON.stringify(rollbackWritebackStore, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel rollback writeback store JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        )}
+        {rollbackWritebackExecutorPlan && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: rollbackWritebackExecutorPlan.rollback_executor_ready ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: rollbackWritebackExecutorPlan.rollback_executor_ready ? "#22c55e" : "#facc15" }}>
+                {rollbackWritebackExecutorPlan.status}
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{rollbackWritebackExecutorPlan.action_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>rollback_writeback_executor_plan_ready {String(rollbackWritebackExecutorPlan.rollback_writeback_executor_plan_ready)} · consumes store {String(rollbackWritebackExecutorPlan.consumes_rollback_writeback_store)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>executor ready {String(rollbackWritebackExecutorPlan.rollback_executor_ready)} · input contract {String(rollbackWritebackExecutorPlan.executor_input_contract_ready)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes Ledger {String(rollbackWritebackExecutorPlan.writes_ledger_kv)} · audit chain {String(rollbackWritebackExecutorPlan.writes_audit_chain)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>artifact rollback-writeback-executor-plan.json · rollback-executor-handoff-plan.json · rollback-executor-audit-plan.json</div>
+            </div>
+            <TextField value={JSON.stringify(rollbackWritebackExecutorPlan, null, 2)} onChange={() => undefined}>
+              <TextArea rows={10} aria-label="Memory Time Travel rollback executor handoff plan JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
         )}

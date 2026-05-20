@@ -32,8 +32,14 @@ const routeSpecs = new Set((pack.backend?.routeSpecs ?? []).map((route) => `${ro
 for (const route of manifest.routes ?? []) {
   if (!routeSpecs.has(route)) fail(`Memory Time Travel pack manifest missing routeSpec: ${route}`);
 }
-for (const capability of ["retentionPruneExecute", "auditLinksWritebackPlan", "auditLinksWritebackStore", "auditLinksWritebackExecutorPlan"]) {
+for (const capability of ["rollbackWritebackStore", "rollbackWritebackExecutorPlan", "retentionPruneExecute", "auditLinksWritebackPlan", "auditLinksWritebackStore", "auditLinksWritebackExecutorPlan"]) {
   if (!(manifest.capabilities ?? []).includes(capability)) fail(`memory-time-travel-pack-sdk.json missing capability: ${capability}`);
+}
+if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.rollback.writeback_store")) {
+  fail("Memory Time Travel pack manifest missing rollback writeback store backend capability");
+}
+if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.rollback.writeback_executor_plan")) {
+  fail("Memory Time Travel pack manifest missing rollback writeback executor plan backend capability");
 }
 if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.retention.prune_execute")) {
   fail("Memory Time Travel pack manifest missing retention prune execute backend capability");
@@ -60,6 +66,8 @@ for (const token of [
   "/v1/memory-time-travel/diff",
   "/v1/memory-time-travel/rollback-plan",
   "/v1/memory-time-travel/rollback/approved-plan",
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/retention/prune/execute",
@@ -87,7 +95,7 @@ if (!page.includes("createMemoryTimeTravelPackClient") || page.includes('from "@
 for (const token of ["Memory Time Travel", "保存快照", "生成 diff", "导出证据包", "Retention dry-run plan", "Merkle 审计链验证", "Pack shell"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing product token: ${token}`);
 }
-for (const token of ["Approved rollback write-back plan", "buildApprovedRollbackPlan", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "global_approval_enqueue_ready"]) {
+for (const token of ["Approved rollback write-back plan", "buildApprovedRollbackPlan", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "global_approval_enqueue_ready", "writeRollbackWritebackStore", "buildRollbackWritebackExecutorPlan", "rollbackWritebackStore", "rollbackWritebackExecutorPlan", "rollback-writeback-store.json", "rollback-writeback-record.json", "rollback-writeback-executor-plan.json", "rollback-executor-handoff-plan.json", "rollback-executor-audit-plan.json", "rollback_writeback_store_ready", "rollback_writeback_executor_plan_ready", "consumes_rollback_writeback_store", "rollback_executor_ready"]) {
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing approved rollback token: ${token}`);
 }
 for (const token of ["KV audit proof-link schema", "previewAuditLinks", "buildAuditLinkWritebackPlan", "writeAuditLinkWritebackStore", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "loadAuditLinks", "native kv_history", "buildRetentionPrunePlan", "executePackLocalRetentionPrune", "执行 pack-local 清理", "retention-prune-execute.json", "生成审批计划", "kv_audit_link_writeback_store_ready", "writes_audit_link_writeback_store", "kv_audit_link_writeback_ready", "backfills_audit_seq", "global_approval_enqueue_ready", "buildAuditLinkWritebackExecutorPlan", "auditLinksWritebackExecutorPlan", "audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "kv_audit_link_writeback_executor_plan_ready", "executor_input_contract_ready", "audit_proof_link_executor_ready", "consumes_audit_link_writeback_store", "writes_audit_chain", "audit_append_plan_ready"]) {
@@ -107,7 +115,7 @@ for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
-for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/retention/prune/execute", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links/writeback/executor/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
+for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/rollback/writeback/store", "/v1/memory-time-travel/rollback/writeback/executor/plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/retention/prune/execute", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links/writeback/executor/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
 
@@ -187,7 +195,20 @@ for (const token of [
   "writes_temporal_kv",
   "memory.rollback.approved_plan",
   "memory.rollback.writeback.plan",
+  "memory.rollback.writeback.store",
+  "memory.rollback.writeback_executor.plan",
+  "rollback-writeback-store.json",
+  "rollback-writeback-record.json",
+  "rollback-writeback-executor-plan.json",
+  "rollback-executor-handoff-plan.json",
+  "rollback-executor-audit-plan.json",
+  "rollback_writeback_store_ready",
+  "rollback_writeback_executor_plan_ready",
+  "consumes_rollback_writeback_store",
+  "rollback_executor_ready",
   "/v1/memory-time-travel/rollback/approved-plan",
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
   "retention-prune-plan.json",
   "retention-prune-execute.json",
   "pack_local_prune_ready",
@@ -265,6 +286,8 @@ for (const token of [
   "/v1/memory-time-travel/status",
   "/v1/memory-time-travel/diff",
   "/v1/memory-time-travel/rollback/approved-plan",
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
   "/v1/memory-time-travel/retention/plan",
   "/v1/memory-time-travel/retention/prune-plan",
   "/v1/memory-time-travel/retention/prune/execute",
@@ -312,9 +335,21 @@ for (const token of [
   "dual_write_plan_ready",
   "cutover_ready",
   "approvedRollbackPlan",
+  "rollbackWritebackStore",
+  "rollbackWritebackExecutorPlan",
   "approved_rollback_plan",
   "rollback_writeback_plan",
   "approval_request_plan",
+  "rollback_writeback_store",
+  "rollback_writeback_records",
+  "rollback_writeback_executor_plan",
+  "rollback_executor_handoff_plan",
+  "rollback_executor_audit_plan",
+  "rollback_writeback_store_ready",
+  "rollback_writeback_executor_plan_ready",
+  "consumes_rollback_writeback_store",
+  "rollback_executor_ready",
+  "writes_rollback_writeback_store",
   "auditLinks",
   "auditLinksPreview",
   "auditLinksWritebackPlan",
