@@ -32,6 +32,7 @@ import {
   type WASMPluginRemoteInstallApprovalQueueWriteback,
   type WASMPluginRemoteInstallApprovalWritebackPlan,
   type WASMPluginRemoteInstallInstallerContinuationPlan,
+  type WASMPluginRemoteInstallInstallerDownloadWriteback,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginStatus,
   type WASMPluginSummary,
@@ -237,6 +238,22 @@ function sampleInstallerContinuationPlan(slug: string) {
   );
 }
 
+function sampleInstallerDownloadWriteback(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      request_key: "preview-request-key",
+      approved: true,
+      approved_by: "security",
+      reason:
+        "download approved package into pack-local installer cache only; keep signature verification and registration blocked",
+      metadata: { ticket: "WASM-REMOTE-DOWNLOAD-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -253,6 +270,7 @@ export default function WASMPluginPackPage() {
     | "remote-approval-writeback"
     | "remote-approval-queue-writeback"
     | "remote-installer-continuation"
+    | "remote-installer-download"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -290,6 +308,10 @@ export default function WASMPluginPackPage() {
   );
   const [remoteInstallerPlan, setRemoteInstallerPlan] =
     useState<WASMPluginRemoteInstallInstallerContinuationPlan | null>(null);
+  const [remoteInstallerDownloadJSON, setRemoteInstallerDownloadJSON] =
+    useState(() => sampleInstallerDownloadWriteback("calculator-remote"));
+  const [remoteInstallerDownload, setRemoteInstallerDownload] =
+    useState<WASMPluginRemoteInstallInstallerDownloadWriteback | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -438,6 +460,23 @@ export default function WASMPluginPackPage() {
       showToast("已生成 installer continuation handoff 计划", "success");
     } catch (e) {
       setError(formatErrorMessage(e, "生成 installer continuation 计划失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeInstallerDownload = async () => {
+    setBusy("remote-installer-download");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteInstallerDownloadJSON);
+      const res =
+        await wasmPluginPack.remoteInstallInstallerDownloadWriteback(payload);
+      setRemoteInstallerDownload(res.writeback);
+      showToast("已写入 pack-local installer 下载缓存", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入 installer 下载缓存失败"));
     } finally {
       setBusy(null);
     }
@@ -606,6 +645,10 @@ export default function WASMPluginPackPage() {
                 {String(status?.installer_continuation_plan_ready ?? false)}
               </Chip>
               <Chip size="sm">
+                installer_download_writeback_ready:{" "}
+                {String(status?.installer_download_writeback_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
                 installer_ready: {String(status?.installer_ready ?? false)}
               </Chip>
               <span
@@ -629,8 +672,10 @@ export default function WASMPluginPackPage() {
               host_abi_enforcement_ready=false 时会被真实执行前阻断；本地 WASM
               模块 SHA-256 与注册元数据不一致时也会被 module integrity gate
               阻断，不进入 sandbox；当前审批写回只落 pack-local queue store，
-              installer continuation 现在只产出 handoff 计划并继续保持
-              installer_ready=false；真实下载、签名验证、install 写回、插件注册、
+              installer continuation 产出 handoff 计划；download writeback
+              只把已审批包下载到 pack-local installer cache 并校验 SHA-256，
+              继续保持 signature_verify_ready=false / installer_ready=false；
+              真实签名验证、install 写回、插件注册、
               Host ABI 权限强执行和 TinyGo
               示例会在后续切片继续接入。
             </div>
@@ -738,7 +783,11 @@ export default function WASMPluginPackPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">Installer</div>
           <div className="kpi-value text-lg">
-            {status?.installer_continuation_plan_ready ? "handoff" : "pending"}
+            {status?.installer_download_writeback_ready
+              ? "cache"
+              : status?.installer_continuation_plan_ready
+                ? "handoff"
+                : "pending"}
           </div>
           <div className="kpi-label mt-1">
             ready: {String(status?.installer_ready ?? false)}
@@ -950,6 +999,124 @@ export default function WASMPluginPackPage() {
                 <TextArea
                   rows={11}
                   aria-label="WASM installer continuation plan result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Download size={16} />
+                  Installer download writeback
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  真实写入边界：读取已 approved 的 pack-local approval queue
+                  record，并要求本次请求显式 approved=true；下载包后只写
+                  pack-local installer-cache 与 installer-download-record.json，
+                  校验 SHA-256 匹配。它不会验签、不会解包、不会写 plugin_dir、
+                  不会注册插件，也不会把 remote_install_ready / installer_ready
+                  置为 true。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-installer-download"}
+                onPress={writeInstallerDownload}
+              >
+                写入下载缓存
+              </Button>
+            </div>
+            <TextField
+              value={remoteInstallerDownloadJSON}
+              onChange={setRemoteInstallerDownloadJSON}
+            >
+              <TextArea
+                rows={7}
+                aria-label="WASM remote install installer download writeback JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                installer_download_writeback_ready:{" "}
+                {String(
+                  remoteInstallerDownload
+                    ?.installer_download_writeback_ready ??
+                    status?.installer_download_writeback_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                download_ready:{" "}
+                {String(remoteInstallerDownload?.download_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                downloads:{" "}
+                {String(remoteInstallerDownload?.downloads ?? false)}
+              </Chip>
+              <Chip size="sm">
+                network_access:{" "}
+                {String(remoteInstallerDownload?.network_access ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_package_cache:{" "}
+                {String(
+                  remoteInstallerDownload?.writes_package_cache ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteInstallerDownload?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                signature_verify_ready:{" "}
+                {String(
+                  remoteInstallerDownload?.signature_verify_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                remote_install_ready:{" "}
+                {String(remoteInstallerDownload?.remote_install_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteInstallerDownload?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_signature_verify:{" "}
+                {String(
+                  remoteInstallerDownload
+                    ?.installer_blocked_until_signature_verify ??
+                    status?.installer_blocked_until_signature_verify ??
+                    true,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installer_download_record sha256_match:{" "}
+                {String(
+                  remoteInstallerDownload?.download_record?.sha256_match ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">artifact: installer-download-record.json</Chip>
+              <Chip size="sm">artifact: installer-package-cache.tgz</Chip>
+            </div>
+            {remoteInstallerDownload && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteInstallerDownload, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM installer download writeback result"
                   className="font-mono text-xs"
                   readOnly
                 />
