@@ -101,6 +101,10 @@ for (const token of [
   "approval-writeback-plan.json",
   "approval-queue-store.json",
   "approval-queue-record.json",
+  "installer-continuation-plan.json",
+  "installer-download-handoff-plan.json",
+  "installer-registration-handoff-plan.json",
+  "installer-audit-handoff-plan.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",
@@ -121,12 +125,12 @@ const page = readRepoFile(manifest.frontend.page);
 if (!page.includes("createWASMPluginPackClient") || page.includes('from "@/lib/api"') || page.includes("api.wasm")) {
   fail("WASM Plugin pack page must use wasm-plugin-pack-client instead of monolithic api.ts");
 }
-for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "Host ABI execution gate", "module integrity gate", "module_integrity_gate_ready", "integrity_gate_ready", "sha256_blocked", "execution_gate_ready", "allows_execution", "blocked", "远程签名包安装计划", "远程安装审批 Gate 计划", "远程安装审批决策计划", "远程安装审批写回桥接计划", "remote_install_plan_ready", "remote_install_ready", "approval_gate_plan_ready", "approval_gate_ready", "approval_queue_plan_ready", "approval_queue_ready", "approval_decision_plan_ready", "approval_decision_ready", "applies_approval_decision", "approval_writeback_plan_ready", "approval_writeback_ready", "installer_blocked_until_writeback", "would_allow_installer_continue", "blocks_installer", "decision_key", "queue_status", "blocked_until_approval_queue", "download_ready", "signature_verify_ready", "signature_verification_plan_ready", "signature_verification", "verifier_gate_ready", "allows_install", "remote-install-plan.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "signature-verification.json", "enforcement_ready", "writes_files", "pack-shell"]) {
+for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "导出证据包", "Host ABI plan", "Host ABI execution gate", "module integrity gate", "module_integrity_gate_ready", "integrity_gate_ready", "sha256_blocked", "execution_gate_ready", "allows_execution", "blocked", "远程签名包安装计划", "远程安装审批 Gate 计划", "远程安装审批决策计划", "远程安装审批写回桥接计划", "remote_install_plan_ready", "remote_install_ready", "approval_gate_plan_ready", "approval_gate_ready", "approval_queue_plan_ready", "approval_queue_ready", "approval_decision_plan_ready", "approval_decision_ready", "applies_approval_decision", "approval_writeback_plan_ready", "approval_writeback_ready", "installer_blocked_until_writeback", "installer_continuation_plan_ready", "installer_ready", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-registration-handoff-plan.json", "would_allow_installer_continue", "blocks_installer", "decision_key", "queue_status", "blocked_until_approval_queue", "download_ready", "signature_verify_ready", "signature_verification_plan_ready", "signature_verification", "verifier_gate_ready", "allows_install", "remote-install-plan.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "signature-verification.json", "enforcement_ready", "writes_files", "pack-shell"]) {
   if (!page.includes(token)) fail(`WASM Plugin pack page missing product token: ${token}`);
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json"]) {
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/remote-install/installer/continuation/plan", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json"]) {
   if (!frontendTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
 
@@ -196,6 +200,10 @@ for (const token of [
   "approval-writeback-plan.json",
   "approval-queue-store.json",
   "approval-queue-record.json",
+  "installer-continuation-plan.json",
+  "installer-download-handoff-plan.json",
+  "installer-registration-handoff-plan.json",
+  "installer-audit-handoff-plan.json",
   "signature-verification.json",
   "downloads",
   "json-wasm-plugin-evidence",
@@ -275,6 +283,10 @@ for (const token of [
   "approval-writeback-plan.json",
   "approval-queue-store.json",
   "approval-queue-record.json",
+  "installer-continuation-plan.json",
+  "installer-download-handoff-plan.json",
+  "installer-registration-handoff-plan.json",
+  "installer-audit-handoff-plan.json",
   "signature-verification.json",
   "downloads",
   "enforcement_ready",

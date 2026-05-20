@@ -31,6 +31,7 @@ import {
   type WASMPluginRemoteInstallApprovalPlan,
   type WASMPluginRemoteInstallApprovalQueueWriteback,
   type WASMPluginRemoteInstallApprovalWritebackPlan,
+  type WASMPluginRemoteInstallInstallerContinuationPlan,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginStatus,
   type WASMPluginSummary,
@@ -225,6 +226,17 @@ function sampleRemoteApprovalQueueWriteback(slug: string) {
   );
 }
 
+function sampleInstallerContinuationPlan(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      request_key: "preview-request-key",
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -240,6 +252,7 @@ export default function WASMPluginPackPage() {
     | "remote-approval-decision"
     | "remote-approval-writeback"
     | "remote-approval-queue-writeback"
+    | "remote-installer-continuation"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -272,6 +285,11 @@ export default function WASMPluginPackPage() {
   );
   const [remoteQueueWriteback, setRemoteQueueWriteback] =
     useState<WASMPluginRemoteInstallApprovalQueueWriteback | null>(null);
+  const [remoteInstallerJSON, setRemoteInstallerJSON] = useState(() =>
+    sampleInstallerContinuationPlan("calculator-remote"),
+  );
+  const [remoteInstallerPlan, setRemoteInstallerPlan] =
+    useState<WASMPluginRemoteInstallInstallerContinuationPlan | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -404,6 +422,22 @@ export default function WASMPluginPackPage() {
       await load();
     } catch (e) {
       setError(formatErrorMessage(e, "写入远程安装审批队列失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const planInstallerContinuation = async () => {
+    setBusy("remote-installer-continuation");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteInstallerJSON);
+      const res =
+        await wasmPluginPack.remoteInstallInstallerContinuationPlan(payload);
+      setRemoteInstallerPlan(res.plan);
+      showToast("已生成 installer continuation handoff 计划", "success");
+    } catch (e) {
+      setError(formatErrorMessage(e, "生成 installer continuation 计划失败"));
     } finally {
       setBusy(null);
     }
@@ -567,6 +601,13 @@ export default function WASMPluginPackPage() {
                 approval_writeback_plan_ready:{" "}
                 {String(status?.approval_writeback_plan_ready ?? false)}
               </Chip>
+              <Chip size="sm">
+                installer_continuation_plan_ready:{" "}
+                {String(status?.installer_continuation_plan_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installer_ready: {String(status?.installer_ready ?? false)}
+              </Chip>
               <span
                 className="text-xs"
                 style={{ color: "var(--yunque-text-muted)" }}
@@ -588,7 +629,8 @@ export default function WASMPluginPackPage() {
               host_abi_enforcement_ready=false 时会被真实执行前阻断；本地 WASM
               模块 SHA-256 与注册元数据不一致时也会被 module integrity gate
               阻断，不进入 sandbox；当前审批写回只落 pack-local queue store，
-              不继续 installer；真实下载、签名验证、install 写回、插件注册、
+              installer continuation 现在只产出 handoff 计划并继续保持
+              installer_ready=false；真实下载、签名验证、install 写回、插件注册、
               Host ABI 权限强执行和 TinyGo
               示例会在后续切片继续接入。
             </div>
@@ -693,6 +735,15 @@ export default function WASMPluginPackPage() {
             ready: {String(status?.approval_writeback_ready ?? false)}
           </div>
         </Card>
+        <Card className="section-card p-4">
+          <div className="kpi-label">Installer</div>
+          <div className="kpi-value text-lg">
+            {status?.installer_continuation_plan_ready ? "handoff" : "pending"}
+          </div>
+          <div className="kpi-label mt-1">
+            ready: {String(status?.installer_ready ?? false)}
+          </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_1fr]">
@@ -771,6 +822,139 @@ export default function WASMPluginPackPage() {
                 校验 / 注册插件
               </Button>
             </div>
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  Installer continuation handoff 计划
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  plan-only 契约：读取 pack-local approval-queue-store.json /
+                  approval-queue-record.json，生成
+                  installer-continuation-plan.json、
+                  installer-download-handoff-plan.json、
+                  installer-registration-handoff-plan.json 与
+                  installer-audit-handoff-plan.json；不下载、不联网、不验签、不写插件文件、不注册插件。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-installer-continuation"}
+                onPress={planInstallerContinuation}
+              >
+                生成 handoff
+              </Button>
+            </div>
+            <TextField
+              value={remoteInstallerJSON}
+              onChange={setRemoteInstallerJSON}
+            >
+              <TextArea
+                rows={5}
+                aria-label="WASM remote install installer continuation plan JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                installer_continuation_plan_ready:{" "}
+                {String(
+                  remoteInstallerPlan?.installer_continuation_plan_ready ??
+                    status?.installer_continuation_plan_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                consumes_approval_queue_store:{" "}
+                {String(
+                  remoteInstallerPlan?.consumes_approval_queue_store ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_queue_record_found:{" "}
+                {String(
+                  remoteInstallerPlan?.approval_queue_record_found ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_approved:{" "}
+                {String(remoteInstallerPlan?.approval_approved ?? false)}
+              </Chip>
+              <Chip size="sm">
+                would_allow_installer_continue:{" "}
+                {String(
+                  remoteInstallerPlan?.would_allow_installer_continue ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                blocks_installer:{" "}
+                {String(remoteInstallerPlan?.blocks_installer ?? true)}
+              </Chip>
+              <Chip size="sm">
+                installer_ready:{" "}
+                {String(
+                  remoteInstallerPlan?.installer_ready ??
+                    status?.installer_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_installer_wiring:{" "}
+                {String(
+                  remoteInstallerPlan
+                    ?.installer_blocked_until_installer_wiring ??
+                    status?.installer_blocked_until_installer_wiring ??
+                    true,
+                )}
+              </Chip>
+              <Chip size="sm">
+                download_ready:{" "}
+                {String(remoteInstallerPlan?.download_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                signature_verify_ready:{" "}
+                {String(remoteInstallerPlan?.signature_verify_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                downloads: {String(remoteInstallerPlan?.downloads ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteInstallerPlan?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteInstallerPlan?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">artifact: installer-continuation-plan.json</Chip>
+              <Chip size="sm">
+                artifact: installer-download-handoff-plan.json
+              </Chip>
+              <Chip size="sm">
+                artifact: installer-registration-handoff-plan.json
+              </Chip>
+              <Chip size="sm">artifact: installer-audit-handoff-plan.json</Chip>
+            </div>
+            {remoteInstallerPlan && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteInstallerPlan, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM installer continuation plan result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
           </Card>
 
           <Card className="section-card p-4">

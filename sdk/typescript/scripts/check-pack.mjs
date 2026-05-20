@@ -11,6 +11,11 @@ const maxUnpackedGrowthPerManifestCapability = 1_000;
 // shapes in a single published slice; keep this scoped to its manifest instead
 // of widening the global per-export budget.
 const maxUnpackedGrowthPerMemoryTimeTravelCapability = 3_600;
+// WASM Plugin installer continuation grows the existing yunque-client/wasm-plugin
+// slice with nested approval-store consumer and installer handoff response types.
+// Tie that reviewable growth to the checked pack SDK manifest route count instead
+// of broadening the global per-export budget.
+const maxUnpackedGrowthPerWASMPluginRoute = 3_000;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;
@@ -23,6 +28,10 @@ const memoryTimeTravelManifestPath = "../manifest/memory-time-travel-pack-sdk.js
 const memoryTimeTravelManifest = existsSync(memoryTimeTravelManifestPath)
   ? JSON.parse(readFileSync(memoryTimeTravelManifestPath, "utf8"))
   : { capabilities: [] };
+const wasmPluginManifestPath = "../manifest/wasm-plugin-pack-sdk.json";
+const wasmPluginManifest = existsSync(wasmPluginManifestPath)
+  ? JSON.parse(readFileSync(wasmPluginManifestPath, "utf8"))
+  : { routes: [] };
 const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
 
 if (pkg.sideEffects !== false) {
@@ -107,12 +116,16 @@ const manifestCapabilityCount = Array.isArray(packManifest.capabilities)
 const memoryTimeTravelCapabilityCount = Array.isArray(memoryTimeTravelManifest.capabilities)
   ? memoryTimeTravelManifest.capabilities.length
   : 0;
+const wasmPluginRouteCount = Array.isArray(wasmPluginManifest.routes)
+  ? wasmPluginManifest.routes.length
+  : 0;
 const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
 const packSdkPrepareSummaryHelperExports = (packsSource.match(/export function summarizeCapabilityPrepare\b/g) ?? []).length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
   + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability
   + Math.max(0, memoryTimeTravelCapabilityCount - 20) * maxUnpackedGrowthPerMemoryTimeTravelCapability
+  + Math.max(0, wasmPluginRouteCount - 13) * maxUnpackedGrowthPerWASMPluginRoute
   + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport
   + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport;
 if (pack.unpackedSize > maxUnpackedSize) {

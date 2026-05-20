@@ -2,7 +2,7 @@
   "id": "yunque.pack.wasm-plugin",
   "name": "WASM Plugin Pack",
   "version": "0.1.0",
-  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行和权限证据包作为高风险可选能力包暴露。",
+  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行、远程安装审批队列与 installer continuation handoff 作为高风险可选能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -25,6 +25,7 @@
       "wasm.remote_install.approval_decision_plan",
       "wasm.remote_install.approval_writeback_plan",
       "wasm.remote_install.approval_queue_writeback",
+      "wasm.remote_install.installer_continuation_plan",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -39,6 +40,7 @@
       "/v1/wasm-plugin/remote-install/approval/decision/plan",
       "/v1/wasm-plugin/remote-install/approval/writeback/plan",
       "/v1/wasm-plugin/remote-install/approval/queue/writeback",
+      "/v1/wasm-plugin/remote-install/installer/continuation/plan",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -107,6 +109,11 @@
         "method": "POST",
         "path": "/v1/wasm-plugin/remote-install/approval/queue/writeback",
         "description": "Persist only a pack-local approval queue store record for a remote install decision; no package download, signature verification, plugin file write, or installer continuation is performed."
+      },
+      {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/installer/continuation/plan",
+        "description": "Plan-only installer continuation handoff that consumes the pack-local approval queue store and emits installer handoff artifacts without download, network access, signature verification, plugin file writes, registration, or installer continuation."
       },
       {
         "method": "GET",

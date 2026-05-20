@@ -38,8 +38,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 12 {
-		t.Fatalf("expected 12 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 13 {
+		t.Fatalf("expected 13 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,18 +53,19 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":                                  {http.MethodGet},
-		"/v1/wasm-plugin/plugins":                                 {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":                                {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":                            {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload":                          {http.MethodPost},
-		"/v1/wasm-plugin/execute":                                 {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/plan":                     {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/plan":            {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/decision/plan":   {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/writeback/plan":  {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/queue/writeback": {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":                               {http.MethodGet},
+		"/v1/wasm-plugin/status":                                     {http.MethodGet},
+		"/v1/wasm-plugin/plugins":                                    {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":                                   {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":                               {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":                             {http.MethodPost},
+		"/v1/wasm-plugin/execute":                                    {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan":                        {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/plan":               {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/decision/plan":      {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/writeback/plan":     {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/queue/writeback":    {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/continuation/plan": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":                                  {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -254,6 +255,45 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/continuation/plan", strings.NewReader(`{"request_key":"custom-request-key"}`))
+	h.RemoteInstallInstallerContinuationPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "installer_continuation_plan_ready") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") {
+		t.Fatalf("remote install installer continuation plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var installerPlanResp struct {
+		Plan RemoteInstallInstallerContinuationPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&installerPlanResp); err != nil {
+		t.Fatalf("decode remote install installer continuation plan: %v", err)
+	}
+	installerPlan := installerPlanResp.Plan
+	if !installerPlan.InstallerContinuationPlanReady || !installerPlan.ConsumesApprovalQueueStore || !installerPlan.ApprovalQueueStoreReady || !installerPlan.ApprovalQueueRecordFound {
+		t.Fatalf("installer continuation plan should consume the pack-local queue store and select the record: %#v", installerPlan)
+	}
+	if !installerPlan.ApprovalApproved || !installerPlan.WouldAllowInstallerContinue || !installerPlan.BlocksInstaller || installerPlan.InstallerReady || !installerPlan.InstallerBlockedUntilInstallerWiring {
+		t.Fatalf("installer continuation should preview approved policy but keep installer blocked: %#v", installerPlan)
+	}
+	if installerPlan.Downloads || installerPlan.WritesFiles || installerPlan.NetworkAccess || installerPlan.InstallsPlugin || installerPlan.DownloadReady || installerPlan.SignatureVerifyReady || installerPlan.RemoteInstallReady {
+		t.Fatalf("installer continuation plan must remain non-destructive: %#v", installerPlan)
+	}
+	if installerPlan.RequestKey != "custom-request-key" || installerPlan.InstallerPlan.Artifact != "installer-continuation-plan.json" || installerPlan.InstallerPlan.DownloadHandoffArtifact != "installer-download-handoff-plan.json" || installerPlan.InstallerPlan.RegistrationHandoffArtifact != "installer-registration-handoff-plan.json" {
+		t.Fatalf("installer continuation should expose deterministic handoff artifacts: %#v", installerPlan.InstallerPlan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/continuation/plan", strings.NewReader(`{"request_key":"missing-request"}`))
+	h.RemoteInstallInstallerContinuationPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing installer continuation plan should still return plan-only status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&installerPlanResp); err != nil {
+		t.Fatalf("decode missing installer continuation plan: %v", err)
+	}
+	if !installerPlanResp.Plan.InstallerContinuationPlanReady || installerPlanResp.Plan.ApprovalQueueRecordFound || installerPlanResp.Plan.WouldAllowInstallerContinue || !installerPlanResp.Plan.BlocksInstaller || installerPlanResp.Plan.Status != "blocked_missing_approval_queue_record" {
+		t.Fatalf("missing installer continuation selector should remain blocked with a shaped plan: %#v", installerPlanResp.Plan)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/execute", strings.NewReader(`{"slug":"calculator","input":"hello"}`))
 	h.Execute(w, req)
 	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "host ABI execution blocked") || fake.calls != 0 {
@@ -323,21 +363,22 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		Files                 []string                                 `json:"files"`
-		HostABIPlan           HostABIPlan                              `json:"host_abi_plan"`
-		HostABIGate           HostABIExecutionGate                     `json:"host_abi_gate"`
-		ModuleIntegrityGate   ModuleIntegrityGate                      `json:"module_integrity_gate"`
-		RemoteInstallPlan     RemoteInstallPlanReport                  `json:"remote_install_plan"`
-		SignatureVerification SignatureVerificationPlan                `json:"signature_verification"`
-		ApprovalGatePlan      RemoteInstallApprovalPlanReport          `json:"approval_gate_plan"`
-		ApprovalDecisionPlan  RemoteInstallApprovalDecisionPlanReport  `json:"approval_decision_plan"`
-		ApprovalWritebackPlan RemoteInstallApprovalWritebackPlanReport `json:"approval_writeback_plan"`
-		ApprovalQueueStore    ApprovalQueueStoreSummary                `json:"approval_queue_store"`
-		ApprovalQueueRecord   ApprovalQueueRecord                      `json:"approval_queue_record"`
+		Files                     []string                                 `json:"files"`
+		HostABIPlan               HostABIPlan                              `json:"host_abi_plan"`
+		HostABIGate               HostABIExecutionGate                     `json:"host_abi_gate"`
+		ModuleIntegrityGate       ModuleIntegrityGate                      `json:"module_integrity_gate"`
+		RemoteInstallPlan         RemoteInstallPlanReport                  `json:"remote_install_plan"`
+		SignatureVerification     SignatureVerificationPlan                `json:"signature_verification"`
+		ApprovalGatePlan          RemoteInstallApprovalPlanReport          `json:"approval_gate_plan"`
+		ApprovalDecisionPlan      RemoteInstallApprovalDecisionPlanReport  `json:"approval_decision_plan"`
+		ApprovalWritebackPlan     RemoteInstallApprovalWritebackPlanReport `json:"approval_writeback_plan"`
+		ApprovalQueueStore        ApprovalQueueStoreSummary                `json:"approval_queue_store"`
+		ApprovalQueueRecord       ApprovalQueueRecord                      `json:"approval_queue_record"`
+		InstallerContinuationPlan InstallerContinuationPlan                `json:"installer_continuation_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -371,6 +412,14 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !evidenceResp.ApprovalQueueRecord.ApprovalQueueStoreReady || evidenceResp.ApprovalQueueRecord.StoreArtifact != "approval-queue-store.json" || evidenceResp.ApprovalQueueRecord.WritesApprovalQueue {
 		t.Fatalf("evidence should include a non-persisting approval queue record preview: %#v", evidenceResp.ApprovalQueueRecord)
+	}
+	if !containsString(evidenceResp.Files, "installer-continuation-plan.json") ||
+		!containsString(evidenceResp.Files, "installer-download-handoff-plan.json") ||
+		!evidenceResp.InstallerContinuationPlan.InstallerContinuationPlanReady ||
+		!evidenceResp.InstallerContinuationPlan.ConsumesApprovalQueueStore ||
+		evidenceResp.InstallerContinuationPlan.InstallerReady ||
+		!evidenceResp.InstallerContinuationPlan.BlocksInstaller {
+		t.Fatalf("evidence should include a conservative installer continuation handoff plan: files=%#v plan=%#v", evidenceResp.Files, evidenceResp.InstallerContinuationPlan)
 	}
 }
 
