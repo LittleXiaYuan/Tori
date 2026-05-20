@@ -16,6 +16,10 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "approval-writeback-plan.json",
   "approval-queue-store.json",
   "approval-queue-record.json",
+  "installer-continuation-plan.json",
+  "installer-download-handoff-plan.json",
+  "installer-registration-handoff-plan.json",
+  "installer-audit-handoff-plan.json",
   "signature-verification.json",
 ] as const;
 
@@ -54,6 +58,12 @@ export const WASM_PLUGIN_APPROVAL_QUEUE_STORE_ARTIFACT =
 
 export const WASM_PLUGIN_APPROVAL_QUEUE_WRITEBACK_CAPABILITY =
   "wasm.remote_install.approval_queue_writeback";
+
+export const WASM_PLUGIN_INSTALLER_CONTINUATION_PLAN_CAPABILITY =
+  "wasm.remote_install.installer_continuation_plan";
+
+export const WASM_PLUGIN_INSTALLER_CONTINUATION_PLAN_ARTIFACT =
+  "installer-continuation-plan.json";
 
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
@@ -108,6 +118,9 @@ export type WASMPluginStatusResponse = {
   approval_writeback_plan_ready: boolean;
   approval_writeback_ready: boolean;
   approval_queue_store_ready: boolean;
+  installer_continuation_plan_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_installer_wiring: boolean;
   approval_queue_store?: WASMPluginApprovalQueueStoreSummary;
   plugin_count: number;
   loaded_count: number;
@@ -292,6 +305,12 @@ export type WASMPluginRemoteInstallApprovalWritebackPlanRequest =
 
 export type WASMPluginRemoteInstallApprovalQueueWritebackRequest =
   WASMPluginRemoteInstallApprovalWritebackPlanRequest;
+
+export type WASMPluginRemoteInstallInstallerContinuationPlanRequest = {
+  request_id?: string;
+  request_key?: string;
+  slug?: string;
+};
 
 export type WASMPluginRemoteInstallPluginPlan = {
   slug: string;
@@ -694,6 +713,96 @@ export type WASMPluginRemoteInstallApprovalQueueWriteback = {
   notes?: string[];
 };
 
+export type WASMPluginInstallerContinuationPlan = {
+  pack_id: string;
+  generated_at: string;
+  installer_continuation_plan_ready: boolean;
+  consumes_approval_queue_store: boolean;
+  approval_queue_store_ready: boolean;
+  approval_queue_record_found: boolean;
+  approval_queue_ready: boolean;
+  approval_decision_ready: boolean;
+  approval_approved: boolean;
+  would_allow_installer_continue: boolean;
+  blocks_installer: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_installer_wiring: boolean;
+  status: string;
+  queue_name: string;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  decision?: "approved" | "denied" | "expired";
+  required_fields: string[];
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  signature_gate_status?: string;
+  canonical_payload_sha256?: string;
+  queue_store_artifact: string;
+  queue_record_artifact: string;
+  download_handoff_artifact: string;
+  registration_handoff_artifact: string;
+  audit_handoff_artifact: string;
+  artifact: string;
+  remote_install_ready: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  checks: WASMPluginRemoteInstallCheck[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallInstallerContinuationPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  installer_continuation_plan_ready: boolean;
+  consumes_approval_queue_store: boolean;
+  approval_queue_store_ready: boolean;
+  approval_queue_record_found: boolean;
+  approval_queue_ready: boolean;
+  approval_decision_ready: boolean;
+  approval_writeback_ready: boolean;
+  applies_approval_decision: boolean;
+  approval_approved: boolean;
+  would_allow_installer_continue: boolean;
+  blocks_installer: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_installer_wiring: boolean;
+  remote_install_ready: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  decision?: "approved" | "denied" | "expired";
+  decision_by?: string;
+  decision_reason?: string;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  signature_gate_status?: string;
+  canonical_payload_sha256?: string;
+  approval_queue_record?: WASMPluginApprovalQueueRecord;
+  approval_queue_store: WASMPluginApprovalQueueStoreSummary;
+  installer_plan: WASMPluginInstallerContinuationPlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
 export type WASMPluginRemoteInstallApprovalDecisionPlanResponse = {
   plan: WASMPluginRemoteInstallApprovalDecisionPlan;
 };
@@ -704,6 +813,10 @@ export type WASMPluginRemoteInstallApprovalWritebackPlanResponse = {
 
 export type WASMPluginRemoteInstallApprovalQueueWritebackResponse = {
   writeback: WASMPluginRemoteInstallApprovalQueueWriteback;
+};
+
+export type WASMPluginRemoteInstallInstallerContinuationPlanResponse = {
+  plan: WASMPluginRemoteInstallInstallerContinuationPlan;
 };
 
 export type WASMPluginRemoteInstallApprovalPlanResponse = {
@@ -750,6 +863,7 @@ export type WASMPluginEvidenceResponse = {
   approval_writeback_plan: WASMPluginRemoteInstallApprovalWritebackPlan;
   approval_queue_store: WASMPluginApprovalQueueStoreSummary;
   approval_queue_record: WASMPluginApprovalQueueRecord;
+  installer_continuation_plan: WASMPluginInstallerContinuationPlan;
   sandbox?: Record<string, unknown>;
 };
 
@@ -939,6 +1053,16 @@ export class WASMPluginClient {
     return this.request<WASMPluginRemoteInstallApprovalQueueWritebackResponse>(
       "POST",
       "/v1/wasm-plugin/remote-install/approval/queue/writeback",
+      input,
+    );
+  }
+
+  remoteInstallInstallerContinuationPlan(
+    input: WASMPluginRemoteInstallInstallerContinuationPlanRequest,
+  ): Promise<WASMPluginRemoteInstallInstallerContinuationPlanResponse> {
+    return this.request<WASMPluginRemoteInstallInstallerContinuationPlanResponse>(
+      "POST",
+      "/v1/wasm-plugin/remote-install/installer/continuation/plan",
       input,
     );
   }
