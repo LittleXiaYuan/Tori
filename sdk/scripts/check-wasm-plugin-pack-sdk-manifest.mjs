@@ -160,9 +160,9 @@ for (const token of ["WASM 插件引擎", "校验 / 注册插件", "Dry-run", "�
 }
 
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
-for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/remote-install/installer/continuation/plan", "/v1/wasm-plugin/remote-install/installer/download/writeback", "/v1/wasm-plugin/remote-install/signature-verification/writeback", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "installer_download_record", "signature_verification_record", "signature_verification_store", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json",
+for (const token of ["/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/remote-install/installer/continuation/plan", "/v1/wasm-plugin/remote-install/installer/download/writeback", "/v1/wasm-plugin/remote-install/signature-verification/writeback", "/v1/wasm-plugin/remote-install/package/inspect/writeback", "/v1/wasm-plugin/evidence/calculator", "host_abi_plan", "module_integrity_gate", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_queue_entry", "approval_decision_plan", "approval_writeback_plan", "installer_download_record", "signature_verification_record", "signature_verification_store", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json",
   "signature-verification-record.json",
-  "signature-verification-store.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json"]) {
+  "signature-verification-store.json", "package-inspection.json", "package-inspect-record.json", "package-inspect-store.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json"]) {
   if (!frontendTest.includes(token)) fail(`WASM Plugin frontend client test missing token: ${token}`);
 }
 
@@ -207,6 +207,7 @@ for (const token of [
   "wasm.remote_install.installer_continuation_plan",
   "wasm.remote_install.installer_download_writeback",
   "wasm.remote_install.signature_verification_writeback",
+  "wasm.remote_install.package_inspect_writeback",
   "RemoteInstallInstallerDownloadWritebackReport",
   "InstallerDownloadRecord",
   "installer_download_writeback_ready",

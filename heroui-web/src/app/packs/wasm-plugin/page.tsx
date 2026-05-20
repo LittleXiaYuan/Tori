@@ -33,6 +33,7 @@ import {
   type WASMPluginRemoteInstallApprovalWritebackPlan,
   type WASMPluginRemoteInstallInstallerContinuationPlan,
   type WASMPluginRemoteInstallInstallerDownloadWriteback,
+  type WASMPluginRemoteInstallPackageInspectWriteback,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginRemoteInstallSignatureVerificationWriteback,
   type WASMPluginStatus,
@@ -271,6 +272,22 @@ function sampleSignatureVerificationWriteback(slug: string) {
   );
 }
 
+function samplePackageInspectWriteback(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      request_key: "preview-request-key",
+      approved: true,
+      inspected_by: "security",
+      reason:
+        "inspect the verified package archive for safe manifest/module layout; keep plugin_dir writes and registration blocked",
+      metadata: { ticket: "WASM-REMOTE-PACKAGE-INSPECT-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -289,6 +306,7 @@ export default function WASMPluginPackPage() {
     | "remote-installer-continuation"
     | "remote-installer-download"
     | "remote-signature-verification"
+    | "remote-package-inspect"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -338,6 +356,11 @@ export default function WASMPluginPackPage() {
     useState<WASMPluginRemoteInstallSignatureVerificationWriteback | null>(
       null,
     );
+  const [remotePackageInspectJSON, setRemotePackageInspectJSON] = useState(() =>
+    samplePackageInspectWriteback("calculator-remote"),
+  );
+  const [remotePackageInspect, setRemotePackageInspect] =
+    useState<WASMPluginRemoteInstallPackageInspectWriteback | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -527,6 +550,23 @@ export default function WASMPluginPackPage() {
     }
   };
 
+  const writePackageInspect = async () => {
+    setBusy("remote-package-inspect");
+    setError(null);
+    try {
+      const payload = JSON.parse(remotePackageInspectJSON);
+      const res =
+        await wasmPluginPack.remoteInstallPackageInspectWriteback(payload);
+      setRemotePackageInspect(res.writeback);
+      showToast("已写入 pack-local 包结构检查记录", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入包结构检查记录失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const setLoaded = async (loaded: boolean) => {
     const target = slug || selectedPlugin?.slug;
     if (!target) return;
@@ -700,6 +740,10 @@ export default function WASMPluginPackPage() {
                 )}
               </Chip>
               <Chip size="sm">
+                package_inspect_writeback_ready:{" "}
+                {String(status?.package_inspect_writeback_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
                 installer_blocked_until_registration:{" "}
                 {String(status?.installer_blocked_until_registration ?? true)}
               </Chip>
@@ -732,7 +776,10 @@ export default function WASMPluginPackPage() {
               signature verification writeback 再消费 installer-download-store，
               对缓存包执行 Ed25519 验签，只写
               signature-verification-store.json / record，不解包、不写
-              plugin_dir、不注册插件，继续保持 remote_install_ready=false /
+              plugin_dir、不注册插件；package inspect writeback 再读取已验签缓存包，
+              只检查 tar.gz 内 manifest 与 WASM module 布局并写
+              package-inspect-store.json / record，不解包到 plugin_dir、不注册插件；
+              继续保持 remote_install_ready=false /
               installer_ready=false / installer_blocked_until_registration=true。
               后续 install 写回、插件注册、Host ABI 权限强执行和 TinyGo
               示例会继续接入。
@@ -841,7 +888,9 @@ export default function WASMPluginPackPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">Installer</div>
           <div className="kpi-value text-lg">
-            {status?.signature_verification_writeback_ready
+            {status?.package_inspect_writeback_ready
+              ? "inspect"
+              : status?.signature_verification_writeback_ready
               ? "verify"
               : status?.installer_download_writeback_ready
               ? "cache"
@@ -933,6 +982,116 @@ export default function WASMPluginPackPage() {
                 校验 / 注册插件
               </Button>
             </div>
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <PackageCheck size={16} />
+                  Package inspect writeback
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  包结构检查边界：消费 pack-local
+                  signature-verification-store.json / record，读取已验签缓存
+                  tar.gz，只确认 manifest.json / plugin.json 与目标 .wasm
+                  模块存在、路径安全、SHA-256 证据可复核；只写
+                  package-inspect-store.json / package-inspect-record.json。
+                  它不解包到 plugin_dir、不注册插件、不加载模块，也不会把
+                  remote_install_ready / installer_ready 置为 true。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-package-inspect"}
+                onPress={writePackageInspect}
+              >
+                写入包检查
+              </Button>
+            </div>
+            <TextField
+              value={remotePackageInspectJSON}
+              onChange={setRemotePackageInspectJSON}
+            >
+              <TextArea
+                rows={7}
+                aria-label="WASM remote install package inspect writeback JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                package_inspect_writeback_ready:{" "}
+                {String(
+                  remotePackageInspect?.package_inspect_writeback_ready ??
+                    status?.package_inspect_writeback_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                package_inspect_ready:{" "}
+                {String(remotePackageInspect?.package_inspect_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                package_layout_ready:{" "}
+                {String(remotePackageInspect?.package_layout_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                manifest_found:{" "}
+                {String(remotePackageInspect?.manifest_found ?? false)}
+              </Chip>
+              <Chip size="sm">
+                wasm_module_found:{" "}
+                {String(remotePackageInspect?.wasm_module_found ?? false)}
+              </Chip>
+              <Chip size="sm">
+                writes_package_inspect_store:{" "}
+                {String(
+                  remotePackageInspect?.writes_package_inspect_store ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remotePackageInspect?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                remote_install_ready:{" "}
+                {String(remotePackageInspect?.remote_install_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remotePackageInspect?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_registration:{" "}
+                {String(
+                  remotePackageInspect
+                    ?.installer_blocked_until_registration ??
+                    status?.installer_blocked_until_registration ??
+                    true,
+                )}
+              </Chip>
+              <Chip size="sm">artifact: package-inspection.json</Chip>
+              <Chip size="sm">artifact: package-inspect-record.json</Chip>
+              <Chip size="sm">artifact: package-inspect-store.json</Chip>
+            </div>
+            {remotePackageInspect && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remotePackageInspect, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM package inspect writeback result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
           </Card>
 
           <Card className="section-card p-4">
