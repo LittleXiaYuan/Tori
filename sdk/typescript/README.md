@@ -124,7 +124,7 @@ import { createAgentKit } from "yunque-client/agent-kit";
 import { createAuthClient } from "yunque-client/auth";
 import { createAiriClient } from "yunque-client/airi";
 import { createBackupClient } from "yunque-client/backup";
-import { createPacksClient, hasCatalogSourceIssues, summarizeCatalogSourceReports } from "yunque-client/packs";
+import { createPacksClient, hasCatalogSourceIssues, summarizeCapabilityPrepare, summarizeCatalogSourceReports } from "yunque-client/packs";
 import { createPlannerRecoveryClient } from "yunque-client/planner-recovery";
 import { createPlannerClient } from "yunque-client/planner";
 import { createPlannerReadClient } from "yunque-client/planner-read";
@@ -2356,16 +2356,18 @@ The lightweight Tori SDK exposes Tori account bind/status/unbind, bound-instance
 The lightweight Packs SDK reads `/v1/packs/installed`, `/v1/packs/enabled`, `/v1/packs/catalog`, and `/v1/packs/backend-modules` so the frontend shell can synchronize menus, frontend route bindings, backend route method/path bindings, UI assets, SDK entrypoints, and catalog `source_reports` from the backend pack registry instead of hard-coding every capability in the main app.
 
 ```ts
-import { createPacksClient } from "yunque-client/packs";
+import { createPacksClient, summarizeCapabilityPrepare } from "yunque-client/packs";
 
 const packs = createPacksClient({ baseUrl: "http://localhost:9090", apiKey: "<api-key>" });
 await packs.install({ manifestPath: "packs/examples/backup-pack/pack.json" });
 const catalog = await packs.catalog();
 const modules = await packs.backendModules();
 const sync = await packs.frontendSync();
+const prepare = await packs.prepareCapabilities(["backup.info", "rpa.replay.plan"]);
 console.log(catalog.source_reports?.map((source) => [source.source, source.ok, source.manifest_count, source.matched_entries]));
 // planCapabilities() / prepareCapabilities() also return catalog_source_reports.
 console.log(summarizeCatalogSourceReports(catalog.source_reports), hasCatalogSourceIssues(catalog));
+console.log(summarizeCapabilityPrepare(prepare.plan, prepare));
 console.log(sync.menus, sync.routes, sync.routeBindings, sync.backendRouteBindings, sync.sdk);
 // TypeScript pack SDK import example:
 // import * as packSdk from sync.sdk.find((entry) => entry.language === "typescript")!.importPath;

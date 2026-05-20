@@ -8,6 +8,7 @@ const basePackSdkHelperExports = 0;
 const maxUnpackedGrowthPerExport = 2_500;
 const maxUnpackedGrowthPerManifestCapability = 1_000;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
+const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const packManifestPath = "../manifest/packs-sdk.json";
@@ -96,10 +97,12 @@ const manifestCapabilityCount = Array.isArray(packManifest.capabilities)
   ? packManifest.capabilities.length
   : 0;
 const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
+const packSdkPrepareSummaryHelperExports = (packsSource.match(/export function summarizeCapabilityPrepare\b/g) ?? []).length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
   + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability
-  + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport;
+  + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport
+  + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport;
 if (pack.unpackedSize > maxUnpackedSize) {
   console.error(`pack unpacked size ${pack.unpackedSize} exceeds dynamic budget ${maxUnpackedSize}`);
   process.exit(1);

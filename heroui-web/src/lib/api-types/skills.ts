@@ -294,6 +294,39 @@ export interface PackCapabilityPrepareReport {
   route_audit_issues?: PackBackendRouteAuditEntry[];
 }
 
+export interface PackCapabilityPrepareSummary {
+  kind: "pack_capability_prepare_summary";
+  generated_at: string;
+  capabilities: string[];
+  allowed: boolean;
+  action: string;
+  plan: {
+    allowed_count: number;
+    blocked_count: number;
+    use_count: number;
+    enable_count: number;
+    install_count: number;
+    route_audit_issue_count: number;
+    required_packs: PackCapabilityIndexEntry[];
+    enable_packs: PackCapabilityIndexEntry[];
+    install_capabilities: string[];
+    catalog_install_hints: PackCatalogEntry[];
+    catalog_download_hints: PackCatalogEntry[];
+  };
+  prepare: {
+    step_count: number;
+    ready_count: number;
+    enable_count: number;
+    install_count: number;
+    download_count: number;
+    route_audit_issue_count: number;
+  } | null;
+  steps: PackCapabilityPrepareStep[];
+  catalog_source_reports: PackCatalogSourceReport[];
+  route_audit_issues: PackBackendRouteAuditEntry[];
+  unavailable_reasons: string[];
+}
+
 export interface PackCatalogEntry {
   manifest_path?: string;
   source?: string;

@@ -37,6 +37,38 @@ export type PackPruneResponse = { removed: string[]; kept: string[]; errors?: st
 export type PackInstallRequest = { manifestPath?: string; manifestUrl?: string; source?: string; download?: boolean };
 export type PacksClientOptions = { baseUrl: string; token?: string; apiKey?: string; headers?: HeadersInit; fetch?: typeof fetch };
 export type PackCatalogSourceSummary = { total_sources: number; ok_sources: number; error_sources: number; manifest_count: number; matched_entries: number; errors: string[]; [key: string]: unknown };
+export type PackCapabilityPrepareSummary = {
+  kind: "pack_capability_prepare_summary";
+  generated_at: string;
+  capabilities: string[];
+  allowed: boolean;
+  action: string;
+  plan: {
+    allowed_count: number;
+    blocked_count: number;
+    use_count: number;
+    enable_count: number;
+    install_count: number;
+    route_audit_issue_count: number;
+    required_packs: PackCapabilityIndexEntry[];
+    enable_packs: PackCapabilityIndexEntry[];
+    install_capabilities: string[];
+    catalog_install_hints: PackCatalogEntry[];
+    catalog_download_hints: PackCatalogEntry[];
+  };
+  prepare: {
+    step_count: number;
+    ready_count: number;
+    enable_count: number;
+    install_count: number;
+    download_count: number;
+    route_audit_issue_count: number;
+  } | null;
+  steps: PackCapabilityPrepareStep[];
+  catalog_source_reports: PackCatalogSourceReport[];
+  route_audit_issues: PackBackendRouteAuditEntry[];
+  unavailable_reasons: string[];
+};
 
 export class PacksClientError extends Error { readonly status: number; readonly body: unknown; constructor(status: number, body: unknown, message?: string) { super(message || `Packs request failed with HTTP ${status}`); this.name = "PacksClientError"; this.status = status; this.body = body; } }
 function trimBaseUrl(baseUrl: string): string { return baseUrl.replace(/\/+$/, ""); }
@@ -53,6 +85,7 @@ function packFrontendPaths(pack: InstalledPack): string[] { return Array.from(ne
 function packCapabilityBindings(pack: InstalledPack): PackCapabilityBinding[] { const sdk = packSdkEntrypoints(pack); const frontendPaths = packFrontendPaths(pack); return (pack.manifest.backend?.capabilities ?? []).filter((capability) => capability.trim().length > 0).map((capability) => ({ capability, packId: pack.manifest.id, packName: pack.manifest.name, routes: [...(pack.manifest.backend?.routes ?? [])], permissions: [...(pack.manifest.backend?.permissions ?? [])], frontendPaths, sdk })); }
 export function summarizeCatalogSourceReports(reports: readonly PackCatalogSourceReport[] = []): PackCatalogSourceSummary { const errors = new Set<string>(); const summary: PackCatalogSourceSummary = { total_sources: reports.length, ok_sources: 0, error_sources: 0, manifest_count: 0, matched_entries: 0, errors: [] }; for (const report of reports) { if (report.ok && (report.errors?.length ?? 0) === 0) summary.ok_sources += 1; else summary.error_sources += 1; summary.manifest_count += report.manifest_count; summary.matched_entries += report.matched_entries; for (const error of report.errors ?? []) if (error.trim()) errors.add(error); } summary.errors = [...errors]; return summary; }
 export function hasCatalogSourceIssues(report: { source_reports?: PackCatalogSourceReport[]; catalog_source_reports?: PackCatalogSourceReport[]; errors?: string[] }): boolean { const reports = report.source_reports ?? report.catalog_source_reports; return (reports ?? []).some((source) => !source.ok || (source.errors?.length ?? 0) > 0) || (report.errors?.length ?? 0) > 0; }
+export function summarizeCapabilityPrepare(plan: PackCapabilityPlanReport, prepare?: PackCapabilityPrepareReport | null): PackCapabilityPrepareSummary { return { kind: "pack_capability_prepare_summary", generated_at: prepare?.generated_at || plan.generated_at, capabilities: prepare?.capabilities || plan.capabilities, allowed: prepare?.allowed ?? plan.allowed, action: prepare?.action || plan.action, plan: { allowed_count: plan.allowed_count, blocked_count: plan.blocked_count, use_count: plan.use_count, enable_count: plan.enable_count, install_count: plan.install_count, route_audit_issue_count: plan.route_audit_issue_count, required_packs: plan.required_packs || [], enable_packs: plan.enable_packs || [], install_capabilities: plan.install_capabilities || [], catalog_install_hints: plan.catalog_install_hints || [], catalog_download_hints: plan.catalog_download_hints || [] }, prepare: prepare ? { step_count: prepare.step_count, ready_count: prepare.ready_count, enable_count: prepare.enable_count, install_count: prepare.install_count, download_count: prepare.download_count, route_audit_issue_count: prepare.route_audit_issue_count } : null, steps: prepare?.steps || [], catalog_source_reports: prepare?.catalog_source_reports || plan.catalog_source_reports || [], route_audit_issues: prepare?.route_audit_issues || plan.route_audit_issues || [], unavailable_reasons: prepare?.unavailable_reasons || plan.unavailable_reasons || [] }; }
 
 export class PacksClient {
   private readonly baseUrl: string; private readonly fetchImpl: typeof fetch; private readonly headers: HeadersInit | undefined; private readonly token: string | undefined; private readonly apiKey: string | undefined;
