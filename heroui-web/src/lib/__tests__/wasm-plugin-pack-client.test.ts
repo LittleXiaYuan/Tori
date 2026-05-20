@@ -626,6 +626,112 @@ describe("wasm-plugin-pack-client", () => {
     labels: ["remote-install", "installer-download-writeback"],
   };
 
+  const signatureVerificationStore = {
+    pack_id: "yunque.pack.wasm-plugin",
+    store: "pack-local-json",
+    store_ready: true,
+    record_count: 1,
+    artifact: "signature-verification-store.json",
+    writes_files: false,
+    writes_signature_verification_store: false,
+    installer_writeback_ready: false,
+  };
+
+  const verifiedSignaturePlan = {
+    ...remoteInstallPlan.signature_verification,
+    verification_gate_ready: true,
+    signature_verify_ready: true,
+    allows_install: true,
+    blocked: false,
+    status: "signature_verified_pending_registration",
+    labels: ["signature-verification", "verified"],
+  };
+
+  const signatureVerificationRecord = {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    status: "signature_verified_pending_installer_registration",
+    signature_verification_writeback_ready: true,
+    installer_download_record_found: true,
+    package_cache_ready: true,
+    download_ready: true,
+    signature_verify_ready: true,
+    signature_verified: true,
+    allows_installer_writeback: true,
+    remote_install_ready: false,
+    installer_ready: false,
+    installer_blocked_until_registration: true,
+    writes_files: false,
+    writes_signature_verification_store: true,
+    installs_plugin: false,
+    queue_name: "wasm_remote_install",
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision_key: "decision-key",
+    verified_by: "security",
+    reason: "verify cached package",
+    algorithm: "ed25519",
+    public_key_id: "root",
+    trust_root: "yunque-pack-root",
+    canonical_payload_sha256: "payload-digest",
+    expected_sha256: installerDownloadRecord.expected_sha256,
+    actual_sha256: installerDownloadRecord.actual_sha256,
+    sha256_match: true,
+    signature_artifact: "signature-verification.json",
+    store_artifact: "signature-verification-store.json",
+    package_cache_artifact: "installer-package-cache-calculator-remote.tgz",
+    package_cache_path:
+      "/pack-data/installer-cache/installer-package-cache-calculator-remote.tgz",
+    artifact: "signature-verification-record.json",
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    signature_verification: verifiedSignaturePlan,
+    checks: [],
+    labels: ["remote-install", "signature-verification", "verified"],
+  };
+
+  const signatureVerificationWriteback = {
+    pack_id: "yunque.pack.wasm-plugin",
+    generated_at: "now",
+    status: "signature_verified_pending_installer_registration",
+    signature_verification_writeback_ready: true,
+    consumes_installer_download_store: true,
+    installer_download_record_found: true,
+    package_cache_ready: true,
+    approval_approved: true,
+    download_ready: true,
+    signature_verify_ready: true,
+    signature_verified: true,
+    allows_installer_writeback: true,
+    remote_install_ready: false,
+    installer_ready: false,
+    installer_blocked_until_registration: true,
+    downloads: false,
+    network_access: false,
+    writes_files: false,
+    writes_signature_verification_store: true,
+    installs_plugin: false,
+    request_id: "wasm-remote-install-preview",
+    request_key: "request-key",
+    decision_key: "decision-key",
+    verified_by: "security",
+    reason: "verify cached package",
+    plugin: remoteInstallPlan.plugin,
+    package: remoteInstallPlan.package,
+    installer_download_record: installerDownloadRecord,
+    signature_verification: verifiedSignaturePlan,
+    verification_record: signatureVerificationRecord,
+    signature_verification_store: signatureVerificationStore,
+    checks: [],
+    artifacts: [
+      "signature-verification-record.json",
+      "signature-verification-store.json",
+      "installer-download-record.json",
+    ],
+    actions: [],
+    labels: ["remote-install", "signature-verification-writeback"],
+  };
+
   it("reads WASM Plugin pack status and plugin metadata through pack-owned routes", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
@@ -656,9 +762,12 @@ describe("wasm-plugin-pack-client", () => {
             approval_writeback_ready: true,
             installer_continuation_plan_ready: true,
             installer_download_writeback_ready: true,
+            signature_verification_writeback_ready: true,
             installer_ready: false,
+            installer_blocked_until_registration: true,
             installer_blocked_until_signature_verify: true,
             installer_blocked_until_installer_wiring: true,
+            signature_verification_store: signatureVerificationStore,
             plugin_count: 1,
             loaded_count: 0,
             capabilities: [
@@ -674,6 +783,7 @@ describe("wasm-plugin-pack-client", () => {
               "wasm.remote_install.approval_queue_writeback",
               "wasm.remote_install.installer_continuation_plan",
               "wasm.remote_install.installer_download_writeback",
+              "wasm.remote_install.signature_verification_writeback",
             ],
           }),
           { status: 200 },
@@ -759,9 +869,14 @@ describe("wasm-plugin-pack-client", () => {
     expect(status.approval_writeback_ready).toBe(true);
     expect(status.installer_continuation_plan_ready).toBe(true);
     expect(status.installer_download_writeback_ready).toBe(true);
+    expect(status.signature_verification_writeback_ready).toBe(true);
     expect(status.installer_ready).toBe(false);
+    expect(status.installer_blocked_until_registration).toBe(true);
     expect(status.installer_blocked_until_signature_verify).toBe(true);
     expect(status.installer_blocked_until_installer_wiring).toBe(true);
+    expect(status.signature_verification_store?.artifact).toBe(
+      "signature-verification-store.json",
+    );
     expect(status.capabilities).toContain("wasm.host_abi.plan");
     expect(status.capabilities).toContain("wasm.host_abi.execution_gate");
     expect(status.capabilities).toContain("wasm.module.integrity_gate");
@@ -787,6 +902,9 @@ describe("wasm-plugin-pack-client", () => {
     );
     expect(status.capabilities).toContain(
       "wasm.remote_install.installer_download_writeback",
+    );
+    expect(status.capabilities).toContain(
+      "wasm.remote_install.signature_verification_writeback",
     );
     expect(spy.mock.calls.map((call) => call[0])).toEqual([
       "/v1/wasm-plugin/status",
@@ -867,6 +985,14 @@ describe("wasm-plugin-pack-client", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({ writeback: installerDownloadWriteback }),
+          {
+            status: 202,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ writeback: signatureVerificationWriteback }),
           {
             status: 202,
           },
@@ -975,6 +1101,13 @@ describe("wasm-plugin-pack-client", () => {
       approved_by: "security",
       reason: "download cache",
     });
+    const signatureVerification =
+      await client.remoteInstallSignatureVerificationWriteback({
+        request_key: "request-key",
+        approved: true,
+        verified_by: "security",
+        reason: "verify cached package",
+      });
     await client.unload("calculator");
 
     expect(executed.result.host_abi_plan.plan_ready).toBe(true);
@@ -1070,6 +1203,26 @@ describe("wasm-plugin-pack-client", () => {
       "installer-download-record.json",
     );
     expect(installerDownload.writeback.download_record.sha256_match).toBe(true);
+    expect(
+      signatureVerification.writeback.signature_verification_writeback_ready,
+    ).toBe(true);
+    expect(signatureVerification.writeback.signature_verify_ready).toBe(true);
+    expect(signatureVerification.writeback.signature_verified).toBe(true);
+    expect(signatureVerification.writeback.allows_installer_writeback).toBe(
+      true,
+    );
+    expect(
+      signatureVerification.writeback.writes_signature_verification_store,
+    ).toBe(true);
+    expect(signatureVerification.writeback.writes_files).toBe(false);
+    expect(signatureVerification.writeback.remote_install_ready).toBe(false);
+    expect(signatureVerification.writeback.installs_plugin).toBe(false);
+    expect(signatureVerification.writeback.verification_record.artifact).toBe(
+      "signature-verification-record.json",
+    );
+    expect(
+      signatureVerification.writeback.signature_verification_store.artifact,
+    ).toBe("signature-verification-store.json");
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/plugins");
     expect((spy.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
     expect(
@@ -1206,7 +1359,19 @@ describe("wasm-plugin-pack-client", () => {
       approved_by: "security",
       reason: "download cache",
     });
-    expect(spy.mock.calls[10]?.[0]).toBe("/v1/wasm-plugin/plugins/unload");
+    expect(spy.mock.calls[10]?.[0]).toBe(
+      "/v1/wasm-plugin/remote-install/signature-verification/writeback",
+    );
+    expect((spy.mock.calls[10]?.[1] as RequestInit).method).toBe("POST");
+    expect(
+      JSON.parse(String((spy.mock.calls[10]?.[1] as RequestInit).body)),
+    ).toEqual({
+      request_key: "request-key",
+      approved: true,
+      verified_by: "security",
+      reason: "verify cached package",
+    });
+    expect(spy.mock.calls[11]?.[0]).toBe("/v1/wasm-plugin/plugins/unload");
   });
 
   it("exports JSON evidence packs by plugin slug", async () => {
@@ -1232,6 +1397,8 @@ describe("wasm-plugin-pack-client", () => {
             "installer-download-handoff-plan.json",
             "installer-download-record.json",
             "installer-package-cache.tgz",
+            "signature-verification-record.json",
+            "signature-verification-store.json",
             "installer-registration-handoff-plan.json",
             "installer-audit-handoff-plan.json",
           ],
@@ -1249,6 +1416,8 @@ describe("wasm-plugin-pack-client", () => {
           approval_queue_record: approvalQueueRecord,
           installer_continuation_plan: installerContinuationPlan.installer_plan,
           installer_download_record: installerDownloadRecord,
+          signature_verification_store: signatureVerificationStore,
+          signature_verification_record: signatureVerificationRecord,
         }),
         { status: 200 },
       ),
@@ -1270,6 +1439,8 @@ describe("wasm-plugin-pack-client", () => {
     expect(evidence.files).toContain("installer-download-handoff-plan.json");
     expect(evidence.files).toContain("installer-download-record.json");
     expect(evidence.files).toContain("installer-package-cache.tgz");
+    expect(evidence.files).toContain("signature-verification-record.json");
+    expect(evidence.files).toContain("signature-verification-store.json");
     expect(evidence.files).toContain("installer-registration-handoff-plan.json");
     expect(evidence.files).toContain("installer-audit-handoff-plan.json");
     expect(evidence.host_abi_plan.status).toBe("plan_only");
@@ -1308,6 +1479,18 @@ describe("wasm-plugin-pack-client", () => {
       "installer-download-record.json",
     );
     expect(evidence.installer_download_record.signature_verify_ready).toBe(
+      false,
+    );
+    expect(evidence.signature_verification_store.artifact).toBe(
+      "signature-verification-store.json",
+    );
+    expect(evidence.signature_verification_record.artifact).toBe(
+      "signature-verification-record.json",
+    );
+    expect(evidence.signature_verification_record.signature_verified).toBe(
+      true,
+    );
+    expect(evidence.signature_verification_record.remote_install_ready).toBe(
       false,
     );
     expect(spy.mock.calls[0]?.[0]).toBe("/v1/wasm-plugin/evidence/calculator");

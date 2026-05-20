@@ -30,8 +30,12 @@ function requireTokens(item, text, tokens) {
   else ok(item, `${tokens.length} tokens present`);
 }
 
-function runCheck(item, command, args, expected = 0) {
-  const result = spawnSync(command, args, { cwd: repoRoot, encoding: "utf8" });
+function runCheck(item, command, args, expected = 0, extraEnv = {}) {
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: { ...process.env, ...extraEnv },
+  });
   if (result.status !== expected) {
     fail(item, `${command} ${args.join(" ")} exited ${result.status}: ${result.stderr || result.stdout}`);
   } else {
@@ -994,6 +998,10 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "/v1/wasm-plugin/remote-install/approval/plan",
   "/v1/wasm-plugin/remote-install/approval/decision/plan",
   "/v1/wasm-plugin/remote-install/approval/writeback/plan",
+  "/v1/wasm-plugin/remote-install/approval/queue/writeback",
+  "/v1/wasm-plugin/remote-install/installer/continuation/plan",
+  "/v1/wasm-plugin/remote-install/installer/download/writeback",
+  "/v1/wasm-plugin/remote-install/signature-verification/writeback",
   "/v1/wasm-plugin/evidence/",
   "runtime_ready",
   "abi_plan_ready",
@@ -1023,6 +1031,11 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "RemoteInstallApprovalWritebackPlanReport",
   "installer_blocked_until_writeback",
   "blocked_until_approval_queue",
+  "signature_verification_writeback_ready",
+  "writes_signature_verification_store",
+  "allows_installer_writeback",
+  "signature_verified",
+  "installer_blocked_until_registration",
   "host_abi_plan",
   "host_abi_gate",
   "module_integrity_gate",
@@ -1047,8 +1060,10 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "wasm.remote_install.approval_queue_writeback",
   "wasm.remote_install.installer_continuation_plan",
   "wasm.remote_install.installer_download_writeback",
+  "wasm.remote_install.signature_verification_writeback",
   "/v1/wasm-plugin/remote-install/installer/continuation/plan",
   "/v1/wasm-plugin/remote-install/installer/download/writeback",
+  "/v1/wasm-plugin/remote-install/signature-verification/writeback",
   "host-abi-plan.json",
   "remote-install-plan.json",
   "approval-gate-plan.json",
@@ -1061,6 +1076,8 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "installer-download-handoff-plan.json",
   "installer-download-record.json",
   "installer-package-cache.tgz",
+  "signature-verification-record.json",
+  "signature-verification-store.json",
   "installer-registration-handoff-plan.json",
   "installer-audit-handoff-plan.json",
   "signature-verification.json",
@@ -1083,13 +1100,17 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "remoteInstallApprovalQueueWriteback",
   "remoteInstallInstallerContinuationPlan",
   "remoteInstallInstallerDownloadWriteback",
+  "remoteInstallSignatureVerificationWriteback",
   "WASMPluginRemoteInstallApprovalPlan",
   "WASMPluginRemoteInstallApprovalDecisionPlan",
   "WASMPluginRemoteInstallApprovalWritebackPlan",
   "WASMPluginRemoteInstallApprovalQueueWriteback",
   "WASMPluginRemoteInstallInstallerContinuationPlan",
   "WASMPluginRemoteInstallInstallerDownloadWriteback",
+  "WASMPluginRemoteInstallSignatureVerificationWriteback",
   "WASMPluginInstallerDownloadRecord",
+  "WASMPluginSignatureVerificationRecord",
+  "WASMPluginSignatureVerificationStoreSummary",
   "WASMPluginInstallerContinuationPlan",
   "WASMPluginApprovalQueueRecord",
   "WASMPluginApprovalQueueStoreSummary",
@@ -1476,7 +1497,9 @@ requireTokens("脚手架和可回滚工程化", scaffold + fullVerification + do
   "RegisterBackendPack",
 ]);
 
-runCheck("contract checker", process.execPath, ["scripts/check-pack-contract.mjs"]);
+runCheck("contract checker", process.execPath, ["scripts/check-pack-contract.mjs"], 0, {
+  PACK_COMPLETION_AUDIT_CHILD: "1",
+});
 runCheck("scaffold checker", process.execPath, ["scripts/check-pack-scaffold.mjs"]);
 runCheck("packs sdk checker", process.execPath, ["sdk/scripts/check-packs-sdk-manifest.mjs"]);
 runCheck("lora pack sdk checker", process.execPath, ["sdk/scripts/check-lora-pack-sdk-manifest.mjs"]);
