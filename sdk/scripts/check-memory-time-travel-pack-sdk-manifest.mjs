@@ -114,6 +114,24 @@ for (const token of ["dual-read parity gate", "runKVHistoryDualReadParity", "kv-
   if (!page.includes(token)) fail(`Memory Time Travel pack page missing kv_history dual-read parity token: ${token}`);
 }
 
+const docs = readRepoFile("doc/PACK-RUNTIME-BLUEPRINT.md") + "\n" + readRepoFile("docs/guide/pack-runtime.md") + "\n" + readRepoFile("docs/zh/guide/pack-runtime.md");
+for (const token of [
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
+  "rollback-writeback-store.json",
+  "rollback-writeback-record.json",
+  "rollback-writeback-executor-plan.json",
+  "rollback-executor-handoff-plan.json",
+  "rollback-executor-audit-plan.json",
+  "rollback_writeback_store_ready=true",
+  "rollback_writeback_executor_plan_ready=true",
+  "consumes_rollback_writeback_store=true",
+  "rollback_executor_ready=false",
+  "writes_audit_chain=false",
+]) {
+  if (!docs.includes(token)) fail(`Memory Time Travel docs missing rollback handoff token: ${token}`);
+}
+
 const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
 for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/rollback/writeback/store", "/v1/memory-time-travel/rollback/writeback/executor/plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/retention/prune/execute", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links/writeback/executor/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);

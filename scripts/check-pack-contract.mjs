@@ -160,6 +160,17 @@ for (const token of [
   "memory.audit.links.writeback_store",
   "memory.audit.links.writeback_executor_plan",
   "memory.retention.prune_execute",
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
+  "rollback-writeback-store.json",
+  "rollback-writeback-record.json",
+  "rollback-writeback-executor-plan.json",
+  "rollback-executor-handoff-plan.json",
+  "rollback-executor-audit-plan.json",
+  "rollback_writeback_store_ready",
+  "rollback_writeback_executor_plan_ready",
+  "consumes_rollback_writeback_store",
+  "rollback_executor_ready",
 ]) {
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Memory Time Travel token: ${token}`);
 }
@@ -178,7 +189,7 @@ for (const token of [
 }
 
 for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs/zh/guide/pack-runtime.md", chineseGuide]]) {
-  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs", "scaffold-pack.mjs", "pack_capability_prepare_summary", "catalog_source_reports", "route_audit_issues", "summarizeCapabilityPrepare"]) {
+  for (const token of ["Pack Runtime", "packruntime.BackendModule", "frontend.menus", "sdk.typescript", "check-pack-contract.mjs", "scaffold-pack.mjs", "pack_capability_prepare_summary", "catalog_source_reports", "route_audit_issues", "summarizeCapabilityPrepare", "/v1/memory-time-travel/rollback/writeback/store", "/v1/memory-time-travel/rollback/writeback/executor/plan", "rollback-writeback-store.json", "rollback-writeback-executor-plan.json", "rollback_executor_ready=false", "writes_audit_chain=false"]) {
     if (!text.includes(token)) fail(`${name} missing token: ${token}`);
   }
 }

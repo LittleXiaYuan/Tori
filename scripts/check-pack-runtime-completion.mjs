@@ -214,6 +214,21 @@ const docs = [
   "docs/zh/guide/pack-runtime-state.md",
 ].map(read).join("\n");
 
+requireTokens("Memory Time Travel rollback handoff docs", docs, [
+  "/v1/memory-time-travel/rollback/writeback/store",
+  "/v1/memory-time-travel/rollback/writeback/executor/plan",
+  "rollback-writeback-store.json",
+  "rollback-writeback-record.json",
+  "rollback-writeback-executor-plan.json",
+  "rollback-executor-handoff-plan.json",
+  "rollback-executor-audit-plan.json",
+  "rollback_writeback_store_ready=true",
+  "rollback_writeback_executor_plan_ready=true",
+  "consumes_rollback_writeback_store=true",
+  "rollback_executor_ready=false",
+  "writes_audit_chain=false",
+]);
+
 requireTokens("轻内核/manifest 协议", manifest + docs + backupManifest, [
   "type Manifest",
   "BackendManifest",
