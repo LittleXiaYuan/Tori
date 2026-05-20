@@ -1,5 +1,5 @@
 import { fetcher } from "./api-core";
-import type { PackBackendModulesResponse, PackBackendRouteAuditReport, PackCatalogReport, PackCapabilityGateReport, PackCapabilityIndexReport, PackCapabilityPlanReport, PackCapabilityPrepareReport, PackCapabilityResolveReport, PackListResponse, PackMutationResponse } from "./pack-types";
+import type { PackBackendModulesResponse, PackBackendRouteAuditReport, PackCatalogReport, PackCapabilityGateReport, PackCapabilityIndexReport, PackCapabilityPlanReport, PackCapabilityPrepareReport, PackCapabilityPrepareSummary, PackCapabilityResolveReport, PackListResponse, PackMutationResponse } from "./pack-types";
 
 export interface PacksPruneResponse {
   removed: string[];
@@ -7,6 +7,41 @@ export interface PacksPruneResponse {
   errors?: string[];
   removed_count: number;
   kept_count: number;
+}
+
+export function summarizeCapabilityPrepare(plan: PackCapabilityPlanReport, prepare?: PackCapabilityPrepareReport | null): PackCapabilityPrepareSummary {
+  return {
+    kind: "pack_capability_prepare_summary",
+    generated_at: prepare?.generated_at || plan.generated_at,
+    capabilities: prepare?.capabilities || plan.capabilities,
+    allowed: prepare?.allowed ?? plan.allowed,
+    action: prepare?.action || plan.action,
+    plan: {
+      allowed_count: plan.allowed_count,
+      blocked_count: plan.blocked_count,
+      use_count: plan.use_count,
+      enable_count: plan.enable_count,
+      install_count: plan.install_count,
+      route_audit_issue_count: plan.route_audit_issue_count,
+      required_packs: plan.required_packs || [],
+      enable_packs: plan.enable_packs || [],
+      install_capabilities: plan.install_capabilities || [],
+      catalog_install_hints: plan.catalog_install_hints || [],
+      catalog_download_hints: plan.catalog_download_hints || [],
+    },
+    prepare: prepare ? {
+      step_count: prepare.step_count,
+      ready_count: prepare.ready_count,
+      enable_count: prepare.enable_count,
+      install_count: prepare.install_count,
+      download_count: prepare.download_count,
+      route_audit_issue_count: prepare.route_audit_issue_count,
+    } : null,
+    steps: prepare?.steps || [],
+    catalog_source_reports: prepare?.catalog_source_reports || plan.catalog_source_reports || [],
+    route_audit_issues: prepare?.route_audit_issues || plan.route_audit_issues || [],
+    unavailable_reasons: prepare?.unavailable_reasons || plan.unavailable_reasons || [],
+  };
 }
 
 export interface PacksClient {

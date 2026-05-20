@@ -24,7 +24,7 @@ import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import type { InstalledPack, PackBackendRouteSpec, PackCapabilityPlanReport, PackCapabilityPrepareReport } from "@/lib/pack-types";
-import { createPacksClient } from "@/lib/packs-client";
+import { createPacksClient, summarizeCapabilityPrepare } from "@/lib/packs-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { formatBackendRouteSpec } from "@/lib/pack-sync";
@@ -52,44 +52,6 @@ async function copyText(text: string, label: string) {
     showToast("复制失败，请手动复制代码片段", "error");
   }
 }
-
-function formatCapabilityPrepareSummary(plan: PackCapabilityPlanReport, prepare?: PackCapabilityPrepareReport | null): string {
-  const sourceReports = prepare?.catalog_source_reports || plan.catalog_source_reports || [];
-  const routeAuditIssues = prepare?.route_audit_issues || plan.route_audit_issues || [];
-  return JSON.stringify({
-    kind: "pack_capability_prepare_summary",
-    generated_at: prepare?.generated_at || plan.generated_at,
-    capabilities: prepare?.capabilities || plan.capabilities,
-    allowed: prepare?.allowed ?? plan.allowed,
-    action: prepare?.action || plan.action,
-    plan: {
-      allowed_count: plan.allowed_count,
-      blocked_count: plan.blocked_count,
-      use_count: plan.use_count,
-      enable_count: plan.enable_count,
-      install_count: plan.install_count,
-      route_audit_issue_count: plan.route_audit_issue_count,
-      required_packs: plan.required_packs || [],
-      enable_packs: plan.enable_packs || [],
-      install_capabilities: plan.install_capabilities || [],
-      catalog_install_hints: plan.catalog_install_hints || [],
-      catalog_download_hints: plan.catalog_download_hints || [],
-    },
-    prepare: prepare ? {
-      step_count: prepare.step_count,
-      ready_count: prepare.ready_count,
-      enable_count: prepare.enable_count,
-      install_count: prepare.install_count,
-      download_count: prepare.download_count,
-      route_audit_issue_count: prepare.route_audit_issue_count,
-    } : null,
-    steps: prepare?.steps || [],
-    catalog_source_reports: sourceReports,
-    route_audit_issues: routeAuditIssues,
-    unavailable_reasons: prepare?.unavailable_reasons || plan.unavailable_reasons || [],
-  }, null, 2);
-}
-
 
 function declaredBackendRouteSpecs(pack: InstalledPack): PackBackendRouteSpec[] {
   const specs = pack.manifest.backend?.routeSpecs || [];
@@ -584,7 +546,7 @@ export default function PacksPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="ghost" onPress={() => void copyText(formatCapabilityPrepareSummary(capabilityPrepare.plan, capabilityPrepare), "准备清单摘要")}>
+                <Button size="sm" variant="ghost" onPress={() => void copyText(JSON.stringify(summarizeCapabilityPrepare(capabilityPrepare.plan, capabilityPrepare), null, 2), "准备清单摘要")}>
                   <ClipboardCopy size={13} /> 复制准备清单摘要
                 </Button>
                 <Chip size="sm" style={{ background: capabilityPrepare.allowed ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.12)", color: capabilityPrepare.allowed ? "var(--yunque-success)" : "var(--yunque-warning)" }}>
@@ -657,7 +619,7 @@ export default function PacksPage() {
           <div className="space-y-3">
             {!capabilityPrepare && (
               <div className="flex justify-end">
-                <Button size="sm" variant="ghost" onPress={() => void copyText(formatCapabilityPrepareSummary(capabilityPlan), "预检摘要")}>
+                <Button size="sm" variant="ghost" onPress={() => void copyText(JSON.stringify(summarizeCapabilityPrepare(capabilityPlan), null, 2), "预检摘要")}>
                   <ClipboardCopy size={13} /> 复制预检摘要
                 </Button>
               </div>

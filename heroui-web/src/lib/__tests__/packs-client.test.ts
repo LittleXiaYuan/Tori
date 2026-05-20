@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createPacksClient } from "../packs-client";
+import { createPacksClient, summarizeCapabilityPrepare } from "../packs-client";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -227,6 +227,12 @@ describe("packs-client", () => {
     expect(prepare.catalog_source_reports?.[1]?.errors?.[0]).toContain("packs/private");
     expect(prepare.plan.catalog_source_reports?.[0]?.source).toBe("packs/examples");
     expect(prepare.download_steps?.[0]?.sha256).toBe("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    const summary = summarizeCapabilityPrepare(prepare.plan, prepare);
+    expect(summary.kind).toBe("pack_capability_prepare_summary");
+    expect(summary.action).toBe("install");
+    expect(summary.prepare?.step_count).toBe(1);
+    expect(summary.steps[0]?.action).toBe("download");
+    expect(summary.catalog_source_reports[1]?.ok).toBe(false);
     expect(audit.ok_routes).toBe(0);
   });
 

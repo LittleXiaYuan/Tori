@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const outDir = ".tmp/incremental-tests";
+const outDir = `.tmp/incremental-tests-${process.pid}`;
 const srcDir = "src";
 const generated = new Set(["client.gen", "sdk.gen", "types.gen", "index"]);
 
@@ -33,8 +33,6 @@ function addJsExtensionToRelativeImports(source) {
   );
 }
 
-rmSync(outDir, { recursive: true, force: true });
-
 const allSlices = listIncrementalSlices();
 const requestedSlices = normalizeRequestedSlices(process.argv.slice(2));
 const missingSlices = requestedSlices.filter((name) => !allSlices.includes(name));
@@ -47,6 +45,12 @@ if (missingSlices.length > 0) {
 
 const slices = requestedSlices.length > 0 ? requestedSlices : allSlices;
 const sources = slices.flatMap((name) => [`${srcDir}/${name}.ts`, `${srcDir}/${name}.test.ts`]);
+
+function cleanup() {
+  rmSync(outDir, { recursive: true, force: true });
+}
+
+cleanup();
 
 const compile = spawnSync(
   process.execPath,
@@ -70,6 +74,7 @@ const compile = spawnSync(
 );
 
 if (compile.error || compile.status !== 0) {
+  cleanup();
   if (compile.error) console.error(compile.error);
   process.exit(compile.status ?? 1);
 }
@@ -81,10 +86,10 @@ for (const testName of slices.map((name) => `${name}.test`)) {
 
   const run = spawnSync(process.execPath, [compiledTestPath], { stdio: "inherit" });
   if (run.error || run.status !== 0) {
-    rmSync(outDir, { recursive: true, force: true });
+    cleanup();
     if (run.error) console.error(run.error);
     process.exit(run.status ?? 1);
   }
 }
 
-rmSync(outDir, { recursive: true, force: true });
+cleanup();

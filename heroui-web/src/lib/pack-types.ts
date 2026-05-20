@@ -15,6 +15,7 @@ export type {
   PackCapabilityIndexReport,
   PackCapabilityPlanReport,
   PackCapabilityPrepareReport,
+  PackCapabilityPrepareSummary,
   PackCapabilityPrepareStep,
   PackCapabilityResolveReport,
   PackDistributionManifest,
