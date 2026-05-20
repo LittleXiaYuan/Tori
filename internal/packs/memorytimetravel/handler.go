@@ -2,7 +2,8 @@
 // Memory Time Travel capability pack. The first delivery is intentionally a pack
 // shell: it owns manifest-gated HTTP routes, versioned memory snapshot storage,
 // point-in-time reconstruction, drift diff summaries, rollback plans, approved
-// rollback write-back planning, retention dry-run planning, JSON evidence
+// rollback write-back planning, retention dry-run planning, pack-local
+// retention prune execution, JSON evidence
 // export, read-only Merkle audit-chain verification, and conservative KV
 // audit proof-link schema plus plan-only proof-link preview gates over native
 // kv_history row previews and Merkle records, plan-only proof-link write-back
@@ -339,6 +340,63 @@ type RetentionPrunePlanReport struct {
 	Candidates               []RetentionCandidate `json:"candidates"`
 	Actions                  []string             `json:"actions"`
 	Notes                    []string             `json:"notes,omitempty"`
+}
+
+type RetentionPruneExecuteRequest struct {
+	Namespace    string   `json:"namespace,omitempty"`
+	CandidateIDs []string `json:"candidate_ids,omitempty"`
+	RequestedBy  string   `json:"requested_by,omitempty"`
+	Reason       string   `json:"reason,omitempty"`
+	ApprovalID   string   `json:"approval_id,omitempty"`
+	Approved     bool     `json:"approved,omitempty"`
+	DryRun       bool     `json:"dry_run,omitempty"`
+}
+
+type RetentionPruneSkippedCandidate struct {
+	ID        string `json:"id"`
+	Namespace string `json:"namespace,omitempty"`
+	Reason    string `json:"reason"`
+}
+
+type RetentionPruneExecuteReport struct {
+	PackID                       string                           `json:"pack_id"`
+	Namespace                    string                           `json:"namespace"`
+	GeneratedAt                  time.Time                        `json:"generated_at"`
+	Stage                        string                           `json:"stage"`
+	Status                       string                           `json:"status"`
+	DryRun                       bool                             `json:"dry_run"`
+	Approved                     bool                             `json:"approved"`
+	ApprovalRequired             bool                             `json:"approval_required"`
+	ApprovalID                   string                           `json:"approval_id,omitempty"`
+	RequestedBy                  string                           `json:"requested_by,omitempty"`
+	Reason                       string                           `json:"reason,omitempty"`
+	PackLocalPruneReady          bool                             `json:"pack_local_prune_ready"`
+	RetentionPackLocalPruneReady bool                             `json:"retention_pack_local_prune_ready"`
+	RetentionPruneReady          bool                             `json:"retention_prune_ready"`
+	TemporalPruneReady           bool                             `json:"temporal_prune_ready"`
+	WritesPackLocalSnapshotStore bool                             `json:"writes_pack_local_snapshot_store"`
+	WritesLedgerKV               bool                             `json:"writes_ledger_kv"`
+	WritesTemporalKV             bool                             `json:"writes_temporal_kv"`
+	WritesNativeKVHistory        bool                             `json:"writes_native_kv_history"`
+	MerkleAppendReady            bool                             `json:"merkle_append_ready"`
+	CronReady                    bool                             `json:"cron_ready"`
+	CandidateCount               int                              `json:"candidate_count"`
+	SelectedCandidateCount       int                              `json:"selected_candidate_count"`
+	DeletedCandidateCount        int                              `json:"deleted_candidate_count"`
+	SkippedCandidateCount        int                              `json:"skipped_candidate_count"`
+	ReclaimableBytes             int                              `json:"reclaimable_bytes"`
+	DeletedBytes                 int                              `json:"deleted_bytes"`
+	ActionCount                  int                              `json:"action_count"`
+	SnapshotCountAfter           int                              `json:"snapshot_count_after"`
+	RetentionPlanGeneratedAt     time.Time                        `json:"retention_plan_generated_at"`
+	RetentionPrunePlan           RetentionPrunePlanReport         `json:"retention_prune_plan"`
+	DeletedCandidates            []RetentionCandidate             `json:"deleted_candidates"`
+	SkippedCandidates            []RetentionPruneSkippedCandidate `json:"skipped_candidates"`
+	Artifacts                    []string                         `json:"artifacts"`
+	Actions                      []string                         `json:"actions"`
+	BlockedBy                    []string                         `json:"blocked_by"`
+	Labels                       []string                         `json:"labels"`
+	Notes                        []string                         `json:"notes,omitempty"`
 }
 
 type MerkleAuditRecord struct {
@@ -1077,6 +1135,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan", Handler: h.ApprovedRollbackPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan", Handler: h.RetentionPlan},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan", Handler: h.RetentionPrunePlan},
+		{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune/execute", Handler: h.RetentionPruneExecute},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan", Handler: h.NativeKVHistoryPlan},
 		{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview", Handler: h.NativeKVHistoryMigrationPreview},
 		{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/dual-read/parity", Handler: h.KVHistoryDualReadParity},
@@ -1115,6 +1174,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"memory.rollback.writeback.plan",
 		"memory.retention.plan",
 		"memory.retention.prune_plan",
+		"memory.retention.prune_execute",
 		"memory.kv_history.native_plan",
 		"memory.kv_history.migration_preview",
 		"memory.kv_history.dual_read.parity",
@@ -1166,6 +1226,8 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		RetentionPlanReady:                    true,
 		RetentionPrunePlanReady:               true,
 		RetentionPruneReady:                   false,
+		RetentionPackLocalPruneReady:          true,
+		WritesPackLocalSnapshotStore:          false,
 		KVAuditLinkSchemaReady:                true,
 		KVAuditLinkPreviewReady:               true,
 		KVAuditLinkWritebackPlanReady:         true,
@@ -1221,6 +1283,8 @@ type statusResponse struct {
 	RetentionPlanReady                    bool             `json:"retention_plan_ready"`
 	RetentionPrunePlanReady               bool             `json:"retention_prune_plan_ready"`
 	RetentionPruneReady                   bool             `json:"retention_prune_ready"`
+	RetentionPackLocalPruneReady          bool             `json:"retention_pack_local_prune_ready"`
+	WritesPackLocalSnapshotStore          bool             `json:"writes_pack_local_snapshot_store"`
 	KVAuditLinkSchemaReady                bool             `json:"kv_audit_link_schema_ready"`
 	KVAuditLinkPreviewReady               bool             `json:"kv_audit_link_preview_ready"`
 	KVAuditLinkWritebackPlanReady         bool             `json:"kv_audit_link_writeback_plan_ready"`
@@ -1423,6 +1487,24 @@ func (h *Handler) RetentionPrunePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
+func (h *Handler) RetentionPruneExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RetentionPruneExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid retention prune execute payload")
+		return
+	}
+	report, err := h.executeRetentionPrune(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"prune": report})
 }
 
 func (h *Handler) NativeKVHistoryPlan(w http.ResponseWriter, r *http.Request) {
@@ -2173,7 +2255,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"pack_id":     PackID,
 		"exported_at": h.now().UTC(),
 		"format":      "json-memory-time-travel-evidence",
-		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "audit-verification.json"},
+		"files":       []string{"snapshot.json", "summary.json", "rollback-plan.json", "approved-rollback-plan.json", "rollback-writeback-plan.json", "approval-request-plan.json", "retention-plan.json", "retention-prune-plan.json", "retention-prune-execute.json", "native-kv-history-plan.json", "kv-history-migration-plan.json", "kv-history-index-plan.json", "kv-history-migration-preview.json", "kv-history-dual-read-parity.json", "kv-history-cutover-plan.json", "kv-history-cutover-readiness.json", "kv-history-dual-read-plan.json", "kv-history-dual-write-plan.json", "kv-history-cutover-rollback-plan.json", "audit-links.json", "audit-link-preview.json", "audit-link-writeback-plan.json", "audit-link-writeback-store.json", "audit-link-writeback-record.json", "audit-link-writeback-executor-plan.json", "audit-link-executor-handoff-plan.json", "audit-link-executor-audit-plan.json", "audit-verification.json"},
 		"snapshot":    snapshot,
 		"history":     truncateSnapshots(snapshots, h.policy.EvidenceMaxSnapshots),
 	}
@@ -2204,6 +2286,11 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 			Reason:    "evidence-export-preview",
 			DryRun:    true,
 		})
+		payload["retention_prune_execute"] = h.retentionPruneExecuteBlockedReport(payload["retention_prune_plan"].(RetentionPrunePlanReport), RetentionPruneExecuteRequest{
+			Namespace: retentionPlan.Namespace,
+			Reason:    "evidence-export-preview",
+			DryRun:    true,
+		}, h.now().UTC(), "dry_run", []string{"evidence-export"}, []string{"dry-run"}, []string{"Evidence export includes the pack-local prune executor contract as dry-run only; no snapshot directories are deleted."})
 	}
 	auditLinks := h.buildKVAuditLinksReport(snapshot.Namespace)
 	payload["kv_audit_link_schema"] = auditLinks
@@ -2311,17 +2398,17 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) statusNotes() []string {
-	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, approved rollback write-back planning, retention dry-run planning, pack-local audit proof-link write-back store handoff, executor input planning, and evidence export are available."}
+	notes := []string{"Pack-local snapshot store, point-in-time reconstruction, drift diff, dry-run rollback planning, approved rollback write-back planning, retention dry-run planning, pack-local retention prune execution, pack-local audit proof-link write-back store handoff, executor input planning, and evidence export are available."}
 	if h.temporalKV != nil {
 		if h.memoryPersisterWriteback {
-			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; approved rollback write-back planning is shaped, while native kv_history tables, retention prune execution, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached and Memory Persister mirrors Mid/Long flushes into memory_snapshot; approved rollback write-back planning is shaped, while native kv_history tables, Ledger temporal retention prune, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
 		} else {
-			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; approved rollback write-back planning is shaped, while Memory Persister write-back, native kv_history tables, retention prune execution, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
+			notes = append(notes, "Ledger KV temporal history reader is attached for snapshot-at reconstruction; approved rollback write-back planning is shaped, while Memory Persister write-back, native kv_history tables, Ledger temporal retention prune, cron scheduling, global Approval Manager enqueue, Merkle append, and rollback execution remain follow-up wiring.")
 		}
 	} else {
 		notes = append(notes, "Ledger KV kv_history reader is not attached; snapshot-at reconstruction falls back to pack-local snapshots, and approved rollback write-back planning remains a non-destructive contract preview.")
 	}
-	notes = append(notes, "Retention planning and prune-plan generation are dry-run only and currently target pack-local snapshots; Ledger temporal KV deletion is intentionally not connected yet.")
+	notes = append(notes, "Retention planning and prune-plan generation remain non-destructive; the pack-local retention prune executor can delete only selected pack-local snapshot directories after explicit approval, while Ledger temporal KV deletion is intentionally not connected yet.")
 	notes = append(notes, "Native kv_history table, migration, index, and dual-read/dual-write cutover plans are available as plan-only artifacts; the current TemporalKV adapter still uses the reserved __kv_history__ Ledger KV namespace and does not migrate rows, write native rows, or switch adapters.")
 	if h.nativeKVHistoryPreviewer != nil {
 		notes = append(notes, "Native kv_history migration preview can scan reserved __kv_history__ documents into deterministic future row previews, but it remains read-only and does not create tables, migrate rows, or change TemporalKVStore behavior.")
@@ -3718,9 +3805,183 @@ func (h *Handler) buildRetentionPrunePlanFromRetention(retentionPlan RetentionPl
 		Actions:                  actions,
 		Notes: []string{
 			"Retention prune-plan is non-destructive and does not delete pack-local snapshots or Ledger temporal KV entries.",
-			"Execution must remain blocked until explicit approval, native kv_history pruning, and audit write-back are wired in a later slice.",
+			"Pack-local snapshot deletion is available only through the explicit approved prune executor; native kv_history pruning, cron scheduling, and audit write-back remain blocked.",
 		},
 	}
+}
+
+func (h *Handler) executeRetentionPrune(req RetentionPruneExecuteRequest) (RetentionPruneExecuteReport, error) {
+	planReq := RetentionPrunePlanRequest{
+		Namespace:    req.Namespace,
+		CandidateIDs: req.CandidateIDs,
+		RequestedBy:  req.RequestedBy,
+		Reason:       req.Reason,
+		DryRun:       req.DryRun,
+	}
+	prunePlan, err := h.buildRetentionPrunePlan(planReq)
+	if err != nil {
+		return RetentionPruneExecuteReport{}, err
+	}
+	generatedAt := h.now().UTC()
+	requestedBy := strings.TrimSpace(req.RequestedBy)
+	reason := strings.TrimSpace(req.Reason)
+	approvalID := strings.TrimSpace(req.ApprovalID)
+	if req.DryRun {
+		return h.retentionPruneExecuteBlockedReport(prunePlan, req, generatedAt, "dry_run", []string{"dry-run-request"}, []string{"dry-run"}, []string{"dry_run=true; no pack-local snapshot directories were deleted."}), nil
+	}
+	var blockedBy []string
+	if !req.Approved {
+		blockedBy = append(blockedBy, "approval-required")
+	}
+	if requestedBy == "" {
+		blockedBy = append(blockedBy, "requested_by-required")
+	}
+	if reason == "" {
+		blockedBy = append(blockedBy, "reason-required")
+	}
+	if len(prunePlan.Candidates) == 0 {
+		blockedBy = append(blockedBy, "no-retention-candidates")
+	}
+	if len(blockedBy) > 0 {
+		return h.retentionPruneExecuteBlockedReport(prunePlan, req, generatedAt, "blocked", blockedBy, []string{"blocked"}, []string{"Pack-local retention prune execution requires approved=true, requested_by, reason, and at least one current retention candidate."}), nil
+	}
+
+	deleted := make([]RetentionCandidate, 0, len(prunePlan.Candidates))
+	skipped := make([]RetentionPruneSkippedCandidate, 0)
+	actions := make([]string, 0, len(prunePlan.Candidates))
+	deletedBytes := 0
+	for _, candidate := range prunePlan.Candidates {
+		dir, err := h.snapshotDir(candidate.Namespace, candidate.ID)
+		if err != nil {
+			skipped = append(skipped, RetentionPruneSkippedCandidate{ID: candidate.ID, Namespace: candidate.Namespace, Reason: err.Error()})
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			skipped = append(skipped, RetentionPruneSkippedCandidate{ID: candidate.ID, Namespace: candidate.Namespace, Reason: err.Error()})
+			continue
+		}
+		deleted = append(deleted, candidate)
+		deletedBytes += candidate.SizeBytes
+		actions = append(actions, fmt.Sprintf("deleted pack-local snapshot %s/%s", candidate.Namespace, candidate.ID))
+	}
+	if len(actions) == 0 {
+		actions = append(actions, "no pack-local snapshot directory was deleted")
+	}
+
+	snapshotsAfter, err := h.listSnapshots("")
+	if err != nil {
+		skipped = append(skipped, RetentionPruneSkippedCandidate{Reason: fmt.Sprintf("snapshot recount failed: %v", err)})
+	}
+	status := "pack_local_pruned"
+	if len(deleted) == 0 {
+		status = "no_op"
+	}
+	if len(skipped) > 0 {
+		status = "partial"
+	}
+	return RetentionPruneExecuteReport{
+		PackID:                       PackID,
+		Namespace:                    prunePlan.Namespace,
+		GeneratedAt:                  generatedAt,
+		Stage:                        "pack-local-retention-prune-before-native-kv-history-prune",
+		Status:                       status,
+		DryRun:                       false,
+		Approved:                     req.Approved,
+		ApprovalRequired:             true,
+		ApprovalID:                   approvalID,
+		RequestedBy:                  requestedBy,
+		Reason:                       reason,
+		PackLocalPruneReady:          true,
+		RetentionPackLocalPruneReady: true,
+		RetentionPruneReady:          true,
+		TemporalPruneReady:           false,
+		WritesPackLocalSnapshotStore: len(deleted) > 0,
+		WritesLedgerKV:               false,
+		WritesTemporalKV:             false,
+		WritesNativeKVHistory:        false,
+		MerkleAppendReady:            false,
+		CronReady:                    false,
+		CandidateCount:               prunePlan.CandidateCount,
+		SelectedCandidateCount:       prunePlan.SelectedCandidateCount,
+		DeletedCandidateCount:        len(deleted),
+		SkippedCandidateCount:        len(skipped),
+		ReclaimableBytes:             prunePlan.ReclaimableBytes,
+		DeletedBytes:                 deletedBytes,
+		ActionCount:                  len(actions),
+		SnapshotCountAfter:           len(snapshotsAfter),
+		RetentionPlanGeneratedAt:     prunePlan.RetentionPlanGeneratedAt,
+		RetentionPrunePlan:           prunePlan,
+		DeletedCandidates:            deleted,
+		SkippedCandidates:            skipped,
+		Artifacts:                    []string{"retention-prune-execute.json", "retention-prune-plan.json"},
+		Actions:                      actions,
+		BlockedBy:                    []string{},
+		Labels:                       []string{"pack-local-executor"},
+		Notes: []string{
+			"Only pack-local snapshot directories selected by the current retention plan were deleted.",
+			"Ledger temporal KV, native kv_history rows, Merkle audit append, and cron scheduling remain intentionally blocked.",
+		},
+	}, nil
+}
+
+func (h *Handler) retentionPruneExecuteBlockedReport(prunePlan RetentionPrunePlanReport, req RetentionPruneExecuteRequest, generatedAt time.Time, status string, blockedBy []string, labels []string, notes []string) RetentionPruneExecuteReport {
+	actions := []string{"no pack-local snapshot directory was deleted"}
+	if req.DryRun && len(prunePlan.Candidates) > 0 {
+		actions = make([]string, 0, len(prunePlan.Candidates))
+		for _, candidate := range prunePlan.Candidates {
+			actions = append(actions, fmt.Sprintf("would delete pack-local snapshot %s/%s", candidate.Namespace, candidate.ID))
+		}
+	}
+	return RetentionPruneExecuteReport{
+		PackID:                       PackID,
+		Namespace:                    prunePlan.Namespace,
+		GeneratedAt:                  generatedAt,
+		Stage:                        "pack-local-retention-prune-before-native-kv-history-prune",
+		Status:                       status,
+		DryRun:                       req.DryRun,
+		Approved:                     req.Approved,
+		ApprovalRequired:             true,
+		ApprovalID:                   strings.TrimSpace(req.ApprovalID),
+		RequestedBy:                  strings.TrimSpace(req.RequestedBy),
+		Reason:                       strings.TrimSpace(req.Reason),
+		PackLocalPruneReady:          true,
+		RetentionPackLocalPruneReady: true,
+		RetentionPruneReady:          false,
+		TemporalPruneReady:           false,
+		WritesPackLocalSnapshotStore: false,
+		WritesLedgerKV:               false,
+		WritesTemporalKV:             false,
+		WritesNativeKVHistory:        false,
+		MerkleAppendReady:            false,
+		CronReady:                    false,
+		CandidateCount:               prunePlan.CandidateCount,
+		SelectedCandidateCount:       prunePlan.SelectedCandidateCount,
+		DeletedCandidateCount:        0,
+		SkippedCandidateCount:        len(prunePlan.Candidates),
+		ReclaimableBytes:             prunePlan.ReclaimableBytes,
+		DeletedBytes:                 0,
+		ActionCount:                  len(actions),
+		RetentionPlanGeneratedAt:     prunePlan.RetentionPlanGeneratedAt,
+		RetentionPrunePlan:           prunePlan,
+		DeletedCandidates:            []RetentionCandidate{},
+		SkippedCandidates:            retentionPruneSkippedFromPlan(prunePlan, strings.Join(blockedBy, ",")),
+		Artifacts:                    []string{"retention-prune-execute.json", "retention-prune-plan.json"},
+		Actions:                      actions,
+		BlockedBy:                    blockedBy,
+		Labels:                       labels,
+		Notes:                        notes,
+	}
+}
+
+func retentionPruneSkippedFromPlan(plan RetentionPrunePlanReport, reason string) []RetentionPruneSkippedCandidate {
+	if len(plan.Candidates) == 0 {
+		return []RetentionPruneSkippedCandidate{}
+	}
+	out := make([]RetentionPruneSkippedCandidate, 0, len(plan.Candidates))
+	for _, candidate := range plan.Candidates {
+		out = append(out, RetentionPruneSkippedCandidate{ID: candidate.ID, Namespace: candidate.Namespace, Reason: reason})
+	}
+	return out
 }
 
 func (h *Handler) saveSnapshot(snapshot Snapshot) error {

@@ -52,8 +52,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 21 {
-		t.Fatalf("expected 21 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 22 {
+		t.Fatalf("expected 22 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -79,6 +79,7 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/rollback/approved-plan":              {http.MethodPost},
 		"/v1/memory-time-travel/retention/plan":                      {http.MethodGet},
 		"/v1/memory-time-travel/retention/prune-plan":                {http.MethodPost},
+		"/v1/memory-time-travel/retention/prune/execute":             {http.MethodPost},
 		"/v1/memory-time-travel/kv-history/native-plan":              {http.MethodGet},
 		"/v1/memory-time-travel/kv-history/migration-preview":        {http.MethodGet},
 		"/v1/memory-time-travel/kv-history/dual-read/parity":         {http.MethodPost},
@@ -259,7 +260,7 @@ func TestMemoryTimeTravelRetentionPlanIsDryRun(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_store_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_executor_plan_ready":true`) || !strings.Contains(w.Body.String(), `"executor_input_contract_ready":true`) || !strings.Contains(w.Body.String(), `"audit_proof_link_executor_ready":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_store") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_executor_plan") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"approved_rollback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"retention_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_plan_ready":true`) || !strings.Contains(w.Body.String(), `"retention_prune_ready":false`) || !strings.Contains(w.Body.String(), `"retention_pack_local_prune_ready":true`) || !strings.Contains(w.Body.String(), `"writes_pack_local_snapshot_store":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_migration_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_history_cutover_readiness_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_parity_check_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_plan_ready":true`) || !strings.Contains(w.Body.String(), `"dual_read_ready":false`) || !strings.Contains(w.Body.String(), `"dual_write_ready":false`) || !strings.Contains(w.Body.String(), `"cutover_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_preview_ready":false`) || !strings.Contains(w.Body.String(), `"native_kv_history_ready":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"migrates_kv_history":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_schema_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_preview_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_plan_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_store_ready":true`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_executor_plan_ready":true`) || !strings.Contains(w.Body.String(), `"executor_input_contract_ready":true`) || !strings.Contains(w.Body.String(), `"audit_proof_link_executor_ready":false`) || !strings.Contains(w.Body.String(), `"kv_audit_link_writeback_ready":false`) || !strings.Contains(w.Body.String(), "memory.rollback.approved_plan") || !strings.Contains(w.Body.String(), "memory.rollback.writeback.plan") || !strings.Contains(w.Body.String(), "memory.retention.plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_plan") || !strings.Contains(w.Body.String(), "memory.retention.prune_execute") || !strings.Contains(w.Body.String(), "memory.kv_history.native_plan") || !strings.Contains(w.Body.String(), "memory.kv_history.migration_preview") || !strings.Contains(w.Body.String(), "memory.kv_history.dual_read.parity") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.plan") || !strings.Contains(w.Body.String(), "memory.kv_history.cutover.readiness") || !strings.Contains(w.Body.String(), "memory.audit.links.schema") || !strings.Contains(w.Body.String(), "memory.audit.links.preview") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_plan") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_store") || !strings.Contains(w.Body.String(), "memory.audit.links.writeback_executor_plan") {
 		t.Fatalf("status should expose retention dry-run readiness, status=%d body=%s", w.Code, w.Body.String())
 	}
 
@@ -331,6 +332,94 @@ func TestMemoryTimeTravelRetentionPrunePlanRequiresApprovalAndDoesNotDelete(t *t
 	h.SnapshotDetail(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("retention prune plan must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelRetentionPruneExecuteDeletesOnlyPackLocalSnapshots(t *testing.T) {
+	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+	h := New(Config{
+		DataDir: t.TempDir(),
+		Now:     func() time.Time { return now },
+		Policy:  RetentionPolicy{RetentionDays: 7, MaxSnapshotsPerNamespace: 2},
+	})
+
+	now = now.AddDate(0, 0, -10)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"old-baseline","namespace":"memory_snapshot","values":{"goal":"ship"}}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save old snapshot status=%d body=%s", w.Code, w.Body.String())
+	}
+	now = time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/retention/prune/execute", strings.NewReader(`{"namespace":"memory_snapshot","candidate_ids":["old-baseline"],"requested_by":"operator","reason":"approved local cleanup","approval_id":"approval-retention-1","approved":true}`))
+	h.RetentionPruneExecute(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention prune execute status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Prune RetentionPruneExecuteReport `json:"prune"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode retention prune execute: %v", err)
+	}
+	if got.Prune.Status != "pack_local_pruned" || !got.Prune.Approved || !got.Prune.PackLocalPruneReady || !got.Prune.RetentionPruneReady || !got.Prune.WritesPackLocalSnapshotStore {
+		t.Fatalf("unexpected retention prune execute flags: %#v", got.Prune)
+	}
+	if got.Prune.WritesLedgerKV || got.Prune.WritesTemporalKV || got.Prune.WritesNativeKVHistory || got.Prune.MerkleAppendReady || got.Prune.CronReady {
+		t.Fatalf("pack-local prune must not touch Ledger/native/Merkle/cron: %#v", got.Prune)
+	}
+	if got.Prune.DeletedCandidateCount != 1 || got.Prune.SkippedCandidateCount != 0 || got.Prune.DeletedCandidates[0].ID != "old-baseline" {
+		t.Fatalf("unexpected deleted candidates: %#v", got.Prune)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/snapshots/old-baseline", nil)
+	h.SnapshotDetail(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("pack-local retention prune should delete selected snapshot directory, status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelRetentionPruneExecuteRequiresApproval(t *testing.T) {
+	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+	h := New(Config{
+		DataDir: t.TempDir(),
+		Now:     func() time.Time { return now },
+		Policy:  RetentionPolicy{RetentionDays: 7, MaxSnapshotsPerNamespace: 2},
+	})
+
+	now = now.AddDate(0, 0, -10)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"old-baseline","namespace":"memory_snapshot","values":{"goal":"ship"}}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save old snapshot status=%d body=%s", w.Code, w.Body.String())
+	}
+	now = time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/retention/prune/execute", strings.NewReader(`{"namespace":"memory_snapshot","candidate_ids":["old-baseline"],"requested_by":"operator","reason":"not approved yet"}`))
+	h.RetentionPruneExecute(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("retention prune execute blocked status=%d body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Prune RetentionPruneExecuteReport `json:"prune"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode retention prune execute blocked: %v", err)
+	}
+	if got.Prune.Status != "blocked" || got.Prune.RetentionPruneReady || got.Prune.WritesPackLocalSnapshotStore || !containsString(got.Prune.BlockedBy, "approval-required") {
+		t.Fatalf("unexpected blocked retention prune execute: %#v", got.Prune)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/snapshots/old-baseline", nil)
+	h.SnapshotDetail(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("blocked retention prune execute must not delete snapshots, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

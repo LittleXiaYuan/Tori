@@ -70,6 +70,8 @@ export interface MemoryTimeTravelStatus {
   retention_plan_ready?: boolean;
   retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
+  retention_pack_local_prune_ready?: boolean;
+  writes_pack_local_snapshot_store?: boolean;
   kv_audit_link_schema_ready?: boolean;
   kv_audit_link_preview_ready?: boolean;
   kv_audit_link_writeback_plan_ready?: boolean;
@@ -1001,6 +1003,63 @@ export interface MemoryTimeTravelRetentionPrunePlan {
   notes?: string[];
 }
 
+export interface MemoryTimeTravelRetentionPruneExecuteInput {
+  namespace?: string;
+  candidate_ids?: string[];
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  approved?: boolean;
+  dry_run?: boolean;
+}
+
+export interface MemoryTimeTravelRetentionPruneSkippedCandidate {
+  id: string;
+  namespace?: string;
+  reason: string;
+}
+
+export interface MemoryTimeTravelRetentionPruneExecute {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  approved: boolean;
+  approval_required: boolean;
+  approval_id?: string;
+  requested_by?: string;
+  reason?: string;
+  pack_local_prune_ready: boolean;
+  retention_pack_local_prune_ready: boolean;
+  retention_prune_ready: boolean;
+  temporal_prune_ready: boolean;
+  writes_pack_local_snapshot_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  writes_native_kv_history: boolean;
+  merkle_append_ready: boolean;
+  cron_ready: boolean;
+  candidate_count: number;
+  selected_candidate_count: number;
+  deleted_candidate_count: number;
+  skipped_candidate_count: number;
+  reclaimable_bytes: number;
+  deleted_bytes: number;
+  action_count: number;
+  snapshot_count_after: number;
+  retention_plan_generated_at: string;
+  retention_prune_plan: MemoryTimeTravelRetentionPrunePlan;
+  deleted_candidates: MemoryTimeTravelRetentionCandidate[];
+  skipped_candidates: MemoryTimeTravelRetentionPruneSkippedCandidate[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+}
+
 export interface MemoryTimeTravelEvidenceResponse {
   pack_id: string;
   exported_at: string;
@@ -1017,6 +1076,7 @@ export interface MemoryTimeTravelEvidenceResponse {
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
   retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
+  retention_prune_execute?: MemoryTimeTravelRetentionPruneExecute;
   native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
   kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
@@ -1060,6 +1120,7 @@ export interface MemoryTimeTravelPackClient {
   approvedRollbackPlan(input: MemoryTimeTravelApprovedRollbackPlanInput): Promise<{ plan: MemoryTimeTravelApprovedRollbackPlan }>;
   retentionPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelRetentionPlan }>;
   retentionPrunePlan(input?: MemoryTimeTravelRetentionPrunePlanInput): Promise<{ plan: MemoryTimeTravelRetentionPrunePlan }>;
+  retentionPruneExecute(input?: MemoryTimeTravelRetentionPruneExecuteInput): Promise<{ prune: MemoryTimeTravelRetentionPruneExecute }>;
   nativeKVHistoryPlan(namespace?: string): Promise<{ plan: MemoryTimeTravelNativeKVHistoryPlan }>;
   nativeKVHistoryMigrationPreview(namespace?: string, limit?: number): Promise<{ kv_history_migration_preview: MemoryTimeTravelNativeKVHistoryMigrationPreview }>;
   kvHistoryDualReadParity(input?: MemoryTimeTravelKVHistoryDualReadParityInput): Promise<{ parity: MemoryTimeTravelKVHistoryDualReadParity }>;
@@ -1120,6 +1181,11 @@ export function createMemoryTimeTravelPackClient(): MemoryTimeTravelPackClient {
       fetcher<{ plan: MemoryTimeTravelRetentionPlan }>(`/v1/memory-time-travel/retention/plan${query({ namespace })}`),
     retentionPrunePlan: (input = {}) =>
       fetcher<{ plan: MemoryTimeTravelRetentionPrunePlan }>("/v1/memory-time-travel/retention/prune-plan", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    retentionPruneExecute: (input = {}) =>
+      fetcher<{ prune: MemoryTimeTravelRetentionPruneExecute }>("/v1/memory-time-travel/retention/prune/execute", {
         method: "POST",
         body: JSON.stringify(input),
       }),

@@ -75,6 +75,8 @@ export type MemoryTimeTravelStatusResponse = {
   retention_plan_ready?: boolean;
   retention_prune_plan_ready?: boolean;
   retention_prune_ready?: boolean;
+  retention_pack_local_prune_ready?: boolean;
+  writes_pack_local_snapshot_store?: boolean;
   kv_audit_link_schema_ready?: boolean;
   kv_audit_link_preview_ready?: boolean;
   kv_audit_link_writeback_plan_ready?: boolean;
@@ -1015,6 +1017,67 @@ export type MemoryTimeTravelRetentionPrunePlanResponse = {
   plan: MemoryTimeTravelRetentionPrunePlan;
 };
 
+export type MemoryTimeTravelRetentionPruneExecuteRequest = {
+  namespace?: string;
+  candidate_ids?: string[];
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  approved?: boolean;
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelRetentionPruneSkippedCandidate = {
+  id: string;
+  namespace?: string;
+  reason: string;
+};
+
+export type MemoryTimeTravelRetentionPruneExecute = {
+  pack_id: string;
+  namespace: string;
+  generated_at: string;
+  stage: string;
+  status: string;
+  dry_run: boolean;
+  approved: boolean;
+  approval_required: boolean;
+  approval_id?: string;
+  requested_by?: string;
+  reason?: string;
+  pack_local_prune_ready: boolean;
+  retention_pack_local_prune_ready: boolean;
+  retention_prune_ready: boolean;
+  temporal_prune_ready: boolean;
+  writes_pack_local_snapshot_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  writes_native_kv_history: boolean;
+  merkle_append_ready: boolean;
+  cron_ready: boolean;
+  candidate_count: number;
+  selected_candidate_count: number;
+  deleted_candidate_count: number;
+  skipped_candidate_count: number;
+  reclaimable_bytes: number;
+  deleted_bytes: number;
+  action_count: number;
+  snapshot_count_after: number;
+  retention_plan_generated_at: string;
+  retention_prune_plan: MemoryTimeTravelRetentionPrunePlan;
+  deleted_candidates: MemoryTimeTravelRetentionCandidate[];
+  skipped_candidates: MemoryTimeTravelRetentionPruneSkippedCandidate[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRetentionPruneExecuteResponse = {
+  prune: MemoryTimeTravelRetentionPruneExecute;
+};
+
 export type MemoryTimeTravelEvidenceResponse = {
   pack_id: string;
   exported_at: string;
@@ -1031,6 +1094,7 @@ export type MemoryTimeTravelEvidenceResponse = {
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
   retention_prune_plan?: MemoryTimeTravelRetentionPrunePlan;
+  retention_prune_execute?: MemoryTimeTravelRetentionPruneExecute;
   native_kv_history_plan?: MemoryTimeTravelNativeKVHistoryPlan;
   kv_history_migration_plan?: MemoryTimeTravelKVHistoryMigrationStepPlan[];
   kv_history_index_plan?: MemoryTimeTravelNativeKVHistoryIndexPlan[];
@@ -1189,6 +1253,10 @@ export class MemoryTimeTravelClient {
 
   retentionPrunePlan(input: MemoryTimeTravelRetentionPrunePlanRequest = {}): Promise<MemoryTimeTravelRetentionPrunePlanResponse> {
     return this.request<MemoryTimeTravelRetentionPrunePlanResponse>("POST", "/v1/memory-time-travel/retention/prune-plan", input);
+  }
+
+  retentionPruneExecute(input: MemoryTimeTravelRetentionPruneExecuteRequest = {}): Promise<MemoryTimeTravelRetentionPruneExecuteResponse> {
+    return this.request<MemoryTimeTravelRetentionPruneExecuteResponse>("POST", "/v1/memory-time-travel/retention/prune/execute", input);
   }
 
   nativeKVHistoryPlan(namespace?: string): Promise<MemoryTimeTravelNativeKVHistoryPlanResponse> {
