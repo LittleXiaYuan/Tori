@@ -175,6 +175,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if !hasRouteSpec(wasmPlugin.Manifest.Backend.RouteSpecs, "POST", "/v1/wasm-plugin/remote-install/signature-verification/writeback") {
 		t.Fatal("expected WASM Plugin signature verification writeback routeSpec")
 	}
+	if !hasRouteSpec(wasmPlugin.Manifest.Backend.RouteSpecs, "POST", "/v1/wasm-plugin/remote-install/package/inspect/writeback") {
+		t.Fatal("expected WASM Plugin package inspect writeback routeSpec")
+	}
 
 	ensureBuiltinPacks(registry)
 	if got := len(registry.List()); got != 12 {

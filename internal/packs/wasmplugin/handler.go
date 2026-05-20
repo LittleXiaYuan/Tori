@@ -1,6 +1,9 @@
 package wasmplugin
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
@@ -209,6 +212,16 @@ type RemoteInstallSignatureVerificationWritebackRequest struct {
 	VerifiedBy string            `json:"verified_by,omitempty"`
 	Reason     string            `json:"reason,omitempty"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
+}
+
+type RemoteInstallPackageInspectWritebackRequest struct {
+	RequestID   string            `json:"request_id,omitempty"`
+	RequestKey  string            `json:"request_key,omitempty"`
+	Slug        string            `json:"slug,omitempty"`
+	Approved    bool              `json:"approved"`
+	InspectedBy string            `json:"inspected_by,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 type RemoteInstallPlanReport struct {
@@ -507,6 +520,47 @@ type RemoteInstallSignatureVerificationWritebackReport struct {
 	Notes                               []string                          `json:"notes,omitempty"`
 }
 
+type RemoteInstallPackageInspectWritebackReport struct {
+	PackID                             string                      `json:"pack_id"`
+	GeneratedAt                        time.Time                   `json:"generated_at"`
+	Status                             string                      `json:"status"`
+	PackageInspectWritebackReady       bool                        `json:"package_inspect_writeback_ready"`
+	ConsumesSignatureVerificationStore bool                        `json:"consumes_signature_verification_store"`
+	SignatureVerificationRecordFound   bool                        `json:"signature_verification_record_found"`
+	SignatureVerified                  bool                        `json:"signature_verified"`
+	PackageCacheReady                  bool                        `json:"package_cache_ready"`
+	ManifestFound                      bool                        `json:"manifest_found"`
+	WASMModuleFound                    bool                        `json:"wasm_module_found"`
+	PackageLayoutReady                 bool                        `json:"package_layout_ready"`
+	PackageInspectReady                bool                        `json:"package_inspect_ready"`
+	AllowsInstallerWriteback           bool                        `json:"allows_installer_writeback"`
+	RemoteInstallReady                 bool                        `json:"remote_install_ready"`
+	InstallerReady                     bool                        `json:"installer_ready"`
+	InstallerBlockedUntilRegistration  bool                        `json:"installer_blocked_until_registration"`
+	Downloads                          bool                        `json:"downloads"`
+	NetworkAccess                      bool                        `json:"network_access"`
+	WritesFiles                        bool                        `json:"writes_files"`
+	WritesPackageInspectStore          bool                        `json:"writes_package_inspect_store"`
+	InstallsPlugin                     bool                        `json:"installs_plugin"`
+	RequestID                          string                      `json:"request_id,omitempty"`
+	RequestKey                         string                      `json:"request_key,omitempty"`
+	DecisionKey                        string                      `json:"decision_key,omitempty"`
+	InspectedBy                        string                      `json:"inspected_by,omitempty"`
+	Reason                             string                      `json:"reason,omitempty"`
+	Plugin                             RemoteInstallPluginPlan     `json:"plugin,omitempty"`
+	Package                            RemoteInstallPackagePlan    `json:"package,omitempty"`
+	SignatureVerificationRecord        SignatureVerificationRecord `json:"signature_verification_record"`
+	PackageInspection                  PackageInspection           `json:"package_inspection"`
+	PackageInspectRecord               PackageInspectRecord        `json:"package_inspect_record"`
+	PackageInspectStore                PackageInspectStoreSummary  `json:"package_inspect_store"`
+	Checks                             []RemoteInstallCheck        `json:"checks"`
+	Artifacts                          []string                    `json:"artifacts"`
+	Actions                            []string                    `json:"actions"`
+	Labels                             []string                    `json:"labels"`
+	Metadata                           map[string]string           `json:"metadata,omitempty"`
+	Notes                              []string                    `json:"notes,omitempty"`
+}
+
 type ApprovalQueueStoreSummary struct {
 	PackID                   string   `json:"pack_id"`
 	QueueName                string   `json:"queue_name"`
@@ -659,6 +713,93 @@ type SignatureVerificationStoreSummary struct {
 	WritesSignatureVerificationStore bool     `json:"writes_signature_verification_store"`
 	InstallerWritebackReady          bool     `json:"installer_writeback_ready"`
 	Notes                            []string `json:"notes,omitempty"`
+}
+
+type PackageInspectRecord struct {
+	PackID                            string                      `json:"pack_id"`
+	GeneratedAt                       time.Time                   `json:"generated_at"`
+	Status                            string                      `json:"status"`
+	PackageInspectWritebackReady      bool                        `json:"package_inspect_writeback_ready"`
+	SignatureVerificationRecordFound  bool                        `json:"signature_verification_record_found"`
+	SignatureVerified                 bool                        `json:"signature_verified"`
+	PackageCacheReady                 bool                        `json:"package_cache_ready"`
+	ManifestFound                     bool                        `json:"manifest_found"`
+	WASMModuleFound                   bool                        `json:"wasm_module_found"`
+	PackageLayoutReady                bool                        `json:"package_layout_ready"`
+	PackageInspectReady               bool                        `json:"package_inspect_ready"`
+	AllowsInstallerWriteback          bool                        `json:"allows_installer_writeback"`
+	RemoteInstallReady                bool                        `json:"remote_install_ready"`
+	InstallerReady                    bool                        `json:"installer_ready"`
+	InstallerBlockedUntilRegistration bool                        `json:"installer_blocked_until_registration"`
+	WritesFiles                       bool                        `json:"writes_files"`
+	WritesPackageInspectStore         bool                        `json:"writes_package_inspect_store"`
+	InstallsPlugin                    bool                        `json:"installs_plugin"`
+	QueueName                         string                      `json:"queue_name,omitempty"`
+	RequestID                         string                      `json:"request_id,omitempty"`
+	RequestKey                        string                      `json:"request_key,omitempty"`
+	DecisionKey                       string                      `json:"decision_key,omitempty"`
+	InspectedBy                       string                      `json:"inspected_by,omitempty"`
+	Reason                            string                      `json:"reason,omitempty"`
+	StoreArtifact                     string                      `json:"store_artifact"`
+	Artifact                          string                      `json:"artifact"`
+	PackageCacheArtifact              string                      `json:"package_cache_artifact,omitempty"`
+	PackageCachePath                  string                      `json:"package_cache_path,omitempty"`
+	Plugin                            RemoteInstallPluginPlan     `json:"plugin,omitempty"`
+	Package                           RemoteInstallPackagePlan    `json:"package,omitempty"`
+	SignatureVerificationRecord       SignatureVerificationRecord `json:"signature_verification_record"`
+	PackageInspection                 PackageInspection           `json:"package_inspection"`
+	Checks                            []RemoteInstallCheck        `json:"checks"`
+	Labels                            []string                    `json:"labels"`
+	Metadata                          map[string]string           `json:"metadata,omitempty"`
+	Notes                             []string                    `json:"notes,omitempty"`
+}
+
+type PackageInspectStoreSummary struct {
+	PackID                    string   `json:"pack_id"`
+	Store                     string   `json:"store"`
+	StoreReady                bool     `json:"store_ready"`
+	RecordCount               int      `json:"record_count"`
+	Artifact                  string   `json:"artifact"`
+	WritesFiles               bool     `json:"writes_files"`
+	WritesPackageInspectStore bool     `json:"writes_package_inspect_store"`
+	InstallerWritebackReady   bool     `json:"installer_writeback_ready"`
+	Notes                     []string `json:"notes,omitempty"`
+}
+
+type PackageInspection struct {
+	PackID              string                  `json:"pack_id"`
+	GeneratedAt         time.Time               `json:"generated_at"`
+	Status              string                  `json:"status"`
+	PackageInspectReady bool                    `json:"package_inspect_ready"`
+	PackageLayoutReady  bool                    `json:"package_layout_ready"`
+	ManifestFound       bool                    `json:"manifest_found"`
+	WASMModuleFound     bool                    `json:"wasm_module_found"`
+	ManifestPath        string                  `json:"manifest_path,omitempty"`
+	WASMModulePath      string                  `json:"wasm_module_path,omitempty"`
+	Entrypoint          string                  `json:"entrypoint,omitempty"`
+	ExpectedModulePath  string                  `json:"expected_module_path,omitempty"`
+	PackageSHA256       string                  `json:"package_sha256,omitempty"`
+	ModuleSHA256        string                  `json:"module_sha256,omitempty"`
+	ManifestSHA256      string                  `json:"manifest_sha256,omitempty"`
+	FileCount           int                     `json:"file_count"`
+	TotalUnpackedBytes  int64                   `json:"total_unpacked_bytes"`
+	DeniedEntries       []string                `json:"denied_entries,omitempty"`
+	AllowedEntries      []PackageInspectionFile `json:"allowed_entries,omitempty"`
+	Checks              []RemoteInstallCheck    `json:"checks"`
+	Artifact            string                  `json:"artifact"`
+	Downloads           bool                    `json:"downloads"`
+	WritesFiles         bool                    `json:"writes_files"`
+	NetworkAccess       bool                    `json:"network_access"`
+	InstallsPlugin      bool                    `json:"installs_plugin"`
+	Labels              []string                `json:"labels"`
+	Notes               []string                `json:"notes,omitempty"`
+}
+
+type PackageInspectionFile struct {
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256,omitempty"`
+	Kind      string `json:"kind"`
 }
 
 type ApprovalQueueRecord struct {
@@ -1024,6 +1165,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/continuation/plan", Handler: h.RemoteInstallInstallerContinuationPlan},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/download/writeback", Handler: h.RemoteInstallInstallerDownloadWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/signature-verification/writeback", Handler: h.RemoteInstallSignatureVerificationWriteback},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/package/inspect/writeback", Handler: h.RemoteInstallPackageInspectWriteback},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -1046,6 +1188,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 	approvalQueueSummary := h.approvalQueueStoreSummary()
 	signatureVerificationStoreSummary := h.signatureVerificationStoreSummary()
+	packageInspectStoreSummary := h.packageInspectStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                                  PackID,
 		"stage":                                    "pack-shell-before-runtime-hosts",
@@ -1071,9 +1214,12 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"installer_continuation_plan_ready":        true,
 		"installer_download_writeback_ready":       true,
 		"signature_verification_writeback_ready":   true,
+		"package_inspect_writeback_ready":          true,
+		"package_inspect_ready":                    false,
 		"installer_ready":                          false,
 		"installer_blocked_until_registration":     true,
 		"installer_blocked_until_signature_verify": true,
+		"installer_blocked_until_package_inspect":  true,
 		"installer_blocked_until_installer_wiring": true,
 		"plugin_count":                             len(plugins),
 		"loaded_count":                             loaded,
@@ -1081,6 +1227,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"store_dir":                                h.dataDir,
 		"approval_queue_store":                     approvalQueueSummary,
 		"signature_verification_store":             signatureVerificationStoreSummary,
+		"package_inspect_store":                    packageInspectStoreSummary,
 		"sandbox":                                  h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
@@ -1100,9 +1247,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.remote_install.installer_continuation_plan",
 			"wasm.remote_install.installer_download_writeback",
 			"wasm.remote_install.signature_verification_writeback",
+			"wasm.remote_install.package_inspect_writeback",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, installer continuation planning, installer download cache write-back, and signature verification write-back are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, installer extraction, plugin file write-back, and plugin registration remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, installer continuation planning, installer download cache write-back, signature verification write-back, and package inspect write-back are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, installer extraction, plugin file write-back, and plugin registration remain follow-up wiring."},
 	})
 }
 
@@ -1418,6 +1566,24 @@ func (h *Handler) RemoteInstallSignatureVerificationWriteback(w http.ResponseWri
 	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
 }
 
+func (h *Handler) RemoteInstallPackageInspectWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallPackageInspectWritebackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install package inspect writeback payload")
+		return
+	}
+	report, err := h.writeRemoteInstallPackageInspect(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1435,11 +1601,12 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	installerContinuationPlan := h.installerContinuationPlanFromRecord(queueRecord, false)
 	installerDownloadRecord := h.installerDownloadRecordFromContinuation(installerContinuationPlan, nil, false, "", "")
 	signatureVerificationRecord := h.signatureVerificationRecordFromDownload(installerDownloadRecord, nil, false, "", "")
+	packageInspectRecord := h.packageInspectRecordFromSignature(signatureVerificationRecord, PackageInspection{}, false, "", "")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                       PackID,
 		"exported_at":                   h.now().UTC(),
 		"format":                        "json-wasm-plugin-evidence",
-		"files":                         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "signature-verification-record.json", "signature-verification-store.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "sandbox-stats.json"},
+		"files":                         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "signature-verification-record.json", "signature-verification-store.json", "package-inspection.json", "package-inspect-store.json", "package-inspect-record.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "sandbox-stats.json"},
 		"plugin":                        plugin,
 		"plan":                          permissionPlan(plugin.Permissions),
 		"host_abi_plan":                 hostABIPlan(plugin.Permissions),
@@ -1456,6 +1623,9 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"installer_download_record":     installerDownloadRecord,
 		"signature_verification_store":  h.signatureVerificationStoreSummary(),
 		"signature_verification_record": signatureVerificationRecord,
+		"package_inspection":            packageInspectRecord.PackageInspection,
+		"package_inspect_store":         h.packageInspectStoreSummary(),
+		"package_inspect_record":        packageInspectRecord,
 		"sandbox":                       h.sandbox.Stats(),
 	})
 }
@@ -2704,6 +2874,160 @@ func (h *Handler) blockedSignatureVerificationReport(req RemoteInstallSignatureV
 	}
 }
 
+func (h *Handler) writeRemoteInstallPackageInspect(req RemoteInstallPackageInspectWritebackRequest) (RemoteInstallPackageInspectWritebackReport, error) {
+	metadata := cleanStringMap(req.Metadata)
+	records, err := h.loadSignatureVerificationRecords()
+	if err != nil {
+		return RemoteInstallPackageInspectWritebackReport{}, err
+	}
+	record, found := selectSignatureVerificationRecord(records, req)
+	checks := []RemoteInstallCheck{
+		{Name: "signature_verification_store_consumed", Required: true, Ready: true, Reason: "package inspect write-back consumes the pack-local signature-verification-store.json contract"},
+		{Name: "signature_verification_record_found", Required: true, Ready: found, Reason: boolReason(found, "signature verification record matched request_id, request_key, slug, or deterministic latest record", "package inspection requires a persisted signature verification record")},
+		{Name: "signature_verified", Required: true, Ready: found && record.SignatureVerified && record.SignatureVerifyReady, Reason: boolReason(found && record.SignatureVerified && record.SignatureVerifyReady, "cached package signature was verified before package inspection", "package inspection remains blocked until signature verification succeeds")},
+		{Name: "explicit_package_inspect_approved", Required: true, Ready: req.Approved, Reason: boolReason(req.Approved, "explicit approved=true was provided for package inspect write-back", "package inspect write-back requires explicit approved=true")},
+		{Name: "package_cache_ready", Required: true, Ready: found && record.PackageCacheReady && strings.TrimSpace(record.PackageCachePath) != "", Reason: boolReason(found && record.PackageCacheReady && strings.TrimSpace(record.PackageCachePath) != "", "signature record points at a pack-local package cache artifact", "package inspection requires a pack-local cached package")},
+		{Name: "installer_registration_wired", Required: true, Ready: false, Reason: "plugin registration remains blocked until a later installer write-back route consumes the package inspection record"},
+	}
+	if !found {
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_missing_signature_verification_record", checks, metadata), nil
+	}
+	if !record.SignatureVerified || !record.SignatureVerifyReady {
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_signature_not_verified", checks, metadata), nil
+	}
+	if !record.PackageCacheReady || strings.TrimSpace(record.PackageCachePath) == "" {
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_missing_package_cache", checks, metadata), nil
+	}
+	if !req.Approved {
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_missing_explicit_package_inspect_approval", checks, metadata), nil
+	}
+	payload, err := os.ReadFile(record.PackageCachePath)
+	if os.IsNotExist(err) {
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_missing_package_cache_file", checks, metadata), nil
+	}
+	if err != nil {
+		return RemoteInstallPackageInspectWritebackReport{}, err
+	}
+	actualSHA := sha256Bytes(payload)
+	if record.ExpectedSHA256 != "" && !strings.EqualFold(record.ExpectedSHA256, actualSHA) {
+		checks = append(checks, RemoteInstallCheck{Name: "cached_package_sha256_match", Required: true, Ready: false, Reason: "cached package bytes no longer match signature verification record"})
+		return h.blockedPackageInspectReport(req, record, PackageInspection{}, "blocked_cached_package_sha256_mismatch", checks, metadata), nil
+	}
+	inspection, err := h.inspectPackage(record, payload)
+	if err != nil {
+		return RemoteInstallPackageInspectWritebackReport{}, err
+	}
+	checks = append(checks,
+		RemoteInstallCheck{Name: "package_archive_read", Required: true, Ready: inspection.FileCount > 0, Reason: boolReason(inspection.FileCount > 0, "package archive was read from pack-local cache", "package archive must contain inspectable entries")},
+		RemoteInstallCheck{Name: "manifest_found", Required: true, Ready: inspection.ManifestFound, Reason: boolReason(inspection.ManifestFound, "package manifest was found in the cached archive", "installer package must include a manifest json")},
+		RemoteInstallCheck{Name: "wasm_module_found", Required: true, Ready: inspection.WASMModuleFound, Reason: boolReason(inspection.WASMModuleFound, "expected WASM module was found in the cached archive", "installer package must include the expected WASM module")},
+		RemoteInstallCheck{Name: "package_layout_safe", Required: true, Ready: inspection.PackageLayoutReady, Reason: boolReason(inspection.PackageLayoutReady, "package entries are relative and stay inside the future extraction root", "package has unsafe or incomplete entries")},
+	)
+	if !inspection.PackageLayoutReady {
+		return h.blockedPackageInspectReport(req, record, inspection, "blocked_package_layout_invalid", checks, metadata), nil
+	}
+	inspectRecord := h.packageInspectRecordFromSignature(record, inspection, true, strings.TrimSpace(req.InspectedBy), strings.TrimSpace(req.Reason))
+	inspectRecord.Metadata = metadata
+	inspectRecord.Checks = append(inspectRecord.Checks, checks...)
+	if err := h.savePackageInspectRecord(inspectRecord); err != nil {
+		return RemoteInstallPackageInspectWritebackReport{}, err
+	}
+	store := h.packageInspectStoreSummary()
+	return RemoteInstallPackageInspectWritebackReport{
+		PackID:                             PackID,
+		GeneratedAt:                        h.now().UTC(),
+		Status:                             "package_inspected_pending_installer_registration",
+		PackageInspectWritebackReady:       true,
+		ConsumesSignatureVerificationStore: true,
+		SignatureVerificationRecordFound:   true,
+		SignatureVerified:                  true,
+		PackageCacheReady:                  true,
+		ManifestFound:                      inspection.ManifestFound,
+		WASMModuleFound:                    inspection.WASMModuleFound,
+		PackageLayoutReady:                 inspection.PackageLayoutReady,
+		PackageInspectReady:                true,
+		AllowsInstallerWriteback:           true,
+		RemoteInstallReady:                 false,
+		InstallerReady:                     false,
+		InstallerBlockedUntilRegistration:  true,
+		Downloads:                          false,
+		NetworkAccess:                      false,
+		WritesFiles:                        false,
+		WritesPackageInspectStore:          true,
+		InstallsPlugin:                     false,
+		RequestID:                          record.RequestID,
+		RequestKey:                         record.RequestKey,
+		DecisionKey:                        record.DecisionKey,
+		InspectedBy:                        strings.TrimSpace(req.InspectedBy),
+		Reason:                             strings.TrimSpace(req.Reason),
+		Plugin:                             record.Plugin,
+		Package:                            record.Package,
+		SignatureVerificationRecord:        record,
+		PackageInspection:                  inspection,
+		PackageInspectRecord:               inspectRecord,
+		PackageInspectStore:                store,
+		Checks:                             checks,
+		Artifacts:                          []string{"package-inspection.json", "package-inspect-record.json", "package-inspect-store.json", "signature-verification-record.json", "signature-verification-store.json", record.PackageCacheArtifact, "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json"},
+		Actions: []string{
+			"inspected the verified cached package archive for a safe manifest/module layout",
+			"wrote only the pack-local package inspect store and kept extraction, plugin_dir writes, registration, and remote_install_ready blocked",
+		},
+		Labels:   []string{"remote-install", "package-inspect-writeback", "pack-local-store", "pending-registration"},
+		Metadata: metadata,
+		Notes: []string{
+			"This route reads the verified pack-local package cache and writes only package-inspect-store.json plus package-inspect-record.json.",
+			"It does not extract package contents to plugin_dir, register plugins, load modules, or mark remote_install_ready=true.",
+			"writes_files=false describes the external/plugin-file boundary; writes_package_inspect_store=true is limited to the pack-owned inspection store artifact.",
+		},
+	}, nil
+}
+
+func (h *Handler) blockedPackageInspectReport(req RemoteInstallPackageInspectWritebackRequest, signatureRecord SignatureVerificationRecord, inspection PackageInspection, status string, checks []RemoteInstallCheck, metadata map[string]string) RemoteInstallPackageInspectWritebackReport {
+	record := h.packageInspectRecordFromSignature(signatureRecord, inspection, false, strings.TrimSpace(req.InspectedBy), strings.TrimSpace(req.Reason))
+	record.Status = status
+	record.Metadata = metadata
+	return RemoteInstallPackageInspectWritebackReport{
+		PackID:                             PackID,
+		GeneratedAt:                        h.now().UTC(),
+		Status:                             status,
+		PackageInspectWritebackReady:       true,
+		ConsumesSignatureVerificationStore: true,
+		SignatureVerificationRecordFound:   strings.TrimSpace(signatureRecord.RequestKey) != "" || strings.TrimSpace(signatureRecord.RequestID) != "",
+		SignatureVerified:                  signatureRecord.SignatureVerified,
+		PackageCacheReady:                  signatureRecord.PackageCacheReady,
+		ManifestFound:                      inspection.ManifestFound,
+		WASMModuleFound:                    inspection.WASMModuleFound,
+		PackageLayoutReady:                 inspection.PackageLayoutReady,
+		PackageInspectReady:                false,
+		AllowsInstallerWriteback:           false,
+		RemoteInstallReady:                 false,
+		InstallerReady:                     false,
+		InstallerBlockedUntilRegistration:  true,
+		Downloads:                          false,
+		NetworkAccess:                      false,
+		WritesFiles:                        false,
+		WritesPackageInspectStore:          false,
+		InstallsPlugin:                     false,
+		RequestID:                          signatureRecord.RequestID,
+		RequestKey:                         signatureRecord.RequestKey,
+		DecisionKey:                        signatureRecord.DecisionKey,
+		InspectedBy:                        strings.TrimSpace(req.InspectedBy),
+		Reason:                             strings.TrimSpace(req.Reason),
+		Plugin:                             signatureRecord.Plugin,
+		Package:                            signatureRecord.Package,
+		SignatureVerificationRecord:        signatureRecord,
+		PackageInspection:                  inspection,
+		PackageInspectRecord:               record,
+		PackageInspectStore:                h.packageInspectStoreSummary(),
+		Checks:                             checks,
+		Artifacts:                          []string{"package-inspection.json", "package-inspect-record.json", "package-inspect-store.json", "signature-verification-record.json", "signature-verification-store.json"},
+		Actions:                            []string{"kept package inspection blocked until a verified cached package, explicit approval, and safe manifest/module layout are all available"},
+		Labels:                             []string{"remote-install", "package-inspect-writeback", "blocked", "no-plugin-install"},
+		Metadata:                           metadata,
+		Notes:                              []string{"No package inspect store was written, and no plugin files were extracted or registered."},
+	}
+}
+
 func selectApprovalQueueRecord(records []ApprovalQueueRecord, req RemoteInstallInstallerContinuationPlanRequest) (ApprovalQueueRecord, bool) {
 	requestKey := strings.TrimSpace(req.RequestKey)
 	requestID := strings.TrimSpace(req.RequestID)
@@ -3314,6 +3638,37 @@ func selectInstallerDownloadRecord(records []InstallerDownloadRecord, req Remote
 	return records[0], true
 }
 
+func selectSignatureVerificationRecord(records []SignatureVerificationRecord, req RemoteInstallPackageInspectWritebackRequest) (SignatureVerificationRecord, bool) {
+	requestKey := strings.TrimSpace(req.RequestKey)
+	requestID := strings.TrimSpace(req.RequestID)
+	slug := strings.ToLower(strings.TrimSpace(req.Slug))
+	for _, record := range records {
+		if requestKey != "" && record.RequestKey == requestKey {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if requestID != "" && record.RequestID == requestID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if slug != "" && record.Plugin.Slug == slug {
+			return record, true
+		}
+	}
+	if requestKey != "" || requestID != "" || slug != "" || len(records) == 0 {
+		return SignatureVerificationRecord{}, false
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].GeneratedAt.Equal(records[j].GeneratedAt) {
+			return records[i].RequestKey < records[j].RequestKey
+		}
+		return records[i].GeneratedAt.After(records[j].GeneratedAt)
+	})
+	return records[0], true
+}
+
 func (h *Handler) signatureVerificationRecordFromDownload(download InstallerDownloadRecord, payload []byte, verified bool, verifiedBy string, reason string) SignatureVerificationRecord {
 	actualSHA := strings.TrimSpace(download.ActualSHA256)
 	sizePayload := payload != nil
@@ -3472,6 +3827,289 @@ func (h *Handler) signatureVerificationStoreSummary() SignatureVerificationStore
 		Notes: []string{
 			"Store readiness only covers the pack-local signature verification JSON bridge.",
 			"Installer write-back, package extraction, plugin_dir writes, and plugin registration remain disabled until later explicit routes consume verified records.",
+		},
+	}
+}
+
+func (h *Handler) inspectPackage(record SignatureVerificationRecord, payload []byte) (PackageInspection, error) {
+	inspection := PackageInspection{
+		PackID:              PackID,
+		GeneratedAt:         h.now().UTC(),
+		Status:              "package_inspect_preview_blocked",
+		PackageInspectReady: false,
+		ExpectedModulePath:  filepath.ToSlash(strings.TrimSpace(record.Plugin.ModulePath)),
+		PackageSHA256:       sha256Bytes(payload),
+		Artifact:            "package-inspection.json",
+		Downloads:           false,
+		WritesFiles:         false,
+		NetworkAccess:       false,
+		InstallsPlugin:      false,
+		Labels:              []string{"remote-install", "package-inspection", "blocked"},
+		Notes:               []string{"Package inspection reads cached archive bytes only and does not extract files to plugin_dir."},
+	}
+	files, manifestFound, wasmFound, manifestPath, wasmPath, manifestSHA, moduleSHA, denied, total, err := inspectPackageArchive(payload, inspection.ExpectedModulePath)
+	if err != nil {
+		return inspection, err
+	}
+	inspection.AllowedEntries = files
+	inspection.ManifestFound = manifestFound
+	inspection.WASMModuleFound = wasmFound
+	inspection.ManifestPath = manifestPath
+	inspection.WASMModulePath = wasmPath
+	inspection.ManifestSHA256 = manifestSHA
+	inspection.ModuleSHA256 = moduleSHA
+	inspection.DeniedEntries = denied
+	inspection.FileCount = len(files)
+	inspection.TotalUnpackedBytes = total
+	inspection.Entrypoint = strings.TrimSpace(record.Plugin.Entrypoint)
+	layoutReady := manifestFound && wasmFound && len(denied) == 0
+	inspection.PackageLayoutReady = layoutReady
+	inspection.PackageInspectReady = layoutReady
+	inspection.Status = boolReason(layoutReady, "package_inspected_pending_installer_registration", "blocked_package_layout_invalid")
+	inspection.Labels = []string{"remote-install", "package-inspection", boolReason(layoutReady, "layout-ready", "blocked")}
+	inspection.Checks = []RemoteInstallCheck{
+		{Name: "archive_entries_safe", Required: true, Ready: len(denied) == 0, Reason: boolReason(len(denied) == 0, "archive entries are relative and safe", "archive contains unsafe or unsupported entries")},
+		{Name: "manifest_found", Required: true, Ready: manifestFound, Reason: boolReason(manifestFound, "manifest json entry found", "manifest json entry is required before installer write-back")},
+		{Name: "wasm_module_found", Required: true, Ready: wasmFound, Reason: boolReason(wasmFound, "expected wasm module found", "expected wasm module is required before installer write-back")},
+	}
+	return inspection, nil
+}
+
+func inspectPackageArchive(payload []byte, expectedModulePath string) ([]PackageInspectionFile, bool, bool, string, string, string, string, []string, int64, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(payload))
+	if err != nil {
+		return nil, false, false, "", "", "", "", nil, 0, fmt.Errorf("package cache must be a .tar.gz archive for inspect write-back: %w", err)
+	}
+	defer reader.Close()
+	tr := tar.NewReader(reader)
+	expectedModule := normalizeArchivePath(expectedModulePath)
+	allowed := []PackageInspectionFile{}
+	denied := []string{}
+	manifestFound := false
+	wasmFound := false
+	manifestPath := ""
+	wasmPath := ""
+	manifestSHA := ""
+	moduleSHA := ""
+	total := int64(0)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, false, false, "", "", "", "", nil, 0, err
+		}
+		path := normalizeArchivePath(header.Name)
+		if path == "" {
+			continue
+		}
+		if unsafeArchivePath(path) {
+			denied = append(denied, path)
+			if header.Typeflag == tar.TypeReg {
+				_, _ = io.Copy(io.Discard, tr)
+			}
+			continue
+		}
+		switch header.Typeflag {
+		case tar.TypeDir:
+			continue
+		case tar.TypeReg, tar.TypeRegA:
+		default:
+			denied = append(denied, path)
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(tr, 16*1024*1024+1))
+		if err != nil {
+			return nil, false, false, "", "", "", "", nil, 0, err
+		}
+		if len(data) > 16*1024*1024 {
+			denied = append(denied, path+":too_large")
+			continue
+		}
+		size := int64(len(data))
+		total += size
+		kind := "other"
+		sum := sha256Bytes(data)
+		lower := strings.ToLower(path)
+		base := strings.ToLower(filepath.Base(path))
+		if lower == expectedModule || strings.HasSuffix(lower, "/"+expectedModule) || (expectedModule == "" && strings.HasSuffix(lower, ".wasm")) {
+			kind = "wasm"
+			wasmFound = true
+			wasmPath = path
+			moduleSHA = sum
+		} else if base == "manifest.json" || base == "plugin.json" || strings.HasSuffix(lower, ".manifest.json") {
+			kind = "manifest"
+			if !manifestFound {
+				manifestFound = true
+				manifestPath = path
+				manifestSHA = sum
+			}
+		}
+		allowed = append(allowed, PackageInspectionFile{Path: path, SizeBytes: size, SHA256: sum, Kind: kind})
+	}
+	sort.Slice(allowed, func(i, j int) bool { return allowed[i].Path < allowed[j].Path })
+	sort.Strings(denied)
+	return allowed, manifestFound, wasmFound, manifestPath, wasmPath, manifestSHA, moduleSHA, denied, total, nil
+}
+
+func normalizeArchivePath(raw string) string {
+	return strings.Trim(strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/"), "/")
+}
+
+func unsafeArchivePath(path string) bool {
+	if path == "" || strings.HasPrefix(path, "/") || strings.HasPrefix(path, "../") || strings.Contains(path, "/../") || strings.Contains(path, "\x00") {
+		return true
+	}
+	if windowsVolumeRe.MatchString(path) {
+		return true
+	}
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) packageInspectRecordFromSignature(signatureRecord SignatureVerificationRecord, inspection PackageInspection, inspected bool, inspectedBy string, reason string) PackageInspectRecord {
+	status := "package_inspect_preview_blocked"
+	if inspected {
+		status = "package_inspected_pending_installer_registration"
+	}
+	if inspection.Artifact == "" {
+		inspection = PackageInspection{
+			PackID:              PackID,
+			GeneratedAt:         h.now().UTC(),
+			Status:              status,
+			PackageInspectReady: inspected,
+			Artifact:            "package-inspection.json",
+			Downloads:           false,
+			WritesFiles:         false,
+			NetworkAccess:       false,
+			InstallsPlugin:      false,
+			Labels:              []string{"remote-install", "package-inspection", boolReason(inspected, "layout-ready", "preview-only")},
+			Notes:               []string{"Package inspection preview keeps extraction and registration blocked."},
+		}
+	}
+	return PackageInspectRecord{
+		PackID:                            PackID,
+		GeneratedAt:                       h.now().UTC(),
+		Status:                            status,
+		PackageInspectWritebackReady:      true,
+		SignatureVerificationRecordFound:  strings.TrimSpace(signatureRecord.RequestKey) != "" || strings.TrimSpace(signatureRecord.RequestID) != "",
+		SignatureVerified:                 signatureRecord.SignatureVerified,
+		PackageCacheReady:                 signatureRecord.PackageCacheReady,
+		ManifestFound:                     inspection.ManifestFound,
+		WASMModuleFound:                   inspection.WASMModuleFound,
+		PackageLayoutReady:                inspection.PackageLayoutReady,
+		PackageInspectReady:               inspected,
+		AllowsInstallerWriteback:          inspected,
+		RemoteInstallReady:                false,
+		InstallerReady:                    false,
+		InstallerBlockedUntilRegistration: true,
+		WritesFiles:                       false,
+		WritesPackageInspectStore:         inspected,
+		InstallsPlugin:                    false,
+		QueueName:                         signatureRecord.QueueName,
+		RequestID:                         signatureRecord.RequestID,
+		RequestKey:                        signatureRecord.RequestKey,
+		DecisionKey:                       signatureRecord.DecisionKey,
+		InspectedBy:                       strings.TrimSpace(inspectedBy),
+		Reason:                            strings.TrimSpace(reason),
+		StoreArtifact:                     "package-inspect-store.json",
+		Artifact:                          "package-inspect-record.json",
+		PackageCacheArtifact:              signatureRecord.PackageCacheArtifact,
+		PackageCachePath:                  signatureRecord.PackageCachePath,
+		Plugin:                            signatureRecord.Plugin,
+		Package:                           signatureRecord.Package,
+		SignatureVerificationRecord:       signatureRecord,
+		PackageInspection:                 inspection,
+		Checks: []RemoteInstallCheck{
+			{Name: "signature_verified", Required: true, Ready: signatureRecord.SignatureVerified, Reason: boolReason(signatureRecord.SignatureVerified, "signature verification record is ready", "package inspection requires signature verification")},
+			{Name: "package_layout_ready", Required: true, Ready: inspected && inspection.PackageLayoutReady, Reason: boolReason(inspected && inspection.PackageLayoutReady, "package manifest and module layout are ready", "package layout has not been inspected")},
+			{Name: "plugin_registration_wired", Required: true, Ready: false, Reason: "plugin registration remains blocked until a later installer route"},
+		},
+		Labels: []string{"remote-install", "package-inspect", boolReason(inspected, "layout-ready", "preview-only")},
+		Notes:  []string{"Package inspect record tracks verified archive layout and keeps extraction/registration blocked."},
+	}
+}
+
+func (h *Handler) packageInspectStorePath() string {
+	return filepath.Join(h.dataDir, "package-inspect-store.json")
+}
+
+func (h *Handler) savePackageInspectRecord(record PackageInspectRecord) error {
+	if err := os.MkdirAll(h.dataDir, 0o755); err != nil {
+		return err
+	}
+	var payload struct {
+		PackID  string                 `json:"pack_id"`
+		Store   string                 `json:"store"`
+		Records []PackageInspectRecord `json:"records"`
+	}
+	payload.PackID = PackID
+	payload.Store = "pack-local-package-inspect-store"
+	if data, err := os.ReadFile(h.packageInspectStorePath()); err == nil && len(data) > 0 {
+		_ = json.Unmarshal(data, &payload)
+	}
+	next := make([]PackageInspectRecord, 0, len(payload.Records)+1)
+	replaced := false
+	for _, existing := range payload.Records {
+		if existing.RequestKey != "" && existing.RequestKey == record.RequestKey {
+			next = append(next, record)
+			replaced = true
+			continue
+		}
+		next = append(next, existing)
+	}
+	if !replaced {
+		next = append(next, record)
+	}
+	payload.PackID = PackID
+	payload.Store = "pack-local-package-inspect-store"
+	payload.Records = next
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.packageInspectStorePath(), append(data, '\n'), 0o644)
+}
+
+func (h *Handler) loadPackageInspectRecords() ([]PackageInspectRecord, error) {
+	data, err := os.ReadFile(h.packageInspectStorePath())
+	if os.IsNotExist(err) {
+		return []PackageInspectRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Records []PackageInspectRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	if payload.Records == nil {
+		payload.Records = []PackageInspectRecord{}
+	}
+	return payload.Records, nil
+}
+
+func (h *Handler) packageInspectStoreSummary() PackageInspectStoreSummary {
+	records, _ := h.loadPackageInspectRecords()
+	return PackageInspectStoreSummary{
+		PackID:                    PackID,
+		Store:                     "pack-local-json",
+		StoreReady:                true,
+		RecordCount:               len(records),
+		Artifact:                  "package-inspect-store.json",
+		WritesFiles:               false,
+		WritesPackageInspectStore: false,
+		InstallerWritebackReady:   false,
+		Notes: []string{
+			"Store readiness only covers the pack-local package inspect JSON bridge.",
+			"Package extraction, plugin_dir writes, plugin metadata registration, module load, and remote_install_ready remain disabled until later explicit routes consume inspected records.",
 		},
 	}
 }

@@ -1061,6 +1061,7 @@ requireTokens("wasm-plugin 蓝图能力包", wasmPluginPack + wasmPluginManifest
   "wasm.remote_install.installer_continuation_plan",
   "wasm.remote_install.installer_download_writeback",
   "wasm.remote_install.signature_verification_writeback",
+  "wasm.remote_install.package_inspect_writeback",
   "/v1/wasm-plugin/remote-install/installer/continuation/plan",
   "/v1/wasm-plugin/remote-install/installer/download/writeback",
   "/v1/wasm-plugin/remote-install/signature-verification/writeback",

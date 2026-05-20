@@ -1,6 +1,9 @@
 package wasmplugin
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
@@ -9,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,14 +38,42 @@ func (f *fakeWasmExecutor) Stats() map[string]any {
 	return map[string]any{"memory_limit_pages": uint32(1024), "max_duration": "30s"}
 }
 
+func buildTestPackage(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	keys := make([]string, 0, len(entries))
+	for name := range entries {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+	for _, name := range keys {
+		body := []byte(entries[name])
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(body))}); err != nil {
+			t.Fatalf("write tar header %s: %v", name, err)
+		}
+		if _, err := tw.Write(body); err != nil {
+			t.Fatalf("write tar body %s: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return buf.Bytes()
+}
+
 func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 	h := New(Config{PluginDir: t.TempDir(), DataDir: t.TempDir(), Sandbox: &fakeWasmExecutor{}})
 	if h.PackID() != PackID {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 15 {
-		t.Fatalf("expected 15 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 16 {
+		t.Fatalf("expected 16 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -69,6 +101,7 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/wasm-plugin/remote-install/installer/continuation/plan":      {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/installer/download/writeback":     {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/signature-verification/writeback": {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/package/inspect/writeback":        {http.MethodPost},
 		"/v1/wasm-plugin/evidence/":                                       {http.MethodGet},
 	}
 	for path, methods := range expected {
@@ -87,6 +120,10 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	now := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
 	fake := &fakeWasmExecutor{}
 	remotePackageBytes := []byte("approved wasm plugin package cache bytes")
+	remotePackageBytes = buildTestPackage(t, map[string]string{
+		"manifest.json":          `{"slug":"calculator-remote","module_path":"calculator-remote.wasm","entrypoint":"plugin_exec"}`,
+		"calculator-remote.wasm": "fake remote wasm bytes",
+	})
 	remotePackageSHA256 := sha256Bytes(remotePackageBytes)
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -413,6 +450,55 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/package/inspect/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":false,"inspected_by":"security","reason":"missing explicit package inspect approval"}`))
+	h.RemoteInstallPackageInspectWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "blocked_missing_explicit_package_inspect_approval") || !strings.Contains(w.Body.String(), "package-inspect-record.json") {
+		t.Fatalf("missing explicit package inspect approval should return blocked report status=%d body=%s", w.Code, w.Body.String())
+	}
+	var packageInspectResp struct {
+		Writeback RemoteInstallPackageInspectWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&packageInspectResp); err != nil {
+		t.Fatalf("decode blocked package inspect writeback: %v", err)
+	}
+	blockedInspect := packageInspectResp.Writeback
+	if !blockedInspect.PackageInspectWritebackReady || blockedInspect.PackageInspectReady || blockedInspect.WritesPackageInspectStore || blockedInspect.WritesFiles || blockedInspect.RemoteInstallReady || blockedInspect.InstallsPlugin {
+		t.Fatalf("blocked package inspect must not write inspect store or install: %#v", blockedInspect)
+	}
+	if _, err := os.Stat(h.packageInspectStorePath()); !os.IsNotExist(err) {
+		t.Fatalf("blocked package inspect should not write inspect store, err=%v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/package/inspect/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":true,"inspected_by":"security","reason":"inspect verified package","metadata":{"ticket":"WASM-INSPECT-1"}}`))
+	h.RemoteInstallPackageInspectWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "package_inspect_writeback_ready") || !strings.Contains(w.Body.String(), "package-inspect-store.json") || !strings.Contains(w.Body.String(), "package_inspected_pending_installer_registration") {
+		t.Fatalf("remote install package inspect writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&packageInspectResp); err != nil {
+		t.Fatalf("decode package inspect writeback: %v", err)
+	}
+	packageInspect := packageInspectResp.Writeback
+	if packageInspect.Status != "package_inspected_pending_installer_registration" || !packageInspect.PackageInspectWritebackReady || !packageInspect.PackageInspectReady || !packageInspect.PackageLayoutReady || !packageInspect.ManifestFound || !packageInspect.WASMModuleFound || !packageInspect.AllowsInstallerWriteback || !packageInspect.WritesPackageInspectStore {
+		t.Fatalf("package inspect should mark layout-ready pack-local handoff: %#v", packageInspect)
+	}
+	if packageInspect.Downloads || packageInspect.NetworkAccess || packageInspect.WritesFiles || packageInspect.RemoteInstallReady || packageInspect.InstallerReady || packageInspect.InstallsPlugin || !packageInspect.InstallerBlockedUntilRegistration {
+		t.Fatalf("package inspect writeback must keep install/registration blocked: %#v", packageInspect)
+	}
+	if packageInspect.RequestKey != "custom-request-key" || packageInspect.InspectedBy != "security" || packageInspect.PackageInspectRecord.RequestKey != "custom-request-key" || !packageInspect.PackageInspectRecord.PackageLayoutReady {
+		t.Fatalf("package inspect record should expose request metadata and layout readiness: %#v", packageInspect.PackageInspectRecord)
+	}
+	if packageInspect.PackageInspection.ManifestPath != "manifest.json" || packageInspect.PackageInspection.WASMModulePath != "calculator-remote.wasm" || packageInspect.PackageInspection.ModuleSHA256 == "" || packageInspect.PackageInspection.ManifestSHA256 == "" || packageInspect.PackageInspection.TotalUnpackedBytes <= 0 {
+		t.Fatalf("package inspection should expose manifest/module evidence: %#v", packageInspect.PackageInspection)
+	}
+	if packageInspect.PackageInspectStore.RecordCount != 1 || !containsString(packageInspect.Artifacts, "package-inspect-store.json") || !containsString(packageInspect.Artifacts, "package-inspect-record.json") || !containsString(packageInspect.Artifacts, "package-inspection.json") {
+		t.Fatalf("package inspect writeback should declare store/record/inspection artifacts: %#v store=%#v", packageInspect.Artifacts, packageInspect.PackageInspectStore)
+	}
+	if data, err := os.ReadFile(h.packageInspectStorePath()); err != nil || !strings.Contains(string(data), "custom-request-key") || !strings.Contains(string(data), "package-inspect-record.json") || !strings.Contains(string(data), "package_inspected_pending_installer_registration") {
+		t.Fatalf("package inspect store should include record: err=%v data=%s", err, string(data))
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/continuation/plan", strings.NewReader(`{"request_key":"missing-request"}`))
 	h.RemoteInstallInstallerContinuationPlan(w, req)
 	if w.Code != http.StatusOK {
@@ -514,6 +600,9 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		InstallerDownloadRecord     InstallerDownloadRecord                  `json:"installer_download_record"`
 		SignatureVerificationStore  SignatureVerificationStoreSummary        `json:"signature_verification_store"`
 		SignatureVerificationRecord SignatureVerificationRecord              `json:"signature_verification_record"`
+		PackageInspection           PackageInspection                        `json:"package_inspection"`
+		PackageInspectStore         PackageInspectStoreSummary               `json:"package_inspect_store"`
+		PackageInspectRecord        PackageInspectRecord                     `json:"package_inspect_record"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -569,6 +658,17 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		evidenceResp.SignatureVerificationRecord.RemoteInstallReady ||
 		evidenceResp.SignatureVerificationRecord.InstallsPlugin {
 		t.Fatalf("evidence should include a conservative signature verification writeback preview: files=%#v store=%#v record=%#v", evidenceResp.Files, evidenceResp.SignatureVerificationStore, evidenceResp.SignatureVerificationRecord)
+	}
+	if !containsString(evidenceResp.Files, "package-inspection.json") ||
+		!containsString(evidenceResp.Files, "package-inspect-store.json") ||
+		!containsString(evidenceResp.Files, "package-inspect-record.json") ||
+		!evidenceResp.PackageInspectStore.StoreReady ||
+		evidenceResp.PackageInspection.PackageInspectReady ||
+		evidenceResp.PackageInspectRecord.PackageInspectReady ||
+		evidenceResp.PackageInspectRecord.WritesPackageInspectStore ||
+		evidenceResp.PackageInspectRecord.RemoteInstallReady ||
+		evidenceResp.PackageInspectRecord.InstallsPlugin {
+		t.Fatalf("evidence should include a conservative package inspect preview: files=%#v inspection=%#v store=%#v record=%#v", evidenceResp.Files, evidenceResp.PackageInspection, evidenceResp.PackageInspectStore, evidenceResp.PackageInspectRecord)
 	}
 }
 
@@ -758,6 +858,88 @@ func TestWASMPluginRemoteInstallApprovalQueueWritebackPersistsPackLocalStore(t *
 	}
 	if stored.Records[0].RequestKey != "queue-writeback-request-key" || stored.Records[0].InstallerBlockedUntilWriteback || !stored.Records[0].InstallerBlockedUntilInstallerWiring {
 		t.Fatalf("stored queue record should preserve conservative installer gates: %#v", stored.Records[0])
+	}
+}
+
+func TestWASMPluginRemoteInstallPackageInspectWritebackRequiresSafeArchive(t *testing.T) {
+	now := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	h := New(Config{PluginDir: t.TempDir(), DataDir: t.TempDir(), Sandbox: &fakeWasmExecutor{}, Now: func() time.Time { return now }})
+	signatureRecord := SignatureVerificationRecord{
+		PackID:                              PackID,
+		GeneratedAt:                         now,
+		Status:                              "signature_verified_pending_installer_registration",
+		SignatureVerificationWritebackReady: true,
+		InstallerDownloadRecordFound:        true,
+		PackageCacheReady:                   true,
+		DownloadReady:                       true,
+		SignatureVerifyReady:                true,
+		SignatureVerified:                   true,
+		AllowsInstallerWriteback:            true,
+		RemoteInstallReady:                  false,
+		InstallerReady:                      false,
+		InstallerBlockedUntilRegistration:   true,
+		WritesFiles:                         false,
+		WritesSignatureVerificationStore:    true,
+		InstallsPlugin:                      false,
+		RequestKey:                          "inspect-request-key",
+		RequestID:                           "inspect-request-id",
+		DecisionKey:                         "inspect-decision-key",
+		ExpectedSHA256:                      "will-fill",
+		SHA256Match:                         true,
+		StoreArtifact:                       "signature-verification-store.json",
+		PackageCacheArtifact:                "installer-package-cache-inspect.tgz",
+		Artifact:                            "signature-verification-record.json",
+		Plugin: RemoteInstallPluginPlan{
+			Slug:       "inspect-calc",
+			Name:       "Inspect Calculator",
+			Version:    "1.0.0",
+			Runtime:    "wazero",
+			Entrypoint: "plugin_exec",
+			ModulePath: "inspect-calc.wasm",
+		},
+		Package: RemoteInstallPackagePlan{
+			PackageURL:       "https://packs.yunque.local/wasm/inspect-calc.tgz",
+			ManifestURL:      "https://packs.yunque.local/wasm/inspect-calc.json",
+			ExpectedSHA256:   "will-fill",
+			SignatureAlg:     "ed25519",
+			ManifestArtifact: "inspect-calc-remote-manifest.json",
+			PackageArtifact:  "inspect-calc.tgz",
+			CacheKey:         "inspect-cache-key",
+		},
+	}
+	unsafePayload := buildTestPackage(t, map[string]string{
+		"manifest.json":     `{"slug":"inspect-calc"}`,
+		"inspect-calc.wasm": "wasm bytes",
+		"../escape.wasm":    "escape",
+	})
+	unsafePath := filepath.Join(t.TempDir(), "unsafe.tgz")
+	if err := os.WriteFile(unsafePath, unsafePayload, 0o644); err != nil {
+		t.Fatalf("write unsafe cache: %v", err)
+	}
+	signatureRecord.PackageCachePath = unsafePath
+	signatureRecord.ExpectedSHA256 = sha256Bytes(unsafePayload)
+	signatureRecord.ActualSHA256 = signatureRecord.ExpectedSHA256
+	signatureRecord.Package.ExpectedSHA256 = signatureRecord.ExpectedSHA256
+	if err := h.saveSignatureVerificationRecord(signatureRecord); err != nil {
+		t.Fatalf("save signature record: %v", err)
+	}
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/package/inspect/writeback", strings.NewReader(`{"request_key":"inspect-request-key","approved":true,"inspected_by":"security","reason":"unsafe archive"}`))
+	h.RemoteInstallPackageInspectWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "blocked_package_layout_invalid") || !strings.Contains(w.Body.String(), "../escape.wasm") {
+		t.Fatalf("unsafe archive should be blocked status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Writeback RemoteInstallPackageInspectWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode unsafe inspect writeback: %v", err)
+	}
+	if resp.Writeback.PackageInspectReady || resp.Writeback.WritesPackageInspectStore || resp.Writeback.PackageInspection.PackageLayoutReady || len(resp.Writeback.PackageInspection.DeniedEntries) == 0 {
+		t.Fatalf("unsafe package inspect should not write store or allow installer: %#v", resp.Writeback)
+	}
+	if _, err := os.Stat(h.packageInspectStorePath()); !os.IsNotExist(err) {
+		t.Fatalf("unsafe package inspect should not write inspect store, err=%v", err)
 	}
 }
 

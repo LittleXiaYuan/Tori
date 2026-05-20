@@ -778,6 +778,141 @@ const signatureVerificationWriteback = {
   labels: ["remote-install", "signature-verification-writeback"],
 };
 
+const packageInspection = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "package_inspected_pending_installer_registration",
+  package_inspect_ready: true,
+  package_layout_ready: true,
+  manifest_found: true,
+  wasm_module_found: true,
+  manifest_path: "manifest.json",
+  wasm_module_path: "calculator-remote.wasm",
+  entrypoint: "_start",
+  expected_module_path: "calculator-remote.wasm",
+  package_sha256: installerDownloadRecord.actual_sha256,
+  module_sha256: "module-digest",
+  manifest_sha256: "manifest-digest",
+  file_count: 2,
+  total_unpacked_bytes: 128,
+  allowed_entries: [
+    {
+      path: "calculator-remote.wasm",
+      size_bytes: 64,
+      sha256: "module-digest",
+      kind: "wasm",
+    },
+    {
+      path: "manifest.json",
+      size_bytes: 64,
+      sha256: "manifest-digest",
+      kind: "manifest",
+    },
+  ],
+  checks: [],
+  artifact: "package-inspection.json",
+  downloads: false,
+  writes_files: false,
+  network_access: false,
+  installs_plugin: false,
+  labels: ["remote-install", "package-inspection", "layout-ready"],
+};
+
+const packageInspectStore = {
+  pack_id: "yunque.pack.wasm-plugin",
+  store: "pack-local-json",
+  store_ready: true,
+  record_count: 1,
+  artifact: "package-inspect-store.json",
+  writes_files: false,
+  writes_package_inspect_store: false,
+  installer_writeback_ready: false,
+};
+
+const packageInspectRecord = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "package_inspected_pending_installer_registration",
+  package_inspect_writeback_ready: true,
+  signature_verification_record_found: true,
+  signature_verified: true,
+  package_cache_ready: true,
+  manifest_found: true,
+  wasm_module_found: true,
+  package_layout_ready: true,
+  package_inspect_ready: true,
+  allows_installer_writeback: true,
+  remote_install_ready: false,
+  installer_ready: false,
+  installer_blocked_until_registration: true,
+  writes_files: false,
+  writes_package_inspect_store: true,
+  installs_plugin: false,
+  queue_name: "wasm_remote_install",
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  inspected_by: "security",
+  reason: "inspect verified package",
+  store_artifact: "package-inspect-store.json",
+  artifact: "package-inspect-record.json",
+  package_cache_artifact: "installer-package-cache-calculator-remote.tgz",
+  package_cache_path:
+    "/pack-data/installer-cache/installer-package-cache-calculator-remote.tgz",
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  signature_verification_record: signatureVerificationRecord,
+  package_inspection: packageInspection,
+  checks: [],
+  labels: ["remote-install", "package-inspect", "layout-ready"],
+};
+
+const packageInspectWriteback = {
+  pack_id: "yunque.pack.wasm-plugin",
+  generated_at: "now",
+  status: "package_inspected_pending_installer_registration",
+  package_inspect_writeback_ready: true,
+  consumes_signature_verification_store: true,
+  signature_verification_record_found: true,
+  signature_verified: true,
+  package_cache_ready: true,
+  manifest_found: true,
+  wasm_module_found: true,
+  package_layout_ready: true,
+  package_inspect_ready: true,
+  allows_installer_writeback: true,
+  remote_install_ready: false,
+  installer_ready: false,
+  installer_blocked_until_registration: true,
+  downloads: false,
+  network_access: false,
+  writes_files: false,
+  writes_package_inspect_store: true,
+  installs_plugin: false,
+  request_id: "wasm-remote-install-preview",
+  request_key: "request-key",
+  decision_key: "decision-key",
+  inspected_by: "security",
+  reason: "inspect verified package",
+  plugin: remoteInstallPlan.plugin,
+  package: remoteInstallPlan.package,
+  signature_verification_record: signatureVerificationRecord,
+  package_inspection: packageInspection,
+  package_inspect_record: packageInspectRecord,
+  package_inspect_store: packageInspectStore,
+  checks: [],
+  artifacts: [
+    "package-inspection.json",
+    "package-inspect-record.json",
+    "package-inspect-store.json",
+    "signature-verification-record.json",
+    "signature-verification-store.json",
+  ],
+  actions: [],
+  labels: ["remote-install", "package-inspect-writeback"],
+};
+
+
 test("WASMPluginClient reads status and plugin list with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createWASMPluginClient({
@@ -812,11 +947,15 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
           installer_continuation_plan_ready: true,
           installer_download_writeback_ready: true,
           signature_verification_writeback_ready: true,
+          package_inspect_writeback_ready: true,
+          package_inspect_ready: false,
           installer_ready: false,
           installer_blocked_until_registration: true,
           installer_blocked_until_signature_verify: true,
+          installer_blocked_until_package_inspect: true,
           installer_blocked_until_installer_wiring: true,
           signature_verification_store: signatureVerificationStore,
+          package_inspect_store: packageInspectStore,
           plugin_count: 1,
           loaded_count: 0,
           capabilities: [
@@ -833,6 +972,7 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
             "wasm.remote_install.installer_continuation_plan",
             "wasm.remote_install.installer_download_writeback",
             "wasm.remote_install.signature_verification_writeback",
+            "wasm.remote_install.package_inspect_writeback",
           ],
         });
       return jsonResponse({
@@ -886,14 +1026,18 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assertEqual(status.installer_continuation_plan_ready, true);
   assertEqual(status.installer_download_writeback_ready, true);
   assertEqual(status.signature_verification_writeback_ready, true);
+  assertEqual(status.package_inspect_writeback_ready, true);
+  assertEqual(status.package_inspect_ready, false);
   assertEqual(status.installer_ready, false);
   assertEqual(status.installer_blocked_until_registration, true);
   assertEqual(status.installer_blocked_until_signature_verify, true);
+  assertEqual(status.installer_blocked_until_package_inspect, true);
   assertEqual(status.installer_blocked_until_installer_wiring, true);
   assertEqual(
     status.signature_verification_store?.artifact,
     "signature-verification-store.json",
   );
+  assertEqual(status.package_inspect_store?.artifact, "package-inspect-store.json");
   assert(status.capabilities.includes("wasm.host_abi.plan"));
   assert(status.capabilities.includes("wasm.host_abi.execution_gate"));
   assert(status.capabilities.includes("wasm.module.integrity_gate"));
@@ -931,6 +1075,11 @@ test("WASMPluginClient reads status and plugin list with bearer token", async ()
   assert(
     status.capabilities.includes(
       "wasm.remote_install.signature_verification_writeback",
+    ),
+  );
+  assert(
+    status.capabilities.includes(
+      "wasm.remote_install.package_inspect_writeback",
     ),
   );
   assertEqual(plugins.count, 1);
@@ -1001,6 +1150,11 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
       )
         return jsonResponse(
           { writeback: signatureVerificationWriteback },
+          { status: 202 },
+        );
+      if (String(url).endsWith("/remote-install/package/inspect/writeback"))
+        return jsonResponse(
+          { writeback: packageInspectWriteback },
           { status: 202 },
         );
       if (String(url).endsWith("/remote-install/plan"))
@@ -1120,6 +1274,12 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
       verified_by: "security",
       reason: "verify cached package",
     });
+  const packageInspect = await client.remoteInstallPackageInspectWriteback({
+    request_key: "request-key",
+    approved: true,
+    inspected_by: "security",
+    reason: "inspect verified package",
+  });
   const detail = await client.plugin("calculator");
   const unloaded = await client.unload("calculator");
 
@@ -1255,6 +1415,27 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   assertEqual(
     signatureVerification.writeback.signature_verification_store.artifact,
     "signature-verification-store.json",
+  );
+  assertEqual(packageInspect.writeback.package_inspect_writeback_ready, true);
+  assertEqual(packageInspect.writeback.package_inspect_ready, true);
+  assertEqual(packageInspect.writeback.package_layout_ready, true);
+  assertEqual(packageInspect.writeback.manifest_found, true);
+  assertEqual(packageInspect.writeback.wasm_module_found, true);
+  assertEqual(packageInspect.writeback.writes_package_inspect_store, true);
+  assertEqual(packageInspect.writeback.writes_files, false);
+  assertEqual(packageInspect.writeback.remote_install_ready, false);
+  assertEqual(packageInspect.writeback.installs_plugin, false);
+  assertEqual(
+    packageInspect.writeback.package_inspection.artifact,
+    "package-inspection.json",
+  );
+  assertEqual(
+    packageInspect.writeback.package_inspect_record.artifact,
+    "package-inspect-record.json",
+  );
+  assertEqual(
+    packageInspect.writeback.package_inspect_store.artifact,
+    "package-inspect-store.json",
   );
   assertEqual(detail.plugin.slug, "calculator");
   assertEqual(unloaded.status, "unloaded");
@@ -1429,10 +1610,24 @@ test("WASMPluginClient installs, loads, executes dry-run, plans remote signed in
   );
   assertEqual(
     calls[11]?.url,
-    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+    "http://localhost:9090/v1/wasm-plugin/remote-install/package/inspect/writeback",
+  );
+  assertEqual(calls[11]?.init?.method, "POST");
+  assertEqual(
+    calls[11]?.init?.body,
+    JSON.stringify({
+      request_key: "request-key",
+      approved: true,
+      inspected_by: "security",
+      reason: "inspect verified package",
+    }),
   );
   assertEqual(
     calls[12]?.url,
+    "http://localhost:9090/v1/wasm-plugin/plugins/calculator",
+  );
+  assertEqual(
+    calls[13]?.url,
     "http://localhost:9090/v1/wasm-plugin/plugins/unload",
   );
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
@@ -1466,6 +1661,9 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
           "installer-package-cache.tgz",
           "signature-verification-record.json",
           "signature-verification-store.json",
+          "package-inspection.json",
+          "package-inspect-record.json",
+          "package-inspect-store.json",
           "installer-registration-handoff-plan.json",
           "installer-audit-handoff-plan.json",
         ],
@@ -1485,6 +1683,9 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
         installer_download_record: installerDownloadRecord,
         signature_verification_store: signatureVerificationStore,
         signature_verification_record: signatureVerificationRecord,
+        package_inspection: packageInspection,
+        package_inspect_store: packageInspectStore,
+        package_inspect_record: packageInspectRecord,
       });
     },
   });
@@ -1510,6 +1711,9 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
     "installer-package-cache.tgz",
     "signature-verification-record.json",
     "signature-verification-store.json",
+    "package-inspection.json",
+    "package-inspect-record.json",
+    "package-inspect-store.json",
     "installer-registration-handoff-plan.json",
     "installer-audit-handoff-plan.json",
   ]);
@@ -1561,6 +1765,17 @@ test("WASMPluginClient exports plugin evidence packs", async () => {
   );
   assertEqual(evidence.signature_verification_record.signature_verified, true);
   assertEqual(evidence.signature_verification_record.remote_install_ready, false);
+  assertEqual(evidence.package_inspection.artifact, "package-inspection.json");
+  assertEqual(evidence.package_inspection.package_layout_ready, true);
+  assertEqual(
+    evidence.package_inspect_store.artifact,
+    "package-inspect-store.json",
+  );
+  assertEqual(
+    evidence.package_inspect_record.artifact,
+    "package-inspect-record.json",
+  );
+  assertEqual(evidence.package_inspect_record.remote_install_ready, false);
   assertEqual(
     calls[0]?.url,
     "http://localhost:9090/v1/wasm-plugin/evidence/calculator",

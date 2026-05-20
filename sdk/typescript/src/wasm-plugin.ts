@@ -2,7 +2,8 @@
  * Lightweight WASM Plugin Pack SDK slice.
  *
  * This keeps WASM plugin registration, lifecycle control, dry-run execution,
- * Host ABI plan/gate previews, approval queue writeback persistence, and
+ * Host ABI plan/gate previews, approval queue writeback persistence,
+ * installer cache/signature/package-inspect writebacks, and
  * evidence export usable without importing the full generated OpenAPI SDK:
  *
  *   import { createWASMPluginClient } from "yunque-client/wasm-plugin";
@@ -22,6 +23,9 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "installer-package-cache.tgz",
   "signature-verification-record.json",
   "signature-verification-store.json",
+  "package-inspection.json",
+  "package-inspect-record.json",
+  "package-inspect-store.json",
   "installer-registration-handoff-plan.json",
   "installer-audit-handoff-plan.json",
   "signature-verification.json",
@@ -87,6 +91,18 @@ export const WASM_PLUGIN_SIGNATURE_VERIFICATION_RECORD_ARTIFACT =
 export const WASM_PLUGIN_SIGNATURE_VERIFICATION_STORE_ARTIFACT =
   "signature-verification-store.json";
 
+export const WASM_PLUGIN_PACKAGE_INSPECT_WRITEBACK_CAPABILITY =
+  "wasm.remote_install.package_inspect_writeback";
+
+export const WASM_PLUGIN_PACKAGE_INSPECTION_ARTIFACT =
+  "package-inspection.json";
+
+export const WASM_PLUGIN_PACKAGE_INSPECT_RECORD_ARTIFACT =
+  "package-inspect-record.json";
+
+export const WASM_PLUGIN_PACKAGE_INSPECT_STORE_ARTIFACT =
+  "package-inspect-store.json";
+
 export type WASMPluginPermissionPolicy = {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -143,12 +159,16 @@ export type WASMPluginStatusResponse = {
   installer_continuation_plan_ready: boolean;
   installer_download_writeback_ready: boolean;
   signature_verification_writeback_ready: boolean;
+  package_inspect_writeback_ready: boolean;
+  package_inspect_ready: boolean;
   installer_ready: boolean;
   installer_blocked_until_registration: boolean;
   installer_blocked_until_signature_verify: boolean;
+  installer_blocked_until_package_inspect: boolean;
   installer_blocked_until_installer_wiring: boolean;
   approval_queue_store?: WASMPluginApprovalQueueStoreSummary;
   signature_verification_store?: WASMPluginSignatureVerificationStoreSummary;
+  package_inspect_store?: WASMPluginPackageInspectStoreSummary;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -355,6 +375,16 @@ export type WASMPluginRemoteInstallSignatureVerificationWritebackRequest = {
   slug?: string;
   approved: boolean;
   verified_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+};
+
+export type WASMPluginRemoteInstallPackageInspectWritebackRequest = {
+  request_id?: string;
+  request_key?: string;
+  slug?: string;
+  approved: boolean;
+  inspected_by?: string;
   reason?: string;
   metadata?: Record<string, string>;
 };
@@ -988,6 +1018,134 @@ export type WASMPluginSignatureVerificationStoreSummary = {
   notes?: string[];
 };
 
+export type WASMPluginPackageInspectionFile = {
+  path: string;
+  size_bytes: number;
+  sha256?: string;
+  kind: string;
+};
+
+export type WASMPluginPackageInspection = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  package_inspect_ready: boolean;
+  package_layout_ready: boolean;
+  manifest_found: boolean;
+  wasm_module_found: boolean;
+  manifest_path?: string;
+  wasm_module_path?: string;
+  entrypoint?: string;
+  expected_module_path?: string;
+  package_sha256?: string;
+  module_sha256?: string;
+  manifest_sha256?: string;
+  file_count: number;
+  total_unpacked_bytes: number;
+  denied_entries?: string[];
+  allowed_entries?: WASMPluginPackageInspectionFile[];
+  checks: WASMPluginRemoteInstallCheck[];
+  artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  labels: string[];
+  notes?: string[];
+};
+
+export type WASMPluginPackageInspectStoreSummary = {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  writes_files: boolean;
+  writes_package_inspect_store: boolean;
+  installer_writeback_ready: boolean;
+  notes?: string[];
+};
+
+export type WASMPluginPackageInspectRecord = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  package_inspect_writeback_ready: boolean;
+  signature_verification_record_found: boolean;
+  signature_verified: boolean;
+  package_cache_ready: boolean;
+  manifest_found: boolean;
+  wasm_module_found: boolean;
+  package_layout_ready: boolean;
+  package_inspect_ready: boolean;
+  allows_installer_writeback: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  writes_files: boolean;
+  writes_package_inspect_store: boolean;
+  installs_plugin: boolean;
+  queue_name?: string;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  inspected_by?: string;
+  reason?: string;
+  store_artifact: string;
+  artifact: string;
+  package_cache_artifact?: string;
+  package_cache_path?: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  signature_verification_record: WASMPluginSignatureVerificationRecord;
+  package_inspection: WASMPluginPackageInspection;
+  checks: WASMPluginRemoteInstallCheck[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
+export type WASMPluginRemoteInstallPackageInspectWriteback = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  package_inspect_writeback_ready: boolean;
+  consumes_signature_verification_store: boolean;
+  signature_verification_record_found: boolean;
+  signature_verified: boolean;
+  package_cache_ready: boolean;
+  manifest_found: boolean;
+  wasm_module_found: boolean;
+  package_layout_ready: boolean;
+  package_inspect_ready: boolean;
+  allows_installer_writeback: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  writes_files: boolean;
+  writes_package_inspect_store: boolean;
+  installs_plugin: boolean;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  inspected_by?: string;
+  reason?: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  signature_verification_record: WASMPluginSignatureVerificationRecord;
+  package_inspection: WASMPluginPackageInspection;
+  package_inspect_record: WASMPluginPackageInspectRecord;
+  package_inspect_store: WASMPluginPackageInspectStoreSummary;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+};
+
 export type WASMPluginRemoteInstallSignatureVerificationWriteback = {
   pack_id: string;
   generated_at: string;
@@ -1052,6 +1210,10 @@ export type WASMPluginRemoteInstallSignatureVerificationWritebackResponse = {
   writeback: WASMPluginRemoteInstallSignatureVerificationWriteback;
 };
 
+export type WASMPluginRemoteInstallPackageInspectWritebackResponse = {
+  writeback: WASMPluginRemoteInstallPackageInspectWriteback;
+};
+
 export type WASMPluginRemoteInstallApprovalPlanResponse = {
   plan: WASMPluginRemoteInstallApprovalPlan;
 };
@@ -1100,6 +1262,9 @@ export type WASMPluginEvidenceResponse = {
   installer_download_record: WASMPluginInstallerDownloadRecord;
   signature_verification_store: WASMPluginSignatureVerificationStoreSummary;
   signature_verification_record: WASMPluginSignatureVerificationRecord;
+  package_inspection: WASMPluginPackageInspection;
+  package_inspect_store: WASMPluginPackageInspectStoreSummary;
+  package_inspect_record: WASMPluginPackageInspectRecord;
   sandbox?: Record<string, unknown>;
 };
 
@@ -1319,6 +1484,16 @@ export class WASMPluginClient {
     return this.request<WASMPluginRemoteInstallSignatureVerificationWritebackResponse>(
       "POST",
       "/v1/wasm-plugin/remote-install/signature-verification/writeback",
+      input,
+    );
+  }
+
+  remoteInstallPackageInspectWriteback(
+    input: WASMPluginRemoteInstallPackageInspectWritebackRequest,
+  ): Promise<WASMPluginRemoteInstallPackageInspectWritebackResponse> {
+    return this.request<WASMPluginRemoteInstallPackageInspectWritebackResponse>(
+      "POST",
+      "/v1/wasm-plugin/remote-install/package/inspect/writeback",
       input,
     );
   }
