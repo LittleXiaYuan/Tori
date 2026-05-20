@@ -86,6 +86,22 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 		t.Fatalf("approved rollback plan status=%d body=%s", w.Code, w.Body.String())
 	}
 
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/store", strings.NewReader(`{"namespace":"memory_snapshot","snapshot_id":"baseline","requested_by":"operator","reason":"gateway rollback store smoke","approval_id":"approval-rollback-store-gateway","dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "rollback_writeback_store_ready") || !strings.Contains(w.Body.String(), "rollback-writeback-store.json") || !strings.Contains(w.Body.String(), "rollback-writeback-record.json") || !strings.Contains(w.Body.String(), `"writes_rollback_writeback_store":true`) || !strings.Contains(w.Body.String(), `"rollback_writeback_ready":false`) || !strings.Contains(w.Body.String(), `"global_approval_enqueue_ready":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) || !strings.Contains(w.Body.String(), `"writes_temporal_kv":false`) || !strings.Contains(w.Body.String(), `"merkle_append_ready":false`) {
+		t.Fatalf("rollback writeback store status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/executor/plan", strings.NewReader(`{"request_key":"approval-rollback-store-gateway","requested_by":"operator","reason":"gateway rollback executor smoke","dry_run":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "rollback_writeback_executor_plan_ready") || !strings.Contains(w.Body.String(), "executor_input_contract_ready") || !strings.Contains(w.Body.String(), "rollback-writeback-executor-plan.json") || !strings.Contains(w.Body.String(), "rollback-executor-handoff-plan.json") || !strings.Contains(w.Body.String(), "rollback-executor-audit-plan.json") || !strings.Contains(w.Body.String(), `"consumes_rollback_writeback_store":true`) || !strings.Contains(w.Body.String(), `"rollback_executor_ready":false`) || !strings.Contains(w.Body.String(), `"rollback_writeback_ready":false`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) || !strings.Contains(w.Body.String(), `"writes_temporal_kv":false`) || !strings.Contains(w.Body.String(), `"writes_audit_chain":false`) {
+		t.Fatalf("rollback executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
+
 	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/retention/prune/execute", strings.NewReader(`{"namespace":"memory_snapshot","candidate_ids":["baseline"],"requested_by":"operator","reason":"gateway approved local cleanup","approval_id":"approval-retention-gateway","approved":true}`))
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
@@ -188,6 +204,8 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/diff",
 				"/v1/memory-time-travel/rollback-plan",
 				"/v1/memory-time-travel/rollback/approved-plan",
+				"/v1/memory-time-travel/rollback/writeback/store",
+				"/v1/memory-time-travel/rollback/writeback/executor/plan",
 				"/v1/memory-time-travel/retention/plan",
 				"/v1/memory-time-travel/retention/prune-plan",
 				"/v1/memory-time-travel/retention/prune/execute",
@@ -213,6 +231,8 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/diff"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback-plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/writeback/store"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/writeback/executor/plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune/execute"},

@@ -52,8 +52,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 22 {
-		t.Fatalf("expected 22 Memory Time Travel routes, got %d", len(routes))
+	if len(routes) != 24 {
+		t.Fatalf("expected 24 Memory Time Travel routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -77,6 +77,8 @@ func TestMemoryTimeTravelHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/memory-time-travel/diff":                                {http.MethodPost},
 		"/v1/memory-time-travel/rollback-plan":                       {http.MethodPost},
 		"/v1/memory-time-travel/rollback/approved-plan":              {http.MethodPost},
+		"/v1/memory-time-travel/rollback/writeback/store":            {http.MethodPost},
+		"/v1/memory-time-travel/rollback/writeback/executor/plan":    {http.MethodPost},
 		"/v1/memory-time-travel/retention/plan":                      {http.MethodGet},
 		"/v1/memory-time-travel/retention/prune-plan":                {http.MethodPost},
 		"/v1/memory-time-travel/retention/prune/execute":             {http.MethodPost},
@@ -178,6 +180,100 @@ func TestMemoryTimeTravelSnapshotDiffRollbackAndEvidence(t *testing.T) {
 	h.Evidence(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-memory-time-travel-evidence") || !strings.Contains(w.Body.String(), "snapshot.json") || !strings.Contains(w.Body.String(), "approved-rollback-plan.json") || !strings.Contains(w.Body.String(), "rollback-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-request-plan.json") || !strings.Contains(w.Body.String(), "retention-plan.json") || !strings.Contains(w.Body.String(), "retention-prune-plan.json") || !strings.Contains(w.Body.String(), "native-kv-history-plan.json") || !strings.Contains(w.Body.String(), "kv-history-migration-plan.json") || !strings.Contains(w.Body.String(), "kv-history-index-plan.json") || !strings.Contains(w.Body.String(), "kv-history-cutover-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-read-plan.json") || !strings.Contains(w.Body.String(), "kv-history-dual-write-plan.json") || !strings.Contains(w.Body.String(), "audit-links.json") || !strings.Contains(w.Body.String(), "audit-link-preview.json") || !strings.Contains(w.Body.String(), "audit-link-writeback-plan.json") || !strings.Contains(w.Body.String(), "audit-verification.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMemoryTimeTravelRollbackWritebackStoreAndExecutorPlanStayPackLocal(t *testing.T) {
+	now := time.Date(2026, 5, 15, 13, 30, 0, 0, time.UTC)
+	h := New(Config{DataDir: t.TempDir(), Now: func() time.Time { return now }})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/snapshots", strings.NewReader(`{"id":"baseline","namespace":"memory_snapshot","source":"test","values":{"goal":"ship","persona":"careful"}}`))
+	h.Snapshots(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("save baseline status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	body := `{"namespace":"memory_snapshot","snapshot_id":"baseline","requested_by":"operator","reason":"rollback queue","approval_id":"approval-rollback-store","dry_run":true}`
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/store", strings.NewReader(body))
+	h.RollbackWritebackStore(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("rollback writeback store status=%d body=%s", w.Code, w.Body.String())
+	}
+	var stored struct {
+		Writeback RollbackWritebackStoreReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&stored); err != nil {
+		t.Fatalf("decode rollback writeback store: %v", err)
+	}
+	if stored.Writeback.Status != "rollback_writeback_record_stored_pending_executor" || !stored.Writeback.RollbackWritebackStoreReady || !stored.Writeback.WritesRollbackWritebackStore {
+		t.Fatalf("unexpected rollback writeback store identity: %#v", stored.Writeback)
+	}
+	if stored.Writeback.RollbackWritebackReady || stored.Writeback.WritesLedgerKV || stored.Writeback.WritesTemporalKV || stored.Writeback.GlobalApprovalEnqueueReady || stored.Writeback.MerkleAppendReady || stored.Writeback.AuditProofLinkReady {
+		t.Fatalf("rollback writeback store must stay pack-local and non-destructive: %#v", stored.Writeback)
+	}
+	if stored.Writeback.ActionCount != 2 || stored.Writeback.RollbackWritebackStore.RecordCount != 1 || stored.Writeback.RollbackWritebackRecord.Status != "stored_pending_rollback_executor" {
+		t.Fatalf("unexpected rollback writeback store counts: %#v", stored.Writeback)
+	}
+	for _, artifact := range []string{"rollback-writeback-store.json", "rollback-writeback-record.json", "approved-rollback-plan.json"} {
+		if !containsString(stored.Writeback.Artifacts, artifact) {
+			t.Fatalf("rollback writeback store missing artifact %s: %#v", artifact, stored.Writeback.Artifacts)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(h.dataDir, "rollback-writeback-store.json")); err != nil {
+		t.Fatalf("expected pack-local rollback-writeback-store.json to be written: %v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/store", strings.NewReader(body))
+	h.RollbackWritebackStore(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("idempotent rollback writeback store status=%d body=%s", w.Code, w.Body.String())
+	}
+	records, err := h.loadRollbackWritebackRecords()
+	if err != nil {
+		t.Fatalf("load rollback writeback records: %v", err)
+	}
+	if len(records) != 1 || records[0].RequestKey != "approval-rollback-store" {
+		t.Fatalf("rollback writeback store should replace by request key, records=%#v", records)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/executor/plan", strings.NewReader(`{"request_key":"approval-rollback-store","requested_by":"operator","reason":"plan rollback executor handoff","dry_run":true}`))
+	h.RollbackWritebackExecutorPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("rollback executor plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var plan struct {
+		Plan RollbackWritebackExecutorPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&plan); err != nil {
+		t.Fatalf("decode rollback executor plan: %v", err)
+	}
+	if plan.Plan.Status != "rollback_writeback_executor_handoff_plan" || !plan.Plan.RollbackWritebackExecutorPlanReady || !plan.Plan.ExecutorInputContractReady || !plan.Plan.ConsumesRollbackWritebackStore {
+		t.Fatalf("unexpected rollback executor plan identity: %#v", plan.Plan)
+	}
+	if plan.Plan.RollbackExecutorReady || plan.Plan.RollbackWritebackReady || plan.Plan.WritesLedgerKV || plan.Plan.WritesTemporalKV || plan.Plan.WritesAuditChain || plan.Plan.GlobalApprovalEnqueueReady || plan.Plan.MerkleAppendReady {
+		t.Fatalf("rollback executor plan must consume store without live writes: %#v", plan.Plan)
+	}
+	if plan.Plan.ActionCount != 2 || plan.Plan.ExecutorHandoffPlan.Target != "ledger.memory.rollback_executor" || !plan.Plan.ExecutorHandoffPlan.ConsumesRollbackWritebackStore || plan.Plan.ExecutorHandoffPlan.RollbackExecutorReady {
+		t.Fatalf("executor handoff plan should map stored rollback record to future executor input only: %#v", plan.Plan.ExecutorHandoffPlan)
+	}
+	if len(plan.Plan.ExecutorHandoffPlan.DedupKey) == 0 || len(plan.Plan.AuditAppendPlan.PayloadDigest) != 64 || plan.Plan.AuditAppendPlan.WritesAuditChain {
+		t.Fatalf("rollback executor audit plan should expose deterministic non-writing metadata: %#v", plan.Plan.AuditAppendPlan)
+	}
+	for _, artifact := range []string{"rollback-writeback-executor-plan.json", "rollback-executor-handoff-plan.json", "rollback-executor-audit-plan.json", "rollback-writeback-store.json", "rollback-writeback-record.json"} {
+		if !containsString(plan.Plan.Artifacts, artifact) {
+			t.Fatalf("rollback executor plan missing artifact %s: %#v", artifact, plan.Plan.Artifacts)
+		}
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/rollback/writeback/executor/plan", strings.NewReader(`{"record_id":"missing","request_id":"missing","request_key":"missing","namespace":"missing"}`))
+	h.RollbackWritebackExecutorPlan(w, req)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "rollback writeback record not found") {
+		t.Fatalf("missing rollback executor record should be a clear 400, status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

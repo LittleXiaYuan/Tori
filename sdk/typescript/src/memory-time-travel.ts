@@ -69,7 +69,12 @@ export type MemoryTimeTravelStatusResponse = {
   approval_manager_bridge_plan_ready?: boolean;
   global_approval_enqueue_ready?: boolean;
   rollback_writeback_plan_ready?: boolean;
+  rollback_writeback_store_ready?: boolean;
+  rollback_writeback_executor_plan_ready?: boolean;
+  consumes_rollback_writeback_store?: boolean;
   rollback_writeback_ready: boolean;
+  rollback_executor_ready?: boolean;
+  writes_rollback_writeback_store?: boolean;
   writes_ledger_kv?: boolean;
   writes_temporal_kv?: boolean;
   retention_plan_ready?: boolean;
@@ -949,6 +954,193 @@ export type MemoryTimeTravelApprovedRollbackPlanResponse = {
   plan: MemoryTimeTravelApprovedRollbackPlan;
 };
 
+export type MemoryTimeTravelRollbackWritebackStoreRequest = MemoryTimeTravelApprovedRollbackPlanRequest;
+
+export type MemoryTimeTravelRollbackWritebackStoreSummary = {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  rollback_writeback_store_ready: boolean;
+  rollback_writeback_ready: boolean;
+  writes_rollback_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  record_count: number;
+  artifact: string;
+  record_artifact: string;
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackWritebackRecord = {
+  pack_id: string;
+  store_name: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  snapshot_id: string;
+  status: string;
+  requested_by?: string;
+  reason?: string;
+  approval_id?: string;
+  created_at: string;
+  updated_at: string;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  approved_rollback_plan_ready: boolean;
+  rollback_writeback_plan_ready: boolean;
+  rollback_writeback_store_ready: boolean;
+  rollback_writeback_ready: boolean;
+  writes_rollback_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  action_count: number;
+  preview_values?: Record<string, string>;
+  proposed_approval_request: MemoryTimeTravelGlobalApprovalRequestPlan;
+  writeback_actions: MemoryTimeTravelRollbackWritebackActionPlan[];
+  plan_summary: MemoryTimeTravelApprovedRollbackPlan;
+  store_artifact: string;
+  record_artifact: string;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackWritebackStore = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  rollback_writeback_store_ready: boolean;
+  approved_rollback_plan_ready: boolean;
+  rollback_writeback_plan_ready: boolean;
+  rollback_writeback_ready: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  writes_rollback_writeback_store: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  request_id: string;
+  request_key: string;
+  approval_id?: string;
+  record_id: string;
+  namespace: string;
+  snapshot_id: string;
+  action_count: number;
+  preview_values?: Record<string, string>;
+  writeback_actions: MemoryTimeTravelRollbackWritebackActionPlan[];
+  rollback_writeback_record: MemoryTimeTravelRollbackWritebackRecord;
+  rollback_writeback_store: MemoryTimeTravelRollbackWritebackStoreSummary;
+  plan_summary: MemoryTimeTravelApprovedRollbackPlan;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackWritebackStoreResponse = {
+  writeback: MemoryTimeTravelRollbackWritebackStore;
+};
+
+export type MemoryTimeTravelRollbackWritebackExecutorPlanRequest = Partial<Record<"record_id" | "request_id" | "request_key" | "namespace" | "snapshot_id" | "requested_by" | "reason", string>> & {
+  dry_run?: boolean;
+};
+
+export type MemoryTimeTravelRollbackExecutorHandoffPlan = {
+  target: string;
+  source_store: string;
+  source_record_artifact: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  snapshot_id: string;
+  dedup_key: string;
+  consumes_rollback_writeback_store: boolean;
+  executor_input_contract_ready: boolean;
+  rollback_executor_ready: boolean;
+  approval_required: boolean;
+  global_approval_enqueue_ready: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  merkle_append_ready: boolean;
+  audit_proof_link_ready: boolean;
+  action_count: number;
+  action_keys: string[];
+  actions: string[];
+  blocked_by: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackExecutorAuditAppendPlan = {
+  audit_append_plan_ready: boolean;
+  merkle_append_ready: boolean;
+  chain: string;
+  event_type: string;
+  subject: string;
+  payload_digest: string;
+  dedup_key: string;
+  writes_audit_chain: boolean;
+  actions: string[];
+  blocked_by: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackWritebackExecutorPlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  stage: string;
+  dry_run: boolean;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  namespace: string;
+  snapshot_id: string;
+  requested_by?: string;
+  reason?: string;
+  rollback_writeback_executor_plan_ready: boolean;
+  executor_input_contract_ready: boolean;
+  consumes_rollback_writeback_store: boolean;
+  rollback_writeback_store_ready: boolean;
+  rollback_writeback_ready: boolean;
+  rollback_executor_ready: boolean;
+  approval_request_plan_ready: boolean;
+  approval_manager_bridge_plan_ready: boolean;
+  global_approval_enqueue_ready: boolean;
+  audit_append_plan_ready: boolean;
+  merkle_append_ready: boolean;
+  writes_audit_chain: boolean;
+  writes_ledger_kv: boolean;
+  writes_temporal_kv: boolean;
+  audit_proof_link_ready: boolean;
+  action_count: number;
+  rollback_writeback_record: MemoryTimeTravelRollbackWritebackRecord;
+  rollback_writeback_store: MemoryTimeTravelRollbackWritebackStoreSummary;
+  executor_handoff_plan: MemoryTimeTravelRollbackExecutorHandoffPlan;
+  audit_append_plan: MemoryTimeTravelRollbackExecutorAuditAppendPlan;
+  writeback_actions: MemoryTimeTravelRollbackWritebackActionPlan[];
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
+
+export type MemoryTimeTravelRollbackWritebackExecutorPlanResponse = {
+  plan: MemoryTimeTravelRollbackWritebackExecutorPlan;
+};
+
 export type MemoryTimeTravelRetentionCandidate = {
   id: string;
   namespace: string;
@@ -1090,6 +1282,13 @@ export type MemoryTimeTravelEvidenceResponse = {
   approved_rollback_plan?: MemoryTimeTravelApprovedRollbackPlan;
   approved_rollback_plan_error?: string;
   rollback_writeback_plan?: MemoryTimeTravelRollbackWritebackActionPlan[];
+  rollback_writeback_store?: MemoryTimeTravelRollbackWritebackStoreSummary;
+  rollback_writeback_store_error?: string;
+  rollback_writeback_records?: MemoryTimeTravelRollbackWritebackRecord[];
+  rollback_writeback_executor_plan?: MemoryTimeTravelRollbackWritebackExecutorPlan;
+  rollback_writeback_executor_plan_error?: string;
+  rollback_executor_handoff_plan?: MemoryTimeTravelRollbackExecutorHandoffPlan;
+  rollback_executor_audit_plan?: MemoryTimeTravelRollbackExecutorAuditAppendPlan;
   approval_request_plan?: MemoryTimeTravelGlobalApprovalRequestPlan;
   retention_plan?: MemoryTimeTravelRetentionPlan;
   retention_plan_error?: string;
@@ -1245,6 +1444,14 @@ export class MemoryTimeTravelClient {
 
   approvedRollbackPlan(input: MemoryTimeTravelApprovedRollbackPlanRequest): Promise<MemoryTimeTravelApprovedRollbackPlanResponse> {
     return this.request<MemoryTimeTravelApprovedRollbackPlanResponse>("POST", "/v1/memory-time-travel/rollback/approved-plan", input);
+  }
+
+  rollbackWritebackStore(input: MemoryTimeTravelRollbackWritebackStoreRequest): Promise<MemoryTimeTravelRollbackWritebackStoreResponse> {
+    return this.request<MemoryTimeTravelRollbackWritebackStoreResponse>("POST", "/v1/memory-time-travel/rollback/writeback/store", input);
+  }
+
+  rollbackWritebackExecutorPlan(input: MemoryTimeTravelRollbackWritebackExecutorPlanRequest = {}): Promise<MemoryTimeTravelRollbackWritebackExecutorPlanResponse> {
+    return this.request<MemoryTimeTravelRollbackWritebackExecutorPlanResponse>("POST", "/v1/memory-time-travel/rollback/writeback/executor/plan", input);
   }
 
   retentionPlan(namespace?: string): Promise<MemoryTimeTravelRetentionPlanResponse> {
