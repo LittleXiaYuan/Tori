@@ -2,7 +2,9 @@ package wasmplugin
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -195,6 +197,16 @@ type RemoteInstallInstallerDownloadWritebackRequest struct {
 	Slug       string            `json:"slug,omitempty"`
 	Approved   bool              `json:"approved"`
 	ApprovedBy string            `json:"approved_by,omitempty"`
+	Reason     string            `json:"reason,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+}
+
+type RemoteInstallSignatureVerificationWritebackRequest struct {
+	RequestID  string            `json:"request_id,omitempty"`
+	RequestKey string            `json:"request_key,omitempty"`
+	Slug       string            `json:"slug,omitempty"`
+	Approved   bool              `json:"approved"`
+	VerifiedBy string            `json:"verified_by,omitempty"`
 	Reason     string            `json:"reason,omitempty"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
 }
@@ -455,6 +467,46 @@ type RemoteInstallInstallerDownloadWritebackReport struct {
 	Notes                                []string                  `json:"notes,omitempty"`
 }
 
+type RemoteInstallSignatureVerificationWritebackReport struct {
+	PackID                              string                            `json:"pack_id"`
+	GeneratedAt                         time.Time                         `json:"generated_at"`
+	Status                              string                            `json:"status"`
+	SignatureVerificationWritebackReady bool                              `json:"signature_verification_writeback_ready"`
+	ConsumesInstallerDownloadStore      bool                              `json:"consumes_installer_download_store"`
+	InstallerDownloadRecordFound        bool                              `json:"installer_download_record_found"`
+	PackageCacheReady                   bool                              `json:"package_cache_ready"`
+	ApprovalApproved                    bool                              `json:"approval_approved"`
+	DownloadReady                       bool                              `json:"download_ready"`
+	SignatureVerifyReady                bool                              `json:"signature_verify_ready"`
+	SignatureVerified                   bool                              `json:"signature_verified"`
+	AllowsInstallerWriteback            bool                              `json:"allows_installer_writeback"`
+	RemoteInstallReady                  bool                              `json:"remote_install_ready"`
+	InstallerReady                      bool                              `json:"installer_ready"`
+	InstallerBlockedUntilRegistration   bool                              `json:"installer_blocked_until_registration"`
+	Downloads                           bool                              `json:"downloads"`
+	NetworkAccess                       bool                              `json:"network_access"`
+	WritesFiles                         bool                              `json:"writes_files"`
+	WritesSignatureVerificationStore    bool                              `json:"writes_signature_verification_store"`
+	InstallsPlugin                      bool                              `json:"installs_plugin"`
+	RequestID                           string                            `json:"request_id,omitempty"`
+	RequestKey                          string                            `json:"request_key,omitempty"`
+	DecisionKey                         string                            `json:"decision_key,omitempty"`
+	VerifiedBy                          string                            `json:"verified_by,omitempty"`
+	Reason                              string                            `json:"reason,omitempty"`
+	Plugin                              RemoteInstallPluginPlan           `json:"plugin,omitempty"`
+	Package                             RemoteInstallPackagePlan          `json:"package,omitempty"`
+	InstallerDownloadRecord             InstallerDownloadRecord           `json:"installer_download_record"`
+	SignatureVerification               SignatureVerificationPlan         `json:"signature_verification"`
+	VerificationRecord                  SignatureVerificationRecord       `json:"verification_record"`
+	SignatureVerificationStore          SignatureVerificationStoreSummary `json:"signature_verification_store"`
+	Checks                              []RemoteInstallCheck              `json:"checks"`
+	Artifacts                           []string                          `json:"artifacts"`
+	Actions                             []string                          `json:"actions"`
+	Labels                              []string                          `json:"labels"`
+	Metadata                            map[string]string                 `json:"metadata,omitempty"`
+	Notes                               []string                          `json:"notes,omitempty"`
+}
+
 type ApprovalQueueStoreSummary struct {
 	PackID                   string   `json:"pack_id"`
 	QueueName                string   `json:"queue_name"`
@@ -551,6 +603,62 @@ type InstallerDownloadRecord struct {
 	Labels                               []string                 `json:"labels"`
 	Metadata                             map[string]string        `json:"metadata,omitempty"`
 	Notes                                []string                 `json:"notes,omitempty"`
+}
+
+type SignatureVerificationRecord struct {
+	PackID                              string                    `json:"pack_id"`
+	GeneratedAt                         time.Time                 `json:"generated_at"`
+	Status                              string                    `json:"status"`
+	SignatureVerificationWritebackReady bool                      `json:"signature_verification_writeback_ready"`
+	InstallerDownloadRecordFound        bool                      `json:"installer_download_record_found"`
+	PackageCacheReady                   bool                      `json:"package_cache_ready"`
+	DownloadReady                       bool                      `json:"download_ready"`
+	SignatureVerifyReady                bool                      `json:"signature_verify_ready"`
+	SignatureVerified                   bool                      `json:"signature_verified"`
+	AllowsInstallerWriteback            bool                      `json:"allows_installer_writeback"`
+	RemoteInstallReady                  bool                      `json:"remote_install_ready"`
+	InstallerReady                      bool                      `json:"installer_ready"`
+	InstallerBlockedUntilRegistration   bool                      `json:"installer_blocked_until_registration"`
+	WritesFiles                         bool                      `json:"writes_files"`
+	WritesSignatureVerificationStore    bool                      `json:"writes_signature_verification_store"`
+	InstallsPlugin                      bool                      `json:"installs_plugin"`
+	QueueName                           string                    `json:"queue_name,omitempty"`
+	RequestID                           string                    `json:"request_id,omitempty"`
+	RequestKey                          string                    `json:"request_key,omitempty"`
+	DecisionKey                         string                    `json:"decision_key,omitempty"`
+	VerifiedBy                          string                    `json:"verified_by,omitempty"`
+	Reason                              string                    `json:"reason,omitempty"`
+	Algorithm                           string                    `json:"algorithm"`
+	PublicKeyID                         string                    `json:"public_key_id,omitempty"`
+	TrustRoot                           string                    `json:"trust_root,omitempty"`
+	CanonicalPayloadSHA256              string                    `json:"canonical_payload_sha256"`
+	ExpectedSHA256                      string                    `json:"expected_sha256,omitempty"`
+	ActualSHA256                        string                    `json:"actual_sha256,omitempty"`
+	SHA256Match                         bool                      `json:"sha256_match"`
+	SignatureArtifact                   string                    `json:"signature_artifact"`
+	StoreArtifact                       string                    `json:"store_artifact"`
+	PackageCacheArtifact                string                    `json:"package_cache_artifact,omitempty"`
+	PackageCachePath                    string                    `json:"package_cache_path,omitempty"`
+	Artifact                            string                    `json:"artifact"`
+	Plugin                              RemoteInstallPluginPlan   `json:"plugin,omitempty"`
+	Package                             RemoteInstallPackagePlan  `json:"package,omitempty"`
+	SignatureVerification               SignatureVerificationPlan `json:"signature_verification"`
+	Checks                              []RemoteInstallCheck      `json:"checks"`
+	Labels                              []string                  `json:"labels"`
+	Metadata                            map[string]string         `json:"metadata,omitempty"`
+	Notes                               []string                  `json:"notes,omitempty"`
+}
+
+type SignatureVerificationStoreSummary struct {
+	PackID                           string   `json:"pack_id"`
+	Store                            string   `json:"store"`
+	StoreReady                       bool     `json:"store_ready"`
+	RecordCount                      int      `json:"record_count"`
+	Artifact                         string   `json:"artifact"`
+	WritesFiles                      bool     `json:"writes_files"`
+	WritesSignatureVerificationStore bool     `json:"writes_signature_verification_store"`
+	InstallerWritebackReady          bool     `json:"installer_writeback_ready"`
+	Notes                            []string `json:"notes,omitempty"`
 }
 
 type ApprovalQueueRecord struct {
@@ -915,6 +1023,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/approval/queue/writeback", Handler: h.RemoteInstallApprovalQueueWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/continuation/plan", Handler: h.RemoteInstallInstallerContinuationPlan},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/download/writeback", Handler: h.RemoteInstallInstallerDownloadWriteback},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/signature-verification/writeback", Handler: h.RemoteInstallSignatureVerificationWriteback},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -936,6 +1045,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	approvalQueueSummary := h.approvalQueueStoreSummary()
+	signatureVerificationStoreSummary := h.signatureVerificationStoreSummary()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                                  PackID,
 		"stage":                                    "pack-shell-before-runtime-hosts",
@@ -960,7 +1070,9 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"approval_writeback_ready":                 true,
 		"installer_continuation_plan_ready":        true,
 		"installer_download_writeback_ready":       true,
+		"signature_verification_writeback_ready":   true,
 		"installer_ready":                          false,
+		"installer_blocked_until_registration":     true,
 		"installer_blocked_until_signature_verify": true,
 		"installer_blocked_until_installer_wiring": true,
 		"plugin_count":                             len(plugins),
@@ -968,6 +1080,7 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"plugin_dir":                               h.pluginDir,
 		"store_dir":                                h.dataDir,
 		"approval_queue_store":                     approvalQueueSummary,
+		"signature_verification_store":             signatureVerificationStoreSummary,
 		"sandbox":                                  h.sandbox.Stats(),
 		"capabilities": []string{
 			"wasm.plugin.registry",
@@ -986,9 +1099,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.remote_install.approval_queue_writeback",
 			"wasm.remote_install.installer_continuation_plan",
 			"wasm.remote_install.installer_download_writeback",
+			"wasm.remote_install.signature_verification_writeback",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, and installer continuation planning are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, package download, signature verification, installer execution, and plugin registration remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, installer continuation planning, installer download cache write-back, and signature verification write-back are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, installer extraction, plugin file write-back, and plugin registration remain follow-up wiring."},
 	})
 }
 
@@ -1286,6 +1400,24 @@ func (h *Handler) RemoteInstallInstallerDownloadWriteback(w http.ResponseWriter,
 	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
 }
 
+func (h *Handler) RemoteInstallSignatureVerificationWriteback(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallSignatureVerificationWritebackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install signature verification writeback payload")
+		return
+	}
+	report, err := h.writeRemoteInstallSignatureVerification(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1302,26 +1434,29 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	queueRecord := h.approvalQueueRecordPreview(writebackPlan)
 	installerContinuationPlan := h.installerContinuationPlanFromRecord(queueRecord, false)
 	installerDownloadRecord := h.installerDownloadRecordFromContinuation(installerContinuationPlan, nil, false, "", "")
+	signatureVerificationRecord := h.signatureVerificationRecordFromDownload(installerDownloadRecord, nil, false, "", "")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pack_id":                     PackID,
-		"exported_at":                 h.now().UTC(),
-		"format":                      "json-wasm-plugin-evidence",
-		"files":                       []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "sandbox-stats.json"},
-		"plugin":                      plugin,
-		"plan":                        permissionPlan(plugin.Permissions),
-		"host_abi_plan":               hostABIPlan(plugin.Permissions),
-		"host_abi_gate":               hostABIExecutionGate(plugin.Permissions),
-		"module_integrity_gate":       moduleIntegrityGate(plugin, h.computeSHA256(plugin.ModulePath)),
-		"remote_install_plan":         remotePlan,
-		"signature_verification":      remotePlan.SignatureVerification,
-		"approval_gate_plan":          h.remoteInstallApprovalPlanForPlugin(plugin),
-		"approval_decision_plan":      h.remoteInstallApprovalDecisionPlanForPlugin(plugin),
-		"approval_writeback_plan":     writebackPlan,
-		"approval_queue_store":        h.approvalQueueStoreSummary(),
-		"approval_queue_record":       queueRecord,
-		"installer_continuation_plan": installerContinuationPlan,
-		"installer_download_record":   installerDownloadRecord,
-		"sandbox":                     h.sandbox.Stats(),
+		"pack_id":                       PackID,
+		"exported_at":                   h.now().UTC(),
+		"format":                        "json-wasm-plugin-evidence",
+		"files":                         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "signature-verification-record.json", "signature-verification-store.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "sandbox-stats.json"},
+		"plugin":                        plugin,
+		"plan":                          permissionPlan(plugin.Permissions),
+		"host_abi_plan":                 hostABIPlan(plugin.Permissions),
+		"host_abi_gate":                 hostABIExecutionGate(plugin.Permissions),
+		"module_integrity_gate":         moduleIntegrityGate(plugin, h.computeSHA256(plugin.ModulePath)),
+		"remote_install_plan":           remotePlan,
+		"signature_verification":        remotePlan.SignatureVerification,
+		"approval_gate_plan":            h.remoteInstallApprovalPlanForPlugin(plugin),
+		"approval_decision_plan":        h.remoteInstallApprovalDecisionPlanForPlugin(plugin),
+		"approval_writeback_plan":       writebackPlan,
+		"approval_queue_store":          h.approvalQueueStoreSummary(),
+		"approval_queue_record":         queueRecord,
+		"installer_continuation_plan":   installerContinuationPlan,
+		"installer_download_record":     installerDownloadRecord,
+		"signature_verification_store":  h.signatureVerificationStoreSummary(),
+		"signature_verification_record": signatureVerificationRecord,
+		"sandbox":                       h.sandbox.Stats(),
 	})
 }
 
@@ -2400,6 +2535,175 @@ func (h *Handler) blockedInstallerDownloadReport(req RemoteInstallInstallerDownl
 	}
 }
 
+func (h *Handler) writeRemoteInstallSignatureVerification(req RemoteInstallSignatureVerificationWritebackRequest) (RemoteInstallSignatureVerificationWritebackReport, error) {
+	metadata := cleanStringMap(req.Metadata)
+	downloads, err := h.loadInstallerDownloadRecords()
+	if err != nil {
+		return RemoteInstallSignatureVerificationWritebackReport{}, err
+	}
+	downloadRecord, found := selectInstallerDownloadRecord(downloads, req)
+	signaturePlan := h.buildSignatureVerificationPlan(downloadRecord.Plugin, downloadRecord.Package)
+	checks := []RemoteInstallCheck{
+		{Name: "installer_download_store_consumed", Required: true, Ready: true, Reason: "signature verification write-back consumes the pack-local installer-download-store.json contract"},
+		{Name: "installer_download_record_found", Required: true, Ready: found, Reason: boolReason(found, "installer download record matched request_id, request_key, slug, or deterministic latest record", "signature verification requires a persisted installer download record")},
+		{Name: "explicit_signature_verification_approved", Required: true, Ready: req.Approved, Reason: boolReason(req.Approved, "explicit approved=true was provided for signature verification write-back", "signature verification write-back requires explicit approved=true")},
+		{Name: "package_cache_ready", Required: true, Ready: found && downloadRecord.DownloadReady && downloadRecord.WritesPackageCache, Reason: boolReason(found && downloadRecord.DownloadReady && downloadRecord.WritesPackageCache, "download record points at a pack-local package cache artifact", "signature verification requires a pack-local package cache artifact")},
+		{Name: "package_sha256_match", Required: true, Ready: found && downloadRecord.SHA256Match, Reason: boolReason(found && downloadRecord.SHA256Match, "downloaded package SHA-256 matched the approved record", "downloaded package SHA-256 must match before signature verification")},
+		{Name: "installer_registration_wired", Required: true, Ready: false, Reason: "plugin registration remains blocked until a later installer write-back route"},
+	}
+	if !found {
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_missing_installer_download_record", checks, metadata), nil
+	}
+	if !downloadRecord.DownloadReady || !downloadRecord.WritesPackageCache || strings.TrimSpace(downloadRecord.CachePath) == "" {
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_missing_package_cache", checks, metadata), nil
+	}
+	if !downloadRecord.SHA256Match {
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_download_sha256_unverified", checks, metadata), nil
+	}
+	if !req.Approved {
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_missing_explicit_signature_approval", checks, metadata), nil
+	}
+	payload, err := os.ReadFile(downloadRecord.CachePath)
+	if os.IsNotExist(err) {
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_missing_package_cache_file", checks, metadata), nil
+	}
+	if err != nil {
+		return RemoteInstallSignatureVerificationWritebackReport{}, err
+	}
+	actualSHA := sha256Bytes(payload)
+	expectedSHA := strings.ToLower(strings.TrimSpace(downloadRecord.ExpectedSHA256))
+	if expectedSHA == "" || actualSHA != expectedSHA {
+		checks = append(checks, RemoteInstallCheck{Name: "cached_package_sha256_match", Required: true, Ready: false, Reason: "cached package bytes no longer match installer download record"})
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_cached_package_sha256_mismatch", checks, metadata), nil
+	}
+	if signaturePlan.Algorithm != "ed25519" {
+		checks = append(checks, RemoteInstallCheck{Name: "signature_algorithm_supported", Required: true, Ready: false, Reason: "only ed25519 package signatures are supported in this reversible verifier slice"})
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_unsupported_signature_algorithm", checks, metadata), nil
+	}
+	signatureBytes, err := decodeEd25519Material(downloadRecord.Package.Signature, ed25519.SignatureSize, "signature")
+	if err != nil {
+		checks = append(checks, RemoteInstallCheck{Name: "signature_material_valid", Required: true, Ready: false, Reason: err.Error()})
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_invalid_signature_material", checks, metadata), nil
+	}
+	publicKey, err := decodeEd25519PublicKey(downloadRecord.Package.TrustRoot, downloadRecord.Package.PublicKeyID)
+	if err != nil {
+		checks = append(checks, RemoteInstallCheck{Name: "public_key_material_valid", Required: true, Ready: false, Reason: err.Error()})
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_invalid_public_key_material", checks, metadata), nil
+	}
+	if !ed25519.Verify(publicKey, payload, signatureBytes) {
+		checks = append(checks, RemoteInstallCheck{Name: "ed25519_signature_valid", Required: true, Ready: false, Reason: "signature did not verify against the cached package bytes"})
+		return h.blockedSignatureVerificationReport(req, downloadRecord, signaturePlan, "blocked_signature_invalid", checks, metadata), nil
+	}
+	verifiedPlan := signatureVerificationPlanVerified(signaturePlan)
+	checks = append(checks,
+		RemoteInstallCheck{Name: "cached_package_sha256_match", Required: true, Ready: true, Reason: "cached package bytes match the installer download record"},
+		RemoteInstallCheck{Name: "signature_algorithm_supported", Required: true, Ready: true, Reason: "ed25519 verifier is wired for cached package bytes"},
+		RemoteInstallCheck{Name: "public_key_material_valid", Required: true, Ready: true, Reason: "ed25519 public key material was decoded from trust_root/public_key_id"},
+		RemoteInstallCheck{Name: "signature_material_valid", Required: true, Ready: true, Reason: "ed25519 signature material was decoded"},
+		RemoteInstallCheck{Name: "ed25519_signature_valid", Required: true, Ready: true, Reason: "signature verified against the cached package bytes"},
+	)
+	verificationRecord := h.signatureVerificationRecordFromDownload(downloadRecord, payload, true, strings.TrimSpace(req.VerifiedBy), strings.TrimSpace(req.Reason))
+	verificationRecord.SignatureVerification = verifiedPlan
+	verificationRecord.Metadata = metadata
+	verificationRecord.Checks = append(verificationRecord.Checks, checks...)
+	if err := h.saveSignatureVerificationRecord(verificationRecord); err != nil {
+		return RemoteInstallSignatureVerificationWritebackReport{}, err
+	}
+	store := h.signatureVerificationStoreSummary()
+	return RemoteInstallSignatureVerificationWritebackReport{
+		PackID:                              PackID,
+		GeneratedAt:                         h.now().UTC(),
+		Status:                              "signature_verified_pending_installer_registration",
+		SignatureVerificationWritebackReady: true,
+		ConsumesInstallerDownloadStore:      true,
+		InstallerDownloadRecordFound:        true,
+		PackageCacheReady:                   true,
+		ApprovalApproved:                    downloadRecord.ApprovalApproved,
+		DownloadReady:                       true,
+		SignatureVerifyReady:                true,
+		SignatureVerified:                   true,
+		AllowsInstallerWriteback:            true,
+		RemoteInstallReady:                  false,
+		InstallerReady:                      false,
+		InstallerBlockedUntilRegistration:   true,
+		Downloads:                           false,
+		NetworkAccess:                       false,
+		WritesFiles:                         false,
+		WritesSignatureVerificationStore:    true,
+		InstallsPlugin:                      false,
+		RequestID:                           downloadRecord.RequestID,
+		RequestKey:                          downloadRecord.RequestKey,
+		DecisionKey:                         downloadRecord.DecisionKey,
+		VerifiedBy:                          strings.TrimSpace(req.VerifiedBy),
+		Reason:                              strings.TrimSpace(req.Reason),
+		Plugin:                              downloadRecord.Plugin,
+		Package:                             downloadRecord.Package,
+		InstallerDownloadRecord:             downloadRecord,
+		SignatureVerification:               verifiedPlan,
+		VerificationRecord:                  verificationRecord,
+		SignatureVerificationStore:          store,
+		Checks:                              checks,
+		Artifacts:                           []string{"signature-verification-record.json", "signature-verification-store.json", "signature-verification.json", "installer-download-record.json", downloadRecord.CacheArtifact, "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json"},
+		Actions: []string{
+			"verified the cached package bytes with Ed25519 signature material from the approved installer record",
+			"wrote only the pack-local signature verification store and kept plugin extraction, plugin_dir writes, registration, and remote_install_ready blocked",
+		},
+		Labels:   []string{"remote-install", "signature-verification-writeback", "ed25519", "pack-local-store", "pending-registration"},
+		Metadata: metadata,
+		Notes: []string{
+			"This route verifies the pack-local cached package bytes and writes only signature-verification-store.json plus signature-verification-record.json.",
+			"It does not download, extract packages, write plugin_dir, register plugins, or mark remote_install_ready=true.",
+			"writes_files=false describes the external/plugin-file boundary; writes_signature_verification_store=true is limited to the pack-owned verification store artifact.",
+		},
+	}, nil
+}
+
+func (h *Handler) blockedSignatureVerificationReport(req RemoteInstallSignatureVerificationWritebackRequest, downloadRecord InstallerDownloadRecord, signaturePlan SignatureVerificationPlan, status string, checks []RemoteInstallCheck, metadata map[string]string) RemoteInstallSignatureVerificationWritebackReport {
+	record := h.signatureVerificationRecordFromDownload(downloadRecord, nil, false, strings.TrimSpace(req.VerifiedBy), strings.TrimSpace(req.Reason))
+	record.Status = status
+	record.SignatureVerification = signaturePlan
+	record.Metadata = metadata
+	return RemoteInstallSignatureVerificationWritebackReport{
+		PackID:                              PackID,
+		GeneratedAt:                         h.now().UTC(),
+		Status:                              status,
+		SignatureVerificationWritebackReady: true,
+		ConsumesInstallerDownloadStore:      true,
+		InstallerDownloadRecordFound:        strings.TrimSpace(downloadRecord.RequestKey) != "" || strings.TrimSpace(downloadRecord.RequestID) != "",
+		PackageCacheReady:                   false,
+		ApprovalApproved:                    downloadRecord.ApprovalApproved,
+		DownloadReady:                       downloadRecord.DownloadReady,
+		SignatureVerifyReady:                false,
+		SignatureVerified:                   false,
+		AllowsInstallerWriteback:            false,
+		RemoteInstallReady:                  false,
+		InstallerReady:                      false,
+		InstallerBlockedUntilRegistration:   true,
+		Downloads:                           false,
+		NetworkAccess:                       false,
+		WritesFiles:                         false,
+		WritesSignatureVerificationStore:    false,
+		InstallsPlugin:                      false,
+		RequestID:                           downloadRecord.RequestID,
+		RequestKey:                          downloadRecord.RequestKey,
+		DecisionKey:                         downloadRecord.DecisionKey,
+		VerifiedBy:                          strings.TrimSpace(req.VerifiedBy),
+		Reason:                              strings.TrimSpace(req.Reason),
+		Plugin:                              downloadRecord.Plugin,
+		Package:                             downloadRecord.Package,
+		InstallerDownloadRecord:             downloadRecord,
+		SignatureVerification:               signaturePlan,
+		VerificationRecord:                  record,
+		SignatureVerificationStore:          h.signatureVerificationStoreSummary(),
+		Checks:                              checks,
+		Artifacts:                           []string{"signature-verification-record.json", "signature-verification-store.json", "installer-download-record.json", "signature-verification.json"},
+		Actions:                             []string{"kept signature verification blocked until a valid cached package, explicit approval, public key material, and Ed25519 signature are all available"},
+		Labels:                              []string{"remote-install", "signature-verification-writeback", "blocked", "no-plugin-install"},
+		Metadata:                            metadata,
+		Notes:                               []string{"No signature verification store was written, and no plugin files were extracted or registered."},
+	}
+}
+
 func selectApprovalQueueRecord(records []ApprovalQueueRecord, req RemoteInstallInstallerContinuationPlanRequest) (ApprovalQueueRecord, bool) {
 	requestKey := strings.TrimSpace(req.RequestKey)
 	requestID := strings.TrimSpace(req.RequestID)
@@ -2949,6 +3253,260 @@ func (h *Handler) installerDownloadRecordFromContinuation(plan InstallerContinua
 		Labels: []string{"remote-install", "installer-download", boolReason(written, "pack-local-cache", "preview-only")},
 		Notes:  []string{"Installer download record tracks the pack-local package cache handoff and keeps signature verification/registration blocked."},
 	}
+}
+
+func (h *Handler) installerDownloadStoreSummary() (int, error) {
+	records, err := h.loadInstallerDownloadRecords()
+	if err != nil {
+		return 0, err
+	}
+	return len(records), nil
+}
+
+func (h *Handler) loadInstallerDownloadRecords() ([]InstallerDownloadRecord, error) {
+	data, err := os.ReadFile(h.installerDownloadStorePath())
+	if os.IsNotExist(err) {
+		return []InstallerDownloadRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Records []InstallerDownloadRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	if payload.Records == nil {
+		payload.Records = []InstallerDownloadRecord{}
+	}
+	return payload.Records, nil
+}
+
+func selectInstallerDownloadRecord(records []InstallerDownloadRecord, req RemoteInstallSignatureVerificationWritebackRequest) (InstallerDownloadRecord, bool) {
+	requestKey := strings.TrimSpace(req.RequestKey)
+	requestID := strings.TrimSpace(req.RequestID)
+	slug := strings.ToLower(strings.TrimSpace(req.Slug))
+	for _, record := range records {
+		if requestKey != "" && record.RequestKey == requestKey {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if requestID != "" && record.RequestID == requestID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if slug != "" && record.Plugin.Slug == slug {
+			return record, true
+		}
+	}
+	if requestKey != "" || requestID != "" || slug != "" || len(records) == 0 {
+		return InstallerDownloadRecord{}, false
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].GeneratedAt.Equal(records[j].GeneratedAt) {
+			return records[i].RequestKey < records[j].RequestKey
+		}
+		return records[i].GeneratedAt.After(records[j].GeneratedAt)
+	})
+	return records[0], true
+}
+
+func (h *Handler) signatureVerificationRecordFromDownload(download InstallerDownloadRecord, payload []byte, verified bool, verifiedBy string, reason string) SignatureVerificationRecord {
+	actualSHA := strings.TrimSpace(download.ActualSHA256)
+	sizePayload := payload != nil
+	if sizePayload {
+		actualSHA = sha256Bytes(payload)
+	}
+	status := "signature_verification_preview_blocked"
+	if verified {
+		status = "signature_verified_pending_installer_registration"
+	}
+	signaturePlan := h.buildSignatureVerificationPlan(download.Plugin, download.Package)
+	if verified {
+		signaturePlan = signatureVerificationPlanVerified(signaturePlan)
+	}
+	return SignatureVerificationRecord{
+		PackID:                              PackID,
+		GeneratedAt:                         h.now().UTC(),
+		Status:                              status,
+		SignatureVerificationWritebackReady: true,
+		InstallerDownloadRecordFound:        strings.TrimSpace(download.RequestKey) != "" || strings.TrimSpace(download.RequestID) != "",
+		PackageCacheReady:                   download.DownloadReady && strings.TrimSpace(download.CachePath) != "",
+		DownloadReady:                       download.DownloadReady,
+		SignatureVerifyReady:                verified,
+		SignatureVerified:                   verified,
+		AllowsInstallerWriteback:            verified,
+		RemoteInstallReady:                  false,
+		InstallerReady:                      false,
+		InstallerBlockedUntilRegistration:   true,
+		WritesFiles:                         false,
+		WritesSignatureVerificationStore:    verified,
+		InstallsPlugin:                      false,
+		QueueName:                           download.QueueName,
+		RequestID:                           download.RequestID,
+		RequestKey:                          download.RequestKey,
+		DecisionKey:                         download.DecisionKey,
+		VerifiedBy:                          strings.TrimSpace(verifiedBy),
+		Reason:                              strings.TrimSpace(reason),
+		Algorithm:                           signaturePlan.Algorithm,
+		PublicKeyID:                         download.Package.PublicKeyID,
+		TrustRoot:                           download.Package.TrustRoot,
+		CanonicalPayloadSHA256:              signaturePlan.CanonicalPayloadSHA256,
+		ExpectedSHA256:                      strings.ToLower(strings.TrimSpace(download.ExpectedSHA256)),
+		ActualSHA256:                        actualSHA,
+		SHA256Match:                         strings.TrimSpace(download.ExpectedSHA256) != "" && actualSHA != "" && strings.EqualFold(download.ExpectedSHA256, actualSHA),
+		SignatureArtifact:                   "signature-verification.json",
+		StoreArtifact:                       "signature-verification-store.json",
+		PackageCacheArtifact:                download.CacheArtifact,
+		PackageCachePath:                    download.CachePath,
+		Artifact:                            "signature-verification-record.json",
+		Plugin:                              download.Plugin,
+		Package:                             download.Package,
+		SignatureVerification:               signaturePlan,
+		Checks: []RemoteInstallCheck{
+			{Name: "installer_download_record_found", Required: true, Ready: strings.TrimSpace(download.RequestKey) != "" || strings.TrimSpace(download.RequestID) != "", Reason: "signature verification consumes a persisted installer-download-record.json"},
+			{Name: "package_cache_ready", Required: true, Ready: download.DownloadReady && strings.TrimSpace(download.CachePath) != "", Reason: boolReason(download.DownloadReady && strings.TrimSpace(download.CachePath) != "", "pack-local package cache is available", "pack-local package cache is required before signature verification")},
+			{Name: "signature_verify_ready", Required: true, Ready: verified, Reason: boolReason(verified, "cached package signature verified", "signature has not been verified")},
+			{Name: "plugin_registration_wired", Required: true, Ready: false, Reason: "plugin registration remains blocked until a later installer route"},
+		},
+		Labels: []string{"remote-install", "signature-verification", boolReason(verified, "verified", "preview-only")},
+		Notes:  []string{"Signature verification record tracks the pack-local verifier result and keeps extraction/registration blocked."},
+	}
+}
+
+func signatureVerificationPlanVerified(plan SignatureVerificationPlan) SignatureVerificationPlan {
+	plan.VerificationGateReady = true
+	plan.SignatureVerifyReady = true
+	plan.AllowsInstall = true
+	plan.Blocked = false
+	plan.Status = "signature_verified_pending_registration"
+	for i := range plan.Checks {
+		if plan.Checks[i].Name == "verifier_wired" {
+			plan.Checks[i].Ready = true
+			plan.Checks[i].Reason = "ed25519 verifier is wired for pack-local cached package bytes"
+		}
+	}
+	plan.Labels = []string{"signature-verification", "verification-gate", "ed25519", "verified", "no-download", "no-file-write"}
+	plan.Notes = []string{
+		"Verified against the pack-local installer cache; this does not extract packages, write plugin files, or register plugins.",
+		"signature_verify_ready=true only allows the later explicit installer write-back route to continue.",
+	}
+	return plan
+}
+
+func (h *Handler) signatureVerificationStorePath() string {
+	return filepath.Join(h.dataDir, "signature-verification-store.json")
+}
+
+func (h *Handler) saveSignatureVerificationRecord(record SignatureVerificationRecord) error {
+	if err := os.MkdirAll(h.dataDir, 0o755); err != nil {
+		return err
+	}
+	var payload struct {
+		PackID  string                        `json:"pack_id"`
+		Store   string                        `json:"store"`
+		Records []SignatureVerificationRecord `json:"records"`
+	}
+	payload.PackID = PackID
+	payload.Store = "pack-local-signature-verification-store"
+	if data, err := os.ReadFile(h.signatureVerificationStorePath()); err == nil && len(data) > 0 {
+		_ = json.Unmarshal(data, &payload)
+	}
+	next := make([]SignatureVerificationRecord, 0, len(payload.Records)+1)
+	replaced := false
+	for _, existing := range payload.Records {
+		if existing.RequestKey != "" && existing.RequestKey == record.RequestKey {
+			next = append(next, record)
+			replaced = true
+			continue
+		}
+		next = append(next, existing)
+	}
+	if !replaced {
+		next = append(next, record)
+	}
+	payload.PackID = PackID
+	payload.Store = "pack-local-signature-verification-store"
+	payload.Records = next
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.signatureVerificationStorePath(), append(data, '\n'), 0o644)
+}
+
+func (h *Handler) loadSignatureVerificationRecords() ([]SignatureVerificationRecord, error) {
+	data, err := os.ReadFile(h.signatureVerificationStorePath())
+	if os.IsNotExist(err) {
+		return []SignatureVerificationRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Records []SignatureVerificationRecord `json:"records"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	if payload.Records == nil {
+		payload.Records = []SignatureVerificationRecord{}
+	}
+	return payload.Records, nil
+}
+
+func (h *Handler) signatureVerificationStoreSummary() SignatureVerificationStoreSummary {
+	records, _ := h.loadSignatureVerificationRecords()
+	return SignatureVerificationStoreSummary{
+		PackID:                           PackID,
+		Store:                            "pack-local-json",
+		StoreReady:                       true,
+		RecordCount:                      len(records),
+		Artifact:                         "signature-verification-store.json",
+		WritesFiles:                      false,
+		WritesSignatureVerificationStore: false,
+		InstallerWritebackReady:          false,
+		Notes: []string{
+			"Store readiness only covers the pack-local signature verification JSON bridge.",
+			"Installer write-back, package extraction, plugin_dir writes, and plugin registration remain disabled until later explicit routes consume verified records.",
+		},
+	}
+}
+
+func decodeEd25519PublicKey(trustRoot string, publicKeyID string) (ed25519.PublicKey, error) {
+	for _, candidate := range []string{trustRoot, publicKeyID} {
+		key, err := decodeEd25519Material(candidate, ed25519.PublicKeySize, "public key")
+		if err == nil {
+			return ed25519.PublicKey(key), nil
+		}
+	}
+	return nil, fmt.Errorf("ed25519 public key material must be base64 or hex encoded in trust_root or public_key_id")
+}
+
+func decodeEd25519Material(raw string, want int, label string) ([]byte, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, fmt.Errorf("%s material is required", label)
+	}
+	for _, prefix := range []string{"ed25519:", "base64:", "hex:"} {
+		if strings.HasPrefix(strings.ToLower(value), prefix) {
+			value = strings.TrimSpace(value[len(prefix):])
+			break
+		}
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(value); err == nil && len(decoded) == want {
+		return decoded, nil
+	}
+	if decoded, err := base64.RawStdEncoding.DecodeString(value); err == nil && len(decoded) == want {
+		return decoded, nil
+	}
+	if decoded, err := hex.DecodeString(value); err == nil && len(decoded) == want {
+		return decoded, nil
+	}
+	return nil, fmt.Errorf("%s material must decode to %d bytes", label, want)
 }
 
 func fetchPackageBytes(ctx context.Context, packageURL string) ([]byte, error) {

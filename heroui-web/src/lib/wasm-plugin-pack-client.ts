@@ -12,6 +12,8 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "installer-download-handoff-plan.json",
   "installer-download-record.json",
   "installer-package-cache.tgz",
+  "signature-verification-record.json",
+  "signature-verification-store.json",
   "installer-registration-handoff-plan.json",
   "installer-audit-handoff-plan.json",
   "signature-verification.json",
@@ -68,6 +70,15 @@ export const WASM_PLUGIN_INSTALLER_DOWNLOAD_RECORD_ARTIFACT =
 export const WASM_PLUGIN_INSTALLER_PACKAGE_CACHE_ARTIFACT =
   "installer-package-cache.tgz";
 
+export const WASM_PLUGIN_SIGNATURE_VERIFICATION_WRITEBACK_CAPABILITY =
+  "wasm.remote_install.signature_verification_writeback";
+
+export const WASM_PLUGIN_SIGNATURE_VERIFICATION_RECORD_ARTIFACT =
+  "signature-verification-record.json";
+
+export const WASM_PLUGIN_SIGNATURE_VERIFICATION_STORE_ARTIFACT =
+  "signature-verification-store.json";
+
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -123,10 +134,13 @@ export interface WASMPluginStatus {
   approval_queue_store_ready: boolean;
   installer_continuation_plan_ready: boolean;
   installer_download_writeback_ready: boolean;
+  signature_verification_writeback_ready: boolean;
   installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
   installer_blocked_until_signature_verify: boolean;
   installer_blocked_until_installer_wiring: boolean;
   approval_queue_store?: WASMPluginApprovalQueueStoreSummary;
+  signature_verification_store?: WASMPluginSignatureVerificationStoreSummary;
   plugin_count: number;
   loaded_count: number;
   plugin_dir?: string;
@@ -283,6 +297,16 @@ export interface WASMPluginRemoteInstallInstallerDownloadWritebackInput {
   slug?: string;
   approved: boolean;
   approved_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface WASMPluginRemoteInstallSignatureVerificationWritebackInput {
+  request_id?: string;
+  request_key?: string;
+  slug?: string;
+  approved: boolean;
+  verified_by?: string;
   reason?: string;
   metadata?: Record<string, string>;
 }
@@ -813,6 +837,102 @@ export interface WASMPluginInstallerDownloadRecord {
   notes?: string[];
 }
 
+export interface WASMPluginSignatureVerificationRecord {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  signature_verification_writeback_ready: boolean;
+  installer_download_record_found: boolean;
+  package_cache_ready: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  signature_verified: boolean;
+  allows_installer_writeback: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  writes_files: boolean;
+  writes_signature_verification_store: boolean;
+  installs_plugin: boolean;
+  queue_name?: string;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  verified_by?: string;
+  reason?: string;
+  algorithm: string;
+  public_key_id?: string;
+  trust_root?: string;
+  canonical_payload_sha256: string;
+  expected_sha256?: string;
+  actual_sha256?: string;
+  sha256_match: boolean;
+  signature_artifact: string;
+  store_artifact: string;
+  package_cache_artifact?: string;
+  package_cache_path?: string;
+  artifact: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  signature_verification: WASMPluginSignatureVerificationPlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
+export interface WASMPluginSignatureVerificationStoreSummary {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  record_count: number;
+  artifact: string;
+  writes_files: boolean;
+  writes_signature_verification_store: boolean;
+  installer_writeback_ready: boolean;
+  notes?: string[];
+}
+
+export interface WASMPluginRemoteInstallSignatureVerificationWriteback {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  signature_verification_writeback_ready: boolean;
+  consumes_installer_download_store: boolean;
+  installer_download_record_found: boolean;
+  package_cache_ready: boolean;
+  approval_approved: boolean;
+  download_ready: boolean;
+  signature_verify_ready: boolean;
+  signature_verified: boolean;
+  allows_installer_writeback: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  writes_files: boolean;
+  writes_signature_verification_store: boolean;
+  installs_plugin: boolean;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  verified_by?: string;
+  reason?: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  installer_download_record: WASMPluginInstallerDownloadRecord;
+  signature_verification: WASMPluginSignatureVerificationPlan;
+  verification_record: WASMPluginSignatureVerificationRecord;
+  signature_verification_store: WASMPluginSignatureVerificationStoreSummary;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface WASMPluginRemoteInstallInstallerDownloadWriteback {
   pack_id: string;
   generated_at: string;
@@ -927,6 +1047,11 @@ export interface WASMPluginPackClient {
   remoteInstallInstallerDownloadWriteback(
     input: WASMPluginRemoteInstallInstallerDownloadWritebackInput,
   ): Promise<{ writeback: WASMPluginRemoteInstallInstallerDownloadWriteback }>;
+  remoteInstallSignatureVerificationWriteback(
+    input: WASMPluginRemoteInstallSignatureVerificationWritebackInput,
+  ): Promise<{
+    writeback: WASMPluginRemoteInstallSignatureVerificationWriteback;
+  }>;
   evidence(slug: string): Promise<{
     pack_id: string;
     exported_at: string;
@@ -946,6 +1071,8 @@ export interface WASMPluginPackClient {
     approval_queue_record: WASMPluginApprovalQueueRecord;
     installer_continuation_plan: WASMPluginInstallerContinuationPlan;
     installer_download_record: WASMPluginInstallerDownloadRecord;
+    signature_verification_store: WASMPluginSignatureVerificationStoreSummary;
+    signature_verification_record: WASMPluginSignatureVerificationRecord;
     sandbox?: Record<string, unknown>;
   }>;
 }
@@ -1050,6 +1177,13 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
           body: JSON.stringify(input),
         },
       ),
+    remoteInstallSignatureVerificationWriteback: (input) =>
+      fetcher<{
+        writeback: WASMPluginRemoteInstallSignatureVerificationWriteback;
+      }>("/v1/wasm-plugin/remote-install/signature-verification/writeback", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     evidence: (slug) =>
       fetcher<{
         pack_id: string;
@@ -1070,6 +1204,8 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         approval_queue_record: WASMPluginApprovalQueueRecord;
         installer_continuation_plan: WASMPluginInstallerContinuationPlan;
         installer_download_record: WASMPluginInstallerDownloadRecord;
+        signature_verification_store: WASMPluginSignatureVerificationStoreSummary;
+        signature_verification_record: WASMPluginSignatureVerificationRecord;
         sandbox?: Record<string, unknown>;
       }>(`/v1/wasm-plugin/evidence/${enc(slug)}`),
   };

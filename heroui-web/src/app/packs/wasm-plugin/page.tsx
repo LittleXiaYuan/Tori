@@ -34,6 +34,7 @@ import {
   type WASMPluginRemoteInstallInstallerContinuationPlan,
   type WASMPluginRemoteInstallInstallerDownloadWriteback,
   type WASMPluginRemoteInstallPlan,
+  type WASMPluginRemoteInstallSignatureVerificationWriteback,
   type WASMPluginStatus,
   type WASMPluginSummary,
 } from "@/lib/wasm-plugin-pack-client";
@@ -254,6 +255,22 @@ function sampleInstallerDownloadWriteback(slug: string) {
   );
 }
 
+function sampleSignatureVerificationWriteback(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      request_key: "preview-request-key",
+      approved: true,
+      verified_by: "security",
+      reason:
+        "verify the cached package signature and write only the pack-local signature verification store",
+      metadata: { ticket: "WASM-REMOTE-SIGNATURE-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -271,6 +288,7 @@ export default function WASMPluginPackPage() {
     | "remote-approval-queue-writeback"
     | "remote-installer-continuation"
     | "remote-installer-download"
+    | "remote-signature-verification"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -312,6 +330,14 @@ export default function WASMPluginPackPage() {
     useState(() => sampleInstallerDownloadWriteback("calculator-remote"));
   const [remoteInstallerDownload, setRemoteInstallerDownload] =
     useState<WASMPluginRemoteInstallInstallerDownloadWriteback | null>(null);
+  const [
+    remoteSignatureVerificationJSON,
+    setRemoteSignatureVerificationJSON,
+  ] = useState(() => sampleSignatureVerificationWriteback("calculator-remote"));
+  const [remoteSignatureVerification, setRemoteSignatureVerification] =
+    useState<WASMPluginRemoteInstallSignatureVerificationWriteback | null>(
+      null,
+    );
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -477,6 +503,25 @@ export default function WASMPluginPackPage() {
       await load();
     } catch (e) {
       setError(formatErrorMessage(e, "写入 installer 下载缓存失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeSignatureVerification = async () => {
+    setBusy("remote-signature-verification");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteSignatureVerificationJSON);
+      const res =
+        await wasmPluginPack.remoteInstallSignatureVerificationWriteback(
+          payload,
+        );
+      setRemoteSignatureVerification(res.writeback);
+      showToast("已写入 pack-local 签名验证记录", "success");
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "写入签名验证记录失败"));
     } finally {
       setBusy(null);
     }
@@ -649,6 +694,16 @@ export default function WASMPluginPackPage() {
                 {String(status?.installer_download_writeback_ready ?? false)}
               </Chip>
               <Chip size="sm">
+                signature_verification_writeback_ready:{" "}
+                {String(
+                  status?.signature_verification_writeback_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_registration:{" "}
+                {String(status?.installer_blocked_until_registration ?? true)}
+              </Chip>
+              <Chip size="sm">
                 installer_ready: {String(status?.installer_ready ?? false)}
               </Chip>
               <span
@@ -673,11 +728,14 @@ export default function WASMPluginPackPage() {
               模块 SHA-256 与注册元数据不一致时也会被 module integrity gate
               阻断，不进入 sandbox；当前审批写回只落 pack-local queue store，
               installer continuation 产出 handoff 计划；download writeback
-              只把已审批包下载到 pack-local installer cache 并校验 SHA-256，
-              继续保持 signature_verify_ready=false / installer_ready=false；
-              真实签名验证、install 写回、插件注册、
-              Host ABI 权限强执行和 TinyGo
-              示例会在后续切片继续接入。
+              只把已审批包下载到 pack-local installer cache 并校验 SHA-256；
+              signature verification writeback 再消费 installer-download-store，
+              对缓存包执行 Ed25519 验签，只写
+              signature-verification-store.json / record，不解包、不写
+              plugin_dir、不注册插件，继续保持 remote_install_ready=false /
+              installer_ready=false / installer_blocked_until_registration=true。
+              后续 install 写回、插件注册、Host ABI 权限强执行和 TinyGo
+              示例会继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
@@ -783,14 +841,18 @@ export default function WASMPluginPackPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">Installer</div>
           <div className="kpi-value text-lg">
-            {status?.installer_download_writeback_ready
+            {status?.signature_verification_writeback_ready
+              ? "verify"
+              : status?.installer_download_writeback_ready
               ? "cache"
               : status?.installer_continuation_plan_ready
                 ? "handoff"
                 : "pending"}
           </div>
           <div className="kpi-label mt-1">
-            ready: {String(status?.installer_ready ?? false)}
+            ready: {String(status?.installer_ready ?? false)} · registration
+            blocked:{" "}
+            {String(status?.installer_blocked_until_registration ?? true)}
           </div>
         </Card>
       </div>
@@ -1117,6 +1179,132 @@ export default function WASMPluginPackPage() {
                 <TextArea
                   rows={11}
                   aria-label="WASM installer download writeback result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  Signature verification writeback
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  验签写回边界：消费 pack-local
+                  installer-download-store.json / installer-download-record.json，
+                  读取缓存包并用审批记录中的 Ed25519 签名材料验证；只写
+                  signature-verification-store.json 与
+                  signature-verification-record.json。它不下载、不解包、不写
+                  plugin_dir、不注册插件，也不会把 remote_install_ready /
+                  installer_ready 置为 true。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-signature-verification"}
+                onPress={writeSignatureVerification}
+              >
+                写入验签记录
+              </Button>
+            </div>
+            <TextField
+              value={remoteSignatureVerificationJSON}
+              onChange={setRemoteSignatureVerificationJSON}
+            >
+              <TextArea
+                rows={7}
+                aria-label="WASM remote install signature verification writeback JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                signature_verification_writeback_ready:{" "}
+                {String(
+                  remoteSignatureVerification
+                    ?.signature_verification_writeback_ready ??
+                    status?.signature_verification_writeback_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                package_cache_ready:{" "}
+                {String(
+                  remoteSignatureVerification?.package_cache_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                signature_verify_ready:{" "}
+                {String(
+                  remoteSignatureVerification?.signature_verify_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                signature_verified:{" "}
+                {String(
+                  remoteSignatureVerification?.signature_verified ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                allows_installer_writeback:{" "}
+                {String(
+                  remoteSignatureVerification?.allows_installer_writeback ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_signature_verification_store:{" "}
+                {String(
+                  remoteSignatureVerification
+                    ?.writes_signature_verification_store ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteSignatureVerification?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                remote_install_ready:{" "}
+                {String(
+                  remoteSignatureVerification?.remote_install_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteSignatureVerification?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">
+                installer_blocked_until_registration:{" "}
+                {String(
+                  remoteSignatureVerification
+                    ?.installer_blocked_until_registration ??
+                    status?.installer_blocked_until_registration ??
+                    true,
+                )}
+              </Chip>
+              <Chip size="sm">
+                artifact: signature-verification-record.json
+              </Chip>
+              <Chip size="sm">
+                artifact: signature-verification-store.json
+              </Chip>
+            </div>
+            {remoteSignatureVerification && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteSignatureVerification, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM signature verification writeback result"
                   className="font-mono text-xs"
                   readOnly
                 />

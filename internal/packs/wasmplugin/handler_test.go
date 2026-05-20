@@ -2,6 +2,8 @@ package wasmplugin
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -38,8 +40,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 14 {
-		t.Fatalf("expected 14 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 15 {
+		t.Fatalf("expected 15 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -53,20 +55,21 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		byPath[route.Path] = methods
 	}
 	expected := map[string][]string{
-		"/v1/wasm-plugin/status":                                      {http.MethodGet},
-		"/v1/wasm-plugin/plugins":                                     {http.MethodGet, http.MethodPost},
-		"/v1/wasm-plugin/plugins/":                                    {http.MethodGet},
-		"/v1/wasm-plugin/plugins/load":                                {http.MethodPost},
-		"/v1/wasm-plugin/plugins/unload":                              {http.MethodPost},
-		"/v1/wasm-plugin/execute":                                     {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/plan":                         {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/plan":                {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/decision/plan":       {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/writeback/plan":      {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/approval/queue/writeback":     {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/installer/continuation/plan":  {http.MethodPost},
-		"/v1/wasm-plugin/remote-install/installer/download/writeback": {http.MethodPost},
-		"/v1/wasm-plugin/evidence/":                                   {http.MethodGet},
+		"/v1/wasm-plugin/status":                                          {http.MethodGet},
+		"/v1/wasm-plugin/plugins":                                         {http.MethodGet, http.MethodPost},
+		"/v1/wasm-plugin/plugins/":                                        {http.MethodGet},
+		"/v1/wasm-plugin/plugins/load":                                    {http.MethodPost},
+		"/v1/wasm-plugin/plugins/unload":                                  {http.MethodPost},
+		"/v1/wasm-plugin/execute":                                         {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/plan":                             {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/plan":                    {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/decision/plan":           {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/writeback/plan":          {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/approval/queue/writeback":         {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/continuation/plan":      {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/download/writeback":     {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/signature-verification/writeback": {http.MethodPost},
+		"/v1/wasm-plugin/evidence/":                                       {http.MethodGet},
 	}
 	for path, methods := range expected {
 		if got, want := strings.Join(byPath[path], ","), strings.Join(methods, ","); got != want {
@@ -85,6 +88,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	fake := &fakeWasmExecutor{}
 	remotePackageBytes := []byte("approved wasm plugin package cache bytes")
 	remotePackageSHA256 := sha256Bytes(remotePackageBytes)
+	publicKey, privateKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate ed25519 key: %v", err)
+	}
+	remotePackageSignature := base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, remotePackageBytes))
+	remotePackagePublicKey := base64.StdEncoding.EncodeToString(publicKey)
 	packageFetches := 0
 	h := New(Config{
 		PluginDir: pluginDir,
@@ -144,7 +153,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","capabilities":["math.add"],"tags":["remote"]}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"`+remotePackageSignature+`","public_key_id":"`+remotePackagePublicKey+`","capabilities":["math.add"],"tags":["remote"]}`))
 	h.RemoteInstallPlan(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "remote_install_plan_ready") || !strings.Contains(w.Body.String(), "signature_verification_plan_ready") || !strings.Contains(w.Body.String(), "signature-verification.json") {
 		t.Fatalf("remote install plan status=%d body=%s", w.Code, w.Body.String())
@@ -158,7 +167,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	if !remotePlanResp.Plan.RemoteInstallPlanReady || remotePlanResp.Plan.RemoteInstallReady || remotePlanResp.Plan.Downloads || remotePlanResp.Plan.WritesFiles || remotePlanResp.Plan.NetworkAccess {
 		t.Fatalf("remote install plan should be plan-only and non-destructive: %#v", remotePlanResp.Plan)
 	}
-	if remotePlanResp.Plan.SignatureVerifyReady || remotePlanResp.Plan.Package.Signature != "sig-ed25519" || remotePlanResp.Plan.Package.PublicKeyID != "yunque-root-2026" || remotePlanResp.Plan.Plugin.Slug != "calculator-remote" {
+	if remotePlanResp.Plan.SignatureVerifyReady || remotePlanResp.Plan.Package.Signature != remotePackageSignature || remotePlanResp.Plan.Package.PublicKeyID != remotePackagePublicKey || remotePlanResp.Plan.Plugin.Slug != "calculator-remote" {
 		t.Fatalf("remote install plan should capture signature metadata and plugin slug: %#v", remotePlanResp.Plan)
 	}
 	if !remotePlanResp.Plan.SignatureVerification.SignatureVerificationPlanReady || remotePlanResp.Plan.SignatureVerification.VerificationGateReady || remotePlanResp.Plan.SignatureVerification.SignatureVerifyReady || remotePlanResp.Plan.SignatureVerification.AllowsInstall || !remotePlanResp.Plan.SignatureVerification.Blocked {
@@ -171,12 +180,12 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/status", nil)
 	h.Status(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_writeback") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_queue_plan_ready") || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_plan") || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_decision_plan") || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_writeback_plan") || !strings.Contains(w.Body.String(), "wasm.remote_install.approval_queue_writeback") || !strings.Contains(w.Body.String(), "signature_verification_writeback_ready") || !strings.Contains(w.Body.String(), "wasm.remote_install.signature_verification_writeback") {
 		t.Fatalf("status should expose approval queue/decision/writeback plan readiness and capabilities: status=%d body=%s", w.Code, w.Body.String())
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"metadata":{"ticket":"WASM-1"}}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"`+remotePackageSignature+`","public_key_id":"`+remotePackagePublicKey+`","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalPlan(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_gate_plan_ready") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") {
 		t.Fatalf("remote install approval plan status=%d body=%s", w.Code, w.Body.String())
@@ -201,7 +210,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/decision/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"preview approval decision","metadata":{"ticket":"WASM-1"}}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/decision/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"`+remotePackageSignature+`","public_key_id":"`+remotePackagePublicKey+`","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"preview approval decision","metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalDecisionPlan(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_decision_plan_ready") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") {
 		t.Fatalf("remote install approval decision plan status=%d body=%s", w.Code, w.Body.String())
@@ -223,7 +232,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/writeback/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"preview approval writeback","metadata":{"ticket":"WASM-1"}}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/writeback/plan", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"0123456789abcdef","signature":"`+remotePackageSignature+`","public_key_id":"`+remotePackagePublicKey+`","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"preview approval writeback","metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalWritebackPlan(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "approval_writeback_plan_ready") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") {
 		t.Fatalf("remote install approval writeback plan status=%d body=%s", w.Code, w.Body.String())
@@ -242,7 +251,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"`+remotePackageSHA256+`","signature":"sig-ed25519","public_key_id":"yunque-root-2026","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"persist approval writeback","metadata":{"ticket":"WASM-1"}}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/approval/queue/writeback", strings.NewReader(`{"slug":"calculator-remote","name":"Calculator Remote","version":"0.2.0","package_url":"https://packs.yunque.local/wasm/calculator-remote-0.2.0.tgz","manifest_url":"https://packs.yunque.local/wasm/calculator-remote.json","module_path":"calculator-remote.wasm","sha256":"`+remotePackageSHA256+`","signature":"`+remotePackageSignature+`","public_key_id":"`+remotePackagePublicKey+`","requested_by":"operator","reason":"test approval gate","risk_tier":"critical","approvers":["security","platform"],"request_id":"wasm-remote-install-custom","request_key":"custom-request-key","decision":"approved","decision_by":"security","decision_reason":"persist approval writeback","metadata":{"ticket":"WASM-1"}}`))
 	h.RemoteInstallApprovalQueueWriteback(w, req)
 	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "approval_queue_store_ready") || !strings.Contains(w.Body.String(), "approval-queue-store.json") {
 		t.Fatalf("remote install approval queue writeback status=%d body=%s", w.Code, w.Body.String())
@@ -355,6 +364,55 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/signature-verification/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":false,"verified_by":"security","reason":"missing explicit signature verification approval"}`))
+	h.RemoteInstallSignatureVerificationWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "blocked_missing_explicit_signature_approval") || !strings.Contains(w.Body.String(), "signature-verification-record.json") {
+		t.Fatalf("missing explicit signature approval should return blocked report status=%d body=%s", w.Code, w.Body.String())
+	}
+	var signatureWritebackResp struct {
+		Writeback RemoteInstallSignatureVerificationWritebackReport `json:"writeback"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&signatureWritebackResp); err != nil {
+		t.Fatalf("decode blocked signature verification writeback: %v", err)
+	}
+	blockedSignature := signatureWritebackResp.Writeback
+	if !blockedSignature.SignatureVerificationWritebackReady || blockedSignature.SignatureVerifyReady || blockedSignature.SignatureVerified || blockedSignature.WritesSignatureVerificationStore || blockedSignature.WritesFiles || blockedSignature.RemoteInstallReady || blockedSignature.InstallsPlugin {
+		t.Fatalf("blocked signature verification must not write verifier store or install: %#v", blockedSignature)
+	}
+	if _, err := os.Stat(h.signatureVerificationStorePath()); !os.IsNotExist(err) {
+		t.Fatalf("blocked signature verification should not write verifier store, err=%v", err)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/signature-verification/writeback", strings.NewReader(`{"request_key":"custom-request-key","approved":true,"verified_by":"security","reason":"verify cached package","metadata":{"ticket":"WASM-SIG-1"}}`))
+	h.RemoteInstallSignatureVerificationWriteback(w, req)
+	if w.Code != http.StatusAccepted || !strings.Contains(w.Body.String(), "signature_verification_writeback_ready") || !strings.Contains(w.Body.String(), "signature-verification-store.json") || !strings.Contains(w.Body.String(), "signature_verified_pending_installer_registration") {
+		t.Fatalf("remote install signature verification writeback status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&signatureWritebackResp); err != nil {
+		t.Fatalf("decode signature verification writeback: %v", err)
+	}
+	signatureWriteback := signatureWritebackResp.Writeback
+	if signatureWriteback.Status != "signature_verified_pending_installer_registration" || !signatureWriteback.SignatureVerificationWritebackReady || !signatureWriteback.SignatureVerifyReady || !signatureWriteback.SignatureVerified || !signatureWriteback.AllowsInstallerWriteback || !signatureWriteback.WritesSignatureVerificationStore {
+		t.Fatalf("signature verification should mark verifier-ready pack-local handoff: %#v", signatureWriteback)
+	}
+	if signatureWriteback.Downloads || signatureWriteback.NetworkAccess || signatureWriteback.WritesFiles || signatureWriteback.RemoteInstallReady || signatureWriteback.InstallerReady || signatureWriteback.InstallsPlugin || !signatureWriteback.InstallerBlockedUntilRegistration {
+		t.Fatalf("signature verification writeback must keep install/registration blocked: %#v", signatureWriteback)
+	}
+	if signatureWriteback.RequestKey != "custom-request-key" || signatureWriteback.VerifiedBy != "security" || signatureWriteback.VerificationRecord.RequestKey != "custom-request-key" || !signatureWriteback.VerificationRecord.SignatureVerified || !signatureWriteback.VerificationRecord.SHA256Match {
+		t.Fatalf("signature verification record should expose request metadata and SHA/signature result: %#v", signatureWriteback.VerificationRecord)
+	}
+	if !signatureWriteback.SignatureVerification.SignatureVerifyReady || !signatureWriteback.SignatureVerification.AllowsInstall || signatureWriteback.SignatureVerification.Blocked || signatureWriteback.SignatureVerification.Status != "signature_verified_pending_registration" {
+		t.Fatalf("signature verification gate should be verified but still registration-gated: %#v", signatureWriteback.SignatureVerification)
+	}
+	if signatureWriteback.SignatureVerificationStore.RecordCount != 1 || !containsString(signatureWriteback.Artifacts, "signature-verification-store.json") || !containsString(signatureWriteback.Artifacts, "signature-verification-record.json") {
+		t.Fatalf("signature verification writeback should declare store/record artifacts: %#v store=%#v", signatureWriteback.Artifacts, signatureWriteback.SignatureVerificationStore)
+	}
+	if data, err := os.ReadFile(h.signatureVerificationStorePath()); err != nil || !strings.Contains(string(data), "custom-request-key") || !strings.Contains(string(data), "signature-verification-record.json") || !strings.Contains(string(data), "signature_verified_pending_installer_registration") {
+		t.Fatalf("signature verification store should include record: err=%v data=%s", err, string(data))
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/continuation/plan", strings.NewReader(`{"request_key":"missing-request"}`))
 	h.RemoteInstallInstallerContinuationPlan(w, req)
 	if w.Code != http.StatusOK {
@@ -437,23 +495,25 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") || !strings.Contains(w.Body.String(), "installer-download-record.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") || !strings.Contains(w.Body.String(), "installer-download-record.json") || !strings.Contains(w.Body.String(), "signature-verification-record.json") || !strings.Contains(w.Body.String(), "signature-verification-store.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
-		Files                     []string                                 `json:"files"`
-		HostABIPlan               HostABIPlan                              `json:"host_abi_plan"`
-		HostABIGate               HostABIExecutionGate                     `json:"host_abi_gate"`
-		ModuleIntegrityGate       ModuleIntegrityGate                      `json:"module_integrity_gate"`
-		RemoteInstallPlan         RemoteInstallPlanReport                  `json:"remote_install_plan"`
-		SignatureVerification     SignatureVerificationPlan                `json:"signature_verification"`
-		ApprovalGatePlan          RemoteInstallApprovalPlanReport          `json:"approval_gate_plan"`
-		ApprovalDecisionPlan      RemoteInstallApprovalDecisionPlanReport  `json:"approval_decision_plan"`
-		ApprovalWritebackPlan     RemoteInstallApprovalWritebackPlanReport `json:"approval_writeback_plan"`
-		ApprovalQueueStore        ApprovalQueueStoreSummary                `json:"approval_queue_store"`
-		ApprovalQueueRecord       ApprovalQueueRecord                      `json:"approval_queue_record"`
-		InstallerContinuationPlan InstallerContinuationPlan                `json:"installer_continuation_plan"`
-		InstallerDownloadRecord   InstallerDownloadRecord                  `json:"installer_download_record"`
+		Files                       []string                                 `json:"files"`
+		HostABIPlan                 HostABIPlan                              `json:"host_abi_plan"`
+		HostABIGate                 HostABIExecutionGate                     `json:"host_abi_gate"`
+		ModuleIntegrityGate         ModuleIntegrityGate                      `json:"module_integrity_gate"`
+		RemoteInstallPlan           RemoteInstallPlanReport                  `json:"remote_install_plan"`
+		SignatureVerification       SignatureVerificationPlan                `json:"signature_verification"`
+		ApprovalGatePlan            RemoteInstallApprovalPlanReport          `json:"approval_gate_plan"`
+		ApprovalDecisionPlan        RemoteInstallApprovalDecisionPlanReport  `json:"approval_decision_plan"`
+		ApprovalWritebackPlan       RemoteInstallApprovalWritebackPlanReport `json:"approval_writeback_plan"`
+		ApprovalQueueStore          ApprovalQueueStoreSummary                `json:"approval_queue_store"`
+		ApprovalQueueRecord         ApprovalQueueRecord                      `json:"approval_queue_record"`
+		InstallerContinuationPlan   InstallerContinuationPlan                `json:"installer_continuation_plan"`
+		InstallerDownloadRecord     InstallerDownloadRecord                  `json:"installer_download_record"`
+		SignatureVerificationStore  SignatureVerificationStoreSummary        `json:"signature_verification_store"`
+		SignatureVerificationRecord SignatureVerificationRecord              `json:"signature_verification_record"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -499,6 +559,16 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !evidenceResp.InstallerDownloadRecord.InstallerDownloadWritebackReady || evidenceResp.InstallerDownloadRecord.Downloads || evidenceResp.InstallerDownloadRecord.WritesPackageCache || evidenceResp.InstallerDownloadRecord.SignatureVerifyReady || evidenceResp.InstallerDownloadRecord.RemoteInstallReady || evidenceResp.InstallerDownloadRecord.InstallsPlugin {
 		t.Fatalf("evidence should include a conservative installer download record preview: %#v", evidenceResp.InstallerDownloadRecord)
+	}
+	if !containsString(evidenceResp.Files, "signature-verification-store.json") ||
+		!containsString(evidenceResp.Files, "signature-verification-record.json") ||
+		!evidenceResp.SignatureVerificationStore.StoreReady ||
+		evidenceResp.SignatureVerificationRecord.SignatureVerifyReady ||
+		evidenceResp.SignatureVerificationRecord.SignatureVerified ||
+		evidenceResp.SignatureVerificationRecord.WritesSignatureVerificationStore ||
+		evidenceResp.SignatureVerificationRecord.RemoteInstallReady ||
+		evidenceResp.SignatureVerificationRecord.InstallsPlugin {
+		t.Fatalf("evidence should include a conservative signature verification writeback preview: files=%#v store=%#v record=%#v", evidenceResp.Files, evidenceResp.SignatureVerificationStore, evidenceResp.SignatureVerificationRecord)
 	}
 }
 

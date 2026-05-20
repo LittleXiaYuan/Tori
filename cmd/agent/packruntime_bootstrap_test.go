@@ -172,6 +172,9 @@ func TestEnsureBuiltinPacksInstallsBackupCogniKernelLoRABrowserIntentChaosProbeC
 	if wasmPlugin.Manifest.SDK.TypeScript != "yunque-client/wasm-plugin" {
 		t.Fatalf("unexpected WASM Plugin SDK import: %s", wasmPlugin.Manifest.SDK.TypeScript)
 	}
+	if !hasRouteSpec(wasmPlugin.Manifest.Backend.RouteSpecs, "POST", "/v1/wasm-plugin/remote-install/signature-verification/writeback") {
+		t.Fatal("expected WASM Plugin signature verification writeback routeSpec")
+	}
 
 	ensureBuiltinPacks(registry)
 	if got := len(registry.List()); got != 12 {
