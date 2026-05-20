@@ -6,7 +6,7 @@ import { AlertTriangle, Clock3, DatabaseZap, Download, GitCompare, History, Link
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
+import { createMemoryTimeTravelPackClient, type MemoryTimeTravelApprovedRollbackPlan, type MemoryTimeTravelAuditVerification, type MemoryTimeTravelDiffReport, type MemoryTimeTravelKVAuditLinksReport, type MemoryTimeTravelKVAuditProofLinkPreview, type MemoryTimeTravelKVAuditProofLinkWritebackPlan, type MemoryTimeTravelKVAuditProofLinkWritebackStore, type MemoryTimeTravelKVAuditProofLinkWritebackExecutorPlan, type MemoryTimeTravelKVHistoryCutoverPlan, type MemoryTimeTravelKVHistoryCutoverReadiness, type MemoryTimeTravelKVHistoryDualReadParity, type MemoryTimeTravelNativeKVHistoryMigrationPreview, type MemoryTimeTravelNativeKVHistoryPlan, type MemoryTimeTravelRetentionPlan, type MemoryTimeTravelRetentionPruneExecute, type MemoryTimeTravelRetentionPrunePlan, type MemoryTimeTravelSnapshotAtResponse, type MemoryTimeTravelSnapshotSummary, type MemoryTimeTravelStatus } from "@/lib/memory-time-travel-pack-client";
 
 const memoryTimeTravelPack = createMemoryTimeTravelPackClient();
 
@@ -47,9 +47,10 @@ export default function MemoryTimeTravelPackPage() {
   const [approvedRollbackPlan, setApprovedRollbackPlan] = useState<MemoryTimeTravelApprovedRollbackPlan | null>(null);
   const [retentionPlan, setRetentionPlan] = useState<MemoryTimeTravelRetentionPlan | null>(null);
   const [retentionPrunePlan, setRetentionPrunePlan] = useState<MemoryTimeTravelRetentionPrunePlan | null>(null);
+  const [retentionPruneExecute, setRetentionPruneExecute] = useState<MemoryTimeTravelRetentionPruneExecute | null>(null);
   const [snapshots, setSnapshots] = useState<MemoryTimeTravelSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "audit-link-writeback-executor" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | null>(null);
+  const [busy, setBusy] = useState<"save" | "snapshot-at" | "diff" | "rollback" | "approved-rollback" | "evidence" | "audit" | "audit-links" | "audit-link-preview" | "audit-link-writeback" | "audit-link-writeback-store" | "audit-link-writeback-executor" | "native-kv-history" | "native-kv-history-preview" | "kv-history-dual-read-parity" | "kv-history-cutover" | "kv-history-cutover-readiness" | "retention" | "retention-prune" | "retention-prune-execute" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [namespace, setNamespace] = useState("memory_snapshot");
   const [snapshotId, setSnapshotId] = useState(defaultSnapshotId);
@@ -210,6 +211,32 @@ export default function MemoryTimeTravelPackPage() {
       );
     } catch (e) {
       setError(formatErrorMessage(e, "生成 retention prune approval plan 失败"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const executePackLocalRetentionPrune = async () => {
+    setBusy("retention-prune-execute");
+    setError(null);
+    try {
+      const candidateIds = retentionPrunePlan?.candidates?.map((item) => item.id) || retentionPlan?.candidates?.map((item) => item.id) || [];
+      const res = await memoryTimeTravelPack.retentionPruneExecute({
+        namespace,
+        candidate_ids: candidateIds,
+        requested_by: "pack-console",
+        reason: "approved pack-local snapshot retention cleanup",
+        approval_id: "approval-pack-local-retention-prune",
+        approved: true,
+      });
+      setRetentionPruneExecute(res.prune);
+      showToast(
+        res.prune.deleted_candidate_count > 0 ? `已删除 ${res.prune.deleted_candidate_count} 个 pack-local 快照` : "没有删除快照，请查看 blocked_by / skipped_candidates",
+        res.prune.deleted_candidate_count > 0 ? "success" : "info",
+      );
+      await load();
+    } catch (e) {
+      setError(formatErrorMessage(e, "执行 pack-local retention prune 失败"));
     } finally {
       setBusy(null);
     }
@@ -476,7 +503,7 @@ export default function MemoryTimeTravelPackPage() {
               <span className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>{status?.pack_id || "yunque.pack.memory-time-travel"}</span>
             </div>
             <div className="text-sm" style={{ color: "var(--yunque-text-muted)" }}>
-              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan / pack-local handoff store / executor handoff plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、retention prune/cron、逐条 KV 审计证明真实写回和真实回滚写回仍作为后续切片推进。
+              当前切片完成记忆快照存储、时间点回溯、漂移 diff、dry-run 回滚计划、approved rollback write-back plan、retention dry-run/prune plan、pack-local retention prune executor、Native kv_history plan / migration preview / dual-read parity gate / cutover readiness gate / cutover plan、KV audit proof-link schema / proof-link preview gate / proof-link writeback plan / pack-local handoff store / executor handoff plan、证据包导出和只读 Merkle 审计链验证。原生 Ledger kv_history 表写入、adapter 切换、Ledger temporal prune/cron、逐条 KV 审计证明真实写回和真实回滚写回仍作为后续切片推进。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}><RefreshCw size={14} />刷新</Button>
@@ -492,7 +519,7 @@ export default function MemoryTimeTravelPackPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="section-card p-4"><div className="kpi-label">快照数量</div><div className="kpi-value">{status?.snapshot_count ?? snapshots.length}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">命名空间</div><div className="kpi-value">{status?.namespace_count ?? 0}</div></Card>
-        <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
+        <Card className="section-card p-4"><div className="kpi-label">Retention</div><div className="kpi-value text-lg">{status?.retention_pack_local_prune_ready ? "pack-local exec" : status?.retention_plan_ready ? "dry-run" : "pending"}</div></Card>
         <Card className="section-card p-4"><div className="kpi-label">Native kv_history</div><div className="kpi-value text-lg">{status?.kv_history_cutover_readiness_ready ? "readiness gate" : status?.dual_read_parity_check_ready ? "parity gate" : status?.kv_history_cutover_plan_ready ? "cutover plan" : status?.native_kv_history_preview_ready ? "preview" : status?.native_kv_history_plan_ready ? "plan" : "pending"}</div></Card>
       </div>
 
@@ -635,12 +662,13 @@ export default function MemoryTimeTravelPackPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><Trash2 size={16} />Retention dry-run plan</div>
             <div className="mt-1 text-xs" style={{ color: "var(--yunque-text-muted)" }}>
-              只计算 pack-local snapshots 的保留策略、候选清理动作和审批计划，不删除文件，也不清理 Ledger temporal KV。后续再接 native kv_history purge 与 cron。
+              先计算 pack-local snapshots 的保留策略与审批计划；现在可在显式 approved=true 后只删除 pack-local snapshot 目录，并输出 retention-prune-execute.json。Ledger temporal KV、native kv_history、Merkle append 与 cron 仍保持阻断。
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" isPending={busy === "retention"} onPress={buildRetentionPlan}><Trash2 size={14} />生成保留计划</Button>
             <Button variant="outline" isPending={busy === "retention-prune"} onPress={buildRetentionPrunePlan}><ShieldCheck size={14} />生成审批计划</Button>
+            <Button variant="outline" isPending={busy === "retention-prune-execute"} onPress={executePackLocalRetentionPrune}><Trash2 size={14} />执行 pack-local 清理</Button>
           </div>
         </div>
         {retentionPlan ? (
@@ -657,7 +685,7 @@ export default function MemoryTimeTravelPackPage() {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed p-4 text-sm" style={{ borderColor: "var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
-            尚未生成保留计划。此入口当前只做 dry-run，用于上线前确认策略不会误删记忆快照。
+            尚未生成保留计划。建议先 dry-run 确认候选，再执行只限 pack-local snapshot 目录的 approved 清理。
           </div>
         )}
         {retentionPrunePlan && (
@@ -670,6 +698,22 @@ export default function MemoryTimeTravelPackPage() {
             </div>
             <TextField value={JSON.stringify(retentionPrunePlan, null, 2)} onChange={() => undefined}>
               <TextArea rows={8} aria-label="Memory Time Travel retention prune plan JSON" className="font-mono text-xs" readOnly />
+            </TextField>
+          </div>
+        )}
+        {retentionPruneExecute && (
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[260px_1fr]">
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--yunque-border)", background: "rgba(255,255,255,0.03)" }}>
+              <Chip size="sm" style={{ background: retentionPruneExecute.writes_pack_local_snapshot_store ? "rgba(34,197,94,0.12)" : "rgba(250,204,21,0.12)", color: retentionPruneExecute.writes_pack_local_snapshot_store ? "#22c55e" : "#facc15" }}>
+                {retentionPruneExecute.status}
+              </Chip>
+              <div className="mt-3 text-2xl font-semibold">{retentionPruneExecute.deleted_candidate_count}/{retentionPruneExecute.selected_candidate_count}</div>
+              <div className="text-xs" style={{ color: "var(--yunque-text-muted)" }}>deleted pack-local snapshots · skipped {retentionPruneExecute.skipped_candidate_count}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes local store {String(retentionPruneExecute.writes_pack_local_snapshot_store)} · writes Ledger {String(retentionPruneExecute.writes_ledger_kv)}</div>
+              <div className="mt-2 text-xs" style={{ color: "var(--yunque-text-muted)" }}>writes native {String(retentionPruneExecute.writes_native_kv_history)} · cron {String(retentionPruneExecute.cron_ready)}</div>
+            </div>
+            <TextField value={JSON.stringify(retentionPruneExecute, null, 2)} onChange={() => undefined}>
+              <TextArea rows={8} aria-label="Memory Time Travel retention prune execute JSON" className="font-mono text-xs" readOnly />
             </TextField>
           </div>
         )}

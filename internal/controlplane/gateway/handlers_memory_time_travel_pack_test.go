@@ -86,6 +86,14 @@ func TestMemoryTimeTravelPackCanSaveSnapshotAndDiff(t *testing.T) {
 		t.Fatalf("approved rollback plan status=%d body=%s", w.Code, w.Body.String())
 	}
 
+	req = httptest.NewRequest(http.MethodPost, "/v1/memory-time-travel/retention/prune/execute", strings.NewReader(`{"namespace":"memory_snapshot","candidate_ids":["baseline"],"requested_by":"operator","reason":"gateway approved local cleanup","approval_id":"approval-retention-gateway","approved":true}`))
+	req.Header.Set("X-API-Key", tenant.APIKey)
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "pack_local_prune_ready") || !strings.Contains(w.Body.String(), "retention-prune-execute.json") || !strings.Contains(w.Body.String(), `"writes_pack_local_snapshot_store":false`) || !strings.Contains(w.Body.String(), `"no-retention-candidates"`) || !strings.Contains(w.Body.String(), `"writes_ledger_kv":false`) || !strings.Contains(w.Body.String(), `"writes_native_kv_history":false`) || !strings.Contains(w.Body.String(), `"merkle_append_ready":false`) {
+		t.Fatalf("pack-local retention prune execute no-op status=%d body=%s", w.Code, w.Body.String())
+	}
+
 	req = httptest.NewRequest(http.MethodGet, "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", nil)
 	req.Header.Set("X-API-Key", tenant.APIKey)
 	w = httptest.NewRecorder()
@@ -182,6 +190,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				"/v1/memory-time-travel/rollback/approved-plan",
 				"/v1/memory-time-travel/retention/plan",
 				"/v1/memory-time-travel/retention/prune-plan",
+				"/v1/memory-time-travel/retention/prune/execute",
 				"/v1/memory-time-travel/kv-history/native-plan",
 				"/v1/memory-time-travel/kv-history/migration-preview",
 				"/v1/memory-time-travel/kv-history/dual-read/parity",
@@ -206,6 +215,7 @@ func newTestGatewayWithMemoryTimeTravelPack(t *testing.T, status packruntime.Pac
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/rollback/approved-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/retention/plan"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune-plan"},
+				{Method: http.MethodPost, Path: "/v1/memory-time-travel/retention/prune/execute"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/native-plan"},
 				{Method: http.MethodGet, Path: "/v1/memory-time-travel/kv-history/migration-preview"},
 				{Method: http.MethodPost, Path: "/v1/memory-time-travel/kv-history/dual-read/parity"},

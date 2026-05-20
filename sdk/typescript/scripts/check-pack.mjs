@@ -7,6 +7,7 @@ const baseManifestCapabilities = 12;
 const basePackSdkHelperExports = 0;
 const maxUnpackedGrowthPerExport = 2_500;
 const maxUnpackedGrowthPerManifestCapability = 1_000;
+const maxUnpackedGrowthPerMemoryTimeTravelCapability = 2_000;
 const maxUnpackedGrowthPerPackSdkHelperExport = 700;
 const maxUnpackedGrowthForPackPrepareSummaryHelperExport = 2_800;
 const maxNonEntryFiles = 16;
@@ -14,6 +15,10 @@ const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const packManifestPath = "../manifest/packs-sdk.json";
 const packManifest = existsSync(packManifestPath)
   ? JSON.parse(readFileSync(packManifestPath, "utf8"))
+  : { capabilities: [] };
+const memoryTimeTravelManifestPath = "../manifest/memory-time-travel-pack-sdk.json";
+const memoryTimeTravelManifest = existsSync(memoryTimeTravelManifestPath)
+  ? JSON.parse(readFileSync(memoryTimeTravelManifestPath, "utf8"))
   : { capabilities: [] };
 const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
 
@@ -96,11 +101,15 @@ if (forbiddenFiles.length > 0) {
 const manifestCapabilityCount = Array.isArray(packManifest.capabilities)
   ? packManifest.capabilities.length
   : 0;
+const memoryTimeTravelCapabilityCount = Array.isArray(memoryTimeTravelManifest.capabilities)
+  ? memoryTimeTravelManifest.capabilities.length
+  : 0;
 const packSdkHelperExports = (packsSource.match(/export function (summarizeCatalogSourceReports|hasCatalogSourceIssues)\b/g) ?? []).length;
 const packSdkPrepareSummaryHelperExports = (packsSource.match(/export function summarizeCapabilityPrepare\b/g) ?? []).length;
 const maxUnpackedSize = baseUnpackedSize
   + Math.max(0, exportedFiles.size - baseExportedFiles) * maxUnpackedGrowthPerExport
   + Math.max(0, manifestCapabilityCount - baseManifestCapabilities) * maxUnpackedGrowthPerManifestCapability
+  + Math.max(0, memoryTimeTravelCapabilityCount - 20) * maxUnpackedGrowthPerMemoryTimeTravelCapability
   + Math.max(0, packSdkHelperExports - basePackSdkHelperExports) * maxUnpackedGrowthPerPackSdkHelperExport
   + packSdkPrepareSummaryHelperExports * maxUnpackedGrowthForPackPrepareSummaryHelperExport;
 if (pack.unpackedSize > maxUnpackedSize) {
