@@ -8,21 +8,30 @@
 
 ## 产品主线
 
-- **个人体验先行**：默认用轻松模式，只把工作台、对话、任务、知识库和设置放到主路径。
+- **个人体验先行**：默认用轻松模式，只把工作台、对话、任务、记忆、能力包和设置放到主路径。
 - **能力按需扩展**：Pack Runtime 和 SDK 是可选能力边界，复杂能力不再平铺到首页。
 - **Tori 做控制面**：团队 / 企业侧的同步、身份、权限、审计、配额、账单和托管运维由 Tori 承接；社区版保持完整本地优先。
+
+## 能力分层
+
+| 层级 | 默认位置 | 说明 |
+|------|----------|------|
+| Core | 工作台 / 对话 / 任务 / 记忆 / 设置 | 只服务“场景 → 行动 → 产物 → 反馈 → 记忆”主路径 |
+| Pack | 能力包中心 | 浏览器、WASM、SBOM、记忆回溯等能力按需启用 |
+| Lab | 完整模式 / 实验入口 | 工作流、图谱、角色、情绪、反思等探索能力默认不打扰新用户 |
+| Control Plane | 完整模式 / Tori | 团队、身份、审计、配额、托管运维和企业控制面 |
 
 ## 仓库结构说明
 
 | 目录 | 说明 |
 |------|------|
 | `apps/web/` | **当前主前端**（HeroUI + Next.js 16），Go 嵌入 `apps/web/out/` |
-| `web/` | 已归档旧前端，不再维护，见 `web/README.md` |
+| `apps/desktop/` | Tauri 桌面壳，消费 `apps/web` 的静态导出 |
+| `packages/yunque-client/` | TypeScript SDK，本地前端和外部集成的前端契约 |
+| `packs/` | 可选能力包 manifest、示例和 runtime 契约 |
 | `docs/` | 面向用户的正式文档与文档站（VitePress） |
-| `doc/` | 内部开发文档、连续性记录、设计蓝图（`.gitignore` 排除） |
+| `doc/` | 内部开发文档、连续性记录、设计蓝图 |
 | `apps/browser-extension/` | 浏览器连接器扩展（Chrome/Edge） |
-| `data/plugins/` | 第三方插件热加载目录 |
-| `data/skills/` | 文件技能热加载目录 |
 
 详细结构见 `docs/repo-layout.md`。
 
@@ -34,7 +43,7 @@
 cp .env.example .env       # ① 复制配置
 # ② 编辑 .env，填入 LLM_API_KEY
 go run ./cmd/agent         # ③ 启动
-# ④ 浏览器自动打开 → http://localhost:9090/chat
+# ④ 浏览器自动打开 → http://localhost:9090/dashboard
 ```
 
 仅需配置一个 `LLM_API_KEY` 即可开始对话。

@@ -13,22 +13,22 @@ export const PRODUCT_SCENARIOS: ProductScenario[] = [
   {
     id: "weekly-report",
     label: "写周报",
-    description: "把一周工作整理成可汇报成果。",
-    prompt: "帮我把最近一周的工作整理成周报，输出本周成果、下周计划和风险提醒。",
+    description: "把一周工作整理成可验收成果。",
+    prompt: "帮我把最近一周的工作整理成周报，输出本周成果、下周计划、风险提醒，并标出值得沉淀到记忆的偏好或长期事实。",
     icon: <ClipboardList size={14} />,
   },
   {
     id: "meeting-notes",
     label: "会议纪要",
-    description: "提炼结论、待办、负责人和风险。",
-    prompt: "把这次会议内容整理成纪要，提炼结论、待办、负责人和风险。",
+    description: "提炼结论、待办、负责人和记忆。",
+    prompt: "把这次会议内容整理成纪要，提炼结论、待办、负责人和风险，并列出后续可回写到记忆的长期事实。",
     icon: <FileText size={14} />,
   },
   {
     id: "web-research",
     label: "网页调研",
-    description: "搜索资料，输出对比表和建议。",
-    prompt: "帮我调研近期 AI 工作流产品的差异，并输出对比表和建议。",
+    description: "搜索资料，输出对比表、建议和可复用记忆。",
+    prompt: "帮我调研近期 AI 工作流产品的差异，输出对比表、建议、来源摘要，并标出下次可复用的记忆。",
     icon: <Search size={14} />,
   },
   {
@@ -49,7 +49,7 @@ export const PRODUCT_SCENARIOS: ProductScenario[] = [
 
 export const ONBOARDING_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
 export const CHAT_EMPTY_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 4);
-export const DASHBOARD_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 4);
+export const DASHBOARD_SCENARIOS = PRODUCT_SCENARIOS.slice(0, 3);
 
 export function scenarioChatHref(prompt: string): string {
   return `/chat?q=${encodeURIComponent(prompt)}`;

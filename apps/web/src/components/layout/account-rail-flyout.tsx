@@ -55,8 +55,8 @@ export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, 
   const isZh = locale === "zh";
   const groupLabel = (g: NavGroup) => (isZh ? g : GROUP_LABEL_EN[g]);
   const title = isZh
-    ? (profileMode === "easy" ? "核心功能" : "所有功能")
-    : (profileMode === "easy" ? "Core Features" : "All Features");
+    ? (profileMode === "easy" ? "主路径" : "所有功能")
+    : (profileMode === "easy" ? "Main Path" : "All Features");
 
   return (
     <aside
