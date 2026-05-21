@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWorkloadFeedbackPrompt,
+  buildWorkloadCatalogHref,
   createWorkloadFeedbackEntry,
   emptyWorkloadFeedbackDraft,
   formatWorkloadFeedbackExport,
   hasWorkloadFeedbackContent,
+  getWorkloadPresetById,
   parseWorkloadFeedbackEntries,
   serializeWorkloadFeedbackEntries,
   WORKLOAD_PRESETS,
@@ -20,6 +22,9 @@ describe("workload presets", () => {
     expect(prompt).toContain(`我刚试了【${preset!.title}】工作负载`);
     expect(prompt).toContain(preset!.capabilities[0]);
     expect(prompt).toContain("30 秒");
+    expect(buildWorkloadCatalogHref(preset!)).toBe(`/packs?preset=${preset!.id}`);
+    expect(getWorkloadPresetById(preset!.id)).toEqual(preset);
+    expect(getWorkloadPresetById("missing")).toBeUndefined();
   });
 
   it("creates and exports persisted workload feedback entries", () => {

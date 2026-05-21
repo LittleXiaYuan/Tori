@@ -34,6 +34,13 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
         >
           30 秒快速体验 <ArrowRight size={14} className="ml-1" />
         </Button>
+        <a
+          href="/packs"
+          className="text-xs font-medium block mx-auto text-center"
+          style={{ color: "var(--yunque-accent)" }}
+        >
+          先去工作负载页，按场景选能力 →
+        </a>
         <button
           onClick={onSkip}
           className="text-xs font-medium block mx-auto"

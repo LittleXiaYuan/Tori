@@ -5,6 +5,7 @@ import {
 import type { SkillInfo } from "@/lib/api";
 import type { ChatDispatch } from "@/lib/chat-state";
 import { CHAT_EMPTY_SCENARIOS } from "@/lib/product-scenarios";
+import { buildWorkloadCatalogHref, WORKLOAD_PRESETS } from "@/lib/workload-presets";
 
 interface ChatEmptyStateProps {
   setupNeeded: boolean;
@@ -107,6 +108,38 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
             </button>
           ));
         })()}
+      </div>
+
+      <div className="w-full max-w-[620px] space-y-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--yunque-text-muted)" }}>
+            工作负载入口
+          </div>
+          <a href="/packs" className="text-[11px] font-medium" style={{ color: "var(--yunque-accent)" }}>
+            去 Packs 先选能力 →
+          </a>
+        </div>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          {WORKLOAD_PRESETS.slice(0, 3).map((preset) => (
+            <a
+              key={preset.id}
+              href={buildWorkloadCatalogHref(preset)}
+              className="flex items-start gap-2 rounded-[16px] p-3 text-left transition-all duration-200 hover-lift group/card"
+              style={{ background: "var(--glass-card, var(--yunque-card))", border: "1px solid var(--glass-edge, var(--yunque-border))" }}
+            >
+              <span className="mt-0.5 shrink-0 flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-accent)" }}>
+                <Package size={14} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium flex items-center gap-1" style={{ color: "var(--yunque-text)" }}>
+                  {preset.title}
+                  <ArrowRight size={10} className="opacity-0 group-hover/card:opacity-60 transition-opacity" style={{ color: "var(--yunque-text-muted)" }} />
+                </div>
+                <div className="mt-0.5 text-[10px] leading-[1.5]" style={{ color: "var(--yunque-text-muted)" }}>{preset.subtitle}</div>
+              </div>
+            </a>
+          ))}
+        </div>
       </div>
 
       <div className="mt-3 flex w-full max-w-[620px] items-center justify-center gap-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button, Card, Chip, Spinner, TextField, Input, Label } from "@heroui/react";
 import {
   ArchiveRestore,
@@ -33,6 +34,7 @@ import {
   formatWorkloadFeedbackExport,
   formatWorkloadFeedbackFindability,
   hasWorkloadFeedbackContent,
+  getWorkloadPresetById,
   parseWorkloadFeedbackEntries,
   serializeWorkloadFeedbackEntries,
   WORKLOAD_FEEDBACK_STORAGE_KEY,
@@ -87,6 +89,7 @@ function statusTone(status: string): { label: string; color: string; bg: string 
 }
 
 export default function PacksPage() {
+  const searchParams = useSearchParams();
   const { data, loading, refresh } = useApiData(async () => packsClient.installed(), { packs: [], count: 0 });
   const { data: catalogData, loading: catalogLoading, refresh: refreshCatalog } = useApiData(async () => packsClient.catalog(), {
     generated_at: "",
@@ -181,6 +184,15 @@ export default function PacksPage() {
     if (typeof window === "undefined") return;
     setWorkloadFeedbackEntries(parseWorkloadFeedbackEntries(localStorage.getItem(WORKLOAD_FEEDBACK_STORAGE_KEY)));
   }, []);
+
+  useEffect(() => {
+    const preset = getWorkloadPresetById(searchParams.get("preset"));
+    if (!preset) return;
+    setActiveWorkloadId(preset.id);
+    setCapabilityPlanInput(formatWorkloadCapabilities(preset));
+    setCapabilityPlan(null);
+    setCapabilityPrepare(null);
+  }, [searchParams]);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);

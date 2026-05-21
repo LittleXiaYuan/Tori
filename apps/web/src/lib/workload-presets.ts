@@ -87,6 +87,15 @@ export function formatWorkloadCapabilities(preset: WorkloadPreset): string {
   return preset.capabilities.join(", ");
 }
 
+export function getWorkloadPresetById(id: string | null | undefined): WorkloadPreset | undefined {
+  if (!id) return undefined;
+  return WORKLOAD_PRESETS.find((preset) => preset.id === id);
+}
+
+export function buildWorkloadCatalogHref(preset: WorkloadPreset): string {
+  return `/packs?preset=${encodeURIComponent(preset.id)}`;
+}
+
 export function buildWorkloadFeedbackPrompt(preset: WorkloadPreset): string {
   return [
     `我刚试了【${preset.title}】工作负载。`,
