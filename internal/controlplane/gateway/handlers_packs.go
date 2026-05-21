@@ -320,7 +320,7 @@ func (g *Gateway) packCatalogSourceDirs() []string {
 	if len(g.packCatalogSources) > 0 {
 		return append([]string(nil), g.packCatalogSources...)
 	}
-	return []string{filepath.Join("packs", "examples"), filepath.Join("packs", "templates")}
+	return []string{filepath.Join("packs", "official"), filepath.Join("packs", "templates")}
 }
 
 func packCatalogManifestPaths(source string) ([]string, error) {

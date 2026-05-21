@@ -107,7 +107,7 @@ for (const token of [
   "json-sbom-drift-evidence",
   "cfg.DataPath(\"sbom-drift\")",
   "sbomdriftpack.New",
-  "packs/examples/sbom-drift-pack/pack.json",
+  "packs/official/sbom-drift-pack/pack.json",
   "ensureBuiltinPacks",
   "TestSBOMDriftPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

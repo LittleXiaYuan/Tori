@@ -29,7 +29,7 @@ func TestLoadFromEnv(t *testing.T) {
 func TestPackCatalogSourceDirsDefaults(t *testing.T) {
 	t.Setenv("PACK_CATALOG_SOURCES", "")
 	cfg := Load()
-	want := []string{filepath.Join("packs", "examples"), filepath.Join("packs", "templates")}
+	want := []string{filepath.Join("packs", "official"), filepath.Join("packs", "templates")}
 	if got := cfg.PackCatalogSourceDirs(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected default pack catalog sources %v, got %v", want, got)
 	}

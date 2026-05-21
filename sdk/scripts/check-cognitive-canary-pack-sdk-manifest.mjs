@@ -144,7 +144,7 @@ for (const token of [
   "rollback-plan.json",
   "cfg.DataPath(\"cognitive-canary\")",
   "cognitivecanarypack.New",
-  "packs/examples/cognitive-canary-pack/pack.json",
+  "packs/official/cognitive-canary-pack/pack.json",
   "ensureBuiltinPacks",
   "TestCognitiveCanaryPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

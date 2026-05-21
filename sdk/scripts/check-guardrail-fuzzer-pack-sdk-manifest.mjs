@@ -113,7 +113,7 @@ for (const token of [
   "json-guardrail-fuzzer-evidence",
   "cfg.DataPath(\"guardrail-fuzzer\")",
   "guardrailfuzzerpack.New",
-  "packs/examples/guardrail-fuzzer-pack/pack.json",
+  "packs/official/guardrail-fuzzer-pack/pack.json",
   "ensureBuiltinPacks",
   "TestGuardrailFuzzerPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

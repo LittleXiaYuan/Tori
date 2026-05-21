@@ -7,7 +7,7 @@
     "Keep backend method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import the existing yunque-client/lora slice only when the LoRA pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/lora-pack/pack.json",
+  "packManifest": "packs/official/lora-pack/pack.json",
   "sdkImport": "yunque-client/lora",
   "routes": [
     "GET /v1/lora/status",

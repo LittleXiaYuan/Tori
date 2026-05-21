@@ -85,7 +85,7 @@ for (const token of [
   "Methods: methods",
   "BackendRouteInfo{Method",
   "browserintentpack.NewHandler",
-  "packs/examples/browser-intent-pack/pack.json",
+  "packs/official/browser-intent-pack/pack.json",
   "ensureBuiltinPacks",
   "loadBuiltinPackManifest",
 ]) {

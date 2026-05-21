@@ -94,7 +94,7 @@ for (const token of [
   "json-evidence-pack",
   "Methods: []string",
   "rpareplaypack.New",
-  "packs/examples/rpa-replay-pack/pack.json",
+  "packs/official/rpa-replay-pack/pack.json",
   "ensureBuiltinPacks",
 ]) {
   if (!backend.includes(token)) fail(`RPA Replay backend pack or gate missing token: ${token}`);

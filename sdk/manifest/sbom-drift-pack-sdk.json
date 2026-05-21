@@ -7,7 +7,7 @@
     "Keep SBOM Drift method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/sbom-drift only when the SBOM Drift pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/sbom-drift-pack/pack.json",
+  "packManifest": "packs/official/sbom-drift-pack/pack.json",
   "sdkImport": "yunque-client/sbom-drift",
   "routes": [
     "GET /v1/sbom-drift/status",

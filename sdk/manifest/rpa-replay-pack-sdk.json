@@ -7,7 +7,7 @@
     "Keep RPA method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/rpa-replay only when the RPA Replay pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/rpa-replay-pack/pack.json",
+  "packManifest": "packs/official/rpa-replay-pack/pack.json",
   "sdkImport": "yunque-client/rpa-replay",
   "routes": [
     "GET /v1/rpa-replay/status",

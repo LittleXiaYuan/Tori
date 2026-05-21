@@ -7,7 +7,7 @@
     "Keep Cognitive Canary method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/cognitive-canary only when the Cognitive Canary pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/cognitive-canary-pack/pack.json",
+  "packManifest": "packs/official/cognitive-canary-pack/pack.json",
   "sdkImport": "yunque-client/cognitive-canary",
   "routes": [
     "GET /v1/cognitive-canary/status",

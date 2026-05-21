@@ -10,7 +10,7 @@
     "Keep remote signed package installs blocked behind deterministic signature_verification, approval decision, pack-local approval queue writeback persistence, installer continuation handoff planning, installer download cache writeback, cached package signature verification writeback, verified package inspection writeback, and installer registration handoff planning until installer write-back and explicit plugin registration become true.",
     "Let external projects import yunque-client/wasm-plugin only when the WASM Plugin pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/wasm-plugin-pack/pack.json",
+  "packManifest": "packs/official/wasm-plugin-pack/pack.json",
   "sdkImport": "yunque-client/wasm-plugin",
   "routes": [
     "GET /v1/wasm-plugin/status",

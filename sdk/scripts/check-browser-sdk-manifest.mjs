@@ -29,7 +29,7 @@ for (const doc of manifest.overviewDocs ?? []) {
   if (!/Browser SDK|browser|\/v1\/browser|\/api\/browser/.test(text)) fail(`overview doc ${doc} does not describe Browser SDK surface`);
 }
 
-const browserPackManifest = JSON.parse(readRepoFile("packs/examples/browser-intent-pack/pack.json") || "{}");
+const browserPackManifest = JSON.parse(readRepoFile("packs/official/browser-intent-pack/pack.json") || "{}");
 if (browserPackManifest.id !== "yunque.pack.browser-intent") fail(`unexpected Browser Intent pack id: ${browserPackManifest.id}`);
 if (browserPackManifest.sdk?.typescript !== "yunque-client/browser") fail("Browser Intent pack sdk.typescript must remain yunque-client/browser");
 if (browserPackManifest.frontend?.menus?.[0]?.path !== "/packs/browser") fail("Browser Intent pack frontend menu path must remain /packs/browser");
@@ -43,7 +43,7 @@ if (!browserPackPage.includes("createBrowserIntentPackClient") || browserPackPag
 const legacyBrowserPage = readRepoFile("apps/web/src/app/browser/page.tsx");
 if (!legacyBrowserPage.includes('redirect("/packs/browser")')) fail("legacy /browser page must redirect to /packs/browser");
 const browserPackBackend = readRepoFile("internal/packs/browserintent/handler.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_packs.go") + "\n" + readRepoFile("cmd/agent/init_tasks.go");
-for (const token of ["const PackID = \"yunque.pack.browser-intent\"", "HandleBrowserIntentPack", "HandleBrowserIntentSession", "BackendRouteAuthPassthrough", "browserintentpack.NewHandler", "packs/examples/browser-intent-pack/pack.json"]) if (!browserPackBackend.includes(token)) fail(`Browser Intent backend pack missing token: ${token}`);
+for (const token of ["const PackID = \"yunque.pack.browser-intent\"", "HandleBrowserIntentPack", "HandleBrowserIntentSession", "BackendRouteAuthPassthrough", "browserintentpack.NewHandler", "packs/official/browser-intent-pack/pack.json"]) if (!browserPackBackend.includes(token)) fail(`Browser Intent backend pack missing token: ${token}`);
 const hardcodedBrowserShell = readRepoFile("apps/web/src/components/sidebar.tsx") + "\n" + readRepoFile("apps/web/src/lib/nav-items.tsx");
 if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.includes("nav-browser")) fail("Browser Intent must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 
