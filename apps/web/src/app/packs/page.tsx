@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Chip, Spinner, TextField, Input, Label } from "@heroui/react";
 import {
   ArchiveRestore,
@@ -25,6 +25,23 @@ import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { createPacksClient, summarizeCapabilityPrepare, type InstalledPack, type PackBackendRouteSpec, type PackCapabilityPlanReport, type PackCapabilityPrepareReport } from "yunque-client/packs";
 import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
+import {
+  buildWorkloadFeedbackPrompt,
+  createWorkloadFeedbackEntry,
+  emptyWorkloadFeedbackDraft,
+  formatWorkloadCapabilities,
+  formatWorkloadFeedbackExport,
+  formatWorkloadFeedbackFindability,
+  hasWorkloadFeedbackContent,
+  parseWorkloadFeedbackEntries,
+  serializeWorkloadFeedbackEntries,
+  WORKLOAD_FEEDBACK_STORAGE_KEY,
+  WORKLOAD_PRESETS,
+  type WorkloadFeedbackDraft,
+  type WorkloadFeedbackEntry,
+  type WorkloadFeedbackFindability,
+  type WorkloadPreset,
+} from "@/lib/workload-presets";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { formatBackendRouteSpec } from "@/lib/pack-sync";
@@ -111,6 +128,9 @@ export default function PacksPage() {
   const [capabilityPlan, setCapabilityPlan] = useState<PackCapabilityPlanReport | null>(null);
   const [capabilityPrepare, setCapabilityPrepare] = useState<PackCapabilityPrepareReport | null>(null);
   const [capabilityPlanBusy, setCapabilityPlanBusy] = useState(false);
+  const [activeWorkloadId, setActiveWorkloadId] = useState(WORKLOAD_PRESETS[0]?.id || "");
+  const [workloadFeedback, setWorkloadFeedback] = useState<WorkloadFeedbackDraft>(() => emptyWorkloadFeedbackDraft());
+  const [workloadFeedbackEntries, setWorkloadFeedbackEntries] = useState<WorkloadFeedbackEntry[]>([]);
 
   const packs = data?.packs || [];
   const catalog = catalogData;
@@ -120,6 +140,10 @@ export default function PacksPage() {
   const capabilityIndex = capabilityData;
   const backendModules = backendModulesData?.modules || [];
   const routeAudit = routeAuditData;
+  const activeWorkload = useMemo(
+    () => WORKLOAD_PRESETS.find((preset) => preset.id === activeWorkloadId) || WORKLOAD_PRESETS[0],
+    [activeWorkloadId],
+  );
   const capabilityEntriesByPack = useMemo(() => {
     const byPack = new Map<string, typeof capabilityIndex.entries>();
     for (const entry of capabilityIndex.entries || []) {
@@ -152,6 +176,11 @@ export default function PacksPage() {
     backendRoutes: backendModules.reduce((n, m) => n + (m.routes?.length || 0), 0),
     routeAuditIssues: (routeAudit.missing_routes || 0) + (routeAudit.method_mismatches || 0) + (routeAudit.undeclared_routes || 0),
   }), [packs, capabilityIndex.capabilities, capabilityIndex.enabled_capabilities, catalog.count, catalog.downloadable, backendModules, routeAudit.missing_routes, routeAudit.method_mismatches, routeAudit.undeclared_routes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setWorkloadFeedbackEntries(parseWorkloadFeedbackEntries(localStorage.getItem(WORKLOAD_FEEDBACK_STORAGE_KEY)));
+  }, []);
 
   const run = async (label: string, op: () => Promise<unknown>) => {
     setBusy(label);
@@ -213,6 +242,43 @@ export default function PacksPage() {
     }
   };
 
+  const updateWorkloadFeedback = <K extends keyof WorkloadFeedbackDraft>(key: K, value: WorkloadFeedbackDraft[K]) => {
+    setWorkloadFeedback((current) => ({ ...current, [key]: value }));
+  };
+
+  const persistWorkloadFeedbackEntries = (entries: WorkloadFeedbackEntry[]) => {
+    const next = entries.slice(0, 30);
+    setWorkloadFeedbackEntries(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(WORKLOAD_FEEDBACK_STORAGE_KEY, serializeWorkloadFeedbackEntries(next));
+    }
+  };
+
+  const saveWorkloadFeedback = () => {
+    if (!activeWorkload) return;
+    if (!hasWorkloadFeedbackContent(workloadFeedback)) {
+      showToast("先记录一点真实体验，再保存反馈。", "error");
+      return;
+    }
+    const entry = createWorkloadFeedbackEntry(activeWorkload, workloadFeedback);
+    persistWorkloadFeedbackEntries([entry, ...workloadFeedbackEntries]);
+    setWorkloadFeedback(emptyWorkloadFeedbackDraft());
+    showToast("工作负载反馈已保存到本地，可一键复制给维护者。", "success");
+  };
+
+  const clearWorkloadFeedback = () => {
+    persistWorkloadFeedbackEntries([]);
+    if (typeof window !== "undefined") localStorage.removeItem(WORKLOAD_FEEDBACK_STORAGE_KEY);
+    showToast("本地工作负载反馈已清空", "success");
+  };
+
+  const applyWorkloadPreset = (preset: WorkloadPreset) => {
+    setActiveWorkloadId(preset.id);
+    setCapabilityPlanInput(formatWorkloadCapabilities(preset));
+    setCapabilityPlan(null);
+    setCapabilityPrepare(null);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-[60vh]"><Spinner size="lg" /></div>;
   }
@@ -222,7 +288,7 @@ export default function PacksPage() {
       <PageHeader
         icon={<Boxes size={20} />}
         title="增量包运行时"
-        description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。"
+        description="Pack Runtime 以后端 registry 为能力来源：安装、启用、禁用、回滚后，前端菜单和入口自动跟随已启用包同步。SDK 在这里按“工作负载”理解：不是只给开发者，而是给用户选用的一组可选能力。"
         onRefresh={() => { void refresh(); void refreshCatalog(); void refreshCapabilities(); void refreshBackendModules(); void refreshRouteAudit(); }}
       />
 
@@ -252,6 +318,168 @@ export default function PacksPage() {
           <div className="kpi-value">{stats.routeAuditIssues}</div>
         </Card>
       </div>
+
+      <Card className="section-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>工作负载 / SDK 面</div>
+            <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+              像 Visual Studio workloads 一样，先选一条用户真的会走的路，再逐步展开能力。这里的 SDK 不是“开发者专属工具箱”，而是“可以按场景启用的增量工作负载”。
+            </div>
+          </div>
+          <Chip size="sm" style={{ background: "rgba(59,130,246,0.12)", color: "var(--yunque-primary)" }}>
+            Workloads
+          </Chip>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {WORKLOAD_PRESETS.map((preset) => (
+            <Card key={preset.id} className="section-card p-4 space-y-3" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>{preset.title}</div>
+                  <div className="text-[11px] mt-1" style={{ color: "var(--yunque-text-muted)" }}>{preset.subtitle}</div>
+                </div>
+                <Chip size="sm" style={{ background: "rgba(255,255,255,0.06)", color: "var(--yunque-text-muted)" }}>
+                  工作负载
+                </Chip>
+              </div>
+
+              <div className="text-xs leading-5" style={{ color: "var(--yunque-text-secondary)" }}>
+                {preset.description}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {preset.capabilities.map((capability) => (
+                  <Chip key={`${preset.id}:${capability}`} size="sm" style={{ background: "rgba(59,130,246,0.08)", color: "var(--yunque-primary)" }}>
+                    {capability}
+                  </Chip>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="primary" onPress={() => applyWorkloadPreset(preset)} className="btn-accent">
+                  套用
+                </Button>
+                <Button size="sm" variant="ghost" onPress={() => void copyText(buildWorkloadFeedbackPrompt(preset), `${preset.title} 反馈模板`)}>
+                  <ClipboardCopy size={14} className="mr-1" />
+                  复制反馈模板
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold" style={{ color: "var(--yunque-text)" }}>体验反馈采集</div>
+              <div className="text-xs mt-1" style={{ color: "var(--yunque-text-muted)" }}>
+                先让自己或朋友按一个 workload 跑真实任务，再记录“找不到 / 多一步 / 不顺手”的地方。反馈只保存在本地，方便你复制成 issue、PR 描述或产品复盘。
+              </div>
+            </div>
+            <Chip size="sm" style={{ background: "rgba(34,197,94,0.10)", color: "var(--yunque-success)" }}>
+              {workloadFeedbackEntries.length} 条
+            </Chip>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-xs space-y-1" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="block">工作负载</span>
+                  <select
+                    value={activeWorkloadId}
+                    onChange={(event) => setActiveWorkloadId(event.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-xs outline-none"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
+                  >
+                    {WORKLOAD_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>{preset.title}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs space-y-1" style={{ color: "var(--yunque-text-muted)" }}>
+                  <span className="block">30 秒内能找到入口吗</span>
+                  <select
+                    value={workloadFeedback.foundIn30Seconds}
+                    onChange={(event) => updateWorkloadFeedback("foundIn30Seconds", event.target.value as WorkloadFeedbackFindability)}
+                    className="w-full rounded-lg px-3 py-2 text-xs outline-none"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
+                  >
+                    <option value="unknown">未记录</option>
+                    <option value="yes">能</option>
+                    <option value="partial">大致能</option>
+                    <option value="no">不能</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <TextField value={workloadFeedback.triedScenario} onChange={(value: string) => updateWorkloadFeedback("triedScenario", value)}>
+                  <Label>真实场景</Label>
+                  <Input placeholder="例如：用浏览器/RPA 自动完成一次网页资料收集" />
+                </TextField>
+                <TextField value={workloadFeedback.mostUseful} onChange={(value: string) => updateWorkloadFeedback("mostUseful", value)}>
+                  <Label>最顺手</Label>
+                  <Input placeholder="例如：套用后能直接看到准备清单" />
+                </TextField>
+              </div>
+
+              <label className="text-xs space-y-1 block" style={{ color: "var(--yunque-text-muted)" }}>
+                <span className="block">最不顺手 / 卡点</span>
+                <textarea
+                  value={workloadFeedback.friction}
+                  onChange={(event) => updateWorkloadFeedback("friction", event.target.value)}
+                  className="w-full min-h-20 rounded-lg px-3 py-2 text-xs outline-none"
+                  placeholder="例如：不知道下一步要点“能力预检”还是“生成准备清单”"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text)" }}
+                />
+              </label>
+
+              <TextField value={workloadFeedback.nextStepToRemove} onChange={(value: string) => updateWorkloadFeedback("nextStepToRemove", value)}>
+                <Label>下次希望少掉哪一步</Label>
+                <Input placeholder="例如：套用 workload 后自动跑预检" />
+              </TextField>
+
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" className="btn-accent" isDisabled={!hasWorkloadFeedbackContent(workloadFeedback)} onPress={saveWorkloadFeedback}>
+                  保存本地反馈
+                </Button>
+                <Button size="sm" variant="ghost" onPress={() => void copyText(formatWorkloadFeedbackExport(workloadFeedbackEntries), "工作负载反馈汇总")}>
+                  <ClipboardCopy size={14} className="mr-1" />
+                  复制汇总
+                </Button>
+                <Button size="sm" variant="ghost" isDisabled={workloadFeedbackEntries.length === 0} onPress={clearWorkloadFeedback}>
+                  清空
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold" style={{ color: "var(--yunque-text)" }}>最近反馈</div>
+              {workloadFeedbackEntries.length === 0 ? (
+                <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px dashed var(--yunque-border)" }}>
+                  还没有反馈。建议从“浏览器 / RPA”或“记忆 / 回溯”开始，跑一个真实任务后只记录一个卡点；别急着做大闭环，先保证信号足够真实。
+                </div>
+              ) : (
+                workloadFeedbackEntries.slice(0, 4).map((entry) => (
+                  <div key={entry.id} className="rounded-xl p-3 text-xs space-y-1" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)", color: "var(--yunque-text-muted)" }}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Chip size="sm" style={{ background: "rgba(59,130,246,0.10)", color: "var(--yunque-primary)" }}>{entry.workloadTitle}</Chip>
+                      <span>{formatWorkloadFeedbackFindability(entry.foundIn30Seconds)}</span>
+                      <span className="font-mono">{formatTime(entry.createdAt)}</span>
+                    </div>
+                    {entry.triedScenario && <div>场景：{entry.triedScenario}</div>}
+                    {entry.friction && <div>卡点：{entry.friction}</div>}
+                    {entry.nextStepToRemove && <div>少一步：{entry.nextStepToRemove}</div>}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="section-card p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">

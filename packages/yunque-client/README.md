@@ -3,7 +3,13 @@
 TypeScript client for the Yunque (云雀) Agent HTTP API. The package root is
 reserved for generated OpenAPI coverage and low-level client bootstrap only.
 Focused product / Pack Runtime capabilities are published as explicit
-subpaths, so applications can import the minimum surface they need.
+subpaths, so applications can import the minimum surface they need. Think of
+these subpaths as selectable workloads rather than developer-only utilities:
+the same slice model can serve user-facing capability bundles, host apps, and
+automation code with one boundary.
+
+See [`docs/guide/workloads-and-sdk.md`](../../docs/guide/workloads-and-sdk.md)
+for the product boundary between workloads, Pack Runtime, and SDK slices.
 
 - Source spec: [`docs/openapi.yaml`](../../docs/openapi.yaml)
 - Generator: [`@hey-api/openapi-ts`](https://github.com/hey-api/openapi-ts)
@@ -28,7 +34,7 @@ For app code, use subpath imports such as `yunque-client/chat`,
 `yunque-client/planner-recovery`, or `yunque-client/agent-kit`.
 The package root (`yunque-client`) intentionally does **not** re-export
 hand-written focused slices; it only exposes generated OpenAPI symbols and the
-generated client bootstrap.
+generated client bootstrap, while the subpaths act like opt-in workloads.
 
 ### Focused client
 
