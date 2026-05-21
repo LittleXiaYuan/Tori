@@ -369,6 +369,13 @@
     "src/reflect-strategies.ts",
     "src/tools.ts",
     "src/sandbox.ts",
+    "src/chaos-probe.ts",
+    "src/cognitive-canary.ts",
+    "src/guardrail-fuzzer.ts",
+    "src/memory-time-travel.ts",
+    "src/rpa-replay.ts",
+    "src/skill-anomaly.ts",
+    "src/wasm-plugin.ts",
     "src/**/*.test.ts"
   ]
 }

@@ -1,8 +1,9 @@
 # yunque-client (TypeScript)
 
-TypeScript client for the Yunque (云雀) Agent HTTP API. The package contains
-both the generated full OpenAPI client and hand-written incremental slices for
-product integrations that should avoid importing the whole platform surface.
+TypeScript client for the Yunque (云雀) Agent HTTP API. The package root is
+reserved for generated OpenAPI coverage and low-level client bootstrap only.
+Focused product / Pack Runtime capabilities are published as explicit
+subpaths, so applications can import the minimum surface they need.
 
 - Source spec: [`docs/openapi.yaml`](../../docs/openapi.yaml)
 - Generator: [`@hey-api/openapi-ts`](https://github.com/hey-api/openapi-ts)
@@ -21,12 +22,15 @@ When/if we publish to npm, install with `npm i yunque-client`.
 
 ## Quick start
 
-For app code, prefer subpath imports such as `yunque-client/chat`,
-`yunque-client/planner-recovery`, or `yunque-client/agent-kit`. The package root (`yunque-client`) re-exports
-the generated all-in-one client for full API coverage and is intentionally
-heavier.
+For app code, use subpath imports such as `yunque-client/chat`,
+`yunque-client/packs`, `yunque-client/wasm-plugin`,
+`yunque-client/memory-time-travel`, `yunque-client/sbom-drift`,
+`yunque-client/planner-recovery`, or `yunque-client/agent-kit`.
+The package root (`yunque-client`) intentionally does **not** re-export
+hand-written focused slices; it only exposes generated OpenAPI symbols and the
+generated client bootstrap.
 
-### Incremental client
+### Focused client
 
 ```ts
 import { createChatClient } from "yunque-client/chat";
@@ -100,11 +104,12 @@ const generated = await generateCogni({
 await evolveCogni({ ...options, path: { id: "code-reviewer" } });
 ```
 
-## Incremental imports
+## Focused subpath imports
 
 The generated `src/sdk.gen.ts` is useful for full API coverage, but it is a
-large all-in-one surface. Product integrations that only need Planner recovery
-can import the hand-written incremental slice instead:
+large all-in-one surface. Product integrations that only need Planner recovery,
+Pack Runtime, or a single capability package must import the focused subpath
+instead of the root:
 
 Planner recovery keeps request actions and server recommendations separate.
 Use `CheckpointRecoveryAction` (`continue` / `retry_failed` / `partial`) when
@@ -115,9 +120,9 @@ submitting them directly. The gateway accepts common UI aliases such as
 request actions for portable integrations.
 
 The package declares `sideEffects: false`, so modern bundlers can drop unused
-subpath slices when applications import only the clients they need. Prefer
-subpath imports like `yunque-client/planner-recovery` for the smallest runtime
-surface; reserve the package root for full generated API coverage.
+subpath slices when applications import only the clients they need. Use focused
+subpaths like `yunque-client/packs` or `yunque-client/planner-recovery` for
+runtime code; reserve the package root for full generated API coverage.
 
 ```ts
 import { createAgentKit } from "yunque-client/agent-kit";
@@ -2603,3 +2608,15 @@ import { createBreakerClient } from "yunque-client/breaker";
 const breaker = createBreakerClient({ baseUrl: "http://localhost:9090", token: "<token>" });
 await breaker.reset();
 ```
+
+### Additional focused pack slices
+
+| Source file | Subpath import | Notes |
+| --- | --- | --- |
+| `src/chaos-probe.ts` | `yunque-client/chaos-probe` | chaos probe pack contracts |
+| `src/cognitive-canary.ts` | `yunque-client/cognitive-canary` | cognitive canary pack contracts |
+| `src/guardrail-fuzzer.ts` | `yunque-client/guardrail-fuzzer` | guardrail fuzzing pack contracts |
+| `src/memory-time-travel.ts` | `yunque-client/memory-time-travel` | memory rollback / audit-link pack contracts |
+| `src/rpa-replay.ts` | `yunque-client/rpa-replay` | replay / automation pack contracts |
+| `src/skill-anomaly.ts` | `yunque-client/skill-anomaly` | skill anomaly approval / bridge pack contracts |
+| `src/wasm-plugin.ts` | `yunque-client/wasm-plugin` | WASM plugin pack contracts |

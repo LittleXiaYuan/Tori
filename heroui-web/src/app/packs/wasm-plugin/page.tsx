@@ -25,7 +25,7 @@ import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
 import {
-  createWASMPluginPackClient,
+  createWASMPluginClient as createWASMPluginPackClient,
   type WASMPluginExecuteResult,
   type WASMPluginRemoteInstallApprovalDecisionPlan,
   type WASMPluginRemoteInstallApprovalPlan,
@@ -37,11 +37,12 @@ import {
   type WASMPluginRemoteInstallPackageInspectWriteback,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginRemoteInstallSignatureVerificationWriteback,
-  type WASMPluginStatus,
+  type WASMPluginStatusResponse as WASMPluginStatus,
   type WASMPluginSummary,
-} from "@/lib/wasm-plugin-pack-client";
+} from "yunque-client/wasm-plugin";
+import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 
-const wasmPluginPack = createWASMPluginPackClient();
+const wasmPluginPack = createWASMPluginPackClient(createYunqueSDKClientOptions());
 
 function statusTone(status: WASMPluginStatus | null): {
   bg: string;

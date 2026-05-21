@@ -23,14 +23,14 @@ import {
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
-import type { InstalledPack, PackBackendRouteSpec, PackCapabilityPlanReport, PackCapabilityPrepareReport } from "@/lib/pack-types";
-import { createPacksClient, summarizeCapabilityPrepare } from "@/lib/packs-client";
+import { createPacksClient, summarizeCapabilityPrepare, type InstalledPack, type PackBackendRouteSpec, type PackCapabilityPlanReport, type PackCapabilityPrepareReport } from "yunque-client/packs";
+import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { formatBackendRouteSpec } from "@/lib/pack-sync";
 
 const EXAMPLE_BACKUP_MANIFEST = "packs/examples/backup-pack/pack.json";
-const packsClient = createPacksClient();
+const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
 function formatTime(value?: string): string {
   if (!value) return "-";
@@ -170,8 +170,8 @@ export default function PacksPage() {
     }
   };
 
-  const install = () => run("install", () => packsClient.installLocal(manifestPath, undefined, false));
-  const installFromURL = () => run("install-url", () => packsClient.installFromURL(manifestUrl, undefined, downloadArtifact));
+  const install = () => run("install", () => packsClient.install({ manifestPath, download: false }));
+  const installFromURL = () => run("install-url", () => packsClient.install({ manifestUrl, download: downloadArtifact }));
   const enable = (id: string) => run(`enable:${id}`, () => packsClient.enable(id));
   const disable = (id: string) => run(`disable:${id}`, () => packsClient.disable(id));
   const rollback = (id: string) => run(`rollback:${id}`, () => packsClient.rollback(id));
@@ -409,7 +409,7 @@ export default function PacksPage() {
                       size="sm"
                       variant="outline"
                       isDisabled={!entry.manifest_path || entry.update_action === "use" || busy === `catalog-install:${entry.manifest.id}`}
-                      onPress={() => run(`catalog-install:${entry.manifest.id}`, () => packsClient.installLocal(entry.manifest_path || "", entry.source, false))}
+                      onPress={() => run(`catalog-install:${entry.manifest.id}`, () => packsClient.install({ manifestPath: entry.manifest_path || "", source: entry.source, download: false }))}
                     >
                       <Download size={13} /> 安装
                     </Button>
@@ -595,12 +595,12 @@ export default function PacksPage() {
                       </Button>
                     )}
                     {step.action === "install" && step.manifest_path && (
-                      <Button size="sm" className="btn-accent" isDisabled={busy === `prepare-install:${step.pack_id}`} onPress={() => run(`prepare-install:${step.pack_id}`, () => packsClient.installLocal(step.manifest_path || "", "prepare", false))}>
+                      <Button size="sm" className="btn-accent" isDisabled={busy === `prepare-install:${step.pack_id}`} onPress={() => run(`prepare-install:${step.pack_id}`, () => packsClient.install({ manifestPath: step.manifest_path || "", source: "prepare", download: false }))}>
                         <Download size={13} /> 安装
                       </Button>
                     )}
                     {step.action === "download" && step.manifest_path && (
-                      <Button size="sm" variant="outline" isDisabled={busy === `prepare-download:${step.pack_id}`} onPress={() => run(`prepare-download:${step.pack_id}`, () => packsClient.installLocal(step.manifest_path || "", "prepare", true))}>
+                      <Button size="sm" variant="outline" isDisabled={busy === `prepare-download:${step.pack_id}`} onPress={() => run(`prepare-download:${step.pack_id}`, () => packsClient.install({ manifestPath: step.manifest_path || "", source: "prepare", download: true }))}>
                         <Download size={13} /> 下载并安装
                       </Button>
                     )}
@@ -732,7 +732,7 @@ export default function PacksPage() {
                           size="sm"
                           className="btn-accent"
                           isDisabled={!entry.manifest_path || busy === `plan-install:${entry.manifest.id}`}
-                          onPress={() => run(`plan-install:${entry.manifest.id}`, () => packsClient.installLocal(entry.manifest_path || "", entry.source, Boolean(entry.downloadable)))}
+                        onPress={() => run(`plan-install:${entry.manifest.id}`, () => packsClient.install({ manifestPath: entry.manifest_path || "", source: entry.source, download: Boolean(entry.downloadable) }))}
                         >
                           <Download size={13} /> 安装推荐包
                         </Button>

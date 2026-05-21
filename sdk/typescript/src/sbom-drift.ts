@@ -51,6 +51,7 @@ export type SBOMDriftStatusResponse = {
   snapshot_count: number;
   repo_root?: string;
   store_dir?: string;
+  ci_baseline_store?: SBOMDriftCIBaselineStoreSummary;
   capabilities: string[];
   notes?: string[];
 } & Partial<SBOMDriftPlanOnlyBoundaryFlags>;
@@ -143,6 +144,102 @@ export type SBOMDriftGovulncheckPlan = {
   notes?: string[];
 };
 
+export type SBOMDriftBaselineArtifactSourceSpec = {
+  source_name: string;
+  provider: string;
+  artifact_url: string;
+  artifact_name: string;
+  baseline_id: string;
+  expected_sha256?: string;
+  auth_ref?: string;
+  fetches_network: boolean;
+  uses_credentials: boolean;
+  writes_baseline: boolean;
+  notes?: string[];
+};
+
+export type SBOMDriftBaselineFetchHandoffPlan = {
+  target: string;
+  dedup_key: string;
+  source: SBOMDriftBaselineArtifactSourceSpec;
+  artifact_source_plan_ready: boolean;
+  baseline_fetch_plan_ready: boolean;
+  baseline_fetch_ready: boolean;
+  artifact_baseline_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  consumes_artifact_repository: boolean;
+  fetches_artifact_baseline: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_baseline_snapshot: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  expected_artifacts: string[];
+  blocked_by: string[];
+  notes?: string[];
+};
+
+export type SBOMDriftCIBaselineStoreSummary = {
+  pack_id: string;
+  store: string;
+  store_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  ci_workflow_writeback_plan_ready: boolean;
+  ci_workflow_writeback_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  record_count: number;
+  artifact: string;
+  record_artifact: string;
+  notes?: string[];
+};
+
+export type SBOMDriftCIBaselineRecord = {
+  pack_id?: string;
+  created_at?: string;
+  status?: string;
+  record_id?: string;
+  request_id?: string;
+  request_key: string;
+  approval_id?: string;
+  base_id?: string;
+  target_id?: string;
+  target_current?: boolean;
+  fail_on_risk?: string;
+  requested_by?: string;
+  reason?: string;
+  blocked?: boolean;
+  risk_level?: string;
+  ci_baseline_store_ready?: boolean;
+  ci_baseline_writeback_ready?: boolean;
+  writes_ci_baseline_store?: boolean;
+  ci_gate_plan_ready?: boolean;
+  ci_gate_ready?: boolean;
+  govulncheck_plan_ready?: boolean;
+  govulncheck_ready?: boolean;
+  vulnerability_ready?: boolean;
+  writes_ci_workflow?: boolean;
+  executes_govulncheck?: boolean;
+  blocks_release?: boolean;
+  base?: SBOMDriftSnapshotSummary;
+  target?: SBOMDriftSnapshotSummary;
+  ci_gate_plan?: SBOMDriftCIGatePlan;
+  artifacts?: string[];
+  actions?: string[];
+  blocked_by?: string[];
+  labels?: string[];
+  notes?: string[];
+};
+
 export type SBOMDriftCIGatePlanRequest = {
   base_id: string;
   target_id?: string;
@@ -178,8 +275,40 @@ export type SBOMDriftCIGatePlanResponse = {
 };
 
 export type SBOMDriftBaselineArtifactSourcePlanRequest = Partial<Record<"source_name" | "provider" | "artifact_url" | "artifact_name" | "baseline_id" | "expected_sha256" | "auth_ref" | "requested_by" | "reason", string>>;
-export type SBOMDriftBaselineArtifactSourcePlan = Record<string, unknown> & SBOMDriftPlanOnlyBoundaryFlags & { status: string; source: Record<string, unknown> & { uses_credentials?: boolean }; baseline_fetch_handoff_plan: Record<string, unknown>; artifacts: string[] };
-export type SBOMDriftBaselineFetchHandoffPlan = SBOMDriftBaselineArtifactSourcePlan["baseline_fetch_handoff_plan"];
+export type SBOMDriftBaselineArtifactSourcePlan = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  stage: string;
+  requested_by?: string;
+  reason?: string;
+  artifact_source_plan_ready: boolean;
+  baseline_fetch_plan_ready: boolean;
+  baseline_fetch_ready: boolean;
+  artifact_baseline_ready: boolean;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  consumes_artifact_repository: boolean;
+  fetches_artifact_baseline: boolean;
+  writes_ci_baseline_store: boolean;
+  writes_baseline_snapshot: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  source: SBOMDriftBaselineArtifactSourceSpec;
+  baseline_fetch_handoff_plan: SBOMDriftBaselineFetchHandoffPlan;
+  ci_baseline_store: SBOMDriftCIBaselineStoreSummary;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
+};
 export type SBOMDriftBaselineArtifactSourcePlanResponse = { plan: SBOMDriftBaselineArtifactSourcePlan };
 
 export type SBOMDriftCIBaselineWritebackRequest = SBOMDriftCIGatePlanRequest & {
@@ -188,19 +317,105 @@ export type SBOMDriftCIBaselineWritebackRequest = SBOMDriftCIGatePlanRequest & {
   request_key?: string;
 };
 
-export type SBOMDriftCIBaselineWriteback = SBOMDriftCIGatePlan & {
+export type SBOMDriftCIBaselineWriteback = {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  record_id: string;
+  request_id: string;
+  request_key: string;
+  approval_id?: string;
+  base_id: string;
+  target_id: string;
+  target_current: boolean;
+  fail_on_risk: string;
+  requested_by?: string;
+  reason?: string;
+  blocked: boolean;
+  risk_level: string;
+  ci_baseline_store_ready: boolean;
+  ci_baseline_writeback_ready: boolean;
   writes_ci_baseline_store: boolean;
+  ci_gate_plan_ready: boolean;
+  ci_gate_ready: boolean;
+  govulncheck_plan_ready: boolean;
+  govulncheck_ready: boolean;
+  vulnerability_ready: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  ci_gate_plan: SBOMDriftCIGatePlan;
+  ci_baseline_store: SBOMDriftCIBaselineStoreSummary;
+  ci_baseline_record: SBOMDriftCIBaselineRecord;
+  artifacts: string[];
+  actions: string[];
+  blocked_by: string[];
+  labels: string[];
+  notes?: string[];
 };
 
 export type SBOMDriftCIBaselineWritebackResponse = {
   writeback: SBOMDriftCIBaselineWriteback;
 };
 
+export type SBOMDriftCIWorkflowStepPlan = {
+  step?: number;
+  name: string;
+  run?: string;
+  artifact?: string;
+  required?: boolean;
+  writes_files: boolean;
+  executes_govulncheck: boolean;
+  blocks_release?: boolean;
+  description?: string;
+};
+
+export type SBOMDriftCIWorkflowHandoffPlan = {
+  workflow_path: string;
+  job_name: string;
+  consumes_ci_baseline_store?: boolean;
+  steps: SBOMDriftCIWorkflowStepPlan[];
+};
+
+export type SBOMDriftReleaseBlockerPlan = {
+  would_block: boolean;
+  blocks_release: boolean;
+};
+
 export type SBOMDriftCIWorkflowWritebackPlan = {
-  status: string; ci_workflow_writeback_plan_ready: boolean; consumes_ci_baseline_store: boolean; writes_ci_workflow: boolean; executes_govulncheck: boolean; blocks_release: boolean;
-  ci_workflow_handoff_plan: { workflow_path: string; job_name: string; steps: Array<Record<string, unknown>> };
-  release_blocker_plan: { would_block: boolean; blocks_release: boolean };
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  stage?: string;
+  record_id?: string;
+  request_id?: string;
+  request_key?: string;
+  requested_by?: string;
+  reason?: string;
+  blocked?: boolean;
+  risk_level?: string;
+  fail_on_risk?: string;
+  ci_baseline_store_ready?: boolean;
+  ci_baseline_writeback_ready?: boolean;
+  ci_workflow_writeback_plan_ready: boolean;
+  ci_workflow_writeback_ready?: boolean;
+  consumes_ci_baseline_store: boolean;
+  ci_gate_plan_ready?: boolean;
+  ci_gate_ready?: boolean;
+  govulncheck_plan_ready?: boolean;
+  govulncheck_ready?: boolean;
+  vulnerability_ready?: boolean;
+  writes_ci_baseline_store?: boolean;
+  writes_ci_workflow: boolean;
+  executes_govulncheck: boolean;
+  blocks_release: boolean;
+  ci_workflow_handoff_plan: SBOMDriftCIWorkflowHandoffPlan;
+  release_blocker_plan: SBOMDriftReleaseBlockerPlan;
   artifacts: string[];
+  actions?: string[];
+  blocked_by?: string[];
+  labels?: string[];
+  notes?: string[];
 };
 export type SBOMDriftCIWorkflowWritebackPlanResponse = { plan: SBOMDriftCIWorkflowWritebackPlan };
 
@@ -215,7 +430,11 @@ export type SBOMDriftEvidenceResponse = {
   govulncheck_plan?: SBOMDriftGovulncheckPlan;
   baseline_artifact_source_plan?: SBOMDriftBaselineArtifactSourcePlan;
   baseline_fetch_handoff_plan?: SBOMDriftBaselineFetchHandoffPlan;
+  ci_baseline_store?: SBOMDriftCIBaselineStoreSummary;
+  ci_baseline_records?: SBOMDriftCIBaselineRecord[];
   ci_workflow_writeback_plan?: SBOMDriftCIWorkflowWritebackPlan;
+  ci_workflow_handoff_plan?: SBOMDriftCIWorkflowHandoffPlan;
+  release_blocker_plan?: SBOMDriftReleaseBlockerPlan;
 };
 
 export type SBOMDriftClientOptions = {

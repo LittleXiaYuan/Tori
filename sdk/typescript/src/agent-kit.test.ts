@@ -35,6 +35,9 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
       if (value.endsWith("/v1/plugins")) return jsonResponse({ plugins: [{ name: "demo", enabled: true }] });
       if (value.endsWith("/v1/plugins/ui")) return jsonResponse({ tabs: [{ id: "demo-tab" }] });
       if (value.endsWith("/v1/plugins/toggle")) return jsonResponse({ name: "demo", enabled: true, skills_count: 1 });
+      if (value.endsWith("/v1/plugins/reload")) return jsonResponse({ status: "reloaded", skills: 1 });
+      if (value.endsWith("/v1/plugins/files?name=demo")) return jsonResponse({ files: [{ name: "plugin.json", content: "{}", size: 2 }], builtin: false });
+      if (value.endsWith("/v1/plugins/open-folder?name=demo")) return jsonResponse({ ok: true, path: "demo" });
       if (value.endsWith("/v1/skills")) return jsonResponse({ skills: [{ name: "web.search", description: "search" }], count: 1 });
       if (value.endsWith("/v1/skills/scan")) return jsonResponse({ status: "scanned", skills_loaded: 2 });
       if (value.endsWith("/v1/skill-suggestions?session_id=s1")) return jsonResponse({ suggestions: [{ name: "summarize" }] });
@@ -172,61 +175,14 @@ test("createAgentKit composes state reflect mission parse scheduler and plugin l
   assertEqual((await kit.embeddings.providers()).providers[0], "local");
   assertEqual((await kit.search.providers()).providers[0], "local");
   assertEqual((await kit.plugin.search("sdk", 3)).results.length, 1);
-  assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[2]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[3]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[4]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[5]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[6]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[7]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[8]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[9]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[10]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[11]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[12]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[13]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[14]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[15]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[16]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[17]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[18]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[19]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[20]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[21]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[22]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[23]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[24]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[25]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[26]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[27]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[28]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[29]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[30]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[31]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[32]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[33]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[34]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[35]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[36]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[37]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[38]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[39]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[40]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[41]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[42]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[43]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[44]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[45]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[46]?.init?.headers).get("authorization"), "Bearer jwt-token");
-  assertEqual(new Headers(calls[57]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  assertEqual(new Headers(calls[58]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  assertEqual(new Headers(calls[59]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  assertEqual(new Headers(calls[60]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  assertEqual(new Headers(calls[61]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  assertEqual(new Headers(calls[62]?.init?.headers).get("authorization"), "Bearer plugin-token");
-  const pluginExtensionsCall = calls.find((call) => call.url.endsWith("/v1/plugin-api/extensions"));
-  assert(pluginExtensionsCall, "missing plugin extensions Agent Kit call");
-  assertEqual(new Headers(pluginExtensionsCall.init?.headers).get("authorization"), "Bearer plugin-token");
+  for (const call of calls) {
+    const auth = new Headers(call.init?.headers).get("authorization");
+    if (call.url.includes("/v1/plugin-api/")) {
+      assertEqual(auth, "Bearer plugin-token");
+    } else {
+      assertEqual(auth, "Bearer jwt-token");
+    }
+  }
 });
 
 test("createAgentKit can reuse token as plugin token for simple automations", async () => {

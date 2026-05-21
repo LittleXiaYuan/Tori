@@ -38,6 +38,12 @@ for (const route of manifest.routes ?? []) {
 const client = readRepoFile(manifest.frontend.client);
 for (const token of [
   "createSBOMDriftPackClient",
+  "yunque-client/sbom-drift",
+  "yunque-client/sbom-drift-ci",
+]) {
+  if (!client.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
+}
+for (const token of [
   "/v1/sbom-drift/status",
   "/v1/sbom-drift/snapshots",
   "/v1/sbom-drift/diff",
@@ -49,7 +55,7 @@ for (const token of [
   "/v1/sbom-drift/evidence/",
   "method: \"POST\"",
 ]) {
-  if (!client.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
+  if (client.includes(token)) fail(`sbom-drift-pack-client should not hard-code transport token: ${token}`);
 }
 
 const page = readRepoFile(manifest.frontend.page);

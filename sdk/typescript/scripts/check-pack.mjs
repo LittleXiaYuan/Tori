@@ -1,7 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
-const baseUnpackedSize = 1_203_000;
+// Keep a small buffer for the richer focused pack slice docs and SBOM drift
+// type surface; the dynamic export/capability growth gates still catch real
+// regressions.
+const baseUnpackedSize = 1_207_000;
 const baseExportedFiles = 137;
 const baseManifestCapabilities = 12;
 const basePackSdkHelperExports = 0;
@@ -36,6 +39,28 @@ const wasmPluginManifest = existsSync(wasmPluginManifestPath)
   ? JSON.parse(readFileSync(wasmPluginManifestPath, "utf8"))
   : { routes: [] };
 const packsSource = existsSync("src/packs.ts") ? readFileSync("src/packs.ts", "utf8") : "";
+const rootIndexSource = existsSync("src/index.ts") ? readFileSync("src/index.ts", "utf8") : "";
+
+const allowedRootExports = new Set(["./types.gen", "./client", "./client.gen", "./sdk.gen"]);
+const rootExportPattern = /export\s+(?:type\s+)?(?:\*\s+|(?:\{[^}]*\}\s+))from\s+['"]([^'"]+)['"]/g;
+const rootExportPaths = [...rootIndexSource.matchAll(rootExportPattern)].map((match) => match[1]);
+const forbiddenRootExports = rootExportPaths.filter((entry) => !allowedRootExports.has(entry));
+for (const required of allowedRootExports) {
+  if (!rootExportPaths.includes(required)) {
+    console.error(`src/index.ts must re-export generated OpenAPI bootstrap: ${required}`);
+    process.exit(1);
+  }
+}
+if (forbiddenRootExports.length > 0) {
+  console.error(
+    [
+      "src/index.ts must stay generated-client-only.",
+      "Focused hand-written SDK slices must be imported via yunque-client/<slice> subpaths, not re-exported from the package root.",
+      `Forbidden root re-exports: ${forbiddenRootExports.join(", ")}`,
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 
 if (pkg.sideEffects !== false) {
   console.error("package.json must declare sideEffects=false so bundlers can tree-shake unused SDK slices");

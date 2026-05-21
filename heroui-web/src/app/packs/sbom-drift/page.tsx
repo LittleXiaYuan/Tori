@@ -6,9 +6,10 @@ import { AlertTriangle, Download, FileJson, GitCompare, PackageSearch, RefreshCw
 import PageHeader from "@/components/page-header";
 import { showToast } from "@/components/toast-provider";
 import { formatErrorMessage } from "@/lib/error-utils";
-import { createSBOMDriftPackClient, type SBOMDriftBaselineArtifactSourcePlan, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCIWorkflowWritebackPlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatus } from "@/lib/sbom-drift-pack-client";
+import { createSBOMDriftClient as createSBOMDriftPackClient, type SBOMDriftBaselineArtifactSourcePlan, type SBOMDriftCIBaselineWriteback, type SBOMDriftCIGatePlan, type SBOMDriftCIWorkflowWritebackPlan, type SBOMDriftCycloneDXDocument, type SBOMDriftDiff, type SBOMDriftSnapshotSummary, type SBOMDriftStatusResponse as SBOMDriftStatus } from "yunque-client/sbom-drift";
+import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 
-const sbomDriftPack = createSBOMDriftPackClient();
+const sbomDriftPack = createSBOMDriftPackClient(createYunqueSDKClientOptions());
 
 function riskTone(risk?: string): { bg: string; fg: string } {
   switch (risk) {
