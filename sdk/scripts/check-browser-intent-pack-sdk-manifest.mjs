@@ -51,12 +51,12 @@ for (const token of [
   if (!client.includes(token)) fail(`browser-intent-pack-client missing token: ${token}`);
 }
 
-const page = readRepoFile("heroui-web/src/app/packs/browser/page.tsx");
+const page = readRepoFile("apps/web/src/app/packs/browser/page.tsx");
 if (!page.includes("createBrowserIntentPackClient") || page.includes('from "@/lib/api"') || page.includes("api.browser")) {
   fail("Browser Intent pack page must use browser-intent-pack-client instead of monolithic api.ts");
 }
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["browserNavigate:", "browserScreenshot:", "browserOcr:", "browserStatus:", "browserConfig:", "browserExtStatus:", "browserExtAction:", "browserExtScenarios:", "browserExtRunScenario:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts still exposes Browser Intent method: ${token}`);
 }
@@ -64,7 +64,7 @@ for (const token of ["browserNavigate:", "browserScreenshot:", "browserOcr:", "b
 const legacy = readRepoFile(manifest.frontend.legacyPath);
 if (!legacy.includes('redirect("/packs/browser")')) fail("legacy /browser page must redirect to /packs/browser");
 
-const shell = readRepoFile("heroui-web/src/components/sidebar.tsx") + "\n" + readRepoFile("heroui-web/src/lib/nav-items.tsx") + "\n" + readRepoFile("heroui-web/src/components/command-palette.tsx");
+const shell = readRepoFile("apps/web/src/components/sidebar.tsx") + "\n" + readRepoFile("apps/web/src/lib/nav-items.tsx") + "\n" + readRepoFile("apps/web/src/components/command-palette.tsx");
 if (shell.includes('href: "/browser"') || shell.includes("nav-browser")) fail("Browser Intent must not remain a hard-coded main-shell nav item");
 if (!shell.includes("fetchEnabledPacks") || !shell.includes("buildPackNavItems")) fail("front shell should sync Browser Intent entry through enabled packs");
 

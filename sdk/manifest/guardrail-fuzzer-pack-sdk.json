@@ -23,7 +23,7 @@
   "frontend": {
     "menuPath": "/packs/guardrail-fuzzer",
     "component": "security/GuardrailFuzzerPackPage",
-    "client": "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
-    "page": "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx"
+    "client": "apps/web/src/lib/guardrail-fuzzer-pack-client.ts",
+    "page": "apps/web/src/app/packs/guardrail-fuzzer/page.tsx"
   }
 }

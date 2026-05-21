@@ -30,8 +30,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/reverie.ts", "sdk/typescript/src/reverie-observe.ts", "sdk/typescript/src/reverie-control.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/reverie.ts", "packages/yunque-client/src/reverie-observe.ts", "packages/yunque-client/src/reverie-control.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "journal": "createReverieClient().journal",
         "stats": "createReverieClient().stats",

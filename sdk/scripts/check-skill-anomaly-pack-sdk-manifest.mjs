@@ -67,7 +67,7 @@ for (const token of ["Skill 行为异常", "写入基线事件", "Dry-run 检测
   if (!page.includes(token)) fail(`Skill Anomaly pack page missing product token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/skill-anomaly-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/skill-anomaly-pack-client.test.ts");
 for (const token of ["/v1/skill-anomaly/status", "/v1/skill-anomaly/detect", "/v1/skill-anomaly/approval-queue/writeback", "/v1/skill-anomaly/approval-queue/bridge/plan", "/v1/skill-anomaly/evidence/text_processing", "approval-queue-store.json", "approval-queue-record.json", "approval-manager-bridge-plan.json"]) {
   if (!frontendTest.includes(token)) fail(`Skill Anomaly frontend client test missing token: ${token}`);
 }
@@ -114,7 +114,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`Skill Anomaly backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/skill-anomaly.ts") + "\n" + readRepoFile("sdk/typescript/src/skill-anomaly.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/skill-anomaly.ts") + "\n" + readRepoFile("packages/yunque-client/src/skill-anomaly.test.ts");
 for (const token of [
   "createSkillAnomalyClient",
   "SkillAnomalyClientError",
@@ -136,10 +136,10 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript Skill Anomaly SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./skill-anomaly"]?.import !== "./src/skill-anomaly.ts") fail("yunque-client/skill-anomaly subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["skillAnomalyStatus:", "createSkillAnomalyEvent:", "skillAnomalyDetect:", "skillAnomalyEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose Skill Anomaly method: ${token}`);
 }

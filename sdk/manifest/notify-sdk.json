@@ -27,13 +27,13 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/notify.ts",
-        "sdk/typescript/src/notify-share.ts",
-        "sdk/typescript/src/notify-channels.ts",
-        "sdk/typescript/src/notify-channel-read.ts",
-        "sdk/typescript/src/notify-channel-control.ts"
+        "packages/yunque-client/src/notify.ts",
+        "packages/yunque-client/src/notify-share.ts",
+        "packages/yunque-client/src/notify-channels.ts",
+        "packages/yunque-client/src/notify-channel-read.ts",
+        "packages/yunque-client/src/notify-channel-control.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "channels": "createNotifyClient().channels",
         "addChannel": "createNotifyClient().addChannel",

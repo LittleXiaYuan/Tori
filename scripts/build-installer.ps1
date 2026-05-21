@@ -7,7 +7,7 @@
 # Prerequisites:
 #   - Go 1.25+
 #   - Inno Setup 6+ (iscc.exe in PATH or default install location)
-#   - Node.js (for frontend build, optional if heroui-web/out/ exists)
+#   - Node.js (for frontend build, optional if apps/web/out/ exists)
 
 param(
     [string]$Version = ""
@@ -45,10 +45,10 @@ if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
 Write-Host "  Built: dist\yunque-agent.exe" -ForegroundColor Green
 
 # Step 2: Ensure frontend (optional)
-if (-not (Test-Path "heroui-web\out\index.html")) {
+if (-not (Test-Path "apps/web\out\index.html")) {
     Write-Host "`n[2/3] Frontend not built, creating placeholder..." -ForegroundColor Yellow
-    New-Item -ItemType Directory -Path "heroui-web\out" -Force | Out-Null
-    Set-Content "heroui-web\out\index.html" '<!DOCTYPE html><html><body><p>Run npm build in heroui-web/</p></body></html>'
+    New-Item -ItemType Directory -Path "apps/web\out" -Force | Out-Null
+    Set-Content "apps/web\out\index.html" '<!DOCTYPE html><html><body><p>Run npm build in apps/web/</p></body></html>'
 } else {
     Write-Host "`n[2/3] Frontend already built." -ForegroundColor Green
 }

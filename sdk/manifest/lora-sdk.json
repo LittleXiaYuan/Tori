@@ -78,19 +78,19 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/lora.ts",
-        "sdk/typescript/src/lora-observe.ts",
-        "sdk/typescript/src/lora-status.ts",
-        "sdk/typescript/src/lora-history.ts",
-        "sdk/typescript/src/lora-control.ts",
-        "sdk/typescript/src/lora-config.ts",
-        "sdk/typescript/src/lora-preview.ts",
-        "sdk/typescript/src/lora-evolution.ts",
-        "sdk/typescript/src/lora-trigger.ts",
-        "sdk/typescript/src/lora-rollback.ts"
+        "packages/yunque-client/src/lora.ts",
+        "packages/yunque-client/src/lora-observe.ts",
+        "packages/yunque-client/src/lora-status.ts",
+        "packages/yunque-client/src/lora-history.ts",
+        "packages/yunque-client/src/lora-control.ts",
+        "packages/yunque-client/src/lora-config.ts",
+        "packages/yunque-client/src/lora-preview.ts",
+        "packages/yunque-client/src/lora-evolution.ts",
+        "packages/yunque-client/src/lora-trigger.ts",
+        "packages/yunque-client/src/lora-rollback.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

@@ -10,9 +10,9 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response { return new
 
 test("ResourceStateClient lists resources with bearer token", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const client = createResourceStateClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse([{ id: "r1", path: "sdk/typescript", type: "repo" }]); } });
+  const client = createResourceStateClient({ baseUrl: "http://localhost:9090/", token: "token-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); return jsonResponse([{ id: "r1", path: "packages/yunque-client", type: "repo" }]); } });
   const resources = await client.list();
-  assertEqual(resources[0]?.path, "sdk/typescript");
+  assertEqual(resources[0]?.path, "packages/yunque-client");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/state/resources");
   assertEqual(new Headers(calls[0]?.init?.headers).get("authorization"), "Bearer token-123");
 });
@@ -20,13 +20,13 @@ test("ResourceStateClient lists resources with bearer token", async () => {
 test("ResourceStateClient tracks and releases resources with API key", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];
   const client = createResourceStateClient({ baseUrl: "http://localhost:9090", apiKey: "key-123", fetch: async (url, init) => { calls.push({ url: String(url), init }); if (init?.method === "DELETE") return jsonResponse({ status: "released" }); return jsonResponse({ status: "tracked" }); } });
-  const tracked = await client.track({ path: "sdk/typescript", type: "repo" });
+  const tracked = await client.track({ path: "packages/yunque-client", type: "repo" });
   const released = await client.release("r1");
   assertEqual(tracked.status, "tracked");
   assertEqual(released.status, "released");
   assertEqual(calls[0]?.url, "http://localhost:9090/v1/state/resources");
   assertEqual(calls[1]?.url, "http://localhost:9090/v1/state/resources?id=r1");
-  assertDeepEqual(JSON.parse(String(calls[0]?.init?.body)), { path: "sdk/typescript", type: "repo" });
+  assertDeepEqual(JSON.parse(String(calls[0]?.init?.body)), { path: "packages/yunque-client", type: "repo" });
   assertEqual(new Headers(calls[0]?.init?.headers).get("x-api-key"), "key-123");
 });
 

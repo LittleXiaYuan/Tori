@@ -69,16 +69,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/workflow.ts",
-        "sdk/typescript/src/workflow-read.ts",
-        "sdk/typescript/src/workflow-write.ts",
-        "sdk/typescript/src/workflow-run.ts",
-        "sdk/typescript/src/workflow-instances.ts",
-        "sdk/typescript/src/workflow-definitions.ts",
-        "sdk/typescript/src/workflow-runs.ts"
+        "packages/yunque-client/src/workflow.ts",
+        "packages/yunque-client/src/workflow-read.ts",
+        "packages/yunque-client/src/workflow-write.ts",
+        "packages/yunque-client/src/workflow-run.ts",
+        "packages/yunque-client/src/workflow-instances.ts",
+        "packages/yunque-client/src/workflow-definitions.ts",
+        "packages/yunque-client/src/workflow-runs.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

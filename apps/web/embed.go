@@ -1,4 +1,4 @@
-// Package webui embeds the Next.js static export from heroui-web/out/.
+// Package webui embeds the Next.js static export from apps/web/out/.
 // Build the frontend first with `make web-build` (requires Node.js).
 // Without a build, a minimal placeholder is embedded and the gateway
 // falls back to the pure-HTML dashboard.

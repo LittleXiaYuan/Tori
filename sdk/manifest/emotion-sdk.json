@@ -43,11 +43,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/emotion.ts",
-        "sdk/typescript/src/interactions.ts"
+        "packages/yunque-client/src/emotion.ts",
+        "packages/yunque-client/src/interactions.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

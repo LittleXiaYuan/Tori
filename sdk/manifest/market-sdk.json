@@ -21,13 +21,13 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/market.ts",
-        "sdk/typescript/src/market-search.ts",
-        "sdk/typescript/src/market-query.ts",
-        "sdk/typescript/src/market-top.ts",
-        "sdk/typescript/src/market-stats.ts"
+        "packages/yunque-client/src/market.ts",
+        "packages/yunque-client/src/market-search.ts",
+        "packages/yunque-client/src/market-query.ts",
+        "packages/yunque-client/src/market-top.ts",
+        "packages/yunque-client/src/market-stats.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "search": "createSkillMarketClient().search",
         "top": "createSkillMarketClient().top",

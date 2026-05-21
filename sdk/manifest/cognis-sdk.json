@@ -228,20 +228,20 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/cognis.ts",
-        "sdk/typescript/src/cognis-registry.ts",
-        "sdk/typescript/src/cognis-observe.ts",
-        "sdk/typescript/src/cognis-traces.ts",
-        "sdk/typescript/src/cognis-health.ts",
-        "sdk/typescript/src/cognis-alerts.ts",
-        "sdk/typescript/src/cognis-experience.ts",
-        "sdk/typescript/src/cognis-evolution.ts",
-        "sdk/typescript/src/cognis-federation.ts",
-        "sdk/typescript/src/cognis-workflows.ts",
-        "sdk/typescript/src/cognis-bundles.ts"
+        "packages/yunque-client/src/cognis.ts",
+        "packages/yunque-client/src/cognis-registry.ts",
+        "packages/yunque-client/src/cognis-observe.ts",
+        "packages/yunque-client/src/cognis-traces.ts",
+        "packages/yunque-client/src/cognis-health.ts",
+        "packages/yunque-client/src/cognis-alerts.ts",
+        "packages/yunque-client/src/cognis-experience.ts",
+        "packages/yunque-client/src/cognis-evolution.ts",
+        "packages/yunque-client/src/cognis-federation.ts",
+        "packages/yunque-client/src/cognis-workflows.ts",
+        "packages/yunque-client/src/cognis-bundles.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

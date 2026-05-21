@@ -14,7 +14,7 @@ subpaths, so applications can import the minimum surface they need.
 From the repo root:
 
 ```bash
-cd sdk/typescript
+cd packages/yunque-client
 npm install
 ```
 
@@ -1653,7 +1653,7 @@ const goals = await goalState.list();
 await goalState.save({ title: "Ship focused state helper", priority: 2 });
 await goalState.delete("goal-1");
 
-await resourceState.track({ path: "sdk/typescript", type: "repo" });
+await resourceState.track({ path: "packages/yunque-client", type: "repo" });
 await resourceState.release("resource-1");
 
 const state = createStateClient({
@@ -1664,7 +1664,7 @@ const focus = await state.focus();
 console.log(focus.focus);
 await state.updateFocus("整理 SDK 状态层", ["sdk", "state"]);
 await state.deleteGoal("goal-1");
-await state.trackResource({ path: "sdk/typescript", type: "repo" });
+await state.trackResource({ path: "packages/yunque-client", type: "repo" });
 await state.releaseResource("resource-1");
 
 const stateSnapshot = createStateSnapshotClient({
@@ -1749,7 +1749,7 @@ cd ../..        # back to repo root
 make openapi
 
 # 2. Regenerate this SDK
-cd sdk/typescript
+cd packages/yunque-client
 npm run generate
 npm run typecheck           # should be silent (0 errors)
 npm run check:incremental   # verifies hand-written slice exports/tests/route coverage

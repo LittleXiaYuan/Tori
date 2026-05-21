@@ -23,7 +23,7 @@
   "frontend": {
     "menuPath": "/packs/rpa-replay",
     "component": "rpa/RPAReplayPackPage",
-    "client": "heroui-web/src/lib/rpa-replay-pack-client.ts",
-    "page": "heroui-web/src/app/packs/rpa-replay/page.tsx"
+    "client": "apps/web/src/lib/rpa-replay-pack-client.ts",
+    "page": "apps/web/src/app/packs/rpa-replay/page.tsx"
   }
 }

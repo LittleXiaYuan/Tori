@@ -17,8 +17,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/chat.ts", "sdk/typescript/src/chat-basic.ts", "sdk/typescript/src/chat-stream.ts", "sdk/typescript/src/chat-agentic.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/chat.ts", "packages/yunque-client/src/chat-basic.ts", "packages/yunque-client/src/chat-stream.ts", "packages/yunque-client/src/chat-agentic.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": { "send": "createChatClient().send", "stream": "createChatClient().stream", "agentic": "createChatClient().agentic", "parseStream": "createChatClient().parseStream" }
     },
     "go": {

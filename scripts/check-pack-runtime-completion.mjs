@@ -93,79 +93,79 @@ const wasmPluginManifest = read("packs/examples/wasm-plugin-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
-  "heroui-web/src/lib/pack-sync.tsx",
-  "heroui-web/src/lib/__tests__/pack-sync.test.ts",
-  "heroui-web/src/lib/packs-client.ts",
-  "heroui-web/src/lib/__tests__/packs-client.test.ts",
-  "heroui-web/src/app/packs/page.tsx",
-  "heroui-web/src/app/packs/[...slug]/page.tsx",
-  "heroui-web/src/app/packs/backup/page.tsx",
-  "heroui-web/src/app/packs/lora/page.tsx",
-  "heroui-web/src/app/packs/cognis/page.tsx",
-  "heroui-web/src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx",
-  "heroui-web/src/lib/backup-pack-client.ts",
-  "heroui-web/src/lib/__tests__/backup-pack-client.test.ts",
-  "heroui-web/src/lib/lora-pack-client.ts",
-  "heroui-web/src/lib/__tests__/lora-pack-client.test.ts",
-  "heroui-web/src/lib/cogni-kernel-pack-client.ts",
-  "heroui-web/src/lib/__tests__/cogni-kernel-pack-client.test.ts",
-  "heroui-web/src/app/packs/browser/page.tsx",
-  "heroui-web/src/lib/browser-intent-pack-client.ts",
-  "heroui-web/src/lib/__tests__/browser-intent-pack-client.test.ts",
-  "heroui-web/src/app/packs/chaos-probe/page.tsx",
-  "heroui-web/src/lib/chaos-probe-pack-client.ts",
-  "heroui-web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
-  "heroui-web/src/app/packs/cognitive-canary/page.tsx",
-  "heroui-web/src/lib/cognitive-canary-pack-client.ts",
-  "heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts",
-  "heroui-web/src/app/packs/guardrail-fuzzer/page.tsx",
-  "heroui-web/src/lib/guardrail-fuzzer-pack-client.ts",
-  "heroui-web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts",
-  "heroui-web/src/app/packs/memory-time-travel/page.tsx",
-  "heroui-web/src/lib/memory-time-travel-pack-client.ts",
-  "heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts",
-  "heroui-web/src/app/packs/rpa-replay/page.tsx",
-  "heroui-web/src/lib/rpa-replay-pack-client.ts",
-  "heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts",
-  "heroui-web/src/app/packs/sbom-drift/page.tsx",
-  "heroui-web/src/lib/sbom-drift-pack-client.ts",
-  "heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts",
-  "heroui-web/src/app/packs/skill-anomaly/page.tsx",
-  "heroui-web/src/lib/skill-anomaly-pack-client.ts",
-  "heroui-web/src/lib/__tests__/skill-anomaly-pack-client.test.ts",
-  "heroui-web/src/app/packs/wasm-plugin/page.tsx",
-  "heroui-web/src/lib/wasm-plugin-pack-client.ts",
-  "heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts",
-  "heroui-web/src/lib/pack-types.ts",
-  "heroui-web/src/lib/api.ts",
-  "heroui-web/src/lib/api-types/skills.ts",
+  "apps/web/src/lib/pack-sync.tsx",
+  "apps/web/src/lib/__tests__/pack-sync.test.ts",
+  "apps/web/src/lib/packs-client.ts",
+  "apps/web/src/lib/__tests__/packs-client.test.ts",
+  "apps/web/src/app/packs/page.tsx",
+  "apps/web/src/app/packs/[...slug]/page.tsx",
+  "apps/web/src/app/packs/backup/page.tsx",
+  "apps/web/src/app/packs/lora/page.tsx",
+  "apps/web/src/app/packs/cognis/page.tsx",
+  "apps/web/src/components/cherry/__tests__/settings-modal-pack-entry.test.tsx",
+  "apps/web/src/lib/backup-pack-client.ts",
+  "apps/web/src/lib/__tests__/backup-pack-client.test.ts",
+  "apps/web/src/lib/lora-pack-client.ts",
+  "apps/web/src/lib/__tests__/lora-pack-client.test.ts",
+  "apps/web/src/lib/cogni-kernel-pack-client.ts",
+  "apps/web/src/lib/__tests__/cogni-kernel-pack-client.test.ts",
+  "apps/web/src/app/packs/browser/page.tsx",
+  "apps/web/src/lib/browser-intent-pack-client.ts",
+  "apps/web/src/lib/__tests__/browser-intent-pack-client.test.ts",
+  "apps/web/src/app/packs/chaos-probe/page.tsx",
+  "apps/web/src/lib/chaos-probe-pack-client.ts",
+  "apps/web/src/lib/__tests__/chaos-probe-pack-client.test.ts",
+  "apps/web/src/app/packs/cognitive-canary/page.tsx",
+  "apps/web/src/lib/cognitive-canary-pack-client.ts",
+  "apps/web/src/lib/__tests__/cognitive-canary-pack-client.test.ts",
+  "apps/web/src/app/packs/guardrail-fuzzer/page.tsx",
+  "apps/web/src/lib/guardrail-fuzzer-pack-client.ts",
+  "apps/web/src/lib/__tests__/guardrail-fuzzer-pack-client.test.ts",
+  "apps/web/src/app/packs/memory-time-travel/page.tsx",
+  "apps/web/src/lib/memory-time-travel-pack-client.ts",
+  "apps/web/src/lib/__tests__/memory-time-travel-pack-client.test.ts",
+  "apps/web/src/app/packs/rpa-replay/page.tsx",
+  "apps/web/src/lib/rpa-replay-pack-client.ts",
+  "apps/web/src/lib/__tests__/rpa-replay-pack-client.test.ts",
+  "apps/web/src/app/packs/sbom-drift/page.tsx",
+  "apps/web/src/lib/sbom-drift-pack-client.ts",
+  "apps/web/src/lib/__tests__/sbom-drift-pack-client.test.ts",
+  "apps/web/src/app/packs/skill-anomaly/page.tsx",
+  "apps/web/src/lib/skill-anomaly-pack-client.ts",
+  "apps/web/src/lib/__tests__/skill-anomaly-pack-client.test.ts",
+  "apps/web/src/app/packs/wasm-plugin/page.tsx",
+  "apps/web/src/lib/wasm-plugin-pack-client.ts",
+  "apps/web/src/lib/__tests__/wasm-plugin-pack-client.test.ts",
+  "apps/web/src/lib/pack-types.ts",
+  "apps/web/src/lib/api.ts",
+  "apps/web/src/lib/api-types/skills.ts",
 ].map(read).join("\n");
-const legacyBackupPage = read("heroui-web/src/app/backup/page.tsx");
-const backupPackPage = read("heroui-web/src/app/packs/backup/page.tsx");
-const legacyLoRAPage = read("heroui-web/src/app/lora/page.tsx");
-const loraPackPage = read("heroui-web/src/app/packs/lora/page.tsx");
-const legacyCogniPage = read("heroui-web/src/app/cognis/page.tsx");
-const cogniPackPage = read("heroui-web/src/app/packs/cognis/page.tsx");
-const legacyBrowserPage = read("heroui-web/src/app/browser/page.tsx");
-const browserPackPage = read("heroui-web/src/app/packs/browser/page.tsx");
-const chaosProbePackPage = read("heroui-web/src/app/packs/chaos-probe/page.tsx");
-const cognitiveCanaryPackPage = read("heroui-web/src/app/packs/cognitive-canary/page.tsx");
-const guardrailFuzzerPackPage = read("heroui-web/src/app/packs/guardrail-fuzzer/page.tsx");
-const memoryTimeTravelPackPage = read("heroui-web/src/app/packs/memory-time-travel/page.tsx");
-const rpaReplayPackPage = read("heroui-web/src/app/packs/rpa-replay/page.tsx");
-const sbomDriftPackPage = read("heroui-web/src/app/packs/sbom-drift/page.tsx");
-const skillAnomalyPackPage = read("heroui-web/src/app/packs/skill-anomaly/page.tsx");
-const wasmPluginPackPage = read("heroui-web/src/app/packs/wasm-plugin/page.tsx");
+const legacyBackupPage = read("apps/web/src/app/backup/page.tsx");
+const backupPackPage = read("apps/web/src/app/packs/backup/page.tsx");
+const legacyLoRAPage = read("apps/web/src/app/lora/page.tsx");
+const loraPackPage = read("apps/web/src/app/packs/lora/page.tsx");
+const legacyCogniPage = read("apps/web/src/app/cognis/page.tsx");
+const cogniPackPage = read("apps/web/src/app/packs/cognis/page.tsx");
+const legacyBrowserPage = read("apps/web/src/app/browser/page.tsx");
+const browserPackPage = read("apps/web/src/app/packs/browser/page.tsx");
+const chaosProbePackPage = read("apps/web/src/app/packs/chaos-probe/page.tsx");
+const cognitiveCanaryPackPage = read("apps/web/src/app/packs/cognitive-canary/page.tsx");
+const guardrailFuzzerPackPage = read("apps/web/src/app/packs/guardrail-fuzzer/page.tsx");
+const memoryTimeTravelPackPage = read("apps/web/src/app/packs/memory-time-travel/page.tsx");
+const rpaReplayPackPage = read("apps/web/src/app/packs/rpa-replay/page.tsx");
+const sbomDriftPackPage = read("apps/web/src/app/packs/sbom-drift/page.tsx");
+const skillAnomalyPackPage = read("apps/web/src/app/packs/skill-anomaly/page.tsx");
+const wasmPluginPackPage = read("apps/web/src/app/packs/wasm-plugin/page.tsx");
 const frontendShell = [
-  "heroui-web/src/components/sidebar.tsx",
-  "heroui-web/src/lib/nav-items.tsx",
-  "heroui-web/src/components/command-palette.tsx",
+  "apps/web/src/components/sidebar.tsx",
+  "apps/web/src/lib/nav-items.tsx",
+  "apps/web/src/components/command-palette.tsx",
 ].map(read).join("\n");
 const sdk = [
-  "sdk/typescript/src/packs.ts",
-  "sdk/typescript/src/packs.test.ts",
-  "sdk/typescript/src/cognis.ts",
-  "sdk/typescript/src/cognis.test.ts",
+  "packages/yunque-client/src/packs.ts",
+  "packages/yunque-client/src/packs.test.ts",
+  "packages/yunque-client/src/cognis.ts",
+  "packages/yunque-client/src/cognis.test.ts",
   "sdk/manifest/packs-sdk.json",
   "sdk/manifest/lora-pack-sdk.json",
   "sdk/manifest/cogni-kernel-pack-sdk.json",
@@ -178,24 +178,24 @@ const sdk = [
   "sdk/manifest/sbom-drift-pack-sdk.json",
   "sdk/manifest/skill-anomaly-pack-sdk.json",
   "sdk/manifest/wasm-plugin-pack-sdk.json",
-  "sdk/typescript/src/cognitive-canary.ts",
-  "sdk/typescript/src/cognitive-canary.test.ts",
-  "sdk/typescript/src/guardrail-fuzzer.ts",
-  "sdk/typescript/src/guardrail-fuzzer.test.ts",
-  "sdk/typescript/src/memory-time-travel.ts",
-  "sdk/typescript/src/memory-time-travel.test.ts",
-  "sdk/typescript/src/rpa-replay.ts",
-  "sdk/typescript/src/rpa-replay.test.ts",
-  "sdk/typescript/src/sbom-drift.ts",
-  "sdk/typescript/src/sbom-drift.test.ts",
-  "sdk/typescript/src/sbom-drift-ci.ts",
-  "sdk/typescript/src/sbom-drift-ci.test.ts",
-  "sdk/typescript/src/skill-anomaly.ts",
-  "sdk/typescript/src/skill-anomaly.test.ts",
-  "sdk/typescript/src/wasm-plugin.ts",
-  "sdk/typescript/src/wasm-plugin.test.ts",
-  "sdk/typescript/src/chaos-probe.ts",
-  "sdk/typescript/src/chaos-probe.test.ts",
+  "packages/yunque-client/src/cognitive-canary.ts",
+  "packages/yunque-client/src/cognitive-canary.test.ts",
+  "packages/yunque-client/src/guardrail-fuzzer.ts",
+  "packages/yunque-client/src/guardrail-fuzzer.test.ts",
+  "packages/yunque-client/src/memory-time-travel.ts",
+  "packages/yunque-client/src/memory-time-travel.test.ts",
+  "packages/yunque-client/src/rpa-replay.ts",
+  "packages/yunque-client/src/rpa-replay.test.ts",
+  "packages/yunque-client/src/sbom-drift.ts",
+  "packages/yunque-client/src/sbom-drift.test.ts",
+  "packages/yunque-client/src/sbom-drift-ci.ts",
+  "packages/yunque-client/src/sbom-drift-ci.test.ts",
+  "packages/yunque-client/src/skill-anomaly.ts",
+  "packages/yunque-client/src/skill-anomaly.test.ts",
+  "packages/yunque-client/src/wasm-plugin.ts",
+  "packages/yunque-client/src/wasm-plugin.test.ts",
+  "packages/yunque-client/src/chaos-probe.ts",
+  "packages/yunque-client/src/chaos-probe.test.ts",
   "sdk/scripts/check-packs-sdk-manifest.mjs",
   "sdk/scripts/check-lora-pack-sdk-manifest.mjs",
   "sdk/scripts/check-cogni-kernel-pack-sdk-manifest.mjs",
@@ -1307,15 +1307,15 @@ if (wasmPluginPackPage.includes("api.wasm") || wasmPluginPackPage.includes('from
   ok("前端 WASM Plugin pack 客户端拆分", "WASM Plugin page uses wasm-plugin-pack-client instead of monolithic api WASM methods");
 }
 
-const packsConsolePage = read("heroui-web/src/app/packs/page.tsx");
+const packsConsolePage = read("apps/web/src/app/packs/page.tsx");
 if (packsConsolePage.includes("api.packsInstalled") || packsConsolePage.includes("api.packBackendModules") || packsConsolePage.includes("api.packInstall") || packsConsolePage.includes("api.packEnable") || packsConsolePage.includes("api.packDisable") || packsConsolePage.includes("api.packRollback") || packsConsolePage.includes("api.packPrune")) {
   fail("前端同步菜单/路由/资源/控制台", "Pack console must use packs-client instead of monolithic api pack methods");
 } else {
   ok("前端 Pack Runtime 客户端拆分", "Pack console uses packs-client instead of monolithic api pack methods");
 }
 
-const monolithicApi = read("heroui-web/src/lib/api.ts");
-const cherrySettings = read("heroui-web/src/components/cherry/settings-modal.tsx");
+const monolithicApi = read("apps/web/src/lib/api.ts");
+const cherrySettings = read("apps/web/src/components/cherry/settings-modal.tsx");
 const forbiddenMonolithicPackMethods = [
   "backupInfo:",
   "backupExport:",

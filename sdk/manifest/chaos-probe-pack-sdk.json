@@ -24,7 +24,7 @@
   "frontend": {
     "menuPath": "/packs/chaos-probe",
     "component": "ops/ChaosProbePackPage",
-    "client": "heroui-web/src/lib/chaos-probe-pack-client.ts",
-    "page": "heroui-web/src/app/packs/chaos-probe/page.tsx"
+    "client": "apps/web/src/lib/chaos-probe-pack-client.ts",
+    "page": "apps/web/src/app/packs/chaos-probe/page.tsx"
   }
 }

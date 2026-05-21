@@ -19,8 +19,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/realtime.ts", "sdk/typescript/src/realtime-connect.ts", "sdk/typescript/src/realtime-messages.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/realtime.ts", "packages/yunque-client/src/realtime-connect.ts", "packages/yunque-client/src/realtime-messages.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": { "wsUrl": "createRealtimeClient().wsUrl", "connect": "createRealtimeClient().connect", "ping": "createRealtimeClient().ping", "chat": "createRealtimeClient().chat", "serialize": "createRealtimeClient().send", "parse": "createRealtimeClient().parse" }
     },
     "go": {

@@ -27,14 +27,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/dispatch.ts",
-        "sdk/typescript/src/dispatch-read.ts",
-        "sdk/typescript/src/dispatch-workers.ts",
-        "sdk/typescript/src/dispatch-queue.ts",
-        "sdk/typescript/src/dispatch-worker-config.ts",
-        "sdk/typescript/src/dispatch-control.ts"
+        "packages/yunque-client/src/dispatch.ts",
+        "packages/yunque-client/src/dispatch-read.ts",
+        "packages/yunque-client/src/dispatch-workers.ts",
+        "packages/yunque-client/src/dispatch-queue.ts",
+        "packages/yunque-client/src/dispatch-worker-config.ts",
+        "packages/yunque-client/src/dispatch-control.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "workers": "createDispatchClient().workers",
         "worker": "createDispatchClient().worker",

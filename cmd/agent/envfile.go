@@ -19,7 +19,7 @@ const envFileName = ".env"
 //     and executable directory.
 //
 // "Best" means the file with the strongest non-placeholder LLM settings.
-// This avoids dev-only placeholder files like desktop/.env with values such
+// This avoids dev-only placeholder files like apps/desktop/.env with values such
 // as LLM_API_KEY=1 from overriding the real repo-root config.
 func loadBestEnvFile() (string, error) {
 	if override := strings.TrimSpace(os.Getenv("YUNQUE_ENV_FILE")); override != "" {

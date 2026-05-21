@@ -36,8 +36,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/interactions.ts", "sdk/typescript/src/agent-kit.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/interactions.ts", "packages/yunque-client/src/agent-kit.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "emotionHistory": "createInteractionsClient().emotionHistory",
         "stickers": "createInteractionsClient().stickers",

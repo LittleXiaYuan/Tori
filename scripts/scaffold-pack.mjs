@@ -45,9 +45,9 @@ if (!routeMethod) {
 
 const packDir = resolve(repoRoot, "packs/examples", slug);
 const handlerDir = resolve(repoRoot, "internal/packs", slug.replaceAll("-", ""));
-const pageDir = resolve(repoRoot, "heroui-web/src/app/packs", slug);
-const frontendClient = resolve(repoRoot, "heroui-web/src/lib", `${slug}-pack-client.ts`);
-const frontendClientTest = resolve(repoRoot, "heroui-web/src/lib/__tests__", `${slug}-pack-client.test.ts`);
+const pageDir = resolve(repoRoot, "apps/web/src/app/packs", slug);
+const frontendClient = resolve(repoRoot, "apps/web/src/lib", `${slug}-pack-client.ts`);
+const frontendClientTest = resolve(repoRoot, "apps/web/src/lib/__tests__", `${slug}-pack-client.test.ts`);
 for (const dir of [packDir, handlerDir, pageDir]) {
   if (existsSync(dir)) {
     console.error(`Refusing to overwrite existing path: ${dir}`);
@@ -229,9 +229,9 @@ Next steps:
 1. Wire \`internal/packs/${slug.replaceAll("-", "")}\` through \`GatewayConfig.BackendPacks\` or \`RegisterBackendPack\`.
 2. Replace the ping handler with real pack logic.
 3. Replace the frontend page with the pack UI.
-4. Extend \`heroui-web/src/lib/${slug}-pack-client.ts\` instead of adding methods to the monolithic frontend \`api\` object.
+4. Extend \`apps/web/src/lib/${slug}-pack-client.ts\` instead of adding methods to the monolithic frontend \`api\` object.
 5. Add a focused SDK slice if \`${sdk}\` does not exist yet.
-6. Run \`node scripts/check-pack-contract.mjs\` and \`npm run test --prefix heroui-web -- src/lib/__tests__/${slug}-pack-client.test.ts\`.
+6. Run \`node scripts/check-pack-contract.mjs\` and \`npm run test --prefix apps/web -- src/lib/__tests__/${slug}-pack-client.test.ts\`.
 `;
 
 const files = [

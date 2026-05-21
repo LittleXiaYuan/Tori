@@ -15,8 +15,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/events.ts", "sdk/typescript/src/events-stream.ts", "sdk/typescript/src/events-parse.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/events.ts", "packages/yunque-client/src/events-stream.ts", "packages/yunque-client/src/events-parse.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": { "stream": "createEventsClient().stream", "parse": "createEventsClient().parseStream" }
     },
     "go": {

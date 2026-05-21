@@ -36,14 +36,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/files.ts",
-        "sdk/typescript/src/files-list.ts",
-        "sdk/typescript/src/files-read.ts",
-        "sdk/typescript/src/files-preview.ts",
-        "sdk/typescript/src/files-download.ts"
+        "packages/yunque-client/src/files.ts",
+        "packages/yunque-client/src/files-list.ts",
+        "packages/yunque-client/src/files-read.ts",
+        "packages/yunque-client/src/files-preview.ts",
+        "packages/yunque-client/src/files-download.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

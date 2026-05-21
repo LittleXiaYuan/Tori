@@ -25,16 +25,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/connectors.ts",
-        "sdk/typescript/src/connector-catalog.ts",
-        "sdk/typescript/src/connector-auth.ts",
-        "sdk/typescript/src/connector-actions.ts",
-        "sdk/typescript/src/connector-list.ts",
-        "sdk/typescript/src/connector-detail.ts",
-        "sdk/typescript/src/connector-connect.ts",
-        "sdk/typescript/src/connector-disconnect.ts"
+        "packages/yunque-client/src/connectors.ts",
+        "packages/yunque-client/src/connector-catalog.ts",
+        "packages/yunque-client/src/connector-auth.ts",
+        "packages/yunque-client/src/connector-actions.ts",
+        "packages/yunque-client/src/connector-list.ts",
+        "packages/yunque-client/src/connector-detail.ts",
+        "packages/yunque-client/src/connector-connect.ts",
+        "packages/yunque-client/src/connector-disconnect.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createConnectorsClient().list",
         "detail": "createConnectorsClient().detail",

@@ -50,18 +50,18 @@ docs/.vitepress/dist/
 .next/
 
 # ── Generated SDK dependencies ──
-sdk/typescript/node_modules/
-sdk/typescript/.cache/
-sdk/typescript/.turbo/
+packages/yunque-client/node_modules/
+packages/yunque-client/.cache/
+packages/yunque-client/.turbo/
 
-# ── Frontend (源码在 heroui-web/src，构建产物在 heroui-web/out/) ──
-heroui-web/node_modules/
-heroui-web/.next/
-heroui-web/out/*
-!heroui-web/out/.keep
-heroui-web/.env.local
-heroui-web/tsconfig.tsbuildinfo
-desktop/src-tauri/frontend/
+# ── Frontend (源码在 apps/web/src，构建产物在 apps/web/out/) ──
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/*
+!apps/web/out/.keep
+apps/web/.env.local
+apps/web/tsconfig.tsbuildinfo
+apps/desktop/src-tauri/frontend/
 
 # ── Generated HTML snapshots ──
 docs/api-reference.html
@@ -103,7 +103,7 @@ id_ed25519
 doc/
 
 # ── Competitive analysis (not for public) ──
-browser-extension/manus-analysis/
+apps/browser-extension/manus-analysis/
 
 # ── AtomCode local agent memories (personal, never commit) ──
 .atomcode/memory.md
@@ -113,4 +113,4 @@ browser-extension/manus-analysis/
 .tmp/
 
 # ── Tauri/Rust build outputs ──
-desktop/src-tauri/target*/
+apps/desktop/src-tauri/target*/

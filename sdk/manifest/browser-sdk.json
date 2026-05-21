@@ -106,14 +106,14 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/browser.ts",
-        "sdk/typescript/src/browser-status.ts",
-        "sdk/typescript/src/browser-capture.ts",
-        "sdk/typescript/src/browser-opp.ts",
-        "sdk/typescript/src/browser-extension.ts"
+        "packages/yunque-client/src/browser.ts",
+        "packages/yunque-client/src/browser-status.ts",
+        "packages/yunque-client/src/browser-capture.ts",
+        "packages/yunque-client/src/browser-opp.ts",
+        "packages/yunque-client/src/browser-extension.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

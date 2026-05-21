@@ -87,7 +87,7 @@ for (const token of ["Collector Pipeline 计划", "responseCollectorPipelinePlan
   if (!page.includes(token)) fail(`Cognitive Canary pack page missing response collector pipeline plan token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/cognitive-canary-pack-client.test.ts");
 for (const token of ["/v1/cognitive-canary/status", "/v1/cognitive-canary/evaluate", "/v1/cognitive-canary/shadow/plan", "/v1/cognitive-canary/response-collector/writeback", "/v1/cognitive-canary/response-collector/pipeline/plan", "/v1/cognitive-canary/evidence/canary-1", "response_collector_summary", "artifact_sha256", "response-collector-plan.json", "response-collector-store.json", "response-collector-pipeline-plan.json", "consumes_response_collector_store", "writes_response_collector_store"]) {
   if (!frontendTest.includes(token)) fail(`Cognitive Canary frontend client test missing token: ${token}`);
 }
@@ -152,7 +152,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`Cognitive Canary backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/cognitive-canary.ts") + "\n" + readRepoFile("sdk/typescript/src/cognitive-canary.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/cognitive-canary.ts") + "\n" + readRepoFile("packages/yunque-client/src/cognitive-canary.test.ts");
 for (const token of [
   "createCognitiveCanaryClient",
   "CognitiveCanaryClientError",
@@ -183,10 +183,10 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript Cognitive Canary SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./cognitive-canary"]?.import !== "./src/cognitive-canary.ts") fail("yunque-client/cognitive-canary subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["cognitiveCanaryStatus:", "cognitiveCanaryEvaluate:", "cognitiveCanaryEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose Cognitive Canary method: ${token}`);
 }

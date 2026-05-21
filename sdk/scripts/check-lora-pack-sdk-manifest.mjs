@@ -35,15 +35,15 @@ for (const token of ["createLoRAPackClient", "/v1/lora/status", "/v1/lora/trigge
   if (!client.includes(token)) fail(`lora-pack-client missing token: ${token}`);
 }
 
-const page = readRepoFile("heroui-web/src/app/packs/lora/page.tsx");
+const page = readRepoFile("apps/web/src/app/packs/lora/page.tsx");
 if (!page.includes("createLoRAPackClient") || !page.includes("pack route is not enabled") || page.includes('from "@/lib/api"') || page.includes("api.getLoRA")) {
   fail("LoRA pack page must use lora-pack-client instead of monolithic api.ts");
 }
 
-const legacy = readRepoFile("heroui-web/src/app/lora/page.tsx");
+const legacy = readRepoFile("apps/web/src/app/lora/page.tsx");
 if (!legacy.includes('redirect("/packs/lora")')) fail("legacy /lora page must redirect to /packs/lora");
 
-const shell = readRepoFile("heroui-web/src/components/sidebar.tsx") + "\n" + readRepoFile("heroui-web/src/lib/nav-items.tsx");
+const shell = readRepoFile("apps/web/src/components/sidebar.tsx") + "\n" + readRepoFile("apps/web/src/lib/nav-items.tsx");
 if (shell.includes('href: "/lora"') || shell.includes('nav-lora')) fail("LoRA must not remain a hard-coded main-shell nav item");
 
 const backend = readRepoFile("internal/packs/lora/handler.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_packs.go") + "\n" + readRepoFile("cmd/agent/init_tasks.go");

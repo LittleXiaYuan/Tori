@@ -48,7 +48,7 @@ func (g *Gateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate Origin before upgrading so a malicious page cannot open a
-	// cross-origin WebSocket against /v1/ws (the STT and browser-extension
+	// cross-origin WebSocket against /v1/ws (the STT and apps/browser-extension
 	// WS endpoints already do this via g.checkWSOrigin /
 	// allowBrowserWSOrigin respectively). checkWSOrigin intentionally
 	// allows an empty Origin header so non-browser clients (CLI, SDK)

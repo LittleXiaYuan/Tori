@@ -53,16 +53,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/documents.ts",
-        "sdk/typescript/src/document-templates.ts",
-        "sdk/typescript/src/document-generate.ts",
-        "sdk/typescript/src/document-docx.ts",
-        "sdk/typescript/src/document-xlsx.ts",
-        "sdk/typescript/src/document-pptx.ts",
-        "sdk/typescript/src/document-html.ts"
+        "packages/yunque-client/src/documents.ts",
+        "packages/yunque-client/src/document-templates.ts",
+        "packages/yunque-client/src/document-generate.ts",
+        "packages/yunque-client/src/document-docx.ts",
+        "packages/yunque-client/src/document-xlsx.ts",
+        "packages/yunque-client/src/document-pptx.ts",
+        "packages/yunque-client/src/document-html.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

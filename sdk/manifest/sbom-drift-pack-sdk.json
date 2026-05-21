@@ -25,7 +25,7 @@
   "frontend": {
     "menuPath": "/packs/sbom-drift",
     "component": "sbom/SBOMDriftPackPage",
-    "client": "heroui-web/src/lib/sbom-drift-pack-client.ts",
-    "page": "heroui-web/src/app/packs/sbom-drift/page.tsx"
+    "client": "apps/web/src/lib/sbom-drift-pack-client.ts",
+    "page": "apps/web/src/app/packs/sbom-drift/page.tsx"
   }
 }

@@ -29,11 +29,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/reactions.ts",
-        "sdk/typescript/src/interactions.ts"
+        "packages/yunque-client/src/reactions.ts",
+        "packages/yunque-client/src/interactions.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

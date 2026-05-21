@@ -50,11 +50,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/instructions.ts",
-        "sdk/typescript/src/interactions.ts"
+        "packages/yunque-client/src/instructions.ts",
+        "packages/yunque-client/src/interactions.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

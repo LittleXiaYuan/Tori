@@ -97,16 +97,16 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/bots.ts",
-        "sdk/typescript/src/bots-read.ts",
-        "sdk/typescript/src/bots-control.ts",
-        "sdk/typescript/src/bots-list.ts",
-        "sdk/typescript/src/bots-detail.ts",
-        "sdk/typescript/src/bots-inbox.ts",
-        "sdk/typescript/src/bots-channels.ts"
+        "packages/yunque-client/src/bots.ts",
+        "packages/yunque-client/src/bots-read.ts",
+        "packages/yunque-client/src/bots-control.ts",
+        "packages/yunque-client/src/bots-list.ts",
+        "packages/yunque-client/src/bots-detail.ts",
+        "packages/yunque-client/src/bots-inbox.ts",
+        "packages/yunque-client/src/bots-channels.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

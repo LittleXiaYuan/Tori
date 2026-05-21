@@ -23,7 +23,7 @@
   "frontend": {
     "menuPath": "/packs/cognis",
     "component": "cognis/CogniKernelPackPage",
-    "client": "heroui-web/src/lib/cogni-kernel-pack-client.ts",
-    "legacyPath": "heroui-web/src/app/cognis/page.tsx"
+    "client": "apps/web/src/lib/cogni-kernel-pack-client.ts",
+    "legacyPath": "apps/web/src/app/cognis/page.tsx"
   }
 }

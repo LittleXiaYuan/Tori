@@ -284,7 +284,7 @@ export default function BrowserIntentPackPage() {
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>2</span>
-                    <span>{t("browserPage.install.step2a")} <strong>{t("browserPage.install.step2b")}</strong>{t("browserPage.install.step2c")} <strong>{t("browserPage.install.step2d")}</strong>{t("browserPage.install.step2e")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>yunque-agent/browser-extension</code></span>
+                    <span>{t("browserPage.install.step2a")} <strong>{t("browserPage.install.step2b")}</strong>{t("browserPage.install.step2c")} <strong>{t("browserPage.install.step2d")}</strong>{t("browserPage.install.step2e")} <code className="rounded px-1 py-0.5 text-[11px]" style={{ background: "var(--yunque-bg-muted)" }}>yunque-agent/apps/browser-extension</code></span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>3</span>

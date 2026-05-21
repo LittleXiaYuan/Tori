@@ -20,8 +20,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/scheduler.ts", "sdk/typescript/src/scheduler-read.ts", "sdk/typescript/src/scheduler-control.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/scheduler.ts", "packages/yunque-client/src/scheduler-read.ts", "packages/yunque-client/src/scheduler-control.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "jobs": "yunque-client/scheduler-read#createSchedulerReadClient().jobs",
         "add": "yunque-client/scheduler-control#createSchedulerControlClient().add",

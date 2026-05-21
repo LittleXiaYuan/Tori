@@ -22,11 +22,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/skills-catalog.ts",
-        "sdk/typescript/src/agent-kit.ts"
+        "packages/yunque-client/src/skills-catalog.ts",
+        "packages/yunque-client/src/agent-kit.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

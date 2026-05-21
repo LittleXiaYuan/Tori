@@ -50,7 +50,7 @@ for (const token of [
   if (!client.includes(token)) fail(`cogni-kernel-pack-client missing token: ${token}`);
 }
 
-const page = readRepoFile("heroui-web/src/app/packs/cognis/page.tsx");
+const page = readRepoFile("apps/web/src/app/packs/cognis/page.tsx");
 if (!page.includes("createCogniKernelPackClient") || page.includes('from "@/lib/api"') || page.includes("api.listCognis") || page.includes("api.reloadCognis")) {
   fail("Cogni Kernel pack page must use cogni-kernel-pack-client instead of monolithic api.ts");
 }
@@ -61,7 +61,7 @@ for (const token of ["运行态 Gate", "runtime_loop_pack_state_ready", "starts_
 const legacy = readRepoFile(manifest.frontend.legacyPath);
 if (!legacy.includes('redirect("/packs/cognis")')) fail("legacy /cognis page must redirect to /packs/cognis");
 
-const shell = readRepoFile("heroui-web/src/components/sidebar.tsx") + "\n" + readRepoFile("heroui-web/src/lib/nav-items.tsx") + "\n" + readRepoFile("heroui-web/src/components/layout/account-rail.tsx");
+const shell = readRepoFile("apps/web/src/components/sidebar.tsx") + "\n" + readRepoFile("apps/web/src/lib/nav-items.tsx") + "\n" + readRepoFile("apps/web/src/components/layout/account-rail.tsx");
 if (shell.includes('href: "/cognis"') || shell.includes("nav-cognis")) fail("Cogni Kernel must not remain a hard-coded main-shell nav item");
 if (!shell.includes("fetchEnabledPacks") || !shell.includes("buildPackNavItems")) fail("front shell should sync Cogni Kernel entry through enabled packs");
 
@@ -94,7 +94,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`Cogni Kernel backend pack or gate missing token: ${token}`);
 }
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["listCognis:", "reloadCognis:", "getCogniHealth:", "triggerCogniEvolution:", "getCogniFederation:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts still exposes Cogni method: ${token}`);
 }

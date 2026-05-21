@@ -28,8 +28,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/graph.ts", "sdk/typescript/src/graph-read.ts", "sdk/typescript/src/graph-entities.ts", "sdk/typescript/src/graph-relations.ts", "sdk/typescript/src/graph-context.ts", "sdk/typescript/src/graph-stats.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/graph.ts", "packages/yunque-client/src/graph-read.ts", "packages/yunque-client/src/graph-entities.ts", "packages/yunque-client/src/graph-relations.ts", "packages/yunque-client/src/graph-context.ts", "packages/yunque-client/src/graph-stats.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "entities": "yunque-client/graph-entities#createGraphEntitiesClient().entities",
         "putEntity": "yunque-client/graph#createGraphClient().putEntity",

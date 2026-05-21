@@ -20,16 +20,16 @@ PLATFORMS   := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 w
 
 .PHONY: build build-full release clean test test-web test-all coverage lint lint-go lint-web vet setup openapi docs-api check check-all web-ensure web-build sbom vulncheck release-safe
 
-## web-ensure: Ensure heroui-web/out/ exists (placeholder if no build)
+## web-ensure: Ensure apps/web/out/ exists (placeholder if no build)
 web-ensure:
-	@mkdir -p heroui-web/out
-	@test -f heroui-web/out/index.html || echo '<!DOCTYPE html><html><body><p>Run make web-build</p></body></html>' > heroui-web/out/index.html
+	@mkdir -p apps/web/out
+	@test -f apps/web/out/index.html || echo '<!DOCTYPE html><html><body><p>Run make web-build</p></body></html>' > apps/web/out/index.html
 
 ## web-build: Build Next.js frontend (requires Node.js)
 web-build:
 	@echo "Building frontend..."
-	cd heroui-web && npm ci && npm run build
-	@echo "Frontend built: heroui-web/out/"
+	cd apps/web && npm ci && npm run build
+	@echo "Frontend built: apps/web/out/"
 
 ## build: Build for current platform (with placeholder frontend if not built)
 build: web-ensure
@@ -38,13 +38,13 @@ build: web-ensure
 
 ## build-full: Build frontend + Go binary
 build-full: web-build
-	@test -d heroui-web/out/_next || (echo "ERROR: heroui-web/out/_next not found — frontend build failed" && exit 1)
+	@test -d apps/web/out/_next || (echo "ERROR: apps/web/out/_next not found — frontend build failed" && exit 1)
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(APP_NAME) ./cmd/agent
 	@echo "Built (with frontend): $(DIST_DIR)/$(APP_NAME)"
 
 ## release: Cross-compile for all platforms (6 targets, with frontend)
 release: clean web-build
-	@test -d heroui-web/out/_next || (echo "ERROR: heroui-web/out/_next not found — frontend build failed" && exit 1)
+	@test -d apps/web/out/_next || (echo "ERROR: apps/web/out/_next not found — frontend build failed" && exit 1)
 	@mkdir -p $(DIST_DIR)
 	@$(foreach platform,$(PLATFORMS), \
 		$(eval OS=$(word 1,$(subst /, ,$(platform)))) \
@@ -65,7 +65,7 @@ test: web-ensure
 ## test-web: Run frontend tests and typecheck
 test-web:
 	@echo "Running frontend tests..."
-	cd heroui-web && npm test && npm run typecheck
+	cd apps/web && npm test && npm run typecheck
 
 ## test-all: Run Go tests plus frontend tests
 test-all: test test-web
@@ -88,10 +88,10 @@ lint-go:
 
 ## lint-web: Run frontend type checking and lint
 lint-web:
-	@if [ -f heroui-web/node_modules/.package-lock.json ]; then \
-		cd heroui-web && npx tsc --noEmit; \
+	@if [ -f apps/web/node_modules/.package-lock.json ]; then \
+		cd apps/web && npx tsc --noEmit; \
 	else \
-		echo "SKIP: heroui-web/node_modules not installed (run 'cd heroui-web && npm ci' first)"; \
+		echo "SKIP: apps/web/node_modules not installed (run 'cd apps/web && npm ci' first)"; \
 	fi
 
 ## vet: Run go vet only (lightweight alternative to full lint)

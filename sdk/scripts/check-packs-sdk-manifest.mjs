@@ -36,8 +36,8 @@ for (const doc of manifest.overviewDocs ?? []) {
   const text = readRepoFile(doc);
   if (!/Pack Runtime SDK|Packs SDK|frontendSync|sync\.sdk|TypeScript pack SDK import example|backend-modules|v1\/packs/i.test(text)) fail(`overview doc ${doc} does not describe Packs SDK surface`);
 }
-const packsSource = readRepoFile("sdk/typescript/src/packs.ts");
-const sdkPackCheck = readRepoFile("sdk/typescript/scripts/check-pack.mjs");
+const packsSource = readRepoFile("packages/yunque-client/src/packs.ts");
+const sdkPackCheck = readRepoFile("packages/yunque-client/scripts/check-pack.mjs");
 for (const token of ["PackSdkEntrypoint", "PackDistributionManifest", "PackArtifacts", "PackPruneResponse", "PackRouteBinding", "PackBackendRouteBinding", "PackCatalogReport", "PackCatalogEntry", "PackCatalogSourceReport", "PackCatalogSourceSummary", "source_reports", "catalog_source_reports", "summarizeCatalogSourceReports", "hasCatalogSourceIssues", "PackCapabilityPrepareSummary", "summarizeCapabilityPrepare", "pack_capability_prepare_summary", "catalog(", "PackCapabilityIndexReport", "PackCapabilityIndexEntry", "PackCapabilityResolveReport", "PackCapabilityGateReport", "PackCapabilityPlanReport", "PackCapabilityPrepareReport", "PackCapabilityPrepareStep", "PackCapabilityBinding", "capabilities()", "resolveCapability(", "gateCapability(", "planCapabilities(", "prepareCapabilities(", "capabilityBindings:", "packCapabilityBindings", "PackBackendRouteAuditReport", "backendRouteAudit()", "backendRouteBindings:", "previousArtifacts", "download?: boolean", "prune()", "routeBindings:", "routeBinding(path", "packRouteBindings", "packSdkEntrypoints", "Object.entries(pack.manifest.sdk", "importPath", "distributions:", "pack.manifest.distribution", "methods?: string[]"]) if (!packsSource.includes(token)) fail(`Packs SDK frontendSync missing SDK/distribution sync token: ${token}`);
 for (const binding of manifest.packBindings ?? []) {
   const text = readRepoFile(binding);

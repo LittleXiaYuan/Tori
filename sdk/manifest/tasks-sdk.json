@@ -62,8 +62,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/tasks.ts", "sdk/typescript/src/task-templates.ts", "sdk/typescript/src/task-gaps.ts", "sdk/typescript/src/task-memory.ts", "sdk/typescript/src/task-threads.ts", "sdk/typescript/src/task-trace.ts", "sdk/typescript/src/task-context.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/tasks.ts", "packages/yunque-client/src/task-templates.ts", "packages/yunque-client/src/task-gaps.ts", "packages/yunque-client/src/task-memory.ts", "packages/yunque-client/src/task-threads.ts", "packages/yunque-client/src/task-trace.ts", "packages/yunque-client/src/task-context.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createTasksClient().list",
         "get": "createTasksClient().get",

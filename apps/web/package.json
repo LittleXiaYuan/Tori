@@ -1,5 +1,5 @@
 {
-  "name": "heroui-web",
+  "name": "yunque-web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -25,7 +25,7 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.2.2",
-    "yunque-client": "file:../sdk/typescript"
+    "yunque-client": "file:../../packages/yunque-client"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

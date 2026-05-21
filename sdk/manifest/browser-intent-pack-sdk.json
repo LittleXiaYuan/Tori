@@ -28,7 +28,7 @@
   "frontend": {
     "menuPath": "/packs/browser",
     "component": "browser/BrowserIntentPackPage",
-    "client": "heroui-web/src/lib/browser-intent-pack-client.ts",
-    "legacyPath": "heroui-web/src/app/browser/page.tsx"
+    "client": "apps/web/src/lib/browser-intent-pack-client.ts",
+    "legacyPath": "apps/web/src/app/browser/page.tsx"
   }
 }

@@ -26,13 +26,17 @@ WORKDIR /src
 
 COPY ledger/ /src/ledger/
 COPY yunque-agent/go.mod yunque-agent/go.sum /src/yunque-agent/
-COPY yunque-agent/heroui-web/package.json yunque-agent/heroui-web/package-lock.json /src/yunque-agent/heroui-web/
+COPY yunque-agent/apps/web/package.json yunque-agent/apps/web/package-lock.json /src/yunque-agent/apps/web/
+# The web app depends on the local TypeScript SDK via
+# `file:../../packages/yunque-client`, so npm needs the package present before
+# `npm ci`.
+COPY yunque-agent/packages/yunque-client/ /src/yunque-agent/packages/yunque-client/
 WORKDIR /src/yunque-agent
 RUN go mod download
-WORKDIR /src/yunque-agent/heroui-web
+WORKDIR /src/yunque-agent/apps/web
 RUN npm ci --prefer-offline --no-audit --no-fund
 
-COPY yunque-agent/heroui-web/ /src/yunque-agent/heroui-web/
+COPY yunque-agent/apps/web/ /src/yunque-agent/apps/web/
 RUN npm run build
 
 WORKDIR /src/yunque-agent

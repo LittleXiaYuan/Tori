@@ -76,15 +76,15 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/approvals.ts",
-        "sdk/typescript/src/approval-pending.ts",
-        "sdk/typescript/src/approval-decisions.ts",
-        "sdk/typescript/src/approval-rules.ts",
-        "sdk/typescript/src/approval-history.ts",
-        "sdk/typescript/src/approval-queue.ts"
+        "packages/yunque-client/src/approvals.ts",
+        "packages/yunque-client/src/approval-pending.ts",
+        "packages/yunque-client/src/approval-decisions.ts",
+        "packages/yunque-client/src/approval-rules.ts",
+        "packages/yunque-client/src/approval-history.ts",
+        "packages/yunque-client/src/approval-queue.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {

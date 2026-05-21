@@ -134,7 +134,7 @@ for (const token of [
   if (!docs.includes(token)) fail(`Memory Time Travel docs missing rollback handoff token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/memory-time-travel-pack-client.test.ts");
 for (const token of ["/v1/memory-time-travel/status", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/rollback/writeback/store", "/v1/memory-time-travel/rollback/writeback/executor/plan", "/v1/memory-time-travel/retention/plan?namespace=memory_snapshot", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/retention/prune/execute", "/v1/memory-time-travel/kv-history/native-plan?namespace=memory_snapshot", "/v1/memory-time-travel/kv-history/migration-preview?namespace=memory_snapshot&limit=50", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links/writeback/executor/plan", "/v1/memory-time-travel/audit/links?namespace=memory_snapshot", "/v1/memory-time-travel/audit/verify?limit=3", "/v1/memory-time-travel/evidence/baseline"]) {
   if (!frontendTest.includes(token)) fail(`Memory Time Travel frontend client test missing token: ${token}`);
 }
@@ -299,7 +299,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`Memory Time Travel backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/memory-time-travel.ts") + "\n" + readRepoFile("sdk/typescript/src/memory-time-travel.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/memory-time-travel.ts") + "\n" + readRepoFile("packages/yunque-client/src/memory-time-travel.test.ts");
 for (const token of [
   "createMemoryTimeTravelClient",
   "MemoryTimeTravelClientError",
@@ -403,10 +403,10 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript Memory Time Travel SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./memory-time-travel"]?.import !== "./src/memory-time-travel.ts") fail("yunque-client/memory-time-travel subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memoryTimeTravelEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose Memory Time Travel method: ${token}`);
 }

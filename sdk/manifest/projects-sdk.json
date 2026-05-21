@@ -25,13 +25,13 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/projects.ts",
-        "sdk/typescript/src/project-read.ts",
-        "sdk/typescript/src/project-list.ts",
-        "sdk/typescript/src/project-detail.ts",
-        "sdk/typescript/src/project-write.ts"
+        "packages/yunque-client/src/projects.ts",
+        "packages/yunque-client/src/project-read.ts",
+        "packages/yunque-client/src/project-list.ts",
+        "packages/yunque-client/src/project-detail.ts",
+        "packages/yunque-client/src/project-write.ts"
       ],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "list": "createProjectsClient().list",
         "create": "createProjectsClient().create",

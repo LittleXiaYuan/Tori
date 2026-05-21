@@ -24,8 +24,8 @@
   "languages": {
     "typescript": {
       "package": "yunque-client",
-      "implementationFiles": ["sdk/typescript/src/auth.ts", "sdk/typescript/src/agent-kit.ts"],
-      "docs": ["sdk/typescript/README.md", "docs/plugins/sdk-typescript.md"],
+      "implementationFiles": ["packages/yunque-client/src/auth.ts", "packages/yunque-client/src/agent-kit.ts"],
+      "docs": ["packages/yunque-client/README.md", "docs/plugins/sdk-typescript.md"],
       "entrypoints": {
         "status": "createAuthClient().status",
         "login": "createAuthClient().login",

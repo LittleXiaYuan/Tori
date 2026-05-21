@@ -62,7 +62,7 @@ for (const token of ["RPA 录制回放", "Dry-run 回放计划", "导出证据�
   if (!page.includes(token)) fail(`RPA Replay pack page missing product token: ${token}`);
 }
 
-const frontendTest = readRepoFile("heroui-web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
+const frontendTest = readRepoFile("apps/web/src/lib/__tests__/rpa-replay-pack-client.test.ts");
 for (const token of ["/v1/rpa-replay/status", "/v1/rpa-replay/replay", "/v1/rpa-replay/executor/plan", "/v1/rpa-replay/evidence/export-report", "executes_browser_actions", "writes_browser_state", "network_access"]) {
   if (!frontendTest.includes(token)) fail(`RPA Replay frontend client test missing token: ${token}`);
 }
@@ -100,7 +100,7 @@ for (const token of [
   if (!backend.includes(token)) fail(`RPA Replay backend pack or gate missing token: ${token}`);
 }
 
-const sdk = readRepoFile("sdk/typescript/src/rpa-replay.ts") + "\n" + readRepoFile("sdk/typescript/src/rpa-replay.test.ts");
+const sdk = readRepoFile("packages/yunque-client/src/rpa-replay.ts") + "\n" + readRepoFile("packages/yunque-client/src/rpa-replay.test.ts");
 for (const token of [
   "createRPAReplayClient",
   "RPAReplayClientError",
@@ -120,10 +120,10 @@ for (const token of [
   if (!sdk.includes(token)) fail(`TypeScript RPA Replay SDK slice missing token: ${token}`);
 }
 
-const pkg = JSON.parse(readRepoFile("sdk/typescript/package.json") || "{}");
+const pkg = JSON.parse(readRepoFile("packages/yunque-client/package.json") || "{}");
 if (pkg.exports?.["./rpa-replay"]?.import !== "./src/rpa-replay.ts") fail("yunque-client/rpa-replay subpath export is missing or drifted");
 
-const monolithicApi = readRepoFile("heroui-web/src/lib/api.ts");
+const monolithicApi = readRepoFile("apps/web/src/lib/api.ts");
 for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", "rpaReplayEvidence:"]) {
   if (monolithicApi.includes(token)) fail(`monolithic api.ts should not expose RPA Replay method: ${token}`);
 }

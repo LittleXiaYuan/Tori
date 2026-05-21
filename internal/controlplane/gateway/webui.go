@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	webui "yunque-agent/heroui-web"
+	webui "yunque-agent/apps/web"
 )
 
 // serveWebUI serves the embedded Next.js static export.

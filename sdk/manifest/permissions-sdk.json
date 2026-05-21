@@ -29,11 +29,11 @@
     "typescript": {
       "package": "yunque-client",
       "implementationFiles": [
-        "sdk/typescript/src/permissions.ts",
-        "sdk/typescript/src/rbac.ts"
+        "packages/yunque-client/src/permissions.ts",
+        "packages/yunque-client/src/rbac.ts"
       ],
       "docs": [
-        "sdk/typescript/README.md",
+        "packages/yunque-client/README.md",
         "docs/plugins/sdk-typescript.md"
       ],
       "entrypoints": {
