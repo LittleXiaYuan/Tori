@@ -970,12 +970,39 @@ export default function ChatPage() {
   }, [searchParams, sendMessage]);
 
   useEffect(() => {
+    // Quick-send arrives through two channels:
+    //   1. In-app SelectionPopup (`app-shell.tsx`) still dispatches a DOM
+    //      CustomEvent — that path is purely renderer-side so DOM events
+    //      are the natural fit.
+    //   2. The Tauri shell (floating panel) used to inject a `document
+    //      .dispatchEvent(...)` via `webview.eval()`, but that forced us
+    //      to keep `'unsafe-eval'` in CSP. It now uses the Tauri event
+    //      bus instead; listen for both so either channel works.
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (detail) sendMessage(detail);
     };
     document.addEventListener("yunque:quick-send", handler);
-    return () => document.removeEventListener("yunque:quick-send", handler);
+
+    let unlistenTauri: (() => void) | undefined;
+    const tauri = (window as unknown as { __TAURI__?: { event?: { listen: (name: string, cb: (e: { payload: string }) => void) => Promise<() => void> } } }).__TAURI__;
+    if (tauri?.event?.listen) {
+      tauri.event
+        .listen("yunque:quick-send", (e) => {
+          if (typeof e.payload === "string" && e.payload) sendMessage(e.payload);
+        })
+        .then((un) => {
+          unlistenTauri = un;
+        })
+        .catch((err) => {
+          console.warn("[chat] tauri listen yunque:quick-send failed", err);
+        });
+    }
+
+    return () => {
+      document.removeEventListener("yunque:quick-send", handler);
+      unlistenTauri?.();
+    };
   }, [sendMessage]);
 
   useEffect(() => {

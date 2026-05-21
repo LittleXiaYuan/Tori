@@ -2,7 +2,7 @@
   "id": "yunque.pack.wasm-plugin",
   "name": "WASM Plugin Pack",
   "version": "0.1.0",
-  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行、远程安装审批队列、installer continuation handoff、下载缓存写回、缓存包签名验证写回与安全包结构检查写回作为高风险可选能力包暴露。",
+  "description": "将 WASM 插件注册、生命周期、沙箱 dry-run/执行、远程安装审批队列、installer continuation handoff、下载缓存写回、缓存包签名验证写回、安全包结构检查写回与 installer registration handoff 计划作为高风险可选能力包暴露。",
   "requiresCore": ">=0.1.0",
   "optional": true,
   "defaultState": "disabled",
@@ -29,6 +29,7 @@
       "wasm.remote_install.installer_download_writeback",
       "wasm.remote_install.signature_verification_writeback",
       "wasm.remote_install.package_inspect_writeback",
+      "wasm.remote_install.installer_registration_plan",
       "wasm.evidence.export"
     ],
     "routes": [
@@ -47,6 +48,7 @@
       "/v1/wasm-plugin/remote-install/installer/download/writeback",
       "/v1/wasm-plugin/remote-install/signature-verification/writeback",
       "/v1/wasm-plugin/remote-install/package/inspect/writeback",
+      "/v1/wasm-plugin/remote-install/installer/registration/plan",
       "/v1/wasm-plugin/evidence/"
     ],
     "permissions": [
@@ -137,6 +139,11 @@
         "description": "Inspect a verified cached package archive for safe manifest and WASM module layout, then persist only pack-local package inspect store/record artifacts; no extraction, plugin file write, registration, load, or remote_install_ready transition is performed."
       },
       {
+        "method": "POST",
+        "path": "/v1/wasm-plugin/remote-install/installer/registration/plan",
+        "description": "Plan a non-destructive installer registration handoff from a verified package inspect record; no extraction, plugin file write, metadata registration, WASM load, or remote_install_ready transition is performed."
+      },
+      {
         "method": "GET",
         "path": "/v1/wasm-plugin/evidence/",
         "description": "Export a JSON evidence pack for one WASM plugin and its permission plan."
@@ -176,7 +183,7 @@
     "blueprint": "doc/WASM-PLUGIN-ENGINE.md",
     "stage": "pack-shell-before-runtime-hosts",
     "risk": "high",
-    "sync": "backend-registry-drives-frontend-installer-cache-signature-verification-and-package-inspection"
+    "sync": "backend-registry-drives-frontend-installer-cache-signature-verification-package-inspection-and-registration-plan"
   },
   "distribution": {
     "manifestUrl": "https://packs.yunque.local/wasm-plugin-pack/pack.json",

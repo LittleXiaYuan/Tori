@@ -224,6 +224,16 @@ type RemoteInstallPackageInspectWritebackRequest struct {
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
+type RemoteInstallInstallerRegistrationPlanRequest struct {
+	RequestID  string            `json:"request_id,omitempty"`
+	RequestKey string            `json:"request_key,omitempty"`
+	Slug       string            `json:"slug,omitempty"`
+	Approved   *bool             `json:"approved,omitempty"`
+	ApprovedBy string            `json:"approved_by,omitempty"`
+	Reason     string            `json:"reason,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+}
+
 type RemoteInstallPlanReport struct {
 	PackID                 string                    `json:"pack_id"`
 	GeneratedAt            time.Time                 `json:"generated_at"`
@@ -561,6 +571,49 @@ type RemoteInstallPackageInspectWritebackReport struct {
 	Notes                              []string                    `json:"notes,omitempty"`
 }
 
+type RemoteInstallInstallerRegistrationPlanReport struct {
+	PackID                            string                     `json:"pack_id"`
+	GeneratedAt                       time.Time                  `json:"generated_at"`
+	Status                            string                     `json:"status"`
+	InstallerRegistrationPlanReady    bool                       `json:"installer_registration_plan_ready"`
+	ConsumesPackageInspectStore       bool                       `json:"consumes_package_inspect_store"`
+	PackageInspectStoreReady          bool                       `json:"package_inspect_store_ready"`
+	PackageInspectRecordFound         bool                       `json:"package_inspect_record_found"`
+	PackageInspectReady               bool                       `json:"package_inspect_ready"`
+	PackageLayoutReady                bool                       `json:"package_layout_ready"`
+	SignatureVerified                 bool                       `json:"signature_verified"`
+	ManifestFound                     bool                       `json:"manifest_found"`
+	WASMModuleFound                   bool                       `json:"wasm_module_found"`
+	ApprovalRequired                  bool                       `json:"approval_required"`
+	ApprovalProvided                  bool                       `json:"approval_provided"`
+	WouldRegisterPlugin               bool                       `json:"would_register_plugin"`
+	RegistrationReady                 bool                       `json:"registration_ready"`
+	RemoteInstallReady                bool                       `json:"remote_install_ready"`
+	InstallerReady                    bool                       `json:"installer_ready"`
+	InstallerBlockedUntilRegistration bool                       `json:"installer_blocked_until_registration"`
+	Downloads                         bool                       `json:"downloads"`
+	NetworkAccess                     bool                       `json:"network_access"`
+	WritesFiles                       bool                       `json:"writes_files"`
+	InstallsPlugin                    bool                       `json:"installs_plugin"`
+	RequestID                         string                     `json:"request_id,omitempty"`
+	RequestKey                        string                     `json:"request_key,omitempty"`
+	DecisionKey                       string                     `json:"decision_key,omitempty"`
+	ApprovedBy                        string                     `json:"approved_by,omitempty"`
+	Reason                            string                     `json:"reason,omitempty"`
+	Plugin                            RemoteInstallPluginPlan    `json:"plugin,omitempty"`
+	Package                           RemoteInstallPackagePlan   `json:"package,omitempty"`
+	PackageInspection                 PackageInspection          `json:"package_inspection"`
+	PackageInspectRecord              PackageInspectRecord       `json:"package_inspect_record"`
+	PackageInspectStore               PackageInspectStoreSummary `json:"package_inspect_store"`
+	RegistrationPlan                  InstallerRegistrationPlan  `json:"registration_plan"`
+	Checks                            []RemoteInstallCheck       `json:"checks"`
+	Artifacts                         []string                   `json:"artifacts"`
+	Actions                           []string                   `json:"actions"`
+	Labels                            []string                   `json:"labels"`
+	Metadata                          map[string]string          `json:"metadata,omitempty"`
+	Notes                             []string                   `json:"notes,omitempty"`
+}
+
 type ApprovalQueueStoreSummary struct {
 	PackID                   string   `json:"pack_id"`
 	QueueName                string   `json:"queue_name"`
@@ -800,6 +853,53 @@ type PackageInspectionFile struct {
 	SizeBytes int64  `json:"size_bytes"`
 	SHA256    string `json:"sha256,omitempty"`
 	Kind      string `json:"kind"`
+}
+
+type InstallerRegistrationPlan struct {
+	PackID                            string                   `json:"pack_id"`
+	GeneratedAt                       time.Time                `json:"generated_at"`
+	InstallerRegistrationPlanReady    bool                     `json:"installer_registration_plan_ready"`
+	ConsumesPackageInspectStore       bool                     `json:"consumes_package_inspect_store"`
+	PackageInspectStoreReady          bool                     `json:"package_inspect_store_ready"`
+	PackageInspectRecordFound         bool                     `json:"package_inspect_record_found"`
+	PackageInspectReady               bool                     `json:"package_inspect_ready"`
+	PackageLayoutReady                bool                     `json:"package_layout_ready"`
+	SignatureVerified                 bool                     `json:"signature_verified"`
+	ManifestFound                     bool                     `json:"manifest_found"`
+	WASMModuleFound                   bool                     `json:"wasm_module_found"`
+	WouldRegisterPlugin               bool                     `json:"would_register_plugin"`
+	RegistrationReady                 bool                     `json:"registration_ready"`
+	RemoteInstallReady                bool                     `json:"remote_install_ready"`
+	InstallerReady                    bool                     `json:"installer_ready"`
+	InstallerBlockedUntilRegistration bool                     `json:"installer_blocked_until_registration"`
+	Status                            string                   `json:"status"`
+	RequestID                         string                   `json:"request_id,omitempty"`
+	RequestKey                        string                   `json:"request_key,omitempty"`
+	DecisionKey                       string                   `json:"decision_key,omitempty"`
+	RequiredFields                    []string                 `json:"required_fields"`
+	Plugin                            RemoteInstallPluginPlan  `json:"plugin,omitempty"`
+	Package                           RemoteInstallPackagePlan `json:"package,omitempty"`
+	ManifestPath                      string                   `json:"manifest_path,omitempty"`
+	WASMModulePath                    string                   `json:"wasm_module_path,omitempty"`
+	PackageSHA256                     string                   `json:"package_sha256,omitempty"`
+	ManifestSHA256                    string                   `json:"manifest_sha256,omitempty"`
+	ModuleSHA256                      string                   `json:"module_sha256,omitempty"`
+	PackageInspectStoreArtifact       string                   `json:"package_inspect_store_artifact"`
+	PackageInspectRecordArtifact      string                   `json:"package_inspect_record_artifact"`
+	PackageInspectionArtifact         string                   `json:"package_inspection_artifact"`
+	SignatureVerificationArtifact     string                   `json:"signature_verification_artifact"`
+	RegistrationHandoffArtifact       string                   `json:"registration_handoff_artifact"`
+	AuditHandoffArtifact              string                   `json:"audit_handoff_artifact"`
+	Artifact                          string                   `json:"artifact"`
+	Downloads                         bool                     `json:"downloads"`
+	WritesFiles                       bool                     `json:"writes_files"`
+	NetworkAccess                     bool                     `json:"network_access"`
+	InstallsPlugin                    bool                     `json:"installs_plugin"`
+	Checks                            []RemoteInstallCheck     `json:"checks"`
+	Actions                           []string                 `json:"actions"`
+	Labels                            []string                 `json:"labels"`
+	Metadata                          map[string]string        `json:"metadata,omitempty"`
+	Notes                             []string                 `json:"notes,omitempty"`
 }
 
 type ApprovalQueueRecord struct {
@@ -1166,6 +1266,7 @@ func (h *Handler) Routes() []packruntime.BackendRoute {
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/download/writeback", Handler: h.RemoteInstallInstallerDownloadWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/signature-verification/writeback", Handler: h.RemoteInstallSignatureVerificationWriteback},
 		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/package/inspect/writeback", Handler: h.RemoteInstallPackageInspectWriteback},
+		{Method: http.MethodPost, Path: "/v1/wasm-plugin/remote-install/installer/registration/plan", Handler: h.RemoteInstallInstallerRegistrationPlan},
 		{Method: http.MethodGet, Path: "/v1/wasm-plugin/evidence/", Handler: h.Evidence},
 	}
 }
@@ -1215,7 +1316,9 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		"installer_download_writeback_ready":       true,
 		"signature_verification_writeback_ready":   true,
 		"package_inspect_writeback_ready":          true,
+		"installer_registration_plan_ready":        true,
 		"package_inspect_ready":                    false,
+		"registration_ready":                       false,
 		"installer_ready":                          false,
 		"installer_blocked_until_registration":     true,
 		"installer_blocked_until_signature_verify": true,
@@ -1248,9 +1351,10 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 			"wasm.remote_install.installer_download_writeback",
 			"wasm.remote_install.signature_verification_writeback",
 			"wasm.remote_install.package_inspect_writeback",
+			"wasm.remote_install.installer_registration_plan",
 			"wasm.evidence.export",
 		},
-		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, installer continuation planning, installer download cache write-back, signature verification write-back, and package inspect write-back are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, installer extraction, plugin file write-back, and plugin registration remain follow-up wiring."},
+		"notes": []string{"Host ABI permission plan preview, conservative execution gate, module integrity gate, remote signed package install plan preview, signature verification gate preview, approval gate plan preview, approval queue entry contract preview, approval decision plan preview, approval queue write-back bridge plan preview, pack-local approval queue write-back persistence, installer continuation planning, installer download cache write-back, signature verification write-back, package inspect write-back, and installer registration handoff planning are available; privileged Host ABI calls are blocked during real execution while enforcement_ready=false, local module SHA-256 drift is blocked before sandbox execution, and runtime host function binding/enforcement, installer extraction, plugin file write-back, and plugin registration remain follow-up wiring."},
 	})
 }
 
@@ -1584,6 +1688,24 @@ func (h *Handler) RemoteInstallPackageInspectWriteback(w http.ResponseWriter, r 
 	writeJSON(w, http.StatusAccepted, map[string]any{"writeback": report})
 }
 
+func (h *Handler) RemoteInstallInstallerRegistrationPlan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req RemoteInstallInstallerRegistrationPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid remote install installer registration plan payload")
+		return
+	}
+	plan, err := h.buildRemoteInstallInstallerRegistrationPlan(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+}
+
 func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1602,11 +1724,12 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 	installerDownloadRecord := h.installerDownloadRecordFromContinuation(installerContinuationPlan, nil, false, "", "")
 	signatureVerificationRecord := h.signatureVerificationRecordFromDownload(installerDownloadRecord, nil, false, "", "")
 	packageInspectRecord := h.packageInspectRecordFromSignature(signatureVerificationRecord, PackageInspection{}, false, "", "")
+	installerRegistrationPlan := h.installerRegistrationPlanFromPackageInspect(packageInspectRecord, false, false, "", "", nil)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"pack_id":                       PackID,
 		"exported_at":                   h.now().UTC(),
 		"format":                        "json-wasm-plugin-evidence",
-		"files":                         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "signature-verification-record.json", "signature-verification-store.json", "package-inspection.json", "package-inspect-store.json", "package-inspect-record.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "sandbox-stats.json"},
+		"files":                         []string{"plugin.json", "permission-plan.json", "host-abi-plan.json", "module-integrity-gate.json", "remote-install-plan.json", "signature-verification.json", "signature-verification-record.json", "signature-verification-store.json", "package-inspection.json", "package-inspect-store.json", "package-inspect-record.json", "plugin-registration-handoff-plan.json", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "approval-gate-plan.json", "approval-queue-entry.json", "approval-decision-plan.json", "approval-writeback-plan.json", "approval-queue-store.json", "approval-queue-record.json", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-download-record.json", "installer-package-cache.tgz", "sandbox-stats.json"},
 		"plugin":                        plugin,
 		"plan":                          permissionPlan(plugin.Permissions),
 		"host_abi_plan":                 hostABIPlan(plugin.Permissions),
@@ -1626,6 +1749,7 @@ func (h *Handler) Evidence(w http.ResponseWriter, r *http.Request) {
 		"package_inspection":            packageInspectRecord.PackageInspection,
 		"package_inspect_store":         h.packageInspectStoreSummary(),
 		"package_inspect_record":        packageInspectRecord,
+		"installer_registration_plan":   installerRegistrationPlan,
 		"sandbox":                       h.sandbox.Stats(),
 	})
 }
@@ -3028,6 +3152,85 @@ func (h *Handler) blockedPackageInspectReport(req RemoteInstallPackageInspectWri
 	}
 }
 
+func (h *Handler) buildRemoteInstallInstallerRegistrationPlan(req RemoteInstallInstallerRegistrationPlanRequest) (RemoteInstallInstallerRegistrationPlanReport, error) {
+	metadata := cleanStringMap(req.Metadata)
+	records, err := h.loadPackageInspectRecords()
+	if err != nil {
+		return RemoteInstallInstallerRegistrationPlanReport{}, err
+	}
+	store := h.packageInspectStoreSummary()
+	record, found := selectPackageInspectRecord(records, req)
+	approved := req.Approved != nil && *req.Approved
+	plan := h.installerRegistrationPlanFromPackageInspect(record, found, approved, strings.TrimSpace(req.ApprovedBy), strings.TrimSpace(req.Reason), metadata)
+	checks := append([]RemoteInstallCheck{}, plan.Checks...)
+	checks = append(checks,
+		RemoteInstallCheck{Name: "package_inspect_store_consumed", Required: true, Ready: true, Reason: "installer registration handoff consumes the pack-local package-inspect-store.json contract"},
+		RemoteInstallCheck{Name: "package_inspect_record_found", Required: true, Ready: found, Reason: boolReason(found, "package inspect record matched request_id, request_key, slug, or deterministic latest record", "installer registration requires a persisted package inspect record")},
+		RemoteInstallCheck{Name: "package_inspect_ready", Required: true, Ready: found && record.PackageInspectReady && record.PackageLayoutReady, Reason: boolReason(found && record.PackageInspectReady && record.PackageLayoutReady, "package inspection has verified safe manifest/module layout", "installer registration remains blocked until package inspect succeeds")},
+		RemoteInstallCheck{Name: "signature_verified", Required: true, Ready: found && record.SignatureVerified, Reason: boolReason(found && record.SignatureVerified, "package inspect record links to a verified signature record", "installer registration requires a verified package signature")},
+		RemoteInstallCheck{Name: "explicit_registration_approved", Required: true, Ready: approved, Reason: boolReason(approved, "explicit approved=true was provided for registration handoff planning", "registration handoff plan requires explicit approved=true before it would register plugin metadata")},
+		RemoteInstallCheck{Name: "plugin_registration_writeback_wired", Required: true, Ready: false, Reason: "this route is plan-only; plugin metadata registration write-back is intentionally not wired"},
+	)
+	status := plan.Status
+	if !found {
+		status = "blocked_missing_package_inspect_record"
+	} else if !record.PackageInspectReady || !record.PackageLayoutReady {
+		status = "blocked_package_inspect_not_ready"
+	} else if !record.SignatureVerified {
+		status = "blocked_signature_not_verified"
+	} else if !approved {
+		status = "blocked_missing_explicit_registration_approval"
+	}
+	plan.Status = status
+	plan.Checks = checks
+	return RemoteInstallInstallerRegistrationPlanReport{
+		PackID:                            PackID,
+		GeneratedAt:                       h.now().UTC(),
+		Status:                            status,
+		InstallerRegistrationPlanReady:    true,
+		ConsumesPackageInspectStore:       true,
+		PackageInspectStoreReady:          store.StoreReady,
+		PackageInspectRecordFound:         found,
+		PackageInspectReady:               found && record.PackageInspectReady,
+		PackageLayoutReady:                found && record.PackageLayoutReady,
+		SignatureVerified:                 found && record.SignatureVerified,
+		ManifestFound:                     found && record.ManifestFound,
+		WASMModuleFound:                   found && record.WASMModuleFound,
+		ApprovalRequired:                  true,
+		ApprovalProvided:                  approved,
+		WouldRegisterPlugin:               found && record.PackageInspectReady && record.PackageLayoutReady && record.SignatureVerified && approved,
+		RegistrationReady:                 false,
+		RemoteInstallReady:                false,
+		InstallerReady:                    false,
+		InstallerBlockedUntilRegistration: true,
+		Downloads:                         false,
+		NetworkAccess:                     false,
+		WritesFiles:                       false,
+		InstallsPlugin:                    false,
+		RequestID:                         record.RequestID,
+		RequestKey:                        record.RequestKey,
+		DecisionKey:                       record.DecisionKey,
+		ApprovedBy:                        strings.TrimSpace(req.ApprovedBy),
+		Reason:                            strings.TrimSpace(req.Reason),
+		Plugin:                            record.Plugin,
+		Package:                           record.Package,
+		PackageInspection:                 record.PackageInspection,
+		PackageInspectRecord:              record,
+		PackageInspectStore:               store,
+		RegistrationPlan:                  plan,
+		Checks:                            checks,
+		Artifacts:                         []string{"installer-registration-handoff-plan.json", "plugin-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "package-inspection.json", "package-inspect-record.json", "package-inspect-store.json", "signature-verification-record.json", "signature-verification-store.json"},
+		Actions:                           append([]string{}, plan.Actions...),
+		Labels:                            plan.Labels,
+		Metadata:                          metadata,
+		Notes: []string{
+			"Plan only: this route consumes the pack-local package inspect store and shapes a future plugin registration handoff.",
+			"It does not extract package contents, write plugin files, register plugin metadata, load WASM, or mark remote_install_ready=true.",
+			"would_register_plugin=true only means the future registration route has enough verified inputs; registration_ready and installer_ready remain false here.",
+		},
+	}, nil
+}
+
 func selectApprovalQueueRecord(records []ApprovalQueueRecord, req RemoteInstallInstallerContinuationPlanRequest) (ApprovalQueueRecord, bool) {
 	requestKey := strings.TrimSpace(req.RequestKey)
 	requestID := strings.TrimSpace(req.RequestID)
@@ -3669,6 +3872,37 @@ func selectSignatureVerificationRecord(records []SignatureVerificationRecord, re
 	return records[0], true
 }
 
+func selectPackageInspectRecord(records []PackageInspectRecord, req RemoteInstallInstallerRegistrationPlanRequest) (PackageInspectRecord, bool) {
+	requestKey := strings.TrimSpace(req.RequestKey)
+	requestID := strings.TrimSpace(req.RequestID)
+	slug := strings.ToLower(strings.TrimSpace(req.Slug))
+	for _, record := range records {
+		if requestKey != "" && record.RequestKey == requestKey {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if requestID != "" && record.RequestID == requestID {
+			return record, true
+		}
+	}
+	for _, record := range records {
+		if slug != "" && record.Plugin.Slug == slug {
+			return record, true
+		}
+	}
+	if requestKey != "" || requestID != "" || slug != "" || len(records) == 0 {
+		return PackageInspectRecord{}, false
+	}
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].GeneratedAt.Equal(records[j].GeneratedAt) {
+			return records[i].RequestKey < records[j].RequestKey
+		}
+		return records[i].GeneratedAt.After(records[j].GeneratedAt)
+	})
+	return records[0], true
+}
+
 func (h *Handler) signatureVerificationRecordFromDownload(download InstallerDownloadRecord, payload []byte, verified bool, verifiedBy string, reason string) SignatureVerificationRecord {
 	actualSHA := strings.TrimSpace(download.ActualSHA256)
 	sizePayload := payload != nil
@@ -4032,6 +4266,82 @@ func (h *Handler) packageInspectRecordFromSignature(signatureRecord SignatureVer
 		},
 		Labels: []string{"remote-install", "package-inspect", boolReason(inspected, "layout-ready", "preview-only")},
 		Notes:  []string{"Package inspect record tracks verified archive layout and keeps extraction/registration blocked."},
+	}
+}
+
+func (h *Handler) installerRegistrationPlanFromPackageInspect(record PackageInspectRecord, found bool, approved bool, approvedBy string, reason string, metadata map[string]string) InstallerRegistrationPlan {
+	readyInputs := found && record.PackageInspectReady && record.PackageLayoutReady && record.SignatureVerified && record.ManifestFound && record.WASMModuleFound
+	wouldRegister := readyInputs && approved
+	status := "blocked_missing_package_inspect_record"
+	if found {
+		status = "blocked_package_inspect_not_ready"
+	}
+	if found && readyInputs {
+		status = "blocked_missing_explicit_registration_approval"
+	}
+	if wouldRegister {
+		status = "plan_only_ready_for_future_registration_writeback"
+	}
+	checks := []RemoteInstallCheck{
+		{Name: "package_inspect_store_ready", Required: true, Ready: true, Reason: "pack-local package inspect store contract is available for installer registration handoff planning"},
+		{Name: "package_inspect_record_found", Required: true, Ready: found, Reason: boolReason(found, "package inspect record is available for registration handoff planning", "registration handoff requires a persisted package inspect record")},
+		{Name: "package_layout_ready", Required: true, Ready: found && record.PackageLayoutReady, Reason: boolReason(found && record.PackageLayoutReady, "safe manifest/module layout was inspected", "registration requires a safe manifest/module layout")},
+		{Name: "signature_verified", Required: true, Ready: found && record.SignatureVerified, Reason: boolReason(found && record.SignatureVerified, "cached package signature was verified", "registration requires a verified signature record")},
+		{Name: "explicit_registration_approved", Required: true, Ready: approved, Reason: boolReason(approved, "explicit approval was provided for future registration handoff", "registration handoff remains blocked without explicit approval")},
+		{Name: "plugin_registration_writeback_wired", Required: true, Ready: false, Reason: "actual plugin metadata write-back is intentionally reserved for a later route"},
+	}
+	return InstallerRegistrationPlan{
+		PackID:                            PackID,
+		GeneratedAt:                       h.now().UTC(),
+		InstallerRegistrationPlanReady:    true,
+		ConsumesPackageInspectStore:       true,
+		PackageInspectStoreReady:          true,
+		PackageInspectRecordFound:         found,
+		PackageInspectReady:               found && record.PackageInspectReady,
+		PackageLayoutReady:                found && record.PackageLayoutReady,
+		SignatureVerified:                 found && record.SignatureVerified,
+		ManifestFound:                     found && record.ManifestFound,
+		WASMModuleFound:                   found && record.WASMModuleFound,
+		WouldRegisterPlugin:               wouldRegister,
+		RegistrationReady:                 false,
+		RemoteInstallReady:                false,
+		InstallerReady:                    false,
+		InstallerBlockedUntilRegistration: true,
+		Status:                            status,
+		RequestID:                         record.RequestID,
+		RequestKey:                        record.RequestKey,
+		DecisionKey:                       record.DecisionKey,
+		RequiredFields:                    []string{"package-inspect-store.json", "package-inspect-record.json", "package_inspect_ready=true", "package_layout_ready=true", "signature_verified=true", "approved=true", "plugin_registration_writeback_wired=true"},
+		Plugin:                            record.Plugin,
+		Package:                           record.Package,
+		ManifestPath:                      record.PackageInspection.ManifestPath,
+		WASMModulePath:                    record.PackageInspection.WASMModulePath,
+		PackageSHA256:                     record.PackageInspection.PackageSHA256,
+		ManifestSHA256:                    record.PackageInspection.ManifestSHA256,
+		ModuleSHA256:                      record.PackageInspection.ModuleSHA256,
+		PackageInspectStoreArtifact:       "package-inspect-store.json",
+		PackageInspectRecordArtifact:      "package-inspect-record.json",
+		PackageInspectionArtifact:         "package-inspection.json",
+		SignatureVerificationArtifact:     "signature-verification-record.json",
+		RegistrationHandoffArtifact:       "plugin-registration-handoff-plan.json",
+		AuditHandoffArtifact:              "installer-audit-handoff-plan.json",
+		Artifact:                          "installer-registration-handoff-plan.json",
+		Downloads:                         false,
+		WritesFiles:                       false,
+		NetworkAccess:                     false,
+		InstallsPlugin:                    false,
+		Checks:                            checks,
+		Actions: []string{
+			"would pass the verified package_inspect_record to a future plugin metadata registration write-back route",
+			"would keep package extraction, plugin_dir writes, module load, and remote_install_ready blocked until registration write-back is explicitly implemented",
+			"would preserve manifest/module SHA-256 evidence for installer audit handoff",
+		},
+		Labels:   []string{"remote-install", "installer-registration", "handoff-plan", "plan-only", "no-extract", "no-file-write", "no-plugin-install"},
+		Metadata: metadata,
+		Notes: []string{
+			"Consumes package inspect records without mutating them.",
+			"Even with approved=true and would_register_plugin=true, this plan does not write plugin metadata or install the package.",
+		},
 	}
 }
 

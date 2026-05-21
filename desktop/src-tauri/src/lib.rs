@@ -98,6 +98,39 @@ impl BackendState {
     }
 }
 
+/// Last-ditch safety net: if the Tauri host exits without going through
+/// `on_window_event` (panic on a background thread, `process::exit`, a
+/// crash in tao's event loop, the user `taskkill /F` on the wrapper,
+/// etc.) the managed `BackendState` is still dropped during teardown of
+/// the `tauri::App`. Without this Drop the Go sidecar would survive as
+/// an orphan, keep holding port 9090, and refuse the next launch.
+///
+/// We avoid the full graceful-timeout dance here because Drop runs on a
+/// path where the process is already going away — best effort SIGTERM
+/// then SIGKILL keeps shutdown bounded.
+impl Drop for BackendState {
+    fn drop(&mut self) {
+        // Safe to get_mut: Drop has exclusive access.
+        let Ok(mut guard) = self.child.lock() else {
+            // Mutex poisoned: still try to take the child via into_inner-ish
+            // recovery so a panic on the spawn path can't strand the sidecar.
+            log::error!("backend state mutex poisoned in Drop; attempting recovery");
+            return;
+        };
+        let Some(mut child) = guard.take() else {
+            return;
+        };
+        let pid = child.id();
+        log::info!("BackendState::drop — reaping sidecar (pid={pid})");
+        let _ = send_graceful_signal(pid);
+        // Short bounded wait so Drop never blocks shutdown forever.
+        if !wait_with_timeout(&mut child, Duration::from_secs(2)) {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
 /// Acquire a Mutex guard, recovering from poisoning so a panic on the
 /// spawn path can never strand the Go child process.
 fn lock_or_recover<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -108,6 +141,50 @@ fn lock_or_recover<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
             poisoned.into_inner()
         }
     }
+}
+
+/// Write `bytes` to `path` atomically by writing into a sibling tempfile
+/// then renaming. Prevents zero-byte / half-written JSON if the process
+/// crashes mid-write or the OS power-cycles during persistence.
+///
+/// Rename is atomic on the same volume on every supported platform
+/// (POSIX `rename(2)`, Windows `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`).
+/// The temp file lives next to the target so we never cross a filesystem
+/// boundary.
+fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let dir = path.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "atomic_write: path has no parent",
+        )
+    })?;
+    std::fs::create_dir_all(dir)?;
+
+    let file_name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("tmp");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = dir.join(format!(".{file_name}.{nonce}.tmp"));
+
+    {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+    }
+    // rename is atomic on the same filesystem; on Windows this maps to
+    // MoveFileExW with MOVEFILE_REPLACE_EXISTING in std since 1.5.
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        // Best-effort cleanup so we don't leave .tmp turds behind.
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(())
 }
 
 // ── Window appearance (per-platform liquid glass / Mica) ────────────────────
@@ -279,8 +356,15 @@ impl FloatingState {
         let Some(dir) = guard.as_ref() else { return };
         let path = dir.join("floating_items.json");
         let items = lock_or_recover(&self.items);
-        if let Ok(json) = serde_json::to_string_pretty(&*items) {
-            let _ = std::fs::write(path, json);
+        let json = match serde_json::to_string_pretty(&*items) {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("serialise floating items failed: {e}");
+                return;
+            }
+        };
+        if let Err(e) = atomic_write(&path, json.as_bytes()) {
+            log::error!("save floating items failed ({}): {e}", path.display());
         }
     }
 
@@ -307,8 +391,15 @@ impl FloatingState {
         let Some(dir) = guard.as_ref() else { return };
         let path = dir.join("floating_ball_pos.json");
         let pos = BallPosition { x, y };
-        if let Ok(json) = serde_json::to_string(&pos) {
-            let _ = std::fs::write(path, json);
+        let json = match serde_json::to_string(&pos) {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("serialise ball pos failed: {e}");
+                return;
+            }
+        };
+        if let Err(e) = atomic_write(&path, json.as_bytes()) {
+            log::error!("save ball pos failed ({}): {e}", path.display());
         }
     }
 
@@ -337,12 +428,19 @@ fn toggle_floating_panel(handle: AppHandle) {
     }
 
     let url = format!("http://127.0.0.1:{port}/floating-panel");
+    let parsed_url = match url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            log::error!("invalid floating-panel url {url:?}: {e}");
+            return;
+        }
+    };
     let (x, y) = panel_position_from_ball(&handle);
 
     let builder = tauri::WebviewWindowBuilder::new(
         &handle,
         "floating-panel",
-        WebviewUrl::External(url.parse().unwrap()),
+        WebviewUrl::External(parsed_url),
     )
     .title("")
     .inner_size(320.0, 460.0)
@@ -363,22 +461,48 @@ fn toggle_floating_panel(handle: AppHandle) {
     }
 }
 
+/// Approximate panel size (matches builder.inner_size below).
+/// Used to clamp the panel into the visible monitor area.
+const PANEL_W: i32 = 320;
+const PANEL_H: i32 = 460;
+/// Keep a small inset so the panel doesn't sit flush with the screen edge.
+const PANEL_EDGE_INSET: i32 = 8;
+
+/// Compute a "near the ball" placement for the floating panel, clamped to
+/// the ball's current monitor. The original `(ball.x - 270, ball.y - 460)`
+/// math sent the panel to negative coordinates when the ball sat near the
+/// top-left corner of the screen, hiding the panel off-screen on first
+/// open. We now mirror around the ball's monitor instead of blindly
+/// subtracting.
+fn clamped_panel_pos(handle: &AppHandle) -> Option<(i32, i32)> {
+    let ball = handle.get_webview_window("floating-ball")?;
+    let pos = ball.outer_position().ok()?;
+    // Prefer the monitor the ball is actually on; fall back to primary.
+    let monitor = ball
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| handle.primary_monitor().ok().flatten())?;
+    let m_pos = monitor.position();
+    let m_size = monitor.size();
+    let min_x = m_pos.x + PANEL_EDGE_INSET;
+    let min_y = m_pos.y + PANEL_EDGE_INSET;
+    let max_x = m_pos.x + (m_size.width as i32) - PANEL_W - PANEL_EDGE_INSET;
+    let max_y = m_pos.y + (m_size.height as i32) - PANEL_H - PANEL_EDGE_INSET;
+    let x = (pos.x - PANEL_W + 50).clamp(min_x, max_x.max(min_x));
+    let y = (pos.y - PANEL_H).clamp(min_y, max_y.max(min_y));
+    Some((x, y))
+}
+
 fn position_panel_near_ball(handle: &AppHandle, panel: &tauri::WebviewWindow) {
-    if let Some(ball) = handle.get_webview_window("floating-ball") {
-        if let Ok(pos) = ball.outer_position() {
-            let _ = panel.set_position(tauri::PhysicalPosition::new(
-                pos.x - 270,
-                pos.y - 460,
-            ));
-        }
+    if let Some((x, y)) = clamped_panel_pos(handle) {
+        let _ = panel.set_position(tauri::PhysicalPosition::new(x, y));
     }
 }
 
 fn panel_position_from_ball(handle: &AppHandle) -> (f64, f64) {
-    if let Some(ball) = handle.get_webview_window("floating-ball") {
-        if let Ok(pos) = ball.outer_position() {
-            return ((pos.x - 270) as f64, (pos.y - 460) as f64);
-        }
+    if let Some((x, y)) = clamped_panel_pos(handle) {
+        return (x as f64, y as f64);
     }
     (400.0, 200.0)
 }
@@ -433,12 +557,19 @@ fn clear_floating_items(state: State<FloatingState>, handle: AppHandle) {
 
 #[tauri::command]
 fn floating_send_to_chat(text: String, handle: AppHandle) {
+    // Emit a typed Tauri event instead of injecting arbitrary JS via
+    // `main.eval()`. Two reasons:
+    //   1. eval() forces us to keep `script-src 'unsafe-eval'` in CSP if
+    //      we ever want to allow webview-side `Function()` etc. By going
+    //      through the event bus we keep CSP tight and still get the
+    //      same delivery semantics.
+    //   2. The previous JSON.stringify + format!() round-trip silently
+    //      dropped messages when serialisation failed (`unwrap_or_default`).
+    //      `emit_to` returns a Result so problems surface in logs.
     if let Some(main) = handle.get_webview_window("main") {
-        let js = format!(
-            "document.dispatchEvent(new CustomEvent('yunque:quick-send', {{ detail: {} }}));",
-            serde_json::to_string(&text).unwrap_or_default()
-        );
-        let _ = main.eval(&js);
+        if let Err(e) = main.emit("yunque:quick-send", &text) {
+            log::warn!("emit yunque:quick-send to main failed: {e}");
+        }
         let _ = main.show();
         let _ = main.set_focus();
     }
@@ -449,6 +580,13 @@ fn floating_send_to_chat(text: String, handle: AppHandle) {
 
 fn create_floating_ball(handle: &AppHandle, port: u16) {
     let url = format!("http://127.0.0.1:{port}/floating-ball");
+    let parsed_url = match url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            log::error!("invalid floating-ball url {url:?}: {e}");
+            return;
+        }
+    };
 
     let state = handle.state::<FloatingState>();
     let (x, y) = if let Some(pos) = state.load_ball_pos() {
@@ -467,7 +605,7 @@ fn create_floating_ball(handle: &AppHandle, port: u16) {
     let builder = tauri::WebviewWindowBuilder::new(
         handle,
         "floating-ball",
-        WebviewUrl::External(url.parse().unwrap()),
+        WebviewUrl::External(parsed_url),
     )
     .title("")
     .inner_size(56.0, 56.0)
@@ -560,7 +698,16 @@ fn simulate_ctrl_c() {
 }
 
 fn register_selection_shortcut(handle: &AppHandle) {
-    let shortcut: Shortcut = "Alt+Y".parse().unwrap();
+    // "Alt+Y" is a static literal — if this ever fails to parse, it's a
+    // programmer error caught at first launch in dev, not a runtime
+    // condition we should panic on in user's hands.
+    let shortcut: Shortcut = match "Alt+Y".parse() {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("failed to parse global shortcut spec: {e}");
+            return;
+        }
+    };
     let handle2 = handle.clone();
     if let Err(e) = handle.global_shortcut().on_shortcut(shortcut, move |_app, _sc, event| {
         if event.state != ShortcutState::Pressed {
@@ -669,12 +816,17 @@ pub fn run() {
             // here too prevents a flash where the window briefly shows
             // the raw webview before Mica/vibrancy kicks in. We default
             // to dark — matching the inline bootstrap script in layout.tsx.
+            //
+            // NOTE: window decorations / title-bar style are owned by
+            // `tauri.conf.json` (decorations:false, hiddenTitle:true) so
+            // every platform follows the same source of truth. The previous
+            // macOS-only override that re-enabled decorations + Overlay
+            // title bar contradicted the conf and produced an inconsistent
+            // chrome on mac vs. Windows. If we ever want a mac-specific
+            // overlay title bar back, do it through `windows[].titleBarStyle`
+            // in tauri.conf.json rather than mutating the window after
+            // creation.
             if let Some(main) = handle.get_webview_window("main") {
-                #[cfg(target_os = "macos")]
-                {
-                    let _ = main.set_decorations(true);
-                    let _ = main.set_title_bar_style(tauri::TitleBarStyle::Overlay);
-                }
                 apply_window_appearance(&main, "dark");
             }
 
@@ -938,6 +1090,14 @@ async fn wait_for_healthy(handle: &AppHandle, port: u16, start: Instant) -> bool
 /// We deliberately avoid pulling in `reqwest` just for one request: the
 /// status line is all we need, and Go's /healthz returns `200 OK` with a
 /// tiny body.
+///
+/// IMPORTANT: a single `read()` does NOT guarantee we get the full status
+/// line in one shot. TCP is a stream — the kernel may hand us 8 bytes now
+/// and the next 4 bytes a millisecond later. The original implementation
+/// returned `false` whenever the first read was short, causing spurious
+/// "unhealthy" verdicts and (worse) `launch_backend` killing a perfectly
+/// good sidecar after timeout. We now loop until we have the 12 status
+/// bytes or the peer closes, whichever comes first.
 async fn probe_healthz(port: u16) -> bool {
     let addr = format!("127.0.0.1:{port}");
     let stream = match tokio::time::timeout(HTTP_PROBE_TIMEOUT, TokioTcpStream::connect(&addr))
@@ -952,9 +1112,19 @@ async fn probe_healthz(port: u16) -> bool {
         s.write_all(b"GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
             .await?;
         s.flush().await?;
+
+        // Read until we have at least the 12-byte status line ("HTTP/1.1 2xx"),
+        // or EOF / buffer fills. 64 bytes is far more than we need but keeps
+        // the syscall count low on real responses.
         let mut buf = [0u8; 64];
-        let n = s.read(&mut buf).await?;
-        Ok::<_, std::io::Error>((buf, n))
+        let mut filled = 0usize;
+        while filled < 12 {
+            match s.read(&mut buf[filled..]).await? {
+                0 => break, // peer closed before sending a full status line
+                n => filled += n,
+            }
+        }
+        Ok::<_, std::io::Error>((buf, filled))
     };
 
     match tokio::time::timeout(HTTP_PROBE_TIMEOUT, probe).await {

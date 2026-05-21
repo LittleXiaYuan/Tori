@@ -72,8 +72,8 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		t.Fatalf("PackID = %q, want %q", h.PackID(), PackID)
 	}
 	routes := h.Routes()
-	if len(routes) != 16 {
-		t.Fatalf("expected 16 WASM plugin routes, got %d", len(routes))
+	if len(routes) != 17 {
+		t.Fatalf("expected 17 WASM plugin routes, got %d", len(routes))
 	}
 	byPath := map[string][]string{}
 	for _, route := range routes {
@@ -102,6 +102,7 @@ func TestWASMPluginHandlerRoutesExposePackShellSurface(t *testing.T) {
 		"/v1/wasm-plugin/remote-install/installer/download/writeback":     {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/signature-verification/writeback": {http.MethodPost},
 		"/v1/wasm-plugin/remote-install/package/inspect/writeback":        {http.MethodPost},
+		"/v1/wasm-plugin/remote-install/installer/registration/plan":      {http.MethodPost},
 		"/v1/wasm-plugin/evidence/":                                       {http.MethodGet},
 	}
 	for path, methods := range expected {
@@ -499,6 +500,52 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/registration/plan", strings.NewReader(`{"request_key":"custom-request-key","approved":false,"approved_by":"security","reason":"missing explicit registration approval"}`))
+	h.RemoteInstallInstallerRegistrationPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "blocked_missing_explicit_registration_approval") || !strings.Contains(w.Body.String(), "installer-registration-handoff-plan.json") || !strings.Contains(w.Body.String(), "plugin-registration-handoff-plan.json") {
+		t.Fatalf("missing explicit installer registration approval should return blocked plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	var registrationPlanResp struct {
+		Plan RemoteInstallInstallerRegistrationPlanReport `json:"plan"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&registrationPlanResp); err != nil {
+		t.Fatalf("decode blocked installer registration plan: %v", err)
+	}
+	blockedRegistration := registrationPlanResp.Plan
+	if !blockedRegistration.InstallerRegistrationPlanReady || !blockedRegistration.ConsumesPackageInspectStore || !blockedRegistration.PackageInspectRecordFound || blockedRegistration.ApprovalProvided || blockedRegistration.WouldRegisterPlugin || blockedRegistration.RegistrationReady || blockedRegistration.WritesFiles || blockedRegistration.RemoteInstallReady || blockedRegistration.InstallerReady || blockedRegistration.InstallsPlugin {
+		t.Fatalf("blocked installer registration plan must consume inspect store but remain non-destructive: %#v", blockedRegistration)
+	}
+	if blockedRegistration.PackageInspectStore.RecordCount != 1 || blockedRegistration.RegistrationPlan.Artifact != "installer-registration-handoff-plan.json" || blockedRegistration.RegistrationPlan.RegistrationHandoffArtifact != "plugin-registration-handoff-plan.json" {
+		t.Fatalf("blocked installer registration plan should expose deterministic handoff artifacts: %#v", blockedRegistration.RegistrationPlan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/registration/plan", strings.NewReader(`{"request_key":"custom-request-key","approved":true,"approved_by":"security","reason":"plan registration handoff","metadata":{"ticket":"WASM-REGISTRATION-1"}}`))
+	h.RemoteInstallInstallerRegistrationPlan(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "installer_registration_plan_ready") || !strings.Contains(w.Body.String(), "plan_only_ready_for_future_registration_writeback") || !strings.Contains(w.Body.String(), "would_register_plugin") {
+		t.Fatalf("installer registration plan status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&registrationPlanResp); err != nil {
+		t.Fatalf("decode installer registration plan: %v", err)
+	}
+	registrationPlan := registrationPlanResp.Plan
+	if registrationPlan.Status != "plan_only_ready_for_future_registration_writeback" || !registrationPlan.InstallerRegistrationPlanReady || !registrationPlan.PackageInspectReady || !registrationPlan.PackageLayoutReady || !registrationPlan.SignatureVerified || !registrationPlan.ManifestFound || !registrationPlan.WASMModuleFound || !registrationPlan.ApprovalProvided || !registrationPlan.WouldRegisterPlugin {
+		t.Fatalf("registration plan should expose ready inputs without performing registration: %#v", registrationPlan)
+	}
+	if registrationPlan.RegistrationReady || registrationPlan.RemoteInstallReady || registrationPlan.InstallerReady || registrationPlan.Downloads || registrationPlan.NetworkAccess || registrationPlan.WritesFiles || registrationPlan.InstallsPlugin || !registrationPlan.InstallerBlockedUntilRegistration {
+		t.Fatalf("registration plan must keep installer/plugin writes blocked: %#v", registrationPlan)
+	}
+	if registrationPlan.RequestKey != "custom-request-key" || registrationPlan.ApprovedBy != "security" || registrationPlan.PackageInspectRecord.RequestKey != "custom-request-key" || registrationPlan.RegistrationPlan.ManifestPath != "manifest.json" || registrationPlan.RegistrationPlan.WASMModulePath != "calculator-remote.wasm" {
+		t.Fatalf("registration plan should preserve inspect record and package evidence: %#v", registrationPlan.RegistrationPlan)
+	}
+	if !containsString(registrationPlan.Artifacts, "installer-registration-handoff-plan.json") || !containsString(registrationPlan.Artifacts, "plugin-registration-handoff-plan.json") || !containsString(registrationPlan.Artifacts, "installer-audit-handoff-plan.json") {
+		t.Fatalf("registration plan should declare handoff/audit artifacts: %#v", registrationPlan.Artifacts)
+	}
+	if _, err := os.Stat(filepath.Join(h.dataDir, "plugin-registration-handoff-plan.json")); !os.IsNotExist(err) {
+		t.Fatalf("installer registration plan must not write handoff files, err=%v", err)
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/continuation/plan", strings.NewReader(`{"request_key":"missing-request"}`))
 	h.RemoteInstallInstallerContinuationPlan(w, req)
 	if w.Code != http.StatusOK {
@@ -509,6 +556,19 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	}
 	if !installerPlanResp.Plan.InstallerContinuationPlanReady || installerPlanResp.Plan.ApprovalQueueRecordFound || installerPlanResp.Plan.WouldAllowInstallerContinue || !installerPlanResp.Plan.BlocksInstaller || installerPlanResp.Plan.Status != "blocked_missing_approval_queue_record" {
 		t.Fatalf("missing installer continuation selector should remain blocked with a shaped plan: %#v", installerPlanResp.Plan)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/wasm-plugin/remote-install/installer/registration/plan", strings.NewReader(`{"request_key":"missing-request","approved":true}`))
+	h.RemoteInstallInstallerRegistrationPlan(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing installer registration plan should still return plan-only status=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := json.NewDecoder(w.Body).Decode(&registrationPlanResp); err != nil {
+		t.Fatalf("decode missing installer registration plan: %v", err)
+	}
+	if !registrationPlanResp.Plan.InstallerRegistrationPlanReady || registrationPlanResp.Plan.PackageInspectRecordFound || registrationPlanResp.Plan.WouldRegisterPlugin || registrationPlanResp.Plan.Status != "blocked_missing_package_inspect_record" || registrationPlanResp.Plan.WritesFiles || registrationPlanResp.Plan.InstallsPlugin {
+		t.Fatalf("missing installer registration selector should remain blocked with a shaped plan: %#v", registrationPlanResp.Plan)
 	}
 
 	w = httptest.NewRecorder()
@@ -581,7 +641,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/wasm-plugin/evidence/calculator", nil)
 	h.Evidence(w, req)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") || !strings.Contains(w.Body.String(), "installer-download-record.json") || !strings.Contains(w.Body.String(), "signature-verification-record.json") || !strings.Contains(w.Body.String(), "signature-verification-store.json") {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "json-wasm-plugin-evidence") || !strings.Contains(w.Body.String(), "permission-plan.json") || !strings.Contains(w.Body.String(), "host-abi-plan.json") || !strings.Contains(w.Body.String(), "remote-install-plan.json") || !strings.Contains(w.Body.String(), "approval-gate-plan.json") || !strings.Contains(w.Body.String(), "approval-decision-plan.json") || !strings.Contains(w.Body.String(), "approval-writeback-plan.json") || !strings.Contains(w.Body.String(), "approval-queue-store.json") || !strings.Contains(w.Body.String(), "approval-queue-record.json") || !strings.Contains(w.Body.String(), "installer-continuation-plan.json") || !strings.Contains(w.Body.String(), "installer-download-record.json") || !strings.Contains(w.Body.String(), "signature-verification-record.json") || !strings.Contains(w.Body.String(), "signature-verification-store.json") || !strings.Contains(w.Body.String(), "installer-registration-handoff-plan.json") || !strings.Contains(w.Body.String(), "plugin-registration-handoff-plan.json") {
 		t.Fatalf("evidence status=%d body=%s", w.Code, w.Body.String())
 	}
 	var evidenceResp struct {
@@ -603,6 +663,7 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		PackageInspection           PackageInspection                        `json:"package_inspection"`
 		PackageInspectStore         PackageInspectStoreSummary               `json:"package_inspect_store"`
 		PackageInspectRecord        PackageInspectRecord                     `json:"package_inspect_record"`
+		InstallerRegistrationPlan   InstallerRegistrationPlan                `json:"installer_registration_plan"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&evidenceResp); err != nil {
 		t.Fatalf("decode evidence: %v", err)
@@ -669,6 +730,17 @@ func TestWASMPluginInstallLoadDryRunExecuteAndEvidence(t *testing.T) {
 		evidenceResp.PackageInspectRecord.RemoteInstallReady ||
 		evidenceResp.PackageInspectRecord.InstallsPlugin {
 		t.Fatalf("evidence should include a conservative package inspect preview: files=%#v inspection=%#v store=%#v record=%#v", evidenceResp.Files, evidenceResp.PackageInspection, evidenceResp.PackageInspectStore, evidenceResp.PackageInspectRecord)
+	}
+	if !containsString(evidenceResp.Files, "installer-registration-handoff-plan.json") ||
+		!containsString(evidenceResp.Files, "plugin-registration-handoff-plan.json") ||
+		!containsString(evidenceResp.Files, "installer-audit-handoff-plan.json") ||
+		!evidenceResp.InstallerRegistrationPlan.InstallerRegistrationPlanReady ||
+		evidenceResp.InstallerRegistrationPlan.WouldRegisterPlugin ||
+		evidenceResp.InstallerRegistrationPlan.RegistrationReady ||
+		evidenceResp.InstallerRegistrationPlan.RemoteInstallReady ||
+		evidenceResp.InstallerRegistrationPlan.WritesFiles ||
+		evidenceResp.InstallerRegistrationPlan.InstallsPlugin {
+		t.Fatalf("evidence should include a conservative installer registration handoff plan: files=%#v plan=%#v", evidenceResp.Files, evidenceResp.InstallerRegistrationPlan)
 	}
 }
 

@@ -17,6 +17,7 @@ export const WASM_PLUGIN_REMOTE_INSTALL_PLAN_ARTIFACTS = [
   "package-inspection.json",
   "package-inspect-record.json",
   "package-inspect-store.json",
+  "plugin-registration-handoff-plan.json",
   "installer-registration-handoff-plan.json",
   "installer-audit-handoff-plan.json",
   "signature-verification.json",
@@ -94,6 +95,15 @@ export const WASM_PLUGIN_PACKAGE_INSPECT_RECORD_ARTIFACT =
 export const WASM_PLUGIN_PACKAGE_INSPECT_STORE_ARTIFACT =
   "package-inspect-store.json";
 
+export const WASM_PLUGIN_INSTALLER_REGISTRATION_PLAN_CAPABILITY =
+  "wasm.remote_install.installer_registration_plan";
+
+export const WASM_PLUGIN_INSTALLER_REGISTRATION_PLAN_ARTIFACT =
+  "installer-registration-handoff-plan.json";
+
+export const WASM_PLUGIN_PLUGIN_REGISTRATION_HANDOFF_ARTIFACT =
+  "plugin-registration-handoff-plan.json";
+
 export interface WASMPluginPermissionPolicy {
   ledger_kv: boolean;
   memory_search: boolean;
@@ -151,7 +161,9 @@ export interface WASMPluginStatus {
   installer_download_writeback_ready: boolean;
   signature_verification_writeback_ready: boolean;
   package_inspect_writeback_ready: boolean;
+  installer_registration_plan_ready: boolean;
   package_inspect_ready: boolean;
+  registration_ready: boolean;
   installer_ready: boolean;
   installer_blocked_until_registration: boolean;
   installer_blocked_until_signature_verify: boolean;
@@ -336,6 +348,16 @@ export interface WASMPluginRemoteInstallPackageInspectWritebackInput {
   slug?: string;
   approved: boolean;
   inspected_by?: string;
+  reason?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface WASMPluginRemoteInstallInstallerRegistrationPlanInput {
+  request_id?: string;
+  request_key?: string;
+  slug?: string;
+  approved?: boolean;
+  approved_by?: string;
   reason?: string;
   metadata?: Record<string, string>;
 }
@@ -1009,6 +1031,96 @@ export interface WASMPluginPackageInspectRecord {
   notes?: string[];
 }
 
+export interface WASMPluginInstallerRegistrationPlan {
+  pack_id: string;
+  generated_at: string;
+  installer_registration_plan_ready: boolean;
+  consumes_package_inspect_store: boolean;
+  package_inspect_store_ready: boolean;
+  package_inspect_record_found: boolean;
+  package_inspect_ready: boolean;
+  package_layout_ready: boolean;
+  signature_verified: boolean;
+  manifest_found: boolean;
+  wasm_module_found: boolean;
+  would_register_plugin: boolean;
+  registration_ready: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  status: string;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  required_fields: string[];
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  manifest_path?: string;
+  wasm_module_path?: string;
+  package_sha256?: string;
+  manifest_sha256?: string;
+  module_sha256?: string;
+  package_inspect_store_artifact: string;
+  package_inspect_record_artifact: string;
+  package_inspection_artifact: string;
+  signature_verification_artifact: string;
+  registration_handoff_artifact: string;
+  audit_handoff_artifact: string;
+  artifact: string;
+  downloads: boolean;
+  writes_files: boolean;
+  network_access: boolean;
+  installs_plugin: boolean;
+  checks: WASMPluginRemoteInstallCheck[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
+export interface WASMPluginRemoteInstallInstallerRegistrationPlan {
+  pack_id: string;
+  generated_at: string;
+  status: string;
+  installer_registration_plan_ready: boolean;
+  consumes_package_inspect_store: boolean;
+  package_inspect_store_ready: boolean;
+  package_inspect_record_found: boolean;
+  package_inspect_ready: boolean;
+  package_layout_ready: boolean;
+  signature_verified: boolean;
+  manifest_found: boolean;
+  wasm_module_found: boolean;
+  approval_required: boolean;
+  approval_provided: boolean;
+  would_register_plugin: boolean;
+  registration_ready: boolean;
+  remote_install_ready: boolean;
+  installer_ready: boolean;
+  installer_blocked_until_registration: boolean;
+  downloads: boolean;
+  network_access: boolean;
+  writes_files: boolean;
+  installs_plugin: boolean;
+  request_id?: string;
+  request_key?: string;
+  decision_key?: string;
+  approved_by?: string;
+  reason?: string;
+  plugin?: WASMPluginRemoteInstallPluginPlan;
+  package?: WASMPluginRemoteInstallPackagePlan;
+  package_inspection: WASMPluginPackageInspection;
+  package_inspect_record: WASMPluginPackageInspectRecord;
+  package_inspect_store: WASMPluginPackageInspectStoreSummary;
+  registration_plan: WASMPluginInstallerRegistrationPlan;
+  checks: WASMPluginRemoteInstallCheck[];
+  artifacts: string[];
+  actions: string[];
+  labels: string[];
+  metadata?: Record<string, string>;
+  notes?: string[];
+}
+
 export interface WASMPluginRemoteInstallPackageInspectWriteback {
   pack_id: string;
   generated_at: string;
@@ -1214,6 +1326,11 @@ export interface WASMPluginPackClient {
   ): Promise<{
     writeback: WASMPluginRemoteInstallPackageInspectWriteback;
   }>;
+  remoteInstallInstallerRegistrationPlan(
+    input: WASMPluginRemoteInstallInstallerRegistrationPlanInput,
+  ): Promise<{
+    plan: WASMPluginRemoteInstallInstallerRegistrationPlan;
+  }>;
   evidence(slug: string): Promise<{
     pack_id: string;
     exported_at: string;
@@ -1238,6 +1355,7 @@ export interface WASMPluginPackClient {
     package_inspection: WASMPluginPackageInspection;
     package_inspect_store: WASMPluginPackageInspectStoreSummary;
     package_inspect_record: WASMPluginPackageInspectRecord;
+    installer_registration_plan: WASMPluginInstallerRegistrationPlan;
     sandbox?: Record<string, unknown>;
   }>;
 }
@@ -1356,6 +1474,14 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    remoteInstallInstallerRegistrationPlan: (input) =>
+      fetcher<{ plan: WASMPluginRemoteInstallInstallerRegistrationPlan }>(
+        "/v1/wasm-plugin/remote-install/installer/registration/plan",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      ),
     evidence: (slug) =>
       fetcher<{
         pack_id: string;
@@ -1381,6 +1507,7 @@ export function createWASMPluginPackClient(): WASMPluginPackClient {
         package_inspection: WASMPluginPackageInspection;
         package_inspect_store: WASMPluginPackageInspectStoreSummary;
         package_inspect_record: WASMPluginPackageInspectRecord;
+        installer_registration_plan: WASMPluginInstallerRegistrationPlan;
         sandbox?: Record<string, unknown>;
       }>(`/v1/wasm-plugin/evidence/${enc(slug)}`),
   };
