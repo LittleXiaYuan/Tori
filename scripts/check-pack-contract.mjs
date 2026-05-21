@@ -29,6 +29,14 @@ function readJSON(path) {
   }
 }
 
+function hasSDKBackedToken(text, token) {
+  // SDK-backed UI adapters delegate HTTP transport to yunque-client slices.
+  // New SDK clients pass the method into a request helper rather than keeping
+  // the older inline fetch option shape (`method: "POST"`) in the adapter.
+  if (token === 'method: "POST"') return text.includes(token) || text.includes('"POST"');
+  return text.includes(token);
+}
+
 function walk(dir) {
   const fullDir = resolve(repoRoot, dir);
   if (!existsSync(fullDir)) return [];
@@ -681,6 +689,7 @@ const sbomDriftPage = readText("heroui-web/src/app/packs/sbom-drift/page.tsx");
 const sbomDriftClient = readText("heroui-web/src/lib/sbom-drift-pack-client.ts");
 const sbomDriftClientTest = readText("heroui-web/src/lib/__tests__/sbom-drift-pack-client.test.ts");
 const sbomDriftSdk = readText("sdk/typescript/src/sbom-drift.ts") + "\n" + readText("sdk/typescript/src/sbom-drift.test.ts");
+const sbomDriftClientContract = `${sbomDriftClient}\n${sbomDriftSdk}`;
 if (sbomDriftManifest) {
   if (!sbomDriftSource.includes(`const PackID = "${sbomDriftManifest.id}"`)) {
     fail("SBOM Drift pack handler PackID must match packs/examples/sbom-drift-pack/pack.json");
@@ -704,7 +713,7 @@ if (sbomDriftPage.includes('from "@/lib/api"') || sbomDriftPage.includes("api.sb
   fail("SBOM Drift pack page must use sbom-drift-pack-client instead of monolithic api object");
 }
 for (const token of ["createSBOMDriftPackClient", "/v1/sbom-drift/status", "/v1/sbom-drift/diff", "/v1/sbom-drift/cyclonedx/", "/v1/sbom-drift/ci-gate/plan", "/v1/sbom-drift/baseline/artifact-source/plan", "/v1/sbom-drift/ci-gate/baseline/writeback", "/v1/sbom-drift/ci-gate/workflow/writeback/plan", "/v1/sbom-drift/evidence/", "govulncheck_plan_ready", "govulncheck_plan", "writes_files", "writes_ci_baseline_store", "artifact_source_plan_ready", "baseline_fetch_plan_ready", "fetches_artifact_baseline", "writes_baseline_snapshot", "ci_workflow_writeback_plan_ready", "consumes_ci_baseline_store", 'method: "POST"']) {
-  if (!sbomDriftClient.includes(token)) fail(`sbom-drift-pack-client missing token: ${token}`);
+  if (!hasSDKBackedToken(sbomDriftClientContract, token)) fail(`sbom-drift-pack-client missing SDK-backed token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("sbom-drift")')) {
   fail("SBOM Drift runtime store must be wired through the configured data directory");
@@ -796,6 +805,7 @@ const memoryTimeTravelClientTest = readText("heroui-web/src/lib/__tests__/memory
 const temporalKVSource = readText("internal/ledger/temporal_kv.go") + "\n" + readText("internal/ledger/temporal_kv_test.go");
 const ledgerPersisterSource = readText("internal/ledger/ledger_persister.go") + "\n" + readText("internal/ledger/ledger_persister_test.go");
 const memoryTimeTravelSdk = readText("sdk/typescript/src/memory-time-travel.ts") + "\n" + readText("sdk/typescript/src/memory-time-travel.test.ts");
+const memoryTimeTravelClientContract = `${memoryTimeTravelClient}\n${memoryTimeTravelSdk}`;
 if (memoryTimeTravelManifest) {
   if (!memoryTimeTravelSource.includes(`const PackID = "${memoryTimeTravelManifest.id}"`)) {
     fail("Memory Time Travel pack handler PackID must match packs/examples/memory-time-travel-pack/pack.json");
@@ -817,7 +827,7 @@ if (memoryTimeTravelPage.includes('from "@/lib/api"') || memoryTimeTravelPage.in
   fail("Memory Time Travel pack page must use memory-time-travel-pack-client instead of monolithic api object");
 }
 for (const token of ["createMemoryTimeTravelPackClient", "/v1/memory-time-travel/status", "/v1/memory-time-travel/snapshots", "/v1/memory-time-travel/snapshot-at", "/v1/memory-time-travel/diff", "/v1/memory-time-travel/rollback-plan", "/v1/memory-time-travel/rollback/approved-plan", "/v1/memory-time-travel/retention/plan", "/v1/memory-time-travel/retention/prune-plan", "/v1/memory-time-travel/retention/prune/execute", "/v1/memory-time-travel/kv-history/native-plan", "/v1/memory-time-travel/kv-history/migration-preview", "/v1/memory-time-travel/kv-history/dual-read/parity", "/v1/memory-time-travel/kv-history/cutover/plan", "/v1/memory-time-travel/kv-history/cutover/readiness", "/v1/memory-time-travel/audit/links", "/v1/memory-time-travel/audit/links/preview", "/v1/memory-time-travel/audit/links/writeback-plan", "/v1/memory-time-travel/audit/links/writeback/store", "/v1/memory-time-travel/audit/links/writeback/executor/plan", "/v1/memory-time-travel/audit/verify", "/v1/memory-time-travel/evidence/", "retentionPruneExecute", "auditLinksWritebackPlan", "auditLinksWritebackStore", "auditLinksWritebackExecutorPlan", 'method: "POST"']) {
-  if (!memoryTimeTravelClient.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
+  if (!hasSDKBackedToken(memoryTimeTravelClientContract, token)) fail(`memory-time-travel-pack-client missing SDK-backed token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("memory-time-travel")')) {
   fail("Memory Time Travel runtime store must be wired through the configured data directory");
@@ -907,6 +917,7 @@ const wasmPluginPage = readText("heroui-web/src/app/packs/wasm-plugin/page.tsx")
 const wasmPluginClient = readText("heroui-web/src/lib/wasm-plugin-pack-client.ts");
 const wasmPluginClientTest = readText("heroui-web/src/lib/__tests__/wasm-plugin-pack-client.test.ts");
 const wasmPluginSdk = readText("sdk/typescript/src/wasm-plugin.ts") + "\n" + readText("sdk/typescript/src/wasm-plugin.test.ts");
+const wasmPluginClientContract = `${wasmPluginClient}\n${wasmPluginSdk}`;
 if (wasmPluginManifest) {
   if (!wasmPluginSource.includes(`const PackID = "${wasmPluginManifest.id}"`)) {
     fail("WASM Plugin pack handler PackID must match packs/examples/wasm-plugin-pack/pack.json");
@@ -927,31 +938,31 @@ if (wasmPluginPage.includes('from "@/lib/api"') || wasmPluginPage.includes("api.
   fail("WASM Plugin pack page must use wasm-plugin-pack-client instead of monolithic api object");
 }
 for (const token of ["createWASMPluginPackClient", "/v1/wasm-plugin/status", "/v1/wasm-plugin/execute", "/v1/wasm-plugin/remote-install/plan", "/v1/wasm-plugin/remote-install/approval/plan", "/v1/wasm-plugin/remote-install/approval/decision/plan", "/v1/wasm-plugin/remote-install/approval/writeback/plan", "/v1/wasm-plugin/remote-install/approval/queue/writeback", "/v1/wasm-plugin/remote-install/installer/continuation/plan", "/v1/wasm-plugin/remote-install/installer/download/writeback", "/v1/wasm-plugin/remote-install/signature-verification/writeback", "/v1/wasm-plugin/remote-install/package/inspect/writeback", "/v1/wasm-plugin/evidence/", "remoteInstallPlan", "remoteInstallApprovalPlan", "remoteInstallApprovalDecisionPlan", "remoteInstallApprovalWritebackPlan", "remoteInstallApprovalQueueWriteback", "remoteInstallInstallerContinuationPlan", "remoteInstallInstallerDownloadWriteback", "remoteInstallSignatureVerificationWriteback", "remoteInstallPackageInspectWriteback", "WASMPluginRemoteInstallPlan", "WASMPluginRemoteInstallApprovalPlan", "WASMPluginRemoteInstallApprovalDecisionPlan", "WASMPluginRemoteInstallApprovalWritebackPlan", "WASMPluginRemoteInstallApprovalQueueWriteback", "WASMPluginRemoteInstallInstallerContinuationPlan", "WASMPluginRemoteInstallInstallerDownloadWriteback", "WASMPluginRemoteInstallSignatureVerificationWriteback", "WASMPluginInstallerContinuationPlan", "WASMPluginInstallerDownloadRecord", "WASMPluginSignatureVerificationRecord", "WASMPluginSignatureVerificationStoreSummary", "WASMPluginApprovalQueueRecord", "WASMPluginApprovalQueueStoreSummary", "WASMPluginApprovalDecisionPlan", "WASMPluginApprovalWritebackPlan", "WASMPluginSignatureVerificationPlan", "remote_install_plan", "signature_verification", "approval_gate_plan", "approval_decision_plan", "approval_writeback_plan", "installer_download_record", "signature_verification_record", "signature_verification_store", 'method: "POST"']) {
-  if (!wasmPluginClient.includes(token)) fail(`wasm-plugin-pack-client missing token: ${token}`);
+  if (!hasSDKBackedToken(wasmPluginClientContract, token)) fail(`wasm-plugin-pack-client missing SDK-backed token: ${token}`);
 }
 for (const token of ["abi_plan_ready", "host_abi_plan", "WASMPluginHostABIPlan", "host_abi_gate", "WASMPluginHostABIExecutionGate", "host_abi_execution_gate_ready", "host_abi_enforcement_ready", "module_integrity_gate_ready", "module_integrity_gate", "WASMPluginModuleIntegrityGate", "integrity_gate_ready", "blocked_module_sha256_mismatch", "execution_gate_ready", "allows_execution", "blocked_until_host_abi_enforcement", "enforcement_ready", "writes_files"]) {
-  if (!wasmPluginClient.includes(token)) fail(`wasm-plugin-pack-client missing Host ABI plan token: ${token}`);
+  if (!wasmPluginClientContract.includes(token)) fail(`wasm-plugin-pack-client missing SDK-backed Host ABI plan token: ${token}`);
 }
 for (const token of ["remote_install_plan_ready", "remote_install_ready", "remote-install-plan.json", "signature-verification.json", "signature_verification_plan_ready", "signature_verification", "verification_gate_ready", "blocked_until_signature_verifier", "allows_install", "download_ready", "signature_verify_ready", "downloads", "writes_files"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend remote install plan missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend remote install plan missing token: ${token}`);
 }
 for (const token of ["approval_gate_plan_ready", "approval_gate_ready", "approval_queue_plan_ready", "approval_queue_entry", "approval-gate-plan.json", "approval-queue-entry.json", "blocked_until_approval_queue", "requires_approval", "writes_approval_queue", "remoteInstallApprovalPlan"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval gate plan missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval gate plan missing token: ${token}`);
 }
 for (const token of ["approval_decision_plan_ready", "approval_decision_ready", "applies_approval_decision", "approval_decision_plan", "approval-decision-plan.json", "would_allow_installer_continue", "blocks_installer", "decision_key", "remoteInstallApprovalDecisionPlan"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval decision plan missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval decision plan missing token: ${token}`);
 }
 for (const token of ["approval_writeback_plan_ready", "approval_writeback_ready", "approval_writeback_plan", "approval_queue_store", "approval_queue_record", "approval-queue-store.json", "approval-queue-record.json", "approval-writeback-plan.json", "installer_blocked_until_writeback", "installer_blocked_until_installer_wiring", "approval_queue_store_ready", "writes_approval_queue_store", "writeback_store", "remoteInstallApprovalWritebackPlan"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval writeback plan missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend approval writeback plan missing token: ${token}`);
 }
 for (const token of ["installer_continuation_plan_ready", "consumes_approval_queue_store", "approval_queue_record_found", "installer_ready", "installer_continuation_plan", "installer-continuation-plan.json", "installer-download-handoff-plan.json", "installer-registration-handoff-plan.json", "installer-audit-handoff-plan.json", "remoteInstallInstallerContinuationPlan"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend installer continuation plan missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend installer continuation plan missing token: ${token}`);
 }
 for (const token of ["installer_download_writeback_ready", "installer_blocked_until_signature_verify", "writes_package_cache", "installer_download_record", "installer-download-record.json", "installer-package-cache.tgz", "remoteInstallInstallerDownloadWriteback"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend installer download writeback missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend installer download writeback missing token: ${token}`);
 }
 for (const token of ["signature_verification_writeback_ready", "writes_signature_verification_store", "signature_verification_store", "signature-verification-record.json", "signature-verification-store.json", "allows_installer_writeback", "signature_verified", "installer_blocked_until_registration", "remoteInstallSignatureVerificationWriteback"]) {
-  if (!wasmPluginClient.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend signature verification writeback missing token: ${token}`);
+  if (!wasmPluginClientContract.includes(token) || !wasmPluginPage.includes(token)) fail(`wasm-plugin frontend signature verification writeback missing token: ${token}`);
 }
 if (!gatewaySource.includes('cfg.DataPath("wasm-plugin")')) {
   fail("WASM Plugin runtime store must be wired through the configured data directory");

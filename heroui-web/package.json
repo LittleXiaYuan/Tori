@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --webpack --port 3001",
     "build": "next build && node -e \"require('fs').writeFileSync('out/.keep', 'placeholder for Go embed when the Next.js static export has not been built\\n')\"",
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",

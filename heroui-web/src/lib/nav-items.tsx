@@ -11,6 +11,7 @@ import {
   Lightbulb, Share2, Bot,
   FolderGit2, Boxes, Users, Workflow,
 } from "lucide-react";
+import type { ProfileMode } from "@/lib/profile-mode";
 
 export type NavGroup = "概览" | "工作" | "智能" | "系统" | "扩展";
 
@@ -60,6 +61,19 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const NAV_GROUP_ORDER: NavGroup[] = ["概览", "工作", "智能", "系统", "扩展"];
+
+const EASY_NAV_ITEM_IDS = new Set([
+  "nav-dashboard",
+  "nav-chat",
+  "nav-missions",
+  "nav-knowledge",
+  "nav-settings",
+]);
+
+export function filterNavItemsByProfile(items: NavItem[], mode: ProfileMode): NavItem[] {
+  if (mode === "full") return items;
+  return items.filter((item) => EASY_NAV_ITEM_IDS.has(item.id));
+}
 
 export function groupNavItems(items: NavItem[]): Record<NavGroup, NavItem[]> {
   const out: Record<NavGroup, NavItem[]> = {

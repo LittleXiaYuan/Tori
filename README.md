@@ -1,10 +1,16 @@
 # 云雀 Agent (Yunque Agent)
 
-一个集成 WebUI、后端网关、记忆、知识库和插件系统的 AI Agent 项目。
+一个本地优先的个人 AI 工作伙伴：从场景出发，完成任务，交付可验收产物，并把反馈沉淀成记忆。
 
 > **Language Note** — Code comments, godoc, and architecture docs are in English.
 > Log messages, system prompts, and user-facing strings are in Chinese, reflecting the primary target market.
 > Contributions in either language are welcome.
+
+## 产品主线
+
+- **个人体验先行**：默认用轻松模式，只把工作台、对话、任务、知识库和设置放到主路径。
+- **能力按需扩展**：Pack Runtime 和 SDK 是可选能力边界，复杂能力不再平铺到首页。
+- **Tori 做控制面**：团队 / 企业侧的同步、身份、权限、审计、配额、账单和托管运维由 Tori 承接；社区版保持完整本地优先。
 
 ## 仓库结构说明
 

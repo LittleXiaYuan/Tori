@@ -4,13 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@heroui/react";
 import {
   Sparkles, ArrowRight, X, CheckCircle2, Circle, Loader2,
-  Zap, MessageCircle, BookOpen, Settings, LayoutDashboard,
-  Search, Brain, Code2, Layers,
+  Zap, Layers,
 } from "lucide-react";
 import { useOnboarding, type OnboardingPhase } from "@/hooks/use-onboarding";
 import { formatErrorMessage } from "@/lib/error-utils";
-
-const PROFILE_KEY = "yunque_profile_mode";
+import { ONBOARDING_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
+import { writeProfileMode } from "@/lib/profile-mode";
 
 function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
   return (
@@ -23,7 +22,7 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
       </div>
       <h1 className="text-2xl font-bold" style={{ color: "var(--yunque-text)" }}>你好，我是云雀</h1>
       <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--yunque-text-secondary)", maxWidth: 340, margin: "12px auto 0" }}>
-        你的全能 AI 助手 — 对话、研究、编码、浏览器操控、任务编排，描述你的需求，我来完成。
+        你的个人 AI 工作伙伴。先说目标，我会把它变成行动、产物和可继续迭代的记忆。
       </p>
 
       <div className="mt-8 space-y-3">
@@ -258,18 +257,11 @@ function ProviderSetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () 
 function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
   const [sent, setSent] = useState(false);
 
-  const demos = [
-    { icon: <Search size={14} />, label: "帮我搜索最新的 AI 趋势", desc: "自动浏览网页并汇总" },
-    { icon: <Brain size={14} />, label: "总结一下今天的科技新闻", desc: "信息提取与摘要" },
-    { icon: <Code2 size={14} />, label: "写一个 Python hello world", desc: "代码生成与运行" },
-  ];
-
   const handleSend = useCallback((text: string) => {
     setSent(true);
-    const encoded = encodeURIComponent(text);
     setTimeout(() => {
       localStorage.setItem("yunque_onboarding_done", "1");
-      window.location.href = `/chat?q=${encoded}`;
+      window.location.href = scenarioChatHref(text);
     }, 300);
   }, []);
 
@@ -281,11 +273,11 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
       <p className="text-xs text-center mt-1" style={{ color: "var(--yunque-text-muted)" }}>点击下方卡片，或输入自定义需求</p>
 
       <div className="mt-5 space-y-2.5">
-        {demos.map((d) => (
+        {ONBOARDING_SCENARIOS.map((d) => (
           <button
             key={d.label}
             className="onboard-demo-card w-full text-left flex items-start gap-3"
-            onClick={() => handleSend(d.label)}
+            onClick={() => handleSend(d.prompt)}
             disabled={sent}
           >
             <span className="mt-0.5 flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center"
@@ -294,7 +286,7 @@ function InteractiveDemoStep({ onNext }: { onNext: () => void }) {
             </span>
             <div>
               <div className="text-sm font-medium" style={{ color: "var(--yunque-text)" }}>{d.label}</div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>{d.desc}</div>
+              <div className="text-[10px] mt-0.5" style={{ color: "var(--yunque-text-muted)" }}>{d.description}</div>
             </div>
           </button>
         ))}
@@ -317,15 +309,15 @@ function ModeSelectStep({ onFinish }: { onFinish: (mode: "easy" | "full") => voi
       id: "easy" as const,
       icon: <Sparkles size={20} />,
       title: "轻松模式",
-      desc: "5 个核心功能，适合日常使用",
-      items: ["概览", "对话", "任务中心", "知识库", "设置"],
+      desc: "围绕个人工作台，只保留日常高频路径",
+      items: ["工作台", "对话", "任务中心", "知识库", "设置"],
       recommended: true,
     },
     {
       id: "full" as const,
       icon: <Layers size={20} />,
       title: "完整模式",
-      desc: "35+ 全部功能，适合专业用户",
+      desc: "展开完整控制台，适合专业调试与运维",
       items: ["所有轻松模式", "工作流编排", "记忆管理", "角色定制", "审计监控", "更多…"],
       recommended: false,
     },
@@ -384,7 +376,7 @@ export function OnboardingGuide() {
   const { phase, setPhase, visible, finish } = useOnboarding();
 
   const handleModeSelect = useCallback((mode: "easy" | "full") => {
-    localStorage.setItem(PROFILE_KEY, mode);
+    writeProfileMode(mode);
     finish();
   }, [finish]);
 

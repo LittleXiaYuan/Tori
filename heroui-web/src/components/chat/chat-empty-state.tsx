@@ -1,9 +1,10 @@
 import {
-  BookOpen, Search, Zap, Package, Sparkles,
+  BookOpen, Package, Sparkles,
   AlertTriangle, ArrowRight, Cpu, FolderOpen, MessageCircle,
 } from "lucide-react";
 import type { SkillInfo } from "@/lib/api";
 import type { ChatDispatch } from "@/lib/chat-state";
+import { CHAT_EMPTY_SCENARIOS } from "@/lib/product-scenarios";
 
 interface ChatEmptyStateProps {
   setupNeeded: boolean;
@@ -33,15 +34,15 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
       <div className="max-w-xl text-center space-y-2">
         <h1 className="text-[28px] font-bold tracking-tight" style={{ color: "var(--yunque-text)" }}>你好，我是云雀</h1>
         <p className="text-sm leading-relaxed" style={{ color: "var(--yunque-text-muted)", maxWidth: 540, margin: "0 auto" }}>
-          你的全能 AI 助手。可以聊天、研究、写代码、处理文件、调度 AI IDE；复杂能力会被收进清晰的工作路径里。
+          你的个人 AI 工作伙伴。先选一个场景，我会把目标推进到行动、产物、反馈和记忆。
         </p>
       </div>
 
       <div className="grid w-full max-w-[620px] grid-cols-3 gap-2">
         {[
-          { icon: <MessageCircle size={13} />, title: "直接对话", desc: "先说需求，不用先理解工具。" },
-          { icon: <Cpu size={13} />, title: "AI IDE 执行", desc: "复杂代码任务可交给外部 IDE。" },
-          { icon: <FolderOpen size={13} />, title: "Workspace 验收", desc: "文件产物可预览、下载、继续改。" },
+          { icon: <MessageCircle size={13} />, title: "先说目标", desc: "不用先理解工具、模型或 Pack。" },
+          { icon: <Cpu size={13} />, title: "按需执行", desc: "复杂任务再派给 AI IDE 或浏览器。" },
+          { icon: <FolderOpen size={13} />, title: "验收产物", desc: "文件、结论和下一步都回到工作台。" },
         ].map((item) => (
           <div
             key={item.title}
@@ -59,36 +60,32 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
 
       <div className="mt-1 grid w-full max-w-[620px] grid-cols-2 gap-2.5">
         {(() => {
-          const fixedCards = [
-            {
-              icon: <Cpu size={14} />,
-              label: "请把这个需求派给 AI IDE 执行，过程中需要我确认时回到 Chat/IM 询问。",
-              desc: "适合代码修改、重构、测试、修 Bug。",
-              displayLabel: "写代码 / 修 Bug",
-            },
-            {
-              icon: <Zap size={14} />,
-              label: "帮我在小红书发布一条效率演示笔记，标题：云雀 Chat-first 自动发布，正文：这条笔记演示云雀从对话识别意图、打开创作中心、填写内容并直接点击发布的完整效率链路。",
-              desc: "从 Chat 触发浏览器直发，不再先去 Pack 页面点按钮。",
-              displayLabel: "小红书直发",
-              autoSend: true,
-            },
-          ];
-          const fallbackCards = [
-            { icon: <BookOpen size={14} />, label: "帮我总结这份文档，并输出待办事项和可交付结论", desc: "贴入文档或笔记，提炼要点与行动项。", displayLabel: "总结文档" },
-            { icon: <Zap size={14} />, label: "帮我把这个复杂任务拆成可执行计划，并告诉我第一步怎么验收", desc: "从想法变成可执行任务列表。", displayLabel: "拆解任务" },
-          ];
+          const fixedCards = CHAT_EMPTY_SCENARIOS.slice(0, 2).map((scenario) => ({
+            icon: scenario.icon,
+            prompt: scenario.prompt,
+            desc: scenario.description,
+            displayLabel: scenario.label,
+            autoSend: true,
+          }));
+          const fallbackCards = CHAT_EMPTY_SCENARIOS.slice(2, 4).map((scenario) => ({
+            icon: scenario.icon,
+            prompt: scenario.prompt,
+            desc: scenario.description,
+            displayLabel: scenario.label,
+            autoSend: true,
+          }));
           const dynamicCards = heroSkills.slice(0, 2).map((sk) => ({
             icon: <Package size={14} />,
-            label: sk.name,
+            prompt: sk.name,
             desc: sk.description || "已安装技能，点击直接使用",
+            displayLabel: sk.name,
           }));
           const cards = [...fixedCards, ...(dynamicCards.length >= 2 ? dynamicCards : fallbackCards)];
           return cards.map((card) => (
             <button
-              key={card.label}
+              key={card.displayLabel}
               onClick={() => {
-                const text: string = ("prompt" in card && typeof card.prompt === "string" && card.prompt) ? card.prompt : card.label;
+                const text: string = card.prompt;
                 if ("autoSend" in card && card.autoSend && onSend) {
                   onSend(text);
                 } else {
@@ -102,7 +99,7 @@ export function ChatEmptyState({ setupNeeded, heroSkills, chatD, inputRef, onSen
               <span className="mt-0.5 shrink-0 flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: "var(--yunque-accent-soft)", color: "var(--yunque-accent)" }}>{card.icon}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-medium flex items-center gap-1" style={{ color: "var(--yunque-text)" }}>
-                  {"displayLabel" in card ? (card as any).displayLabel : card.label}
+                  {card.displayLabel}
                   <ArrowRight size={10} className="opacity-0 group-hover/card:opacity-60 transition-opacity" style={{ color: "var(--yunque-text-muted)" }} />
                 </div>
                 <div className="mt-0.5 text-[10px] leading-[1.5]" style={{ color: "var(--yunque-text-muted)" }}>{card.desc}</div>

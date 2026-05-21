@@ -6,14 +6,15 @@
  * 当鼠标停留在 AccountRail（左侧 64px 极窄栏）上 0.3s 时显示，
  * 鼠标离开二级栏区域后 0.2s 自动收起。
  *
- * 内容：5 大分组（概览/工作/智能/系统/扩展），每组列出全部条目。
+ * 内容：默认跟随轻松/完整模式过滤功能面，避免新用户一开始看到全部条目。
  * 通过 `data-active` 在当前路径上高亮。
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, groupNavItems } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, type NavGroup, type NavItem, filterNavItemsByProfile, groupNavItems } from "@/lib/nav-items";
 import { useI18n } from "@/lib/i18n";
+import { PROFILE_MODE_KEY, readProfileMode } from "@/lib/profile-mode";
 
 interface AccountRailFlyoutProps {
   open: boolean;
@@ -37,10 +38,25 @@ export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, 
   const router = useRouter();
   const pathname = usePathname();
   const { locale } = useI18n();
+  const [profileMode, setProfileMode] = useState(readProfileMode);
 
-  const grouped = useMemo(() => groupNavItems([...NAV_ITEMS, ...extItems]), [extItems]);
+  useEffect(() => {
+    const handleProfileModeChange = (event: StorageEvent) => {
+      if (event.key === PROFILE_MODE_KEY) setProfileMode(readProfileMode());
+    };
+    window.addEventListener("storage", handleProfileModeChange);
+    return () => window.removeEventListener("storage", handleProfileModeChange);
+  }, []);
+
+  const grouped = useMemo(
+    () => groupNavItems(filterNavItemsByProfile([...NAV_ITEMS, ...extItems], profileMode)),
+    [extItems, profileMode],
+  );
   const isZh = locale === "zh";
   const groupLabel = (g: NavGroup) => (isZh ? g : GROUP_LABEL_EN[g]);
+  const title = isZh
+    ? (profileMode === "easy" ? "核心功能" : "所有功能")
+    : (profileMode === "easy" ? "Core Features" : "All Features");
 
   return (
     <aside
@@ -54,7 +70,7 @@ export default function AccountRailFlyout({ open, extItems = [], anchorTop = 0, 
     >
       <div className="account-rail-flyout-header">
         <div className="account-rail-flyout-title">
-          {isZh ? "所有功能" : "All Features"}
+          {title}
         </div>
         <div className="account-rail-flyout-hint">
           {isZh ? (
