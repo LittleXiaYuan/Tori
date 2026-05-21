@@ -43,7 +43,7 @@ nul
 vendor/
 
 # ── Legacy frontend (已归档) ──
-web/
+/web/
 docs/node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
