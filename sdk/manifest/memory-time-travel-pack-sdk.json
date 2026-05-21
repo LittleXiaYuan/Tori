@@ -1,7 +1,7 @@
 {
   "version": 1,
   "domain": "memory-time-travel-pack",
-  "packManifest": "packs/examples/memory-time-travel-pack/pack.json",
+  "packManifest": "packs/official/memory-time-travel-pack/pack.json",
   "sdkImport": "yunque-client/memory-time-travel",
   "routes": [
     "GET /v1/memory-time-travel/status",

@@ -7,7 +7,7 @@
     "Keep backend method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import the existing yunque-client/cognis slice only when the Cogni Kernel pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/cogni-kernel-pack/pack.json",
+  "packManifest": "packs/official/cogni-kernel-pack/pack.json",
   "sdkImport": "yunque-client/cognis",
   "routes": [
     "GET /v1/cognis",

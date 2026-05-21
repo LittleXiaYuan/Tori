@@ -12,9 +12,9 @@ describe("packs-client", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ packs: [], count: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         generated_at: "2026-05-17T00:00:00Z",
-        sources: ["packs/examples", "packs/private"],
+        sources: ["packs/official", "packs/private"],
         source_reports: [
-          { source: "packs/examples", ok: true, manifest_count: 2, matched_entries: 1 },
+          { source: "packs/official", ok: true, manifest_count: 2, matched_entries: 1 },
           { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
         ],
         count: 1,
@@ -24,8 +24,8 @@ describe("packs-client", () => {
         capabilities: 1,
         capability: "browser.intent",
         entries: [{
-          manifest_path: "packs/examples/browser-intent-pack/pack.json",
-          source: "packs/examples",
+          manifest_path: "packs/official/browser-intent-pack/pack.json",
+          source: "packs/official",
           manifest: { id: "yunque.pack.browser-intent", name: "Browser Intent Pack", version: "0.1.0", backend: { capabilities: ["browser.intent"] }, distribution: { packageUrl: "https://packs.yunque.local/browser.tgz", sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" } },
           installed: false,
           enabled: false,
@@ -106,8 +106,8 @@ describe("packs-client", () => {
         required_packs: [{ capability: "backup.info", pack_id: "yunque.pack.backup", pack_name: "Backup Pack", pack_status: "enabled", enabled: true, optional: true }],
         enable_packs: [{ capability: "browser.intent", pack_id: "yunque.pack.browser-intent", pack_name: "Browser Intent Pack", pack_status: "disabled", enabled: false, optional: true }],
         catalog_install_hints: [{
-          manifest_path: "packs/examples/rpa-replay-pack/pack.json",
-          source: "packs/examples",
+          manifest_path: "packs/official/rpa-replay-pack/pack.json",
+          source: "packs/official",
           manifest: { id: "yunque.pack.rpa-replay", name: "RPA Replay Pack", version: "0.1.0", backend: { capabilities: ["rpa.replay.plan"] }, distribution: { packageUrl: "https://packs.yunque.local/rpa.tgz", sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" } },
           installed: false,
           enabled: false,
@@ -115,8 +115,8 @@ describe("packs-client", () => {
           downloadable: true,
         }],
         catalog_download_hints: [{
-          manifest_path: "packs/examples/rpa-replay-pack/pack.json",
-          source: "packs/examples",
+          manifest_path: "packs/official/rpa-replay-pack/pack.json",
+          source: "packs/official",
           manifest: { id: "yunque.pack.rpa-replay", name: "RPA Replay Pack", version: "0.1.0", backend: { capabilities: ["rpa.replay.plan"] }, distribution: { packageUrl: "https://packs.yunque.local/rpa.tgz", sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" } },
           installed: false,
           enabled: false,
@@ -124,7 +124,7 @@ describe("packs-client", () => {
           downloadable: true,
         }],
         catalog_source_reports: [
-          { source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 },
+          { source: "packs/official", ok: true, manifest_count: 1, matched_entries: 1 },
           { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
         ],
       }), { status: 200 }))
@@ -134,16 +134,16 @@ describe("packs-client", () => {
         allowed: false,
         action: "install",
         catalog_source_reports: [
-          { source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 },
+          { source: "packs/official", ok: true, manifest_count: 1, matched_entries: 1 },
           { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] },
         ],
-        plan: { generated_at: "2026-05-17T00:00:02Z", capabilities: ["backup.info", "browser.intent"], allowed: false, action: "install", allowed_count: 1, blocked_count: 1, use_count: 1, enable_count: 0, install_count: 1, route_audit_issue_count: 0, gates: [], catalog_source_reports: [{ source: "packs/examples", ok: true, manifest_count: 1, matched_entries: 1 }, { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] }] },
+        plan: { generated_at: "2026-05-17T00:00:02Z", capabilities: ["backup.info", "browser.intent"], allowed: false, action: "install", allowed_count: 1, blocked_count: 1, use_count: 1, enable_count: 0, install_count: 1, route_audit_issue_count: 0, gates: [], catalog_source_reports: [{ source: "packs/official", ok: true, manifest_count: 1, matched_entries: 1 }, { source: "packs/private", ok: false, manifest_count: 0, matched_entries: 0, errors: ["pack catalog source packs/private: not found"] }] },
         steps: [{
           action: "download",
           pack_id: "yunque.pack.rpa-replay",
           pack_name: "RPA Replay Pack",
           capability: "rpa.replay.plan",
-          manifest_path: "packs/examples/rpa-replay-pack/pack.json",
+          manifest_path: "packs/official/rpa-replay-pack/pack.json",
           package_url: "https://packs.yunque.local/rpa.tgz",
           sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           installed: false,
@@ -205,7 +205,7 @@ describe("packs-client", () => {
       "/v1/packs/backend-modules",
       "/v1/packs/backend-route-audit",
     ]);
-    expect(catalog.sources).toEqual(["packs/examples", "packs/private"]);
+    expect(catalog.sources).toEqual(["packs/official", "packs/private"]);
     expect(catalog.source_reports?.[0]?.matched_entries).toBe(1);
     expect(catalog.source_reports?.[1]?.ok).toBe(false);
     expect(catalog.source_reports?.[1]?.errors?.[0]).toContain("packs/private");
@@ -225,7 +225,7 @@ describe("packs-client", () => {
     expect(plan.catalog_source_reports?.[1]?.ok).toBe(false);
     expect(prepare.action).toBe("install");
     expect(prepare.catalog_source_reports?.[1]?.errors?.[0]).toContain("packs/private");
-    expect(prepare.plan.catalog_source_reports?.[0]?.source).toBe("packs/examples");
+    expect(prepare.plan.catalog_source_reports?.[0]?.source).toBe("packs/official");
     expect(prepare.download_steps?.[0]?.sha256).toBe("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     const summary = summarizeCapabilityPrepare(prepare.plan, prepare);
     expect(summary.kind).toBe("pack_capability_prepare_summary");
@@ -242,12 +242,12 @@ describe("packs-client", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ pack: { status: "enabled" }, status: "enabled" }), { status: 200 }));
 
     const client = createPacksClient();
-    await client.installLocal("packs/examples/backup-pack/pack.json", "local", false);
+    await client.installLocal("packs/official/backup-pack/pack.json", "local", false);
     await client.installFromURL("https://packs.example/pack.json", "remote", true);
 
     expect(fetchSpy.mock.calls[0]?.[0]).toBe("/v1/packs/install");
     expect(JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
-      manifest_path: "packs/examples/backup-pack/pack.json",
+      manifest_path: "packs/official/backup-pack/pack.json",
       source: "local",
       download: false,
     });

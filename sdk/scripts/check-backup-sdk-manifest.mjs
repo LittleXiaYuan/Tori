@@ -9,7 +9,7 @@ const requiredCapabilities = ["info", "export", "import"];
 const capabilityNames = new Set((manifest.capabilities ?? []).map((cap) => cap.name));
 for (const required of requiredCapabilities) if (!capabilityNames.has(required)) fail(`manifest missing capability: ${required}`);
 for (const actual of capabilityNames) if (!requiredCapabilities.includes(actual)) fail(`manifest has unexpected capability: ${actual}`);
-const routes = readRepoFile("packs/examples/backup-pack/pack.json") + "\n" + readRepoFile("internal/packs/backup/handler.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_packs.go");
+const routes = readRepoFile("packs/official/backup-pack/pack.json") + "\n" + readRepoFile("internal/packs/backup/handler.go") + "\n" + readRepoFile("internal/controlplane/gateway/handlers_packs.go");
 for (const route of ['"/v1/backup/info"', '"/v1/backup/export"', '"/v1/backup/import"']) if (!routes.includes(route)) fail(`gateway route not found: ${route}`);
 for (const handler of ["PackID", "Routes() []packruntime.BackendRoute", "Info", "Export", "Import", "requirePackRoute"]) if (!routes.includes(handler)) fail(`backup pack route contract not found: ${handler}`);
 function symbolAlternatives(symbol) { const raw = symbol.split("#").pop().replace(/\(\).*$/, ""); const tail = raw.replace(/^.*\./, "").replace(/^.*::/, ""); const snake = tail.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`).replace(/^_/, ""); return [raw, tail, tail.replace(/^[A-Z]/, (c) => c.toLowerCase()), tail.replace(/^[a-z]/, (c) => c.toUpperCase()), snake].filter(Boolean); }

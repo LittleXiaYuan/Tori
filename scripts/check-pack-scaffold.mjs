@@ -11,8 +11,8 @@ function fail(message) {
 }
 
 const expectedFiles = [
-  "packs/examples/verifier-pack/pack.json",
-  "packs/examples/verifier-pack/README.md",
+  "packs/official/verifier-pack/pack.json",
+  "packs/official/verifier-pack/README.md",
   "internal/packs/verifierpack/handler.go",
   "apps/web/src/app/packs/verifier-pack/page.tsx",
   "apps/web/src/lib/verifier-pack-pack-client.ts",

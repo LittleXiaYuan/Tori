@@ -87,7 +87,7 @@ for (const token of [
   "BackendRouteInfo{Method",
   "Methods: methods",
   "cognikernelpack.NewHandler",
-  "packs/examples/cogni-kernel-pack/pack.json",
+  "packs/official/cogni-kernel-pack/pack.json",
   "ensureBuiltinPacks",
   "loadBuiltinPackManifest",
 ]) {

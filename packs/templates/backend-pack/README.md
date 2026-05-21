@@ -5,7 +5,7 @@
 ## 复制模板
 
 ```powershell
-Copy-Item -Recurse packs/templates/backend-pack packs/examples/my-pack
+Copy-Item -Recurse packs/templates/backend-pack packs/official/my-pack
 ```
 
 然后修改：

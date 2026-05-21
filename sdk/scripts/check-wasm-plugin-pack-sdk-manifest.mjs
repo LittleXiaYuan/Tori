@@ -175,7 +175,7 @@ for (const token of [
   "json-wasm-plugin-evidence",
   "cfg.DataPath(\"wasm-plugin\")",
   "wasmpluginpack.New",
-  "packs/examples/wasm-plugin-pack/pack.json",
+  "packs/official/wasm-plugin-pack/pack.json",
   "ensureBuiltinPacks",
   "TestWASMPluginPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

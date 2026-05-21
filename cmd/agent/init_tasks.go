@@ -530,18 +530,18 @@ func ensureBuiltinPacks(registry *packruntime.Registry) {
 		return
 	}
 	for _, manifestPath := range []string{
-		"packs/examples/backup-pack/pack.json",
-		"packs/examples/cogni-kernel-pack/pack.json",
-		"packs/examples/lora-pack/pack.json",
-		"packs/examples/browser-intent-pack/pack.json",
-		"packs/examples/chaos-probe-pack/pack.json",
-		"packs/examples/cognitive-canary-pack/pack.json",
-		"packs/examples/guardrail-fuzzer-pack/pack.json",
-		"packs/examples/memory-time-travel-pack/pack.json",
-		"packs/examples/rpa-replay-pack/pack.json",
-		"packs/examples/sbom-drift-pack/pack.json",
-		"packs/examples/skill-anomaly-pack/pack.json",
-		"packs/examples/wasm-plugin-pack/pack.json",
+		"packs/official/backup-pack/pack.json",
+		"packs/official/cogni-kernel-pack/pack.json",
+		"packs/official/lora-pack/pack.json",
+		"packs/official/browser-intent-pack/pack.json",
+		"packs/official/chaos-probe-pack/pack.json",
+		"packs/official/cognitive-canary-pack/pack.json",
+		"packs/official/guardrail-fuzzer-pack/pack.json",
+		"packs/official/memory-time-travel-pack/pack.json",
+		"packs/official/rpa-replay-pack/pack.json",
+		"packs/official/sbom-drift-pack/pack.json",
+		"packs/official/skill-anomaly-pack/pack.json",
+		"packs/official/wasm-plugin-pack/pack.json",
 	} {
 		manifest, err := loadBuiltinPackManifest(manifestPath)
 		if err != nil {

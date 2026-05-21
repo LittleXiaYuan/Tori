@@ -216,7 +216,7 @@ func (c Config) IsModuleDisabled(name string) bool {
 }
 
 var defaultPackCatalogSources = []string{
-	filepath.Join("packs", "examples"),
+	filepath.Join("packs", "official"),
 	filepath.Join("packs", "templates"),
 }
 
@@ -229,7 +229,7 @@ func DefaultPackCatalogSources() []string {
 // PackCatalogSourceDirs returns the local pack manifest sources used by the
 // read-only Pack Runtime catalog. PACK_CATALOG_SOURCES accepts a comma-separated
 // list of directories or explicit pack.json files. Empty/whitespace-only values
-// fall back to the built-in examples/templates catalog.
+// fall back to the built-in official/templates catalog.
 func (c Config) PackCatalogSourceDirs() []string {
 	sources := ParsePaths(c.PackCatalogSources)
 	if len(sources) == 0 {

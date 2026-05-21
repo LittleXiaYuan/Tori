@@ -46,7 +46,7 @@ import { useApiData } from "@/lib/use-api-data";
 import { formatErrorMessage } from "@/lib/error-utils";
 import { formatBackendRouteSpec } from "@/lib/pack-sync";
 
-const EXAMPLE_BACKUP_MANIFEST = "packs/examples/backup-pack/pack.json";
+const OFFICIAL_BACKUP_MANIFEST = "packs/official/backup-pack/pack.json";
 const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
 function formatTime(value?: string): string {
@@ -120,7 +120,7 @@ export default function PacksPage() {
     undeclared_routes: 0,
     entries: [],
   });
-  const [manifestPath, setManifestPath] = useState(EXAMPLE_BACKUP_MANIFEST);
+  const [manifestPath, setManifestPath] = useState(OFFICIAL_BACKUP_MANIFEST);
   const [manifestUrl, setManifestUrl] = useState("");
   const [downloadArtifact, setDownloadArtifact] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -502,7 +502,7 @@ export default function PacksPage() {
           <div className="flex flex-col md:flex-row gap-3">
             <TextField value={manifestPath} onChange={(v: string) => setManifestPath(v)} className="flex-1">
               <Label>manifest_path</Label>
-              <Input placeholder={EXAMPLE_BACKUP_MANIFEST} />
+              <Input placeholder={OFFICIAL_BACKUP_MANIFEST} />
             </TextField>
             <Button className="btn-accent md:self-end" isDisabled={!manifestPath || busy === "install"} onPress={install}>
               <Download size={14} /> 安装本地
@@ -605,7 +605,7 @@ export default function PacksPage() {
         </div>
         {catalog.entries.length === 0 ? (
           <div className="text-xs rounded-xl p-3" style={{ color: "var(--yunque-text-muted)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--yunque-border)" }}>
-            暂无 catalog manifest。请确认 `packs/examples` 或企业私有 pack 源已配置。
+            暂无 catalog manifest。请确认 `packs/official` 或企业私有 pack 源已配置。
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">

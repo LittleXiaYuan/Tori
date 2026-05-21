@@ -67,29 +67,29 @@ const gateway = [
   "cmd/agent/init_tasks.go",
 ].map(read).join("\n");
 const backup = read("internal/packs/backup/handler.go");
-const backupManifest = read("packs/examples/backup-pack/pack.json");
+const backupManifest = read("packs/official/backup-pack/pack.json");
 const loraPack = read("internal/packs/lora/handler.go");
-const loraManifest = read("packs/examples/lora-pack/pack.json");
+const loraManifest = read("packs/official/lora-pack/pack.json");
 const cogniKernelPack = read("internal/packs/cognikernel/handler.go");
-const cogniKernelManifest = read("packs/examples/cogni-kernel-pack/pack.json");
+const cogniKernelManifest = read("packs/official/cogni-kernel-pack/pack.json");
 const browserIntentPack = read("internal/packs/browserintent/handler.go");
-const browserIntentManifest = read("packs/examples/browser-intent-pack/pack.json");
+const browserIntentManifest = read("packs/official/browser-intent-pack/pack.json");
 const chaosProbePack = read("internal/packs/chaosprobe/handler.go");
-const chaosProbeManifest = read("packs/examples/chaos-probe-pack/pack.json");
+const chaosProbeManifest = read("packs/official/chaos-probe-pack/pack.json");
 const cognitiveCanaryPack = read("internal/packs/cognitivecanary/handler.go");
-const cognitiveCanaryManifest = read("packs/examples/cognitive-canary-pack/pack.json");
+const cognitiveCanaryManifest = read("packs/official/cognitive-canary-pack/pack.json");
 const guardrailFuzzerPack = read("internal/packs/guardrailfuzzer/handler.go");
-const guardrailFuzzerManifest = read("packs/examples/guardrail-fuzzer-pack/pack.json");
+const guardrailFuzzerManifest = read("packs/official/guardrail-fuzzer-pack/pack.json");
 const memoryTimeTravelPack = read("internal/packs/memorytimetravel/handler.go");
-const memoryTimeTravelManifest = read("packs/examples/memory-time-travel-pack/pack.json");
+const memoryTimeTravelManifest = read("packs/official/memory-time-travel-pack/pack.json");
 const rpaReplayPack = read("internal/packs/rpareplay/handler.go");
-const rpaReplayManifest = read("packs/examples/rpa-replay-pack/pack.json");
+const rpaReplayManifest = read("packs/official/rpa-replay-pack/pack.json");
 const sbomDriftPack = read("internal/packs/sbomdrift/handler.go");
-const sbomDriftManifest = read("packs/examples/sbom-drift-pack/pack.json");
+const sbomDriftManifest = read("packs/official/sbom-drift-pack/pack.json");
 const skillAnomalyPack = read("internal/packs/skillanomaly/handler.go");
-const skillAnomalyManifest = read("packs/examples/skill-anomaly-pack/pack.json");
+const skillAnomalyManifest = read("packs/official/skill-anomaly-pack/pack.json");
 const wasmPluginPack = read("internal/packs/wasmplugin/handler.go");
-const wasmPluginManifest = read("packs/examples/wasm-plugin-pack/pack.json");
+const wasmPluginManifest = read("packs/official/wasm-plugin-pack/pack.json");
 const scaffold = read("scripts/scaffold-pack.mjs") + "\n" + read("scripts/check-pack-scaffold.mjs");
 const fullVerification = read("scripts/check-pack-runtime-all.mjs");
 const frontend = [
@@ -266,17 +266,17 @@ requireTokens("本地 installed registry / install-enable-disable-rollback", reg
   "/v1/packs/prune",
   "ensureBuiltinPacks",
   "loadBuiltinPackManifest",
-  "packs/examples/lora-pack/pack.json",
-  "packs/examples/cogni-kernel-pack/pack.json",
-  "packs/examples/browser-intent-pack/pack.json",
-  "packs/examples/chaos-probe-pack/pack.json",
-  "packs/examples/cognitive-canary-pack/pack.json",
-  "packs/examples/guardrail-fuzzer-pack/pack.json",
-  "packs/examples/memory-time-travel-pack/pack.json",
-  "packs/examples/rpa-replay-pack/pack.json",
-  "packs/examples/sbom-drift-pack/pack.json",
-  "packs/examples/skill-anomaly-pack/pack.json",
-  "packs/examples/wasm-plugin-pack/pack.json",
+  "packs/official/lora-pack/pack.json",
+  "packs/official/cogni-kernel-pack/pack.json",
+  "packs/official/browser-intent-pack/pack.json",
+  "packs/official/chaos-probe-pack/pack.json",
+  "packs/official/cognitive-canary-pack/pack.json",
+  "packs/official/guardrail-fuzzer-pack/pack.json",
+  "packs/official/memory-time-travel-pack/pack.json",
+  "packs/official/rpa-replay-pack/pack.json",
+  "packs/official/sbom-drift-pack/pack.json",
+  "packs/official/skill-anomaly-pack/pack.json",
+  "packs/official/wasm-plugin-pack/pack.json",
 ]);
 
 requireTokens("后端 backend pack module registry / route gates", backend + gateway, [
@@ -354,7 +354,7 @@ requireTokens("Pack catalog source 配置化", config + gateway + backend + fron
   "cfg.PackCatalogSourceDirs()",
   "TestPackCatalogSourceDirsDefaults",
   "TestPackCatalogSourceDirsFromEnv",
-  "packs/examples,packs/templates",
+  "packs/official,packs/templates",
   "PackCatalogSourceReport",
   "source_reports",
   "catalog_source_reports",

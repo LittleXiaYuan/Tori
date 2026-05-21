@@ -291,7 +291,7 @@ for (const token of [
   "json-memory-time-travel-evidence",
   "cfg.DataPath(\"memory-time-travel\")",
   "memorytimetravelpack.New",
-  "packs/examples/memory-time-travel-pack/pack.json",
+  "packs/official/memory-time-travel-pack/pack.json",
   "ensureBuiltinPacks",
   "TestMemoryTimeTravelPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

@@ -7,7 +7,7 @@
     "Keep Chaos Probe method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/chaos-probe only when the Chaos Probe pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/chaos-probe-pack/pack.json",
+  "packManifest": "packs/official/chaos-probe-pack/pack.json",
   "sdkImport": "yunque-client/chaos-probe",
   "routes": [
     "GET /v1/chaos-probe/status",

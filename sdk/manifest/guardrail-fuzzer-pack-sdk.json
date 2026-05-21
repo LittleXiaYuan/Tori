@@ -7,7 +7,7 @@
     "Keep guardrail fuzzer method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/guardrail-fuzzer only when the Guardrail Fuzzer pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/guardrail-fuzzer-pack/pack.json",
+  "packManifest": "packs/official/guardrail-fuzzer-pack/pack.json",
   "sdkImport": "yunque-client/guardrail-fuzzer",
   "routes": [
     "GET /v1/guardrail-fuzzer/status",

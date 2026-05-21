@@ -106,7 +106,7 @@ for (const token of [
   "action_allowed",
   "cfg.DataPath(\"skill-anomaly\")",
   "skillanomalypack.New",
-  "packs/examples/skill-anomaly-pack/pack.json",
+  "packs/official/skill-anomaly-pack/pack.json",
   "ensureBuiltinPacks",
   "TestSkillAnomalyPackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

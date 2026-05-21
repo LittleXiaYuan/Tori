@@ -14,7 +14,7 @@ import type { InstalledPack } from "../pack-types";
 
 const backupPack: InstalledPack = {
   status: "enabled",
-  source: "packs/examples/backup-pack",
+  source: "packs/official/backup-pack",
   manifest: {
     id: "yunque.pack.backup",
     name: "Backup Pack",
@@ -37,7 +37,7 @@ const backupPack: InstalledPack = {
 
 const laterPack: InstalledPack = {
   status: "enabled",
-  source: "packs/examples/later-pack",
+  source: "packs/official/later-pack",
   manifest: {
     id: "yunque.pack.later",
     name: "Later Pack",
@@ -54,7 +54,7 @@ const laterPack: InstalledPack = {
 
 const loraPack: InstalledPack = {
   status: "enabled",
-  source: "packs/examples/lora-pack",
+  source: "packs/official/lora-pack",
   manifest: {
     id: "yunque.pack.lora",
     name: "LoRA / LAA Evolution Pack",
@@ -77,7 +77,7 @@ const loraPack: InstalledPack = {
 
 const cogniKernelPack: InstalledPack = {
   status: "enabled",
-  source: "packs/examples/cogni-kernel-pack",
+  source: "packs/official/cogni-kernel-pack",
   manifest: {
     id: "yunque.pack.cogni-kernel",
     name: "Cogni Kernel Pack",

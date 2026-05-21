@@ -59,7 +59,7 @@ const scaffoldScript = readText("scripts/scaffold-pack.mjs");
 const scaffoldCheck = readText("scripts/check-pack-scaffold.mjs");
 const completionCheck = readText("scripts/check-pack-runtime-completion.mjs");
 for (const token of [
-  "packs/examples/chaos-probe-pack",
+  "packs/official/chaos-probe-pack",
   "yunque.pack.chaos-probe",
   "pack-shell-before-scheduler",
   "yunque-client/chaos-probe",
@@ -74,7 +74,7 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Chaos Probe token: ${token}`);
 }
 for (const token of [
-  "packs/examples/wasm-plugin-pack",
+  "packs/official/wasm-plugin-pack",
   "yunque.pack.wasm-plugin",
   "pack-shell-before-runtime-hosts",
   "yunque-client/wasm-plugin",
@@ -85,7 +85,7 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing WASM Plugin token: ${token}`);
 }
 for (const token of [
-  "packs/examples/skill-anomaly-pack",
+  "packs/official/skill-anomaly-pack",
   "yunque.pack.skill-anomaly",
   "pack-shell-before-audit-hook",
   "yunque-client/skill-anomaly",
@@ -95,7 +95,7 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Skill Anomaly token: ${token}`);
 }
 for (const token of [
-  "packs/examples/guardrail-fuzzer-pack",
+  "packs/official/guardrail-fuzzer-pack",
   "yunque.pack.guardrail-fuzzer",
   "pack-shell-before-ci-fuzz",
   "yunque-client/guardrail-fuzzer",
@@ -111,7 +111,7 @@ for (const token of [
   if (!packRuntimeBlueprint.includes(token)) fail(`PACK-RUNTIME-BLUEPRINT.md missing Guardrail Fuzzer token: ${token}`);
 }
 for (const token of [
-  "packs/examples/memory-time-travel-pack",
+  "packs/official/memory-time-travel-pack",
   "yunque.pack.memory-time-travel",
   "pack-shell-before-ledger-kv-history",
   "yunque-client/memory-time-travel",
@@ -202,11 +202,11 @@ for (const [name, text] of [["docs/guide/pack-runtime.md", englishGuide], ["docs
   }
 }
 const configDocs = readText("docs/guide/configuration.md") + "\n" + readText("docs/zh/guide/configuration.md") + "\n" + readText(".env.example");
-for (const token of ["PACK_CATALOG_SOURCES", "packs/examples,packs/templates", "/v1/packs/catalog", "pack.json"]) {
+for (const token of ["PACK_CATALOG_SOURCES", "packs/official,packs/templates", "/v1/packs/catalog", "pack.json"]) {
   if (!configDocs.includes(token)) fail(`Pack catalog configuration docs missing token: ${token}`);
 }
 
-for (const token of ["packs/examples", "internal/packs", "apps/web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "routeSpecs", "routeMethod", "--method", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
+for (const token of ["packs/official", "internal/packs", "apps/web/src/app/packs", "update: { channel: \"stable\", rollback: true }", "sdk: { typescript: sdk }", "routeSpecs", "routeMethod", "--method", "distribution:", "packageUrl", "frontendUrl", "sha256", "RegisterBackendPack", "--dry-run", "--json", "dryRun", "jsonOutput"]) {
   if (!scaffoldScript.includes(token)) fail(`scaffold-pack.mjs missing token: ${token}`);
 }
 for (const token of ["verifier-pack", "--dry-run", "--json", "manifest.backend.routeSpecs", "manifest.frontend.menus", "manifest.frontend.routes", "manifest.sdk.typescript", "manifest.distribution.packageUrl", "manifest.distribution.frontendUrl", "manifest.distribution.sha256", "manifest.update.rollback"]) {
@@ -287,7 +287,7 @@ const gatewaySource = readText("internal/controlplane/gateway/handlers_packs.go"
   + readText("internal/packs/wasmplugin/handler.go")
   + "\n"
   + readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
-for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackCatalog", "packCatalogReport", "/v1/packs/catalog", "SetPackCatalogSources", "cfg.PackCatalogSourceDirs()", "PACK_CATALOG_SOURCES", "PackCatalogSourceDirs", "DefaultPackCatalogSources", "TestPackCatalogSourceDirsFromEnv", "sourceReport.MatchedEntries", "SourceReports", "manifest and matched counts", "handlePackCapabilities", "handlePackCapabilityResolve", "handlePackCapabilityGate", "handlePackCapabilityPlan", "packCapabilityIndexReport", "packCapabilityResolveReport", "packCapabilityGateReport", "packCapabilityPlanReport", "/v1/packs/capabilities", "/v1/packs/capabilities/resolve", "/v1/packs/capabilities/gate", "/v1/packs/capabilities/plan", "handlePackBackendModules", "handlePackBackendRouteAudit", "backendRouteAuditReport", "/v1/packs/backend-route-audit", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackCatalogListsInstallableManifestsAndCapabilityHints", "TestPackBackendModulesExposeMountedRoutes", "TestPackCapabilitiesExposeManifestCapabilityIndex", "TestPackCapabilityResolveReturnsPreferredAction", "TestPackCapabilityGateChecksEnabledStateAndRouteAudit", "TestPackCapabilityPlanAggregatesWorkflowPreflight", "TestPackBackendRouteAuditComparesManifestAndMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/examples/lora-pack/pack.json", "packs/examples/cogni-kernel-pack/pack.json", "packs/examples/browser-intent-pack/pack.json", "packs/examples/chaos-probe-pack/pack.json", "packs/examples/cognitive-canary-pack/pack.json", "packs/examples/guardrail-fuzzer-pack/pack.json", "packs/examples/memory-time-travel-pack/pack.json", "packs/examples/rpa-replay-pack/pack.json", "packs/examples/sbom-drift-pack/pack.json", "packs/examples/skill-anomaly-pack/pack.json", "packs/examples/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "cognitivecanarypack.New", "cfg.DataPath(\"cognitive-canary\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "memorytimetravelpack.New", "cfg.DataPath(\"memory-time-travel\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "ServeCogniKernel", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
+for (const token of ["BackendPacks", "RegisterBackendPack", "registerBackendPack", "requirePackRoute", "backendPackAuth", "BackendRouteAuthPassthrough", "backendPackRoutes", "backendPackRouteInfos", "BackendRouteInfo{Method", "Methods: methods", "normalizeBackendRouteMethods", "must declare an HTTP method", "handlePackCatalog", "packCatalogReport", "/v1/packs/catalog", "SetPackCatalogSources", "cfg.PackCatalogSourceDirs()", "PACK_CATALOG_SOURCES", "PackCatalogSourceDirs", "DefaultPackCatalogSources", "TestPackCatalogSourceDirsFromEnv", "sourceReport.MatchedEntries", "SourceReports", "manifest and matched counts", "handlePackCapabilities", "handlePackCapabilityResolve", "handlePackCapabilityGate", "handlePackCapabilityPlan", "packCapabilityIndexReport", "packCapabilityResolveReport", "packCapabilityGateReport", "packCapabilityPlanReport", "/v1/packs/capabilities", "/v1/packs/capabilities/resolve", "/v1/packs/capabilities/gate", "/v1/packs/capabilities/plan", "handlePackBackendModules", "handlePackBackendRouteAudit", "backendRouteAuditReport", "/v1/packs/backend-route-audit", "handlePackPrune", "/v1/packs/prune", "Download     bool", "CacheDistribution", "PruneArtifacts", "InstallWithArtifacts", "route conflict", "TestRegisterBackendPackMountsModuleAfterGatewayConstruction", "TestRegisterBackendPackIsIdempotentForSamePackRoute", "TestRegisterBackendPackPanicsOnRouteConflict", "TestPackCatalogListsInstallableManifestsAndCapabilityHints", "TestPackBackendModulesExposeMountedRoutes", "TestPackCapabilitiesExposeManifestCapabilityIndex", "TestPackCapabilityResolveReturnsPreferredAction", "TestPackCapabilityGateChecksEnabledStateAndRouteAudit", "TestPackCapabilityPlanAggregatesWorkflowPreflight", "TestPackBackendRouteAuditComparesManifestAndMountedRoutes", "TestBackendPackMultiMethodRouteInfoAndGate", "TestBackendPackPassthroughAuthRouteKeepsPackGate", "expected mounted route method to be preserved", "expected downloaded artifacts to be recorded", "ensureBuiltinPacks", "loadBuiltinPackManifest", "packs/official/lora-pack/pack.json", "packs/official/cogni-kernel-pack/pack.json", "packs/official/browser-intent-pack/pack.json", "packs/official/chaos-probe-pack/pack.json", "packs/official/cognitive-canary-pack/pack.json", "packs/official/guardrail-fuzzer-pack/pack.json", "packs/official/memory-time-travel-pack/pack.json", "packs/official/rpa-replay-pack/pack.json", "packs/official/sbom-drift-pack/pack.json", "packs/official/skill-anomaly-pack/pack.json", "packs/official/wasm-plugin-pack/pack.json", "backuppack.DefaultHandler()", "lorapack.NewHandler", "cognikernelpack.NewHandler", "browserintentpack.NewHandler", "chaosprobepack.New", "cfg.DataPath(\"chaos-probe\")", "cognitivecanarypack.New", "cfg.DataPath(\"cognitive-canary\")", "guardrailfuzzerpack.New", "cfg.DataPath(\"guardrail-fuzzer\")", "memorytimetravelpack.New", "cfg.DataPath(\"memory-time-travel\")", "rpareplaypack.New", "cfg.DataPath(\"rpa-replay\")", "sbomdriftpack.New", "cfg.DataPath(\"sbom-drift\")", "skillanomalypack.New", "cfg.DataPath(\"skill-anomaly\")", "ServeCogniKernel", "HandleBrowserIntentPack", "BackendPacks: []packruntime.BackendModule"]) {
   if (!gatewaySource.includes(token)) fail(`gateway pack registration missing token: ${token}`);
 }
 if (/must be called before Gateway routes are registered/.test(gatewaySource)) {
@@ -304,12 +304,12 @@ for (const token of ["type BackendRoute", "Method  string", "Methods []string", 
 if (!backendContract.includes("json:\"catalog_source_reports")) fail("packruntime backend contract missing token: json:\"catalog_source_reports");
 
 const packFiles = [
-  ...walk("packs/examples").filter((path) => path.endsWith("/pack.json")),
+  ...walk("packs/official").filter((path) => path.endsWith("/pack.json")),
   ...walk("packs/templates").filter((path) => path.endsWith("/pack.json")),
 ].sort();
 
 if (packFiles.length === 0) {
-  fail("no pack manifests found under packs/examples or packs/templates");
+  fail("no pack manifests found under packs/official or packs/templates");
 }
 
 for (const path of packFiles) {
@@ -369,24 +369,24 @@ for (const path of packFiles) {
 
 const apiSource = readText("apps/web/src/lib/api.ts");
 
-const backupManifest = readJSON("packs/examples/backup-pack/pack.json");
+const backupManifest = readJSON("packs/official/backup-pack/pack.json");
 const backupSource = readText("internal/packs/backup/handler.go");
 if (backupManifest) {
   if (!backupSource.includes(`const PackID = "${backupManifest.id}"`)) {
-    fail("backup pack handler PackID must match packs/examples/backup-pack/pack.json");
+    fail("backup pack handler PackID must match packs/official/backup-pack/pack.json");
   }
   for (const route of backupManifest.backend?.routes ?? []) {
     if (!backupSource.includes(route)) fail(`backup handler missing route declared in manifest: ${route}`);
   }
 }
 
-const loraManifest = readJSON("packs/examples/lora-pack/pack.json");
+const loraManifest = readJSON("packs/official/lora-pack/pack.json");
 const loraSource = readText("internal/packs/lora/handler.go");
 const loraPage = readText("apps/web/src/app/packs/lora/page.tsx");
 const legacyLoraPage = readText("apps/web/src/app/lora/page.tsx");
 if (loraManifest) {
   if (!loraSource.includes(`const PackID = "${loraManifest.id}"`)) {
-    fail("lora pack handler PackID must match packs/examples/lora-pack/pack.json");
+    fail("lora pack handler PackID must match packs/official/lora-pack/pack.json");
   }
   for (const route of loraManifest.backend?.routes ?? []) {
     if (!loraSource.includes(route)) fail(`lora handler missing route declared in manifest: ${route}`);
@@ -402,7 +402,7 @@ if (!legacyLoraPage.includes('redirect("/packs/lora")')) {
   fail("legacy /lora page should redirect to /packs/lora");
 }
 
-const cogniKernelManifest = readJSON("packs/examples/cogni-kernel-pack/pack.json");
+const cogniKernelManifest = readJSON("packs/official/cogni-kernel-pack/pack.json");
 const cogniKernelSource = readText("internal/packs/cognikernel/handler.go");
 const cogniGatewayBridge = readText("internal/controlplane/gateway/handlers_cogni.go");
 const cogniKernelPage = readText("apps/web/src/app/packs/cognis/page.tsx");
@@ -410,7 +410,7 @@ const legacyCogniPage = readText("apps/web/src/app/cognis/page.tsx");
 const cogniKernelClient = readText("apps/web/src/lib/cogni-kernel-pack-client.ts");
 if (cogniKernelManifest) {
   if (!cogniKernelSource.includes(`const PackID = "${cogniKernelManifest.id}"`)) {
-    fail("Cogni Kernel pack handler PackID must match packs/examples/cogni-kernel-pack/pack.json");
+    fail("Cogni Kernel pack handler PackID must match packs/official/cogni-kernel-pack/pack.json");
   }
   for (const route of cogniKernelManifest.backend?.routes ?? []) {
     if (!cogniKernelSource.includes(route)) fail(`Cogni Kernel handler missing route declared in manifest: ${route}`);
@@ -452,7 +452,7 @@ if (hardcodedCogniShell.includes('href: "/cognis"') || hardcodedCogniShell.inclu
   fail("Cogni Kernel must not remain a hard-coded main-shell nav item; use /v1/packs/enabled pack sync");
 }
 
-const browserIntentManifest = readJSON("packs/examples/browser-intent-pack/pack.json");
+const browserIntentManifest = readJSON("packs/official/browser-intent-pack/pack.json");
 const browserIntentSource = readText("internal/packs/browserintent/handler.go");
 const browserIntentBridge = readText("internal/controlplane/gateway/handlers_browser_pack.go");
 const browserIntentPage = readText("apps/web/src/app/packs/browser/page.tsx");
@@ -460,7 +460,7 @@ const legacyBrowserPage = readText("apps/web/src/app/browser/page.tsx");
 const browserIntentClient = readText("apps/web/src/lib/browser-intent-pack-client.ts");
 if (browserIntentManifest) {
   if (!browserIntentSource.includes(`const PackID = "${browserIntentManifest.id}"`)) {
-    fail("Browser Intent pack handler PackID must match packs/examples/browser-intent-pack/pack.json");
+    fail("Browser Intent pack handler PackID must match packs/official/browser-intent-pack/pack.json");
   }
   for (const route of browserIntentManifest.backend?.routes ?? []) {
     if (!browserIntentSource.includes(route)) fail(`Browser Intent handler missing route declared in manifest: ${route}`);
@@ -500,7 +500,7 @@ if (hardcodedBrowserShell.includes('href: "/browser"') || hardcodedBrowserShell.
 }
 
 
-const chaosProbeManifest = readJSON("packs/examples/chaos-probe-pack/pack.json");
+const chaosProbeManifest = readJSON("packs/official/chaos-probe-pack/pack.json");
 const chaosProbeSource = readText("internal/packs/chaosprobe/handler.go");
 const chaosProbeGateTest = readText("internal/controlplane/gateway/handlers_chaos_probe_pack_test.go");
 const chaosProbePage = readText("apps/web/src/app/packs/chaos-probe/page.tsx");
@@ -509,7 +509,7 @@ const chaosProbeClientTest = readText("apps/web/src/lib/__tests__/chaos-probe-pa
 const chaosProbeSdk = readText("packages/yunque-client/src/chaos-probe.ts") + "\n" + readText("packages/yunque-client/src/chaos-probe.test.ts");
 if (chaosProbeManifest) {
   if (!chaosProbeSource.includes(`const PackID = "${chaosProbeManifest.id}"`)) {
-    fail("Chaos Probe pack handler PackID must match packs/examples/chaos-probe-pack/pack.json");
+    fail("Chaos Probe pack handler PackID must match packs/official/chaos-probe-pack/pack.json");
   }
   for (const route of chaosProbeManifest.backend?.routes ?? []) {
     if (!chaosProbeSource.includes(route)) fail(`Chaos Probe handler missing route declared in manifest: ${route}`);
@@ -585,7 +585,7 @@ for (const token of ["chaosProbeStatus:", "chaosProbeRun:", "chaosProbeEvidence:
 }
 
 
-const cognitiveCanaryManifest = readJSON("packs/examples/cognitive-canary-pack/pack.json");
+const cognitiveCanaryManifest = readJSON("packs/official/cognitive-canary-pack/pack.json");
 const cognitiveCanarySource = readText("internal/packs/cognitivecanary/handler.go");
 const cognitiveCanaryGateTest = readText("internal/controlplane/gateway/handlers_cognitive_canary_pack_test.go");
 const cognitiveCanaryPage = readText("apps/web/src/app/packs/cognitive-canary/page.tsx");
@@ -594,7 +594,7 @@ const cognitiveCanaryClientTest = readText("apps/web/src/lib/__tests__/cognitive
 const cognitiveCanarySdk = readText("packages/yunque-client/src/cognitive-canary.ts") + "\n" + readText("packages/yunque-client/src/cognitive-canary.test.ts");
 if (cognitiveCanaryManifest) {
   if (!cognitiveCanarySource.includes(`const PackID = "${cognitiveCanaryManifest.id}"`)) {
-    fail("Cognitive Canary pack handler PackID must match packs/examples/cognitive-canary-pack/pack.json");
+    fail("Cognitive Canary pack handler PackID must match packs/official/cognitive-canary-pack/pack.json");
   }
   for (const route of cognitiveCanaryManifest.backend?.routes ?? []) {
     if (!cognitiveCanarySource.includes(route)) fail(`Cognitive Canary handler missing route declared in manifest: ${route}`);
@@ -638,7 +638,7 @@ for (const token of ["cognitiveCanaryStatus:", "cognitiveCanaryEvaluate:", "cogn
 }
 
 
-const rpaReplayManifest = readJSON("packs/examples/rpa-replay-pack/pack.json");
+const rpaReplayManifest = readJSON("packs/official/rpa-replay-pack/pack.json");
 const rpaReplaySource = readText("internal/packs/rpareplay/handler.go");
 const rpaReplayGateTest = readText("internal/controlplane/gateway/handlers_rpa_replay_pack_test.go");
 const rpaReplayPage = readText("apps/web/src/app/packs/rpa-replay/page.tsx");
@@ -647,7 +647,7 @@ const rpaReplayClientTest = readText("apps/web/src/lib/__tests__/rpa-replay-pack
 const rpaReplaySdk = readText("packages/yunque-client/src/rpa-replay.ts") + "\n" + readText("packages/yunque-client/src/rpa-replay.test.ts");
 if (rpaReplayManifest) {
   if (!rpaReplaySource.includes(`const PackID = "${rpaReplayManifest.id}"`)) {
-    fail("RPA Replay pack handler PackID must match packs/examples/rpa-replay-pack/pack.json");
+    fail("RPA Replay pack handler PackID must match packs/official/rpa-replay-pack/pack.json");
   }
   for (const route of rpaReplayManifest.backend?.routes ?? []) {
     if (!rpaReplaySource.includes(route)) fail(`RPA Replay handler missing route declared in manifest: ${route}`);
@@ -682,7 +682,7 @@ for (const token of ["rpaReplayStatus:", "createRPAReplayTrace:", "rpaReplay:", 
 }
 
 
-const sbomDriftManifest = readJSON("packs/examples/sbom-drift-pack/pack.json");
+const sbomDriftManifest = readJSON("packs/official/sbom-drift-pack/pack.json");
 const sbomDriftSource = readText("internal/packs/sbomdrift/handler.go");
 const sbomDriftGateTest = readText("internal/controlplane/gateway/handlers_sbom_drift_pack_test.go");
 const sbomDriftPage = readText("apps/web/src/app/packs/sbom-drift/page.tsx");
@@ -692,7 +692,7 @@ const sbomDriftSdk = readText("packages/yunque-client/src/sbom-drift.ts") + "\n"
 const sbomDriftClientContract = `${sbomDriftClient}\n${sbomDriftSdk}`;
 if (sbomDriftManifest) {
   if (!sbomDriftSource.includes(`const PackID = "${sbomDriftManifest.id}"`)) {
-    fail("SBOM Drift pack handler PackID must match packs/examples/sbom-drift-pack/pack.json");
+    fail("SBOM Drift pack handler PackID must match packs/official/sbom-drift-pack/pack.json");
   }
   for (const route of sbomDriftManifest.backend?.routes ?? []) {
     if (!sbomDriftSource.includes(route)) fail(`SBOM Drift handler missing route declared in manifest: ${route}`);
@@ -745,7 +745,7 @@ for (const token of ["sbomDriftStatus:", "createSBOMDriftSnapshot:", "sbomDriftD
 }
 
 
-const guardrailFuzzerManifest = readJSON("packs/examples/guardrail-fuzzer-pack/pack.json");
+const guardrailFuzzerManifest = readJSON("packs/official/guardrail-fuzzer-pack/pack.json");
 const guardrailFuzzerSource = readText("internal/packs/guardrailfuzzer/handler.go");
 const guardrailFuzzerGateTest = readText("internal/controlplane/gateway/handlers_guardrail_fuzzer_pack_test.go");
 const guardrailFuzzerPage = readText("apps/web/src/app/packs/guardrail-fuzzer/page.tsx");
@@ -754,7 +754,7 @@ const guardrailFuzzerClientTest = readText("apps/web/src/lib/__tests__/guardrail
 const guardrailFuzzerSdk = readText("packages/yunque-client/src/guardrail-fuzzer.ts") + "\n" + readText("packages/yunque-client/src/guardrail-fuzzer.test.ts");
 if (guardrailFuzzerManifest) {
   if (!guardrailFuzzerSource.includes(`const PackID = "${guardrailFuzzerManifest.id}"`)) {
-    fail("Guardrail Fuzzer pack handler PackID must match packs/examples/guardrail-fuzzer-pack/pack.json");
+    fail("Guardrail Fuzzer pack handler PackID must match packs/official/guardrail-fuzzer-pack/pack.json");
   }
   for (const route of guardrailFuzzerManifest.backend?.routes ?? []) {
     if (!guardrailFuzzerSource.includes(route)) fail(`Guardrail Fuzzer handler missing route declared in manifest: ${route}`);
@@ -796,7 +796,7 @@ for (const token of ["guardrailFuzzerStatus:", "guardrailFuzzerRun:", "guardrail
 }
 
 
-const memoryTimeTravelManifest = readJSON("packs/examples/memory-time-travel-pack/pack.json");
+const memoryTimeTravelManifest = readJSON("packs/official/memory-time-travel-pack/pack.json");
 const memoryTimeTravelSource = readText("internal/packs/memorytimetravel/handler.go");
 const memoryTimeTravelGateTest = readText("internal/controlplane/gateway/handlers_memory_time_travel_pack_test.go");
 const memoryTimeTravelPage = readText("apps/web/src/app/packs/memory-time-travel/page.tsx");
@@ -808,7 +808,7 @@ const memoryTimeTravelSdk = readText("packages/yunque-client/src/memory-time-tra
 const memoryTimeTravelClientContract = `${memoryTimeTravelClient}\n${memoryTimeTravelSdk}`;
 if (memoryTimeTravelManifest) {
   if (!memoryTimeTravelSource.includes(`const PackID = "${memoryTimeTravelManifest.id}"`)) {
-    fail("Memory Time Travel pack handler PackID must match packs/examples/memory-time-travel-pack/pack.json");
+    fail("Memory Time Travel pack handler PackID must match packs/official/memory-time-travel-pack/pack.json");
   }
   for (const route of memoryTimeTravelManifest.backend?.routes ?? []) {
     if (!memoryTimeTravelSource.includes(route)) fail(`Memory Time Travel handler missing route declared in manifest: ${route}`);
@@ -864,7 +864,7 @@ for (const token of ["memoryTimeTravelStatus:", "memoryTimeTravelDiff:", "memory
 }
 
 
-const skillAnomalyManifest = readJSON("packs/examples/skill-anomaly-pack/pack.json");
+const skillAnomalyManifest = readJSON("packs/official/skill-anomaly-pack/pack.json");
 const skillAnomalySource = readText("internal/packs/skillanomaly/handler.go");
 const skillAnomalyGateTest = readText("internal/controlplane/gateway/handlers_skill_anomaly_pack_test.go");
 const skillAnomalyPage = readText("apps/web/src/app/packs/skill-anomaly/page.tsx");
@@ -873,7 +873,7 @@ const skillAnomalyClientTest = readText("apps/web/src/lib/__tests__/skill-anomal
 const skillAnomalySdk = readText("packages/yunque-client/src/skill-anomaly.ts") + "\n" + readText("packages/yunque-client/src/skill-anomaly.test.ts");
 if (skillAnomalyManifest) {
   if (!skillAnomalySource.includes(`const PackID = "${skillAnomalyManifest.id}"`)) {
-    fail("Skill Anomaly pack handler PackID must match packs/examples/skill-anomaly-pack/pack.json");
+    fail("Skill Anomaly pack handler PackID must match packs/official/skill-anomaly-pack/pack.json");
   }
   for (const route of skillAnomalyManifest.backend?.routes ?? []) {
     if (!skillAnomalySource.includes(route)) fail(`Skill Anomaly handler missing route declared in manifest: ${route}`);
@@ -910,7 +910,7 @@ for (const token of ["skillAnomalyStatus:", "createSkillAnomalyEvent:", "skillAn
 }
 
 
-const wasmPluginManifest = readJSON("packs/examples/wasm-plugin-pack/pack.json");
+const wasmPluginManifest = readJSON("packs/official/wasm-plugin-pack/pack.json");
 const wasmPluginSource = readText("internal/packs/wasmplugin/handler.go");
 const wasmPluginGateTest = readText("internal/controlplane/gateway/handlers_wasm_plugin_pack_test.go");
 const wasmPluginPage = readText("apps/web/src/app/packs/wasm-plugin/page.tsx");
@@ -920,7 +920,7 @@ const wasmPluginSdk = readText("packages/yunque-client/src/wasm-plugin.ts") + "\
 const wasmPluginClientContract = `${wasmPluginClient}\n${wasmPluginSdk}`;
 if (wasmPluginManifest) {
   if (!wasmPluginSource.includes(`const PackID = "${wasmPluginManifest.id}"`)) {
-    fail("WASM Plugin pack handler PackID must match packs/examples/wasm-plugin-pack/pack.json");
+    fail("WASM Plugin pack handler PackID must match packs/official/wasm-plugin-pack/pack.json");
   }
   for (const route of wasmPluginManifest.backend?.routes ?? []) {
     if (!wasmPluginSource.includes(route)) fail(`WASM Plugin handler missing route declared in manifest: ${route}`);

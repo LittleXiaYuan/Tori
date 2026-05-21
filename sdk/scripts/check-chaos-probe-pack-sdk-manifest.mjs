@@ -201,7 +201,7 @@ for (const token of [
   "json-chaos-probe-evidence",
   'cfg.DataPath("chaos-probe")',
   "chaosprobepack.New",
-  "packs/examples/chaos-probe-pack/pack.json",
+  "packs/official/chaos-probe-pack/pack.json",
   "ensureBuiltinPacks",
   "TestChaosProbePackGateReturnsNotFoundWhenDisabled",
   "StatusMethodNotAllowed",

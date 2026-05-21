@@ -8,7 +8,7 @@
     "Keep global Approval Manager enqueue, Merkle audit append, Trust Score mutation, approval release, and runtime action execution blocked until explicit downstream wiring consumes the pack-local queue record.",
     "Let external projects import yunque-client/skill-anomaly only when the Skill Anomaly pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/skill-anomaly-pack/pack.json",
+  "packManifest": "packs/official/skill-anomaly-pack/pack.json",
   "sdkImport": "yunque-client/skill-anomaly",
   "routes": [
     "GET /v1/skill-anomaly/status",

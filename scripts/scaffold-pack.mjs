@@ -43,7 +43,7 @@ if (!routeMethod) {
   process.exit(1);
 }
 
-const packDir = resolve(repoRoot, "packs/examples", slug);
+const packDir = resolve(repoRoot, "packs/official", slug);
 const handlerDir = resolve(repoRoot, "internal/packs", slug.replaceAll("-", ""));
 const pageDir = resolve(repoRoot, "apps/web/src/app/packs", slug);
 const frontendClient = resolve(repoRoot, "apps/web/src/lib", `${slug}-pack-client.ts`);

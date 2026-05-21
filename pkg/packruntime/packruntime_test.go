@@ -220,7 +220,7 @@ func TestRegistryInstallEnableDisableAndRollback(t *testing.T) {
 	}
 	base := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
 	registry.now = func() time.Time { return base }
-	installed, err := registry.Install(backupManifest("0.1.0"), "packs/examples/backup-pack")
+	installed, err := registry.Install(backupManifest("0.1.0"), "packs/official/backup-pack")
 	if err != nil {
 		t.Fatalf("Install: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestRegistryOnChangeEmitsMutationEvents(t *testing.T) {
 		events = append(events, event)
 	})
 
-	if _, err := registry.Install(backupManifest("0.1.0"), "packs/examples/backup-pack"); err != nil {
+	if _, err := registry.Install(backupManifest("0.1.0"), "packs/official/backup-pack"); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 	if _, err := registry.Disable("yunque.pack.backup"); err != nil {
@@ -283,7 +283,7 @@ func TestRegistryOnChangeEmitsMutationEvents(t *testing.T) {
 	if _, err := registry.Enable("yunque.pack.backup"); err != nil {
 		t.Fatalf("Enable: %v", err)
 	}
-	if _, err := registry.Install(backupManifest("0.1.1"), "packs/examples/backup-pack"); err != nil {
+	if _, err := registry.Install(backupManifest("0.1.1"), "packs/official/backup-pack"); err != nil {
 		t.Fatalf("Install update: %v", err)
 	}
 	if _, err := registry.Rollback("yunque.pack.backup"); err != nil {

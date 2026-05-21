@@ -7,7 +7,7 @@
     "Keep browser method/path gates, frontend menu/route sync, and SDK import metadata in the pack manifest.",
     "Let external projects import yunque-client/browser only when the Browser Intent pack is installed and enabled."
   ],
-  "packManifest": "packs/examples/browser-intent-pack/pack.json",
+  "packManifest": "packs/official/browser-intent-pack/pack.json",
   "sdkImport": "yunque-client/browser",
   "routes": [
     "GET /v1/browser/status",
