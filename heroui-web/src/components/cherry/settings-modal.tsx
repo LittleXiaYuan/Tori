@@ -41,7 +41,8 @@ import {
 import { CherryModal } from "./overlay";
 import { api } from "@/lib/api";
 import type { VersionInfo } from "@/lib/api-types";
-import { createPacksClient } from "@/lib/packs-client";
+import { createPacksClient } from "yunque-client/packs";
+import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 import { loadTheme, patchAndApply, THEME_STORAGE_KEY } from "@/lib/theme-engine";
 
 export interface CherrySettingsModalProps {
@@ -50,7 +51,7 @@ export interface CherrySettingsModalProps {
   initialSection?: SectionId;
 }
 
-const packsClient = createPacksClient();
+const packsClient = createPacksClient(createYunqueSDKClientOptions());
 const BACKUP_PACK_ID = "yunque.pack.backup";
 
 type SectionId =

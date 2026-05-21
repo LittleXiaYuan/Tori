@@ -2,8 +2,9 @@
 
 import type React from "react";
 import { BrainCircuit, CircuitBoard, HardDriveDownload, Package, Puzzle } from "lucide-react";
-import { createPacksClient } from "@/lib/packs-client";
-import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "@/lib/pack-types";
+import { createPacksClient } from "yunque-client/packs";
+import type { InstalledPack, PackBackendRouteSpec, PackDistributionManifest, PackFrontendAssets, PackFrontendMenu } from "yunque-client/packs";
+import { createYunqueSDKClientOptions } from "@/lib/sdk-client";
 
 
 export interface PackSdkEntrypoint {
@@ -56,7 +57,7 @@ const packIconMap: Record<string, React.ReactNode> = {
   puzzle: <Puzzle size={16} />,
 };
 
-const packsClient = createPacksClient();
+const packsClient = createPacksClient(createYunqueSDKClientOptions());
 
 export function resolvePackIcon(name?: string): React.ReactNode {
   if (!name) return <Package size={16} />;

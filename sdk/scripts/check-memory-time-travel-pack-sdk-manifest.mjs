@@ -57,9 +57,11 @@ if (!(pack.backend?.capabilities ?? []).includes("memory_time_travel.audit.links
 const client = readRepoFile(manifest.frontend.client);
 for (const token of [
   "createMemoryTimeTravelPackClient",
-  "auditLinksWritebackPlan",
-  "auditLinksWritebackStore",
-  "auditLinksWritebackExecutorPlan",
+  "yunque-client/memory-time-travel",
+]) {
+  if (!client.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
+}
+for (const token of [
   "/v1/memory-time-travel/status",
   "/v1/memory-time-travel/snapshots",
   "/v1/memory-time-travel/snapshot-at",
@@ -85,7 +87,7 @@ for (const token of [
   "/v1/memory-time-travel/evidence/",
   "method: \"POST\"",
 ]) {
-  if (!client.includes(token)) fail(`memory-time-travel-pack-client missing token: ${token}`);
+  if (client.includes(token)) fail(`memory-time-travel-pack-client should not hard-code transport token: ${token}`);
 }
 
 const page = readRepoFile(manifest.frontend.page);
