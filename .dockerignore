@@ -36,7 +36,6 @@ apps/web/.next/
 apps/web/out/
 
 # ── Local-only content to keep out of online builds ──
-xiaoyu/
 doc/
 docs/
 apps/desktop/src-tauri/target*/

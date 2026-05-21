@@ -47,7 +47,6 @@ ledger/*.log
 yunque-agent/apps/browser-extension/
 yunque-agent/apps/desktop/
 yunque-agent/apps/desktop/src-tauri/target*/
-yunque-agent/xiaoyu/
 yunque-agent/.atomcode/
 yunque-agent/.tmp/
 yunque-agent/doc/
