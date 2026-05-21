@@ -33,6 +33,7 @@ import {
   type WASMPluginRemoteInstallApprovalWritebackPlan,
   type WASMPluginRemoteInstallInstallerContinuationPlan,
   type WASMPluginRemoteInstallInstallerDownloadWriteback,
+  type WASMPluginRemoteInstallInstallerRegistrationPlan,
   type WASMPluginRemoteInstallPackageInspectWriteback,
   type WASMPluginRemoteInstallPlan,
   type WASMPluginRemoteInstallSignatureVerificationWriteback,
@@ -288,6 +289,22 @@ function samplePackageInspectWriteback(slug: string) {
   );
 }
 
+function sampleInstallerRegistrationPlan(slug: string) {
+  return JSON.stringify(
+    {
+      slug,
+      request_key: "preview-request-key",
+      approved: true,
+      approved_by: "security",
+      reason:
+        "plan plugin registration handoff from verified package inspect record; keep extraction and plugin metadata writeback blocked",
+      metadata: { ticket: "WASM-REMOTE-REGISTRATION-1" },
+    },
+    null,
+    2,
+  );
+}
+
 export default function WASMPluginPackPage() {
   const [status, setStatus] = useState<WASMPluginStatus | null>(null);
   const [plugins, setPlugins] = useState<WASMPluginSummary[]>([]);
@@ -307,6 +324,7 @@ export default function WASMPluginPackPage() {
     | "remote-installer-download"
     | "remote-signature-verification"
     | "remote-package-inspect"
+    | "remote-installer-registration"
     | null
   >(null);
   const [error, setError] = useState<string | null>(null);
@@ -348,10 +366,8 @@ export default function WASMPluginPackPage() {
     useState(() => sampleInstallerDownloadWriteback("calculator-remote"));
   const [remoteInstallerDownload, setRemoteInstallerDownload] =
     useState<WASMPluginRemoteInstallInstallerDownloadWriteback | null>(null);
-  const [
-    remoteSignatureVerificationJSON,
-    setRemoteSignatureVerificationJSON,
-  ] = useState(() => sampleSignatureVerificationWriteback("calculator-remote"));
+  const [remoteSignatureVerificationJSON, setRemoteSignatureVerificationJSON] =
+    useState(() => sampleSignatureVerificationWriteback("calculator-remote"));
   const [remoteSignatureVerification, setRemoteSignatureVerification] =
     useState<WASMPluginRemoteInstallSignatureVerificationWriteback | null>(
       null,
@@ -361,6 +377,10 @@ export default function WASMPluginPackPage() {
   );
   const [remotePackageInspect, setRemotePackageInspect] =
     useState<WASMPluginRemoteInstallPackageInspectWriteback | null>(null);
+  const [remoteInstallerRegistrationJSON, setRemoteInstallerRegistrationJSON] =
+    useState(() => sampleInstallerRegistrationPlan("calculator-remote"));
+  const [remoteInstallerRegistration, setRemoteInstallerRegistration] =
+    useState<WASMPluginRemoteInstallInstallerRegistrationPlan | null>(null);
   const [inputJSON, setInputJSON] = useState(() =>
     JSON.stringify({ a: 1, b: 2 }, null, 2),
   );
@@ -567,6 +587,24 @@ export default function WASMPluginPackPage() {
     }
   };
 
+  const planInstallerRegistration = async () => {
+    setBusy("remote-installer-registration");
+    setError(null);
+    try {
+      const payload = JSON.parse(remoteInstallerRegistrationJSON);
+      const res =
+        await wasmPluginPack.remoteInstallInstallerRegistrationPlan(payload);
+      setRemoteInstallerRegistration(res.plan);
+      showToast("已生成 installer registration handoff 计划", "success");
+    } catch (e) {
+      setError(
+        formatErrorMessage(e, "生成 installer registration handoff 计划失败"),
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const setLoaded = async (loaded: boolean) => {
     const target = slug || selectedPlugin?.slug;
     if (!target) return;
@@ -744,6 +782,14 @@ export default function WASMPluginPackPage() {
                 {String(status?.package_inspect_writeback_ready ?? false)}
               </Chip>
               <Chip size="sm">
+                installer_registration_plan_ready:{" "}
+                {String(status?.installer_registration_plan_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
+                registration_ready:{" "}
+                {String(status?.registration_ready ?? false)}
+              </Chip>
+              <Chip size="sm">
                 installer_blocked_until_registration:{" "}
                 {String(status?.installer_blocked_until_registration ?? true)}
               </Chip>
@@ -764,9 +810,8 @@ export default function WASMPluginPackPage() {
               当前切片先把 WASM 插件注册、load/unload 生命周期、沙箱执行
               dry-run、权限计划、Host ABI plan preview、真实执行前 Host ABI
               execution gate、远程签名包安装计划、远程安装审批 gate
-              计划、审批决策 plan-only
-              预览、审批队列写回桥接计划、pack-local 审批队列 JSON
-              持久化和证据包放进可选 Pack。请求 ledger_kv /
+              计划、审批决策 plan-only 预览、审批队列写回桥接计划、pack-local
+              审批队列 JSON 持久化和证据包放进可选 Pack。请求 ledger_kv /
               memory_search / http_fetch / env_get 的插件在
               host_abi_enforcement_ready=false 时会被真实执行前阻断；本地 WASM
               模块 SHA-256 与注册元数据不一致时也会被 module integrity gate
@@ -774,15 +819,19 @@ export default function WASMPluginPackPage() {
               installer continuation 产出 handoff 计划；download writeback
               只把已审批包下载到 pack-local installer cache 并校验 SHA-256；
               signature verification writeback 再消费 installer-download-store，
-              对缓存包执行 Ed25519 验签，只写
-              signature-verification-store.json / record，不解包、不写
-              plugin_dir、不注册插件；package inspect writeback 再读取已验签缓存包，
-              只检查 tar.gz 内 manifest 与 WASM module 布局并写
-              package-inspect-store.json / record，不解包到 plugin_dir、不注册插件；
-              继续保持 remote_install_ready=false /
-              installer_ready=false / installer_blocked_until_registration=true。
-              后续 install 写回、插件注册、Host ABI 权限强执行和 TinyGo
-              示例会继续接入。
+              对缓存包执行 Ed25519 验签，只写 signature-verification-store.json
+              / record，不解包、不写 plugin_dir、不注册插件；package inspect
+              writeback 再读取已验签缓存包， 只检查 tar.gz 内 manifest 与 WASM
+              module 布局并写 package-inspect-store.json / record，不解包到
+              plugin_dir、不注册插件； installer registration handoff 继续消费
+              package-inspect-store.json 生成
+              installer-registration-handoff-plan.json /
+              plugin-registration-handoff-plan.json /
+              installer-audit-handoff-plan.json，
+              只说明后续注册写回需要的字段，不解包、不写插件文件、不注册元数据；
+              继续保持 remote_install_ready=false / installer_ready=false /
+              installer_blocked_until_registration=true。 后续 install
+              写回、插件注册、Host ABI 权限强执行和 TinyGo 示例会继续接入。
             </div>
           </div>
           <Button size="sm" variant="ghost" onPress={load}>
@@ -888,15 +937,17 @@ export default function WASMPluginPackPage() {
         <Card className="section-card p-4">
           <div className="kpi-label">Installer</div>
           <div className="kpi-value text-lg">
-            {status?.package_inspect_writeback_ready
-              ? "inspect"
-              : status?.signature_verification_writeback_ready
-              ? "verify"
-              : status?.installer_download_writeback_ready
-              ? "cache"
-              : status?.installer_continuation_plan_ready
-                ? "handoff"
-                : "pending"}
+            {status?.installer_registration_plan_ready
+              ? "register-plan"
+              : status?.package_inspect_writeback_ready
+                ? "inspect"
+                : status?.signature_verification_writeback_ready
+                  ? "verify"
+                  : status?.installer_download_writeback_ready
+                    ? "cache"
+                    : status?.installer_continuation_plan_ready
+                      ? "handoff"
+                      : "pending"}
           </div>
           <div className="kpi-label mt-1">
             ready: {String(status?.installer_ready ?? false)} · registration
@@ -1068,8 +1119,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_blocked_until_registration:{" "}
                 {String(
-                  remotePackageInspect
-                    ?.installer_blocked_until_registration ??
+                  remotePackageInspect?.installer_blocked_until_registration ??
                     status?.installer_blocked_until_registration ??
                     true,
                 )}
@@ -1087,6 +1137,139 @@ export default function WASMPluginPackPage() {
                 <TextArea
                   rows={11}
                   aria-label="WASM package inspect writeback result"
+                  className="font-mono text-xs"
+                  readOnly
+                />
+              </TextField>
+            )}
+          </Card>
+
+          <Card className="section-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck size={16} />
+                  Installer registration handoff 计划
+                </div>
+                <div
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--yunque-text-muted)" }}
+                >
+                  plan-only 契约：消费 package-inspect-store.json /
+                  package-inspect-record.json，确认 package_inspect_ready /
+                  signature_verified / manifest_found / wasm_module_found
+                  后，只生成 installer-registration-handoff-plan.json、
+                  plugin-registration-handoff-plan.json 与
+                  installer-audit-handoff-plan.json。它不解包、不写
+                  plugin_dir、不注册插件元数据、不加载 WASM，也不会把
+                  remote_install_ready / installer_ready 置为 true。
+                </div>
+              </div>
+              <Button
+                className="btn-accent"
+                isPending={busy === "remote-installer-registration"}
+                onPress={planInstallerRegistration}
+              >
+                生成注册 handoff
+              </Button>
+            </div>
+            <TextField
+              value={remoteInstallerRegistrationJSON}
+              onChange={setRemoteInstallerRegistrationJSON}
+            >
+              <TextArea
+                rows={7}
+                aria-label="WASM remote install installer registration plan JSON"
+                className="font-mono text-xs"
+              />
+            </TextField>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip size="sm">
+                installer_registration_plan_ready:{" "}
+                {String(
+                  remoteInstallerRegistration
+                    ?.installer_registration_plan_ready ??
+                    status?.installer_registration_plan_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                consumes_package_inspect_store:{" "}
+                {String(
+                  remoteInstallerRegistration
+                    ?.consumes_package_inspect_store ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                package_inspect_record_found:{" "}
+                {String(
+                  remoteInstallerRegistration
+                    ?.package_inspect_record_found ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                package_layout_ready:{" "}
+                {String(
+                  remoteInstallerRegistration?.package_layout_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                signature_verified:{" "}
+                {String(
+                  remoteInstallerRegistration?.signature_verified ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                approval_provided:{" "}
+                {String(
+                  remoteInstallerRegistration?.approval_provided ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                would_register_plugin:{" "}
+                {String(
+                  remoteInstallerRegistration?.would_register_plugin ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                registration_ready:{" "}
+                {String(
+                  remoteInstallerRegistration?.registration_ready ??
+                    status?.registration_ready ??
+                    false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                writes_files:{" "}
+                {String(remoteInstallerRegistration?.writes_files ?? false)}
+              </Chip>
+              <Chip size="sm">
+                remote_install_ready:{" "}
+                {String(
+                  remoteInstallerRegistration?.remote_install_ready ?? false,
+                )}
+              </Chip>
+              <Chip size="sm">
+                installs_plugin:{" "}
+                {String(remoteInstallerRegistration?.installs_plugin ?? false)}
+              </Chip>
+              <Chip size="sm">
+                artifact: installer-registration-handoff-plan.json
+              </Chip>
+              <Chip size="sm">
+                artifact: plugin-registration-handoff-plan.json
+              </Chip>
+              <Chip size="sm">artifact: installer-audit-handoff-plan.json</Chip>
+            </div>
+            {remoteInstallerRegistration && (
+              <TextField
+                className="mt-3"
+                value={JSON.stringify(remoteInstallerRegistration, null, 2)}
+                onChange={() => undefined}
+              >
+                <TextArea
+                  rows={11}
+                  aria-label="WASM installer registration handoff plan result"
                   className="font-mono text-xs"
                   readOnly
                 />
@@ -1177,8 +1360,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_blocked_until_installer_wiring:{" "}
                 {String(
-                  remoteInstallerPlan
-                    ?.installer_blocked_until_installer_wiring ??
+                  remoteInstallerPlan?.installer_blocked_until_installer_wiring ??
                     status?.installer_blocked_until_installer_wiring ??
                     true,
                 )}
@@ -1268,8 +1450,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_download_writeback_ready:{" "}
                 {String(
-                  remoteInstallerDownload
-                    ?.installer_download_writeback_ready ??
+                  remoteInstallerDownload?.installer_download_writeback_ready ??
                     status?.installer_download_writeback_ready ??
                     false,
                 )}
@@ -1279,8 +1460,7 @@ export default function WASMPluginPackPage() {
                 {String(remoteInstallerDownload?.download_ready ?? false)}
               </Chip>
               <Chip size="sm">
-                downloads:{" "}
-                {String(remoteInstallerDownload?.downloads ?? false)}
+                downloads: {String(remoteInstallerDownload?.downloads ?? false)}
               </Chip>
               <Chip size="sm">
                 network_access:{" "}
@@ -1288,9 +1468,7 @@ export default function WASMPluginPackPage() {
               </Chip>
               <Chip size="sm">
                 writes_package_cache:{" "}
-                {String(
-                  remoteInstallerDownload?.writes_package_cache ?? false,
-                )}
+                {String(remoteInstallerDownload?.writes_package_cache ?? false)}
               </Chip>
               <Chip size="sm">
                 writes_files:{" "}
@@ -1313,8 +1491,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_blocked_until_signature_verify:{" "}
                 {String(
-                  remoteInstallerDownload
-                    ?.installer_blocked_until_signature_verify ??
+                  remoteInstallerDownload?.installer_blocked_until_signature_verify ??
                     status?.installer_blocked_until_signature_verify ??
                     true,
                 )}
@@ -1356,11 +1533,10 @@ export default function WASMPluginPackPage() {
                   className="mt-1 text-xs"
                   style={{ color: "var(--yunque-text-muted)" }}
                 >
-                  验签写回边界：消费 pack-local
-                  installer-download-store.json / installer-download-record.json，
-                  读取缓存包并用审批记录中的 Ed25519 签名材料验证；只写
-                  signature-verification-store.json 与
-                  signature-verification-record.json。它不下载、不解包、不写
+                  验签写回边界：消费 pack-local installer-download-store.json /
+                  installer-download-record.json， 读取缓存包并用审批记录中的
+                  Ed25519 签名材料验证；只写 signature-verification-store.json
+                  与 signature-verification-record.json。它不下载、不解包、不写
                   plugin_dir、不注册插件，也不会把 remote_install_ready /
                   installer_ready 置为 true。
                 </div>
@@ -1387,8 +1563,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 signature_verification_writeback_ready:{" "}
                 {String(
-                  remoteSignatureVerification
-                    ?.signature_verification_writeback_ready ??
+                  remoteSignatureVerification?.signature_verification_writeback_ready ??
                     status?.signature_verification_writeback_ready ??
                     false,
                 )}
@@ -1421,8 +1596,8 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 writes_signature_verification_store:{" "}
                 {String(
-                  remoteSignatureVerification
-                    ?.writes_signature_verification_store ?? false,
+                  remoteSignatureVerification?.writes_signature_verification_store ??
+                    false,
                 )}
               </Chip>
               <Chip size="sm">
@@ -1442,8 +1617,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_blocked_until_registration:{" "}
                 {String(
-                  remoteSignatureVerification
-                    ?.installer_blocked_until_registration ??
+                  remoteSignatureVerification?.installer_blocked_until_registration ??
                     status?.installer_blocked_until_registration ??
                     true,
                 )}
@@ -1451,9 +1625,7 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 artifact: signature-verification-record.json
               </Chip>
-              <Chip size="sm">
-                artifact: signature-verification-store.json
-              </Chip>
+              <Chip size="sm">artifact: signature-verification-store.json</Chip>
             </div>
             {remoteSignatureVerification && (
               <TextField
@@ -1565,8 +1737,8 @@ export default function WASMPluginPackPage() {
               <Chip size="sm">
                 installer_blocked_until_installer_wiring:{" "}
                 {String(
-                  remoteQueueWriteback
-                    ?.installer_blocked_until_installer_wiring ?? true,
+                  remoteQueueWriteback?.installer_blocked_until_installer_wiring ??
+                    true,
                 )}
               </Chip>
               <Chip size="sm">
@@ -1739,7 +1911,8 @@ export default function WASMPluginPackPage() {
                   plan-only 契约：只把 approval-queue-entry.json 与
                   approval-decision-plan.json 串成 approval-writeback-plan.json
                   预览；该计划本身不写队列、不应用决策。真实队列写回请使用上方
-                  pack-local queue store 路由，installer continuation 仍需后续显式接线。
+                  pack-local queue store 路由，installer continuation
+                  仍需后续显式接线。
                 </div>
               </div>
               <Button
