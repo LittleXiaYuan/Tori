@@ -17,11 +17,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Button, Tooltip } from "@heroui/react";
 import {
-  BookOpen,
   Brain,
   LayoutGrid,
   LogOut,
-  MailWarning,
   MessageCircle,
   Moon,
   Puzzle,
@@ -50,12 +48,11 @@ interface QuickLink {
 
 /**
  * 常用功能直达，少而精；其它入口仍然在 ⌘K 命令面板里。
- * 顺序：对话最常用，往下递减。
+ * 工作台由头像承载；这里仅放行动、任务和记忆三段主路径。
  */
 const QUICK_LINKS: QuickLink[] = [
   { href: "/chat",      icon: <MessageCircle size={16} />, zh: "对话",   en: "Chat" },
   { href: "/missions",  icon: <Zap size={16} />,           zh: "任务",   en: "Missions" },
-  { href: "/knowledge", icon: <BookOpen size={16} />,      zh: "知识库", en: "Knowledge" },
   { href: "/memory",    icon: <Brain size={16} />,         zh: "记忆",   en: "Memory" },
 ];
 
@@ -86,6 +83,7 @@ export default function AccountRail() {
             href: `/ext/${t.key}`,
             label: t.label,
             group: "扩展" as const,
+            layer: "pack" as const,
             icon: <Puzzle size={16} />,
             keywords: `${t.label} ${t.label_en || ""} extension ${t.key}`,
           })),
@@ -103,6 +101,7 @@ export default function AccountRail() {
             href: item.href,
             label: item.label,
             group: "扩展" as const,
+            layer: "pack" as const,
             icon: item.icon,
             keywords: item.keywords,
           })),
@@ -248,7 +247,6 @@ export default function AccountRail() {
       help: zh ? "帮助" : "Help",
       logout: zh ? "退出" : "Logout",
       locale: zh ? "English" : "中文",
-      inbox: zh ? "收件箱" : "Inbox",
       themeLight: zh ? "切换到亮色" : "Switch to Light",
       themeDark: zh ? "切换到暗色" : "Switch to Dark",
     };
@@ -379,22 +377,6 @@ export default function AccountRail() {
           </Tooltip.Content>
         </Tooltip>
 
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <Button
-              size="sm"
-              variant="ghost"
-              isIconOnly
-              className="account-rail-btn"
-              data-active={pathname === "/inbox" || undefined}
-              onPress={() => router.push("/inbox")}
-              aria-label={ui.inbox}
-            >
-              <MailWarning size={16} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content placement="right">{ui.inbox}</Tooltip.Content>
-        </Tooltip>
       </div>
 
       <div className="account-rail-bottom">

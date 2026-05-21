@@ -12,7 +12,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Yunque Agent",
-  description: "Yunque Agent - Powered by HeroUI",
+  description: "本地优先的个人 AI 工作伙伴：从场景到行动、产物、反馈和记忆。",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

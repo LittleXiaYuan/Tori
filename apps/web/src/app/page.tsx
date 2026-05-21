@@ -13,9 +13,9 @@ import { api } from "@/lib/api";
 // Go sidecar isn't up yet.
 //
 // Branches:
-//   1. LLM fully configured         → /chat (primary workspace)
+//   1. LLM fully configured         → /dashboard (scenario-first workspace)
 //   2. First run, nothing bound yet → /setup (choose Tori vs API key)
-//   3. Probe failed (backend down)  → /chat (let that page show the error)
+//   3. Probe failed (backend down)  → /dashboard (let the shell show the error)
 export default function Home() {
   const router = useRouter();
 
@@ -31,9 +31,9 @@ export default function Home() {
         if (cancelled) return;
 
         const needsSetup = Boolean(env?.first_run) && !tori?.bound;
-        router.replace(needsSetup ? "/setup" : "/chat");
+        router.replace(needsSetup ? "/setup" : "/dashboard");
       } catch {
-        if (!cancelled) router.replace("/chat");
+        if (!cancelled) router.replace("/dashboard");
       }
     })();
     return () => {

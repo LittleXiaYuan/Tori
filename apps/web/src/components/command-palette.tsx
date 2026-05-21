@@ -46,6 +46,7 @@ export default function CommandPalette() {
             href: `/ext/${t.key}`,
             label: t.label,
             group: "扩展",
+            layer: "pack" as const,
             icon: <Puzzle size={16} />,
             keywords: `${t.label} ${t.label_en || ""} extension ${t.key}`,
           })),
@@ -62,6 +63,7 @@ export default function CommandPalette() {
           href: item.href,
           label: item.label,
           group: "扩展",
+          layer: "pack" as const,
           icon: item.icon,
           keywords: item.keywords,
         })));
@@ -230,7 +232,7 @@ export default function CommandPalette() {
           <input
             ref={inputRef}
             className="cmd-input"
-            placeholder="搜索页面、知识、任务，或浏览下方分类…"
+            placeholder="搜索任务、记忆、页面，或打开可选能力…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
