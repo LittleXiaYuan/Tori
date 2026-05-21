@@ -1443,8 +1443,9 @@
   ],
   "scripts": {
     "generate": "node scripts/generate-openapi.mjs",
-    "typecheck": "tsc --noEmit",
-    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "check:root-boundary": "node scripts/check-root-boundary.mjs",
+    "typecheck": "npm run check:root-boundary && tsc --noEmit",
+    "typecheck:test": "npm run check:root-boundary && tsc --noEmit -p tsconfig.test.json",
     "test": "npm run check:incremental && npm run typecheck:test && node scripts/run-incremental-tests.mjs",
     "check:incremental": "node scripts/check-incremental-coverage.mjs",
     "check:state-manifest": "node ../scripts/check-state-sdk-manifest.mjs",

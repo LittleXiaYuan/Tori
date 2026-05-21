@@ -17,8 +17,7 @@ import { useState, useCallback, useEffect, useMemo, useTransition } from "react"
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
-
-type ProfileMode = "easy" | "full";
+import { PROFILE_MODE_KEY, readProfileMode, writeProfileMode, type ProfileMode } from "@/lib/profile-mode";
 
 interface NavItem {
   href: string;
@@ -63,7 +62,7 @@ const categories: NavCategory[] = [
     { href: "/heartbeat", label: "心跳", labelEn: "Heartbeat", icon: <HeartPulse size={16} />, tier: "full" },
   ]},
   { id: "system", label: "系统", labelEn: "System", icon: <ShieldCheck size={16} />, children: [
-    { href: "/models", label: "模型", labelEn: "Models", icon: <Cpu size={16} />, tier: "easy" },
+    { href: "/models", label: "模型", labelEn: "Models", icon: <Cpu size={16} />, tier: "full" },
     { href: "/metrics", label: "指标", labelEn: "Metrics", icon: <BarChart3 size={16} />, tier: "full" },
     { href: "/approvals", label: "审批", labelEn: "Approvals", icon: <ShieldCheck size={16} />, tier: "full" },
     { href: "/audit", label: "审计", labelEn: "Audit", icon: <Shield size={16} />, tier: "full" },
@@ -86,16 +85,6 @@ function resolveIcon(name: string): React.ReactNode {
 
 const COLLAPSED_KEY = "yunque_sidebar_collapsed";
 const EXPANDED_KEY = "yunque_sidebar_groups";
-const PROFILE_KEY = "yunque_profile_mode";
-
-function getStoredProfile(): ProfileMode {
-  if (typeof window === "undefined") return "full";
-  try {
-    const v = localStorage.getItem(PROFILE_KEY);
-    return v === "easy" ? "easy" : "full";
-  } catch { return "full"; }
-}
-
 function filterByProfile(cats: NavCategory[], mode: ProfileMode): NavCategory[] {
   if (mode === "full") return cats;
   return cats
@@ -131,7 +120,15 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [, startTransition] = useTransition();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(getStoredGroups);
-  const [profileMode, setProfileMode] = useState<ProfileMode>(getStoredProfile);
+  const [profileMode, setProfileMode] = useState<ProfileMode>(readProfileMode);
+
+  useEffect(() => {
+    const handleProfileModeChange = (event: StorageEvent) => {
+      if (event.key === PROFILE_MODE_KEY) setProfileMode(readProfileMode());
+    };
+    window.addEventListener("storage", handleProfileModeChange);
+    return () => window.removeEventListener("storage", handleProfileModeChange);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -160,7 +157,7 @@ export default function Sidebar() {
   const toggleProfileMode = useCallback(() => {
     setProfileMode((prev) => {
       const next: ProfileMode = prev === "easy" ? "full" : "easy";
-      localStorage.setItem(PROFILE_KEY, next);
+      writeProfileMode(next);
       return next;
     });
   }, []);

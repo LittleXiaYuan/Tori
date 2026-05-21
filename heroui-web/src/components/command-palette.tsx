@@ -6,8 +6,9 @@ import {
   Puzzle, Search, FileText, ArrowRight, Sparkles, Layers,
 } from "lucide-react";
 import { api, SearchResult } from "@/lib/api";
-import { NAV_ITEMS, NAV_GROUP_ORDER, type NavItem, type NavGroup } from "@/lib/nav-items";
+import { NAV_ITEMS, NAV_GROUP_ORDER, filterNavItemsByProfile, type NavItem, type NavGroup } from "@/lib/nav-items";
 import { buildPackNavItems, fetchEnabledPacks } from "@/lib/pack-sync";
+import { PROFILE_MODE_KEY, readProfileMode, writeProfileMode } from "@/lib/profile-mode";
 
 interface CommandItem {
   id: string;
@@ -28,6 +29,7 @@ export default function CommandPalette() {
   const [searching, setSearching] = useState(false);
   const [extItems, setExtItems] = useState<NavItem[]>([]);
   const [packItems, setPackItems] = useState<NavItem[]>([]);
+  const [profileMode, setProfileMode] = useState(readProfileMode);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -65,6 +67,14 @@ export default function CommandPalette() {
         })));
       })
       .catch(() => setPackItems([]));
+  }, []);
+
+  useEffect(() => {
+    const handleProfileModeChange = (event: StorageEvent) => {
+      if (event.key === PROFILE_MODE_KEY) setProfileMode(readProfileMode());
+    };
+    window.addEventListener("storage", handleProfileModeChange);
+    return () => window.removeEventListener("storage", handleProfileModeChange);
   }, []);
 
   const close = useCallback(() => {
@@ -117,9 +127,13 @@ export default function CommandPalette() {
     return () => clearTimeout(timerRef.current);
   }, [query]);
 
+  const visibleNavItems = useMemo(
+    () => filterNavItemsByProfile([...NAV_ITEMS, ...packItems, ...extItems], profileMode),
+    [extItems, packItems, profileMode],
+  );
+
   const navCommands: CommandItem[] = useMemo(() => {
-    const all = [...NAV_ITEMS, ...packItems, ...extItems];
-    const isEasy = typeof window !== "undefined" && localStorage.getItem("yunque_profile_mode") === "easy";
+    const isEasy = profileMode === "easy";
     const profileCmd: CommandItem = {
       id: "profile-toggle",
       label: isEasy ? "切换到完整模式" : "切换到轻松模式",
@@ -128,15 +142,14 @@ export default function CommandPalette() {
       keywords: "easy full simple profile mode 简洁 轻松 完整 专家 switch toggle",
       action: () => {
         const next = isEasy ? "full" : "easy";
-        localStorage.setItem("yunque_profile_mode", next);
-        window.dispatchEvent(new StorageEvent("storage", { key: "yunque_profile_mode", newValue: next }));
+        writeProfileMode(next);
         window.location.reload();
         close();
       },
     };
     return [
       profileCmd,
-      ...all.map((item) => ({
+      ...visibleNavItems.map((item) => ({
         ...item,
         action: () => {
           if (item.href) router.push(item.href);
@@ -144,7 +157,7 @@ export default function CommandPalette() {
         },
       })),
     ];
-  }, [extItems, packItems, router, close]);
+  }, [profileMode, router, close, visibleNavItems]);
 
   const q = query.toLowerCase();
   const filteredNav = q
@@ -193,11 +206,11 @@ export default function CommandPalette() {
 
   const navByGroup = useMemo(() => {
     const out: Record<string, NavItem[]> = {};
-    for (const it of [...NAV_ITEMS, ...packItems, ...extItems]) {
+    for (const it of visibleNavItems) {
       (out[it.group] ??= []).push(it);
     }
     return out;
-  }, [extItems, packItems]);
+  }, [visibleNavItems]);
 
   if (!open) return null;
 

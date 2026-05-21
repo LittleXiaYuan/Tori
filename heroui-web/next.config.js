@@ -40,6 +40,9 @@ const nextConfig = {
   ...(isProd ? { output: "export" } : {}),
   images: { unoptimized: true },
   transpilePackages: ["yunque-client"],
+  experimental: {
+    externalDir: true,
+  },
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   trailingSlash: true,
   // 关掉 dev 模式左下角的 "Rendering..."/编译状态浮标：放在桌面应用里

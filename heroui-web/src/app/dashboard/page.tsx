@@ -22,6 +22,7 @@ import {
 import { usePolling } from "@/lib/use-polling";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { formatErrorMessage } from "@/lib/error-utils";
+import { DASHBOARD_SCENARIOS, scenarioChatHref } from "@/lib/product-scenarios";
 
 /* ── helpers ───────────────────────────────────── */
 
@@ -205,8 +206,9 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">概览</h1>
+          <h1 className="page-title">工作台</h1>
           <div className="page-subtitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span>先选场景，再验收产物</span>
             <span className={`status-dot ${metrics ? "status-dot--online" : "status-dot--offline"}`} />
             {metrics ? "运行中" : "离线"}
             {version ? ` · v${version.version}` : ""}
@@ -365,22 +367,27 @@ export default function DashboardPage() {
         {/* Right sidebar: stacked info cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
 
-          {/* Quick Actions */}
+          {/* Scenario launcher */}
           <div className="section-card" style={{ padding: "var(--card-pad-sm)" }}>
-            <div className="section-title">快捷操作</div>
+            <div className="section-title">从一个场景开始</div>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--yunque-text-muted)", margin: "-2px 0 var(--sp-3)" }}>
+              云雀会从 Chat 出发，把目标推进到行动、产物和可验收结论。
+            </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-              {[
-                { icon: <MessageCircle size={14} />, label: "新建对话", href: "/chat", accent: "var(--yunque-accent)" },
-                { icon: <Zap size={14} />, label: "创建任务", href: "/missions", accent: "var(--yunque-warning)" },
-                { icon: <Settings size={14} />, label: "系统设置", href: "/settings", accent: "var(--yunque-text-muted)" },
-              ].map(a => (
+              {DASHBOARD_SCENARIOS.map(a => (
                 <button
-                  key={a.href}
-                  onClick={() => router.push(a.href)}
+                  key={a.id}
+                  onClick={() => router.push(scenarioChatHref(a.prompt))}
                   className="quick-action-btn"
+                  style={{ alignItems: "flex-start", padding: "10px 12px" }}
                 >
-                  <span style={{ color: a.accent, display: "flex" }}>{a.icon}</span>
-                  {a.label}
+                  <span style={{ color: "var(--yunque-accent)", display: "flex", marginTop: 2 }}>{a.icon}</span>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                    <span>{a.label}</span>
+                    <span style={{ fontSize: "var(--text-2xs)", color: "var(--yunque-text-muted)", lineHeight: 1.4 }}>
+                      {a.description}
+                    </span>
+                  </span>
                   <ArrowRight size={11} className="ml-auto" style={{ opacity: 0.4 }} />
                 </button>
               ))}
